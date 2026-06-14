@@ -525,6 +525,7 @@ function showScreen(id,push=true){
   if(fabSoap) fabSoap.style.display=(id==='screen-expediente'&&currentPatient)?'flex':'none';
 }
 function goBack(){
+  if(typeof consentStream!=='undefined'&&consentStream){ consentStream.getTracks().forEach(t=>t.stop()); consentStream=null; }
   screenStack.pop();
   const prev=screenStack[screenStack.length-1]||'screen-agenda';
   showScreen(prev,false);
@@ -715,7 +716,9 @@ function renderExpediente(tab='historia'){
     if(hasAllergy) html+=`<div class="allergy-box">🚫 Alergia: ${p.alergias}</div>`;
     html+=`
     <div class="section-card">
-      <div class="section-title">📋 Datos generales</div>
+      <div class="section-title">📋 Datos generales
+        <button onclick="editarHistoria('generales')" style="margin-left:auto;background:var(--navy);color:white;border:none;border-radius:20px;padding:3px 12px;font-size:11px;font-weight:700;cursor:pointer">✏️ Editar</button>
+      </div>
       <div class="field-row"><div class="field-label">Médico referente</div><div class="field-value">${p.medicoReferente||'—'}</div></div>
       <div class="field-row"><div class="field-label">Terapeuta</div><div class="field-value">${p.terapeuta}</div></div>
       <div class="field-row"><div class="field-label">Diagnóstico</div><div class="field-value">${p.dx}</div></div>
@@ -723,7 +726,9 @@ function renderExpediente(tab='historia'){
       <div class="field-row"><div class="field-label">Alergias</div><div class="field-value" style="color:${hasAllergy?'#AD1457':'inherit'}">${p.alergias}</div></div>
     </div>
     <div class="section-card">
-      <div class="section-title">🏥 Antecedentes</div>
+      <div class="section-title">🏥 Antecedentes
+        <button onclick="editarHistoria('antecedentes')" style="margin-left:auto;background:var(--navy);color:white;border:none;border-radius:20px;padding:3px 12px;font-size:11px;font-weight:700;cursor:pointer">✏️ Editar</button>
+      </div>
       <div class="field-row"><div class="field-label">Patológicos</div><div class="field-value">${p.antecedentes.patologicos}</div></div>
       <div class="field-row"><div class="field-label">Deportivos</div><div class="field-value">${p.antecedentes.deportivos}</div></div>
       <div class="field-row"><div class="field-label">Deporte / frecuencia</div><div class="field-value">${p.antecedentes.deporteFrecuencia}</div></div>
@@ -731,7 +736,9 @@ function renderExpediente(tab='historia'){
       <div class="field-row"><div class="field-label">Medicamentos</div><div class="field-value">${p.antecedentes.medicamentos}</div></div>
     </div>
     <div class="section-card">
-      <div class="section-title">💬 Motivo de consulta</div>
+      <div class="section-title">💬 Motivo de consulta
+        <button onclick="editarHistoria('motivo')" style="margin-left:auto;background:var(--navy);color:white;border:none;border-radius:20px;padding:3px 12px;font-size:11px;font-weight:700;cursor:pointer">✏️ Editar</button>
+      </div>
       <div class="field-row"><div class="field-label">Dx médico</div><div class="field-value">${p.motivo.dxMedico}</div></div>
       <div class="field-row"><div class="field-label">Padecimiento</div><div class="field-value narrative">${p.motivo.padecimiento}</div></div>
       <div class="field-row"><div class="field-label">Mecanismo</div><div class="field-value">${p.motivo.mecanismo}</div></div>
@@ -745,7 +752,9 @@ function renderExpediente(tab='historia'){
     const v=p.valoracion;
     html+=`
     <div class="section-card">
-      <div class="section-title">📊 Valoración inicial</div>
+      <div class="section-title">📊 Valoración inicial
+        <button onclick="editarHistoria('valoracion')" style="margin-left:auto;background:var(--navy);color:white;border:none;border-radius:20px;padding:3px 12px;font-size:11px;font-weight:700;cursor:pointer">✏️ Editar</button>
+      </div>
       <div class="field-row"><div class="field-label">Dolor (EVA)</div>
         <div class="field-value"><div style="display:flex;align-items:center;gap:8px;"><div class="eva-num ${getEvaClass(v.eva)}">${v.eva}</div><span style="font-size:13px;color:#5A6478;">/10</span></div></div></div>
       <div class="field-row"><div class="field-label">Inflamación</div><div class="field-value">${v.inflamacion}</div></div>
@@ -758,7 +767,9 @@ function renderExpediente(tab='historia'){
       <div class="field-row"><div class="field-label">🚩 Banderas rojas</div><div class="field-value" style="color:${v.banderasRojas!=='Ninguna'?'var(--red)':'var(--green)'};font-weight:600;">${v.banderasRojas}</div></div>
     </div>
     <div class="section-card">
-      <div class="section-title">🔎 Diagnóstico funcional</div>
+      <div class="section-title">🔎 Diagnóstico funcional
+        <button onclick="editarHistoria('dxfuncional')" style="margin-left:auto;background:var(--navy);color:white;border:none;border-radius:20px;padding:3px 12px;font-size:11px;font-weight:700;cursor:pointer">✏️ Editar</button>
+      </div>
       <div class="field-row"><div class="field-label">Dx clínico</div><div class="field-value">${p.dxFuncional.dxClinico}</div></div>
       <div class="field-row"><div class="field-label">Dx funcional</div><div class="field-value narrative">${p.dxFuncional.dxFuncional}</div></div>
       <div class="field-row"><div class="field-label">Limitaciones</div><div class="field-value">${p.dxFuncional.limitaciones}</div></div>
@@ -767,7 +778,9 @@ function renderExpediente(tab='historia'){
       <div class="field-row"><div class="field-label">Pronóstico</div><div class="field-value">${p.dxFuncional.pronostico}</div></div>
     </div>
     <div class="section-card">
-      <div class="section-title">🎯 Plan de tratamiento</div>
+      <div class="section-title">🎯 Plan de tratamiento
+        <button onclick="editarHistoria('plan')" style="margin-left:auto;background:var(--navy);color:white;border:none;border-radius:20px;padding:3px 12px;font-size:11px;font-weight:700;cursor:pointer">✏️ Editar</button>
+      </div>
       <div class="field-row"><div class="field-label">Frecuencia</div><div class="field-value">${p.planTto.frecuencia}</div></div>
       <div class="field-row"><div class="field-label">Sesiones</div><div class="field-value">${p.planTto.sesiones}</div></div>
       <div class="field-row"><div class="field-label">Ejercicio</div><div class="field-value">${p.planTto.ejercicioTerapeutico}</div></div>
@@ -1157,6 +1170,8 @@ function previewMedia(pid,tipo,i){
 // ── CONSENTIMIENTO INFORMADO ───────────────────────────────────────────────
 function showConsentimiento(){
   if(!currentPatient) return;
+  fotoIdData=null;
+  if(consentStream){ consentStream.getTracks().forEach(t=>t.stop()); consentStream=null; }
   document.getElementById('consent-topbar-meta').textContent=currentPatient.name;
   screenStack.push('screen-consent');showScreen('screen-consent',false);
   renderConsentForm();
@@ -1298,17 +1313,68 @@ function renderConsentForm(){
         </div>
       </div>
 
+      <!-- CÁMARA + FIRMA SIMULTÁNEAS -->
+      <div style="font-size:12px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">
+        📸 Cámara frontal + ✍️ Firma — al mismo tiempo <span style="color:var(--red)">*</span>
+      </div>
+      <div style="font-size:12px;color:var(--gray-400);margin-bottom:10px;line-height:1.5">
+        La cámara se activa mientras el paciente firma. Ambos quedan registrados juntos como evidencia.
+      </div>
+
+      <!-- LAYOUT: cámara arriba, firma abajo -->
+      <div id="consent-cam-start" style="margin-bottom:10px">
+        <button onclick="startConsentCamera()" style="width:100%;background:var(--navy);color:white;border:none;border-radius:var(--radius);padding:14px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:10px">
+          <span style="font-size:20px">🤳</span> Activar cámara frontal
+        </button>
+        <div style="font-size:11px;color:var(--gray-400);text-align:center;margin-top:6px">
+          Safari pedirá permiso — toca Permitir
+        </div>
+      </div>
+
+      <!-- Video en vivo (visible mientras firma) -->
+      <div id="consent-cam-live" style="display:none;margin-bottom:10px">
+        <div style="position:relative;border-radius:var(--radius-sm);overflow:hidden;background:#000">
+          <video id="consent-video" autoplay playsinline muted style="width:100%;display:block;border-radius:var(--radius-sm);transform:scaleX(-1);max-height:180px;object-fit:cover"></video>
+          <div style="position:absolute;top:6px;left:0;right:0;text-align:center">
+            <span style="background:rgba(192,57,43,.85);color:white;font-size:10px;font-weight:700;padding:3px 10px;border-radius:20px">🔴 CÁMARA ACTIVA — Firme abajo</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Foto capturada -->
+      <div id="consent-cam-done" style="display:none;margin-bottom:10px;text-align:center">
+        <div style="position:relative;display:inline-block">
+          <img id="consent-foto-img" style="width:120px;height:120px;object-fit:cover;border-radius:10px;border:3px solid var(--green)">
+          <div style="position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,.65);color:white;font-size:9px;font-weight:700;padding:3px;border-radius:0 0 7px 7px">IDENTIDAD VERIFICADA · ${fechaHoy} ${horaHoy}</div>
+        </div>
+        <div style="font-size:12px;color:var(--green);font-weight:700;margin-top:6px">✅ Foto capturada al momento de firma</div>
+        <button onclick="retakeConsentPhoto()" style="background:none;border:1px solid var(--gray-200);border-radius:var(--radius-sm);padding:5px 12px;font-size:11px;color:var(--gray-400);cursor:pointer;font-family:inherit;margin-top:4px">Volver a tomar</button>
+      </div>
+
+      <!-- Canvas oculto para captura -->
+      <canvas id="consent-cap-canvas" style="display:none"></canvas>
+
       <!-- FIRMA DIGITAL -->
       <div style="font-size:12px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">
         ✍️ Firma digital <span style="color:var(--red)">*</span>
       </div>
       <div class="consent-canvas-wrap" id="canvas-wrap">
         <canvas id="sig-canvas" height="160"></canvas>
-        <div class="canvas-label">Firma aquí con el dedo</div>
+        <div class="canvas-label">Firma aquí con el dedo mientras la cámara está activa</div>
       </div>
       <div style="display:flex;gap:8px;margin-top:8px;align-items:center">
         <button class="btn-clear-sig" onclick="sigMain&&sigMain.clear()">Borrar firma</button>
-        <span style="font-size:11px;color:var(--gray-400)">Registro electrónico: fecha, hora y evidencia de aceptación</span>
+        <span style="font-size:11px;color:var(--gray-400)">Registro electrónico: fecha, hora y evidencia</span>
+      </div>
+
+      <!-- Botón capturar foto (aparece después de activar cámara) -->
+      <div id="consent-cap-btn-wrap" style="display:none;margin-top:10px">
+        <button onclick="captureConsentPhoto()" style="width:100%;background:var(--gold);color:var(--navy-dark);border:none;border-radius:var(--radius);padding:12px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">
+          📸 Capturar foto de identidad ahora
+        </button>
+        <div style="font-size:11px;color:var(--gray-400);text-align:center;margin-top:4px">
+          Toca este botón mientras el paciente está firmando arriba
+        </div>
       </div>
     </div>
   </div>
@@ -1346,6 +1412,65 @@ function renderConsentForm(){
 
 
 // Cámara de identidad — pendiente de implementar con HTTPS (GitHub Pages)
+// ── CÁMARA CONSENTIMIENTO ─────────────────────────────────────────────────
+let consentStream = null;
+
+async function startConsentCamera(){
+  try {
+    consentStream = await navigator.mediaDevices.getUserMedia({
+      video:{ facingMode:'user', width:{ideal:640}, height:{ideal:480} },
+      audio:false
+    });
+    const video = document.getElementById('consent-video');
+    if(video){ video.srcObject = consentStream; }
+    document.getElementById('consent-cam-start').style.display = 'none';
+    document.getElementById('consent-cam-live').style.display = 'block';
+    document.getElementById('consent-cap-btn-wrap').style.display = 'block';
+    showToast('🎥 Cámara activa — el paciente puede firmar ahora');
+  } catch(err){
+    showToast('Permiso de cámara denegado — solo se guardará la firma','error');
+    document.getElementById('consent-cam-start').innerHTML = `
+      <div style="background:var(--amber-light);border-radius:var(--radius-sm);padding:10px 12px;font-size:12px;color:var(--amber);font-weight:600">
+        ⚠️ Cámara no disponible — el consentimiento se guardará solo con firma digital
+      </div>`;
+  }
+}
+
+function captureConsentPhoto(){
+  const video = document.getElementById('consent-video');
+  const canvas = document.getElementById('consent-cap-canvas');
+  if(!video || !canvas) return;
+  canvas.width = video.videoWidth || 320;
+  canvas.height = video.videoHeight || 240;
+  const ctx = canvas.getContext('2d');
+  ctx.translate(canvas.width, 0);
+  ctx.scale(-1, 1);
+  ctx.drawImage(video, 0, 0);
+  fotoIdData = canvas.toDataURL('image/jpeg', 0.85);
+  // stop stream
+  if(consentStream){ consentStream.getTracks().forEach(t=>t.stop()); consentStream=null; }
+  // show captured
+  const img = document.getElementById('consent-foto-img');
+  if(img) img.src = fotoIdData;
+  document.getElementById('consent-cam-live').style.display = 'none';
+  document.getElementById('consent-cap-btn-wrap').style.display = 'none';
+  document.getElementById('consent-cam-done').style.display = 'block';
+  showToast('✅ Foto capturada junto con la firma','success');
+}
+
+function retakeConsentPhoto(){
+  fotoIdData = null;
+  if(consentStream){ consentStream.getTracks().forEach(t=>t.stop()); consentStream=null; }
+  document.getElementById('consent-cam-done').style.display = 'none';
+  document.getElementById('consent-cam-live').style.display = 'none';
+  document.getElementById('consent-cap-btn-wrap').style.display = 'none';
+  document.getElementById('consent-cam-start').style.display = 'block';
+  document.getElementById('consent-cam-start').innerHTML = `
+    <button onclick="startConsentCamera()" style="width:100%;background:var(--navy);color:white;border:none;border-radius:var(--radius);padding:14px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:10px">
+      <span style="font-size:20px">🤳</span> Activar cámara frontal
+    </button>
+    <div style="font-size:11px;color:var(--gray-400);text-align:center;margin-top:6px">Safari pedirá permiso — toca Permitir</div>`;
+}
 
 function togglePuncion(){
   const sec=document.getElementById('puncion-section');
@@ -1374,6 +1499,8 @@ function guardarConsentimiento(){
       if(!sigTutor||sigTutor.isEmpty()){showToast('Se requiere la firma del tutor','error');return}
     }
   }
+  // Stop camera if still running
+  if(consentStream){ consentStream.getTracks().forEach(t=>t.stop()); consentStream=null; }
   const ahora=new Date();
   const firma=sigMain.canvas.toDataURL('image/png');
   const firmaPS=sigPS&&!sigPS.isEmpty()?sigPS.canvas.toDataURL('image/png'):null;
@@ -1381,6 +1508,7 @@ function guardarConsentimiento(){
   currentPatient.consentimiento={
     firmado:true,
     firma, firmaPS, firmaTutor,
+    fotoIdentidad: fotoIdData||null,
     fecha:ahora.toLocaleDateString('es-MX',{day:'2-digit',month:'2-digit',year:'numeric'}),
     hora:ahora.toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'}),
     nombre,
@@ -1390,6 +1518,7 @@ function guardarConsentimiento(){
     tel:document.getElementById('con-tel')?.value.trim()||null,
     emergencia:document.getElementById('con-emergencia')?.value.trim()||null,
   };
+  fotoIdData=null;
   saveDB('pts',patientsDB);
   const saved=document.getElementById('sig-saved');
   if(saved) saved.style.display='block';
@@ -1527,6 +1656,187 @@ function guardarNuevoPaciente(){
   patientsDB.push(nuevo);saveDB('pts',patientsDB);
   showToast('✅ Expediente creado','success');
   goBack();renderAgenda();
+}
+
+// ── EDITAR HISTORIA CLÍNICA ───────────────────────────────────────────────
+function editarHistoria(seccion){
+  const p = currentPatient;
+  const c = document.getElementById('content-expediente');
+  const v = p.valoracion;
+
+  let formHtml = `<div style="padding-bottom:100px">`;
+
+  if(seccion==='generales'){
+    formHtml += `
+    <div class="form-section">
+      <div class="form-section-title">📋 Datos generales</div>
+      <div class="form-group">
+        <div class="form-field"><div class="form-label">Médico referente</div><input class="form-input" type="text" id="ed-medico" value="${p.medicoReferente||''}"></div>
+        <div class="form-field"><div class="form-label">Diagnóstico <span class="req">*</span></div><input class="form-input" type="text" id="ed-dx" value="${p.dx}"></div>
+        <div class="form-field"><div class="form-label">Contraindicaciones</div><textarea class="form-input" id="ed-contra">${p.contraindicaciones}</textarea></div>
+        <div class="form-label" style="padding:13px 14px 0">Alergias <span class="req">*</span></div>
+        <div class="form-field"><input class="form-input" type="text" id="ed-alergias" value="${p.alergias}"></div>
+      </div>
+    </div>`;
+  }
+
+  if(seccion==='antecedentes'){
+    formHtml += `
+    <div class="form-section">
+      <div class="form-section-title">🏥 Antecedentes</div>
+      <div class="form-group">
+        <div class="form-field"><div class="form-label">Patológicos</div><textarea class="form-input" id="ed-patologicos">${p.antecedentes.patologicos}</textarea></div>
+        <div class="form-field"><div class="form-label">Deportivos</div><input class="form-input" type="text" id="ed-deportivos" value="${p.antecedentes.deportivos}"></div>
+        <div class="form-field"><div class="form-label">Deporte y frecuencia</div><input class="form-input" type="text" id="ed-deporte-freq" value="${p.antecedentes.deporteFrecuencia}"></div>
+        <div class="form-field"><div class="form-label">Cirugías previas</div><input class="form-input" type="text" id="ed-cirugias" value="${p.antecedentes.cirugias}"></div>
+        <div class="form-field"><div class="form-label">Medicamentos</div><textarea class="form-input" id="ed-medicamentos">${p.antecedentes.medicamentos}</textarea></div>
+      </div>
+    </div>`;
+  }
+
+  if(seccion==='motivo'){
+    formHtml += `
+    <div class="form-section">
+      <div class="form-section-title">💬 Motivo de consulta</div>
+      <div class="form-group">
+        <div class="form-field"><div class="form-label">Diagnóstico médico <span class="req">*</span></div><input class="form-input" type="text" id="ed-dxmedico" value="${p.motivo.dxMedico}"></div>
+        <div class="form-field"><div class="form-label">Padecimiento actual</div><textarea class="form-input" id="ed-padecimiento" style="min-height:80px">${p.motivo.padecimiento}</textarea></div>
+        <div class="form-field"><div class="form-label">Mecanismo de lesión</div><input class="form-input" type="text" id="ed-mecanismo" value="${p.motivo.mecanismo}"></div>
+        <div class="form-field"><div class="form-label">Tiempo de evolución</div><input class="form-input" type="text" id="ed-evolucion" value="${p.motivo.evolucion}"></div>
+        <div class="form-field"><div class="form-label">Estudios de imagen</div><input class="form-input" type="text" id="ed-estudios" value="${p.motivo.estudios}"></div>
+        <div class="form-field"><div class="form-label">Hallazgos / conclusión</div><textarea class="form-input" id="ed-hallazgos" style="min-height:80px">${p.motivo.hallazgos}</textarea></div>
+      </div>
+    </div>`;
+  }
+
+  if(seccion==='valoracion'){
+    formHtml += `
+    <div class="form-section">
+      <div class="form-section-title">📊 Valoración inicial</div>
+      <div class="form-group">
+        <div class="form-field">
+          <div class="form-label">EVA inicial</div>
+          <div class="eva-slider-wrap">
+            <input type="range" class="eva-slider" min="0" max="10" value="${v.eva}" id="ed-eva"
+              oninput="document.getElementById('ed-eva-v').textContent=this.value;updateEvaVal('ed-eva-v',+this.value)">
+            <div class="eva-val ${getEvaClass(v.eva)}" id="ed-eva-v">${v.eva}</div>
+          </div>
+        </div>
+        <div class="form-field"><div class="form-label">Inflamación</div><input class="form-input" type="text" id="ed-inflamacion" value="${v.inflamacion}"></div>
+        <div class="form-field"><div class="form-label">Marcha / postura</div><input class="form-input" type="text" id="ed-marcha" value="${v.marcha}"></div>
+        <div class="form-field"><div class="form-label">ROM</div><input class="form-input" type="text" id="ed-rom" value="${v.rom}"></div>
+        <div class="form-field"><div class="form-label">Fuerza muscular</div><input class="form-input" type="text" id="ed-fuerza" value="${v.fuerza}"></div>
+        <div class="form-field"><div class="form-label">Flexibilidad</div><input class="form-input" type="text" id="ed-flex" value="${v.flexibilidad}"></div>
+        <div class="form-field"><div class="form-label">Pruebas especiales</div><input class="form-input" type="text" id="ed-pruebas" value="${v.pruebasEspeciales}"></div>
+        <div class="form-field"><div class="form-label">Palpación</div><input class="form-input" type="text" id="ed-palpacion" value="${v.palpacion}"></div>
+        <div class="form-field"><div class="form-label">🚩 Banderas rojas</div><input class="form-input" type="text" id="ed-banderas" value="${v.banderasRojas}"></div>
+      </div>
+    </div>`;
+  }
+
+  if(seccion==='dxfuncional'){
+    formHtml += `
+    <div class="form-section">
+      <div class="form-section-title">🔎 Diagnóstico funcional</div>
+      <div class="form-group">
+        <div class="form-field"><div class="form-label">Dx clínico</div><input class="form-input" type="text" id="ed-dxclinico" value="${p.dxFuncional.dxClinico}"></div>
+        <div class="form-field"><div class="form-label">Dx funcional</div><textarea class="form-input" id="ed-dxfuncional" style="min-height:72px">${p.dxFuncional.dxFuncional}</textarea></div>
+        <div class="form-field"><div class="form-label">Limitaciones</div><input class="form-input" type="text" id="ed-limitaciones" value="${p.dxFuncional.limitaciones}"></div>
+        <div class="form-field"><div class="form-label">Objetivos CP</div><input class="form-input" type="text" id="ed-objcp" value="${p.dxFuncional.objetivosCP}"></div>
+        <div class="form-field"><div class="form-label">Objetivos LP</div><input class="form-input" type="text" id="ed-objlp" value="${p.dxFuncional.objetivosLP}"></div>
+        <div class="form-field"><div class="form-label">Pronóstico</div><input class="form-input" type="text" id="ed-pronostico" value="${p.dxFuncional.pronostico}"></div>
+      </div>
+    </div>`;
+  }
+
+  if(seccion==='plan'){
+    formHtml += `
+    <div class="form-section">
+      <div class="form-section-title">🎯 Plan de tratamiento</div>
+      <div class="form-group">
+        <div class="form-field"><div class="form-label">Frecuencia</div><input class="form-input" type="text" id="ed-frecuencia" value="${p.planTto.frecuencia}"></div>
+        <div class="form-field"><div class="form-label">Sesiones</div><input class="form-input" type="number" id="ed-sesiones" value="${p.planTto.sesiones}"></div>
+        <div class="form-field"><div class="form-label">Ejercicio terapéutico</div><textarea class="form-input" id="ed-ejercicio">${p.planTto.ejercicioTerapeutico}</textarea></div>
+        <div class="form-field"><div class="form-label">Terapia manual</div><input class="form-input" type="text" id="ed-tmanual" value="${p.planTto.terapiaManual}"></div>
+        <div class="form-field"><div class="form-label">Agentes físicos</div><input class="form-input" type="text" id="ed-agentes" value="${p.planTto.agentesFisicos}"></div>
+        <div class="form-field"><div class="form-label">Contraindicaciones</div><input class="form-input" type="text" id="ed-plancontra" value="${p.planTto.contraindicaciones}"></div>
+      </div>
+    </div>`;
+  }
+
+  const tabRetorno = seccion==='valoracion'||seccion==='dxfuncional'||seccion==='plan' ? 'valoracion' : 'historia';
+
+  formHtml += `
+    <button class="btn-primary" onclick="guardarEdicionHistoria('${seccion}','${tabRetorno}')">💾 Guardar cambios</button>
+    <button class="btn-secondary" onclick="renderExpediente('${tabRetorno}')">Cancelar</button>
+  </div>`;
+
+  // Replace content directly (no new screen needed)
+  const header = c.innerHTML.split('<div class="tabs">')[0];
+  c.innerHTML = `
+    <div style="background:linear-gradient(135deg,var(--navy),var(--navy-light));color:white;padding:12px 16px;margin:-16px -16px 16px;display:flex;align-items:center;gap:10px">
+      <button onclick="renderExpediente('${tabRetorno}')" style="background:none;border:none;color:white;font-size:22px;cursor:pointer;padding:0 8px 0 0">‹</button>
+      <div style="font-weight:700;font-size:15px">Editando — ${p.name.split(' ')[0]}</div>
+    </div>
+    ${formHtml}`;
+}
+
+function guardarEdicionHistoria(seccion, tabRetorno){
+  const p = currentPatient;
+  const v = id => document.getElementById(id)?.value.trim()||'';
+
+  if(seccion==='generales'){
+    p.medicoReferente = v('ed-medico');
+    p.dx = v('ed-dx') || p.dx;
+    p.contraindicaciones = v('ed-contra');
+    p.alergias = v('ed-alergias') || p.alergias;
+  }
+  if(seccion==='antecedentes'){
+    p.antecedentes.patologicos = v('ed-patologicos');
+    p.antecedentes.deportivos = v('ed-deportivos');
+    p.antecedentes.deporteFrecuencia = v('ed-deporte-freq');
+    p.antecedentes.cirugias = v('ed-cirugias');
+    p.antecedentes.medicamentos = v('ed-medicamentos');
+  }
+  if(seccion==='motivo'){
+    p.motivo.dxMedico = v('ed-dxmedico') || p.motivo.dxMedico;
+    p.motivo.padecimiento = v('ed-padecimiento');
+    p.motivo.mecanismo = v('ed-mecanismo');
+    p.motivo.evolucion = v('ed-evolucion');
+    p.motivo.estudios = v('ed-estudios');
+    p.motivo.hallazgos = v('ed-hallazgos');
+  }
+  if(seccion==='valoracion'){
+    p.valoracion.eva = parseInt(document.getElementById('ed-eva')?.value||p.valoracion.eva);
+    p.valoracion.inflamacion = v('ed-inflamacion');
+    p.valoracion.marcha = v('ed-marcha');
+    p.valoracion.rom = v('ed-rom');
+    p.valoracion.fuerza = v('ed-fuerza');
+    p.valoracion.flexibilidad = v('ed-flex');
+    p.valoracion.pruebasEspeciales = v('ed-pruebas');
+    p.valoracion.palpacion = v('ed-palpacion');
+    p.valoracion.banderasRojas = v('ed-banderas');
+  }
+  if(seccion==='dxfuncional'){
+    p.dxFuncional.dxClinico = v('ed-dxclinico');
+    p.dxFuncional.dxFuncional = v('ed-dxfuncional');
+    p.dxFuncional.limitaciones = v('ed-limitaciones');
+    p.dxFuncional.objetivosCP = v('ed-objcp');
+    p.dxFuncional.objetivosLP = v('ed-objlp');
+    p.dxFuncional.pronostico = v('ed-pronostico');
+  }
+  if(seccion==='plan'){
+    p.planTto.frecuencia = v('ed-frecuencia');
+    p.planTto.sesiones = v('ed-sesiones');
+    p.planTto.ejercicioTerapeutico = v('ed-ejercicio');
+    p.planTto.terapiaManual = v('ed-tmanual');
+    p.planTto.agentesFisicos = v('ed-agentes');
+    p.planTto.contraindicaciones = v('ed-plancontra');
+  }
+
+  saveDB('pts', patientsDB);
+  showToast('✅ Cambios guardados','success');
+  renderExpediente(tabRetorno);
 }
 
 // ── EJERCICIOS ────────────────────────────────────────────────────────────
