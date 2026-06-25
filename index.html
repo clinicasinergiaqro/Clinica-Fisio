@@ -2092,7 +2092,7 @@ function renderAgenda(){
   let html=`<div class="date-header">
     <div><div class="date-text">${today.toLocaleDateString('es-MX',{weekday:'long',day:'numeric',month:'long'})}</div>
     <div class="date-sub">Hoy</div></div>
-    <div class="session-count">${pts.length} pacientes</div></div>`;
+    <div class="session-count">Google Calendar</div></div>`;
   // ── Dashboard de hoy ──────────────────────────────────────────────────────
   const conPrecaucion=pts.filter(p=>p.seguridadClinica?.tienePrecaucion).length;
   const sinConsent=pts.filter(p=>!Array.isArray(p.consentimientos)||!p.consentimientos.some(c=>c.firmado)).length;
