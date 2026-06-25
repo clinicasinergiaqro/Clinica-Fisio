@@ -6370,6 +6370,8 @@ async function guardarConsentimiento(){
       : ((window.jspdf && window.jspdf.jsPDF) ? 'jspdf OK' : 'jspdf SIN .jsPDF');
     alert('🔧 Diagnóstico PDF ['+_diagJsPdf+']: '+((e&&e.message)||e||'error desconocido'));
   }
+  // DIAGNÓSTICO TEMPORAL (K.4-A): ¿el PDF se generó (buffer con bytes) o quedó null sin lanzar?
+  alert('PDF GEN: pdfBuffer=' + (pdfBuffer ? ('OK '+(pdfBuffer.byteLength||pdfBuffer.length||'?')+' bytes') : 'NULL'));
 
   const [firmaResult, firmaPSResult, firmaTutorResult, pdfResult] = await Promise.all([
     subirFirma(firmaB64,'firma'),
@@ -6377,6 +6379,8 @@ async function guardarConsentimiento(){
     subirFirma(firmaTutorB64,'firmaTutor'),
     pdfBuffer ? subirPDF(pdfBuffer) : Promise.resolve(null),
   ]);
+  // DIAGNÓSTICO TEMPORAL (K.4-B): ¿subirPDF devolvió .url? ¿qué devolvió exactamente?
+  alert('SUBIR PDF: pdfResult=' + JSON.stringify(pdfResult) + ' | tiene .url=' + !!(pdfResult && pdfResult.url));
 
   // ── Construir objeto del consentimiento y agregar al array ─────────────────
   const nuevoConsentimiento={
@@ -6444,26 +6448,12 @@ async function guardarConsentimiento(){
       showToast('⚠️ Consentimiento guardado local, pero Sheets no confirmó. Revisa conexión.','warning');
     }
     // DIAGNÓSTICO TEMPORAL (K.2-B): de qué rama viene la navegación y a dónde.
-    alert('NAV FINAL: rama=then | res.ok='+!!(res&&res.ok)+' | stack=['+screenStack.join(',')+'] | destino='+(screenStack[screenStack.length-2]||'screen-agenda'));
-    setTimeout(()=>{
-      alert('ANTES goBack: pantalla actual=' + (screenStack[screenStack.length-1]||'?'));
-      goBack();
-      alert('DESPUÉS goBack: pantalla actual=' + (screenStack[screenStack.length-1]||'?'));
-      renderExpediente('consent');
-      alert('DESPUÉS renderExpediente: pantalla actual=' + (screenStack[screenStack.length-1]||'?') + ' | visible=' + (document.querySelector('.screen.active')?.id||'?'));
-    },1400);
+    setTimeout(()=>{goBack();renderExpediente('consent')},1400);
   }).catch((errSave) => {
     // DIAGNÓSTICO TEMPORAL (K.2-D): si saveDB rechaza, ver el error y que esta rama navega.
     alert('CATCH saveDB: '+((errSave&&errSave.message)||errSave||'sin error'));
     showToast('⚠️ Sin conexión — consentimiento guardado solo en este equipo.','warning');
-    alert('NAV FINAL: rama=catch | stack=['+screenStack.join(',')+'] | destino='+(screenStack[screenStack.length-2]||'screen-agenda'));
-    setTimeout(()=>{
-      alert('ANTES goBack: pantalla actual=' + (screenStack[screenStack.length-1]||'?'));
-      goBack();
-      alert('DESPUÉS goBack: pantalla actual=' + (screenStack[screenStack.length-1]||'?'));
-      renderExpediente('consent');
-      alert('DESPUÉS renderExpediente: pantalla actual=' + (screenStack[screenStack.length-1]||'?') + ' | visible=' + (document.querySelector('.screen.active')?.id||'?'));
-    },1400);
+    setTimeout(()=>{goBack();renderExpediente('consent')},1400);
   });
   }catch(errGuardado){
     console.error('guardarConsentimiento:', errGuardado);
