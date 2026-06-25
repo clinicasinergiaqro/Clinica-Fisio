@@ -6601,13 +6601,7 @@ async function guardarConsentimiento(){
   try{ pdfBuffer=await generarPDFConsentimiento(); }
   catch(e){
     console.warn('jsPDF error:',e);
-    // DIAGNÓSTICO TEMPORAL (K.2-A): error EXACTO del PDF en pantalla (iPad sin consola).
-    var _diagJsPdf = (typeof window.jspdf==='undefined') ? 'window.jspdf=UNDEFINED'
-      : ((window.jspdf && window.jspdf.jsPDF) ? 'jspdf OK' : 'jspdf SIN .jsPDF');
-    alert('🔧 Diagnóstico PDF ['+_diagJsPdf+']: '+((e&&e.message)||e||'error desconocido'));
   }
-  // DIAGNÓSTICO TEMPORAL (K.4-A): ¿el PDF se generó (buffer con bytes) o quedó null sin lanzar?
-  alert('PDF GEN: pdfBuffer=' + (pdfBuffer ? ('OK '+(pdfBuffer.byteLength||pdfBuffer.length||'?')+' bytes') : 'NULL'));
 
   const [firmaResult, firmaPSResult, firmaTutorResult, pdfResult] = await Promise.all([
     subirFirma(firmaB64,'firma'),
@@ -6615,8 +6609,6 @@ async function guardarConsentimiento(){
     subirFirma(firmaTutorB64,'firmaTutor'),
     pdfBuffer ? subirPDF(pdfBuffer) : Promise.resolve(null),
   ]);
-  // DIAGNÓSTICO TEMPORAL (K.4-B): ¿subirPDF devolvió .url? ¿qué devolvió exactamente?
-  alert('SUBIR PDF: pdfResult=' + JSON.stringify(pdfResult) + ' | tiene .url=' + !!(pdfResult && pdfResult.url));
 
   // ── Construir objeto del consentimiento y agregar al array ─────────────────
   const nuevoConsentimiento={
@@ -6683,20 +6675,24 @@ async function guardarConsentimiento(){
     } else {
       showToast('⚠️ Consentimiento guardado local, pero Sheets no confirmó. Revisa conexión.','warning');
     }
-    // DIAGNÓSTICO TEMPORAL (K.2-B): de qué rama viene la navegación y a dónde.
-    setTimeout(()=>{goBack();renderExpediente('consent')},1400);
+    // K-FINAL: dejar al usuario en el EXPEDIENTE del paciente (pestaña Consentimiento), no en la lista.
+    setTimeout(()=>{_volverAExpedienteConsent()},1400);
   }).catch((errSave) => {
-    // DIAGNÓSTICO TEMPORAL (K.2-D): si saveDB rechaza, ver el error y que esta rama navega.
-    alert('CATCH saveDB: '+((errSave&&errSave.message)||errSave||'sin error'));
+    console.warn('saveDB consentimiento:', errSave);
     showToast('⚠️ Sin conexión — consentimiento guardado solo en este equipo.','warning');
-    setTimeout(()=>{goBack();renderExpediente('consent')},1400);
+    setTimeout(()=>{_volverAExpedienteConsent()},1400);
   });
   }catch(errGuardado){
     console.error('guardarConsentimiento:', errGuardado);
-    // DIAGNÓSTICO TEMPORAL (K.2-C): cualquier throw en el camino, visible y exacto.
-    alert('ERROR GUARDAR: '+((errGuardado&&errGuardado.message)||errGuardado||'error inesperado'));
     showToast('No se pudo completar el consentimiento: '+((errGuardado&&errGuardado.message)||'error inesperado')+'. Intenta de nuevo.','error');
   }
+}
+// K-FINAL: tras guardar el consentimiento, dejar al usuario en el EXPEDIENTE del paciente (no en la lista).
+function _volverAExpedienteConsent(){
+  if(screenStack[screenStack.length-1]==='screen-consent') screenStack.pop();
+  if(screenStack[screenStack.length-1]!=='screen-expediente') screenStack.push('screen-expediente');
+  showScreen('screen-expediente',false);
+  renderExpediente('consent');
 }
 
 function clearSig(){sigMain&&sigMain.clear()}
