@@ -2200,7 +2200,62 @@ async function FST_montarAgendaCalendar(rango){
     listEl.innerHTML = '<div style="font-size:12px;color:var(--gray-400);padding:6px 0">Sin eventos en el calendario para este rango.</div>';
     return;
   }
-  listEl.innerHTML = evs.map(_agendaEventoHTML).join('');
+  if (rango === 'dia') {
+    listEl.innerHTML = evs.map(_agendaEventoHTML).join('');   // Hoy: lista plana (sin cambios)
+  } else {
+    // Semana / Próxima: AGRUPAR por día
+    var grupos = {};
+    evs.forEach(function(ev){ var k=_agendaDiaISO(ev.inicio); (grupos[k]=grupos[k]||[]).push(ev); });
+    var dias = Object.keys(grupos).sort();                    // fechas ascendentes
+    var totalCitas = evs.length;
+    var totNuevos = evs.filter(function(e){return e.esNuevo;}).length;
+    var totSin = evs.filter(function(e){return e.sinAsignar;}).length;
+    var resumenSem = '<div style="font-size:12px;color:var(--gray-500);margin-bottom:10px;padding:6px 10px;background:#F3F6FB;border-radius:10px">'
+      + '<b style="color:var(--navy)">'+totalCitas+' citas</b> · '+totNuevos+' nuevos · '+totSin+' sin asignar</div>';
+    var htmlSem = resumenSem + dias.map(function(diaISO){
+      var citas = grupos[diaISO].slice().sort(function(a,b){ return a.inicio<b.inicio?-1:1; });
+      var r = _agendaResumenDia(citas);
+      var esHoy = _agendaEsHoy(diaISO);
+      var chipsTer = Object.keys(r.terapeutas).map(function(n){
+        var c = (typeof AGENDA_COLORES!=='undefined' && AGENDA_COLORES[n]) ? AGENDA_COLORES[n] : (typeof AGENDA_COLOR_SIN!=='undefined'?AGENDA_COLOR_SIN:'#9BA3B5');
+        return '<span style="font-size:10px;color:'+c+';font-weight:700">'+escapeHTML(n)+' '+r.terapeutas[n]+'</span>';
+      }).join(' · ');
+      var titulo = _agendaDiaLargo(diaISO);
+      return '<div style="margin:0 0 14px;border:1px solid #E6EAF2;border-radius:14px;overflow:hidden;box-shadow:0 1px 3px rgba(20,40,80,.05)">'
+        + '<div style="padding:8px 12px;background:'+(esHoy?'var(--navy)':'#F3F6FB')+';color:'+(esHoy?'#fff':'var(--navy)')+'">'
+        + '<div style="font-size:13px;font-weight:800;text-transform:capitalize">'+escapeHTML(titulo)+(esHoy?' · HOY':'')+'</div>'
+        + '<div style="font-size:11px;font-weight:600;opacity:.9;margin-top:2px">'+citas.length+' cita'+(citas.length!==1?'s':'')
+        + (chipsTer?' · '+chipsTer:'')+(r.sinAsignar?' · '+r.sinAsignar+' sin asignar':'')+'</div></div>'
+        + '<div style="padding:4px 12px">'+citas.map(_agendaEventoHTML).join('')+'</div>'
+        + '</div>';
+    }).join('');
+    listEl.innerHTML = htmlSem;
+  }
+}
+// ── G-3: agrupación por día para vista semana/próxima (reusa funciones G-2) ──
+// Fecha local YYYY-MM-DD de un evento (para agrupar por día sin desfase de zona).
+function _agendaDiaISO(iso){
+  try{ var d=new Date(iso); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+  catch(e){ return ''; }
+}
+function _agendaEsHoy(diaISO){
+  var h=new Date(); var hoy=h.getFullYear()+'-'+String(h.getMonth()+1).padStart(2,'0')+'-'+String(h.getDate()).padStart(2,'0');
+  return diaISO===hoy;
+}
+function _agendaDiaLargo(diaISO){
+  try{ var p=diaISO.split('-'); var d=new Date(Number(p[0]),Number(p[1])-1,Number(p[2]));
+    return d.toLocaleDateString('es-MX',{weekday:'long',day:'numeric',month:'long'}); }
+  catch(e){ return diaISO; }
+}
+// Resumen de terapeutas del día: {Zara:5, Carlos:3, ...} + sinAsignar + nuevos
+function _agendaResumenDia(citas){
+  var t={}, nuevos=0, sin=0;
+  citas.forEach(function(ev){
+    if(ev.esNuevo) nuevos++;
+    if(ev.sinAsignar) sin++;
+    (Array.isArray(ev.terapeutas)?ev.terapeutas:[]).forEach(function(n){ t[n]=(t[n]||0)+1; });
+  });
+  return {terapeutas:t, nuevos:nuevos, sinAsignar:sin};
 }
 function showPacientes(){
   document.querySelectorAll('.nav-item').forEach((n,i)=>n.classList.toggle('active',i===1));
