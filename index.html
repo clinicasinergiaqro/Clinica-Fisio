@@ -2174,6 +2174,86 @@ function _agendaEventoHTML(ev){
     + '</div>';
 }
 function FST_cambiarRangoAgenda(rango){ FST_montarAgendaCalendar(rango); }
+// ── G-7: vista HOY como timeline por horas (solo rango 'dia'). App SOLO LEE. ──
+// Tarjeta de cita en el timeline: borde color terapeuta, hora inicio–fin, chips, tap → expediente.
+function _agendaTarjetaTimeline(ev){
+  var colorTer = (Array.isArray(ev.terapeutas) && ev.terapeutas.length && AGENDA_COLORES[ev.terapeutas[0]]) ? AGENDA_COLORES[ev.terapeutas[0]] : AGENDA_COLOR_SIN;
+  var horaIni = _horaLocal(ev.inicio);
+  var horaFin = ev.fin ? _horaLocal(ev.fin) : '';
+  var franja = horaIni + (horaFin ? ('–'+horaFin) : '');
+  var chips = _agendaChipsTerapeutas(ev);
+  var bNuevo = ev.esNuevo ? '<span style="font-size:9px;font-weight:700;color:#0E7C66;background:#D1FAE5;border-radius:6px;padding:1px 6px">🆕</span>' : '';
+  var bSin = ev.sinAsignar ? '<span style="font-size:9px;font-weight:700;color:#fff;background:'+AGENDA_COLOR_SIN+';border-radius:6px;padding:1px 6px">sin asignar</span>' : '';
+  var pac = escapeHTML(ev.paciente || '(sin nombre)');
+  return '<div data-nombre="'+escapeAttr_(ev.paciente||'')+'" onclick="_abrirCitaAgenda(this.dataset.nombre)" '
+    + 'style="flex:1 1 140px;min-width:128px;cursor:pointer;background:#fff;border:1px solid #EEF1F6;border-left:4px solid '+colorTer+';border-radius:8px;box-shadow:0 1px 3px rgba(20,40,80,.06);padding:6px 8px">'
+    + '<div style="font-size:13px;font-weight:700;color:#1F2937;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+pac+'</div>'
+    + '<div style="font-size:10px;color:var(--gray-400);margin:2px 0 4px">'+escapeHTML(franja)+'</div>'
+    + '<div style="display:flex;align-items:center;flex-wrap:wrap;gap:4px">'+chips+bNuevo+bSin+'</div>'
+    + '</div>';
+}
+// Construye el timeline: columna de horas (izq) + fila por hora + tarjetas (columnas si simultáneas) + línea "ahora".
+function _agendaTimelineHTML(evs){
+  var porHora = {};
+  (Array.isArray(evs)?evs:[]).forEach(function(ev){
+    var h = new Date(ev.inicio).getHours();
+    if(isNaN(h)) return;
+    (porHora[h]=porHora[h]||[]).push(ev);
+  });
+  var horasConCitas = Object.keys(porHora).map(Number);
+  if(!horasConCitas.length) return evs.map(_agendaEventoHTML).join('');   // fallback defensivo (lista G-6)
+  var horaMin = Math.max(0, Math.min.apply(null, horasConCitas));
+  var horaMax = Math.min(23, Math.max.apply(null, horasConCitas));
+  var ahora = new Date();
+  var filas = '';
+  for(var h=horaMin; h<=horaMax; h++){
+    var ampm = (h%12===0?12:h%12) + (h<12?' am':' pm');
+    var citasH = (porHora[h]||[]).slice().sort(function(a,b){ return a.inicio<b.inicio?-1:1; });
+    var tarjetas = citasH.map(_agendaTarjetaTimeline).join('');
+    var nowLine = '';
+    if(ahora.getHours()===h){   // rango 'dia' = hoy siempre → línea del ahora
+      var pct = Math.round((ahora.getMinutes()/60)*100);
+      nowLine = '<div style="position:absolute;left:0;right:0;top:'+pct+'%;height:2px;background:#E0245E;z-index:2"><div style="position:absolute;left:-3px;top:-3px;width:8px;height:8px;border-radius:50%;background:#E0245E"></div></div>';
+    }
+    filas += '<div style="display:flex;gap:8px;min-height:64px;border-top:1px solid #F0F2F7">'
+      + '<div style="width:52px;flex-shrink:0;font-size:11px;font-weight:700;color:var(--gray-400);padding-top:6px;text-align:right">'+ampm+'</div>'
+      + '<div style="flex:1;min-width:0;position:relative;display:flex;gap:6px;flex-wrap:wrap;align-content:flex-start;padding:4px 0">'+nowLine+tarjetas+'</div>'
+      + '</div>';
+  }
+  return '<div style="margin-top:4px">'+filas+'</div>';
+}
+// Tap en una cita: match único activo → expediente; único histórico → expediente; 0/ambiguo → buscador prellenado.
+async function _abrirCitaAgenda(nombre){
+  try{
+    var norm = function(s){ return (typeof FST_normalizarBusqueda==='function') ? FST_normalizarBusqueda(s||'') : String(s||'').toLowerCase().trim(); };
+    var nq = norm(nombre);
+    if(!nq){ showPacientes(); return; }
+    var matchEn = function(lista){
+      return (Array.isArray(lista)?lista:[]).filter(function(p){
+        return norm(p.name)===nq || (p.nombreNormalizado && norm(p.nombreNormalizado)===nq);
+      });
+    };
+    // 1) activos (síncrono, siempre disponible)
+    var act = matchEn(patientsDB);
+    if(act.length===1){ openExpediente(act[0].id); return; }
+    // 2) si no hay match activo, buscar en la lista fusionada (incluye históricos si FST_LISTA_ACTIVA)
+    if(act.length===0 && typeof FST_obtenerListaParaRender==='function'){
+      var fus = [];
+      try{ fus = await FST_obtenerListaParaRender(); }catch(e){ fus = patientsDB||[]; }
+      var m = matchEn(fus);
+      if(m.length===1){ FST_abrirPacienteDesdeLista(m[0].id); return; }
+    }
+    // 3) 0 o múltiples → buscador de pacientes prellenado (no forzar match)
+    showPacientes();
+    setTimeout(function(){
+      var inp = document.getElementById('buscador-pacientes');
+      if(inp){ inp.value = nombre; }
+      if(typeof renderPacientes==='function') renderPacientes(nombre,'todos');
+      var inp2 = document.getElementById('buscador-pacientes');
+      if(inp2){ inp2.focus(); }
+    }, 80);
+  }catch(e){ console.warn('[Agenda tap]', e&&e.message); try{ showPacientes(); }catch(_){} }
+}
 // G-4(5): cita SIN la columna de hora (para agrupar por hora en semana/próxima). No toca _agendaEventoHTML.
 function _agendaCitaSinHoraHTML(ev){
   var chips = _agendaChipsTerapeutas(ev);
@@ -2249,7 +2329,7 @@ async function FST_montarAgendaCalendar(rango){
     return;
   }
   if (rango === 'dia') {
-    listEl.innerHTML = evs.map(_agendaEventoHTML).join('');   // Hoy: lista plana (sin cambios)
+    listEl.innerHTML = _agendaTimelineHTML(evs);   // G-7: Hoy = timeline por horas (tap abre expediente)
   } else {
     // Semana / Próxima: AGRUPAR por día
     var grupos = {};
