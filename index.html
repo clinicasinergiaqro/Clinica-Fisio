@@ -2193,7 +2193,8 @@ function _agendaTarjetaTimeline(ev){
     + '</div>';
 }
 // Construye el timeline: columna de horas (izq) + fila por hora + tarjetas (columnas si simultáneas) + línea "ahora".
-function _agendaTimelineHTML(evs){
+function _agendaTimelineHTML(evs, rango){
+  rango = rango || 'dia';
   var porHora = {};
   (Array.isArray(evs)?evs:[]).forEach(function(ev){
     var h = new Date(ev.inicio).getHours();
@@ -2211,7 +2212,7 @@ function _agendaTimelineHTML(evs){
     var citasH = (porHora[h]||[]).slice().sort(function(a,b){ return a.inicio<b.inicio?-1:1; });
     var tarjetas = citasH.map(_agendaTarjetaTimeline).join('');
     var nowLine = '';
-    if(ahora.getHours()===h){   // rango 'dia' = hoy siempre → línea del ahora
+    if(rango==='dia' && ahora.getHours()===h){   // línea del ahora solo en HOY (no en mañana/pasado)
       var pct = Math.round((ahora.getMinutes()/60)*100);
       nowLine = '<div style="position:absolute;left:0;right:0;top:'+pct+'%;height:2px;background:#E0245E;z-index:2"><div style="position:absolute;left:-3px;top:-3px;width:8px;height:8px;border-radius:50%;background:#E0245E"></div></div>';
     }
@@ -2306,7 +2307,7 @@ async function FST_montarAgendaCalendar(rango){
   rango = rango || 'dia';
   // G-4(1): topbar dinámico por rango (solo afecta #topbar-title del screen-agenda)
   var _ttEl = document.getElementById('topbar-title');
-  if(_ttEl) _ttEl.textContent = (rango==='semana'?'Agenda semanal':rango==='semanaSiguiente'?'Próximas citas':'Agenda de hoy');
+  if(_ttEl) _ttEl.textContent = (rango==='semana'?'Agenda semanal':rango==='semanaSiguiente'?'Próximas citas':rango==='manana'?'Agenda de mañana':rango==='pasado'?'Pasado mañana':'Agenda de hoy');
   const cont = document.getElementById('content-agenda');
   if(!cont) return;
   let block = document.getElementById('agenda-cal-block');
@@ -2316,7 +2317,7 @@ async function FST_montarAgendaCalendar(rango){
   block.innerHTML = '<div class="section-card"><div style="padding:12px 14px">'
     + '<div style="font-size:13px;font-weight:700;color:var(--navy);margin-bottom:8px">📅 Agenda del calendario</div>'
     + '<div style="font-size:10px;color:var(--gray-400);margin:-4px 0 8px">Sincronizado desde Google Calendar · Solo lectura</div>'
-    + '<div style="display:flex;gap:6px;margin-bottom:10px">'+btn('dia','Hoy')+btn('semana','Semana')+btn('semanaSiguiente','Próxima')+'</div>'
+    + '<div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap">'+btn('dia','Hoy')+btn('manana','Mañana')+btn('pasado','Pasado')+btn('semana','Semana')+btn('semanaSiguiente','Próxima')+'</div>'
     + '<div id="agenda-cal-list"><div style="font-size:12px;color:var(--gray-400);padding:6px 0">⏳ Cargando agenda…</div></div>'
     + '</div></div>';
   const reqId = (window._agendaCalReq = (window._agendaCalReq||0) + 1);
@@ -2338,8 +2339,8 @@ async function FST_montarAgendaCalendar(rango){
     listEl.innerHTML = '<div style="font-size:12px;color:var(--gray-400);padding:6px 0;line-height:1.5">'+_vac+'</div>';
     return;
   }
-  if (rango === 'dia') {
-    listEl.innerHTML = _agendaTimelineHTML(evs);   // G-7: Hoy = timeline por horas (tap abre expediente)
+  if (rango === 'dia' || rango === 'manana' || rango === 'pasado') {
+    listEl.innerHTML = _agendaTimelineHTML(evs, rango);   // G-7/G-9: timeline de un día (hoy/mañana/pasado)
   } else {
     // Semana / Próxima: AGRUPAR por día
     var grupos = {};
