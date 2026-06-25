@@ -2665,6 +2665,7 @@ function renderExpediente(tab='historia'){
     <button class="tab ${tab==='consent'?'active':''}" onclick="renderExpediente('consent')">Consentimiento</button>
   </div>
   ${(currentUser&&(currentUser.role==='supervisor'||currentUser.name==='CARLOS'||p.terapeuta===currentUser.name||p.terapeutaSeguimiento===currentUser.name))?`<div style="padding:4px 14px 0;text-align:right"><button data-pid="${escapeAttr_(p.id)}" onclick="exportarExpedienteJSON(this.dataset.pid)" style="background:transparent;border:1px solid rgba(255,255,255,.4);color:white;border-radius:16px;padding:4px 12px;font-size:11px;cursor:pointer;font-weight:600">📥 Exportar JSON</button></div>`:''}
+  ${(currentUser&&currentUser.role==='supervisor')?`<div style="padding:4px 14px 0;text-align:right"><button data-pid="${escapeAttr_(p.id)}" onclick="_abrirEditarPaciente(this.dataset.pid)" style="background:transparent;border:1px solid rgba(255,255,255,.4);color:white;border-radius:16px;padding:4px 12px;font-size:11px;cursor:pointer;font-weight:600">✏️ Editar datos</button></div>`:''}
   ${renderIndicadorCompletitud(p)}`;
 
   // Alerta de seguridad clínica — visible en todos los tabs del expediente
@@ -5337,6 +5338,81 @@ async function _persistirEstudios(p){
     { estudiosDocs: Array.isArray(p.estudiosDocs)?p.estudiosDocs:[] }, { merge:true }
   );
   return { ok:true, via:'firestore' };
+}
+// ── LOOP E: editar datos básicos del paciente (solo supervisor; activos + históricos) ──
+// Persiste datos básicos. Activo → saveDB (Sheet). Histórico → Firestore merge (NO toca el Sheet). Patrón de _persistirEstudios.
+async function _persistirDatosPaciente(p){
+  if (patientsDB.some(function(x){ return x.id===p.id; })) {
+    return await saveDB('pts',[p]);                                  // activo: guarda el objeto como hoy
+  }
+  var initOk = (typeof FST_init==='function') ? await FST_init() : false;
+  if (!initOk || !window._fstDb) throw new Error('Firestore no disponible');
+  await window._fstDb.collection('pacientes').doc(p.id).set(
+    { name: p.name, nombreNormalizado: p.nombreNormalizado || FST_normalizarNombreLive(p.name||''),
+      age: p.age, telefono: p.telefono||'', terapeuta: p.terapeuta||'' },
+    { merge:true }
+  );
+  return { ok:true, via:'firestore' };
+}
+function _abrirEditarPaciente(pid){
+  if(!(currentUser && currentUser.role==='supervisor')){ showToast('Sin permiso — solo supervisor','error'); return; }
+  var p = _resolverPaciente(pid);
+  if(!p){ showToast('Paciente no encontrado','error'); return; }
+  var ters = ['CARLOS','DAF','ZARA','CAMI','GORE','JESS'];
+  var opts = ters.map(function(t){ return '<option value="'+t+'"'+(p.terapeuta===t?' selected':'')+'>'+t+'</option>'; }).join('');
+  if(p.terapeuta && ters.indexOf(p.terapeuta)===-1){ opts = '<option value="'+escapeAttr_(p.terapeuta)+'" selected>'+escapeHTML(p.terapeuta)+'</option>'+opts; }
+  var ov = document.createElement('div');
+  ov.id = '_edit-pac-ov';
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:10001;display:flex;align-items:flex-end;justify-content:center';
+  ov.onclick = function(e){ if(e.target===ov) ov.remove(); };
+  var inp = 'width:100%;padding:12px;border:1px solid var(--gray-200);border-radius:10px;font-size:16px;margin:4px 0 10px';
+  var lbl = 'font-size:12px;font-weight:700;color:var(--gray-400)';
+  ov.innerHTML = '<div style="background:#fff;border-radius:16px 16px 0 0;width:100%;max-width:480px;padding:16px">'
+    + '<div style="font-weight:800;color:var(--navy);margin-bottom:12px">✏️ Editar datos del paciente</div>'
+    + '<label style="'+lbl+'">Nombre</label>'
+    + '<input id="_ep-nombre" type="text" value="'+escapeAttr_(p.name||'')+'" style="'+inp+'">'
+    + '<label style="'+lbl+'">Edad</label>'
+    + '<input id="_ep-edad" type="number" inputmode="numeric" value="'+escapeAttr_(String(p.age==null?'':p.age))+'" style="'+inp+'">'
+    + '<label style="'+lbl+'">Teléfono</label>'
+    + '<input id="_ep-tel" type="tel" inputmode="tel" value="'+escapeAttr_(p.telefono||'')+'" style="'+inp+'">'
+    + '<label style="'+lbl+'">Terapeuta</label>'
+    + '<select id="_ep-ter" style="'+inp+'">'+opts+'</select>'
+    + '<button id="_ep-ok" style="width:100%;padding:12px;border:none;border-radius:10px;background:var(--navy);color:#fff;font-size:14px;font-weight:700;cursor:pointer;margin-top:4px">Guardar cambios</button>'
+    + '<button id="_ep-cancel" style="width:100%;padding:10px;margin-top:4px;border:none;background:none;color:var(--gray-400);font-size:13px;cursor:pointer">Cancelar</button>'
+    + '</div>';
+  document.body.appendChild(ov);
+  ov.querySelector('#_ep-cancel').onclick = function(){ ov.remove(); };
+  ov.querySelector('#_ep-ok').onclick = function(){ _guardarEdicionPaciente(pid); };
+}
+async function _guardarEdicionPaciente(pid){
+  if(!(currentUser && currentUser.role==='supervisor')){ showToast('Sin permiso — solo supervisor','error'); return; }
+  var p = _resolverPaciente(pid);
+  if(!p){ showToast('Paciente no encontrado','error'); return; }
+  var nombre = (document.getElementById('_ep-nombre') && document.getElementById('_ep-nombre').value || '').trim();
+  if(!nombre){ showToast('El nombre no puede estar vacío','error'); return; }
+  var edadRaw = (document.getElementById('_ep-edad') && document.getElementById('_ep-edad').value || '').trim();
+  var tel = (document.getElementById('_ep-tel') && document.getElementById('_ep-tel').value || '').trim();
+  var ter = (document.getElementById('_ep-ter') && document.getElementById('_ep-ter').value || '').trim();
+  var nombreCambio = (p.name !== nombre);
+  p.name = nombre;
+  if(nombreCambio) p.nombreNormalizado = FST_normalizarNombreLive(nombre);   // OBLIGATORIO: o se pierde de búsquedas/tap
+  if(edadRaw!==''){ var e=parseInt(edadRaw,10); if(!isNaN(e)) p.age = e; }
+  p.telefono = tel;
+  if(ter) p.terapeuta = ter;
+  p.updatedAt = Date.now();
+  try{
+    var res = await _persistirDatosPaciente(p);
+    var ok = !!(res && res.ok);
+    var ov = document.getElementById('_edit-pac-ov'); if(ov) ov.remove();
+    var tn = document.getElementById('exp-topbar-name'); if(tn) tn.textContent = p.name.split(' ').slice(0,2).join(' ');
+    var tm = document.getElementById('exp-topbar-meta'); if(tm) tm.textContent = (p.age!=null?p.age+' años · ':'')+(p.terapeuta||'');
+    var av = document.getElementById('exp-avatar'); if(av) av.textContent = initials(p.name);
+    if(typeof renderExpediente==='function') renderExpediente(currentTab||'historia');
+    showToast(ok?'✅ Datos actualizados':'⚠️ Guardado local, Sheets no confirmó', ok?'success':'warning');
+  }catch(err){
+    console.error('editarPaciente:', err);
+    showToast('No se pudo guardar: '+((err&&err.message)||'error inesperado'), 'error');
+  }
 }
 
 async function FST_renderEstudiosApartado(pid){
