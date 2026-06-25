@@ -2665,7 +2665,7 @@ function renderExpediente(tab='historia'){
     <button class="tab ${tab==='consent'?'active':''}" onclick="renderExpediente('consent')">Consentimiento</button>
   </div>
   ${(currentUser&&(currentUser.role==='supervisor'||currentUser.name==='CARLOS'||p.terapeuta===currentUser.name||p.terapeutaSeguimiento===currentUser.name))?`<div style="padding:4px 14px 0;text-align:right"><button data-pid="${escapeAttr_(p.id)}" onclick="exportarExpedienteJSON(this.dataset.pid)" style="background:transparent;border:1px solid rgba(255,255,255,.4);color:white;border-radius:16px;padding:4px 12px;font-size:11px;cursor:pointer;font-weight:600">📥 Exportar JSON</button></div>`:''}
-  ${(currentUser&&currentUser.role==='supervisor')?`<div style="padding:4px 14px 0;text-align:right"><button data-pid="${escapeAttr_(p.id)}" onclick="_abrirEditarPaciente(this.dataset.pid)" style="background:transparent;border:1px solid rgba(255,255,255,.4);color:white;border-radius:16px;padding:4px 12px;font-size:11px;cursor:pointer;font-weight:600">✏️ Editar datos</button></div>`:''}
+  ${(currentUser&&currentUser.role==='supervisor')?`<div style="padding:4px 14px 0;text-align:right"><button data-pid="${escapeAttr_(p.id)}" onclick="_abrirEditarPaciente(this.dataset.pid)" style="background:var(--gold);border:none;color:var(--navy-dark);border-radius:16px;padding:5px 14px;font-size:12px;cursor:pointer;font-weight:700">✏️ Editar datos</button></div>`:''}
   ${renderIndicadorCompletitud(p)}`;
 
   // Alerta de seguridad clínica — visible en todos los tabs del expediente
