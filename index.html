@@ -2171,8 +2171,48 @@ function _agendaEventoHTML(ev){
     + '</div></div>';
 }
 function FST_cambiarRangoAgenda(rango){ FST_montarAgendaCalendar(rango); }
+// G-4(5): cita SIN la columna de hora (para agrupar por hora en semana/próxima). No toca _agendaEventoHTML.
+function _agendaCitaSinHoraHTML(ev){
+  var chips = _agendaChipsTerapeutas(ev);
+  var bNuevo = ev.esNuevo ? '<span style="font-size:10px;font-weight:700;color:#0E7C66;background:#D1FAE5;border-radius:8px;padding:2px 8px">🆕 nuevo</span>' : '';
+  var bSin = ev.sinAsignar ? '<span style="font-size:10px;font-weight:700;color:#fff;background:'+AGENDA_COLOR_SIN+';border-radius:8px;padding:2px 8px">sin asignar</span>' : '';
+  var pac = escapeHTML(ev.paciente || '(sin nombre)');
+  return '<div style="padding:5px 0 5px 8px;border-left:2px solid #EEF1F6;margin-bottom:4px">'
+    + '<div style="font-size:13px;font-weight:600;color:#1F2937">'+pac+'</div>'
+    + '<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px">'+chips+' '+bNuevo+' '+bSin+'</div>'
+    + '</div>';
+}
+// G-4(5): agrupa citas (ya ordenadas por inicio) por hora local; hora como subencabezado, citas debajo sin repetir hora.
+function _agendaCitasPorHora(citas){
+  var porHora = {}, orden = [];
+  citas.forEach(function(ev){
+    var h = _horaLocal(ev.inicio) || '—';
+    if(!porHora[h]){ porHora[h]=[]; orden.push(h); }   // citas pre-ordenadas: orden = cronológico
+    porHora[h].push(ev);
+  });
+  return orden.map(function(h){
+    return '<div style="margin:2px 0 6px">'
+      + '<div style="font-size:12px;font-weight:800;color:var(--navy);margin:4px 0 2px">🕒 '+escapeHTML(h)+'</div>'
+      + porHora[h].map(_agendaCitaSinHoraHTML).join('')
+      + '</div>';
+  }).join('');
+}
+// G-4(4): etiqueta de rango de fechas a partir de los días agrupados (ascendentes).
+function _agendaRangoFechasLabel(dias, rango){
+  if(!dias || !dias.length) return '';
+  function parse(iso){ var p=iso.split('-'); return new Date(Number(p[0]),Number(p[1])-1,Number(p[2])); }
+  function mes(d){ return d.toLocaleDateString('es-MX',{month:'long'}); }
+  var pre = (rango==='semana') ? 'Semana del ' : 'Próxima semana, del ';
+  var d0=parse(dias[0]), d1=parse(dias[dias.length-1]);
+  if(dias.length===1) return (rango==='semana'?'Semana: ':'Próxima semana: ')+d0.getDate()+' de '+mes(d0);
+  if(d0.getMonth()===d1.getMonth()) return pre+d0.getDate()+' al '+d1.getDate()+' de '+mes(d1);
+  return pre+d0.getDate()+' de '+mes(d0)+' al '+d1.getDate()+' de '+mes(d1);
+}
 async function FST_montarAgendaCalendar(rango){
   rango = rango || 'dia';
+  // G-4(1): topbar dinámico por rango (solo afecta #topbar-title del screen-agenda)
+  var _ttEl = document.getElementById('topbar-title');
+  if(_ttEl) _ttEl.textContent = (rango==='semana'?'Agenda semanal':rango==='semanaSiguiente'?'Próximas citas':'Agenda de hoy');
   const cont = document.getElementById('content-agenda');
   if(!cont) return;
   let block = document.getElementById('agenda-cal-block');
@@ -2181,6 +2221,7 @@ async function FST_montarAgendaCalendar(rango){
     + (r===rango?'background:var(--navy);color:#fff':'background:#EEF1F6;color:var(--navy)')+'">'+txt+'</button>';
   block.innerHTML = '<div class="section-card"><div style="padding:12px 14px">'
     + '<div style="font-size:13px;font-weight:700;color:var(--navy);margin-bottom:8px">📅 Agenda del calendario</div>'
+    + '<div style="font-size:10px;color:var(--gray-400);margin:-4px 0 8px">Sincronizado desde Google Calendar · Solo lectura</div>'
     + '<div style="display:flex;gap:6px;margin-bottom:10px">'+btn('dia','Hoy')+btn('semana','Semana')+btn('semanaSiguiente','Próxima')+'</div>'
     + '<div id="agenda-cal-list"><div style="font-size:12px;color:var(--gray-400);padding:6px 0">⏳ Cargando agenda…</div></div>'
     + '</div></div>';
@@ -2197,7 +2238,10 @@ async function FST_montarAgendaCalendar(rango){
   }
   const evs = Array.isArray(res.eventos) ? res.eventos : [];
   if(!evs.length){
-    listEl.innerHTML = '<div style="font-size:12px;color:var(--gray-400);padding:6px 0">Sin eventos en el calendario para este rango.</div>';
+    var _vac = (rango==='dia')
+      ? 'Sin citas programadas hoy en Google Calendar. Las citas se gestionan en Google Calendar y aquí solo se visualizan.'
+      : 'Sin citas programadas para este rango en Google Calendar. Cuando se agreguen aparecerán aquí automáticamente.';
+    listEl.innerHTML = '<div style="font-size:12px;color:var(--gray-400);padding:6px 0;line-height:1.5">'+_vac+'</div>';
     return;
   }
   if (rango === 'dia') {
@@ -2212,7 +2256,8 @@ async function FST_montarAgendaCalendar(rango){
     var totSin = evs.filter(function(e){return e.sinAsignar;}).length;
     var resumenSem = '<div style="font-size:12px;color:var(--gray-500);margin-bottom:10px;padding:6px 10px;background:#F3F6FB;border-radius:10px">'
       + '<b style="color:var(--navy)">'+totalCitas+' citas</b> · '+totNuevos+' nuevos · '+totSin+' sin asignar</div>';
-    var htmlSem = resumenSem + dias.map(function(diaISO){
+    var rangoFechas = _agendaRangoFechasLabel(dias, rango);
+    var htmlSem = (rangoFechas?('<div style="font-size:13px;font-weight:800;color:var(--navy);margin-bottom:8px">'+escapeHTML(rangoFechas)+'</div>'):'') + resumenSem + dias.map(function(diaISO){
       var citas = grupos[diaISO].slice().sort(function(a,b){ return a.inicio<b.inicio?-1:1; });
       var r = _agendaResumenDia(citas);
       var esHoy = _agendaEsHoy(diaISO);
@@ -2226,7 +2271,7 @@ async function FST_montarAgendaCalendar(rango){
         + '<div style="font-size:13px;font-weight:800;text-transform:capitalize">'+escapeHTML(titulo)+(esHoy?' · HOY':'')+'</div>'
         + '<div style="font-size:11px;font-weight:600;opacity:.9;margin-top:2px">'+citas.length+' cita'+(citas.length!==1?'s':'')
         + (chipsTer?' · '+chipsTer:'')+(r.sinAsignar?' · '+r.sinAsignar+' sin asignar':'')+'</div></div>'
-        + '<div style="padding:4px 12px">'+citas.map(_agendaEventoHTML).join('')+'</div>'
+        + '<div style="padding:4px 12px">'+_agendaCitasPorHora(citas)+'</div>'
         + '</div>';
     }).join('');
     listEl.innerHTML = htmlSem;
