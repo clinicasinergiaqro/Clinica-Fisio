@@ -2113,8 +2113,9 @@ function renderAgenda(){
   }
   if(incomplete>0) html+=`<div class="alert-banner"><div class="alert-banner-icon">⚠️</div>
     <div class="alert-banner-text">${incomplete} nota${incomplete>1?'s':''} SOAP incompleta${incomplete>1?'s':''}</div></div>`;
-  if(!pts.length) html+=`<div class="empty-state"><div class="emoji">📅</div><p>Sin pacientes hoy.<br>Toca + para agregar.</p></div>`;
-  else pts.forEach(p=>{
+  // G-6(1): empty-state "Sin pacientes hoy / Toca + para agregar" omitido — las citas vienen de
+  // Google Calendar (bloque de abajo), no de patientsDB. Evita el hueco grande del centro.
+  if(pts.length) pts.forEach(p=>{
     const inc=Array.isArray(p.soap)&&p.soap.some(s=>!s.completa);
     const hasConsent=Array.isArray(p.consentimientos)&&p.consentimientos.some(c=>c.firmado);
     const soapAtrasado=necesitaAlertaSoapSemanal(p);
@@ -2164,8 +2165,9 @@ function _agendaEventoHTML(ev){
   var bNuevo = ev.esNuevo ? '<span style="font-size:9px;font-weight:700;color:#0E7C66;background:#D1FAE5;border-radius:6px;padding:1px 6px">🆕</span>' : '';
   var bSin = ev.sinAsignar ? '<span style="font-size:9px;font-weight:700;color:#fff;background:'+AGENDA_COLOR_SIN+';border-radius:6px;padding:1px 6px">sin asignar</span>' : '';
   var pac = escapeHTML(ev.paciente || '(sin nombre)');
+  var _colorTer = (Array.isArray(ev.terapeutas) && ev.terapeutas.length && AGENDA_COLORES[ev.terapeutas[0]]) ? AGENDA_COLORES[ev.terapeutas[0]] : AGENDA_COLOR_SIN;
   // 1 renglón: hora fija (der) | paciente flexible (truncado) | chips a la derecha
-  return '<div style="display:flex;align-items:center;gap:10px;padding:7px 4px;border-bottom:1px solid #F0F2F7">'
+  return '<div style="display:flex;align-items:center;gap:10px;padding:7px 8px;border-left:4px solid '+_colorTer+';border-bottom:1px solid #F0F2F7;border-radius:6px;margin-bottom:2px">'
     + '<div style="font-size:12px;font-weight:800;color:var(--navy);min-width:62px;text-align:right">'+escapeHTML(hora)+'</div>'
     + '<div style="flex:1;min-width:0;font-size:13px;font-weight:600;color:#1F2937;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+pac+'</div>'
     + '<div style="display:flex;align-items:center;flex-wrap:wrap;justify-content:flex-end;gap:4px;flex-shrink:0">'+chips+bNuevo+bSin+'</div>'
@@ -2178,7 +2180,8 @@ function _agendaCitaSinHoraHTML(ev){
   var bNuevo = ev.esNuevo ? '<span style="font-size:9px;font-weight:700;color:#0E7C66;background:#D1FAE5;border-radius:6px;padding:1px 6px">🆕</span>' : '';
   var bSin = ev.sinAsignar ? '<span style="font-size:9px;font-weight:700;color:#fff;background:'+AGENDA_COLOR_SIN+';border-radius:6px;padding:1px 6px">sin asignar</span>' : '';
   var pac = escapeHTML(ev.paciente || '(sin nombre)');
-  return '<div style="display:flex;align-items:center;gap:8px;padding:5px 4px 5px 10px;border-left:2px solid #EEF1F6;margin-bottom:2px">'
+  var _colorTer = (Array.isArray(ev.terapeutas) && ev.terapeutas.length && AGENDA_COLORES[ev.terapeutas[0]]) ? AGENDA_COLORES[ev.terapeutas[0]] : AGENDA_COLOR_SIN;
+  return '<div style="display:flex;align-items:center;gap:8px;padding:5px 8px 5px 10px;border-left:4px solid '+_colorTer+';border-radius:6px;margin-bottom:2px">'
     + '<div style="flex:1;min-width:0;font-size:13px;font-weight:600;color:#1F2937;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+pac+'</div>'
     + '<div style="display:flex;align-items:center;flex-wrap:wrap;justify-content:flex-end;gap:4px;flex-shrink:0">'+chips+bNuevo+bSin+'</div>'
     + '</div>';
