@@ -176,6 +176,13 @@ function FST_renderCard(s){
   const semana = Number.isFinite(s.semana) ? s.semana : 1;
   const texto = linkify_(s.textoOriginal || '');  // LOOP H: links clicables (ya escapa HTML internamente)
   const isTextoLibre = s.formatoOriginal === 'texto_libre' || !(s.s && s.s.dolor);
+  // LOOP J-2: en notas estructuradas el link vive en textoOriginal y no se pintaba. Bloque aditivo solo si hay URLs.
+  var linksNota = (typeof _FST_extraerLinksDeTexto==='function' && s.textoOriginal) ? _FST_extraerLinksDeTexto(s.textoOriginal, s.fecha) : [];
+  var bloqueLinks = linksNota.length
+    ? '<div class="soap-section"><div class="soap-label"><span class="soap-s">🔗 Links de esta nota</span></div><div class="soap-text">'
+      + linksNota.map(function(l){ var u=escapeAttr_(l.url); return '<a href="'+u+'" target="_blank" rel="noopener noreferrer" style="color:var(--navy);text-decoration:underline;word-break:break-all">'+escapeHTML(l.url)+'</a>'; }).join('<br>')
+      + '</div></div>'
+    : '';
   return '<div class="soap-card" style="opacity:.92;border-left:3px solid var(--navy)">'
     + '<div class="soap-header" style="cursor:default"><div>'
     + '<div class="soap-sesion">Sesión ' + escapeHTML(s.num) + ' <span style="font-size:10px;color:var(--gray-400);font-weight:400"> · Histórico Firestore</span></div>'
@@ -187,7 +194,8 @@ function FST_renderCard(s){
         : '<div class="soap-section"><div class="soap-label"><span class="soap-s">S</span></div><div class="soap-text">' + escapeHTML((s.s&&s.s.dolor)||'') + ' ' + escapeHTML((s.s&&s.s.cambios)||'') + ' ' + escapeHTML((s.s&&s.s.actFisica)||'') + '</div></div>'
           + '<div class="soap-section"><div class="soap-label"><span class="soap-o">O</span></div><div class="soap-text">' + escapeHTML((s.o&&s.o.rom)||'') + ' ' + escapeHTML((s.o&&s.o.fuerza)||'') + ' ' + escapeHTML((s.o&&s.o.hallazgos)||'') + '</div></div>'
           + '<div class="soap-section"><div class="soap-label"><span class="soap-a">A</span></div><div class="soap-text">' + escapeHTML((s.a&&s.a.evolucion)||'') + ' ' + escapeHTML((s.a&&s.a.analisis)||'') + '</div></div>'
-          + '<div class="soap-section"><div class="soap-label"><span class="soap-p">P</span></div><div class="soap-text">' + escapeHTML((s.p&&s.p.tratamiento)||'') + ' ' + escapeHTML((s.p&&s.p.indicaciones)||'') + '</div></div>')
+          + '<div class="soap-section"><div class="soap-label"><span class="soap-p">P</span></div><div class="soap-text">' + escapeHTML((s.p&&s.p.tratamiento)||'') + ' ' + escapeHTML((s.p&&s.p.indicaciones)||'') + '</div></div>'
+          + bloqueLinks)
     + '</div></div>';
 }
 
