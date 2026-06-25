@@ -4460,7 +4460,7 @@ function guardarSOAP(){
     p.ultimoUsuario=ter;
     tempEvolMedia=[];
     saveDB('pts',[p]).then(res=>{
-      showToast(res?.ok?'✅ Nota SOAP actualizada':'⚠️ Actualizada local, Sheets pendiente','success');
+      showToast(res?.ok?'✅ Nota SOAP actualizada':'⚠️ Actualizada local, Sheets pendiente',res?.ok?'success':'warning');
       if (res?.ok === true && typeof FST_guardarSesionFirestore === 'function') FST_guardarSesionFirestore(p, p.soap[idx], 'edicion').catch(()=>{});
     }).catch(()=>showToast('⚠️ Sin conexión — actualizada local','warning'))
     .finally(()=>_liberarGuardSOAP());
@@ -4485,7 +4485,7 @@ function guardarSOAP(){
     p.ultimoUsuario=ter;
     tempEvolMedia=[];
     saveDB('pts',[p]).then(res=>{
-      showToast(res?.ok?'✅ Nota SOAP guardada — Sesión '+sesNum:'⚠️ SOAP guardada local, Sheets no confirmó','success');
+      showToast(res?.ok?'✅ Nota SOAP guardada — Sesión '+sesNum:'⚠️ SOAP guardada local, Sheets no confirmó',res?.ok?'success':'warning');
       if (res?.ok === true && typeof FST_guardarSesionFirestore === 'function') FST_guardarSesionFirestore(p, nuevaSOAP, 'nueva').catch(()=>{});
     }).catch(()=>showToast('⚠️ Sin conexión — SOAP guardada solo en este equipo','warning'))
     .finally(()=>_liberarGuardSOAP());
@@ -6836,7 +6836,7 @@ function registrarAltaClinica(){
   };
   p.updatedAt = Date.now();
   saveDB('pts',[p]).then(res=>{
-    showToast(res?.ok?'Alta clínica registrada ✅':'⚠️ Alta local, Sheets pendiente','success');
+    showToast(res?.ok?'Alta clínica registrada ✅':'⚠️ Alta local, Sheets pendiente',res?.ok?'success':'warning');
   }).catch(()=>showToast('⚠️ Sin conexión — alta local','warning'));
   renderExpediente(currentTab||'historia');
 }
@@ -6860,7 +6860,7 @@ function agregarRevaloracion(){
   });
   p.updatedAt = Date.now();
   saveDB('pts',[p]).then(res=>{
-    showToast(res?.ok?'Revaloración registrada ✅':'⚠️ Revaloración local, Sheets pendiente','success');
+    showToast(res?.ok?'Revaloración registrada ✅':'⚠️ Revaloración local, Sheets pendiente',res?.ok?'success':'warning');
   }).catch(()=>showToast('⚠️ Sin conexión — revaloración local','warning'));
   renderExpediente(currentTab||'historia');
 }
@@ -6885,7 +6885,7 @@ function registrarEventoAdverso(){
   });
   p.updatedAt = Date.now();
   saveDB('pts',[p]).then(res=>{
-    showToast(res?.ok?'Evento adverso registrado ✅':'⚠️ Evento local, Sheets pendiente','success');
+    showToast(res?.ok?'Evento adverso registrado ✅':'⚠️ Evento local, Sheets pendiente',res?.ok?'success':'warning');
   }).catch(()=>showToast('⚠️ Sin conexión — evento local','warning'));
   renderExpediente(currentTab||'historia');
 }
@@ -6931,7 +6931,7 @@ function guardarAntecedentesCompleto(){
   if(idx>=0) patientsDB[idx]=p;
 
   saveDB('pts',[p]).then(res=>{
-    showToast(res?.ok?'Antecedentes guardados ✅':'⚠️ Guardado local, Sheets no confirmó','success');
+    showToast(res?.ok?'Antecedentes guardados ✅':'⚠️ Guardado local, Sheets no confirmó',res?.ok?'success':'warning');
     renderExpediente('historia');
   }).catch(()=>{ showToast('⚠️ Sin conexión — guardado local','warning'); renderExpediente('historia'); });
 }
@@ -7825,7 +7825,7 @@ function abrirNuevoMotivoConsulta(){
   if(idx>=0) patientsDB[idx]=p;
   // e. Guardar solo este paciente
   saveDB('pts',[p]).then(res=>{
-    showToast(res?.ok?'Nuevo motivo iniciado. El anterior quedó en el historial ✅':'⚠️ Guardado local, Sheets no confirmó','success');
+    showToast(res?.ok?'Nuevo motivo iniciado. El anterior quedó en el historial ✅':'⚠️ Guardado local, Sheets no confirmó',res?.ok?'success':'warning');
   }).catch(()=>showToast('⚠️ Sin conexión — guardado local','warning'));
   // f. Abrir editar valoración para el nuevo motivo
   abrirEditarValoracion();
