@@ -2155,31 +2155,32 @@ async function FST_fetchAgendaCalendar(rango){
 function _agendaChipsTerapeutas(ev){
   return (Array.isArray(ev.terapeutas)?ev.terapeutas:[]).map(function(n){
     var color = AGENDA_COLORES[n] || AGENDA_COLOR_SIN;
-    return '<span style="font-size:10px;font-weight:700;color:#fff;background:'+color+';border-radius:8px;padding:2px 8px;white-space:nowrap">'+escapeHTML(n)+'</span>';
+    return '<span style="font-size:9px;font-weight:700;color:#fff;background:'+color+';border-radius:6px;padding:1px 7px;white-space:nowrap">'+escapeHTML(n)+'</span>';
   }).join(' ');
 }
 function _agendaEventoHTML(ev){
   var hora = _horaLocal(ev.inicio);
   var chips = _agendaChipsTerapeutas(ev);
-  var bNuevo = ev.esNuevo ? '<span style="font-size:10px;font-weight:700;color:#0E7C66;background:#D1FAE5;border-radius:8px;padding:2px 8px">🆕 nuevo</span>' : '';
-  var bSin = ev.sinAsignar ? '<span style="font-size:10px;font-weight:700;color:#fff;background:'+AGENDA_COLOR_SIN+';border-radius:8px;padding:2px 8px">sin asignar</span>' : '';
+  var bNuevo = ev.esNuevo ? '<span style="font-size:9px;font-weight:700;color:#0E7C66;background:#D1FAE5;border-radius:6px;padding:1px 6px">🆕</span>' : '';
+  var bSin = ev.sinAsignar ? '<span style="font-size:9px;font-weight:700;color:#fff;background:'+AGENDA_COLOR_SIN+';border-radius:6px;padding:1px 6px">sin asignar</span>' : '';
   var pac = escapeHTML(ev.paciente || '(sin nombre)');
-  return '<div style="display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-bottom:1px solid #EEF1F6">'
-    + '<div style="font-size:13px;font-weight:800;color:var(--navy);min-width:48px">'+escapeHTML(hora)+'</div>'
-    + '<div style="flex:1"><div style="font-size:13px;font-weight:600;color:#1F2937">'+pac+'</div>'
-    + '<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px">'+chips+' '+bNuevo+' '+bSin+'</div>'
-    + '</div></div>';
+  // 1 renglón: hora fija (der) | paciente flexible (truncado) | chips a la derecha
+  return '<div style="display:flex;align-items:center;gap:10px;padding:7px 4px;border-bottom:1px solid #F0F2F7">'
+    + '<div style="font-size:12px;font-weight:800;color:var(--navy);min-width:62px;text-align:right">'+escapeHTML(hora)+'</div>'
+    + '<div style="flex:1;min-width:0;font-size:13px;font-weight:600;color:#1F2937;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+pac+'</div>'
+    + '<div style="display:flex;align-items:center;flex-wrap:wrap;justify-content:flex-end;gap:4px;flex-shrink:0">'+chips+bNuevo+bSin+'</div>'
+    + '</div>';
 }
 function FST_cambiarRangoAgenda(rango){ FST_montarAgendaCalendar(rango); }
 // G-4(5): cita SIN la columna de hora (para agrupar por hora en semana/próxima). No toca _agendaEventoHTML.
 function _agendaCitaSinHoraHTML(ev){
   var chips = _agendaChipsTerapeutas(ev);
-  var bNuevo = ev.esNuevo ? '<span style="font-size:10px;font-weight:700;color:#0E7C66;background:#D1FAE5;border-radius:8px;padding:2px 8px">🆕 nuevo</span>' : '';
-  var bSin = ev.sinAsignar ? '<span style="font-size:10px;font-weight:700;color:#fff;background:'+AGENDA_COLOR_SIN+';border-radius:8px;padding:2px 8px">sin asignar</span>' : '';
+  var bNuevo = ev.esNuevo ? '<span style="font-size:9px;font-weight:700;color:#0E7C66;background:#D1FAE5;border-radius:6px;padding:1px 6px">🆕</span>' : '';
+  var bSin = ev.sinAsignar ? '<span style="font-size:9px;font-weight:700;color:#fff;background:'+AGENDA_COLOR_SIN+';border-radius:6px;padding:1px 6px">sin asignar</span>' : '';
   var pac = escapeHTML(ev.paciente || '(sin nombre)');
-  return '<div style="padding:5px 0 5px 8px;border-left:2px solid #EEF1F6;margin-bottom:4px">'
-    + '<div style="font-size:13px;font-weight:600;color:#1F2937">'+pac+'</div>'
-    + '<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px">'+chips+' '+bNuevo+' '+bSin+'</div>'
+  return '<div style="display:flex;align-items:center;gap:8px;padding:5px 4px 5px 10px;border-left:2px solid #EEF1F6;margin-bottom:2px">'
+    + '<div style="flex:1;min-width:0;font-size:13px;font-weight:600;color:#1F2937;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+pac+'</div>'
+    + '<div style="display:flex;align-items:center;flex-wrap:wrap;justify-content:flex-end;gap:4px;flex-shrink:0">'+chips+bNuevo+bSin+'</div>'
     + '</div>';
 }
 // G-4(5): agrupa citas (ya ordenadas por inicio) por hora local; hora como subencabezado, citas debajo sin repetir hora.
