@@ -6368,7 +6368,7 @@ async function guardarConsentimiento(){
     // DIAGNÓSTICO TEMPORAL (K.2-A): error EXACTO del PDF en pantalla (iPad sin consola).
     var _diagJsPdf = (typeof window.jspdf==='undefined') ? 'window.jspdf=UNDEFINED'
       : ((window.jspdf && window.jspdf.jsPDF) ? 'jspdf OK' : 'jspdf SIN .jsPDF');
-    showToast('🔧 Diagnóstico PDF ['+_diagJsPdf+']: '+((e&&e.message)||e||'error desconocido'),'error');
+    alert('🔧 Diagnóstico PDF ['+_diagJsPdf+']: '+((e&&e.message)||e||'error desconocido'));
   }
 
   const [firmaResult, firmaPSResult, firmaTutorResult, pdfResult] = await Promise.all([
@@ -6445,13 +6445,25 @@ async function guardarConsentimiento(){
     }
     // DIAGNÓSTICO TEMPORAL (K.2-B): de qué rama viene la navegación y a dónde.
     alert('NAV FINAL: rama=then | res.ok='+!!(res&&res.ok)+' | stack=['+screenStack.join(',')+'] | destino='+(screenStack[screenStack.length-2]||'screen-agenda'));
-    setTimeout(()=>{goBack();renderExpediente('consent')},1400);
+    setTimeout(()=>{
+      alert('ANTES goBack: pantalla actual=' + (screenStack[screenStack.length-1]||'?'));
+      goBack();
+      alert('DESPUÉS goBack: pantalla actual=' + (screenStack[screenStack.length-1]||'?'));
+      renderExpediente('consent');
+      alert('DESPUÉS renderExpediente: pantalla actual=' + (screenStack[screenStack.length-1]||'?') + ' | visible=' + (document.querySelector('.screen.active')?.id||'?'));
+    },1400);
   }).catch((errSave) => {
     // DIAGNÓSTICO TEMPORAL (K.2-D): si saveDB rechaza, ver el error y que esta rama navega.
     alert('CATCH saveDB: '+((errSave&&errSave.message)||errSave||'sin error'));
     showToast('⚠️ Sin conexión — consentimiento guardado solo en este equipo.','warning');
     alert('NAV FINAL: rama=catch | stack=['+screenStack.join(',')+'] | destino='+(screenStack[screenStack.length-2]||'screen-agenda'));
-    setTimeout(()=>{goBack();renderExpediente('consent')},1400);
+    setTimeout(()=>{
+      alert('ANTES goBack: pantalla actual=' + (screenStack[screenStack.length-1]||'?'));
+      goBack();
+      alert('DESPUÉS goBack: pantalla actual=' + (screenStack[screenStack.length-1]||'?'));
+      renderExpediente('consent');
+      alert('DESPUÉS renderExpediente: pantalla actual=' + (screenStack[screenStack.length-1]||'?') + ' | visible=' + (document.querySelector('.screen.active')?.id||'?'));
+    },1400);
   });
   }catch(errGuardado){
     console.error('guardarConsentimiento:', errGuardado);
