@@ -2132,12 +2132,75 @@ function renderAgenda(){
       </div><div style="display:flex;flex-direction:column;gap:3px;align-items:flex-end">${badge}${badgeAtraso}</div></div>`;
   });
   c.innerHTML=html;
+  // G-2: bloque adicional "Agenda del calendario" (async, no bloquea el dashboard de hoy)
+  try{ FST_montarAgendaCalendar('dia'); }catch(e){ console.warn('[Agenda cal] montar:', e&&e.message); }
   // M2-E: toast una vez por sesión si hay SOAP atrasado
   const atrasados=patientsDB.filter(p=>!String(p.name||'').startsWith('TEST_QA_')&&necesitaAlertaSoapSemanal(p)&&Array.isArray(p.soap)&&p.soap.length>0).length;
   if(atrasados>0 && !sessionStorage.getItem('toastSoapMostrado')){
     showToast(`${atrasados} paciente${atrasados>1?'s':''} con SOAP atrasado (+7 días)`,'warning');
     sessionStorage.setItem('toastSoapMostrado','1');
   }
+}
+// ── G-2: Agenda del Google Calendar (backend leerAgenda) — la app SOLO LEE ──
+const AGENDA_COLORES = {Carlos:'#1B3A6B', Zara:'#0E7C66', Camila:'#B8860B', Dafne:'#7B4FA3', Goretti:'#C0392B', Jess:'#2C7BB6'};
+const AGENDA_COLOR_SIN = '#9BA3B5';
+function _horaLocal(iso){
+  try{ return new Date(iso).toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'}); }
+  catch(e){ return ''; }
+}
+// POST autenticado reutilizando callAppsScriptPrivado (patrón L976/idToken). Devuelve la respuesta cruda.
+async function FST_fetchAgendaCalendar(rango){
+  return await callAppsScriptPrivado('leerAgenda', {rango: rango||'dia'});
+}
+function _agendaChipsTerapeutas(ev){
+  return (Array.isArray(ev.terapeutas)?ev.terapeutas:[]).map(function(n){
+    var color = AGENDA_COLORES[n] || AGENDA_COLOR_SIN;
+    return '<span style="font-size:10px;font-weight:700;color:#fff;background:'+color+';border-radius:8px;padding:2px 8px;white-space:nowrap">'+escapeHTML(n)+'</span>';
+  }).join(' ');
+}
+function _agendaEventoHTML(ev){
+  var hora = _horaLocal(ev.inicio);
+  var chips = _agendaChipsTerapeutas(ev);
+  var bNuevo = ev.esNuevo ? '<span style="font-size:10px;font-weight:700;color:#0E7C66;background:#D1FAE5;border-radius:8px;padding:2px 8px">🆕 nuevo</span>' : '';
+  var bSin = ev.sinAsignar ? '<span style="font-size:10px;font-weight:700;color:#fff;background:'+AGENDA_COLOR_SIN+';border-radius:8px;padding:2px 8px">sin asignar</span>' : '';
+  var pac = escapeHTML(ev.paciente || '(sin nombre)');
+  return '<div style="display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-bottom:1px solid #EEF1F6">'
+    + '<div style="font-size:13px;font-weight:800;color:var(--navy);min-width:48px">'+escapeHTML(hora)+'</div>'
+    + '<div style="flex:1"><div style="font-size:13px;font-weight:600;color:#1F2937">'+pac+'</div>'
+    + '<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px">'+chips+' '+bNuevo+' '+bSin+'</div>'
+    + '</div></div>';
+}
+function FST_cambiarRangoAgenda(rango){ FST_montarAgendaCalendar(rango); }
+async function FST_montarAgendaCalendar(rango){
+  rango = rango || 'dia';
+  const cont = document.getElementById('content-agenda');
+  if(!cont) return;
+  let block = document.getElementById('agenda-cal-block');
+  if(!block){ block = document.createElement('div'); block.id='agenda-cal-block'; block.style.marginTop='8px'; cont.appendChild(block); }
+  const btn = (r,txt)=>'<button onclick="FST_cambiarRangoAgenda(\''+r+'\')" style="font-size:12px;font-weight:700;border:none;border-radius:10px;padding:6px 12px;cursor:pointer;font-family:inherit;'
+    + (r===rango?'background:var(--navy);color:#fff':'background:#EEF1F6;color:var(--navy)')+'">'+txt+'</button>';
+  block.innerHTML = '<div class="section-card"><div style="padding:12px 14px">'
+    + '<div style="font-size:13px;font-weight:700;color:var(--navy);margin-bottom:8px">📅 Agenda del calendario</div>'
+    + '<div style="display:flex;gap:6px;margin-bottom:10px">'+btn('dia','Hoy')+btn('semana','Semana')+btn('semanaSiguiente','Próxima')+'</div>'
+    + '<div id="agenda-cal-list"><div style="font-size:12px;color:var(--gray-400);padding:6px 0">⏳ Cargando agenda…</div></div>'
+    + '</div></div>';
+  const reqId = (window._agendaCalReq = (window._agendaCalReq||0) + 1);
+  let res;
+  try{ res = await FST_fetchAgendaCalendar(rango); }
+  catch(e){ res = {ok:false, error:'RED_ERROR', msg:e&&e.message}; }
+  if(reqId !== window._agendaCalReq) return;        // respuesta obsoleta: el usuario ya cambió de rango
+  const listEl = document.getElementById('agenda-cal-list');
+  if(!listEl) return;
+  if(!res || !res.ok){
+    listEl.innerHTML = '<div style="font-size:12px;color:var(--red);padding:6px 0">⚠️ No se pudo cargar la agenda'+(res&&res.error==='AUTH_REQUIRED'?' (sesión expirada)':'')+'.</div>';
+    return;
+  }
+  const evs = Array.isArray(res.eventos) ? res.eventos : [];
+  if(!evs.length){
+    listEl.innerHTML = '<div style="font-size:12px;color:var(--gray-400);padding:6px 0">Sin eventos en el calendario para este rango.</div>';
+    return;
+  }
+  listEl.innerHTML = evs.map(_agendaEventoHTML).join('');
 }
 function showPacientes(){
   document.querySelectorAll('.nav-item').forEach((n,i)=>n.classList.toggle('active',i===1));
