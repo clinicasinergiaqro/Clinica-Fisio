@@ -2277,9 +2277,19 @@ function _agendaCitasPorHora(citas){
   return orden.map(function(h){
     return '<div style="margin:2px 0 6px">'
       + '<div style="font-size:12px;font-weight:800;color:var(--navy);margin:4px 0 2px">🕒 '+escapeHTML(h)+'</div>'
-      + porHora[h].map(_agendaCitaSinHoraHTML).join('')
+      + '<div style="display:flex;flex-wrap:wrap;gap:6px">'+porHora[h].map(_agendaTarjetaTimeline).join('')+'</div>'
       + '</div>';
   }).join('');
+}
+// G-8: alterna el cuerpo colapsable de un día (Semana/Próxima) y rota su flecha. Estado en memoria.
+function _agendaToggleDia(diaISO){
+  window._agendaDiasAbiertos = window._agendaDiasAbiertos || {};
+  var abierto = !window._agendaDiasAbiertos[diaISO];
+  window._agendaDiasAbiertos[diaISO] = abierto;
+  var cuerpo = document.getElementById('agdia-'+diaISO);
+  var flecha = document.getElementById('agflecha-'+diaISO);
+  if(cuerpo) cuerpo.style.display = abierto ? 'block' : 'none';
+  if(flecha) flecha.style.transform = 'rotate('+(abierto?90:0)+'deg)';
 }
 // G-4(4): etiqueta de rango de fechas a partir de los días agrupados (ascendentes).
 function _agendaRangoFechasLabel(dias, rango){
@@ -2341,21 +2351,29 @@ async function FST_montarAgendaCalendar(rango){
     var resumenSem = '<div style="font-size:12px;color:var(--gray-500);margin-bottom:10px;padding:6px 10px;background:#F3F6FB;border-radius:10px">'
       + '<b style="color:var(--navy)">'+totalCitas+' citas</b> · '+totNuevos+' nuevos · '+totSin+' sin asignar</div>';
     var rangoFechas = _agendaRangoFechasLabel(dias, rango);
+    window._agendaDiasAbiertos = window._agendaDiasAbiertos || {};   // G-8: estado colapsable por día (en memoria)
     var htmlSem = (rangoFechas?('<div style="font-size:13px;font-weight:800;color:var(--navy);margin-bottom:8px">'+escapeHTML(rangoFechas)+'</div>'):'') + resumenSem + dias.map(function(diaISO){
       var citas = grupos[diaISO].slice().sort(function(a,b){ return a.inicio<b.inicio?-1:1; });
       var r = _agendaResumenDia(citas);
       var esHoy = _agendaEsHoy(diaISO);
+      // G-8: estado inicial — HOY abierto (semana); en Próxima abrir el primer día; resto cerrado.
+      var _defAbierto = esHoy || (rango==='semanaSiguiente' && diaISO===dias[0]);
+      var abierto = (window._agendaDiasAbiertos[diaISO] !== undefined) ? window._agendaDiasAbiertos[diaISO] : _defAbierto;
+      window._agendaDiasAbiertos[diaISO] = abierto;
       var chipsTer = Object.keys(r.terapeutas).map(function(n){
         var c = (typeof AGENDA_COLORES!=='undefined' && AGENDA_COLORES[n]) ? AGENDA_COLORES[n] : (typeof AGENDA_COLOR_SIN!=='undefined'?AGENDA_COLOR_SIN:'#9BA3B5');
         return '<span style="font-size:10px;color:'+c+';font-weight:700">'+escapeHTML(n)+' '+r.terapeutas[n]+'</span>';
       }).join(' · ');
       var titulo = _agendaDiaLargo(diaISO);
       return '<div style="margin:0 0 14px;border:1px solid #E6EAF2;border-radius:14px;overflow:hidden;box-shadow:0 1px 3px rgba(20,40,80,.05)">'
-        + '<div style="padding:8px 12px;background:'+(esHoy?'var(--navy)':'#F3F6FB')+';color:'+(esHoy?'#fff':'var(--navy)')+'">'
-        + '<div style="font-size:13px;font-weight:800;text-transform:capitalize">'+escapeHTML(titulo)+(esHoy?' · HOY':'')+'</div>'
+        + '<div onclick="_agendaToggleDia(\''+diaISO+'\')" style="cursor:pointer;padding:8px 12px;background:'+(esHoy?'var(--navy)':'#F3F6FB')+';color:'+(esHoy?'#fff':'var(--navy)')+'">'
+        + '<div style="display:flex;align-items:center;gap:8px">'
+        + '<span id="agflecha-'+diaISO+'" style="font-size:16px;font-weight:800;display:inline-block;transition:transform .15s;transform:rotate('+(abierto?90:0)+'deg)">›</span>'
+        + '<div style="flex:1;font-size:13px;font-weight:800;text-transform:capitalize">'+escapeHTML(titulo)+(esHoy?' · HOY':'')+'</div>'
+        + '</div>'
         + '<div style="font-size:11px;font-weight:600;opacity:.9;margin-top:2px">'+citas.length+' cita'+(citas.length!==1?'s':'')
         + (chipsTer?' · '+chipsTer:'')+(r.sinAsignar?' · '+r.sinAsignar+' sin asignar':'')+'</div></div>'
-        + '<div style="padding:4px 12px">'+_agendaCitasPorHora(citas)+'</div>'
+        + '<div id="agdia-'+diaISO+'" style="padding:4px 12px;display:'+(abierto?'block':'none')+'">'+_agendaCitasPorHora(citas)+'</div>'
         + '</div>';
     }).join('');
     listEl.innerHTML = htmlSem;
