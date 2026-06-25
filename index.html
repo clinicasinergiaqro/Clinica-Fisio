@@ -5437,6 +5437,7 @@ async function FST_renderEstudiosApartado(pid){
     box.innerHTML = todos.map(function(e){
       var t = ESTUDIO_TIPOS[e.tipo] || { icono:'📎', label:e.tipo||'Doc' };
       var badgeNota = (e.origen==='nota') ? '<span style="font-size:9px;font-weight:700;background:#FEF3C7;color:#92400E;padding:2px 7px;border-radius:8px;margin-left:6px">en nota</span>' : '';
+      var badgeSesion = (e.origen==='soap') ? '<span style="font-size:9px;font-weight:700;background:#F0F2F7;color:#5A6478;padding:2px 7px;border-radius:8px;margin-left:6px">📎 desde sesión</span>' : '';
       var desc = (e.descripcion && e.descripcion!=='(en nota)') ? e.descripcion : (e.url||'');
       var u = escapeAttr_(e.url||'');
       var link = e.url ? '<a href="'+u+'" target="_blank" rel="noopener noreferrer" style="color:var(--navy);text-decoration:underline;word-break:break-all">'+escapeHTML(desc)+'</a>' : escapeHTML(desc);
@@ -5444,7 +5445,7 @@ async function FST_renderEstudiosApartado(pid){
       var borrar = (e.origen!=='nota') ? '<button data-pid="'+escapeAttr_(pid)+'" data-eid="'+escapeAttr_(e.id||'')+'" onclick="borrarEstudio(this.dataset.pid,this.dataset.eid)" style="background:none;border:none;color:var(--gray-400);font-size:18px;cursor:pointer;margin-left:auto">×</button>' : '';
       return '<div class="doc-item" style="align-items:flex-start">'
         + '<div class="doc-icon" style="font-size:18px">'+t.icono+'</div>'
-        + '<div class="doc-info"><div class="doc-name">'+link+badgeNota+'</div>'
+        + '<div class="doc-info"><div class="doc-name">'+link+badgeNota+badgeSesion+'</div>'
         + '<div class="doc-meta">'+escapeHTML(fechaTxt)
         + ' · <span style="font-size:9px;font-weight:700;background:#E8EEF7;color:var(--navy);padding:1px 6px;border-radius:8px">'+t.label+'</span>'
         + (e.agregadoPor?(' · agregado por '+escapeHTML(e.agregadoPor)):'')+'</div></div>'
@@ -5590,6 +5591,18 @@ async function handleMedia(ev,tipo,pid){
 
       if(tipo==='foto'||tipo==='galeria') p.fotos.push(entry);
       else p.docs.push(entry);
+      // I-B: reflejar en Estudios, marcado por tipo y origen 'soap' (reusa url/fbPath, NO re-sube)
+      if(!Array.isArray(p.estudiosDocs)) p.estudiosDocs=[];
+      p.estudiosDocs.push({
+        id:'est_'+ts+'_'+Math.random().toString(36).slice(2,6),
+        tipo:(kind==='imagen'?'imagen':'doc'),
+        url:url, fbPath:fbPath,
+        descripcion:(f.name||'').replace(/\.[^.]+$/,''),
+        fechaEstudio:new Date().toISOString().slice(0,10),
+        fechaAgregado:new Date().toLocaleDateString('es-MX'),
+        agregadoPor:currentUser.name,
+        origen:'soap', mediaId:mediaId
+      });
       agregados++;
 
     }catch(err){
