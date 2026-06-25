@@ -6032,7 +6032,7 @@ async function guardarConsentimiento(){
 
   // ── GENERAR PDF CON jsPDF ──────────────────────────────────────────────────
   async function generarPDFConsentimiento(){
-    const { jsPDF } = window.jspdf;
+    const jsPDF = (window.jspdf && window.jspdf.jsPDF) || window.jsPDF;
     if(!jsPDF) throw new Error('jsPDF no disponible');
 
     // Logo de la clinica (base64 embebido)
@@ -6359,6 +6359,7 @@ async function guardarConsentimiento(){
     }catch(e){ console.warn('subirPDF:',e.message); return null; }
   }
 
+  try{
   showToast('⏳ Subiendo documentos…','');
   let pdfBuffer=null;
   try{ pdfBuffer=await generarPDFConsentimiento(); }
@@ -6428,9 +6429,11 @@ async function guardarConsentimiento(){
   if(saved) saved.style.display='block';
 
   saveDB('pts',[currentPatient]).then(res => {
-    const enNube=pdfResult?.url?' — PDF en nube ☁️':(firmaResult?.url?' — firma en nube ☁️':'');
+    const pdfOk = !!(pdfResult && pdfResult.url);
+    const enNube = pdfOk?' — PDF en nube ☁️':(firmaResult?.url?' — firma en nube ☁️':'');
     if(res && res.ok){
-      showToast('✅ Consentimiento guardado'+enNube,'success');
+      if(pdfOk) showToast('✅ Consentimiento guardado'+enNube,'success');
+      else showToast('⚠️ Consentimiento guardado SIN PDF — reintenta generar el PDF','warning');
     } else {
       showToast('⚠️ Consentimiento guardado local, pero Sheets no confirmó. Revisa conexión.','warning');
     }
@@ -6439,6 +6442,10 @@ async function guardarConsentimiento(){
     showToast('⚠️ Sin conexión — consentimiento guardado solo en este equipo.','warning');
     setTimeout(()=>{goBack();renderExpediente('consent')},1400);
   });
+  }catch(errGuardado){
+    console.error('guardarConsentimiento:', errGuardado);
+    showToast('No se pudo completar el consentimiento: '+((errGuardado&&errGuardado.message)||'error inesperado')+'. Intenta de nuevo.','error');
+  }
 }
 
 function clearSig(){sigMain&&sigMain.clear()}
