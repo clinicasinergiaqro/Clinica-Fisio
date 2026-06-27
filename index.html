@@ -2463,7 +2463,13 @@ function _evaSinMejoria(p){
     .map(_evaRep).filter(function(v){return v!=null;});
   if(conEva.length<3) return null;
   var u=conEva.slice(-3);
-  if(u[2] >= u[0]) return {txt:'EVA sin mejoría ('+u[0]+'→'+u[2]+' en 3 sesiones)'};
+  var caida=u[0]-u[2];
+  if(caida<3){
+    var txt=(caida<=0)
+      ? 'EVA sin mejoría ('+u[0]+'→'+u[2]+' en 3 sesiones)'
+      : 'EVA con poca mejoría ('+u[0]+'→'+u[2]+', solo bajó '+caida+' en 3 sesiones)';
+    return {txt:txt};
+  }
   return null;
 }
 function _vigilanciaClinica(p){
@@ -2491,7 +2497,7 @@ function _pedirMotivoReval(){
     ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:10002;display:flex;align-items:flex-end;justify-content:center';
     ov.onclick=function(e){ if(e.target===ov){ ov.remove(); resolve(null);} };
     ov.innerHTML='<div style="background:#fff;border-radius:16px 16px 0 0;width:100%;max-width:480px;padding:18px">'
-      +'<div style="font-weight:800;color:var(--navy);margin-bottom:8px">🙋 Pedir revaloración del supervisor</div>'
+      +'<div style="font-weight:800;color:#C0392B;margin-bottom:8px">🆘 Pedir valoración o apoyo de Carlos</div>'
       +'<div style="font-size:12px;color:var(--gray-500);margin-bottom:8px">¿Por qué? (opcional)</div>'
       +'<textarea id="_revalmotivo" rows="3" placeholder="p.ej. sin mejoría, duda de tratamiento, dolor que no cede…" style="width:100%;box-sizing:border-box;border:1px solid var(--gray-200);border-radius:10px;padding:10px;font-family:inherit;font-size:14px;resize:none"></textarea>'
       +'<div style="display:flex;gap:8px;margin-top:12px">'
@@ -2509,7 +2515,7 @@ async function pedirRevaloracion(pid){
   var motivo=await _pedirMotivoReval();
   if(motivo===null) return;
   p.revalSolicitada={activa:true, por:(currentUser&&currentUser.name)||'', fecha:todayFmt(), motivo:motivo||''};
-  try{ await saveDB('pts',[p]); showToast('🙋 Revaloración solicitada al supervisor','success'); }
+  try{ await saveDB('pts',[p]); showToast('🆘 Solicitud enviada a Carlos','success'); }
   catch(e){ showToast('❌ '+((e&&e.message)||'error'),'error'); }
 }
 // Supervisor: marcar resuelta.
@@ -2905,7 +2911,7 @@ function renderExpediente(tab='historia'){
   </div>
   ${(currentUser&&(currentUser.role==='supervisor'||currentUser.name==='CARLOS'||p.terapeuta===currentUser.name||p.terapeutaSeguimiento===currentUser.name))?`<div style="padding:4px 14px 0;text-align:right"><button data-pid="${escapeAttr_(p.id)}" onclick="exportarExpedienteJSON(this.dataset.pid)" style="background:transparent;border:1px solid rgba(255,255,255,.4);color:white;border-radius:16px;padding:4px 12px;font-size:11px;cursor:pointer;font-weight:600">📥 Exportar JSON</button></div>`:''}
   ${(currentUser&&currentUser.role==='supervisor')?`<div style="padding:4px 14px 0;text-align:right"><button data-pid="${escapeAttr_(p.id)}" onclick="_abrirEditarPaciente(this.dataset.pid)" style="background:var(--gold);border:none;color:var(--navy-dark);border-radius:16px;padding:5px 14px;font-size:12px;cursor:pointer;font-weight:700">✏️ Editar datos</button></div>`:''}
-  <div style="padding:4px 14px 0;text-align:right"><button data-pid="${escapeAttr_(p.id)}" onclick="pedirRevaloracion(this.dataset.pid)" style="background:#E0E7FF;border:none;color:#3730A3;border-radius:16px;padding:5px 14px;font-size:12px;cursor:pointer;font-weight:700">🙋 Pedir revaloración</button></div>
+  <div style="padding:6px 14px 0;text-align:right"><button data-pid="${escapeAttr_(p.id)}" onclick="pedirRevaloracion(this.dataset.pid)" style="background:#C0392B;border:none;color:#fff;border-radius:14px;padding:10px 20px;font-size:14px;cursor:pointer;font-weight:800;box-shadow:0 2px 6px rgba(192,57,43,.35)">🆘 Pedir valoración o apoyo de Carlos</button></div>
   ${renderIndicadorCompletitud(p)}`;
 
   // Alerta de seguridad clínica — visible en todos los tabs del expediente
