@@ -5138,15 +5138,60 @@ function copiarSesionAnterior(){
   showToast('Sesión anterior copiada como base editable. Revisa cambios antes de guardar.','');
   document.getElementById('content-soap')?.scrollTo({top:0,behavior:'smooth'});
 }
+// FA-prev: comprime una imagen a JPEG ~0.7 (máx 1600px) → Blob. Reusa canvas.
+function _comprimirImagenSoap(file){
+  return new Promise(function(resolve,reject){
+    try{
+      var fr=new FileReader();
+      fr.onload=function(e){
+        var img=new Image();
+        img.onload=function(){
+          var max=1600, w=img.width, h=img.height;
+          if(w>max||h>max){ if(w>=h){ h=Math.round(h*max/w); w=max; } else { w=Math.round(w*max/h); h=max; } }
+          var c=document.createElement('canvas'); c.width=w; c.height=h;
+          c.getContext('2d').drawImage(img,0,0,w,h);
+          c.toBlob(function(blob){ blob?resolve(blob):reject(new Error('toBlob null')); },'image/jpeg',0.7);
+        };
+        img.onerror=reject; img.src=e.target.result;
+      };
+      fr.onerror=reject; fr.readAsDataURL(file);
+    }catch(e){ reject(e); }
+  });
+}
 async function handleSoapPhoto(ev,tipo){
-  for(const f of Array.from(ev.target.files)){
-    const data=await readFile(f);
-    tempEvolMedia.push({name:f.name,data,type:f.type,fecha:todayFmt(),label:f.name.replace(/\.[^.]+$/,'')});
+  const pid = currentPatient && currentPatient.id;
+  const files = Array.from(ev.target.files);
+  if(files.length) showToast('☁️ Procesando foto(s)…','');
+  for(const f of files){
+    const ts=Date.now();
+    const esImg = !!(f.type && f.type.startsWith('image'));
+    const data = await readFile(f);   // base64 de respaldo si todo lo demás falla
+    const mediaId = 'ms_'+(pid||'x')+'_'+ts+'_'+Math.random().toString(36).slice(2,6);
+    let url='', fbPath='';
+    if(pid){
+      try{
+        const blob = esImg ? await _comprimirImagenSoap(f) : f;
+        const safe = (f.name||'archivo').replace(/[^\w.\-]+/g,'_');
+        fbPath = `clinica/sinergia/${pid}/soap/${ts}_${safe}`;
+        const ref = fbStorage.ref(fbPath);
+        await ref.put(blob,{contentType: esImg?'image/jpeg':(f.type||'application/octet-stream')});
+        url = await ref.getDownloadURL();
+      }catch(err){
+        console.warn('[SOAP media] Storage falló, fallback IndexedDB:', err&&err.message);
+        fbPath='';
+        try{ await idbSet(mediaId, data); }catch(e2){ /* si IDB también falla, queda data en memoria */ }
+      }
+    }
+    tempEvolMedia.push({
+      name:f.name, type:f.type, fecha:todayFmt(), label:f.name.replace(/\.[^.]+$/,''),
+      mediaId, url, fbPath,
+      data: url ? null : data   // subió a Storage → sin base64; si no, conservar (IDB/memoria)
+    });
   }
   ev.target.value='';
   const g=document.getElementById('soap-media-preview');
   if(g) g.innerHTML=tempEvolMedia.map((f,i)=>`<div class="media-thumb">
-    ${f.type&&f.type.startsWith('image')?`<img src="${f.data}" loading="lazy" decoding="async">`:
+    ${f.type&&f.type.startsWith('image')?`<img src="${f.url||f.data}" loading="lazy" decoding="async">`:
       f.name&&f.name.endsWith('.pdf')?`<div style="width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:22px;gap:2px">📄<div style="font-size:8px;color:#5A6478">PDF</div></div>`:
       f.name&&(f.name.endsWith('.docx')||f.name.endsWith('.doc'))?`<div style="width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:22px;gap:2px">📝<div style="font-size:8px;color:#5A6478">Word</div></div>`:
       f.name&&(f.name.endsWith('.xlsx')||f.name.endsWith('.xls'))?`<div style="width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:22px;gap:2px">📊<div style="font-size:8px;color:#5A6478">Excel</div></div>`:
@@ -5657,6 +5702,8 @@ async function restaurarMedia(p){
   };
   await restaurarArr(p.fotos);
   await restaurarArr(p.docs);
+  // FA-prev: restaurar media dentro de cada SOAP (mismo criterio: url→no toca; mediaId→idbGet)
+  if(Array.isArray(p.soap)){ for(const s of p.soap){ if(s && Array.isArray(s.media)) await restaurarArr(s.media); } }
 }
 function deleteMedia(pid,tipo,i){
   const p=patientsDB.find(x=>x.id===pid);if(!p)return;
