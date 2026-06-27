@@ -2463,7 +2463,13 @@ function _evaSinMejoria(p){
     .map(_evaRep).filter(function(v){return v!=null;});
   if(conEva.length<3) return null;
   var u=conEva.slice(-3);
-  if(u[2] >= u[0]) return {txt:'EVA sin mejoría ('+u[0]+'→'+u[2]+' en 3 sesiones)'};
+  var caida=u[0]-u[2];
+  if(caida<3){
+    var txt=(caida<=0)
+      ? 'EVA sin mejoría ('+u[0]+'→'+u[2]+' en 3 sesiones)'
+      : 'EVA con poca mejoría ('+u[0]+'→'+u[2]+', solo bajó '+caida+' en 3 sesiones)';
+    return {txt:txt};
+  }
   return null;
 }
 function _vigilanciaClinica(p){
