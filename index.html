@@ -162,7 +162,6 @@ async function FST_fetchSesiones(pid){
 
 function FST_badgesSesion(s){
   const b = [];
-  b.push('<span style="font-size:10px;font-weight:700;background:#E8EEF7;color:var(--navy);padding:2px 8px;border-radius:12px;margin-right:4px">\u{1F4C2} Histórico</span>');
   if (s.revisionPendiente) b.push('<span class="badge badge-alert" style="font-size:10px">⚠ Revisión pendiente</span>');
   else b.push('<span style="font-size:10px;color:var(--green);font-weight:700">✅ Revisada</span>');
   if ((s.motivosRevision||[]).some(function(m){ return m==='FECHA_FUTURA'||m==='FECHA_RARA'||m==='fecha_futura'; })) b.push('<span class="badge badge-alert" style="font-size:10px;background:#FEF3C7;color:#92400E">\u{1F534} Fecha pendiente</span>');
@@ -185,7 +184,7 @@ function FST_renderCard(s){
     : '';
   return '<div class="soap-card" style="opacity:.92;border-left:3px solid var(--navy)">'
     + '<div class="soap-header" style="cursor:default"><div>'
-    + '<div class="soap-sesion">Sesión ' + escapeHTML(s.num) + ' <span style="font-size:10px;color:var(--gray-400);font-weight:400"> · Histórico Firestore</span></div>'
+    + '<div class="soap-sesion">Sesión ' + escapeHTML(s.num) + '</div>'
     + '<div class="soap-meta">' + fecha + ' · <span style="font-weight:700;color:var(--navy)">' + terapeuta + '</span> · Semana ' + escapeHTML(semana) + '</div>'
     + '</div><div style="display:flex;flex-wrap:wrap;gap:4px;align-items:center">' + FST_badgesSesion(s) + '</div></div>'
     + '<div class="soap-body">'
