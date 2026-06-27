@@ -5500,14 +5500,19 @@ async function FST_renderEstudiosApartado(pid){
       var u = escapeAttr_(e.url||'');
       var link = e.url ? '<a href="'+u+'" target="_blank" rel="noopener noreferrer" style="color:var(--navy);text-decoration:underline;word-break:break-all">'+escapeHTML(desc)+'</a>' : escapeHTML(desc);
       var fechaTxt = _aISO(e.fechaEstudio) ? _fechaLegible(_aISO(e.fechaEstudio)) : (e.fechaEstudio ? String(e.fechaEstudio) : '(sin fecha)');
-      var borrar = (e.origen!=='nota') ? '<button data-pid="'+escapeAttr_(pid)+'" data-eid="'+escapeAttr_(e.id||'')+'" onclick="borrarEstudio(this.dataset.pid,this.dataset.eid)" style="background:none;border:none;color:var(--gray-400);font-size:18px;cursor:pointer;margin-left:auto">×</button>' : '';
+      var acciones = '';
+      if (e.origen!=='nota') {
+        var btnReclas = e.id ? '<button data-pid="'+escapeAttr_(pid)+'" data-eid="'+escapeAttr_(e.id)+'" onclick="reclasificarEstudio(this.dataset.pid,this.dataset.eid)" style="background:none;border:1px solid var(--gray-200);border-radius:8px;color:var(--gray-400);font-size:13px;line-height:1;padding:5px 9px;cursor:pointer" title="Cambiar tipo">🏷️</button>' : '';
+        var btnBorrar = '<button data-pid="'+escapeAttr_(pid)+'" data-eid="'+escapeAttr_(e.id||'')+'" onclick="borrarEstudio(this.dataset.pid,this.dataset.eid)" style="background:none;border:none;color:var(--gray-400);font-size:18px;cursor:pointer">×</button>';
+        acciones = '<div style="margin-left:auto;display:flex;align-items:center;gap:6px;flex-shrink:0">'+btnReclas+btnBorrar+'</div>';
+      }
       return '<div class="doc-item" style="align-items:flex-start">'
         + '<div class="doc-icon" style="font-size:18px">'+t.icono+'</div>'
         + '<div class="doc-info"><div class="doc-name">'+link+badgeNota+badgeSesion+'</div>'
         + '<div class="doc-meta">'+escapeHTML(fechaTxt)
         + ' · <span style="font-size:9px;font-weight:700;background:#E8EEF7;color:var(--navy);padding:1px 6px;border-radius:8px">'+t.label+'</span>'
         + (e.agregadoPor?(' · agregado por '+escapeHTML(e.agregadoPor)):'')+'</div></div>'
-        + borrar + '</div>';
+        + acciones + '</div>';
     }).join('');
   } catch(e){ box.innerHTML = '<div style="padding:12px;color:var(--red);font-size:12px">Error al cargar estudios: '+escapeHTML(e.message)+'</div>'; }
 }
@@ -5588,6 +5593,52 @@ async function borrarEstudio(pid, eid){
   p.estudiosDocs = p.estudiosDocs.filter(function(e){ return String(e.id)!==String(eid); });
   try { await _persistirEstudios(p); if (window._estudiosCache) delete window._estudiosCache[pid]; showToast('Estudio eliminado',''); FST_renderEstudiosApartado(pid); }
   catch(e){ showToast('❌ Error: '+e.message,'error'); }
+}
+
+// MINI-LOOP reclasificar: cambia el tipo de un estudio ya guardado (ej. foto 'imagen' → 'receta').
+// Solo aplica a estudios persistidos (origen!=='nota'); los 'en nota' se derivan del texto.
+// Patrón = clon de borrarEstudio: confía en la hidratación que ya hizo FST_renderEstudiosApartado.
+async function reclasificarEstudio(pid, eid){
+  var p = _resolverPaciente(pid);
+  if (!p || !Array.isArray(p.estudiosDocs)) return;
+  var est = p.estudiosDocs.find(function(e){ return String(e.id)===String(eid); });
+  if (!est) { showToast('Estudio no encontrado','error'); return; }
+  var nuevo = await _pedirTipoReclasificar(est.tipo);
+  if (!nuevo || nuevo===est.tipo) return;           // canceló o eligió el mismo
+  var anterior = est.tipo;
+  est.tipo = nuevo;
+  try {
+    await _persistirEstudios(p);
+    if (window._estudiosCache) delete window._estudiosCache[pid];
+    showToast('✅ Tipo cambiado a '+((ESTUDIO_TIPOS[nuevo]||{}).label||nuevo),'success');
+    FST_renderEstudiosApartado(pid);
+  } catch(e){
+    est.tipo = anterior;                            // rollback en memoria si no persistió
+    showToast('❌ Error: '+e.message,'error');
+  }
+}
+
+// Action sheet con los 4 tipos canónicos; marca el actual. Devuelve Promise<tipo|null>.
+// Modal propio (iOS PWA standalone suprime prompt/confirm), mismo patrón que menuAgregarEstudio.
+function _pedirTipoReclasificar(tipoActual){
+  return new Promise(function(resolve){
+    var ov = document.createElement('div');
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:10000;display:flex;align-items:flex-end;justify-content:center';
+    function cerrar(v){ ov.remove(); resolve(v); }
+    ov.onclick = function(e){ if(e.target===ov) cerrar(null); };
+    var ops = [['receta','💊 Receta'],['link','🔗 Link'],['interpretacion','📝 Interpretación'],['imagen','🩻 Imagen / estudio']];
+    ov.innerHTML = '<div style="background:#fff;border-radius:16px 16px 0 0;width:100%;max-width:480px;padding:16px">'
+      + '<div style="font-weight:800;color:var(--navy);margin-bottom:10px">Cambiar tipo de estudio</div>'
+      + ops.map(function(o){
+          var actual = (o[0]===tipoActual);
+          return '<button data-tipo="'+o[0]+'" style="width:100%;text-align:left;padding:12px;margin-bottom:6px;border:1px solid '+(actual?'var(--navy)':'var(--gray-200)')+';border-radius:10px;background:'+(actual?'#E8EEF7':'#fff')+';font-size:14px;font-weight:'+(actual?'700':'400')+';cursor:pointer">'+o[1]+(actual?'  ✓ (actual)':'')+'</button>';
+        }).join('')
+      + '<button data-cancel="1" style="width:100%;padding:10px;margin-top:4px;border:none;background:none;color:var(--gray-400);font-size:13px;cursor:pointer">Cancelar</button></div>';
+    document.body.appendChild(ov);
+    ov.querySelectorAll('button').forEach(function(b){
+      b.onclick = function(){ if(b.dataset.cancel){ cerrar(null); return; } cerrar(b.dataset.tipo); };
+    });
+  });
 }
 
 async function handleMedia(ev,tipo,pid){
