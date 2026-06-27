@@ -2061,6 +2061,7 @@ function togglePassVer(){
 document.getElementById('login-pass').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin()});
 // Check for public exercise link on load
 window.addEventListener('DOMContentLoaded', initApp);
+window.addEventListener('DOMContentLoaded', function(){ try{ _initDblEnter(); }catch(_){} });
 
 // ── Service Worker — offline shell ──────────────────────────
 if ('serviceWorker' in navigator) {
@@ -2341,7 +2342,7 @@ async function FST_montarAgendaCalendar(rango){
     + '<div style="font-size:13px;font-weight:700;color:var(--navy);margin-bottom:8px">📅 Agenda del calendario</div>'
     + '<div style="font-size:10px;color:var(--gray-400);margin:-4px 0 8px">Sincronizado desde Google Calendar · Solo lectura</div>'
     + '<div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap">'+btn('dia','Hoy')+btn('manana','Mañana')+btn('pasado','Pasado')+btn('semana','Semana')+btn('semanaSiguiente','Próxima')+'</div>'
-    + ((currentUser&&currentUser.role==='supervisor')?'<div style="margin-bottom:10px;display:flex;gap:6px;flex-wrap:wrap"><button onclick="mostrarPendientesSOAP()" style="font-size:12px;font-weight:700;border:none;border-radius:10px;padding:6px 12px;cursor:pointer;font-family:inherit;background:#FEF3C7;color:#92400E">📋 Notas pendientes</button><button onclick="mostrarRevaloraciones()" style="font-size:12px;font-weight:700;border:none;border-radius:10px;padding:6px 12px;cursor:pointer;font-family:inherit;background:#E0E7FF;color:#3730A3">🔄 Revalorar'+((typeof _countRevaloraciones==="function"&&_countRevaloraciones()>0)?(" ("+_countRevaloraciones()+")"):"")+'</button></div>':'')
+    + (esSupervisorUI()?'<div style="margin-bottom:10px;display:flex;gap:6px;flex-wrap:wrap"><button onclick="mostrarPendientesSOAP()" style="font-size:12px;font-weight:700;border:none;border-radius:10px;padding:6px 12px;cursor:pointer;font-family:inherit;background:#FEF3C7;color:#92400E">📋 Notas pendientes</button><button onclick="mostrarRevaloraciones()" style="font-size:12px;font-weight:700;border:none;border-radius:10px;padding:6px 12px;cursor:pointer;font-family:inherit;background:#E0E7FF;color:#3730A3">🔄 Revalorar'+((typeof _countRevaloraciones==="function"&&_countRevaloraciones()>0)?(" ("+_countRevaloraciones()+")"):"")+'</button><button onclick="toggleVistaTerapeuta()" style="font-size:12px;font-weight:700;border:none;border-radius:10px;padding:6px 12px;cursor:pointer;font-family:inherit;background:#EEF1F6;color:var(--navy)">👁️ Ver como terapeuta</button></div>':'')
     + '<div id="agenda-cal-list"><div style="font-size:12px;color:var(--gray-400);padding:6px 0">⏳ Cargando agenda…</div></div>'
     + '</div></div>';
   const reqId = (window._agendaCalReq = (window._agendaCalReq||0) + 1);
@@ -2564,6 +2565,62 @@ function mostrarRevaloraciones(){
     +'<div style="font-size:11px;color:var(--gray-400);margin-bottom:12px">🙋 pedida · 📈 EVA sin mejoría · 🚩 banderas/contraindicaciones</div>'
     +cuerpo+'</div>';
   document.body.appendChild(ov);
+}
+// ── Doble-Enter: en SOAP / editar-valoración / [data-dblenter], Enter avanza de campo;
+//    en textarea, doble-Enter rápido (<600ms) quita el salto y avanza. ──
+function _dblEnterAvanzar(el){
+  var cont = el.closest('#content-soap, #content-editar-valoracion, [data-dblenter]');
+  if(!cont) return;
+  var foco = Array.prototype.slice.call(cont.querySelectorAll('input:not([type=hidden]):not([readonly]):not([disabled]), select, textarea'))
+    .filter(function(f){ return f.offsetParent!==null; });
+  var i = foco.indexOf(el);
+  if(i>=0 && i+1<foco.length){
+    var n=foco[i+1]; n.focus();
+    try{ if(n.setSelectionRange && (n.tagName==='TEXTAREA'||n.type==='text')) n.setSelectionRange(n.value.length,n.value.length); }catch(_){}
+  }
+}
+function _initDblEnter(){
+  if(window._dblEnterOn) return; window._dblEnterOn=true;
+  document.addEventListener('keydown', function(e){
+    if(e.key!=='Enter' || e.isComposing) return;
+    var el=e.target; if(!el || !el.closest) return;
+    if(!el.closest('#content-soap, #content-editar-valoracion, [data-dblenter]')) return;
+    var tag=el.tagName;
+    if(tag==='TEXTAREA'){
+      var now=Date.now(), prev=Number(el.dataset.lastEnter||0);
+      if(now-prev<600){
+        e.preventDefault(); el.dataset.lastEnter='0';
+        var pos=el.selectionStart;
+        if(pos>0 && el.value.charAt(pos-1)==='\n'){
+          el.value=el.value.slice(0,pos-1)+el.value.slice(pos);
+          try{ el.selectionStart=el.selectionEnd=pos-1; }catch(_){}
+        }
+        _dblEnterAvanzar(el);
+      } else { el.dataset.lastEnter=String(now); }
+    } else if(tag==='INPUT' || tag==='SELECT'){
+      e.preventDefault(); _dblEnterAvanzar(el);
+    }
+  });
+}
+// ── Vista previa de terapeuta: el supervisor puede ver la UI como un terapeuta. ──
+function esSupervisorUI(){ return !!(currentUser && currentUser.role==='supervisor' && !window._previewTerapeuta); }
+function toggleVistaTerapeuta(forzar){
+  window._previewTerapeuta = (typeof forzar==='boolean') ? forzar : !window._previewTerapeuta;
+  var mostrarSup = !!(currentUser && currentUser.role==='supervisor' && !window._previewTerapeuta);
+  var ns=document.getElementById('nav-supervision'), nq=document.getElementById('nav-qa');
+  if(ns) ns.style.display = mostrarSup?'flex':'none';
+  if(nq) nq.style.display = mostrarSup?'flex':'none';
+  var b=document.getElementById('preview-banner');
+  if(window._previewTerapeuta){
+    if(!b){
+      b=document.createElement('div'); b.id='preview-banner';
+      b.style.cssText='position:fixed;bottom:74px;left:50%;transform:translateX(-50%);z-index:10005;background:#3730A3;color:#fff;border-radius:20px;padding:8px 16px;font-size:13px;font-weight:700;box-shadow:0 3px 10px rgba(0,0,0,.25);display:flex;align-items:center;gap:10px';
+      b.innerHTML='👁️ Viendo como terapeuta <button onclick="toggleVistaTerapeuta(false)" style="background:#fff;color:#3730A3;border:none;border-radius:12px;padding:3px 10px;font-weight:800;cursor:pointer">Volver</button>';
+      document.body.appendChild(b);
+    }
+  } else if(b){ b.remove(); }
+  try{ if(currentPatient && typeof renderExpediente==='function' && document.getElementById('content-expediente')) renderExpediente(currentTab||'historia'); }catch(_){}
+  try{ if(document.getElementById('agenda-cal-block') && typeof FST_montarAgendaCalendar==='function') FST_montarAgendaCalendar('dia'); }catch(_){}
 }
 function _computarPendientesSOAP(eventos, diasISO){
   var diasDDMM={}; diasISO.forEach(function(i){ var k=_ddmmFromISO(i); if(k) diasDDMM[k]=true; });
@@ -2910,7 +2967,7 @@ function renderExpediente(tab='historia'){
     <button class="tab ${tab==='consent'?'active':''}" onclick="renderExpediente('consent')">Consentimiento</button>
   </div>
   ${(currentUser&&(currentUser.role==='supervisor'||currentUser.name==='CARLOS'||p.terapeuta===currentUser.name||p.terapeutaSeguimiento===currentUser.name))?`<div style="padding:4px 14px 0;text-align:right"><button data-pid="${escapeAttr_(p.id)}" onclick="exportarExpedienteJSON(this.dataset.pid)" style="background:transparent;border:1px solid rgba(255,255,255,.4);color:white;border-radius:16px;padding:4px 12px;font-size:11px;cursor:pointer;font-weight:600">📥 Exportar JSON</button></div>`:''}
-  ${(currentUser&&currentUser.role==='supervisor')?`<div style="padding:4px 14px 0;text-align:right"><button data-pid="${escapeAttr_(p.id)}" onclick="_abrirEditarPaciente(this.dataset.pid)" style="background:var(--gold);border:none;color:var(--navy-dark);border-radius:16px;padding:5px 14px;font-size:12px;cursor:pointer;font-weight:700">✏️ Editar datos</button></div>`:''}
+  ${(esSupervisorUI())?`<div style="padding:4px 14px 0;text-align:right"><button data-pid="${escapeAttr_(p.id)}" onclick="_abrirEditarPaciente(this.dataset.pid)" style="background:var(--gold);border:none;color:var(--navy-dark);border-radius:16px;padding:5px 14px;font-size:12px;cursor:pointer;font-weight:700">✏️ Editar datos</button></div>`:''}
   <div style="padding:6px 14px 0;text-align:right"><button data-pid="${escapeAttr_(p.id)}" onclick="pedirRevaloracion(this.dataset.pid)" style="background:#C0392B;border:none;color:#fff;border-radius:14px;padding:10px 20px;font-size:14px;cursor:pointer;font-weight:800;box-shadow:0 2px 6px rgba(192,57,43,.35)">🆘 Pedir valoración o apoyo de Carlos</button></div>
   ${renderIndicadorCompletitud(p)}`;
 
@@ -7764,7 +7821,7 @@ function editarHistoria(seccion){
   const c = document.getElementById('content-expediente');
   const v = p.valoracion;
 
-  let formHtml = `<div style="padding-bottom:100px">`;
+  let formHtml = `<div data-dblenter="1" style="padding-bottom:100px">`;
 
   if(seccion==='generales'){
     formHtml += `
