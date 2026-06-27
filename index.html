@@ -2528,17 +2528,22 @@ async function resolverRevaloracion(pid){
   catch(e){ showToast('❌ '+((e&&e.message)||'error'),'error'); }
 }
 // Supervisor: lista de pacientes para revalorar.
-function mostrarRevaloraciones(){
+async function mostrarRevaloraciones(){
   if(!(currentUser&&currentUser.role==='supervisor')){ showToast('Solo supervisor','error'); return; }
   var ex=document.querySelector('[data-revalov]'); if(ex) ex.remove();
-  var lista=[];
-  (Array.isArray(patientsDB)?patientsDB:[]).forEach(function(p){ var m=_motivosRevaloracion(p); if(m.length) lista.push({p:p, motivos:m}); });
-  var peso=function(it){ return it.motivos.some(function(x){return x.tipo==='manual';})?0:(it.motivos.some(function(x){return x.tipo==='eva';})?1:2); };
-  lista.sort(function(a,b){return peso(a)-peso(b);});
   var ov=document.createElement('div');
   ov.setAttribute('data-revalov','1');
   ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:10001;display:flex;align-items:flex-start;justify-content:center;overflow:auto;padding:40px 12px';
   ov.onclick=function(e){ if(e.target===ov) ov.remove(); };
+  ov.innerHTML='<div style="background:#fff;border-radius:16px;width:100%;max-width:520px;padding:18px"><div style="font-size:12px;color:var(--gray-400)">⏳ Actualizando pacientes…</div></div>';
+  document.body.appendChild(ov);
+  try{ var d=await loadFromCloud(); if(Array.isArray(d)&&d.length) patientsDB=d; }catch(_){}
+  if(!document.body.contains(ov)) return;
+  var card=ov.firstChild;
+  var lista=[];
+  (Array.isArray(patientsDB)?patientsDB:[]).forEach(function(p){ var m=_motivosRevaloracion(p); if(m.length) lista.push({p:p, motivos:m}); });
+  var peso=function(it){ return it.motivos.some(function(x){return x.tipo==='manual';})?0:(it.motivos.some(function(x){return x.tipo==='eva';})?1:2); };
+  lista.sort(function(a,b){return peso(a)-peso(b);});
   var cuerpo;
   if(!lista.length){
     cuerpo='<div style="text-align:center;padding:20px;color:#2E7D52;font-weight:700">✅ Sin pacientes para revalorar</div>';
@@ -2558,13 +2563,11 @@ function mostrarRevaloraciones(){
         +'</div></div>';
     }).join('');
   }
-  ov.innerHTML='<div style="background:#fff;border-radius:16px;width:100%;max-width:520px;padding:18px">'
-    +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">'
+  card.innerHTML='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">'
     +'<div style="font-size:16px;font-weight:800;color:var(--navy)">🔄 Pacientes para revalorar</div>'
     +'<button onclick="this.closest(\'[data-revalov]\').remove()" style="background:none;border:none;font-size:22px;color:var(--gray-400);cursor:pointer">×</button></div>'
-    +'<div style="font-size:11px;color:var(--gray-400);margin-bottom:12px">🙋 pedida · 📈 EVA sin mejoría · 🚩 banderas/contraindicaciones</div>'
-    +cuerpo+'</div>';
-  document.body.appendChild(ov);
+    +'<div style="font-size:11px;color:var(--gray-400);margin-bottom:12px">🙋 pedida · 📈 EVA sin/poca mejoría · 🚩 banderas/contraindicaciones</div>'
+    +cuerpo;
 }
 // ── Doble-Enter: en SOAP / editar-valoración / [data-dblenter], Enter avanza de campo;
 //    en textarea, doble-Enter rápido (<600ms) quita el salto y avanza. ──
@@ -2702,6 +2705,7 @@ async function mostrarPendientesSOAP(){
       +'<div style="text-align:right;margin-top:12px"><button onclick="this.closest(\'[data-pendov]\').remove()" style="padding:8px 14px;border:none;border-radius:10px;background:var(--navy);color:#fff;font-weight:700;cursor:pointer">Cerrar</button></div>';
     return;
   }
+  try{ var dPac=await loadFromCloud(); if(Array.isArray(dPac)&&dPac.length) patientsDB=dPac; }catch(_){}
   var rep=_computarPendientesSOAP(res.eventos||[], dias);
   var etiqueta=(dias.length>1)?('Desde '+_ddmmFromISO(dias[0])):'Hoy';
   card.innerHTML=_pendientesHTML(rep, etiqueta);
