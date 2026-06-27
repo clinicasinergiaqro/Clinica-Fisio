@@ -2432,6 +2432,17 @@ var _PEND_ROLLOUT_ISO = '2026-06-29';   // piso del control (lunes). No cuenta d
 function _hoyISOlocal(){
   var h=new Date(); return h.getFullYear()+'-'+String(h.getMonth()+1).padStart(2,'0')+'-'+String(h.getDate()).padStart(2,'0');
 }
+// F1.2: días ISO de la ventana [rollout..hoy] (no cuenta días previos al rollout).
+function _diasVentanaPendientes(){
+  var hoy=_hoyISOlocal();
+  var desde=(_PEND_ROLLOUT_ISO>hoy)?hoy:_PEND_ROLLOUT_ISO;
+  var out=[], d=new Date(desde+'T12:00:00'), fin=new Date(hoy+'T12:00:00');
+  while(d<=fin){ out.push(d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')); d.setDate(d.getDate()+1); }
+  return out;
+}
+function FST_fetchAgendaRango(desde, hasta){
+  return callAppsScriptPrivado('leerAgenda', {rango:'rango_fechas', desde:desde, hasta:hasta});
+}
 function _ddmmFromISO(diaISO){
   var p=String(diaISO||'').split('-'); return (p.length===3) ? (p[2]+'/'+p[1]+'/'+p[0]) : '';   // DD/MM/YYYY (= todayFmt)
 }
@@ -2505,15 +2516,21 @@ async function mostrarPendientesSOAP(){
   ov.innerHTML='<div style="background:#fff;border-radius:16px;width:100%;max-width:520px;padding:18px"><div style="font-size:12px;color:var(--gray-400)">⏳ Calculando notas pendientes…</div></div>';
   document.body.appendChild(ov);
   var card=ov.firstChild;
+  var dias=_diasVentanaPendientes();
   var res;
-  try{ res=await FST_fetchAgendaCalendar('dia'); }catch(e){ res={ok:false}; }
+  try{ res=await FST_fetchAgendaRango(dias[0], dias[dias.length-1]); }catch(e){ res={ok:false}; }
+  if(!res||!res.ok){
+    // fallback: si el rango no responde (backend no desplegado / hiccup), al menos HOY
+    try{ res=await FST_fetchAgendaCalendar('dia'); dias=[_hoyISOlocal()]; }catch(e2){ res={ok:false}; }
+  }
   if(!res||!res.ok){
     card.innerHTML='<div style="color:var(--red);font-size:13px">⚠️ No se pudo leer la agenda.</div>'
       +'<div style="text-align:right;margin-top:12px"><button onclick="this.closest(\'[data-pendov]\').remove()" style="padding:8px 14px;border:none;border-radius:10px;background:var(--navy);color:#fff;font-weight:700;cursor:pointer">Cerrar</button></div>';
     return;
   }
-  var rep=_computarPendientesSOAP(res.eventos||[], [_hoyISOlocal()]);   // F1.1: ventana = hoy
-  card.innerHTML=_pendientesHTML(rep, 'Hoy');
+  var rep=_computarPendientesSOAP(res.eventos||[], dias);
+  var etiqueta=(dias.length>1)?('Desde '+_ddmmFromISO(dias[0])):'Hoy';
+  card.innerHTML=_pendientesHTML(rep, etiqueta);
 }
 function showPacientes(){
   document.querySelectorAll('.nav-item').forEach((n,i)=>n.classList.toggle('active',i===1));
