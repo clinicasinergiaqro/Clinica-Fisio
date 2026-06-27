@@ -1025,7 +1025,20 @@ function saveLocal(k,v){
       }));
     }
     localStorage.setItem('sinergia_'+k, JSON.stringify(toSave));
-  }catch(e){ console.warn('saveLocal error:',e.message); }
+  }catch(e){
+    var esCuota = !!(e && (e.name==='QuotaExceededError' || e.code===22 || e.code===1014
+      || /quota/i.test((e.name||'')+' '+(e.message||''))));
+    if(esCuota){
+      console.warn('saveLocal QUOTA:', e.message);
+      // FIX-B: avisar UNA vez por sesión (no en bucle). La nube ya tiene los datos; falló solo el respaldo local.
+      if(!window._quotaAvisado){
+        window._quotaAvisado = true;
+        try{ showToastCritico_('⚠️ Almacenamiento del dispositivo lleno — algunos datos no se respaldaron en este equipo. Tus cambios sí se guardan en la nube. Libera espacio o contacta soporte.'); }catch(_){}
+      }
+    } else {
+      console.warn('saveLocal error:', e.message);   // otros errores: comportamiento igual que hoy
+    }
+  }
 }
 function loadLocal(k){
   try{ const v=localStorage.getItem('sinergia_'+k); return v?JSON.parse(v):null; }
