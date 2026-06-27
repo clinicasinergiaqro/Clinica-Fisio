@@ -2572,7 +2572,7 @@ async function mostrarRevaloraciones(){
 // ── Doble-Enter: en SOAP / editar-valoración / [data-dblenter], Enter avanza de campo;
 //    en textarea, doble-Enter rápido (<600ms) quita el salto y avanza. ──
 function _dblEnterAvanzar(el){
-  var cont = el.closest('#content-soap, #content-editar-valoracion, [data-dblenter]');
+  var cont = el.closest('#content-soap, #content-editar-valoracion, #content-nuevo, [data-dblenter]');
   if(!cont) return;
   var foco = Array.prototype.slice.call(cont.querySelectorAll('input:not([type=hidden]):not([readonly]):not([disabled]), select, textarea'))
     .filter(function(f){ return f.offsetParent!==null; });
@@ -2587,7 +2587,7 @@ function _initDblEnter(){
   document.addEventListener('keydown', function(e){
     if(e.key!=='Enter' || e.isComposing) return;
     var el=e.target; if(!el || !el.closest) return;
-    if(!el.closest('#content-soap, #content-editar-valoracion, [data-dblenter]')) return;
+    if(!el.closest('#content-soap, #content-editar-valoracion, #content-nuevo, [data-dblenter]')) return;
     var tag=el.tagName;
     if(tag==='TEXTAREA'){
       var now=Date.now(), prev=Number(el.dataset.lastEnter||0);
@@ -7452,20 +7452,6 @@ function renderNuevoPaciente(){
 
   // Navegación con Enter entre campos
   setTimeout(()=>{
-    camposOrden.forEach((id,i)=>{
-      const el=document.getElementById(id);
-      if(!el||el.tagName==='TEXTAREA') return; // textareas: Enter hace salto de línea normal
-      el.addEventListener('keydown',function(e){
-        if(e.key==='Enter'){
-          e.preventDefault();
-          // Buscar el siguiente campo disponible
-          for(let j=i+1;j<camposOrden.length;j++){
-            const next=document.getElementById(camposOrden[j]);
-            if(next){next.focus();break;}
-          }
-        }
-      });
-    });
     activarAutosaveNuevo();
     cargarBorradorNuevoSiExiste();
   },100);
