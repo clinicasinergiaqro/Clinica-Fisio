@@ -1237,6 +1237,7 @@ async function saveDB(k, v){
       sexo: p.sexo || '',
       altaClinica: p.altaClinica||{activa:false,fecha:null,hora:null,criterio:'',objetivosCumplidos:'',estadoFuncional:'',indicaciones:'',terapeuta:'',observaciones:''},
       revaloraciones: Array.isArray(p.revaloraciones)?p.revaloraciones:[],
+      revalSolicitada: p.revalSolicitada || null,
       eventosAdversos: Array.isArray(p.eventosAdversos)?p.eventosAdversos:[],
       consentimientoImagen: p.consentimientoImagen||{aceptado:false,fecha:null,hora:null,alcance:'',observaciones:''},
       consentimientoWhatsApp: p.consentimientoWhatsApp||{aceptado:false,fecha:null,hora:null,telefono:'',aceptaRecordatorios:false,aceptaEjercicios:false,observaciones:''},
@@ -2340,7 +2341,7 @@ async function FST_montarAgendaCalendar(rango){
     + '<div style="font-size:13px;font-weight:700;color:var(--navy);margin-bottom:8px">📅 Agenda del calendario</div>'
     + '<div style="font-size:10px;color:var(--gray-400);margin:-4px 0 8px">Sincronizado desde Google Calendar · Solo lectura</div>'
     + '<div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap">'+btn('dia','Hoy')+btn('manana','Mañana')+btn('pasado','Pasado')+btn('semana','Semana')+btn('semanaSiguiente','Próxima')+'</div>'
-    + ((currentUser&&currentUser.role==='supervisor')?'<div style="margin-bottom:10px"><button onclick="mostrarPendientesSOAP()" style="font-size:12px;font-weight:700;border:none;border-radius:10px;padding:6px 12px;cursor:pointer;font-family:inherit;background:#FEF3C7;color:#92400E">📋 Notas pendientes</button></div>':'')
+    + ((currentUser&&currentUser.role==='supervisor')?'<div style="margin-bottom:10px;display:flex;gap:6px;flex-wrap:wrap"><button onclick="mostrarPendientesSOAP()" style="font-size:12px;font-weight:700;border:none;border-radius:10px;padding:6px 12px;cursor:pointer;font-family:inherit;background:#FEF3C7;color:#92400E">📋 Notas pendientes</button><button onclick="mostrarRevaloraciones()" style="font-size:12px;font-weight:700;border:none;border-radius:10px;padding:6px 12px;cursor:pointer;font-family:inherit;background:#E0E7FF;color:#3730A3">🔄 Revalorar'+((typeof _countRevaloraciones==="function"&&_countRevaloraciones()>0)?(" ("+_countRevaloraciones()+")"):"")+'</button></div>':'')
     + '<div id="agenda-cal-list"><div style="font-size:12px;color:var(--gray-400);padding:6px 0">⏳ Cargando agenda…</div></div>'
     + '</div></div>';
   const reqId = (window._agendaCalReq = (window._agendaCalReq||0) + 1);
@@ -2449,6 +2450,115 @@ function _ddmmFromISO(diaISO){
 }
 var _normPend = function(s){ return (typeof FST_normalizarBusqueda==='function') ? FST_normalizarBusqueda(s||'') : String(s||'').toLowerCase().trim(); };
 // Núcleo: eventos de agenda + días ISO de la ventana → déficit por terapeuta. Solo activos (p.soap).
+// ── F2: Alertas de revaloración (supervisor). 3 fuentes: manual + EVA sin mejoría + banderas. ──
+function _evaRep(s){
+  if(!s) return null;
+  if(s.evaI!=null && !isNaN(Number(s.evaI))) return Number(s.evaI);
+  if(s.evaF!=null && !isNaN(Number(s.evaF))) return Number(s.evaF);
+  return null;
+}
+function _evaSinMejoria(p){
+  var conEva=(Array.isArray(p.soap)?p.soap:[]).slice()
+    .sort(function(a,b){return (a.num||0)-(b.num||0);})
+    .map(_evaRep).filter(function(v){return v!=null;});
+  if(conEva.length<3) return null;
+  var u=conEva.slice(-3);
+  if(u[2] >= u[0]) return {txt:'EVA sin mejoría ('+u[0]+'→'+u[2]+' en 3 sesiones)'};
+  return null;
+}
+function _vigilanciaClinica(p){
+  var sc=p.seguridadClinica||{}, m=[];
+  if(sc.tienePrecaucion) m.push('precaución clínica');
+  if(Array.isArray(sc.banderasRojas)&&sc.banderasRojas.length) m.push(sc.banderasRojas.length+' bandera(s) roja(s)');
+  if(Array.isArray(sc.condiciones)&&sc.condiciones.length>=2) m.push(sc.condiciones.length+' comorbilidades');
+  if(p.contraindicaciones && p.contraindicaciones!=='Ninguna' && p.contraindicaciones!=='') m.push('contraindicaciones');
+  return m.length ? m.join(' · ') : null;
+}
+function _motivosRevaloracion(p){
+  var out=[];
+  if(p.revalSolicitada && p.revalSolicitada.activa) out.push({tipo:'manual', icono:'🙋', txt:'Pedida por '+escapeHTML(p.revalSolicitada.por||'?')+(p.revalSolicitada.motivo?(' — '+escapeHTML(p.revalSolicitada.motivo)):'')});
+  var ev=_evaSinMejoria(p); if(ev) out.push({tipo:'eva', icono:'📈', txt:ev.txt});
+  var vc=_vigilanciaClinica(p); if(vc) out.push({tipo:'bandera', icono:'🚩', txt:vc});
+  return out;
+}
+function _countRevaloraciones(){
+  return (Array.isArray(patientsDB)?patientsDB:[]).reduce(function(a,p){ return a+(_motivosRevaloracion(p).length?1:0); },0);
+}
+// Modal para el motivo (iOS PWA suprime prompt). Devuelve Promise<string|null>.
+function _pedirMotivoReval(){
+  return new Promise(function(resolve){
+    var ov=document.createElement('div');
+    ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:10002;display:flex;align-items:flex-end;justify-content:center';
+    ov.onclick=function(e){ if(e.target===ov){ ov.remove(); resolve(null);} };
+    ov.innerHTML='<div style="background:#fff;border-radius:16px 16px 0 0;width:100%;max-width:480px;padding:18px">'
+      +'<div style="font-weight:800;color:var(--navy);margin-bottom:8px">🙋 Pedir revaloración del supervisor</div>'
+      +'<div style="font-size:12px;color:var(--gray-500);margin-bottom:8px">¿Por qué? (opcional)</div>'
+      +'<textarea id="_revalmotivo" rows="3" placeholder="p.ej. sin mejoría, duda de tratamiento, dolor que no cede…" style="width:100%;box-sizing:border-box;border:1px solid var(--gray-200);border-radius:10px;padding:10px;font-family:inherit;font-size:14px;resize:none"></textarea>'
+      +'<div style="display:flex;gap:8px;margin-top:12px">'
+      +'<button id="_revalcancel" style="flex:1;padding:10px;border:1px solid var(--gray-200);border-radius:10px;background:#fff;font-weight:700;cursor:pointer">Cancelar</button>'
+      +'<button id="_revalok" style="flex:1;padding:10px;border:none;border-radius:10px;background:var(--navy);color:#fff;font-weight:700;cursor:pointer">Pedir</button>'
+      +'</div></div>';
+    document.body.appendChild(ov);
+    ov.querySelector('#_revalcancel').onclick=function(){ ov.remove(); resolve(null); };
+    ov.querySelector('#_revalok').onclick=function(){ var v=(ov.querySelector('#_revalmotivo').value||'').trim(); ov.remove(); resolve(v); };
+  });
+}
+// Manual: el terapeuta pide revaloración del supervisor.
+async function pedirRevaloracion(pid){
+  var p=_resolverPaciente(pid); if(!p){ showToast('Paciente no encontrado','error'); return; }
+  var motivo=await _pedirMotivoReval();
+  if(motivo===null) return;
+  p.revalSolicitada={activa:true, por:(currentUser&&currentUser.name)||'', fecha:todayFmt(), motivo:motivo||''};
+  try{ await saveDB('pts',[p]); showToast('🙋 Revaloración solicitada al supervisor','success'); }
+  catch(e){ showToast('❌ '+((e&&e.message)||'error'),'error'); }
+}
+// Supervisor: marcar resuelta.
+async function resolverRevaloracion(pid){
+  if(!(currentUser&&currentUser.role==='supervisor')){ showToast('Solo supervisor','error'); return; }
+  var p=_resolverPaciente(pid); if(!p||!p.revalSolicitada) return;
+  p.revalSolicitada=Object.assign({}, p.revalSolicitada, {activa:false, resueltaPor:(currentUser&&currentUser.name)||'', fechaResuelta:todayFmt()});
+  try{ await saveDB('pts',[p]); showToast('✅ Revaloración resuelta','success'); mostrarRevaloraciones(); }
+  catch(e){ showToast('❌ '+((e&&e.message)||'error'),'error'); }
+}
+// Supervisor: lista de pacientes para revalorar.
+function mostrarRevaloraciones(){
+  if(!(currentUser&&currentUser.role==='supervisor')){ showToast('Solo supervisor','error'); return; }
+  var ex=document.querySelector('[data-revalov]'); if(ex) ex.remove();
+  var lista=[];
+  (Array.isArray(patientsDB)?patientsDB:[]).forEach(function(p){ var m=_motivosRevaloracion(p); if(m.length) lista.push({p:p, motivos:m}); });
+  var peso=function(it){ return it.motivos.some(function(x){return x.tipo==='manual';})?0:(it.motivos.some(function(x){return x.tipo==='eva';})?1:2); };
+  lista.sort(function(a,b){return peso(a)-peso(b);});
+  var ov=document.createElement('div');
+  ov.setAttribute('data-revalov','1');
+  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:10001;display:flex;align-items:flex-start;justify-content:center;overflow:auto;padding:40px 12px';
+  ov.onclick=function(e){ if(e.target===ov) ov.remove(); };
+  var cuerpo;
+  if(!lista.length){
+    cuerpo='<div style="text-align:center;padding:20px;color:#2E7D52;font-weight:700">✅ Sin pacientes para revalorar</div>';
+  } else {
+    cuerpo=lista.map(function(it){
+      var p=it.p;
+      var mh=it.motivos.map(function(m){ return '<div style="font-size:12px;color:#374151;padding:1px 0">'+m.icono+' '+m.txt+'</div>'; }).join('');
+      var manual=it.motivos.some(function(x){return x.tipo==='manual';});
+      return '<div style="margin-bottom:12px;padding:10px;border:1px solid #E6EAF2;border-radius:12px">'
+        +'<div style="display:flex;align-items:center;justify-content:space-between;gap:8px">'
+        +'<div style="font-size:14px;font-weight:800;color:var(--navy)">'+escapeHTML(p.name)+'</div>'
+        +'<div style="font-size:11px;color:var(--gray-400)">'+escapeHTML(p.terapeuta||'')+'</div></div>'
+        +mh
+        +'<div style="display:flex;gap:8px;margin-top:8px">'
+        +'<button data-pid="'+escapeAttr_(p.id)+'" onclick="this.closest(\'[data-revalov]\').remove();openExpediente(this.dataset.pid)" style="font-size:12px;font-weight:700;border:none;border-radius:10px;padding:6px 12px;cursor:pointer;background:var(--navy);color:#fff">Ver expediente</button>'
+        +(manual?'<button data-pid="'+escapeAttr_(p.id)+'" onclick="resolverRevaloracion(this.dataset.pid)" style="font-size:12px;font-weight:700;border:1px solid var(--gray-200);border-radius:10px;padding:6px 12px;cursor:pointer;background:#fff;color:var(--navy)">Marcar resuelta</button>':'')
+        +'</div></div>';
+    }).join('');
+  }
+  ov.innerHTML='<div style="background:#fff;border-radius:16px;width:100%;max-width:520px;padding:18px">'
+    +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">'
+    +'<div style="font-size:16px;font-weight:800;color:var(--navy)">🔄 Pacientes para revalorar</div>'
+    +'<button onclick="this.closest(\'[data-revalov]\').remove()" style="background:none;border:none;font-size:22px;color:var(--gray-400);cursor:pointer">×</button></div>'
+    +'<div style="font-size:11px;color:var(--gray-400);margin-bottom:12px">🙋 pedida · 📈 EVA sin mejoría · 🚩 banderas/contraindicaciones</div>'
+    +cuerpo+'</div>';
+  document.body.appendChild(ov);
+}
 function _computarPendientesSOAP(eventos, diasISO){
   var diasDDMM={}; diasISO.forEach(function(i){ var k=_ddmmFromISO(i); if(k) diasDDMM[k]=true; });
   var idx={};
@@ -2795,6 +2905,7 @@ function renderExpediente(tab='historia'){
   </div>
   ${(currentUser&&(currentUser.role==='supervisor'||currentUser.name==='CARLOS'||p.terapeuta===currentUser.name||p.terapeutaSeguimiento===currentUser.name))?`<div style="padding:4px 14px 0;text-align:right"><button data-pid="${escapeAttr_(p.id)}" onclick="exportarExpedienteJSON(this.dataset.pid)" style="background:transparent;border:1px solid rgba(255,255,255,.4);color:white;border-radius:16px;padding:4px 12px;font-size:11px;cursor:pointer;font-weight:600">📥 Exportar JSON</button></div>`:''}
   ${(currentUser&&currentUser.role==='supervisor')?`<div style="padding:4px 14px 0;text-align:right"><button data-pid="${escapeAttr_(p.id)}" onclick="_abrirEditarPaciente(this.dataset.pid)" style="background:var(--gold);border:none;color:var(--navy-dark);border-radius:16px;padding:5px 14px;font-size:12px;cursor:pointer;font-weight:700">✏️ Editar datos</button></div>`:''}
+  <div style="padding:4px 14px 0;text-align:right"><button data-pid="${escapeAttr_(p.id)}" onclick="pedirRevaloracion(this.dataset.pid)" style="background:#E0E7FF;border:none;color:#3730A3;border-radius:16px;padding:5px 14px;font-size:12px;cursor:pointer;font-weight:700">🙋 Pedir revaloración</button></div>
   ${renderIndicadorCompletitud(p)}`;
 
   // Alerta de seguridad clínica — visible en todos los tabs del expediente
