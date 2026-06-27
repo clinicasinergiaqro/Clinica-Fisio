@@ -5697,6 +5697,28 @@ async function borrarEstudio(pid, eid){
 // MINI-LOOP clasificar imagen histórica: la registra como estudio (origen:'historico', reusa url)
 // → aparece en Estudios y, derivado por url, etiqueta la miniatura en la galería SOAP.
 // Hidrata estudiosDocs ANTES de escribir (el índice fusionado no los trae). NO toca fotosHistoricas.
+// Deriva la fecha de una imagen histórica: busca su nombre de archivo (de la url) en el textoOriginal
+// de las sesiones y devuelve la fecha ISO de la sesión que la referencia. null si no se halla.
+async function _fechaSesionPorImagen(pid, url){
+  try {
+    var sinQuery = String(url||'').split('?')[0];
+    var decoded = decodeURIComponent(sinQuery);
+    var fname = decoded.substring(decoded.lastIndexOf('/')+1);
+    if (!fname) return null;
+    var base = fname.replace(/\.[^.]+$/,'');
+    if (base.length < 6) return null;
+    var uuid = (fname.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i)||[])[0] || '';
+    var sesiones = (typeof FST_fetchSesiones==='function') ? await FST_fetchSesiones(pid) : [];
+    for (var i=0;i<sesiones.length;i++){
+      var t = sesiones[i].textoOriginal || '';
+      if (!t) continue;
+      if (t.indexOf(fname)>=0 || t.indexOf(base)>=0 || (uuid && t.indexOf(uuid)>=0)) {
+        return sesiones[i].fecha ? (_aISO(sesiones[i].fecha) || sesiones[i].fecha) : null;
+      }
+    }
+    return null;
+  } catch(e){ console.warn('[hist fecha]', e.message); return null; }
+}
 async function clasificarImagenHistorica(pid, url){
   if (!url) return;
   var p = _resolverPaciente(pid);
@@ -5712,20 +5734,30 @@ async function clasificarImagenHistorica(pid, url){
   var ya = p.estudiosDocs.find(function(e){ return e && e.url===url && e.origen==='historico'; });
   var nuevo = await _pedirTipoReclasificar(ya ? ya.tipo : '');
   if (!nuevo) return;
-  if (ya) { ya.tipo = nuevo; }
-  else {
+  var fechaEst = '';
+  if (ya) {
+    ya.tipo = nuevo;
+    if (!ya.fechaEstudio) {
+      var fAuto = await _fechaSesionPorImagen(pid, url);
+      if (!fAuto) fAuto = (await _pedirFechaEstudio()) || '';
+      if (fAuto) ya.fechaEstudio = fAuto;
+    }
+    fechaEst = ya.fechaEstudio || '';
+  } else {
+    fechaEst = await _fechaSesionPorImagen(pid, url);
+    if (!fechaEst) fechaEst = (await _pedirFechaEstudio()) || '';
     p.estudiosDocs.push({
       id:'est_'+Date.now()+'_'+Math.random().toString(36).slice(2,6),
       tipo:nuevo, url:url, descripcion:'Imagen histórica',
-      fechaEstudio:'', fechaAgregado:new Date().toLocaleDateString('es-MX'),
+      fechaEstudio:fechaEst, fechaAgregado:new Date().toLocaleDateString('es-MX'),
       agregadoPor:(currentUser&&currentUser.name)||'', origen:'historico'
     });
   }
   try {
     await _persistirEstudios(p);
     if (window._estudiosCache) delete window._estudiosCache[pid];
-    showToast('✅ Clasificada como '+((ESTUDIO_TIPOS[nuevo]||{}).label||nuevo),'success');
-    if (typeof FST_renderHistorialSoap==='function') FST_renderHistorialSoap(pid);  // refresca etiqueta en galería SOAP
+    showToast('✅ Clasificada como '+((ESTUDIO_TIPOS[nuevo]||{}).label||nuevo)+(fechaEst?' · '+_fechaLegible(fechaEst):''),'success');
+    if (typeof FST_renderHistorialSoap==='function') FST_renderHistorialSoap(pid);
     if (typeof FST_renderEstudiosApartado==='function') FST_renderEstudiosApartado(pid);
   } catch(e){ showToast('❌ Error: '+e.message,'error'); }
 }
