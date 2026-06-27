@@ -1173,7 +1173,7 @@ async function saveDB(k, v){
             storageProvider:m.storageProvider||'',
             fbPath:m.fbPath||'', url:m.url||'',
             fecha:m.fecha||'',
-            data:(m.data&&String(m.data).startsWith('data:image/'))?m.data:null
+            data:(m.url ? null : ((m.data&&String(m.data).startsWith('data:image/'))?m.data:null))
           }))
         }));
         let chunk1=[], chunk2=[], chunk3=[], tam1=0, tam2=0;
@@ -1204,7 +1204,7 @@ async function saveDB(k, v){
           storageProvider: e.media.storageProvider||'',
           fbPath: e.media.fbPath||'',
           url: e.media.url||'',
-          data: (e.media.data && String(e.media.data).startsWith('data:image/')) ? e.media.data : null
+          data: (e.media.url ? null : ((e.media.data && String(e.media.data).startsWith('data:image/')) ? e.media.data : null))
         }:null
       })),
       fotos: (Array.isArray(p.fotos)?p.fotos:[]).map(f=>({id:f.id||f.mediaId||'',patientId:f.patientId||'',patientName:f.patientName||'',categoria:f.categoria||'foto',name:f.name||'',originalFileName:f.originalFileName||f.name||'',safeFileName:f.safeFileName||'',label:f.label||'',type:f.type||'',mimeType:f.mimeType||f.type||'',kind:f.kind||'',sizeBytes:f.sizeBytes||0,storageProvider:f.url?'firebase':(f.storageProvider||''),fbPath:f.fbPath||'',url:f.url||'',mediaId:f.mediaId||'',subidoPor:f.subidoPor||'',uploadedBy:f.uploadedBy||f.subidoPor||'',fecha:f.fecha||'',fechaCreacion:f.fechaCreacion||f.fecha||'',isDeleted:f.isDeleted||false})),
