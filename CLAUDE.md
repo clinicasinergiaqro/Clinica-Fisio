@@ -5,6 +5,11 @@
 - NO fragmentar en varias partes/bloques. El usuario trabaja en iPad y no puede copiar por pedazos.
 - Si un cambio toca varios puntos del archivo, mostrarlo igualmente como un único bloque continuo.
 
+## Instrucciones / pruebas / prompts para copiar
+- SIEMPRE en UN SOLO bloque de código de texto plano corrido, de principio a fin, en una sola caja copiable.
+- SIN líneas separadoras horizontales (═══, ───, etc.), SIN numeración en saltos de línea que corte la selección.
+- En el iPad los separadores cortan la selección y no se puede copiar completo: todo seguido en una sola caja.
+
 ## Flujo de git por loop
 - GitHub Pages se publica desde `main`. Cada loop termina con MERGE A MAIN (PR + squash merge) para llegar a producción.
 - Tras cada merge a main, RECREAR la rama de trabajo desde main para evitar conflictos en el siguiente loop:

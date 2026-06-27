@@ -198,19 +198,28 @@ function FST_renderCard(s){
     + '</div></div>';
 }
 
-// LOOP D.5 — Galería de imágenes históricas a nivel paciente (Opción C). Solo lectura del doc paciente.
+// LOOP D.5 + mini-loop clasificar: galería de imágenes históricas. Solo lectura de fotosHistoricas.
+// El tipo se DERIVA por url desde estudiosDocs (no se guarda aparte en fotosHistoricas).
 async function FST_renderGaleriaHistorica(pid){
   try {
     if (!pid || !window._fstDb) return '';
     const snap = await window._fstDb.collection('pacientes').doc(pid).get();
-    const fotos = ((snap.data() || {}).fotosHistoricas || []).filter(function(f){ return f && f.url; });
+    const data = snap.data() || {};
+    const fotos = (data.fotosHistoricas || []).filter(function(f){ return f && f.url; });
     if (!fotos.length) return '';
+    const tipoPorUrl = {};
+    (Array.isArray(data.estudiosDocs)?data.estudiosDocs:[]).forEach(function(e){ if(e&&e.url&&e.tipo) tipoPorUrl[e.url]=e.tipo; });
     const thumbs = fotos.map(function(f){
       const u = escapeAttr_(f.url);
-      return '<a href="' + u + '" target="_blank" rel="noopener" class="media-thumb" style="display:block">'
-        + '<img loading="lazy" src="' + u + '" alt="histórica" '
-        + 'onerror="this.parentNode.style.display=\'none\'" '
-        + 'style="width:100%;height:100%;object-fit:cover;border-radius:8px"></a>';
+      const tp = tipoPorUrl[f.url];
+      const t = tp ? (ESTUDIO_TIPOS[tp]||{icono:'📎',label:tp}) : null;
+      const etiqueta = t ? '<div class="media-label" style="background:rgba(13,27,62,.82)">'+t.icono+' '+t.label+'</div>' : '';
+      return '<div class="media-thumb">'
+        + '<a href="'+u+'" target="_blank" rel="noopener" style="display:block;width:100%;height:100%">'
+        + '<img loading="lazy" src="'+u+'" alt="histórica" onerror="this.parentNode.parentNode.style.display=\'none\'" style="width:100%;height:100%;object-fit:cover;display:block"></a>'
+        + '<button data-pid="'+escapeAttr_(pid)+'" data-url="'+u+'" onclick="event.preventDefault();event.stopPropagation();clasificarImagenHistorica(this.dataset.pid,this.dataset.url)" style="position:absolute;top:4px;right:4px;background:rgba(255,255,255,.92);border:1px solid var(--gray-200);border-radius:8px;font-size:13px;line-height:1;padding:4px 7px;cursor:pointer;z-index:2" title="Clasificar">🏷️</button>'
+        + etiqueta
+        + '</div>';
     }).join('');
     return '<div style="margin:14px 0 6px;padding:0 14px">'
       + '<div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.7px;color:var(--gray-400)">\u{1F4F7} Imágenes históricas del expediente (' + fotos.length + ')</div>'
@@ -5496,6 +5505,7 @@ async function FST_renderEstudiosApartado(pid){
       var t = ESTUDIO_TIPOS[e.tipo] || { icono:'📎', label:e.tipo||'Doc' };
       var badgeNota = (e.origen==='nota') ? '<span style="font-size:9px;font-weight:700;background:#FEF3C7;color:#92400E;padding:2px 7px;border-radius:8px;margin-left:6px">en nota</span>' : '';
       var badgeSesion = (e.origen==='soap') ? '<span style="font-size:9px;font-weight:700;background:#F0F2F7;color:#5A6478;padding:2px 7px;border-radius:8px;margin-left:6px">📎 desde sesión</span>' : '';
+      var badgeHist = (e.origen==='historico') ? '<span style="font-size:9px;font-weight:700;background:#EAF6EC;color:#2E7D32;padding:2px 7px;border-radius:8px;margin-left:6px">📷 histórica</span>' : '';
       var desc = (e.descripcion && e.descripcion!=='(en nota)') ? e.descripcion : (e.url||'');
       var u = escapeAttr_(e.url||'');
       var link = e.url ? '<a href="'+u+'" target="_blank" rel="noopener noreferrer" style="color:var(--navy);text-decoration:underline;word-break:break-all">'+escapeHTML(desc)+'</a>' : escapeHTML(desc);
@@ -5508,7 +5518,7 @@ async function FST_renderEstudiosApartado(pid){
       }
       return '<div class="doc-item" style="align-items:flex-start">'
         + '<div class="doc-icon" style="font-size:18px">'+t.icono+'</div>'
-        + '<div class="doc-info"><div class="doc-name">'+link+badgeNota+badgeSesion+'</div>'
+        + '<div class="doc-info"><div class="doc-name">'+link+badgeNota+badgeSesion+badgeHist+'</div>'
         + '<div class="doc-meta">'+escapeHTML(fechaTxt)
         + ' · <span style="font-size:9px;font-weight:700;background:#E8EEF7;color:var(--navy);padding:1px 6px;border-radius:8px">'+t.label+'</span>'
         + (e.agregadoPor?(' · agregado por '+escapeHTML(e.agregadoPor)):'')+'</div></div>'
@@ -5593,6 +5603,42 @@ async function borrarEstudio(pid, eid){
   p.estudiosDocs = p.estudiosDocs.filter(function(e){ return String(e.id)!==String(eid); });
   try { await _persistirEstudios(p); if (window._estudiosCache) delete window._estudiosCache[pid]; showToast('Estudio eliminado',''); FST_renderEstudiosApartado(pid); }
   catch(e){ showToast('❌ Error: '+e.message,'error'); }
+}
+
+// MINI-LOOP clasificar imagen histórica: la registra como estudio (origen:'historico', reusa url)
+// → aparece en Estudios y, derivado por url, etiqueta la miniatura en la galería SOAP.
+// Hidrata estudiosDocs ANTES de escribir (el índice fusionado no los trae). NO toca fotosHistoricas.
+async function clasificarImagenHistorica(pid, url){
+  if (!url) return;
+  var p = _resolverPaciente(pid);
+  if (!p) { showToast('Paciente no encontrado','error'); return; }
+  if (!patientsDB.some(function(x){ return x.id===pid; }) && window._fstDb) {
+    try {
+      var dsnap = await window._fstDb.collection('pacientes').doc(pid).get();
+      var fe = (dsnap.data()||{}).estudiosDocs;
+      if (Array.isArray(fe)) p.estudiosDocs = fe;
+    } catch(e){ console.warn('[hist→estudio] hidratar:', e.message); showToast('No se pudo leer el expediente','error'); return; }
+  }
+  if (!Array.isArray(p.estudiosDocs)) p.estudiosDocs = [];
+  var ya = p.estudiosDocs.find(function(e){ return e && e.url===url && e.origen==='historico'; });
+  var nuevo = await _pedirTipoReclasificar(ya ? ya.tipo : '');
+  if (!nuevo) return;
+  if (ya) { ya.tipo = nuevo; }
+  else {
+    p.estudiosDocs.push({
+      id:'est_'+Date.now()+'_'+Math.random().toString(36).slice(2,6),
+      tipo:nuevo, url:url, descripcion:'Imagen histórica',
+      fechaEstudio:'', fechaAgregado:new Date().toLocaleDateString('es-MX'),
+      agregadoPor:(currentUser&&currentUser.name)||'', origen:'historico'
+    });
+  }
+  try {
+    await _persistirEstudios(p);
+    if (window._estudiosCache) delete window._estudiosCache[pid];
+    showToast('✅ Clasificada como '+((ESTUDIO_TIPOS[nuevo]||{}).label||nuevo),'success');
+    if (typeof FST_renderHistorialSoap==='function') FST_renderHistorialSoap(pid);  // refresca etiqueta en galería SOAP
+    if (typeof FST_renderEstudiosApartado==='function') FST_renderEstudiosApartado(pid);
+  } catch(e){ showToast('❌ Error: '+e.message,'error'); }
 }
 
 // MINI-LOOP reclasificar: cambia el tipo de un estudio ya guardado (ej. foto 'imagen' → 'receta').
