@@ -2530,6 +2530,11 @@ function _vigilanciaClinica(p){
 }
 function _motivosRevaloracion(p){
   if(p && p.revalSolicitada && p.revalSolicitada.resueltaManualmente) return [];
+  // Snooze: si fue pospuesta y la fecha aún no llega, ocultar. Al vencer, reaparece sola.
+  if(p && p.revalSolicitada && p.revalSolicitada.pospuestaHasta){
+    var _hoyISO=(function(){ var d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); })();
+    if(String(p.revalSolicitada.pospuestaHasta) >= _hoyISO) return [];
+  }
   var out=[];
   if(p.revalSolicitada && p.revalSolicitada.activa) out.push({tipo:'manual', icono:'🙋', txt:'Pedida por '+escapeHTML(p.revalSolicitada.por||'?')+(p.revalSolicitada.motivo?(' — '+escapeHTML(p.revalSolicitada.motivo)):'')});
   var ev=_evaSinMejoria(p); if(ev) out.push({tipo:'eva', icono:'📈', txt:ev.txt});
@@ -2574,6 +2579,28 @@ async function resolverRevaloracion(pid){
   if(!p.revalSolicitada) p.revalSolicitada={};
   p.revalSolicitada=Object.assign({}, p.revalSolicitada, {activa:false, resueltaPor:(currentUser&&currentUser.name)||'', fechaResuelta:todayFmt(), resueltaManualmente:true});
   try{ await saveDB('pts',[p]); showToast('✅ Revaloración resuelta','success'); mostrarRevaloraciones(); }
+  catch(e){ showToast('❌ '+((e&&e.message)||'error'),'error'); }
+}
+function _isoMasDias(n){ var d=new Date(); d.setDate(d.getDate()+n); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function _posponerRevaloracion(pid){
+  if(!(currentUser&&currentUser.role==='supervisor')){ showToast('Solo supervisor','error'); return; }
+  var ov=document.createElement('div');
+  ov.setAttribute('data-posponer','1');
+  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:10003;display:flex;align-items:flex-end;justify-content:center;padding:0';
+  ov.onclick=function(e){ if(e.target===ov) ov.remove(); };
+  function btn(dias){ return '<button onclick="_aplicarPosponer(\''+pid+'\','+dias+')" style="flex:1;padding:14px;border:1px solid var(--gray-200);border-radius:12px;background:#fff;font-weight:800;font-size:15px;color:var(--navy);cursor:pointer;font-family:inherit">'+dias+' días</button>'; }
+  ov.innerHTML='<div style="background:#fff;border-radius:16px 16px 0 0;width:100%;max-width:480px;padding:18px">'
+    +'<div style="font-weight:800;color:var(--navy);margin-bottom:4px">⏰ Posponer revaloración</div>'
+    +'<div style="font-size:12px;color:var(--gray-500);margin-bottom:14px">Volverá a aparecer al vencer el plazo, si la condición sigue.</div>'
+    +'<div style="display:flex;gap:8px">'+btn(7)+btn(15)+btn(30)+'</div>'
+    +'<button onclick="this.closest(\'[data-posponer]\').remove()" style="width:100%;margin-top:10px;padding:10px;border:none;border-radius:10px;background:#F3F6FB;color:var(--gray-500);font-weight:700;cursor:pointer;font-family:inherit">Cancelar</button>'
+    +'</div>';
+  document.body.appendChild(ov);
+}
+async function _aplicarPosponer(pid, dias){
+  var p=_resolverPaciente(pid); if(!p){ showToast('Paciente no encontrado','error'); return; }
+  p.revalSolicitada=Object.assign({}, p.revalSolicitada||{}, {pospuestaHasta:_isoMasDias(dias), pospuestaPor:(currentUser&&currentUser.name)||'', pospuestaFecha:todayFmt()});
+  try{ await saveDB('pts',[p]); var ovMenu=document.querySelector('[data-posponer]'); if(ovMenu) ovMenu.remove(); showToast('⏰ Pospuesta '+dias+' días','success'); mostrarRevaloraciones(); }
   catch(e){ showToast('❌ '+((e&&e.message)||'error'),'error'); }
 }
 async function _eliminarPacienteRevalorar(pid, tarjetaEl) {
@@ -2684,7 +2711,7 @@ async function mostrarRevaloraciones(){
         +mh
         +'<div style="display:flex;gap:8px;margin-top:8px">'
         +'<button data-pid="'+escapeAttr_(p.id)+'" onclick="this.closest(\'[data-revalov]\').remove();openExpediente(this.dataset.pid)" style="font-size:12px;font-weight:700;border:none;border-radius:10px;padding:6px 12px;cursor:pointer;background:var(--navy);color:#fff">Ver expediente</button>'
-        +'<button data-pid="'+escapeAttr_(p.id)+'" onclick="resolverRevaloracion(this.dataset.pid)" style="font-size:12px;font-weight:700;border:1px solid var(--gray-200);border-radius:10px;padding:6px 12px;cursor:pointer;background:#fff;color:var(--navy)">Marcar resuelta</button>'
+        +'<button data-pid="'+escapeAttr_(p.id)+'" onclick="_posponerRevaloracion(this.dataset.pid)" style="font-size:12px;font-weight:700;border:1px solid var(--gray-200);border-radius:10px;padding:6px 12px;cursor:pointer;background:#fff;color:var(--navy)">⏰ Posponer</button>'
         +(currentUser && currentUser.role==='supervisor' ? '<button data-pid="'+escapeAttr_(p.id)+'" onclick="(function(btn){_eliminarPacienteRevalorar(btn.dataset.pid, btn.closest(\'[data-reval-card]\'))})(this)" style="font-size:12px;font-weight:700;border:none;border-radius:10px;padding:6px 12px;cursor:pointer;font-family:inherit;background:#FEE2E2;color:#B91C1C">🗑️ Eliminar</button>' : '')
         +'</div></div>';
     }).join('');
