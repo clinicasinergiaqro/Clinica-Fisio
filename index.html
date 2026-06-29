@@ -2598,7 +2598,7 @@ async function mostrarRevaloraciones(){
         +mh
         +'<div style="display:flex;gap:8px;margin-top:8px">'
         +'<button data-pid="'+escapeAttr_(p.id)+'" onclick="this.closest(\'[data-revalov]\').remove();openExpediente(this.dataset.pid)" style="font-size:12px;font-weight:700;border:none;border-radius:10px;padding:6px 12px;cursor:pointer;background:var(--navy);color:#fff">Ver expediente</button>'
-        +(manual?'<button data-pid="'+escapeAttr_(p.id)+'" onclick="resolverRevaloracion(this.dataset.pid)" style="font-size:12px;font-weight:700;border:1px solid var(--gray-200);border-radius:10px;padding:6px 12px;cursor:pointer;background:#fff;color:var(--navy)">Marcar resuelta</button>':'')
+        +'<button data-pid="'+escapeAttr_(p.id)+'" onclick="resolverRevaloracion(this.dataset.pid)" style="font-size:12px;font-weight:700;border:1px solid var(--gray-200);border-radius:10px;padding:6px 12px;cursor:pointer;background:#fff;color:var(--navy)">Marcar resuelta</button>'
         +(currentUser && currentUser.role==='supervisor' ? '<button data-pid="'+escapeAttr_(p.id)+'" onclick="(function(btn){_eliminarPacienteRevalorar(btn.dataset.pid, btn.closest(\'[data-reval-card]\'))})(this)" style="font-size:12px;font-weight:700;border:none;border-radius:10px;padding:6px 12px;cursor:pointer;font-family:inherit;background:#FEE2E2;color:#B91C1C">🗑️ Eliminar</button>' : '')
         +'</div></div>';
     }).join('');
