@@ -2794,7 +2794,7 @@ async function mostrarPendientesSOAP(){
   try{
     var okF=await FST_init();
     if(okF && window._fstDb){
-      var snapH=await window._fstDb.collection('pacientes').select('nombreNormalizado','name').get();
+      var snapH=await window._fstDb.collection('pacientes').get();
       snapH.forEach(function(d){
         var data=d.data()||{};
         if(data.nombreNormalizado) idxHist[_normPend(data.nombreNormalizado)]=true;
