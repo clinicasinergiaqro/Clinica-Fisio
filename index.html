@@ -2482,6 +2482,7 @@ function _vigilanciaClinica(p){
   return m.length ? m.join(' · ') : null;
 }
 function _motivosRevaloracion(p){
+  if(p && p.revalSolicitada && p.revalSolicitada.resueltaManualmente) return [];
   var out=[];
   if(p.revalSolicitada && p.revalSolicitada.activa) out.push({tipo:'manual', icono:'🙋', txt:'Pedida por '+escapeHTML(p.revalSolicitada.por||'?')+(p.revalSolicitada.motivo?(' — '+escapeHTML(p.revalSolicitada.motivo)):'')});
   var ev=_evaSinMejoria(p); if(ev) out.push({tipo:'eva', icono:'📈', txt:ev.txt});
@@ -2522,8 +2523,9 @@ async function pedirRevaloracion(pid){
 // Supervisor: marcar resuelta.
 async function resolverRevaloracion(pid){
   if(!(currentUser&&currentUser.role==='supervisor')){ showToast('Solo supervisor','error'); return; }
-  var p=_resolverPaciente(pid); if(!p||!p.revalSolicitada) return;
-  p.revalSolicitada=Object.assign({}, p.revalSolicitada, {activa:false, resueltaPor:(currentUser&&currentUser.name)||'', fechaResuelta:todayFmt()});
+  var p=_resolverPaciente(pid); if(!p) return;
+  if(!p.revalSolicitada) p.revalSolicitada={};
+  p.revalSolicitada=Object.assign({}, p.revalSolicitada, {activa:false, resueltaPor:(currentUser&&currentUser.name)||'', fechaResuelta:todayFmt(), resueltaManualmente:true});
   try{ await saveDB('pts',[p]); showToast('✅ Revaloración resuelta','success'); mostrarRevaloraciones(); }
   catch(e){ showToast('❌ '+((e&&e.message)||'error'),'error'); }
 }
