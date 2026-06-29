@@ -1469,9 +1469,10 @@ async function loadFromCloud(){
         }
       });
 
-      saveLocal('pts',saneados);
+      var saneadosLimpios=saneados.filter(function(p){ return !_esPacienteTest(p); });
+      saveLocal('pts',saneadosLimpios);
       try{ localStorage.setItem('sinergia_ultimaSyncOk', new Date().toLocaleString('es-MX')); }catch(e){}
-      return saneados;
+      return saneadosLimpios;
     }
     return null;
   }catch(e){console.error('loadFromCloud error:',e);return null;}
@@ -1636,8 +1637,20 @@ function sanearYRecalcularEdad(p){
 }
 function tryParse(s,fallback){try{return JSON.parse(s);}catch(e){return fallback;}}
 
+// ── Detección de pacientes de prueba (LIMPIEZA-TEST) ──
+var _IDS_TEST = ['p1781643783300','p1781427175480']; // los dos Juan de prueba (0 sesiones, CARLOS)
+function _esPacienteTest(p){
+  if(!p) return false;
+  if(p.id && _IDS_TEST.indexOf(p.id)!==-1) return true;
+  var n=String(p.name||'').trim();
+  if(/^test/i.test(n)) return true;
+  if(n.replace(/\s/g,'').length<=2) return true;
+  var exactos=['prueba','zorras','menor de edad','j','df'];
+  if(exactos.indexOf(n.toLowerCase())!==-1) return true;
+  return false;
+}
 // Patients — datos demo compartidos para todos
-let patientsDB = loadDB('pts') || [];
+let patientsDB = (loadDB('pts') || []).filter(function(p){ return !(typeof _esPacienteTest==='function' && _esPacienteTest(p)); });
 
 
 // ── UTILS ──────────────────────────────────────────────────────────────────
@@ -2604,6 +2617,43 @@ async function _eliminarPacienteRevalorar(pid, tarjetaEl) {
 
   showToast('🗑️ Paciente eliminado', 'success');
 }
+async function _limpiarTodosLosTest(){
+  if(!(currentUser && currentUser.role==='supervisor')){ showToast('Solo supervisor','error'); return; }
+  var tests=(Array.isArray(patientsDB)?patientsDB:[]).filter(function(p){ return _esPacienteTest(p); });
+  if(!tests.length){ showToast('No hay pacientes de prueba','success'); return; }
+  var confirmado=await new Promise(function(resolve){
+    var m=document.createElement('div');
+    m.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px';
+    m.innerHTML='<div style="background:#fff;border-radius:16px;padding:24px;max-width:340px;width:100%;text-align:center">'
+      +'<div style="font-size:18px;font-weight:800;color:#1e293b;margin-bottom:8px">¿Eliminar '+tests.length+' pacientes de prueba?</div>'
+      +'<div style="font-size:13px;color:#64748b;margin-bottom:20px">Se eliminarán permanentemente de Sheet, Firestore y este dispositivo. No afecta pacientes reales.</div>'
+      +'<div style="display:flex;gap:10px;justify-content:center">'
+      +'<button id="_lt_cancel" style="padding:10px 20px;border-radius:10px;border:1px solid #e2e8f0;background:#f8fafc;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">Cancelar</button>'
+      +'<button id="_lt_ok" style="padding:10px 20px;border-radius:10px;border:none;background:#ef4444;color:#fff;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">Eliminar '+tests.length+'</button>'
+      +'</div></div>';
+    document.body.appendChild(m);
+    m.querySelector('#_lt_cancel').onclick=function(){ m.remove(); resolve(false); };
+    m.querySelector('#_lt_ok').onclick=function(){ m.remove(); resolve(true); };
+  });
+  if(!confirmado) return;
+  showToast('🧹 Limpiando '+tests.length+' pacientes de prueba…','');
+  var okCount=0;
+  for(var i=0;i<tests.length;i++){
+    var pid=tests[i].id;
+    try{
+      patientsDB=patientsDB.filter(function(p){ return p.id!==pid; });
+      try{ var pts=JSON.parse(localStorage.getItem('sinergia_pts')||'[]'); localStorage.setItem('sinergia_pts', JSON.stringify(pts.filter(function(p){ return p.id!==pid; }))); }catch(e){}
+      if(String(pid).indexOf('mig_pac')!==0){
+        try{ if(window._fstDb) await window._fstDb.collection('pacientes').doc(pid).delete(); }catch(e){ console.warn('[limpiar] FST:',e); }
+        try{ await qaFetchPrivado('deletePaciente', { id: pid }); }catch(e){ console.warn('[limpiar] Sheet:',e); }
+      }
+      okCount++;
+    }catch(e){ console.warn('[limpiar] error con',pid,e); }
+  }
+  showToast('✅ '+okCount+' pacientes de prueba eliminados','success');
+  try{ mostrarRevaloraciones(); }catch(e){}
+  try{ renderPacientes(); }catch(e){}
+}
 // Supervisor: lista de pacientes para revalorar.
 async function mostrarRevaloraciones(){
   if(!(currentUser&&currentUser.role==='supervisor')){ showToast('Solo supervisor','error'); return; }
@@ -2641,7 +2691,9 @@ async function mostrarRevaloraciones(){
   }
   card.innerHTML='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">'
     +'<div style="font-size:16px;font-weight:800;color:var(--navy)">🔄 Pacientes para revalorar</div>'
-    +'<button onclick="this.closest(\'[data-revalov]\').remove()" style="background:none;border:none;font-size:22px;color:var(--gray-400);cursor:pointer">×</button></div>'
+    +'<div style="display:flex;align-items:center">'
+    +(currentUser&&currentUser.role==='supervisor'?'<button onclick="_limpiarTodosLosTest()" style="font-size:11px;font-weight:700;border:none;border-radius:10px;padding:6px 10px;cursor:pointer;background:#FEE2E2;color:#B91C1C;margin-right:8px">🧹 Limpiar pruebas</button>':'')
+    +'<button onclick="this.closest(\'[data-revalov]\').remove()" style="background:none;border:none;font-size:22px;color:var(--gray-400);cursor:pointer">×</button></div></div>'
     +'<div style="font-size:11px;color:var(--gray-400);margin-bottom:12px">🙋 pedida · 📈 EVA sin/poca mejoría · 🚩 banderas/contraindicaciones</div>'
     +cuerpo;
 }
