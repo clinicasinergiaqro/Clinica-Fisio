@@ -2576,10 +2576,8 @@ async function mostrarRevaloraciones(){
   ov.setAttribute('data-revalov','1');
   ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:10001;display:flex;align-items:flex-start;justify-content:center;overflow:auto;padding:40px 12px';
   ov.onclick=function(e){ if(e.target===ov) ov.remove(); };
-  ov.innerHTML='<div style="background:#fff;border-radius:16px;width:100%;max-width:520px;padding:18px"><div style="font-size:12px;color:var(--gray-400)">⏳ Actualizando pacientes…</div></div>';
+  ov.innerHTML='<div style="background:#fff;border-radius:16px;width:100%;max-width:520px;padding:18px"></div>';
   document.body.appendChild(ov);
-  try{ var d=await loadFromCloud(); if(Array.isArray(d)&&d.length) patientsDB=d; }catch(_){}
-  if(!document.body.contains(ov)) return;
   var card=ov.firstChild;
   var lista=[];
   (Array.isArray(patientsDB)?patientsDB:[]).forEach(function(p){ var m=_motivosRevaloracion(p); if(m.length) lista.push({p:p, motivos:m}); });
