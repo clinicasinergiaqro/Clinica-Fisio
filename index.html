@@ -2527,6 +2527,47 @@ async function resolverRevaloracion(pid){
   try{ await saveDB('pts',[p]); showToast('✅ Revaloración resuelta','success'); mostrarRevaloraciones(); }
   catch(e){ showToast('❌ '+((e&&e.message)||'error'),'error'); }
 }
+async function _eliminarPacienteRevalorar(pid, tarjetaEl) {
+  var confirmado = await new Promise(function(resolve) {
+    var m = document.createElement('div');
+    m.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px';
+    m.innerHTML = '<div style="background:#fff;border-radius:16px;padding:24px;max-width:320px;width:100%;text-align:center">'
+      + '<div style="font-size:18px;font-weight:800;color:#1e293b;margin-bottom:8px">¿Eliminar paciente?</div>'
+      + '<div style="font-size:13px;color:#64748b;margin-bottom:20px">Se eliminará permanentemente de la lista y base de datos.</div>'
+      + '<div style="display:flex;gap:10px;justify-content:center">'
+      + '<button id="_elim_cancel" style="padding:10px 20px;border-radius:10px;border:1px solid #e2e8f0;background:#f8fafc;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">Cancelar</button>'
+      + '<button id="_elim_ok" style="padding:10px 20px;border-radius:10px;border:none;background:#ef4444;color:#fff;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">Eliminar</button>'
+      + '</div></div>';
+    document.body.appendChild(m);
+    m.querySelector('#_elim_cancel').onclick = function() { m.remove(); resolve(false); };
+    m.querySelector('#_elim_ok').onclick = function() { m.remove(); resolve(true); };
+  });
+  if (!confirmado) return;
+
+  // 1. Borrar de patientsDB
+  patientsDB = patientsDB.filter(function(p) { return p.id !== pid; });
+
+  // 2. Borrar de localStorage sinergia_pts
+  try {
+    var pts = JSON.parse(localStorage.getItem('sinergia_pts') || '[]');
+    localStorage.setItem('sinergia_pts', JSON.stringify(pts.filter(function(p){ return p.id !== pid; })));
+  } catch(e) {}
+
+  // 3. Si NO es histórico: borrar de Firestore y del Sheet
+  if (String(pid).indexOf('mig_pac_') !== 0) {
+    try {
+      if (window._fstDb) await window._fstDb.collection('pacientes').doc(pid).delete();
+    } catch(e) { console.warn('[eliminar] Firestore:', e); }
+    try {
+      await qaFetchPrivado('deletePaciente', { id: pid });
+    } catch(e) { console.warn('[eliminar] Sheet:', e); }
+  }
+
+  // 4. Quitar del DOM
+  if (tarjetaEl) tarjetaEl.remove();
+
+  showToast('🗑️ Paciente eliminado', 'success');
+}
 // Supervisor: lista de pacientes para revalorar.
 async function mostrarRevaloraciones(){
   if(!(currentUser&&currentUser.role==='supervisor')){ showToast('Solo supervisor','error'); return; }
@@ -2552,7 +2593,7 @@ async function mostrarRevaloraciones(){
       var p=it.p;
       var mh=it.motivos.map(function(m){ return '<div style="font-size:12px;color:#374151;padding:1px 0">'+m.icono+' '+m.txt+'</div>'; }).join('');
       var manual=it.motivos.some(function(x){return x.tipo==='manual';});
-      return '<div style="margin-bottom:12px;padding:10px;border:1px solid #E6EAF2;border-radius:12px">'
+      return '<div data-reval-card="1" style="margin-bottom:12px;padding:10px;border:1px solid #E6EAF2;border-radius:12px">'
         +'<div style="display:flex;align-items:center;justify-content:space-between;gap:8px">'
         +'<div style="font-size:14px;font-weight:800;color:var(--navy)">'+escapeHTML(p.name)+'</div>'
         +'<div style="font-size:11px;color:var(--gray-400)">'+escapeHTML(p.terapeuta||'')+'</div></div>'
@@ -2560,6 +2601,7 @@ async function mostrarRevaloraciones(){
         +'<div style="display:flex;gap:8px;margin-top:8px">'
         +'<button data-pid="'+escapeAttr_(p.id)+'" onclick="this.closest(\'[data-revalov]\').remove();openExpediente(this.dataset.pid)" style="font-size:12px;font-weight:700;border:none;border-radius:10px;padding:6px 12px;cursor:pointer;background:var(--navy);color:#fff">Ver expediente</button>'
         +(manual?'<button data-pid="'+escapeAttr_(p.id)+'" onclick="resolverRevaloracion(this.dataset.pid)" style="font-size:12px;font-weight:700;border:1px solid var(--gray-200);border-radius:10px;padding:6px 12px;cursor:pointer;background:#fff;color:var(--navy)">Marcar resuelta</button>':'')
+        +(currentUser && currentUser.role==='supervisor' ? '<button data-pid="'+escapeAttr_(p.id)+'" onclick="(function(btn){_eliminarPacienteRevalorar(btn.dataset.pid, btn.closest(\'[data-reval-card]\'))})(this)" style="font-size:12px;font-weight:700;border:none;border-radius:10px;padding:6px 12px;cursor:pointer;font-family:inherit;background:#FEE2E2;color:#B91C1C">🗑️ Eliminar</button>' : '')
         +'</div></div>';
     }).join('');
   }
