@@ -2709,7 +2709,7 @@ function _computarPendientesSOAP(eventos, diasISO, idxHist){
     if(p&&p.nombreNormalizado) idx[_normPend(p.nombreNormalizado)]=p;
   });
   var porPac={}, noId=[];
-  idxHist = idxHist || {};
+  idxHist = Array.isArray(idxHist) ? idxHist : [];
   (Array.isArray(eventos)?eventos:[]).forEach(function(ev){
     var nombre=ev.paciente||'';
     var ter=(Array.isArray(ev.terapeutas)&&ev.terapeutas.length)?ev.terapeutas[0]:'Sin asignar';
@@ -2721,8 +2721,12 @@ function _computarPendientesSOAP(eventos, diasISO, idxHist){
       if((!e.ter||e.ter==='Sin asignar') && ter!=='Sin asignar') e.ter=ter;
       return;
     }
-    // No está en activos: ¿es histórico conocido en Firestore? → identificado, no es "no identificado"
-    if(clave && idxHist[clave]){ return; }
+    // No está en activos: ¿casa por tokens con algún histórico de Firestore? (mín. 2 palabras)
+    var tc=clave.split(' ').filter(Boolean);
+    if(tc.length>=2){
+      var esHist=idxHist.some(function(te){ return tc.every(function(w){ return te.indexOf(w)!==-1; }); });
+      if(esHist){ return; }
+    }
     noId.push({nombre:nombre||'(sin nombre)', ter:ter});
   });
   var porTer={};
@@ -2790,18 +2794,18 @@ async function mostrarPendientesSOAP(){
   }
   try{ var dPac=await loadFromCloud(); if(Array.isArray(dPac)&&dPac.length) patientsDB=dPac; }catch(_){}
   // Índice ligero de históricos (una sola lectura) para no marcar como "no identificado" a pacientes de Firestore
-  var idxHist={};
+  var idxHist=[];
   try{
     var okF=await FST_init();
     if(okF && window._fstDb){
       var snapH=await window._fstDb.collection('pacientes').get();
       snapH.forEach(function(d){
         var data=d.data()||{};
-        if(data.nombreNormalizado) idxHist[_normPend(data.nombreNormalizado)]=true;
-        if(data.name) idxHist[_normPend(data.name)]=true;
+        var nn=_normPend(data.nombreNormalizado || data.name || '');
+        if(nn){ var tk=nn.split(' ').filter(Boolean); if(tk.length) idxHist.push(tk); }
       });
     }
-  }catch(_h){ idxHist={}; }
+  }catch(_h){ idxHist=[]; }
   var rep=_computarPendientesSOAP(res.eventos||[], dias, idxHist);
   var etiqueta=(dias.length>1)?('Desde '+_ddmmFromISO(dias[0])):'Hoy';
   card.innerHTML=_pendientesHTML(rep, etiqueta);
