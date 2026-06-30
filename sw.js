@@ -2,7 +2,7 @@
 // Service Worker — Clínica Sinergia (offline shell)
 // CAMBIAR la fecha de CACHE en cada deploy para forzar actualización
 // ═══════════════════════════════════════════════════════════
-const CACHE = 'sinergia-shell-v1-2026-06-29l';
+const CACHE = 'sinergia-shell-v1-2026-06-29m';
 const SHELL = [
   './',
   './index.html',
@@ -57,7 +57,7 @@ self.addEventListener('fetch', e => {
     return;
   }
   // Librerías estáticas: cache-first + refresh silencioso
-  if (url.includes('gstatic.com/firebasejs') || url.includes('cdnjs.cloudflare.com')) {
+  if (url.includes('gstatic.com/firebasejs') || url.includes('cdnjs.cloudflare.com') || url.includes('cdn.jsdelivr.net') || url.includes('docs.opencv.org')) {
     e.respondWith(
       caches.match(req).then(hit => {
         const fetchAndCache = fetch(req).then(resp => {
