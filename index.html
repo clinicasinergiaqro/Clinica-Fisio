@@ -12120,11 +12120,11 @@ function scanner2ArchivoElegido(ev){
   const f=ev.target.files&&ev.target.files[0]; if(!f) return; ev.target.value='';
   if(!f.type.startsWith('image')){ showToast('Selecciona una imagen','error'); return; }
   const reader=new FileReader();
-  reader.onload=()=>{ const img=new Image(); img.onload=()=>{ detenerCamaraScanner2(); procesarCapturaScanner2(img, null); }; img.onerror=()=>showToast('Imagen inválida','error'); img.src=reader.result; };
+  reader.onload=()=>{ const img=new Image(); img.onload=()=>{ detenerCamaraScanner2(); procesarCapturaScanner2(img, null, true); }; img.onerror=()=>showToast('Imagen inválida','error'); img.src=reader.result; };
   reader.readAsDataURL(f);
 }
 
-async function procesarCapturaScanner2(img, puntosDetectadosEnVivo){
+async function procesarCapturaScanner2(img, puntosDetectadosEnVivo, desdeGaleria){
   _autoCapturaHecha=false;
   const maxW=1500; let w=img.naturalWidth, h=img.naturalHeight;
   let escala=1;
@@ -12142,10 +12142,16 @@ async function procesarCapturaScanner2(img, puntosDetectadosEnVivo){
     const ptsBase=puntosDetectadosEnVivo.map(p=>({x:p.x*escala, y:p.y*escala}));
     if(validarDocumentoDetectado(ptsBase, base)){ corners=ptsBase; }
   }
-  // Si no hubo puntos válidos en vivo, detectar en alta resolución sobre la captura
+  // Si no hubo puntos válidos en vivo, intentar detección.
   if(!corners){
-    const cvOK = await ensureOpenCVReady();
-    if(cvOK){ try{ const d=detectarDocumentoRobusto(base); if(d && d.score>=40){ const c=d.puntos.map(pr=>({x:pr[0],y:pr[1]})); if(validarDocumentoDetectado(c, base)) corners=c; } }catch(e){ corners=null; } }
+    if(desdeGaleria){
+      // Desde galería: NO esperar OpenCV. Si ya está cacheado/listo, intentar rápido; si no, al manual.
+      if(opencvListo()){ try{ const d=detectarDocumentoRobusto(base); if(d && d.score>=40){ const c=d.puntos.map(pr=>({x:pr[0],y:pr[1]})); if(validarDocumentoDetectado(c, base)) corners=c; } }catch(e){ corners=null; } }
+    } else {
+      // Desde cámara: comportamiento original (esperar OpenCV en alta resolución)
+      const cvOK = await ensureOpenCVReady();
+      if(cvOK){ try{ const d=detectarDocumentoRobusto(base); if(d && d.score>=40){ const c=d.puntos.map(pr=>({x:pr[0],y:pr[1]})); if(validarDocumentoDetectado(c, base)) corners=c; } }catch(e){ corners=null; } }
+    }
   }
 
   if(corners){
