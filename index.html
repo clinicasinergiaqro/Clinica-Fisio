@@ -11925,7 +11925,21 @@ async function abrirCamaraScanner2(){
   const sinv=document.getElementById('scan2-sinvideo');
   const estado=document.getElementById('scan2-estado-vivo');
   try{
-    const stream = await navigator.mediaDevices.getUserMedia({ video:{ facingMode:{ideal:'environment'}, width:{ideal:1280}, height:{ideal:720} }, audio:false });
+    let stream;
+    try {
+      // LOOP-1A: resolución nativa máxima (4K si el sensor lo da)
+      stream = await navigator.mediaDevices.getUserMedia({
+        video:{ facingMode:{ideal:'environment'}, width:{ideal:4096,min:1280}, height:{ideal:3072,min:720}, advanced:[{focusMode:'continuous'}] },
+        audio:false
+      });
+    } catch(eHi) {
+      // LOOP-1A: fallback a resolución estándar si la alta no es soportada (iPads viejos)
+      console.warn('[scanner] alta resolución no soportada, fallback 1280x720:', eHi && eHi.message);
+      stream = await navigator.mediaDevices.getUserMedia({
+        video:{ facingMode:{ideal:'environment'}, width:{ideal:1280}, height:{ideal:720} },
+        audio:false
+      });
+    }
     scannerState.stream = stream; video.srcObject = stream; await video.play();
     video.style.display='block'; sinv.style.display='none';
     if(estado){ estado.style.display='block'; estado.textContent= opencvListo()?'Buscando documento…':'OpenCV cargando…'; }
@@ -12077,7 +12091,8 @@ function capturarFotoScanner2(){
   if(!scannerState.stream || !video || video.videoWidth===0){ document.getElementById('scan2-file').click(); return; }
   detenerDeteccionEnVivoScanner();
   const cv2=document.createElement('canvas');
-  let w=video.videoWidth, h=video.videoHeight, scale=1; const maxW=1600;
+  // LOOP-1B: captura a resolución completa del sensor (cap 3200px para balance calidad/memoria)
+  let w=video.videoWidth, h=video.videoHeight, scale=1; const maxW=3200;
   if(w>maxW){ scale=maxW/w; h=Math.round(h*scale); w=maxW; }
   cv2.width=w; cv2.height=h; cv2.getContext('2d').drawImage(video,0,0,w,h);
   // A2: usar los puntos detectados en vivo (en coords del frame nativo); escalar por 'scale'
@@ -12631,12 +12646,22 @@ async function guardarPDFScannerMultipagina(){
     const jsPDFCtor=(window.jspdf&&window.jspdf.jsPDF)||window.jsPDF;
     if(!jsPDFCtor) throw new Error('jsPDF no disponible');
     const pdf=new jsPDFCtor({unit:'pt',format:'letter'});
+    // LOOP-1D: metadatos PDF clínicos
+    try{
+      pdf.setProperties({
+        title: 'Escaneo clínico — ' + ((currentPatient && currentPatient.name) || 'Paciente'),
+        author: (currentUser && currentUser.name) || 'Clínica Sinergia',
+        subject: 'Expediente clínico digital',
+        creator: 'Scanner Clínico Sinergia',
+        keywords: 'expediente,clinico,sinergia'
+      });
+    }catch(_meta){}
     const pw=pdf.internal.pageSize.getWidth(), ph=pdf.internal.pageSize.getHeight(), margen=18;
     scannerState.pages.forEach((pg,idx)=>{
       if(idx>0) pdf.addPage();
       const maxW=pw-margen*2, maxH=ph-margen*2, ratio=Math.min(maxW/pg.w, maxH/pg.h);
       const iw=pg.w*ratio, ih=pg.h*ratio;
-      pdf.addImage(pg.dataUrl,'JPEG',(pw-iw)/2,(ph-ih)/2,iw,ih,undefined,'FAST');
+      pdf.addImage(pg.dataUrl,'JPEG',(pw-iw)/2,(ph-ih)/2,iw,ih,undefined,'SLOW');
     });
     const blob=pdf.output('blob'); const ts=Date.now(); const now=new Date();
     const yyyymmdd=now.getFullYear()+String(now.getMonth()+1).padStart(2,'0')+String(now.getDate()).padStart(2,'0');
