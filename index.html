@@ -12126,7 +12126,7 @@ function scanner2ArchivoElegido(ev){
 
 async function procesarCapturaScanner2(img, puntosDetectadosEnVivo, desdeGaleria){
   _autoCapturaHecha=false;
-  const maxW=1500; let w=img.naturalWidth, h=img.naturalHeight;
+  const maxW=2400; let w=img.naturalWidth, h=img.naturalHeight;
   let escala=1;
   if(w>maxW){ escala=maxW/w; h=Math.round(h*escala); w=maxW; }
   const base=document.createElement('canvas'); base.width=w; base.height=h;
@@ -12622,7 +12622,7 @@ function reintentarTomaScanner2(){
 function agregarPaginaActualScanner2(){
   if(scannerState.paginaActualAgregada) return true;
   const cvp=getCanvasPaginaActualProcesada(); if(!cvp) return false;
-  scannerState.pages.push({ dataUrl: cvp.toDataURL('image/jpeg',0.85), w:cvp.width, h:cvp.height,
+  scannerState.pages.push({ dataUrl: cvp.toDataURL('image/jpeg',0.92), w:cvp.width, h:cvp.height,
     filtro:scannerState.filtro, calidad:[...(scannerState.calidad||[])], autoDetectado:scannerState.autoDetectado, ajusteManual:scannerState.ajusteManual });
   scannerState.paginaActualAgregada=true; renderThumbsScanner2();
   document.getElementById('scan2-paginas-wrap').style.display='block';
