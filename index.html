@@ -3958,16 +3958,55 @@ function FST_abrirPacienteDesdeLista(pid) {
     const p = (window._FST_listaPacientesPorId || {})[id];
     if (!p) { console.warn('[FST-LISTA] paciente no encontrado en vista:', id); return; }
 
-    patientsDB.push(p);
-    try {
-      return openExpediente(id); // flujo real, sin replicar nada
-    } finally {
-      const idx = patientsDB.indexOf(p); // por referencia exacta, no por índice precalculado
-      if (idx !== -1) patientsDB.splice(idx, 1);
-    }
+    // M-2: hidratar campos clínicos completos desde Firestore antes de abrir.
+    // El índice solo trae 10 campos de lista; antecedentes/motivo/valoracion/
+    // dxFuncional/planTto/alergias viven en el doc completo y nunca se leían.
+    FST_hidratarCamposClinicos(p, id).finally(() => {
+      patientsDB.push(p);
+      try {
+        openExpediente(id); // flujo real, sin replicar nada
+      } finally {
+        const idx = patientsDB.indexOf(p); // por referencia exacta, no por índice precalculado
+        if (idx !== -1) patientsDB.splice(idx, 1);
+      }
+    });
 
   } catch(e) {
     console.warn('[FST-LISTA] error abriendo paciente:', e.message);
+  }
+}
+
+// M-2: hidrata un objeto de paciente (proveniente del índice FST) con los
+// campos clínicos completos del doc raíz de Firestore. Muta `p` in-place.
+// No lanza error si Firestore falla — el expediente se abre igual con lo
+// que ya había en el índice (age/terapeuta/dx), solo sin los campos extra.
+async function FST_hidratarCamposClinicos(p, id) {
+  try {
+    if (!window._fstDb && typeof FST_init === 'function') {
+      await FST_init();
+    }
+    if (!window._fstDb) return;
+
+    const snap = await window._fstDb.collection('pacientes').doc(id).get();
+    if (!snap.exists) return;
+    const d = snap.data() || {};
+
+    if (d.age != null && p.age == null)   p.age = d.age;
+    if (d.alergias)                       p.alergias = d.alergias;
+    if (d.motivoConsulta)                 p.motivoConsulta = d.motivoConsulta;
+    if (d.antecedentes && typeof d.antecedentes === 'object' && !Array.isArray(d.antecedentes))
+      p.antecedentes = d.antecedentes;
+    if (d.motivo && typeof d.motivo === 'object' && !Array.isArray(d.motivo))
+      p.motivo = d.motivo;
+    if (d.valoracion && typeof d.valoracion === 'object' && !Array.isArray(d.valoracion))
+      p.valoracion = d.valoracion;
+    if (d.dxFuncional && typeof d.dxFuncional === 'object' && !Array.isArray(d.dxFuncional))
+      p.dxFuncional = d.dxFuncional;
+    if (d.planTto && typeof d.planTto === 'object' && !Array.isArray(d.planTto))
+      p.planTto = d.planTto;
+
+  } catch(e) {
+    console.warn('[FST-LISTA] hidratar campos clínicos falló (no bloqueante):', e.message);
   }
 }
 
