@@ -1731,6 +1731,16 @@ function toggleModoOscuro(){
 }
 
 function todayFmt(){return new Date().toLocaleDateString('es-MX',{day:'2-digit',month:'2-digit',year:'numeric'})}
+// FECHA EDITABLE: normaliza una fecha de nota (DD/MM/YYYY o YYYY-MM-DD) al formato del input type=date (YYYY-MM-DD)
+function _normalizarFechaParaInput(fecha){
+  if(!fecha) return '';
+  if(/^\d{4}-\d{2}-\d{2}$/.test(fecha)) return fecha;
+  var m=fecha.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+  if(m) return m[3]+'-'+m[2].padStart(2,'0')+'-'+m[1].padStart(2,'0');
+  var m2=fecha.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2})$/);
+  if(m2) return '20'+m2[3]+'-'+m2[2].padStart(2,'0')+'-'+m2[1].padStart(2,'0');
+  return '';
+}
 
 // ID único robusto para registros NUEVOS (evita colisión Date.now en uso simultáneo)
 function generarIdSeguro_(prefijo){
@@ -4817,6 +4827,13 @@ function renderSOAPForm(){
   }).join('');
   const semana=Math.ceil(sesNum/2);
 
+  // FECHA EDITABLE: valor inicial del campo (edición = fecha de la nota; nueva = hoy). Formato YYYY-MM-DD para type=date.
+  var _fechaConsultaVal = _isoMasDias(0);
+  if(editingSoapId && Array.isArray(p.soap)){
+    var _naFecha=p.soap.find(function(s){return s.id===editingSoapId;});
+    if(_naFecha && _naFecha.fecha){ var _fi=_normalizarFechaParaInput(_naFecha.fecha); if(_fi) _fechaConsultaVal=_fi; }
+  }
+
   // get last soap for reference
   const lastSoap=Array.isArray(p.soap)&&p.soap.length?p.soap[p.soap.length-1]:null;
 
@@ -4868,6 +4885,17 @@ function renderSOAPForm(){
       </div>
       <textarea class="form-input" id="dictado-textarea" placeholder="Aquí aparece el texto dictado en vivo… (ej: paciente acude con cinco de diez, arcos de movimiento limitados, se aplicó ultrasonido y estiramientos)" style="min-height:90px" oninput="_dictadoTextareaManual()"></textarea>
       <div id="dictado-preview"></div>
+    </div>
+  </div>
+
+  <!-- Fecha de la consulta (editable, default hoy) -->
+  <div class="form-section">
+    <div class="form-section-title">📅 Fecha de la consulta</div>
+    <div class="form-group">
+      <div class="form-field">
+        <div class="form-label">Fecha real de la cita <span style="font-size:11px;color:var(--gray-400)">(si la nota se llena después, corrígela aquí)</span></div>
+        <input type="date" class="form-input" id="f-fecha-consulta" style="max-width:180px" max="${_isoMasDias(0)}" value="${_fechaConsultaVal}">
+      </div>
     </div>
   </div>
 
@@ -5272,6 +5300,11 @@ function guardarSOAP(){
     })()
   };
 
+  // FECHA EDITABLE: leer la fecha del campo (YYYY-MM-DD) y convertir a DD/MM/YYYY (formato de la app)
+  const fechaInputEl = document.getElementById('f-fecha-consulta');
+  const fechaConsulta = (fechaInputEl && fechaInputEl.value) ? fechaInputEl.value : todayFmt();
+  const fechaConsultaFmt = /^\d{4}-\d{2}-\d{2}$/.test(fechaConsulta) ? fechaConsulta.split('-').reverse().join('/') : fechaConsulta;
+
   if(editingSoapId){
     // ── MODO EDICIÓN — actualizar nota existente ───────────────────────────
     const idx=p.soap.findIndex(s=>s.id===editingSoapId);
@@ -5317,6 +5350,7 @@ function guardarSOAP(){
     if(!datosNota.modoNota && notaAnterior.modoNota) datosNota.modoNota = notaAnterior.modoNota;
     if((!Array.isArray(datosNota.atendidoPor)||!datosNota.atendidoPor.length) && Array.isArray(notaAnterior.atendidoPor)) datosNota.atendidoPor = notaAnterior.atendidoPor;
     p.soap[idx]={...notaAnterior, ...datosNota, historialEdiciones:notaAnterior.historialEdiciones};
+    p.soap[idx].fecha = fechaConsultaFmt; // FECHA EDITABLE: usar la fecha del campo (puede corregirse al editar)
     // MIGRACIÓN: al estructurar una nota importada, queda revisada y completa
     if(p.soap[idx].importado){ p.soap[idx].revisionPendiente=false; p.soap[idx].completa=true; p.soap[idx].formatoOriginal='soap'; }
     editingSoapId=null;
@@ -5336,7 +5370,7 @@ function guardarSOAP(){
     const sesNum=p.sesiones+1;
     const semana=Math.ceil(sesNum/2);
     const nuevaSOAP={
-      id:generarIdSeguro_('s'), num:sesNum, fecha:todayFmt(),
+      id:generarIdSeguro_('s'), num:sesNum, fecha:fechaConsultaFmt,
       horaCreacion:new Date().toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'}),
       fechaHoraISO: new Date().toISOString(), // NOM-024: timestamp ISO para trazabilidad
       terapeuta:ter,
