@@ -11795,6 +11795,7 @@ async function resetImportacion_(){
       <div id="scan2-video-container" style="position:relative;background:#000;border-radius:10px;overflow:hidden;width:100%;height:54vh">
         <video id="scan2-video" playsinline muted style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:contain;display:none"></video>
         <canvas id="scan2-overlay-canvas" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none"></canvas>
+        <div id="scan2-estab-bar" style="position:absolute;bottom:10px;left:50%;transform:translateX(-50%);width:140px;height:6px;border-radius:4px;background:rgba(255,255,255,.25);display:none;overflow:hidden;z-index:5"><div id="scan2-estab-fill" style="height:100%;width:0%;border-radius:4px;background:#3DDC97;transition:width .15s ease"></div></div>
         <div id="scan2-sinvideo" style="position:absolute;top:0;left:0;width:100%;height:100%;display:flex;align-items:center;justify-content:center;padding:30px 16px;color:white;font-size:13px;text-align:center;box-sizing:border-box">Coloca el documento dentro del encuadre. Si la cámara no abre, usa "Elegir imagen".</div>
       </div>
       <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px">
@@ -12074,15 +12075,22 @@ function dibujarOverlayDeteccionEnVivo(puntos, estado, canvasAnalisis, videoEl, 
 function evaluarEstabilidadDocumento(puntos){
   const prev=scannerState._prevPuntos;
   scannerState._prevPuntos=puntos.map(p=>({x:p.x,y:p.y}));
-  if(!prev) return {estado:'Documento detectado', estable:false};
+  const bar=document.getElementById('scan2-estab-bar');
+  const fill=document.getElementById('scan2-estab-fill');
+  if(!prev){ scannerState._estableCount=0; if(bar) bar.style.display='none'; return {estado:'Documento detectado', estable:false}; }
   let mov=0; for(let i=0;i<4;i++) mov+=Math.hypot(puntos[i].x-prev[i].x, puntos[i].y-prev[i].y);
-  if(mov<8) scannerState._estableCount=(scannerState._estableCount||0)+1; else scannerState._estableCount=0;
-  if(scannerState._estableCount>=3) return {estado:'Mantén estable', estable:true};
+  // UMBRAL 15px: tolera temblor de mano. FRAMES 4: ~1s a 4fps antes de disparar.
+  var UMBRAL_MOV=15, FRAMES_ESTABLE=4;
+  if(mov<UMBRAL_MOV) scannerState._estableCount=(scannerState._estableCount||0)+1; else scannerState._estableCount=0;
+  var pct=Math.min(100, Math.round((scannerState._estableCount/FRAMES_ESTABLE)*100));
+  if(bar && fill){ if(scannerState._estableCount>0){ bar.style.display='block'; fill.style.width=pct+'%'; } else { bar.style.display='none'; } }
+  if(scannerState._estableCount>=FRAMES_ESTABLE){ if(bar) bar.style.display='none'; return {estado:'Mantén estable', estable:true}; }
   return {estado:'Documento detectado', estable:false};
 }
 let _autoCapturaHecha=false;
 function autoCapturarSiEstable(){
   if(_autoCapturaHecha) return; _autoCapturaHecha=true;
+  var bar=document.getElementById('scan2-estab-bar'); if(bar) bar.style.display='none';
   setTimeout(()=>{ if(scannerState.liveDetectionActive) capturarFotoScanner2(); }, 250);
 }
 
