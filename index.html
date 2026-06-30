@@ -2075,6 +2075,10 @@ document.getElementById('login-pass').addEventListener('keydown',e=>{if(e.key===
 // Check for public exercise link on load
 window.addEventListener('DOMContentLoaded', initApp);
 window.addEventListener('DOMContentLoaded', function(){ try{ _initDblEnter(); }catch(_){} });
+// REFRESCO-PACIENTES: al volver la app a primer plano, refrescar la lista (throttle interno de 30s).
+document.addEventListener('visibilitychange', function(){
+  if(document.visibilityState === 'visible'){ try{ refrescarPacientesDesdeNube(); }catch(_){} }
+});
 
 // ── Service Worker — offline shell ──────────────────────────
 if ('serviceWorker' in navigator) {
@@ -2889,9 +2893,40 @@ async function mostrarPendientesSOAP(){
   var etiqueta=(dias.length>1)?('Desde '+_ddmmFromISO(dias[0])):'Hoy';
   card.innerHTML=_pendientesHTML(rep, etiqueta);
 }
+// REFRESCO-PACIENTES: recarga la lista desde el Sheet en segundo plano, sin bloquear.
+// Pinta primero lo que hay en memoria (el caller ya renderizó); cuando lleguen datos
+// frescos, actualiza patientsDB, invalida la vista fusionada y re-renderiza si la
+// pantalla de pacientes está visible. Offline-first: si falla, deja la lista actual.
+async function refrescarPacientesDesdeNube(opts){
+  opts = opts || {};
+  var ahora = Date.now();
+  if(!opts.forzar){
+    if(window._refrescoPacientesEnCurso) return;
+    if(window._ultimoRefrescoPacientes && (ahora - window._ultimoRefrescoPacientes) < 30000) return;
+  }
+  window._refrescoPacientesEnCurso = true;
+  try{
+    var d = await loadFromCloud();
+    if(Array.isArray(d) && d.length){
+      patientsDB = d;
+      if(typeof window._FST_invalidarVistaPacientes === 'function') window._FST_invalidarVistaPacientes();
+      window._ultimoRefrescoPacientes = Date.now();
+      var sp = document.getElementById('screen-pacientes');
+      if(sp && sp.classList.contains('active')){
+        var q = (document.getElementById('buscador-pacientes')||{}).value || '';
+        try{ renderPacientes(q); }catch(e){ console.warn('[refrescarPacientes] re-render', e); }
+      }
+    }
+  }catch(e){
+    console.warn('[refrescarPacientes] fallo no crítico:', e && e.message);
+  }finally{
+    window._refrescoPacientesEnCurso = false;
+  }
+}
 function showPacientes(){
   document.querySelectorAll('.nav-item').forEach((n,i)=>n.classList.toggle('active',i===1));
   screenStack.push('screen-pacientes');showScreen('screen-pacientes',false);renderPacientes();
+  refrescarPacientesDesdeNube(); // refresco en segundo plano (con throttle interno)
 }
 // CAMBIO P1 — Cargar el siguiente lote sin re-renderizar todo
 function verMasPacientes_(btn){
