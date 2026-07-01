@@ -4029,6 +4029,13 @@ function FST_abrirPacienteDesdeLista(pid) {
   if (!id) return;
 
   try {
+    // Fix Bug 1: si es histórico, remover stub vacío para forzar hidratación
+    if (String(id||'').startsWith('mig_pac_')) {
+      const stubIdx = patientsDB.findIndex(p => String(p?.id||'') === id);
+      if (stubIdx >= 0) {
+        patientsDB.splice(stubIdx, 1);
+      }
+    }
     // Caso 1: paciente local — flujo original intacto
     const existeLocal = Array.isArray(patientsDB) && patientsDB.some(p => String(p?.id || '') === id);
     if (existeLocal) return openExpediente(id);
