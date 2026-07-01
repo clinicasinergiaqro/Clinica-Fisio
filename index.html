@@ -251,6 +251,16 @@ async function FST_renderHistorialSoap(pid){
     if (dups.length) console.error('[FST] IDs duplicados:', dups.map(function(s){ return s.id; }));
     const cards = sesiones.map(FST_renderCard).join('');
     const galeria = await FST_renderGaleriaHistorica(pid);
+    // LOOP: inyectar "Primera sesión registrada" en placeholder de Datos generales
+    var _fstPrimeraSesEl = document.getElementById('fst-primera-sesion');
+    if(_fstPrimeraSesEl){
+      var _fstFechas=sesiones.map(function(s){return s.fecha;}).filter(Boolean).sort();
+      if(_fstFechas.length){
+        var _fstMinF=_fstFechas[0], _fstFmtF=_fstMinF;
+        try{var _pp=_fstMinF.split('-');_fstFmtF=new Date(Number(_pp[0]),Number(_pp[1])-1,Number(_pp[2])).toLocaleDateString('es-MX',{day:'2-digit',month:'2-digit',year:'numeric'});}catch(e){}
+        _fstPrimeraSesEl.innerHTML='<div class="field-row"><div class="field-label">Primera sesión registrada</div><div class="field-value" style="color:var(--gray-400);font-size:13px">'+escapeHTML(_fstFmtF)+'</div></div>';
+      }
+    }
     box.innerHTML = galeria + '<div style="margin:14px 0 6px;padding:0 14px"><div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.7px;color:var(--gray-400)">\u{1F4C2} Historial clínico (Firestore staging · ' + sesiones.length + ' sesiones)</div></div>' + cards;
     console.log('[FST] ' + sesiones.length + ' sesiones pintadas · pid=' + pid);
   } catch (e) {
@@ -3261,6 +3271,30 @@ function renderExpediente(tab='historia'){
       <div class="field-row"><div class="field-label">Médico referente</div><div class="field-value">${escapeHTML(p.medicoReferente||'—')}</div></div>
       <div class="field-row"><div class="field-label">Terapeuta</div><div class="field-value">${escapeHTML(p.terapeuta)}${p.terapeutaSeguimiento?` <span style="color:var(--green);font-size:12px">→ Seguimiento: ${escapeHTML(p.terapeutaSeguimiento)}</span>`:''}</div></div>
       <div class="field-row"><div class="field-label">Creado por</div><div class="field-value" style="color:var(--gray-400);font-size:13px">${escapeHTML(p.creadoPor||'—')} · ${escapeHTML(p.fechaCreacion||'—')}</div></div>
+      ${(()=>{
+        const esMig=(p.id||'').startsWith('mig_pac_');
+        if(esMig){
+          // Histórico: placeholder vacío — FST_renderHistorialSoap lo llenará con min(sesiones.fecha)
+          return '<div id="fst-primera-sesion"></div>';
+        }
+        // Activo: calcular fecha de creación
+        function _fmtFechaExp(v){
+          if(!v) return '';
+          const s=String(v);
+          // Firestore Timestamp-like object serializado
+          if(typeof v==='object'&&v.seconds) try{return new Date(v.seconds*1000).toLocaleDateString('es-MX',{day:'2-digit',month:'2-digit',year:'numeric'});}catch(e){}
+          // YYYY-MM-DD
+          if(/^\d{4}-\d{2}-\d{2}/.test(s)) try{const p=s.slice(0,10).split('-');return new Date(Number(p[0]),Number(p[1])-1,Number(p[2])).toLocaleDateString('es-MX',{day:'2-digit',month:'2-digit',year:'numeric'});}catch(e){}
+          return s; // ya formateado o desconocido — usar tal cual
+        }
+        let fechaExp=_fmtFechaExp(p.createdAt);
+        if(!fechaExp&&Array.isArray(p.soap)&&p.soap.length){
+          const fechas=p.soap.map(function(s){return s.fecha;}).filter(Boolean).sort();
+          if(fechas.length) fechaExp=_fmtFechaExp(fechas[0]);
+        }
+        if(!fechaExp) return '';
+        return `<div class="field-row"><div class="field-label">Expediente creado</div><div class="field-value" style="color:var(--gray-400);font-size:13px">${escapeHTML(fechaExp)}</div></div>`;
+      })()}
       ${p.ultimoUsuario&&p.ultimoUsuario!==p.creadoPor?`<div class="field-row"><div class="field-label">Última edición</div><div class="field-value" style="color:var(--gray-400);font-size:13px">${escapeHTML(p.ultimoUsuario)} · ${escapeHTML(p.fechaActualizacion||'—')}</div></div>`:''}
       <div class="field-row"><div class="field-label">Diagnóstico</div><div class="field-value">${escapeHTML(p.dx)}</div></div>
       <div class="field-row"><div class="field-label">Contraindicaciones</div><div class="field-value" style="color:${hasContra?'var(--red)':'inherit'}">${escapeHTML(p.contraindicaciones)}</div></div>
