@@ -477,6 +477,11 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',Arial,sans-serif
 .field-row:last-child{border-bottom:none}
 .field-label{font-size:12px;color:var(--gray-400);font-weight:600;min-width:120px;flex-shrink:0;padding-top:1px}
 .field-value{font-size:14px;color:var(--gray-800);flex:1;line-height:1.5}
+.fecha-row{display:flex;justify-content:space-between;align-items:baseline;padding:8px 0;border-bottom:1px solid var(--gray-200)}
+.fecha-row:last-child{border-bottom:none}
+.fecha-label{font-weight:500;color:var(--gray-800);font-size:13px}
+.fecha-valor{text-align:right;color:var(--gray-600);font-size:13px}
+.fecha-valor small{font-size:11px;color:var(--gray-400)}
 .field-value.narrative{font-size:13px;line-height:1.6;color:var(--gray-600)}
 
 /* EVA */
@@ -3161,6 +3166,120 @@ function renderIndicadorCompletitud(p){
   </div>`;
 }
 
+// ── Fechas clínicas (Prompt B v2) ──────────────────────────────────────────
+// Parseo tolerante: YYYY-MM-DD, DD/MM/YYYY, DD/MM/YY, ISO, Firestore Timestamp, Date.
+// Rechaza vacío/null/undefined/Invalid Date/futuras absurdas/'9999'. Devuelve Date|null.
+function parseFechaClinicaSegura(valor){
+  if(valor===null||valor===undefined||valor==='') return null;
+  var d=null;
+  try{
+    if(valor instanceof Date){ d=valor; }
+    else if(typeof valor==='object'){
+      if(typeof valor.toDate==='function') d=valor.toDate();
+      else if(valor.seconds!=null) d=new Date(valor.seconds*1000);
+      else if(valor._seconds!=null) d=new Date(valor._seconds*1000);
+    } else if(typeof valor==='number'){ d=new Date(valor); }
+    else {
+      var s=String(valor).trim(); var m;
+      if(!s||s.indexOf('9999')>=0) return null;
+      if(m=s.match(/^(\d{4})-(\d{2})-(\d{2})/)) d=new Date(Number(m[1]),Number(m[2])-1,Number(m[3]));
+      else if(m=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/)) d=new Date(Number(m[3]),Number(m[2])-1,Number(m[1]));
+      else if(m=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2})$/)){ var yy=Number(m[3]); d=new Date(yy+(yy<=79?2000:1900),Number(m[2])-1,Number(m[1])); }
+      else d=new Date(s);
+    }
+  }catch(e){ return null; }
+  if(!d||isNaN(d.getTime())) return null;
+  var y=d.getFullYear(), maxY=(new Date()).getFullYear()+1;
+  if(y<2000||y>maxY) return null;
+  return d;
+}
+
+// Extrae fechas embebidas en texto libre (DD/MM/YY[YY] o YYYY-MM-DD). Devuelve Date[] ordenado.
+function extraerFechasDeTextoClinico(texto){
+  var out=[]; if(!texto) return out;
+  var s=String(texto), m, re=/(\d{1,2}\/\d{1,2}\/\d{2,4})/g;
+  while(m=re.exec(s)){ var d=parseFechaClinicaSegura(m[1]); if(d) out.push(d); }
+  var re2=/(\d{4}-\d{2}-\d{2})/g;
+  while(m=re2.exec(s)){ var d2=parseFechaClinicaSegura(m[1]); if(d2) out.push(d2); }
+  out.sort(function(a,b){return a-b;});
+  return out;
+}
+
+// Combina p.soap + sesionesFirestore, deduplica por fecha+terapeuta, devuelve los 4 hitos.
+async function obtenerResumenFechasClinicas(paciente, sesionesFirestore){
+  var p=paciente||{};
+  sesionesFirestore=Array.isArray(sesionesFirestore)?sesionesFirestore:[];
+  var todas=(Array.isArray(p.soap)?p.soap:[]).concat(sesionesFirestore);
+  var seen={}, unicas=[];
+  todas.forEach(function(s){
+    if(!s) return;
+    var f=parseFechaClinicaSegura(s.fecha); if(!f) return;
+    var key=f.getTime()+'|'+String(s.terapeuta||'').trim().toLowerCase();
+    if(seen[key]) return; seen[key]=1;
+    unicas.push({fecha:f, terapeuta:s.terapeuta||''});
+  });
+  unicas.sort(function(a,b){return a.fecha-b.fecha;});
+  function mk(fecha,fuente,confiable){ return {fecha:fecha||null, fuente:fuente||'', confiable:confiable!==false}; }
+
+  var primeraSesion = unicas.length ? mk(unicas[0].fecha,'sesiones',true) : mk(null,'',true);
+  var ultimaSesion  = unicas.length ? mk(unicas[unicas.length-1].fecha,'sesiones',true) : mk(null,'',true);
+
+  var fhc, c;
+  if(c=parseFechaClinicaSegura(p.fechaHistoriaClinica)) fhc=mk(c,'registro historia',true);
+  else if(c=parseFechaClinicaSegura(p.historia&&p.historia.fecha)) fhc=mk(c,'historia',true);
+  else if(c=parseFechaClinicaSegura(p.valoracion&&p.valoracion.fecha)) fhc=mk(c,'valoración',true);
+  else if(p.date&&String(p.date).indexOf('9999')<0&&(c=parseFechaClinicaSegura(p.date))) fhc=mk(c,'alta paciente',true);
+  else if(unicas.length) fhc=mk(unicas[0].fecha,'min. sesiones',false);
+  else { var ft=extraerFechasDeTextoClinico(p.textoOriginal); fhc = ft.length ? mk(ft[0],'texto original',false) : mk(null,'',true); }
+
+  var pc;
+  if(c=parseFechaClinicaSegura(p.fechaPrimeraCita)) pc=mk(c,'primera cita',true);
+  else if(c=parseFechaClinicaSegura(p.primeraCita)) pc=mk(c,'primera cita',true);
+  else if(primeraSesion.fecha) pc=mk(primeraSesion.fecha,'≈ primera sesión',false);
+  else pc=mk(null,'',true);
+
+  return { fechaHistoriaClinica:fhc, primeraCita:pc, primeraSesion:primeraSesion, ultimaSesion:ultimaSesion };
+}
+
+// Pinta el bloque de 4 fechas en el contenedor dado. "Pendiente de validar ⚠" si no hay fecha.
+function renderResumenFechas(resumen, containerId){
+  var box=document.getElementById(containerId); if(!box) return;
+  function fmt(d){
+    if(!(d instanceof Date)||isNaN(d.getTime())) return null;
+    if(typeof formatearFecha==='function'){ try{ var r=formatearFecha(d); if(r) return r; }catch(e){} }
+    return String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0')+'/'+d.getFullYear();
+  }
+  function row(label, campo){
+    var val=campo&&campo.fecha ? fmt(campo.fecha) : null;
+    var badge=(val&&campo&&campo.confiable===false) ? ' <span style="font-size:10px;font-weight:700;background:var(--amber-light);color:var(--amber);padding:1px 6px;border-radius:8px">baja confianza</span>' : '';
+    var valorHtml = val
+      ? escapeHTML(val)+badge+(campo.fuente?'<br><small>'+escapeHTML(campo.fuente)+'</small>':'')
+      : '<span style="color:var(--amber);font-weight:600">Pendiente de validar ⚠</span>';
+    return '<div class="fecha-row"><div class="fecha-label">'+escapeHTML(label)+'</div><div class="fecha-valor">'+valorHtml+'</div></div>';
+  }
+  box.innerHTML =
+    row('Fecha de historia clínica', resumen.fechaHistoriaClinica)+
+    row('Primera cita registrada', resumen.primeraCita)+
+    row('Primera sesión registrada', resumen.primeraSesion)+
+    row('Última sesión registrada', resumen.ultimaSesion);
+}
+
+// Driver: render inmediato con datos locales, luego enriquece con sesiones Firestore.
+function actualizarFechasClinicas(paciente){
+  if(!paciente||!document.getElementById('fechas-clinicas-body')) return;
+  var pid=paciente.id;
+  obtenerResumenFechasClinicas(paciente, []).then(function(res){
+    if(currentPatient&&currentPatient.id===pid) renderResumenFechas(res,'fechas-clinicas-body');
+  });
+  if(typeof FST_fetchSesiones==='function'){
+    FST_fetchSesiones(pid).then(function(sesFS){
+      return obtenerResumenFechasClinicas(paciente, sesFS||[]);
+    }).then(function(res2){
+      if(res2&&currentPatient&&currentPatient.id===pid) renderResumenFechas(res2,'fechas-clinicas-body');
+    }).catch(function(){});
+  }
+}
+
 function renderExpediente(tab='historia'){
   currentTab=tab;
   const p=currentPatient;
@@ -3259,6 +3378,12 @@ function renderExpediente(tab='historia'){
       </div>`;
     }
     html+=`
+    <div class="section-card" id="card-fechas-clinicas" style="margin-bottom:12px">
+      <div class="section-title">📅 Fechas clínicas</div>
+      <div id="fechas-clinicas-body" style="padding:0 14px 12px">
+        <div style="font-size:12px;color:var(--gray-400)">Calculando fechas…</div>
+      </div>
+    </div>
     <div class="section-card">
       <div class="section-title">📋 Datos generales
         <button onclick="editarHistoria('generales')" style="margin-left:auto;background:var(--navy);color:white;border:none;border-radius:20px;padding:3px 12px;font-size:11px;font-weight:700;cursor:pointer">✏️ Editar</button>
@@ -3271,30 +3396,6 @@ function renderExpediente(tab='historia'){
       <div class="field-row"><div class="field-label">Médico referente</div><div class="field-value">${escapeHTML(p.medicoReferente||'—')}</div></div>
       <div class="field-row"><div class="field-label">Terapeuta</div><div class="field-value">${escapeHTML(p.terapeuta)}${p.terapeutaSeguimiento?` <span style="color:var(--green);font-size:12px">→ Seguimiento: ${escapeHTML(p.terapeutaSeguimiento)}</span>`:''}</div></div>
       <div class="field-row"><div class="field-label">Creado por</div><div class="field-value" style="color:var(--gray-400);font-size:13px">${escapeHTML(p.creadoPor||'—')} · ${escapeHTML(p.fechaCreacion||'—')}</div></div>
-      ${(()=>{
-        const esMig=(p.id||'').startsWith('mig_pac_');
-        if(esMig){
-          // Histórico: placeholder vacío — FST_renderHistorialSoap lo llenará con min(sesiones.fecha)
-          return '<div id="fst-primera-sesion"></div>';
-        }
-        // Activo: calcular fecha de creación
-        function _fmtFechaExp(v){
-          if(!v) return '';
-          const s=String(v);
-          // Firestore Timestamp-like object serializado
-          if(typeof v==='object'&&v.seconds) try{return new Date(v.seconds*1000).toLocaleDateString('es-MX',{day:'2-digit',month:'2-digit',year:'numeric'});}catch(e){}
-          // YYYY-MM-DD
-          if(/^\d{4}-\d{2}-\d{2}/.test(s)) try{const p=s.slice(0,10).split('-');return new Date(Number(p[0]),Number(p[1])-1,Number(p[2])).toLocaleDateString('es-MX',{day:'2-digit',month:'2-digit',year:'numeric'});}catch(e){}
-          return s; // ya formateado o desconocido — usar tal cual
-        }
-        let fechaExp=_fmtFechaExp(p.createdAt);
-        if(!fechaExp&&Array.isArray(p.soap)&&p.soap.length){
-          const fechas=p.soap.map(function(s){return s.fecha;}).filter(Boolean).sort();
-          if(fechas.length) fechaExp=_fmtFechaExp(fechas[0]);
-        }
-        if(!fechaExp) return '';
-        return `<div class="field-row"><div class="field-label">Expediente creado</div><div class="field-value" style="color:var(--gray-400);font-size:13px">${escapeHTML(fechaExp)}</div></div>`;
-      })()}
       ${p.ultimoUsuario&&p.ultimoUsuario!==p.creadoPor?`<div class="field-row"><div class="field-label">Última edición</div><div class="field-value" style="color:var(--gray-400);font-size:13px">${escapeHTML(p.ultimoUsuario)} · ${escapeHTML(p.fechaActualizacion||'—')}</div></div>`:''}
       <div class="field-row"><div class="field-label">Diagnóstico</div><div class="field-value">${escapeHTML(p.dx)}</div></div>
       <div class="field-row"><div class="field-label">Contraindicaciones</div><div class="field-value" style="color:${hasContra?'var(--red)':'inherit'}">${escapeHTML(p.contraindicaciones)}</div></div>
@@ -3566,6 +3667,8 @@ function renderExpediente(tab='historia'){
   // FST (STAGING): historial Firestore SOLO en el tab SOAP, tras el render principal.
   // No-op con el flag apagado. No muta p.soap[]. setTimeout deja que termine c.innerHTML.
   if (tab==='soap' && typeof FST_renderHistorialSoap === 'function') setTimeout(function(){ FST_renderHistorialSoap(p.id); }, 0);
+  // Prompt B v2: fechas clínicas en tab Historia (render local inmediato + enriquecido Firestore).
+  if (tab==='historia') setTimeout(function(){ actualizarFechasClinicas(p); }, 0);
   if (tab==='estudios' && typeof FST_renderEstudiosApartado === 'function') setTimeout(function(){ FST_renderEstudiosApartado(p.id); }, 0);
 }
 
