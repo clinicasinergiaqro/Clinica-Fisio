@@ -3328,6 +3328,7 @@ function renderExpediente(tab='historia'){
     <button class="tab ${tab==='valoracion'?'active':''}" onclick="renderExpediente('valoracion')">Valoración</button>
     <button class="tab ${tab==='soap'?'active':''}" onclick="renderExpediente('soap')">SOAP</button>
     <button class="tab ${tab==='estudios'?'active':''}" onclick="renderExpediente('estudios')">Estudios</button>
+    <button class="tab ${tab==='reporte'?'active':''}" onclick="renderExpediente('reporte')">📄 Reporte${(typeof _RPT_tieneSintesisValidada==='function' && !_RPT_tieneSintesisValidada(p))?' <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--amber);vertical-align:middle"></span>':''}</button>
     <button class="tab ${tab==='ejercicios'?'active':''}" onclick="showEjercicios()">🏃 Ejercicios</button>
     <button class="tab ${tab==='consent'?'active':''}" onclick="renderExpediente('consent')">Consentimiento</button>
   </div>
@@ -3629,6 +3630,10 @@ function renderExpediente(tab='historia'){
     </div>`;
   }
 
+  if(tab==='reporte'){
+    html+=`<div id="rpt-root"><div style="text-align:center;padding:20px;color:var(--gray-400);font-size:12px">Generando reporte…</div></div>`;
+  }
+
   if(tab==='consent'){
     const cons = Array.isArray(p.consentimientos) ? p.consentimientos : [];
     if(cons.length > 0){
@@ -3678,6 +3683,8 @@ function renderExpediente(tab='historia'){
   // Prompt B v2: fechas clínicas en tab Historia (render local inmediato + enriquecido Firestore).
   if (tab==='historia') setTimeout(function(){ actualizarFechasClinicas(p); }, 0);
   if (tab==='estudios' && typeof FST_renderEstudiosApartado === 'function') setTimeout(function(){ FST_renderEstudiosApartado(p.id); }, 0);
+  // IC v3.0 · Slice 2 — reporte clínico base (JS puro, sin API)
+  if (tab==='reporte' && typeof RPT_pintarPestanaReporte === 'function') setTimeout(function(){ RPT_pintarPestanaReporte(p.id); }, 0);
 }
 
 // ── SOAP FORM ──────────────────────────────────────────────────────────────
@@ -9314,6 +9321,327 @@ let currentEjercicio = null; // ejercicio being edited
 
 function generateToken(){
   return Math.random().toString(36).substr(2,16) + Date.now().toString(36);
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// IC v3.0 · Slice 2 — REPORTE CLÍNICO BASE (JS puro, sin API, $0)
+// Solo lectura. Para mig_pac_* nunca escribe. Reutiliza parseFechaClinicaSegura.
+// ══════════════════════════════════════════════════════════════════════════
+
+// EVA de una sesión: usa s.eva (activos) o parsea de dolor/textoOriginal (históricos).
+function _RPT_numEva(v){
+  if(v==null) return null;
+  if(typeof v==='number') return isNaN(v)?null:v;
+  var n=parseInt(String(v).replace(/\/.*$/,''),10);
+  return isNaN(n)?null:n;
+}
+function _RPT_evaDeSesion(s){
+  if(!s) return null;
+  var e=s.eva;
+  if(e && typeof e==='object'){ var f=_RPT_numEva(e.final); var i=_RPT_numEva(e.inicio); return f!=null?f:i; }
+  var n=_RPT_numEva(e); if(n!=null) return n;
+  var txt=(((s.s&&s.s.dolor)||'')+' '+(s.textoOriginal||''));
+  var m=txt.match(/(\d{1,2})\s*\/\s*10/); if(m){ var v=parseInt(m[1],10); if(v>=0&&v<=10) return v; }
+  m=txt.match(/eva\s*[:=]?\s*(\d{1,2})/i); if(m){ var v2=parseInt(m[1],10); if(v2>=0&&v2<=10) return v2; }
+  return null;
+}
+function _RPT_fechaCorta(iso){
+  var d=(typeof parseFechaClinicaSegura==='function')?parseFechaClinicaSegura(iso):null;
+  if(!d) return iso||'—';
+  var mes=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'][d.getMonth()];
+  return d.getDate()+' '+mes;
+}
+
+// Merge FST_fetchSesiones + p.soap, dedup por (num|fecha), orden cronológico.
+async function _RPT_obtenerSesionesDedup(pid){
+  var p=_resolverPaciente(pid); if(!p) return [];
+  var fs=[];
+  if(typeof FST_fetchSesiones==='function'){
+    try{ if(typeof FST_init==='function') await FST_init(); fs=(await FST_fetchSesiones(pid))||[]; }catch(e){ fs=[]; }
+  }
+  var local=Array.isArray(p.soap)?p.soap:[];
+  var mapa={};
+  function key(s){ return (s.num||'')+'|'+(s.fecha||s.date||''); }
+  fs.forEach(function(s){ mapa[key(s)]=s; });
+  local.forEach(function(s){ if(!mapa[key(s)]) mapa[key(s)]=s; });
+  return Object.keys(mapa).map(function(k){ return mapa[k]; })
+    .sort(function(a,b){ return String(a.fecha||a.date||'').localeCompare(String(b.fecha||b.date||'')); });
+}
+
+function _RPT_hashEntradas(p, sesiones){
+  var evas=sesiones.map(function(s){ var e=_RPT_evaDeSesion(s); return e==null?'-':e; });
+  var nEst=(Array.isArray(p.estudiosDocs)?p.estudiosDocs:[]).length;
+  return sesiones.length+'|'+evas.join(',')+'|'+nEst;
+}
+function _RPT_buscarSintesisCache(p, hash){
+  var arr=Array.isArray(p.reportesClinicosIA)?p.reportesClinicosIA:[];
+  for(var i=arr.length-1;i>=0;i--){ if(arr[i]&&arr[i].hashEntradas===hash&&arr[i].sintesisIA) return arr[i]; }
+  return null;
+}
+function _RPT_tieneSintesisValidada(p){
+  var arr=(p&&Array.isArray(p.reportesClinicosIA))?p.reportesClinicosIA:[];
+  return arr.some(function(r){ return r&&r.sintesisIA&&r.validado; });
+}
+function _RPT_periodo(sesiones){
+  var fechas=sesiones.map(function(s){ return s.fecha||s.date||''; }).filter(Boolean).sort();
+  if(!fechas.length) return '—';
+  var a=_RPT_fechaLarga(fechas[0]), b=_RPT_fechaLarga(fechas[fechas.length-1]);
+  return a===b?a:(a+' – '+b);
+}
+function _RPT_fechaLarga(iso){
+  var d=(typeof parseFechaClinicaSegura==='function')?parseFechaClinicaSegura(iso):null;
+  if(!d) return iso||'—';
+  var mes=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'][d.getMonth()];
+  return d.getDate()+' '+mes+' '+d.getFullYear();
+}
+
+// Banderas automáticas desde campos existentes (contraindicaciones, meds, neuro reciente).
+function _RPT_detectarBanderas(p, sesiones){
+  var alto=[], aclarar=[];
+  var meds=(((p.antecedentes&&p.antecedentes.medicamentos)||'')+' '+(p.medicamentos||''));
+  if(/anticoag|warfar|acenocumar|rivaroxab|apixab|heparin|sintrom|clopidogrel/i.test(meds)) alto.push('Anticoagulantes/antiagregantes en medicación — precaución con técnicas invasivas o agresivas');
+  var contra=p.contraindicaciones||'';
+  if(contra && contra!=='Ninguna' && contra!=='—') alto.push('Contraindicación registrada: '+contra);
+  var ult3=sesiones.slice(-3);
+  var neuro=ult3.some(function(s){ var t=((s.o&&s.o.hallazgos)||'')+' '+((s.s&&s.s.cambios)||'')+' '+(s.textoOriginal||''); return /hormigue|entumec|adormec|parestesi/i.test(t); });
+  if(neuro) aclarar.push('Síntomas neurológicos (hormigueo/entumecimiento) en sesiones recientes — valorar');
+  var alg=p.alergias||'';
+  if(alg && alg!=='Ninguna' && alg!=='—' && !/negad|ningun/i.test(alg)) aclarar.push('Alergias: '+alg);
+  return { riesgoAlto:alto, aAclarar:aclarar };
+}
+
+// ── Builders de HTML ──────────────────────────────────────────────────────
+function _RPT_css(){
+  return '<style>'
+  + '.rpt-container{font-size:13px;color:var(--gray-800);padding:2px}'
+  + '.rpt-h{font-size:12px;font-weight:800;color:var(--navy);margin:0 0 8px;text-transform:uppercase;letter-spacing:.4px}'
+  + '.rpt-sec{background:#fff;border:1px solid var(--gray-200);border-radius:12px;padding:12px 14px;margin-bottom:12px}'
+  + '.rpt-dash{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:12px}'
+  + '.rpt-card{border:1px solid var(--gray-200);border-radius:12px;padding:10px 12px;background:var(--gray-50)}'
+  + '.rpt-card .lbl{font-size:10px;font-weight:700;color:var(--gray-400);text-transform:uppercase;letter-spacing:.4px}'
+  + '.rpt-card .val{font-size:16px;font-weight:800;margin-top:2px;line-height:1.2}'
+  + '.rpt-kv{display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-bottom:1px solid var(--gray-100)}'
+  + '.rpt-kv:last-child{border-bottom:none}.rpt-kv .k{font-weight:600;color:var(--gray-600)}'
+  + '.rpt-nd{color:var(--amber)}'
+  + '.rpt-tbl{width:100%;border-collapse:collapse;font-size:12px}'
+  + '.rpt-tbl th{text-align:left;font-size:10px;text-transform:uppercase;color:var(--gray-400);padding:6px 8px;border-bottom:2px solid var(--gray-200)}'
+  + '.rpt-tbl td{padding:6px 8px;border-bottom:1px solid var(--gray-100);vertical-align:top}'
+  + '.rpt-flag{background:#FFF7ED}'
+  + '.rpt-pill{display:inline-block;min-width:30px;text-align:center;padding:1px 8px;border-radius:10px;font-weight:800;font-size:11px;color:#fff}'
+  + '.rpt-badgeIA{background:#6B46C1;color:#fff;padding:1px 6px;border-radius:6px;font-size:10px;font-weight:700}'
+  + '@media print{.tabs,.topbar,.nav,.nav-item,button,.rpt-noprint{display:none!important}.rpt-container{padding:0}.rpt-sec,.rpt-tbl tr{page-break-inside:avoid}}'
+  + '</style>';
+}
+function _RPT_htmlCabecera(p, sesiones){
+  var edad=(p.age!=null&&p.age!=='')?escapeHTML(String(p.age))+' años':'—';
+  var ter=escapeHTML(p.terapeuta||p.terapeutaActual||'—');
+  return '<div class="rpt-sec" style="border-color:var(--navy)">'
+    + '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px">'
+    + '<div style="font-weight:800;color:var(--navy);font-size:15px">Clínica Sinergia · Reporte Clínico</div>'
+    + '<div style="font-size:11px;color:var(--gray-400)">'+escapeHTML(new Date().toLocaleDateString('es-MX'))+'</div></div>'
+    + '<div style="margin-top:8px;font-size:16px;font-weight:800">'+escapeHTML(p.name||'—')+'</div>'
+    + '<div style="font-size:12px;color:var(--gray-600);margin-top:2px">'+edad+' · '+escapeHTML(p.sexo||'N/D')+' · Terapeuta: '+ter+'</div>'
+    + '<div style="font-size:12px;color:var(--gray-400);margin-top:2px">Periodo: '+escapeHTML(_RPT_periodo(sesiones))+'</div>'
+    + '</div>';
+}
+function _RPT_card(lbl,val,color,small){
+  return '<div class="rpt-card"><div class="lbl">'+escapeHTML(lbl)+'</div><div class="val" style="color:'+color+(small?';font-size:12.5px':'')+'">'+escapeHTML(val)+'</div></div>';
+}
+function _RPT_htmlDashboard(p, sesiones){
+  var ultEva=null;
+  for(var i=sesiones.length-1;i>=0;i--){ var e=_RPT_evaDeSesion(sesiones[i]); if(e!=null){ ultEva=e; break; } }
+  var estadoColor=ultEva==null?'var(--gray-400)':(ultEva>=5?'var(--red)':(ultEva>=3?'var(--amber)':'var(--green)'));
+  var estadoTxt=ultEva==null?'Sin EVA':(ultEva+'/10');
+  var b=_RPT_detectarBanderas(p,sesiones);
+  var riesgoColor=b.riesgoAlto.length?'var(--red)':(b.aAclarar.length?'var(--amber)':'var(--green)');
+  var riesgoTxt=b.riesgoAlto.length?(b.riesgoAlto.length+' alto'):(b.aAclarar.length?(b.aAclarar.length+' a aclarar'):'Sin banderas');
+  var contra=p.contraindicaciones||'';
+  var contraTxt=(contra&&contra!=='Ninguna'&&contra!=='—')?contra:'Ninguna';
+  var contraColor=(contraTxt!=='Ninguna')?'var(--red)':'var(--green)';
+  var ult=sesiones.length?sesiones[sesiones.length-1]:null;
+  var ultTxt=ult?(_RPT_fechaCorta(ult.fecha||ult.date)+' · '+(ult.terapeuta||'—')):'—';
+  return '<div class="rpt-dash">'
+    + _RPT_card('Estado clínico', estadoTxt, estadoColor)
+    + _RPT_card('Riesgo clínico', riesgoTxt, riesgoColor)
+    + _RPT_card('Contraindicaciones', contraTxt, contraColor, true)
+    + _RPT_card('Última sesión', ultTxt, 'var(--navy)', true)
+    + '</div>';
+}
+function _RPT_htmlAntecedentes(p){
+  var a=p.antecedentes||{};
+  function row(k,v){ var has=v&&String(v).trim()&&v!=='—'; return '<div class="rpt-kv"><span class="k">'+k+'</span><span'+(has?'':' class="rpt-nd"')+'>'+(has?escapeHTML(v):'No documentado')+'</span></div>'; }
+  return '<div class="rpt-sec"><h3 class="rpt-h">🏥 Antecedentes</h3>'
+    + row('Patológicos', a.patologicos)
+    + row('Quirúrgicos', a.cirugias)
+    + row('Deportivos', a.deportivos)
+    + row('Medicamentos', a.medicamentos)
+    + row('Alergias', p.alergias)
+    + '</div>';
+}
+function _RPT_htmlBanderas(p, sesiones){
+  var b=_RPT_detectarBanderas(p,sesiones);
+  function col(titulo,items,color,bg){
+    var lis=items.length?items.map(function(x){ return '<li style="margin:3px 0">'+escapeHTML(x)+'</li>'; }).join(''):'<li style="color:var(--gray-400);list-style:none;margin-left:-14px">Ninguna</li>';
+    return '<div style="flex:1;background:'+bg+';border-radius:10px;padding:8px 10px"><div style="font-weight:800;color:'+color+';font-size:11px;margin-bottom:4px">'+titulo+'</div><ul style="margin:0;padding-left:16px;font-size:11px">'+lis+'</ul></div>';
+  }
+  return '<div class="rpt-sec"><h3 class="rpt-h">🚩 Seguridad clínica</h3><div style="display:flex;gap:8px">'
+    + col('Riesgo alto', b.riesgoAlto, 'var(--red)', 'var(--red-light)')
+    + col('A aclarar', b.aAclarar, 'var(--amber)', 'var(--amber-light)')
+    + '</div></div>';
+}
+function _RPT_htmlEstudios(p){
+  var est=Array.isArray(p.estudiosDocs)?p.estudiosDocs:[];
+  if(!est.length) return '<div class="rpt-sec"><h3 class="rpt-h">🔬 Estudios</h3><div style="color:var(--gray-400);font-size:12px">Sin estudios registrados</div></div>';
+  var badgeIA='<span class="rpt-badgeIA">🧠 IA</span>';
+  var items=est.map(function(e){
+    var label=(typeof ESTUDIO_TIPOS!=='undefined'&&ESTUDIO_TIPOS[e.tipo]&&ESTUDIO_TIPOS[e.tipo].label)||e.tipo||'Documento';
+    var head='<div style="font-weight:700">'+escapeHTML(label)+(e.fechaEstudio?(' · '+escapeHTML(String(e.fechaEstudio))):'')+'</div>';
+    var body='', r=e.resumenIA;
+    if(r){
+      if(r.tipoDetectado==='imagen_sin_reporte'){
+        body='<div class="rpt-nd">⚠️ Imagen sin reporte médico'+(e.resumenManual?(' · Nota manual: '+escapeHTML(e.resumenManual.texto||'')):'')+'</div>';
+      } else if(e.tipo==='receta'||r.diagnostico||r.plan){
+        body=(r.diagnostico?('<div>'+badgeIA+' <b>Dx:</b> '+escapeHTML(r.diagnostico)+'</div>'):'')
+          +(r.plan?('<div><b>Plan:</b> '+escapeHTML(r.plan)+'</div>'):'')
+          +(r.medicoReferente?('<div><b>Médico:</b> '+escapeHTML(r.medicoReferente)+'</div>'):'');
+      } else {
+        body=((r.hallazgos&&r.hallazgos.length)?('<div>'+badgeIA+' <b>Hallazgos:</b> '+escapeHTML(Array.isArray(r.hallazgos)?r.hallazgos.join('; '):r.hallazgos)+'</div>'):'')
+          +(r.conclusion?('<div><b>Conclusión:</b> '+escapeHTML(r.conclusion)+'</div>'):'');
+      }
+      if(r.resumenCorto) body+='<div style="color:#6B46C1;font-style:italic;margin-top:2px">'+escapeHTML(r.resumenCorto)+'</div>';
+      if(!body) body='<div class="rpt-nd">Interpretación IA sin campos legibles</div>';
+    } else if(e.resumenManual){
+      body='<div>✏️ '+escapeHTML(e.resumenManual.texto||'')+'</div>';
+    } else {
+      body='<div style="color:var(--gray-400)">Sin interpretación IA</div>';
+    }
+    return '<div style="padding:8px 0;border-bottom:1px solid var(--gray-100)">'+head+body+'</div>';
+  }).join('');
+  return '<div class="rpt-sec"><h3 class="rpt-h">🔬 Estudios</h3>'+items+'</div>';
+}
+function _RPT_htmlSoap(sesiones){
+  if(!sesiones.length) return '<div class="rpt-sec"><h3 class="rpt-h">📋 Síntesis SOAP</h3><div style="color:var(--gray-400)">Sin sesiones</div></div>';
+  var rows=sesiones.map(function(s,idx){
+    var eva=_RPT_evaDeSesion(s);
+    var pill=eva==null?'<span style="color:var(--gray-400)">—</span>':'<span class="rpt-pill" style="background:'+(eva>=5?'var(--red)':(eva>=3?'var(--amber)':'var(--green)'))+'">'+eva+'</span>';
+    var dolor=(s.s&&s.s.dolor)||'';
+    var hall=(s.o&&s.o.hallazgos)||'';
+    var trat=(s.p&&s.p.tratamiento)||'';
+    var busca=(hall+' '+((s.s&&s.s.cambios)||'')+' '+(s.textoOriginal||'')).toLowerCase();
+    var flag=/hormigue|entumec|adormec/.test(busca);
+    var resumenTexto=hall||(s.textoOriginal||'').slice(0,90);
+    return '<tr'+(flag?' class="rpt-flag"':'')+'>'
+      + '<td>'+(flag?'🚩 ':'')+'S'+escapeHTML(String(s.num||(idx+1)))+'<div style="font-size:10px;color:var(--gray-400)">'+escapeHTML(_RPT_fechaCorta(s.fecha||s.date))+(s.terapeuta?(' · '+escapeHTML(s.terapeuta)):'')+'</div></td>'
+      + '<td>'+pill+(dolor?('<div style="font-size:10px;color:var(--gray-600)">'+escapeHTML(String(dolor).slice(0,60))+'</div>'):'')+'</td>'
+      + '<td>'+escapeHTML(resumenTexto)+'</td>'
+      + '<td>'+escapeHTML(trat)+'</td></tr>';
+  }).join('');
+  return '<div class="rpt-sec"><h3 class="rpt-h">📋 Síntesis SOAP ('+sesiones.length+')</h3>'
+    + '<div style="overflow-x:auto"><table class="rpt-tbl"><thead><tr><th>Sesión</th><th>Dolor</th><th>Hallazgos</th><th>Tratamiento</th></tr></thead><tbody>'
+    + rows+'</tbody></table></div></div>';
+}
+function _RPT_htmlSintesis(sintesis, pid){
+  if(sintesis&&sintesis.sintesisIA){
+    var s=sintesis.sintesisIA;
+    return '<div class="rpt-sec"><h3 class="rpt-h">🧠 Síntesis IA</h3><div style="white-space:pre-wrap">'+escapeHTML(typeof s==='string'?s:JSON.stringify(s,null,2))+'</div>'
+      + '<div style="font-size:10px;color:var(--gray-400);margin-top:6px">Generada '+escapeHTML(sintesis.fecha||'')+(sintesis.validado?' · ✅ validada':'')+'</div></div>';
+  }
+  return '<div class="rpt-sec rpt-noprint"><h3 class="rpt-h">🧠 Síntesis IA</h3>'
+    + '<div style="color:var(--gray-600);font-size:12px;margin-bottom:8px">Aún no hay síntesis generada por IA para este estado del expediente.</div>'
+    + '<button onclick="RPT_generarSintesisIA(\''+escapeAttr_(pid)+'\')" style="background:linear-gradient(135deg,#6B46C1,#805AD5);color:#fff;border:none;border-radius:10px;padding:8px 16px;font-size:13px;font-weight:700;cursor:pointer">🧠 Generar síntesis IA (~3 seg)</button></div>';
+}
+function _RPT_htmlVerdictBase(p, sesiones){
+  var evas=sesiones.map(_RPT_evaDeSesion).filter(function(x){ return x!=null; });
+  var dolorFinal=evas.length?evas[evas.length-1]:null;
+  var pico=evas.length?Math.max.apply(null,evas):null;
+  var dfTxt=dolorFinal==null?'—':(dolorFinal+'/10'+(pico!=null&&pico!==dolorFinal?(' (pico '+pico+'/10)'):''));
+  var b=_RPT_detectarBanderas(p,sesiones);
+  var nBand=b.riesgoAlto.length+b.aAclarar.length;
+  function m(lbl,val){ return '<div style="flex:1;text-align:center"><div style="font-size:20px;font-weight:800;color:var(--navy)">'+escapeHTML(String(val))+'</div><div style="font-size:10px;color:var(--gray-400);text-transform:uppercase">'+escapeHTML(lbl)+'</div></div>'; }
+  return '<div class="rpt-sec"><h3 class="rpt-h">📊 Métricas (calculadas · $0)</h3><div style="display:flex;gap:8px">'
+    + m('Dolor final', dfTxt)+m('Sesiones', sesiones.length)+m('Banderas', nBand)+m('Costo IA', '$0')
+    + '</div></div>';
+}
+function _RPT_htmlFirmas(){
+  return '<div class="rpt-sec"><div style="display:flex;gap:24px;margin-top:16px">'
+    + '<div style="flex:1;text-align:center;border-top:1px solid var(--gray-400);padding-top:4px;font-size:11px;color:var(--gray-600)">Fisioterapeuta tratante</div>'
+    + '<div style="flex:1;text-align:center;border-top:1px solid var(--gray-400);padding-top:4px;font-size:11px;color:var(--gray-600)">Supervisión clínica</div>'
+    + '</div></div>';
+}
+function _RPT_htmlLegal(){
+  return '<div style="font-size:10px;color:var(--gray-400);padding:8px 4px;line-height:1.5">'
+    + 'Documento confidencial — expediente clínico electrónico conforme a la NOM-004-SSA3-2012. '
+    + 'Uso exclusivo del personal de salud autorizado. Generado el '+escapeHTML(new Date().toLocaleString('es-MX'))+'.</div>';
+}
+
+// Gráfica de dolor SVG (sin librerías).
+function _RPT_pintarGrafica(pid, sesiones){
+  var box=document.getElementById('rpt-grafica-'+pid);
+  if(!box) return;
+  var pts=sesiones.map(function(s,i){ return { i:i, eva:_RPT_evaDeSesion(s), fecha:s.fecha||s.date||'', num:s.num||(i+1) }; }).filter(function(x){ return x.eva!=null; });
+  if(!pts.length){ box.innerHTML='<div style="color:var(--gray-400);font-size:12px;padding:8px">Sin datos de EVA para graficar</div>'; return; }
+  var W=Math.max(320,40+pts.length*46), H=200, padL=28, padR=12, padT=12, padB=42;
+  var plotW=W-padL-padR, plotH=H-padT-padB;
+  function x(i){ return padL+(pts.length===1?plotW/2:(i/(pts.length-1))*plotW); }
+  function y(v){ return padT+(1-(v/10))*plotH; }
+  var svg='<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;height:auto;max-width:100%" xmlns="http://www.w3.org/2000/svg">';
+  for(var g=0;g<=10;g+=2){ var yy=y(g).toFixed(1);
+    svg+='<line x1="'+padL+'" y1="'+yy+'" x2="'+(W-padR)+'" y2="'+yy+'" stroke="#EEF0F4" stroke-width="1"/>';
+    svg+='<text x="'+(padL-6)+'" y="'+(y(g)+3).toFixed(1)+'" font-size="9" fill="#9BA3B5" text-anchor="end">'+g+'</text>';
+  }
+  var first=pts[0].eva, last=pts[pts.length-1].eva;
+  if(pts.length>=2&&last<first){ var yz=y(2).toFixed(1); svg+='<rect x="'+padL+'" y="'+yz+'" width="'+plotW+'" height="'+(H-padB-y(2)).toFixed(1)+'" fill="#2E7D52" opacity="0.06"/>'; }
+  var d=pts.map(function(pp,i){ return (i===0?'M':'L')+x(i).toFixed(1)+' '+y(pp.eva).toFixed(1); }).join(' ');
+  svg+='<path d="'+d+'" fill="none" stroke="#9BA3B5" stroke-width="2"/>';
+  pts.forEach(function(pp,i){
+    var col=pp.eva>=5?'#C0392B':(pp.eva>=3?'#B7791F':'#2E7D52');
+    svg+='<circle cx="'+x(i).toFixed(1)+'" cy="'+y(pp.eva).toFixed(1)+'" r="4.5" fill="'+col+'"/>';
+    svg+='<text x="'+x(i).toFixed(1)+'" y="'+(y(pp.eva)-8).toFixed(1)+'" font-size="9" fill="'+col+'" text-anchor="middle" font-weight="700">'+pp.eva+'</text>';
+    svg+='<text x="'+x(i).toFixed(1)+'" y="'+(H-padB+14)+'" font-size="8" fill="#5A6478" text-anchor="middle">S'+escapeHTML(String(pp.num))+'</text>';
+    svg+='<text x="'+x(i).toFixed(1)+'" y="'+(H-padB+24)+'" font-size="8" fill="#9BA3B5" text-anchor="middle">'+escapeHTML(_RPT_fechaCorta(pp.fecha))+'</text>';
+  });
+  svg+='</svg>';
+  box.innerHTML=svg;
+}
+
+// Orquestador principal de la pestaña Reporte.
+async function RPT_pintarPestanaReporte(pid){
+  var root=document.getElementById('rpt-root');
+  if(!root) return;
+  try{
+    var p=_resolverPaciente(pid);
+    if(!p){ root.innerHTML='<div style="padding:16px;color:var(--red)">Paciente no encontrado</div>'; return; }
+    // Histórico: hidratar estudiosDocs + reportesClinicosIA desde Firestore (solo lectura)
+    if(!patientsDB.some(function(x){ return x.id===pid; }) && window._fstDb){
+      try{
+        var ds=await window._fstDb.collection('pacientes').doc(pid).get();
+        var dd=ds.data()||{};
+        if(Array.isArray(dd.estudiosDocs)) p.estudiosDocs=dd.estudiosDocs;
+        if(Array.isArray(dd.reportesClinicosIA)) p.reportesClinicosIA=dd.reportesClinicosIA;
+      }catch(e){ console.warn('[RPT] hidratar histórico:', e.message); }
+    }
+    var sesiones=await _RPT_obtenerSesionesDedup(pid);
+    var hash=_RPT_hashEntradas(p, sesiones);
+    var sintesis=_RPT_buscarSintesisCache(p, hash);
+    root.innerHTML='<div class="rpt-container">'
+      + _RPT_css()
+      + _RPT_htmlCabecera(p, sesiones)
+      + _RPT_htmlDashboard(p, sesiones)
+      + '<div class="rpt-sec"><h3 class="rpt-h">📈 Evolución del dolor</h3><div id="rpt-grafica-'+escapeAttr_(pid)+'">…</div></div>'
+      + _RPT_htmlAntecedentes(p)
+      + _RPT_htmlBanderas(p, sesiones)
+      + _RPT_htmlEstudios(p)
+      + _RPT_htmlSoap(sesiones)
+      + _RPT_htmlSintesis(sintesis, pid)
+      + _RPT_htmlVerdictBase(p, sesiones)
+      + _RPT_htmlFirmas()
+      + _RPT_htmlLegal()
+      + '</div>';
+    _RPT_pintarGrafica(pid, sesiones);
+  }catch(e){
+    console.warn('[RPT] pintar:', e.message);
+    root.innerHTML='<div style="padding:16px;color:var(--red)">Error al generar reporte: '+escapeHTML(e.message)+'</div>';
+  }
 }
 
 function showEjercicios(){
