@@ -1107,6 +1107,8 @@ async function saveDB(k, v){
     const lista = Array.isArray(v) ? v : [];
     lista.forEach(mod=>{
       if(!mod||!mod.id) return;
+      // GUARDIA: históricos no viven en patientsDB (solo en Firestore + vista FST)
+      if(String(mod.id).startsWith('mig_pac_')) return;
       mod.updatedAt = Date.now(); // marca de tiempo numérica confiable (para Pieza 4)
       const idx = patientsDB.findIndex(x=>x.id===mod.id);
       if(idx>=0) patientsDB[idx]=mod;
@@ -1123,6 +1125,12 @@ async function saveDB(k, v){
 
   for(const p of lista){
     if(!p || !p.id) continue;
+    // GUARDIA DUAL-WRITE: históricos viven SOLO en Firestore, nunca en Sheets.
+    // Si un mig_pac_* llegara aquí, sería un stub accidental. Bloquearlo en origen.
+    if(String(p.id).startsWith('mig_pac_')) {
+      console.warn('[saveDB] Bloqueado: intento de escribir histórico a Sheets:', p.id);
+      continue;
+    }
 
     // Copia limpia SIN base64 para enviar a Sheets
     const pLimpio = {
@@ -4132,11 +4140,12 @@ function FST_abrirPacienteDesdeLista(pid) {
   if (!id) return;
 
   try {
-    // Fix Bug 1: si es histórico, remover stub vacío para forzar hidratación
+    // Fix Bug 1 (permanente): remover TODAS las ocurrencias del stub mig_pac_*
+    // Cubre stubs duplicados que pudieran llegar por loadFromCloud.
+    // Con el guardia en saveDB esto no debería ocurrir, pero se mantiene como red de seguridad.
     if (String(id||'').startsWith('mig_pac_')) {
-      const stubIdx = patientsDB.findIndex(p => String(p?.id||'') === id);
-      if (stubIdx >= 0) {
-        patientsDB.splice(stubIdx, 1);
+      for (let _k = patientsDB.length - 1; _k >= 0; _k--) {
+        if (String(patientsDB[_k]?.id || '') === id) patientsDB.splice(_k, 1);
       }
     }
     // Caso 1: paciente local — flujo original intacto
