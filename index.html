@@ -9542,6 +9542,7 @@ function _RPT_htmlSoap(sesiones){
 }
 // Slice 3 (Nivel 2): render rico de la síntesis (ejecutiva + 3 columnas) o placeholder.
 function _RPT_htmlSintesis(entry, pid){
+  var _puedeSintetizar = (typeof currentUser !== 'undefined' && currentUser && (currentUser.role === 'supervisor' || currentUser.name === 'CARLOS'));
   if(entry && entry.sintesisIA){
     var s=entry.sintesisIA;
     var recs=s.recomendaciones||{};
@@ -9557,7 +9558,7 @@ function _RPT_htmlSintesis(entry, pid){
       + _RPT_colRecomendacion('Mediano plazo', recs.mediano||[], 'var(--amber-light)', 'var(--amber)')
       + _RPT_colRecomendacion('Alta / seguimiento', recs.largo||[], 'var(--blue-light)', 'var(--navy)')
       + '</div>'
-      + '<button class="rpt-noprint" onclick="RPT_generarSintesisIA(\''+escapeAttr_(pid)+'\')" style="margin-top:10px;background:transparent;border:1px solid #a78bfa;border-radius:8px;padding:5px 12px;font-size:11px;color:#6B46C1;cursor:pointer">↺ Actualizar síntesis</button>'
+      + (_puedeSintetizar ? '<button class="rpt-noprint" onclick="RPT_generarSintesisIA(\''+escapeAttr_(pid)+'\')" style="margin-top:10px;background:transparent;border:1px solid #a78bfa;border-radius:8px;padding:5px 12px;font-size:11px;color:#6B46C1;cursor:pointer">↺ Actualizar síntesis</button>' : '')
       + '</div>';
   }
   return '<div class="rpt-sec rpt-noprint" style="border:1.5px dashed #a78bfa;text-align:center;background:#faf5ff">'
@@ -9565,7 +9566,7 @@ function _RPT_htmlSintesis(entry, pid){
     + '<div style="font-size:13px;font-weight:700;color:#4c1d95;margin-bottom:4px">Síntesis clínica IA</div>'
     + '<div style="font-size:11px;color:#6d28d9;margin-bottom:4px">El reporte base está completo.</div>'
     + '<div style="font-size:10px;color:var(--gray-400);margin-bottom:12px">La síntesis y recomendaciones se generan cuando las necesites.<br>Costo aproximado: ~$0.003 USD · Tiempo: ~3 segundos</div>'
-    + '<button onclick="RPT_generarSintesisIA(\''+escapeAttr_(pid)+'\')" style="background:#6B46C1;color:#fff;border:none;border-radius:10px;padding:8px 20px;font-size:12px;font-weight:700;cursor:pointer">🧠 Generar síntesis IA</button></div>';
+    + (_puedeSintetizar ? '<button onclick="RPT_generarSintesisIA(\''+escapeAttr_(pid)+'\')" style="background:#6B46C1;color:#fff;border:none;border-radius:10px;padding:8px 20px;font-size:12px;font-weight:700;cursor:pointer">🧠 Generar síntesis IA</button>' : '<div style="font-size:10px;color:var(--gray-400)">Solo el supervisor puede generar la síntesis IA</div>') + '</div>';
 }
 function _RPT_colRecomendacion(titulo, items, bg, color){
   var lis = (items&&items.length)
@@ -9610,6 +9611,10 @@ function _RPT_armarPayloadCorto(p, sesiones){
 
 // Slice 3 · Síntesis IA bajo demanda (~$0.003). Cachea por hash; Firestore-only para mig_pac_*.
 async function RPT_generarSintesisIA(pid){
+  if (!currentUser || (currentUser.role !== 'supervisor' && currentUser.name !== 'CARLOS')) {
+    showToast('Solo el supervisor puede generar la síntesis IA', 'warn');
+    return;
+  }
   var btn = document.querySelector('[onclick="RPT_generarSintesisIA(\''+pid+'\')"]');
   if(btn){ btn.disabled=true; btn.textContent='⏳ Generando…'; }
   try{
