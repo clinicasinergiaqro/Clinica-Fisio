@@ -9540,15 +9540,112 @@ function _RPT_htmlSoap(sesiones){
     + '<div style="overflow-x:auto"><table class="rpt-tbl"><thead><tr><th>Sesión</th><th>Dolor</th><th>Hallazgos</th><th>Tratamiento</th></tr></thead><tbody>'
     + rows+'</tbody></table></div></div>';
 }
-function _RPT_htmlSintesis(sintesis, pid){
-  if(sintesis&&sintesis.sintesisIA){
-    var s=sintesis.sintesisIA;
-    return '<div class="rpt-sec"><h3 class="rpt-h">🧠 Síntesis IA</h3><div style="white-space:pre-wrap">'+escapeHTML(typeof s==='string'?s:JSON.stringify(s,null,2))+'</div>'
-      + '<div style="font-size:10px;color:var(--gray-400);margin-top:6px">Generada '+escapeHTML(sintesis.fecha||'')+(sintesis.validado?' · ✅ validada':'')+'</div></div>';
+// Slice 3 (Nivel 2): render rico de la síntesis (ejecutiva + 3 columnas) o placeholder.
+function _RPT_htmlSintesis(entry, pid){
+  if(entry && entry.sintesisIA){
+    var s=entry.sintesisIA;
+    var recs=s.recomendaciones||{};
+    var cuando = s.generadoEn || entry.generadoEn || '';
+    var cuandoTxt = cuando ? escapeHTML(new Date(cuando).toLocaleDateString('es-MX')) : '';
+    return '<div class="rpt-sec" style="border-color:#a78bfa;background:#faf5ff">'
+      + '<div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">'
+      + '<span class="rpt-badgeIA">🧠 IA</span><h3 class="rpt-h" style="margin:0">Síntesis clínica</h3>'
+      + (cuandoTxt?'<span style="font-size:9px;color:var(--gray-400);margin-left:auto">'+cuandoTxt+(entry.validado?' · ✅ validada':'')+'</span>':'')+'</div>'
+      + '<div style="font-size:12px;color:#3b0764;line-height:1.65;margin-bottom:10px">'+escapeHTML(s.sintesisEjecutiva||'')+'</div>'
+      + '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">'
+      + _RPT_colRecomendacion('Corto plazo', recs.corto||[], 'var(--red-light)', 'var(--red)')
+      + _RPT_colRecomendacion('Mediano plazo', recs.mediano||[], 'var(--amber-light)', 'var(--amber)')
+      + _RPT_colRecomendacion('Alta / seguimiento', recs.largo||[], 'var(--blue-light)', 'var(--navy)')
+      + '</div>'
+      + '<button class="rpt-noprint" onclick="RPT_generarSintesisIA(\''+escapeAttr_(pid)+'\')" style="margin-top:10px;background:transparent;border:1px solid #a78bfa;border-radius:8px;padding:5px 12px;font-size:11px;color:#6B46C1;cursor:pointer">↺ Actualizar síntesis</button>'
+      + '</div>';
   }
-  return '<div class="rpt-sec rpt-noprint"><h3 class="rpt-h">🧠 Síntesis IA</h3>'
-    + '<div style="color:var(--gray-600);font-size:12px;margin-bottom:8px">Aún no hay síntesis generada por IA para este estado del expediente.</div>'
-    + '<button onclick="RPT_generarSintesisIA(\''+escapeAttr_(pid)+'\')" style="background:linear-gradient(135deg,#6B46C1,#805AD5);color:#fff;border:none;border-radius:10px;padding:8px 16px;font-size:13px;font-weight:700;cursor:pointer">🧠 Generar síntesis IA (~3 seg)</button></div>';
+  return '<div class="rpt-sec rpt-noprint" style="border:1.5px dashed #a78bfa;text-align:center;background:#faf5ff">'
+    + '<div style="font-size:20px;margin-bottom:6px">🧠</div>'
+    + '<div style="font-size:13px;font-weight:700;color:#4c1d95;margin-bottom:4px">Síntesis clínica IA</div>'
+    + '<div style="font-size:11px;color:#6d28d9;margin-bottom:4px">El reporte base está completo.</div>'
+    + '<div style="font-size:10px;color:var(--gray-400);margin-bottom:12px">La síntesis y recomendaciones se generan cuando las necesites.<br>Costo aproximado: ~$0.003 USD · Tiempo: ~3 segundos</div>'
+    + '<button onclick="RPT_generarSintesisIA(\''+escapeAttr_(pid)+'\')" style="background:#6B46C1;color:#fff;border:none;border-radius:10px;padding:8px 20px;font-size:12px;font-weight:700;cursor:pointer">🧠 Generar síntesis IA</button></div>';
+}
+function _RPT_colRecomendacion(titulo, items, bg, color){
+  var lis = (items&&items.length)
+    ? items.map(function(r){ return '<div style="font-size:10px;color:var(--gray-800);margin-bottom:3px;padding-left:8px;border-left:2px solid '+color+'">'+escapeHTML(r)+'</div>'; }).join('')
+    : '<div style="font-size:10px;color:var(--gray-400);font-style:italic">—</div>';
+  return '<div style="background:'+bg+';border:1px solid '+color+';border-radius:8px;padding:8px 10px">'
+    + '<div style="font-size:9px;font-weight:700;color:'+color+';text-transform:uppercase;letter-spacing:.4px;margin-bottom:5px">'+escapeHTML(titulo)+'</div>'
+    + lis + '</div>';
+}
+
+// Slice 3 · Payload mínimo (secreto del bajo costo): últimas 5 completas, resto solo EVA+fecha.
+function _RPT_armarPayloadCorto(p, sesiones){
+  var n=sesiones.length;
+  var sesResumen=sesiones.map(function(s,i){
+    var eva=_RPT_evaDeSesion(s);
+    if(i>=n-5){
+      var hallazgo='';
+      if(s.o&&typeof s.o==='object') hallazgo=s.o.hallazgos||s.o.rom||'';
+      else if(typeof s.o==='string') hallazgo=s.o;
+      var trat = (typeof s.p==='string')?s.p:((s.p&&s.p.tratamiento)||'');
+      return { s:'S'+(i+1), f:s.fecha||s.date, t:s.terapeuta, eva:eva, h:String(hallazgo).slice(0,120), p:String(trat).slice(0,80) };
+    }
+    return { s:'S'+(i+1), f:s.fecha||s.date, eva:eva };
+  });
+  var estudiosResumen=(p.estudiosDocs||[])
+    .filter(function(e){ return e.resumenIA && e.resumenIA.tipoDetectado!=='imagen_sin_reporte'; })
+    .map(function(e){ return e.resumenIA.resumenCorto||e.resumenIA.diagnostico||''; })
+    .filter(Boolean);
+  var evas=sesResumen.map(function(s){ return s.eva; }).filter(function(v){ return v!=null; });
+  return {
+    nombre:p.name, edad:p.age,
+    dxFuncional:(typeof p.dxFuncional==='string'?p.dxFuncional:(p.dxFuncional&&p.dxFuncional.dxFuncional))||p.dx||'Sin documentar',
+    contraindicaciones:p.contraindicaciones||'Ninguna',
+    medicamentos:(p.antecedentes&&p.antecedentes.medicamentos)||'No documentados',
+    totalSesiones:n,
+    evaInicial:evas.length?evas[0]:null,
+    evaFinal:evas.length?evas[evas.length-1]:null,
+    evaPico:evas.length?Math.max.apply(null,evas):null,
+    sesiones:sesResumen, estudiosResumen:estudiosResumen
+  };
+}
+
+// Slice 3 · Síntesis IA bajo demanda (~$0.003). Cachea por hash; Firestore-only para mig_pac_*.
+async function RPT_generarSintesisIA(pid){
+  var btn = document.querySelector('[onclick="RPT_generarSintesisIA(\''+pid+'\')"]');
+  if(btn){ btn.disabled=true; btn.textContent='⏳ Generando…'; }
+  try{
+    var p=_resolverPaciente(pid);
+    if(!p) throw new Error('Paciente no encontrado');
+    var sesiones=await _RPT_obtenerSesionesDedup(pid);
+    var payload=_RPT_armarPayloadCorto(p, sesiones);
+    var hash=_RPT_hashEntradas(p, sesiones); // MISMO hash que usa el orquestador para el caché
+
+    var r=await callAppsScriptPrivado('generarSintesisIA', { payload:payload });
+    if(!r || !r.ok || !r.sintesis) throw new Error(r&&r.error?r.error:'Sin respuesta');
+    if(!r.sintesis.sintesisEjecutiva || !r.sintesis.recomendaciones) throw new Error('Respuesta incompleta de la IA');
+
+    if(!Array.isArray(p.reportesClinicosIA)) p.reportesClinicosIA=[];
+    var entrada={
+      id:'rpt_'+Date.now(), generadoEn:new Date().toISOString(), version:'ic-nivel2', hashEntradas:hash,
+      sintesisIA:{ sintesisEjecutiva:r.sintesis.sintesisEjecutiva, recomendaciones:r.sintesis.recomendaciones, generadoEn:new Date().toISOString() },
+      validado:false, validadoPor:null
+    };
+    var idx=p.reportesClinicosIA.findIndex(function(x){ return x.hashEntradas===hash; });
+    if(idx>=0) p.reportesClinicosIA[idx]=entrada; else p.reportesClinicosIA.push(entrada);
+
+    // Persistir — guard-safe: histórico → Firestore; activo → saveDB
+    if(String(p.id||'').startsWith('mig_pac_')){
+      if(typeof FST_init==='function') await FST_init();
+      await window._fstDb.collection('pacientes').doc(p.id).set({ reportesClinicosIA:p.reportesClinicosIA }, { merge:true });
+    } else {
+      await saveDB('pts', [p]);
+    }
+    showToast('🧠 Síntesis generada','success');
+    RPT_pintarPestanaReporte(pid); // re-render completo del reporte
+  }catch(e){
+    console.warn('[IC síntesis]', e.message);
+    showToast('No se pudo generar: '+e.message,'warning');
+    if(btn){ btn.disabled=false; btn.textContent='🧠 Generar síntesis IA'; }
+  }
 }
 function _RPT_htmlVerdictBase(p, sesiones){
   var evas=sesiones.map(_RPT_evaDeSesion).filter(function(x){ return x!=null; });
