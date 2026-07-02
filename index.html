@@ -6279,12 +6279,56 @@ async function FST_renderEstudiosApartado(pid){
         var btnBorrar = '<button data-pid="'+escapeAttr_(pid)+'" data-eid="'+escapeAttr_(e.id||'')+'" onclick="borrarEstudio(this.dataset.pid,this.dataset.eid)" style="background:none;border:none;color:var(--gray-400);font-size:18px;cursor:pointer">×</button>';
         acciones = '<div style="margin-left:auto;display:flex;align-items:center;gap:6px;flex-shrink:0">'+btnReclas+btnBorrar+'</div>';
       }
+      // IC v3.0 · Parte 1 — bloque de lectura IA (solo estudios propios persistidos)
+      var iaBlock = '';
+      if (e.id && e.origen!=='nota' && e.origen!=='soap') {
+        if (!e.resumenIA && ['receta','interpretacion','imagen'].indexOf(e.tipo) >= 0) {
+          iaBlock += '<button data-pid="'+escapeAttr_(pid)+'" data-eid="'+escapeAttr_(e.id)+'"'
+            + ' onclick="interpretarEstudioIA(this.dataset.pid, this.dataset.eid)"'
+            + ' style="margin-top:6px;background:linear-gradient(135deg,#6B46C1,#805AD5);color:#fff;border:none;border-radius:10px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer">'
+            + '🧠 Interpretar con IA</button>';
+        }
+        if (e.resumenIA) {
+          var r = e.resumenIA;
+          if (r.tipoDetectado === 'imagen_sin_reporte') {
+            iaBlock += '<div style="margin-top:8px;padding:10px;background:#FFF7ED;border-left:3px solid #F59E0B;border-radius:8px;font-size:11px">'
+              + '<b>⚠️ Estudio sin reporte médico</b><br>Requiere lectura por especialista.'
+              + '<br><button data-pid="'+escapeAttr_(pid)+'" data-eid="'+escapeAttr_(e.id)+'"'
+              + ' onclick="agregarInterpretacionManual(this.dataset.pid,this.dataset.eid)"'
+              + ' style="margin-top:6px;background:none;border:1px solid #D97706;border-radius:8px;color:#D97706;padding:4px 10px;font-size:11px;cursor:pointer">✏️ Anotar interpretación manual</button>'
+              + '</div>';
+          } else {
+            var badgeIA = '<span style="background:#6B46C1;color:#fff;padding:2px 6px;border-radius:6px;font-size:10px;font-weight:700">🧠 IA</span>';
+            iaBlock += '<div style="margin-top:8px;padding:10px;background:#FAF5FF;border-left:3px solid #6B46C1;border-radius:8px;font-size:11px">';
+            iaBlock += badgeIA + ' <b>' + escapeHTML(r.tipoDetectado || r.tipo || 'Documento') + '</b><br>';
+            if (r.diagnostico) iaBlock += '<b>Dx:</b> ' + escapeHTML(r.diagnostico) + '<br>';
+            if (r.plan) iaBlock += '<b>Plan:</b> ' + escapeHTML(r.plan) + '<br>';
+            if (r.hallazgos && r.hallazgos.length) iaBlock += '<b>Hallazgos:</b> ' + escapeHTML(Array.isArray(r.hallazgos) ? r.hallazgos.join('; ') : r.hallazgos) + '<br>';
+            if (r.conclusion) iaBlock += '<b>Conclusión:</b> ' + escapeHTML(r.conclusion) + '<br>';
+            if (r.medicoReferente) iaBlock += '<b>Médico:</b> ' + escapeHTML(r.medicoReferente) + '<br>';
+            if (r.resumenCorto) iaBlock += '<div style="margin-top:4px;color:#6B46C1;font-style:italic">' + escapeHTML(r.resumenCorto) + '</div>';
+            if (r.relevanciaFisio) iaBlock += '<div style="margin-top:4px;padding:6px;background:#EDE9FE;border-radius:6px">' + badgeIA + ' ' + escapeHTML(r.relevanciaFisio) + '</div>';
+            var checked = r.validadoPor ? ' checked disabled' : '';
+            var validTxt = r.validadoPor ? 'Validado por ' + escapeHTML(r.validadoPor) : 'Validar interpretación';
+            iaBlock += '<label style="display:flex;align-items:center;gap:6px;margin-top:6px;font-size:11px;cursor:pointer">'
+              + '<input type="checkbox"' + checked + ' onchange="validarResumenIA(\'' + escapeAttr_(pid) + '\',\'' + escapeAttr_(e.id) + '\',this.checked)">'
+              + validTxt + '</label>';
+            iaBlock += '<a href="' + escapeAttr_(e.url||'') + '" target="_blank" style="display:inline-block;margin-top:4px;color:#6B46C1;font-size:11px;text-decoration:underline">Ver documento original</a>';
+            iaBlock += '</div>';
+          }
+        }
+        if (e.resumenManual && !e.resumenIA) {
+          iaBlock += '<div style="margin-top:8px;padding:10px;background:#F0FDF4;border-left:3px solid #16A34A;border-radius:8px;font-size:11px">'
+            + '<b>✏️ Interpretación manual</b>'+(e.resumenManual.autor?(' · '+escapeHTML(e.resumenManual.autor)):'')+'<br>'+escapeHTML(e.resumenManual.texto||'')+'</div>';
+        }
+      }
       return '<div class="doc-item" style="align-items:flex-start">'
         + '<div class="doc-icon" style="font-size:18px">'+t.icono+'</div>'
         + '<div class="doc-info"><div class="doc-name">'+link+badgeNota+badgeSesion+badgeHist+'</div>'
         + '<div class="doc-meta">'+escapeHTML(fechaTxt)
         + ' · <span style="font-size:9px;font-weight:700;background:#E8EEF7;color:var(--navy);padding:1px 6px;border-radius:8px">'+t.label+'</span>'
-        + (e.agregadoPor?(' · agregado por '+escapeHTML(e.agregadoPor)):'')+'</div></div>'
+        + (e.agregadoPor?(' · agregado por '+escapeHTML(e.agregadoPor)):'')+'</div>'
+        + iaBlock + '</div>'
         + acciones + '</div>';
     }).join('');
   } catch(e){ box.innerHTML = '<div style="padding:12px;color:var(--red);font-size:12px">Error al cargar estudios: '+escapeHTML(e.message)+'</div>'; }
@@ -6356,6 +6400,130 @@ function agregarEstudioArchivo(pid, tipo){
     } catch(e){ showToast('❌ Error subiendo: '+e.message,'error'); }
   };
   inp.click();
+}
+
+// ── INTELIGENCIA CLÍNICA v3.0 · Parte 1 — Lectura IA de documentos (OPCIONAL) ──
+// Comprime imágenes >2MB a máx 2048px antes de base64. PDFs pasan sin tocar.
+async function _comprimirImagenSiNecesario(file){
+  if ((file.type||'').indexOf('pdf') >= 0 || (file.name||'').toLowerCase().endsWith('.pdf')) return file;
+  if (file.size <= 2*1024*1024) return file;
+  return new Promise(function(resolve){
+    var img = new Image();
+    var url = URL.createObjectURL(file);
+    img.onload = function(){
+      URL.revokeObjectURL(url);
+      var MAX=2048, w=img.width, h=img.height;
+      if (w>MAX || h>MAX){ var ratio=Math.min(MAX/w, MAX/h); w=Math.round(w*ratio); h=Math.round(h*ratio); }
+      var canvas=document.createElement('canvas'); canvas.width=w; canvas.height=h;
+      canvas.getContext('2d').drawImage(img,0,0,w,h);
+      canvas.toBlob(function(blob){ resolve(new File([blob], file.name||'estudio.jpg', {type:'image/jpeg'})); }, 'image/jpeg', 0.85);
+    };
+    img.onerror = function(){ URL.revokeObjectURL(url); resolve(file); };
+    img.src = url;
+  });
+}
+
+// Interpreta un estudio con IA (desde el botón "🧠 Interpretar"). Extraer ≠ diagnosticar.
+async function interpretarEstudioIA(pid, estudioId){
+  try {
+    var p = _resolverPaciente(pid);
+    if (!p || !Array.isArray(p.estudiosDocs)) return;
+    var est = p.estudiosDocs.find(function(e){ return e.id === estudioId; });
+    if (!est || !est.url){ showToast('Estudio no encontrado','warning'); return; }
+    if (est.resumenIA){ showToast('Ya tiene interpretación IA',''); return; }
+
+    showToast('🧠 Interpretando documento…','');
+
+    var response = await fetch(est.url);
+    var blob = await response.blob();
+    var file = new File([blob], est.descripcion || 'estudio', { type: blob.type });
+    file = await _comprimirImagenSiNecesario(file);
+
+    if (file.size > 5*1024*1024){ showToast('Archivo demasiado grande para lectura IA (máx 5MB)','warning'); return; }
+
+    var base64 = await new Promise(function(res, rej){
+      var r = new FileReader();
+      r.onload = function(){ res(r.result.split(',')[1]); };
+      r.onerror = function(){ rej(new Error('Error leyendo archivo')); };
+      r.readAsDataURL(file);
+    });
+
+    var mediaType = file.type || 'image/jpeg';
+    var esPDF = mediaType === 'application/pdf' || (file.name||'').toLowerCase().endsWith('.pdf');
+
+    var resultado = await callAppsScriptPrivado('interpretarEstudio', {
+      base64: base64, mediaType: mediaType, esPDF: esPDF, tipo: est.tipo, nombrePaciente: (p.name||'')
+    });
+
+    if (!resultado || !resultado.ok || !resultado.resumen){ showToast('No se pudo interpretar el documento','warning'); return; }
+
+    est.resumenIA = resultado.resumen;
+    est.resumenIA.fechaInterpretacion = new Date().toISOString();
+    est.resumenIA.version = 'ic-v1';
+    est.resumenIA.validadoPor = null;
+    est.resumenIA.validadoEn = null;
+
+    await _persistirEstudios(p);
+    if (window._estudiosCache) delete window._estudiosCache[pid];
+    FST_renderEstudiosApartado(pid);
+    showToast('🧠 Estudio interpretado','success');
+
+    // Bitácora (control de costos)
+    callAppsScriptPrivado('registrarAcceso', {
+      accion:'interpretarEstudio_IA', fecha:new Date().toLocaleDateString('es-MX'),
+      hora:new Date().toLocaleTimeString('es-MX'), usuario:(window.currentUser||{}).name||'',
+      correo:(window.currentUser||{}).email||'', rol:(window.currentUser||{}).role||''
+    }).catch(function(){});
+
+  } catch(e){
+    console.warn('[IC] Error interpretando estudio:', e.message);
+    showToast('Error: '+e.message,'warning');
+  }
+}
+
+// Interpretación manual para estudios sin reporte médico (imagen_sin_reporte).
+async function agregarInterpretacionManual(pid, estudioId){
+  var p = _resolverPaciente(pid);
+  if (!p) return;
+  var est = (p.estudiosDocs||[]).find(function(e){ return e.id === estudioId; });
+  if (!est) return;
+  var texto = await _pedirTextoLibre('Interpretación manual', 'Anota lo que el médico indicó (llamada, consulta, etc.)');
+  if (!texto) return;
+  est.resumenManual = { texto: texto, origen:'terapeuta', fecha:new Date().toISOString(), autor:(window.currentUser||{}).name||'' };
+  await _persistirEstudios(p);
+  if (window._estudiosCache) delete window._estudiosCache[pid];
+  FST_renderEstudiosApartado(pid);
+  showToast('✏️ Interpretación guardada','success');
+}
+
+// Valida/desvalida el resumen IA de un estudio (checkbox).
+async function validarResumenIA(pid, estudioId, validado){
+  var p = _resolverPaciente(pid);
+  if (!p) return;
+  var est = (p.estudiosDocs||[]).find(function(e){ return e.id === estudioId; });
+  if (!est || !est.resumenIA) return;
+  est.resumenIA.validadoPor = validado ? ((window.currentUser||{}).name || 'desconocido') : null;
+  est.resumenIA.validadoEn = validado ? new Date().toISOString() : null;
+  await _persistirEstudios(p);
+}
+
+// Modal de texto libre (Promise<string|null>). Patrón de _pedirLinkEstudio.
+function _pedirTextoLibre(titulo, placeholder){
+  return new Promise(function(resolve){
+    var ov = document.createElement('div');
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:10002;display:flex;align-items:flex-end;justify-content:center';
+    var cerrado=false;
+    function cerrar(val){ if(cerrado) return; cerrado=true; ov.remove(); resolve(val); }
+    ov.onclick = function(e){ if(e.target===ov) cerrar(null); };
+    ov.innerHTML = '<div style="background:#fff;border-radius:16px 16px 0 0;width:100%;max-width:480px;padding:16px">'
+      + '<div style="font-weight:800;color:var(--navy);margin-bottom:10px">'+escapeHTML(titulo||'Texto')+'</div>'
+      + '<textarea id="_ptl-txt" rows="4" placeholder="'+escapeAttr_(placeholder||'')+'" style="width:100%;padding:12px;border:1px solid var(--gray-200);border-radius:10px;font-size:15px;font-family:inherit;resize:vertical"></textarea>'
+      + '<button id="_ptl-ok" style="width:100%;padding:12px;border:none;border-radius:10px;background:var(--navy);color:#fff;font-size:14px;font-weight:700;cursor:pointer;margin-top:8px">Guardar</button>'
+      + '<button id="_ptl-cancel" style="width:100%;padding:10px;margin-top:4px;border:none;background:none;color:var(--gray-400);font-size:13px;cursor:pointer">Cancelar</button></div>';
+    document.body.appendChild(ov);
+    ov.querySelector('#_ptl-ok').onclick = function(){ var v=(ov.querySelector('#_ptl-txt').value||'').trim(); cerrar(v||null); };
+    ov.querySelector('#_ptl-cancel').onclick = function(){ cerrar(null); };
+  });
 }
 
 async function borrarEstudio(pid, eid){
