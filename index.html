@@ -6478,8 +6478,8 @@ async function interpretarEstudioIA(pid, estudioId){
     // Bitácora (control de costos)
     callAppsScriptPrivado('registrarAcceso', {
       accion:'interpretarEstudio_IA', fecha:new Date().toLocaleDateString('es-MX'),
-      hora:new Date().toLocaleTimeString('es-MX'), usuario:(window.currentUser||{}).name||'',
-      correo:(window.currentUser||{}).email||'', rol:(window.currentUser||{}).role||''
+      hora:new Date().toLocaleTimeString('es-MX'), usuario:(currentUser||{}).name||'',
+      correo:(currentUser||{}).email||'', rol:(currentUser||{}).role||''
     }).catch(function(){});
 
   } catch(e){
@@ -6496,7 +6496,7 @@ async function agregarInterpretacionManual(pid, estudioId){
   if (!est) return;
   var texto = await _pedirTextoLibre('Interpretación manual', 'Anota lo que el médico indicó (llamada, consulta, etc.)');
   if (!texto) return;
-  est.resumenManual = { texto: texto, origen:'terapeuta', fecha:new Date().toISOString(), autor:(window.currentUser||{}).name||'' };
+  est.resumenManual = { texto: texto, origen:'terapeuta', fecha:new Date().toISOString(), autor:(currentUser||{}).name||'' };
   await _persistirEstudios(p);
   if (window._estudiosCache) delete window._estudiosCache[pid];
   FST_renderEstudiosApartado(pid);
@@ -6509,7 +6509,7 @@ async function validarResumenIA(pid, estudioId, validado){
   if (!p) return;
   var est = (p.estudiosDocs||[]).find(function(e){ return e.id === estudioId; });
   if (!est || !est.resumenIA) return;
-  est.resumenIA.validadoPor = validado ? ((window.currentUser||{}).name || 'desconocido') : null;
+  est.resumenIA.validadoPor = validado ? ((currentUser||{}).name || 'desconocido') : null;
   est.resumenIA.validadoEn = validado ? new Date().toISOString() : null;
   await _persistirEstudios(p);
 }
