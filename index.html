@@ -5368,7 +5368,7 @@ function _liberarGuardSOAP(){
   const btn = document.querySelector('[onclick="guardarSOAP()"]');
   if(btn){ btn.disabled = false; btn.style.opacity = ''; }
 }
-function guardarSOAP(){
+async function guardarSOAP(){
   // H-02: anti-doble-toque
   if(_guardandoSOAP){ showToast('Guardado en curso, espera un momento…','warning'); return; }
   _guardandoSOAP = true;
@@ -5527,7 +5527,26 @@ function guardarSOAP(){
 
   } else {
     // ── MODO NUEVA NOTA ────────────────────────────────────────────────────
-    const sesNum=p.sesiones+1;
+    // FIX num-migrados: el num nuevo = max(num de TODAS las sesiones) + 1.
+    // Para migrados, p.soap[] no trae el histórico (FST es read-only y lo carga
+    // en bloque aparte) y p.sesiones puede ser 0 → antes daba num=1 duplicado.
+    // Tomamos el máximo real de todas las fuentes disponibles.
+    let _maxNum = 0;
+    if (Array.isArray(p.soap)) p.soap.forEach(s => { const n = Number(s.num)||0; if (n>_maxNum) _maxNum=n; });
+    _maxNum = Math.max(_maxNum, Number(p.sesiones)||0, Number(p.sesionesCount)||0);
+    // Histórico Firestore no cargado en memoria (migrados): leer el num real.
+    // Degrada limpio: si falla o tarda >4s, usa el max de memoria y guarda igual.
+    const _faltaHistorial = (Number(p.sesionesCount)||0) > (Array.isArray(p.soap)?p.soap.length:0);
+    if (_faltaHistorial && typeof FST_fetchSesiones==='function' && window._fstDb && p.id) {
+      try {
+        const _hist = await Promise.race([
+          FST_fetchSesiones(p.id),
+          new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),4000))
+        ]);
+        if (Array.isArray(_hist)) _hist.forEach(s => { const n = Number(s.num)||0; if (n>_maxNum) _maxNum=n; });
+      } catch(e){ console.warn('[SOAP] histórico Firestore no leído para num (degrada a memoria):', e.message); }
+    }
+    const sesNum=_maxNum + 1;
     const semana=Math.ceil(sesNum/2);
     const nuevaSOAP={
       id:generarIdSeguro_('s'), num:sesNum, fecha:fechaConsultaFmt,
