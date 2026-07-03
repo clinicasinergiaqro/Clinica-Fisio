@@ -3536,7 +3536,7 @@ function renderExpediente(tab='historia'){
             <div class="soap-meta">${s.fecha}${s.horaCreacion?' · '+escapeHTML(s.horaCreacion):''} · <span style="font-weight:700;color:var(--navy)">${s.terapeuta}</span>${(Array.isArray(s.atendidoPor)&&s.atendidoPor.length&&!(s.atendidoPor.length===1&&s.atendidoPor[0]===s.terapeuta))?' · <span style="font-size:11px;color:var(--gray-500)">👥 Atendió: '+s.atendidoPor.map(escapeHTML).join(', ')+'</span>':''} · Semana ${s.semana}${s.modoNota?' · <span style="background:#E8EEF7;color:var(--navy);font-size:10px;font-weight:700;padding:2px 7px;border-radius:8px">'+escapeHTML(s.modoNota)+'</span>':''}</div>
           </div>
           <div style="display:flex;gap:6px;align-items:center;">
-            <div class="eva-num ${getEvaClass(s.s.dolor?.split('/')[0]||5)}" style="width:28px;height:28px;font-size:12px;">${s.s.dolor?.split('/')[0]||'?'}</div>
+            <div class="eva-num ${getEvaClass(s.s?.dolor?.split('/')[0]||5)}" style="width:28px;height:28px;font-size:12px;">${s.s?.dolor?.split('/')[0]||'?'}</div>
             <button data-sid="${escapeAttr_(s.id)}" onclick="editarSOAP(this.dataset.sid)" style="background:var(--navy);color:white;border:none;border-radius:20px;padding:3px 10px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">✏️ Editar</button>
             ${s.historialEdiciones&&s.historialEdiciones.length?`<button data-sid="${escapeAttr_(s.id)}" onclick="verHistorialEdicionesSOAP(this.dataset.sid)" style="background:var(--gray-100);color:var(--gray-600);border:none;border-radius:20px;padding:3px 10px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">🕘 Ver historial</button>`:''}
           </div>
