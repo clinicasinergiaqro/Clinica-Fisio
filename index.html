@@ -1109,8 +1109,8 @@ async function saveDB(k, v){
     const lista = Array.isArray(v) ? v : [];
     lista.forEach(mod=>{
       if(!mod||!mod.id) return;
-      // GUARDIA: históricos no viven en patientsDB (solo en Firestore + vista FST)
-      if(String(mod.id).startsWith('mig_pac_')) return;
+      // GUARDIA: históricos (mig_pac_) y pacientes bloqueados/test no viven en patientsDB
+      if(String(mod.id).startsWith('mig_pac_') || _esPacienteTest(mod)) return;
       mod.updatedAt = Date.now(); // marca de tiempo numérica confiable (para Pieza 4)
       const idx = patientsDB.findIndex(x=>x.id===mod.id);
       if(idx>=0) patientsDB[idx]=mod;
@@ -1127,10 +1127,10 @@ async function saveDB(k, v){
 
   for(const p of lista){
     if(!p || !p.id) continue;
-    // GUARDIA DUAL-WRITE: históricos viven SOLO en Firestore, nunca en Sheets.
-    // Si un mig_pac_* llegara aquí, sería un stub accidental. Bloquearlo en origen.
-    if(String(p.id).startsWith('mig_pac_')) {
-      console.warn('[saveDB] Bloqueado: intento de escribir histórico a Sheets:', p.id);
+    // GUARDIA DUAL-WRITE: históricos (mig_pac_) SOLO en Firestore; y pacientes
+    // bloqueados/test (p002 corrupto, etc.) nunca deben re-escribirse a Sheets.
+    if(String(p.id).startsWith('mig_pac_') || _esPacienteTest(p)) {
+      console.warn('[saveDB] Bloqueado: no se escribe a Sheets (histórico o bloqueado):', p.id);
       continue;
     }
 
@@ -1487,8 +1487,11 @@ async function loadFromCloud(){
 
       // ── PIEZA 4 (decisión 1): pacientes creados OFFLINE que aún no están en Sheets ──
       // No vienen en la nube; conservarlos y encolarlos para que suban. Nunca borrarlos.
+      // EXCEPCIÓN: no re-encolar históricos (mig_pac_) ni bloqueados/test (p002). Estos
+      // NO son "creados offline sin subir" — son basura que resucitaría en Sheets.
       local.forEach(pLocal=>{
-        if(pLocal && pLocal.id && !idsDeNube.has(pLocal.id)){
+        if(pLocal && pLocal.id && !idsDeNube.has(pLocal.id)
+           && !String(pLocal.id).startsWith('mig_pac_') && !_esPacienteTest(pLocal)){
           saneados.push(pLocal);
           encolarSync(pLocal.id);
         }
@@ -1663,7 +1666,7 @@ function sanearYRecalcularEdad(p){
 function tryParse(s,fallback){try{return JSON.parse(s);}catch(e){return fallback;}}
 
 // ── Detección de pacientes de prueba (LIMPIEZA-TEST) ──
-var _IDS_TEST = ['p1781643783300','p1781427175480']; // los dos Juan de prueba (0 sesiones, CARLOS)
+var _IDS_TEST = ['p1781643783300','p1781427175480','p002']; // 2 Juan de prueba + p002 (stub corrupto ZARA que resucitaba en Sheets)
 function _esPacienteTest(p){
   if(!p) return false;
   if(p.id && _IDS_TEST.indexOf(p.id)!==-1) return true;
