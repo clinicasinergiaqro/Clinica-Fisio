@@ -2670,6 +2670,23 @@ async function _eliminarPacienteRevalorar(pid, tarjetaEl) {
   });
   if (!confirmado) return;
 
+  // Agujero #2: mover los archivos del paciente a borrados/ ANTES de eliminarlo (no dejar huérfanos).
+  // Cubre los archivos con referencia estructurada (estudios/fotos/docs/media SOAP). Los históricos
+  // migrados / ejercicios (sin fbPath en estos arrays) los recoge el barrido de fantasmas server-side.
+  try {
+    var _pDel = _resolverPaciente(pid);
+    if (_pDel){
+      var _archivos = [];
+      (Array.isArray(_pDel.estudiosDocs)?_pDel.estudiosDocs:[]).forEach(function(e){ if(e&&e.fbPath) _archivos.push({fbPath:e.fbPath, tipoDoc:e.tipo||'estudio'}); });
+      (Array.isArray(_pDel.fotos)?_pDel.fotos:[]).forEach(function(e){ if(e&&e.fbPath) _archivos.push({fbPath:e.fbPath, tipoDoc:'foto'}); });
+      (Array.isArray(_pDel.docs)?_pDel.docs:[]).forEach(function(e){ if(e&&e.fbPath) _archivos.push({fbPath:e.fbPath, tipoDoc:'doc'}); });
+      (Array.isArray(_pDel.soap)?_pDel.soap:[]).forEach(function(s){ (s&&Array.isArray(s.media)?s.media:[]).forEach(function(m){ if(m&&m.fbPath) _archivos.push({fbPath:m.fbPath, tipoDoc:'soap-media'}); }); });
+      for (var _k=0; _k<_archivos.length; _k++){
+        await _moverArchivoABorrados(_archivos[_k].fbPath, {tipo:'paciente-eliminado', pid:pid, tipoDoc:_archivos[_k].tipoDoc, nombre:(_pDel.name||'')});
+      }
+    }
+  } catch(e){ console.warn('[eliminar] mover archivos a borrados:', e.message); }
+
   // 1. Borrar de patientsDB
   patientsDB = patientsDB.filter(function(p) { return p.id !== pid; });
 
@@ -6565,14 +6582,68 @@ function _pedirTextoLibre(titulo, placeholder){
   });
 }
 
+// ── BORRADO LÓGICO (tombstone) ────────────────────────────────────────────
+// Registra un tombstone auditable en Firestore (metadato, SIN contenido sensible).
+async function _tombstoneBorrado(data){
+  try {
+    if (window._fstDb) await window._fstDb.collection('borrados_audit').add(Object.assign({
+      fecha: new Date().toISOString(),
+      por: (currentUser&&currentUser.name)||'?',
+      rol: (currentUser&&currentUser.role)||''
+    }, data));
+  } catch(e){ console.warn('[borrados] tombstone falló:', e.message); }
+}
+// Mueve un archivo de Storage a borrados/ (borrado LÓGICO: copy+delete, reversible).
+// Devuelve true si el archivo quedó fuera de su ruta original (o ya no existía) → seguro
+// quitar la referencia. Devuelve false si falló → NO quitar la referencia (evita huérfanos).
+// El SDK web no tiene copy nativo: descarga los bytes y los re-sube al destino.
+async function _moverArchivoABorrados(fbPath, tomb){
+  if (!fbPath) return true; // referencia sin archivo físico → nada que mover en la nube
+  var origen = fbStorage.ref(fbPath);
+  var destPath = 'borrados/' + Date.now() + '/' + fbPath;
+  // 1) Copiar bytes original → destino
+  try {
+    var url = await origen.getDownloadURL();
+    var blob = await (await fetch(url)).blob();
+    await fbStorage.ref(destPath).put(blob);
+  } catch(err){
+    if (err && err.code==='storage/object-not-found'){
+      await _tombstoneBorrado(Object.assign({}, tomb, {fbPath:fbPath, destino:null, nota:'objeto ya ausente'}));
+      return true; // ya no existía → tratamos como movido
+    }
+    console.warn('[borrados] copia falló:', err && err.message);
+    return false; // ← agujero #1: no dejar la referencia sin su archivo
+  }
+  // 2) Borrar el original (esto corta su token/URL pública). Si falla → rollback del destino.
+  try {
+    await origen.delete();
+  } catch(err){
+    if (!(err && err.code==='storage/object-not-found')){
+      try { await fbStorage.ref(destPath).delete(); } catch(e){} // rollback: no dejar duplicado
+      console.warn('[borrados] delete original falló:', err && err.message);
+      return false;
+    }
+  }
+  await _tombstoneBorrado(Object.assign({}, tomb, {fbPath:fbPath, destino:destPath}));
+  return true;
+}
+
 async function borrarEstudio(pid, eid){
   var p = _resolverPaciente(pid);
   if (!p || !Array.isArray(p.estudiosDocs)) return;
-  var ok = await _confirmarBorradoModal('¿Eliminar este estudio?', 'No borra el archivo de la nube. Esta acción no se puede deshacer.');
+  var est = p.estudiosDocs.find(function(e){ return String(e.id)===String(eid); });
+  if (!est) return;
+  // ¿Quién puede borrar? supervisor o quien lo subió
+  var puede = (currentUser.role==='supervisor') || (est.agregadoPor && est.agregadoPor===currentUser.name);
+  if (!puede){ showToast('Solo el supervisor o quien subió el archivo puede eliminarlo','warning'); return; }
+  var ok = await _confirmarBorradoModal('¿Eliminar este estudio?', 'El archivo se moverá a la papelera de la clínica (borrado, recuperable por el supervisor). Desaparecerá del expediente.');
   if (!ok) return;
+  // Mover el archivo a borrados/ ANTES de quitar la referencia (ambos o ninguno)
+  var movido = await _moverArchivoABorrados(est.fbPath, {tipo:'estudio', pid:pid, tipoDoc:est.tipo||null, id:est.id});
+  if (!movido){ showToast('❌ No se pudo mover el archivo a la papelera. No se eliminó; reintenta.','error'); return; }
   p.estudiosDocs = p.estudiosDocs.filter(function(e){ return String(e.id)!==String(eid); });
-  try { await _persistirEstudios(p); if (window._estudiosCache) delete window._estudiosCache[pid]; showToast('Estudio eliminado',''); FST_renderEstudiosApartado(pid); }
-  catch(e){ showToast('❌ Error: '+e.message,'error'); }
+  try { await _persistirEstudios(p); if (window._estudiosCache) delete window._estudiosCache[pid]; showToast('🗑️ Estudio movido a la papelera','success'); FST_renderEstudiosApartado(pid); }
+  catch(e){ showToast('⚠️ Archivo movido, pero no se pudo guardar el índice: '+e.message,'error'); }
 }
 
 // MINI-LOOP clasificar imagen histórica: la registra como estudio (origen:'historico', reusa url)
@@ -6816,33 +6887,32 @@ async function restaurarMedia(p){
   // FA-prev: restaurar media dentro de cada SOAP (mismo criterio: url→no toca; mediaId→idbGet)
   if(Array.isArray(p.soap)){ for(const s of p.soap){ if(s && Array.isArray(s.media)) await restaurarArr(s.media); } }
 }
-function deleteMedia(pid,tipo,i){
+async function deleteMedia(pid,tipo,i){
   const p=patientsDB.find(x=>x.id===pid);if(!p)return;
-  if(!confirm('¿Eliminar este archivo? No se puede deshacer.')) return;
   const arr = tipo==='foto'?p.fotos:p.docs;
   const item = Array.isArray(arr)?arr[i]:null;
-  // Borrar de Firebase Storage si tiene ruta
-  if(item&&item.fbPath){
-    try{ fbStorage.ref(item.fbPath).delete(); }
-    catch(e){ console.warn('No se pudo borrar de Firebase:',e.message); }
-  }
-  if(item&&item.mediaId){ idbSet(item.mediaId,null); } // limpiar de IndexedDB
+  if(!item) return;
+  if(!confirm('¿Eliminar este archivo? Se moverá a la papelera de la clínica (recuperable por el supervisor).')) return;
+  // Mover a borrados/ ANTES de quitar la referencia (ambos o ninguno)
+  const movido = await _moverArchivoABorrados(item.fbPath, {tipo:tipo, pid:pid, id:item.mediaId||null});
+  if(!movido){ showToast('❌ No se pudo mover el archivo a la papelera. No se eliminó; reintenta.','error'); return; }
+  if(item.mediaId){ try{ await idbSet(item.mediaId,null); }catch(e){} } // limpiar de IndexedDB
   if(tipo==='foto'&&Array.isArray(p.fotos))p.fotos.splice(i,1);
   else if(Array.isArray(p.docs))p.docs.splice(i,1);
   if(!Array.isArray(p.historialCambios)) p.historialCambios=[];
   const ahoraStr=new Date().toLocaleDateString('es-MX')+' '+new Date().toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'});
-  p.historialCambios.push({usuario:currentUser.name,seccion:'archivos',fecha:ahoraStr,accion:`Eliminó ${tipo==='foto'?'una foto':'un documento'}`,antes:'archivo presente',despues:'eliminado'});
+  p.historialCambios.push({usuario:currentUser.name,seccion:'archivos',fecha:ahoraStr,accion:`Movió a papelera ${tipo==='foto'?'una foto':'un documento'}`,antes:'archivo presente',despues:'en papelera'});
   p.fechaActualizacion=ahoraStr;
   p.ultimoUsuario=currentUser.name;
   saveDB('pts',[p]).then(res => {
     if(res && res.ok){
-      showToast('✅ Archivo eliminado','success');
+      showToast('🗑️ Archivo movido a la papelera','success');
     } else {
-      showToast('⚠️ Eliminado local, pero Sheets no confirmó. Revisa conexión.','warning');
+      showToast('⚠️ Movido en la nube, pero Sheets no confirmó. Revisa conexión.','warning');
     }
     renderExpediente('estudios');
   }).catch(() => {
-    showToast('⚠️ Sin conexión — cambio guardado solo en este equipo.','warning');
+    showToast('⚠️ Archivo movido; índice guardado solo en este equipo.','warning');
     renderExpediente('estudios');
   });
 }
