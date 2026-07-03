@@ -9461,17 +9461,50 @@ function _RPT_css(){
   + '@media print{.tabs,.topbar,.nav,.nav-item,button,.rpt-noprint{display:none!important}.rpt-container{padding:0}.rpt-sec,.rpt-tbl tr{page-break-inside:avoid}}'
   + '</style>';
 }
+// Valor real o marcador "No registrado" (nunca inventa, nunca IA).
+function _RPT_val(v){
+  var s=(v==null)?'':String(v).trim();
+  return s ? escapeHTML(s) : '<span style="color:#B0894A;font-style:italic">No registrado</span>';
+}
+// N.º de expediente legible: mig_pac_XXXXXXXX… → SIN-XXXXXXXX ; activos (p*) → SIN-[ID].
+function _RPT_folioExpediente(id){
+  var s=String(id||'').trim();
+  if(!s) return '—';
+  if(s.indexOf('mig_pac_')===0) return 'SIN-'+s.slice(8,16).toUpperCase();
+  return 'SIN-'+s.toUpperCase();
+}
+// Cabecera tipo-PDF: logo desde Storage + título + N.º expediente + fecha emisión.
 function _RPT_htmlCabecera(p, sesiones){
-  var edad=(p.age!=null&&p.age!=='')?escapeHTML(String(p.age))+' años':'—';
+  var logo='https://storage.googleapis.com/clinicasinergia-ec2cf.firebasestorage.app/clinica/sinergia/assets/logo_horizontal.png';
+  var exp=p.folio?escapeHTML(String(p.folio)):escapeHTML(_RPT_folioExpediente(p.id));
+  var hoy=escapeHTML(new Date().toLocaleDateString('es-MX'));
+  return '<div style="display:flex;justify-content:space-between;align-items:flex-start;padding:4px 0 12px;border-bottom:2px solid #1F5C4D;-webkit-print-color-adjust:exact;print-color-adjust:exact">'
+    + '<img src="'+logo+'" alt="Clínica Sinergia" style="height:38px;width:auto;display:block">'
+    + '<div style="text-align:right">'
+    + '<div style="font-size:10px;font-weight:700;color:#1F5C4D;letter-spacing:1px">RESUMEN CLÍNICO DE EXPEDIENTE</div>'
+    + '<div style="font-size:9px;color:#8A8D8A;margin-top:3px">Expediente N.º '+exp+'</div>'
+    + '<div style="font-size:9px;color:#8A8D8A">Emitido: '+hoy+' · Confidencial</div>'
+    + '</div></div>';
+}
+// Franja de paciente — grid 4 col tipo-PDF.
+function _RPT_htmlFranjaPaciente(p, sesiones){
+  var edad=(p.age!=null&&p.age!=='')?(escapeHTML(String(p.age))+' años'):'N/D';
+  var sexo=p.sexo?escapeHTML(p.sexo):'N/D';
   var ter=escapeHTML(p.terapeuta||p.terapeutaActual||'—');
-  return '<div class="rpt-sec" style="border-color:var(--navy)">'
-    + '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px">'
-    + '<div style="font-weight:800;color:var(--navy);font-size:15px">Clínica Sinergia · Reporte Clínico</div>'
-    + '<div style="font-size:11px;color:var(--gray-400)">'+escapeHTML(new Date().toLocaleDateString('es-MX'))+'</div></div>'
-    + '<div style="margin-top:8px;font-size:16px;font-weight:800">'+escapeHTML(p.name||'—')+'</div>'
-    + '<div style="font-size:12px;color:var(--gray-600);margin-top:2px">'+edad+' · '+escapeHTML(p.sexo||'N/D')+' · Terapeuta: '+ter+'</div>'
-    + '<div style="font-size:12px;color:var(--gray-400);margin-top:2px">Periodo: '+escapeHTML(_RPT_periodo(sesiones))+'</div>'
+  function c(lbl,val,color){ return '<div><div style="font-size:8.5px;color:#9497A2;letter-spacing:0.8px;text-transform:uppercase;margin-bottom:3px">'+lbl+'</div><div style="font-size:13px'+(color?';font-weight:700;color:'+color:'')+'">'+val+'</div></div>'; }
+  return '<div style="display:grid;grid-template-columns:2fr 1fr 1fr 1.4fr;margin:14px 0;padding:12px 14px;border:0.5px solid #E2E4E0;border-radius:6px">'
+    + c('Paciente', escapeHTML(p.name||'—'), '#2E3192')
+    + c('Edad / Sexo', edad+' · '+sexo)
+    + c('Terapeuta', ter)
+    + c('Periodo', escapeHTML(_RPT_periodo(sesiones)))
     + '</div>';
+}
+// Encabezado de sección numerado (badge cuadrado + título mayúsculas + hairline).
+function _RPT_secHead(n, titulo){
+  return '<div style="display:flex;align-items:center;gap:8px;margin:18px 0 8px">'
+    + '<span style="width:18px;height:18px;background:#2E3192;color:#fff;font-size:10px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;border-radius:3px;-webkit-print-color-adjust:exact;print-color-adjust:exact">'+escapeHTML(String(n))+'</span>'
+    + '<span style="font-size:11.5px;font-weight:700;color:#2E3192;letter-spacing:0.5px;text-transform:uppercase;white-space:nowrap">'+escapeHTML(titulo)+'</span>'
+    + '<span style="flex:1;height:1px;background:#E2E4E0"></span></div>';
 }
 function _RPT_card(lbl,val,color,small){
   return '<div class="rpt-card"><div class="lbl">'+escapeHTML(lbl)+'</div><div class="val" style="color:'+color+(small?';font-size:12.5px':'')+'">'+escapeHTML(val)+'</div></div>';
@@ -9498,14 +9531,34 @@ function _RPT_htmlDashboard(p, sesiones){
 }
 function _RPT_htmlAntecedentes(p){
   var a=p.antecedentes||{};
-  function row(k,v){ var has=v&&String(v).trim()&&v!=='—'; return '<div class="rpt-kv"><span class="k">'+k+'</span><span'+(has?'':' class="rpt-nd"')+'>'+(has?escapeHTML(v):'No documentado')+'</span></div>'; }
-  return '<div class="rpt-sec"><h3 class="rpt-h">🏥 Antecedentes</h3>'
-    + row('Patológicos', a.patologicos)
-    + row('Quirúrgicos', a.cirugias)
-    + row('Deportivos', a.deportivos)
-    + row('Medicamentos', a.medicamentos)
-    + row('Alergias', p.alergias)
-    + '</div>';
+  function rowL(k,v,last){ return '<tr'+(last?'':' style="border-bottom:0.5px solid #EEEFEC"')+'><td style="padding:7px 10px;font-weight:700;color:#3A3B38;font-size:10.5px;width:110px;vertical-align:top">'+k+'</td><td style="padding:7px 10px;color:#4A4B48;font-size:11px">'+_RPT_val(v)+'</td></tr>'; }
+  return _RPT_secHead(1,'Antecedentes relevantes')
+    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:0 24px">'
+    + '<table style="width:100%;border-collapse:collapse">'
+    +   rowL('Patológicos', a.patologicos) + rowL('Quirúrgicos', a.cirugias) + rowL('Deportivos', a.deportivos, true)
+    + '</table>'
+    + '<table style="width:100%;border-collapse:collapse">'
+    +   rowL('Medicamentos', a.medicamentos) + rowL('Alergias', p.alergias) + rowL('Estudios previos', (p.motivo&&p.motivo.estudios), true)
+    + '</table></div>';
+}
+// Valoración funcional inicial — campos estructurados del expediente (sin IA).
+function _RPT_htmlValoracion(p, sesiones){
+  var v=p.valoracion||{}, mo=p.motivo||{};
+  var dolorIni=v.dolor||v.eva||'';
+  if(!String(dolorIni).trim()){ for(var i=0;i<sesiones.length;i++){ var e=_RPT_evaDeSesion(sesiones[i]); if(e!=null){ dolorIni=e+'/10'; break; } } }
+  var obj=(p.dxFuncional&&typeof p.dxFuncional==='object'&&(p.dxFuncional.objetivosCP||p.dxFuncional.objetivosLP))||(p.planTto&&p.planTto.objetivos)||'';
+  function row(k,val,last){ return '<tr'+(last?'':' style="border-bottom:0.5px solid #EEEFEC"')+'><td style="padding:7px 10px;font-weight:700;color:#3A3B38;font-size:10.5px;width:160px;vertical-align:top">'+k+'</td><td style="padding:7px 10px;color:#4A4B48;font-size:11px">'+_RPT_val(val)+'</td></tr>'; }
+  return _RPT_secHead(2,'Valoración funcional inicial')
+    + '<table style="width:100%;border-collapse:collapse">'
+    + row('Mecanismo de lesión', mo.mecanismo)
+    + row('Dolor inicial (EVA)', dolorIni)
+    + row('Irradiación', v.irradiacion)
+    + row('Palpación', v.palpacion)
+    + row('ROM', v.rom)
+    + row('Fuerza', v.fuerza)
+    + row('Neurológico', v.neurologico||v.banderasRojas)
+    + row('Objetivos', obj, true)
+    + '</table>';
 }
 function _RPT_htmlBanderas(p, sesiones){
   var b=_RPT_detectarBanderas(p,sesiones);
@@ -9549,25 +9602,53 @@ function _RPT_htmlEstudios(p){
   return '<div class="rpt-sec"><h3 class="rpt-h">🔬 Estudios</h3>'+items+'</div>';
 }
 function _RPT_htmlSoap(sesiones){
-  if(!sesiones.length) return '<div class="rpt-sec"><h3 class="rpt-h">📋 Síntesis SOAP</h3><div style="color:var(--gray-400)">Sin sesiones</div></div>';
-  var rows=sesiones.map(function(s,idx){
+  if(!sesiones.length) return _RPT_secHead(4,'Síntesis de notas SOAP')+'<div style="color:#9095A5;font-size:11px">Sin sesiones registradas</div>';
+  var orden=sesiones.slice().sort(function(a,b){ var fa=obtenerFechaSoapISO(a)||'',fb=obtenerFechaSoapISO(b)||''; if(fa!==fb)return fa<fb?1:-1; return (Number(b&&b.num)||0)-(Number(a&&a.num)||0); });
+  function pill(eva){
+    if(eva==null) return '<span style="color:#9497A2;font-size:9px">—</span>';
+    var c=eva>=5?{bg:'#FCEBEB',fg:'#A32D2D'}:(eva>=3?{bg:'#FBF3E4',fg:'#8A5A0B'}:{bg:'#E1F5EE',fg:'#0F6E56'});
+    return '<span style="background:'+c.bg+';color:'+c.fg+';padding:2px 8px;border-radius:9px;font-size:9px;font-weight:700;-webkit-print-color-adjust:exact;print-color-adjust:exact">'+eva+'/10</span>';
+  }
+  var th='background:#1F5C4D;color:#fff;text-align:left;padding:7px 9px;font-size:9px;text-transform:uppercase;letter-spacing:0.5px;-webkit-print-color-adjust:exact;print-color-adjust:exact';
+  var tdB='padding:8px 9px;border-bottom:0.5px solid #EEEFEC';
+  // ¿algún registro tiene tratamiento estructurado? Si no, se omite también el header de esa columna.
+  var hayP=orden.some(function(s){ return s.p && s.p.tratamiento && String(s.p.tratamiento).trim(); });
+  var rows=orden.map(function(s,idx){
     var eva=_RPT_evaDeSesion(s);
-    var pill=eva==null?'<span style="color:var(--gray-400)">—</span>':'<span class="rpt-pill" style="background:'+(eva>=5?'var(--red)':(eva>=3?'var(--amber)':'var(--green)'))+'">'+eva+'</span>';
-    var dolor=(s.s&&s.s.dolor)||'';
-    var hall=(s.o&&s.o.hallazgos)||'';
+    var hall=(s.o&&s.o.hallazgos)||(s.a&&s.a.analisis)||'';
     var trat=(s.p&&s.p.tratamiento)||'';
-    var busca=(hall+' '+((s.s&&s.s.cambios)||'')+' '+(s.textoOriginal||'')).toLowerCase();
-    var flag=/hormigue|entumec|adormec/.test(busca);
-    var resumenTexto=hall||(s.textoOriginal||'').slice(0,90);
-    return '<tr'+(flag?' class="rpt-flag"':'')+'>'
-      + '<td>'+(flag?'🚩 ':'')+'S'+escapeHTML(String(s.num||(idx+1)))+'<div style="font-size:10px;color:var(--gray-400)">'+escapeHTML(_RPT_fechaCorta(s.fecha||s.date))+(s.terapeuta?(' · '+escapeHTML(s.terapeuta)):'')+'</div></td>'
-      + '<td>'+pill+(dolor?('<div style="font-size:10px;color:var(--gray-600)">'+escapeHTML(String(dolor).slice(0,60))+'</div>'):'')+'</td>'
-      + '<td>'+escapeHTML(resumenTexto)+'</td>'
-      + '<td>'+escapeHTML(trat)+'</td></tr>';
+    // texto_libre: sin tratamiento estructurado y con texto original → Hallazgos ancho completo, sin col Tratamiento.
+    var textoLibre = !String(trat).trim() && !!String(s.textoOriginal||'').trim();
+    var zebra=(idx%2===0)?'background:#FAFAF8;-webkit-print-color-adjust:exact;print-color-adjust:exact;':'';
+    var celS='<td style="'+tdB+'"><span style="font-weight:700">S'+escapeHTML(String(s.num||''))+' · '+escapeHTML(_RPT_fechaCorta(s.fecha||s.date))+'</span><br><span style="font-size:8.5px;color:#9497A2">'+escapeHTML(s.terapeuta||'—')+'</span></td>';
+    var celD='<td style="'+tdB+'">'+pill(eva)+'</td>';
+    if(textoLibre){
+      var txt=String(s.textoOriginal||'').replace(/\s+/g,' ').slice(0,190);
+      return '<tr style="'+zebra+'">'+celS+celD+'<td'+(hayP?' colspan="2"':'')+' style="'+tdB+';color:#4A4B48">'+escapeHTML(txt)+'</td></tr>';
+    }
+    var resumen=hall||(s.textoOriginal||'').replace(/\s+/g,' ').slice(0,110);
+    return '<tr style="'+zebra+'">'+celS+celD
+      + '<td style="'+tdB+';color:#4A4B48">'+escapeHTML(resumen)+'</td>'
+      + '<td style="'+tdB+';color:#4A4B48">'+escapeHTML(trat)+'</td></tr>';
   }).join('');
-  return '<div class="rpt-sec"><h3 class="rpt-h">📋 Síntesis SOAP ('+sesiones.length+')</h3>'
-    + '<div style="overflow-x:auto"><table class="rpt-tbl"><thead><tr><th>Sesión</th><th>Dolor</th><th>Hallazgos</th><th>Tratamiento</th></tr></thead><tbody>'
-    + rows+'</tbody></table></div></div>';
+  return _RPT_secHead(4,'Síntesis de notas SOAP ('+orden.length+')')
+    + '<table style="width:100%;border-collapse:collapse;font-size:10px">'
+    + '<thead><tr><th style="'+th+';border-radius:4px 0 0 0;width:110px">Sesión</th><th style="'+th+';width:50px">Dolor</th><th style="'+th+(hayP?'':';border-radius:0 4px 0 0')+'">Hallazgos'+(hayP?' (O/A)':'')+'</th>'+(hayP?('<th style="'+th+';border-radius:0 4px 0 0;width:34%">Tratamiento (P)</th>'):'')+'</tr></thead>'
+    + '<tbody>'+rows+'</tbody></table>';
+}
+// Métricas — cálculo directo del EVA (primera vs última sesión). Sin IA.
+function _RPT_htmlMetricas(p, sesiones){
+  var evas=[]; sesiones.forEach(function(s){ var e=_RPT_evaDeSesion(s); if(e!=null) evas.push(e); });
+  var ini=evas.length?evas[0]:null, act=evas.length?evas[evas.length-1]:null;
+  var red=(ini!=null&&act!=null&&ini>0)?Math.round((ini-act)/ini*100):null;
+  function m(val,lbl){ return '<div style="text-align:center"><div style="font-size:22px;font-weight:700;line-height:1">'+val+'</div><div style="font-size:8px;letter-spacing:0.5px;text-transform:uppercase;color:#A8C8BC;margin-top:4px">'+lbl+'</div></div>'; }
+  return _RPT_secHead(5,'Métricas del tratamiento')
+    + '<div style="background:#1F5C4D;color:#fff;border-radius:8px;padding:16px 18px;display:grid;grid-template-columns:repeat(4,1fr);gap:16px;-webkit-print-color-adjust:exact;print-color-adjust:exact">'
+    + m((ini!=null?ini+'/10':'—'),'Dolor inicial')
+    + m((act!=null?act+'/10':'—'),'Dolor actual')
+    + m((red!=null?'↓ '+red+'%':'—'),'Reducción')
+    + m(String(sesiones.length),'Total sesiones')
+    + '</div>';
 }
 // Slice 3 (Nivel 2): render rico de la síntesis (ejecutiva + 3 columnas) o placeholder.
 function _RPT_htmlSintesis(entry, pid){
@@ -9693,14 +9774,15 @@ function _RPT_htmlVerdictBase(p, sesiones){
     + m('Dolor final', dfTxt)+m('Sesiones', sesiones.length)+m('Banderas', nBand)+m('Costo IA', '$0')
     + '</div></div>';
 }
-function _RPT_htmlFirmas(){
-  return '<div class="rpt-sec"><div style="display:flex;gap:24px;margin-top:16px">'
-    + '<div style="flex:1;text-align:center;border-top:1px solid var(--gray-400);padding-top:4px;font-size:11px;color:var(--gray-600)">Fisioterapeuta tratante</div>'
-    + '<div style="flex:1;text-align:center;border-top:1px solid var(--gray-400);padding-top:4px;font-size:11px;color:var(--gray-600)">Supervisión clínica</div>'
-    + '</div></div>';
+function _RPT_htmlFirmas(p){
+  var ter=escapeHTML((p&&(p.terapeuta||p.terapeutaActual))||'Fisioterapeuta tratante');
+  return '<div style="display:grid;grid-template-columns:1fr 1fr;gap:40px;margin-top:26px;padding-top:8px">'
+    + '<div style="text-align:center"><div style="border-top:0.5px solid #9497A2;margin-bottom:5px"></div><div style="font-size:11px;font-weight:700">'+ter+'</div><div style="font-size:9px;color:#6B6F6B">Fisioterapeuta tratante · Céd. Prof. ______</div></div>'
+    + '<div style="text-align:center"><div style="border-top:0.5px solid #9497A2;margin-bottom:5px"></div><div style="font-size:11px;font-weight:700">Supervisión clínica</div><div style="font-size:9px;color:#6B6F6B">Clínica Sinergia · Céd. Prof. ______</div></div>'
+    + '</div>';
 }
 function _RPT_htmlLegal(){
-  return '<div style="font-size:10px;color:var(--gray-400);padding:8px 4px;line-height:1.5">'
+  return '<div style="margin-top:18px;padding-top:10px;border-top:0.5px solid #E2E4E0;font-size:8.5px;color:#8A8D8A;line-height:1.5">'
     + 'Documento confidencial — expediente clínico electrónico conforme a la NOM-004-SSA3-2012. '
     + 'Uso exclusivo del personal de salud autorizado. Generado el '+escapeHTML(new Date().toLocaleString('es-MX'))+'.</div>';
 }
@@ -9757,15 +9839,14 @@ async function RPT_pintarPestanaReporte(pid){
     root.innerHTML='<div class="rpt-container">'
       + _RPT_css()
       + _RPT_htmlCabecera(p, sesiones)
-      + _RPT_htmlDashboard(p, sesiones)
-      + '<div class="rpt-sec"><h3 class="rpt-h">📈 Evolución del dolor</h3><div id="rpt-grafica-'+escapeAttr_(pid)+'">…</div></div>'
+      + _RPT_htmlFranjaPaciente(p, sesiones)
       + _RPT_htmlAntecedentes(p)
-      + _RPT_htmlBanderas(p, sesiones)
-      + _RPT_htmlEstudios(p)
+      + _RPT_htmlValoracion(p, sesiones)
+      + _RPT_secHead(3,'Evolución del dolor')
+      + '<div style="border:0.5px solid #E2E4E0;border-radius:6px;padding:14px"><div id="rpt-grafica-'+escapeAttr_(pid)+'">…</div></div>'
       + _RPT_htmlSoap(sesiones)
-      + _RPT_htmlSintesis(sintesis, pid)
-      + _RPT_htmlVerdictBase(p, sesiones)
-      + _RPT_htmlFirmas()
+      + _RPT_htmlMetricas(p, sesiones)
+      + _RPT_htmlFirmas(p)
       + _RPT_htmlLegal()
       + '</div>';
     _RPT_pintarGrafica(pid, sesiones);
