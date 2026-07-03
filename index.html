@@ -9625,9 +9625,10 @@ function _RPT_htmlResumen(p){
   var dxf=(p.dxFuncional&&typeof p.dxFuncional==='object')?p.dxFuncional:{};
   // Motivo de consulta ← p.motivoConsulta, fallback a p.motivo.padecimiento.
   var motivo=_limpio(p.motivoConsulta)||_limpio(mo.padecimiento);
-  // Diagnóstico médico ← dxFuncional.dxClinico (campo limpio, igual que la vista de expediente).
-  // Fallback a p.dx SOLO si es corto de 1 línea, para no volcar el blob de los pacientes migrados.
-  var dxMed=_limpio(dxf.dxClinico);
+  // Diagnóstico médico — CAMPO CANÓNICO que editan las terapeutas: motivo.dxMedico
+  // (igual que el botón Editar del Motivo, L8722, y la vista de expediente, L3487).
+  // Prioridad: motivo.dxMedico → dxFuncional.dxClinico → p.dx (corto, 1 línea) → "No registrado".
+  var dxMed=_limpio(mo.dxMedico)||_limpio(dxf.dxClinico);
   if(!dxMed){ var dxRaw=(typeof p.dx==='string')?p.dx.trim():''; if(dxRaw && dxRaw.indexOf('\n')===-1 && dxRaw.length<=120) dxMed=dxRaw; }
   // Diagnóstico funcional ← dxFuncional.dxFuncional.
   var dxFunc=_limpio(dxf.dxFuncional);
