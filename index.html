@@ -1666,7 +1666,8 @@ function sanearYRecalcularEdad(p){
 function tryParse(s,fallback){try{return JSON.parse(s);}catch(e){return fallback;}}
 
 // ── Detección de pacientes de prueba (LIMPIEZA-TEST) ──
-var _IDS_TEST = ['p1781643783300','p1781427175480','p002']; // 2 Juan de prueba + p002 (stub corrupto ZARA que resucitaba en Sheets)
+var _IDS_TEST = ['p1781643783300','p1781427175480','p002',
+  'p1781813126150','p0b58a214-e48e-46bb-9954-4a41d2092ccd','p1781814958552','p3978d981-a3f0-4cb2-aced-59b898ca23bd']; // 2 Juan de prueba + p002 (ZARA) + 4 expedientes de prueba borrados 2026-07-03 (Zaray/Camila/Dafne/Carlos Aranda) — blocklist anti-resurrección
 function _esPacienteTest(p){
   if(!p) return false;
   if(p.id && _IDS_TEST.indexOf(p.id)!==-1) return true;
