@@ -249,7 +249,9 @@ async function FST_renderHistorialSoap(pid){
     }
     const ids = new Set(); const dups = sesiones.filter(function(s){ if (ids.has(s.id)) return true; ids.add(s.id); return false; });
     if (dups.length) console.error('[FST] IDs duplicados:', dups.map(function(s){ return s.id; }));
-    const cards = sesiones.map(FST_renderCard).join('');
+    // Presentación: más reciente primero (fecha DESC). Copia — no muta `sesiones`,
+    // que se usa abajo para "primera sesión registrada" y el conteo.
+    const cards = [...sesiones].sort(_cmpSoapFechaDesc).map(FST_renderCard).join('');
     const galeria = await FST_renderGaleriaHistorica(pid);
     // LOOP: inyectar "Primera sesión registrada" en placeholder de Datos generales
     var _fstPrimeraSesEl = document.getElementById('fst-primera-sesion');
@@ -1902,6 +1904,14 @@ function obtenerFechaSoapISO(s){
   const iso=str.slice(0,10);
   return /^\d{4}-\d{2}-\d{2}$/.test(iso) ? iso : null;
 }
+// Comparador SOLO de presentación: muestra sesiones de más reciente a más antigua
+// (fecha DESC, con fallback a num si falta fecha). No altera num en Firestore ni el
+// orden cronológico ASC de la gráfica EVA (que se ordena por separado).
+function _cmpSoapFechaDesc(a,b){
+  const fa=obtenerFechaSoapISO(a)||'', fb=obtenerFechaSoapISO(b)||'';
+  if(fa!==fb) return fa<fb?1:-1;                    // fecha descendente (más reciente arriba)
+  return (Number(b&&b.num)||0)-(Number(a&&a.num)||0); // empate/sin fecha → num descendente
+}
 function obtenerUltimaFechaSoap(p){
   const fechas=((p&&p.soap)||[]).map(obtenerFechaSoapISO).filter(Boolean).sort();
   return fechas.length ? fechas[fechas.length-1] : null;
@@ -3525,7 +3535,7 @@ function renderExpediente(tab='historia'){
 
   if(tab==='soap'){
     html+=generarGraficaEVA(p);
-    const soaps=[...p.soap].sort((a,b)=>b.num-a.num); // más reciente primero
+    const soaps=[...p.soap].sort(_cmpSoapFechaDesc); // más reciente primero (fecha DESC, fallback num)
     if(!soaps.length) html+=`<div class="empty-state"><div class="emoji">📝</div><p>Sin notas SOAP.<br>Toca 📝 para agregar la primera sesión.</p></div>`;
     else soaps.forEach(s=>{
       const inc=!s.completa;
