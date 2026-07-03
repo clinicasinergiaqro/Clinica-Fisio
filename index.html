@@ -9558,6 +9558,52 @@ function _RPT_htmlAntecedentes(p){
     +   rowL('Medicamentos', a.medicamentos) + rowL('Alergias', p.alergias) + rowL('Estudios previos', (p.motivo&&p.motivo.estudios), true)
     + '</table></div>';
 }
+// Seguridad clínica — mapeo DIRECTO de campos del expediente (sin IA, solo datos reales).
+// Rojo = contraindicaciones (p.contraindicaciones + planTto). Ámbar = condiciones/implantes/
+// banderas marcadas (seguridadClinica) + alergias. Ver formularios ~7954 y saneo ~1594.
+function _RPT_htmlSeguridad(p){
+  // "Sin dato" — solo marcadores/placeholders exactos; NO filtra por prefijo "no/sin"
+  // para no descartar contraindicaciones reales como "NO TECAR".
+  function _segVacio(s){
+    var t=String(s==null?'':s).trim().toLowerCase();
+    if(!t) return true;
+    return /^(ninguna|ninguno|—|-|n\/?d|n\/?a|revisar seguridad cl|no especificad|\[pendiente\])/.test(t);
+  }
+  // Banderas rojas ← contraindicaciones (dos fuentes), separadas por · , ; o saltos de línea.
+  var rojas=[];
+  [p.contraindicaciones, (p.planTto&&p.planTto.contraindicaciones)].forEach(function(c){
+    if(_segVacio(c)) return;
+    String(c).split(/[·,;\n]+/).forEach(function(x){
+      var t=x.trim();
+      if(t && !_segVacio(t) && rojas.indexOf(t)===-1) rojas.push(t);
+    });
+  });
+  // Precauciones ← condiciones + implantes + banderas marcadas (ya son solo las activas) + alergias.
+  var sc=(p.seguridadClinica&&typeof p.seguridadClinica==='object')?p.seguridadClinica:{};
+  var prec=[];
+  function _addArr(a){ (Array.isArray(a)?a:[]).forEach(function(x){ var t=String(x||'').trim(); if(t && t!=='Ninguna referida' && prec.indexOf(t)===-1) prec.push(t); }); }
+  _addArr(sc.condiciones); _addArr(sc.implantes); _addArr(sc.banderasRojas);
+  if(!_segVacio(p.alergias) && !/negad|ningun/i.test(String(p.alergias))) prec.push('Alergias: '+String(p.alergias).trim());
+  var head=_RPT_secHead(2,'Seguridad clínica');
+  // Sección totalmente vacía → un solo aviso.
+  if(!rojas.length && !prec.length){
+    return head+'<div class="rc-avoid" style="border:0.5px solid #E2E4E0;border-radius:6px;padding:12px 14px;margin-bottom:12px;font-size:11px;color:#9497A2;font-style:italic">Sin datos de seguridad registrados</div>';
+  }
+  function _segGrupo(bg,border,fg,titulo,items,vacioTxt){
+    var cuerpo=items.length
+      ? '<ul style="margin:0;padding-left:16px">'+items.map(function(x){ return '<li style="margin:3px 0;font-size:11px;color:'+fg+'">'+escapeHTML(x)+'</li>'; }).join('')+'</ul>'
+      : '<div style="font-size:11px;color:#9497A2;font-style:italic">'+escapeHTML(vacioTxt)+'</div>';
+    return '<div style="background:'+bg+';border:0.5px solid '+border+';border-radius:6px;padding:9px 11px;-webkit-print-color-adjust:exact;print-color-adjust:exact">'
+      + '<div style="font-size:9px;font-weight:800;letter-spacing:0.6px;text-transform:uppercase;color:'+fg+';margin-bottom:5px">'+titulo+'</div>'
+      + cuerpo+'</div>';
+  }
+  var inner='';
+  // Grupo rojo: se OMITE por completo si no hay contraindicaciones.
+  if(rojas.length){ inner+=_segGrupo('#FCEBEB','#E7B8B8','#A32D2D','🚩 Banderas rojas · Contraindicaciones',rojas,''); inner+='<div style="height:8px"></div>'; }
+  // Grupo ámbar: siempre presente (con fallback) mientras la sección no esté vacía.
+  inner+=_segGrupo('#FBF3E4','#E8D4A8','#8A5A0B','⚠️ Precauciones',prec,'Sin precauciones registradas');
+  return head+'<div class="rc-avoid" style="border:0.5px solid #E2E4E0;border-radius:6px;padding:12px 14px;margin-bottom:12px">'+inner+'</div>';
+}
 // Valoración funcional inicial — campos estructurados del expediente (sin IA).
 function _RPT_htmlValoracion(p, sesiones){
   var v=p.valoracion||{}, mo=p.motivo||{};
@@ -9565,7 +9611,7 @@ function _RPT_htmlValoracion(p, sesiones){
   if(!String(dolorIni).trim()){ for(var i=0;i<sesiones.length;i++){ var e=_RPT_evaDeSesion(sesiones[i]); if(e!=null){ dolorIni=e+'/10'; break; } } }
   var obj=(p.dxFuncional&&typeof p.dxFuncional==='object'&&(p.dxFuncional.objetivosCP||p.dxFuncional.objetivosLP))||(p.planTto&&p.planTto.objetivos)||'';
   function row(k,val,last){ return '<tr'+(last?'':' style="border-bottom:0.5px solid #EEEFEC"')+'><td style="padding:7px 10px;font-weight:700;color:#3A3B38;font-size:10.5px;width:160px;vertical-align:top">'+k+'</td><td style="padding:7px 10px;color:#4A4B48;font-size:11px">'+_RPT_val(val)+'</td></tr>'; }
-  return _RPT_secHead(2,'Valoración funcional inicial')
+  return _RPT_secHead(3,'Valoración funcional inicial')
     + '<table style="width:100%;border-collapse:collapse">'
     + row('Mecanismo de lesión', mo.mecanismo)
     + row('Dolor inicial (EVA)', dolorIni)
@@ -9619,7 +9665,7 @@ function _RPT_htmlEstudios(p){
   return '<div class="rpt-sec"><h3 class="rpt-h">🔬 Estudios</h3>'+items+'</div>';
 }
 function _RPT_htmlSoap(sesiones){
-  if(!sesiones.length) return _RPT_secHead(4,'Síntesis de notas SOAP')+'<div style="color:#9095A5;font-size:11px">Sin sesiones registradas</div>';
+  if(!sesiones.length) return _RPT_secHead(5,'Síntesis de notas SOAP')+'<div style="color:#9095A5;font-size:11px">Sin sesiones registradas</div>';
   var orden=sesiones.slice().sort(function(a,b){ var fa=obtenerFechaSoapISO(a)||'',fb=obtenerFechaSoapISO(b)||''; if(fa!==fb)return fa<fb?1:-1; return (Number(b&&b.num)||0)-(Number(a&&a.num)||0); });
   function pill(eva){
     if(eva==null) return '<span style="color:#9497A2;font-size:9px">—</span>';
@@ -9648,7 +9694,7 @@ function _RPT_htmlSoap(sesiones){
       + '<td style="'+tdB+';color:#4A4B48">'+escapeHTML(resumen)+'</td>'
       + '<td style="'+tdB+';color:#4A4B48">'+escapeHTML(trat)+'</td></tr>';
   }).join('');
-  return _RPT_secHead(4,'Síntesis de notas SOAP ('+orden.length+')')
+  return _RPT_secHead(5,'Síntesis de notas SOAP ('+orden.length+')')
     + '<table style="width:100%;border-collapse:collapse;font-size:10px">'
     + '<thead><tr><th style="'+th+';border-radius:4px 0 0 0;width:110px">Sesión</th><th style="'+th+';width:50px">Dolor</th><th style="'+th+(hayP?'':';border-radius:0 4px 0 0')+'">Hallazgos'+(hayP?' (O/A)':'')+'</th>'+(hayP?('<th style="'+th+';border-radius:0 4px 0 0;width:34%">Tratamiento (P)</th>'):'')+'</tr></thead>'
     + '<tbody>'+rows+'</tbody></table>';
@@ -9659,7 +9705,7 @@ function _RPT_htmlMetricas(p, sesiones){
   var ini=evas.length?evas[0]:null, act=evas.length?evas[evas.length-1]:null;
   var red=(ini!=null&&act!=null&&ini>0)?Math.round((ini-act)/ini*100):null;
   function m(val,lbl){ return '<div style="text-align:center"><div style="font-size:22px;font-weight:700;line-height:1">'+val+'</div><div style="font-size:8px;letter-spacing:0.5px;text-transform:uppercase;color:#A8C8BC;margin-top:4px">'+lbl+'</div></div>'; }
-  return _RPT_secHead(5,'Métricas del tratamiento')
+  return _RPT_secHead(6,'Métricas del tratamiento')
     + '<div class="rc-avoid" style="background:#1F5C4D;color:#fff;border-radius:8px;padding:16px 18px;display:grid;grid-template-columns:repeat(4,1fr);gap:16px;-webkit-print-color-adjust:exact;print-color-adjust:exact">'
     + m((ini!=null?ini+'/10':'—'),'Dolor inicial')
     + m((act!=null?act+'/10':'—'),'Dolor actual')
@@ -9859,8 +9905,9 @@ async function RPT_pintarPestanaReporte(pid){
       + _RPT_htmlCabecera(p, sesiones)
       + _RPT_htmlFranjaPaciente(p, sesiones)
       + _RPT_htmlAntecedentes(p)
+      + _RPT_htmlSeguridad(p)
       + _RPT_htmlValoracion(p, sesiones)
-      + _RPT_secHead(3,'Evolución del dolor')
+      + _RPT_secHead(4,'Evolución del dolor')
       + '<div class="rc-avoid" style="border:0.5px solid #E2E4E0;border-radius:6px;padding:14px"><div id="rpt-grafica-'+escapeAttr_(pid)+'">…</div></div>'
       + _RPT_htmlSoap(sesiones)
       + _RPT_htmlMetricas(p, sesiones)
