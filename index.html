@@ -10046,6 +10046,94 @@ function showEjercicios(){
   renderEjercicios();
 }
 
+// ── Envío de ejercicios por WhatsApp (híbrido, robusto) ────────────────────
+// Normaliza un teléfono MX a wa.me (52 + 10 dígitos). Devuelve {valido, e164}.
+function _normalizarTelWA(tel){
+  var s = String(tel==null?'':tel).replace(/[^\d+]/g,'').replace(/^\+/,''); // solo dígitos, sin +
+  var local = s;
+  if(local.length>10 && local.indexOf('52')===0) local = local.slice(2); // no duplicar 52
+  if(local.length===11 && local.indexOf('1')===0) local = local.slice(1); // 1 de larga distancia MX
+  if(!/^\d{10}$/.test(local)) return {valido:false, e164:null};
+  return {valido:true, e164:'52'+local};
+}
+// Copia best-effort: navigator.clipboard → textarea+execCommand. Devuelve true si copió.
+async function _intentarCopiar(texto){
+  try{ if(navigator.clipboard && navigator.clipboard.writeText){ await navigator.clipboard.writeText(texto); return true; } }catch(e){}
+  try{
+    var ta=document.createElement('textarea'); ta.value=texto;
+    ta.setAttribute('readonly',''); ta.style.cssText='position:fixed;top:-1000px;left:-1000px;opacity:0';
+    document.body.appendChild(ta); ta.focus(); ta.select(); ta.setSelectionRange(0, texto.length);
+    var ok=document.execCommand('copy'); document.body.removeChild(ta);
+    return !!ok;
+  }catch(e){ return false; }
+}
+// Fallback final: modal seleccionable (el copiado NUNCA falla en silencio).
+function _modalCopiarTexto(texto){
+  var ov=document.createElement('div');
+  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:100000;display:flex;align-items:center;justify-content:center;padding:20px';
+  var box=document.createElement('div');
+  box.style.cssText='background:#fff;border-radius:14px;padding:18px;max-width:440px;width:100%';
+  box.innerHTML='<div style="font-size:15px;font-weight:800;color:#1B3A6B;margin-bottom:6px">Copia el mensaje</div>'
+    +'<div style="font-size:12px;color:#64748b;margin-bottom:10px">Toca <b>Copiar</b>, o mantén presionado el texto para seleccionarlo.</div>';
+  var ta=document.createElement('textarea'); ta.readOnly=true; ta.value=texto;
+  ta.style.cssText='width:100%;height:170px;font-size:13px;padding:10px;border:1px solid #E2E4E0;border-radius:8px;font-family:inherit;-webkit-user-select:text;user-select:text';
+  box.appendChild(ta);
+  var row=document.createElement('div'); row.style.cssText='display:flex;gap:8px;justify-content:flex-end;margin-top:12px';
+  var bCopy=document.createElement('button'); bCopy.textContent='📋 Copiar';
+  bCopy.style.cssText='background:#25D366;color:#fff;border:none;border-radius:10px;padding:9px 16px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit';
+  bCopy.onclick=function(){ ta.focus(); ta.select(); ta.setSelectionRange(0,texto.length); try{ if(document.execCommand('copy')) showToast('✅ Copiado','success'); }catch(e){} };
+  var bClose=document.createElement('button'); bClose.textContent='Cerrar';
+  bClose.style.cssText='background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:9px 16px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit';
+  bClose.onclick=function(){ ov.remove(); };
+  row.appendChild(bCopy); row.appendChild(bClose); box.appendChild(row); ov.appendChild(box); document.body.appendChild(ov);
+}
+// PART 1 fix: valida que el token resuelve un doc en el backend ANTES de entregar el link.
+async function _validarLinkEjercicios(token){
+  try{
+    var r=await fetch(APPS_SCRIPT_URL+'?action=getEjerciciosPublicos&ejerciciosToken='+encodeURIComponent(token),{method:'GET'});
+    var d=await r.json();
+    if(d && d.ok) return {ok:true};
+    return {ok:false, code:(d && d.code)||404};
+  }catch(e){ return {ok:false, code:'neterr'}; }
+}
+async function enviarEjerciciosWhatsApp(){
+  var p=currentPatient; if(!p) return;
+  var ejs=Array.isArray(p.ejercicios)?p.ejercicios:[];
+  // PART 3: sin ejercicios → no mandar link vacío
+  if(!ejs.length){ showToast('Sin ejercicios asignados — agrega al menos uno antes de enviar','warning'); return; }
+  if(!p.ejerciciosToken){ p.ejerciciosToken=generateToken(); p.ejerciciosLinkActivo=true; }
+  if(p.ejerciciosLinkActivo===false){ showToast('El link está desactivado. Actívalo primero (🔓).','warning'); return; }
+  showToast('⏳ Preparando link…','');
+  // PART 1: sincroniza token+ejercicios ACTUALES al Sheet y valida que resuelve (link nunca roto ni viejo)
+  try{ await saveDB('pts',[p]); }catch(e){}
+  var v=await _validarLinkEjercicios(p.ejerciciosToken);
+  if(!v.ok && v.code===403){ showToast('El link está desactivado. Actívalo primero.','warning'); return; }
+  if(!v.ok && v.code===404){
+    try{ await saveDB('pts',[p]); }catch(e){}     // reintento: fuerza guardado y revalida
+    v=await _validarLinkEjercicios(p.ejerciciosToken);
+    if(!v.ok && v.code===404){ showToast('⚠️ El link aún no sincroniza con la nube. Espera unos segundos y reintenta (revisa conexión).','warning'); return; }
+  }
+  // (v.code==='neterr' → no bloqueamos por fallo de red del validador; el link ya se guardó)
+  var base=window.location.href.split('?')[0].split('#')[0];
+  var link=base+'?ejercicios='+p.ejerciciosToken;
+  var nombre=(p.name||'').split(' ').slice(0,2).join(' ');
+  var msg='Hola '+nombre+', te compartimos tu programa de ejercicios indicado en Clínica Sinergia. '
+    +'Realízalo según la dosificación de cada ejercicio. Si alguno aumenta dolor, inflamación, mareo o molestia importante, suspéndelo y avísanos. '
+    +'Tu rutina: '+link;
+  var copiado=await _intentarCopiar(msg);
+  var tel=_normalizarTelWA(p.telefono);
+  if(tel.valido){
+    var waUrl='https://wa.me/'+tel.e164+'?text='+encodeURIComponent(msg);
+    var w=window.open(waUrl,'_blank'); if(!w){ location.href=waUrl; } // iOS PWA: window.open post-await suele bloquearse
+    showToast(copiado?'✅ Copiado + WhatsApp abierto':'✅ WhatsApp abierto con el mensaje','success');
+  } else {
+    // Sin teléfono válido: la copia ES la entrega → garantizar con modal si falló
+    if(!copiado){ _modalCopiarTexto(msg); }
+    if(!String(p.telefono||'').trim()) showToast('✅ Copiado (sin teléfono, pégalo tú en WhatsApp)','success');
+    else showToast('✅ Copiado (teléfono inválido, revísalo)','warning');
+  }
+}
+
 function renderEjercicios(){
   const p = currentPatient;
   const ejs = p.ejercicios || [];
@@ -10069,8 +10157,8 @@ function renderEjercicios(){
     <div style="padding:12px 14px">
       <div class="link-url">${linkUrl}</div>
       <div class="link-btns">
-        <button class="btn-copy" onclick="copyLink('${linkUrl}')">📋 Copiar</button>
-        <button class="btn-wa" onclick="sendWhatsApp('${linkUrl}','${p.name}')">WhatsApp</button>
+        <button class="btn-copy" onclick="copyLink('${linkUrl}')">📋 Copiar link</button>
+        <button class="btn-wa" onclick="enviarEjerciciosWhatsApp()"${!ejs.length?' disabled title="Sin ejercicios asignados" style="opacity:.45;cursor:not-allowed"':''}>📲 Enviar por WhatsApp</button>
         <button class="btn-copy" onclick="verComoPaciente()" style="background:#E8F5E9;color:var(--green);border:1px solid var(--green)">👀 Ver como paciente</button>
         <button class="btn-toggle-link" onclick="toggleLink()">${activo?'🔒 Desactivar':'🔓 Activar'}</button>
       </div>
