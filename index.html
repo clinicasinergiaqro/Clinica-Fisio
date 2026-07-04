@@ -154,7 +154,11 @@ async function FST_fetchSesiones(pid){
         p: (typeof d.p === 'object' && d.p) ? d.p : { tratamiento:'', indicaciones:'', contraindicaciones:'' },
         textoOriginal: d.textoOriginal || '', formatoOriginal: d.formatoOriginal || 'texto_libre',
         revisionPendiente: !!d.revisionPendiente, motivosRevision: Array.isArray(d.motivosRevision) ? d.motivosRevision : [],
-        imagenesPendientes: !!d.imagenesPendientes, completa: false, importado: true, _origen: 'firestore_historico'
+        imagenesPendientes: !!d.imagenesPendientes,
+        evaI: d.evaI != null ? Number(d.evaI) : null, evaF: d.evaF != null ? Number(d.evaF) : null,
+        modalidades: Array.isArray(d.modalidades) ? d.modalidades : [], modoNota: d.modoNota || '',
+        historialEdiciones: Array.isArray(d.historialEdiciones) ? d.historialEdiciones : [],
+        completa: false, importado: true, _origen: 'firestore_historico'
       };
     });
   } catch (e) { console.error('[FST] fetchSesiones ERROR:', e.message); return []; }
@@ -169,12 +173,21 @@ function FST_badgesSesion(s){
   return b.join(' ');
 }
 
-function FST_renderCard(s){
+function FST_renderCard(s, pid){
   const fecha = escapeHTML(s.fecha || '(sin fecha)');
   const terapeuta = escapeHTML(s.terapeuta || 'REVISAR');
   const semana = Number.isFinite(s.semana) ? s.semana : 1;
   const texto = linkify_(s.textoOriginal || '');  // LOOP H: links clicables (ya escapa HTML internamente)
   const isTextoLibre = s.formatoOriginal === 'texto_libre' || !(s.s && s.s.dolor);
+  var ultimaEdicion = Array.isArray(s.historialEdiciones) && s.historialEdiciones.length
+    ? s.historialEdiciones[s.historialEdiciones.length-1] : null;
+  var bannerEdicion = ultimaEdicion
+    ? '<div style="font-size:10px;color:var(--gray-400);padding:2px 14px 4px">Última edición: '+escapeHTML(ultimaEdicion.fecha||'')+' '+escapeHTML(ultimaEdicion.hora||'')+' por '+escapeHTML(ultimaEdicion.usuario||'?')+'</div>'
+    : '';
+  var botonesEdicion = '<div style="display:flex;gap:6px;padding:4px 14px 8px;flex-wrap:wrap">'
+    + '<button type="button" data-sid="'+escapeAttr_(s.id||'')+'" data-pid="'+escapeAttr_(pid||'')+'" onclick="editarSoapHistorico(this.dataset.sid,this.dataset.pid)" style="font-size:12px;font-weight:700;padding:6px 12px;border-radius:12px;border:1.5px solid var(--navy);background:white;color:var(--navy);cursor:pointer">✏️ Editar</button>'
+    + '<button type="button" data-sid="'+escapeAttr_(s.id||'')+'" onclick="verHistorialEdicionesSOAP(this.dataset.sid,true)" style="font-size:12px;font-weight:600;padding:6px 12px;border-radius:12px;border:1.5px solid var(--gray-200);background:white;color:var(--gray-600);cursor:pointer">🕘 Historial</button>'
+    + '</div>';
   // LOOP J-2: en notas estructuradas el link vive en textoOriginal y no se pintaba. Bloque aditivo solo si hay URLs.
   var linksNota = (typeof _FST_extraerLinksDeTexto==='function' && s.textoOriginal) ? _FST_extraerLinksDeTexto(s.textoOriginal, s.fecha) : [];
   var bloqueLinks = linksNota.length
@@ -195,7 +208,9 @@ function FST_renderCard(s){
           + '<div class="soap-section"><div class="soap-label"><span class="soap-a">A</span></div><div class="soap-text">' + escapeHTML((s.a&&s.a.evolucion)||'') + ' ' + escapeHTML((s.a&&s.a.analisis)||'') + '</div></div>'
           + '<div class="soap-section"><div class="soap-label"><span class="soap-p">P</span></div><div class="soap-text">' + escapeHTML((s.p&&s.p.tratamiento)||'') + ' ' + escapeHTML((s.p&&s.p.indicaciones)||'') + '</div></div>'
           + bloqueLinks)
-    + '</div></div>';
+    + '</div>'
+    + bannerEdicion + botonesEdicion
+    + '</div>';
 }
 
 // LOOP D.5 + mini-loop clasificar: galería de imágenes históricas. Solo lectura de fotosHistoricas.
@@ -242,6 +257,7 @@ async function FST_renderHistorialSoap(pid){
     const ok = await FST_init();
     if (!ok) { box.innerHTML = '<div style="padding:10px 14px;font-size:12px;color:var(--red)">⚠ No se pudo autenticar con Firestore staging.</div>'; return; }
     const sesiones = await FST_fetchSesiones(pid);
+    _fstSesionesCache[pid] = sesiones;
     if (!sesiones.length) {
       const galeriaSola = await FST_renderGaleriaHistorica(pid);
       box.innerHTML = galeriaSola + '<div style="padding:10px 14px;font-size:12px;color:var(--gray-400)">Sin historial Firestore para este paciente.</div>';
@@ -251,7 +267,7 @@ async function FST_renderHistorialSoap(pid){
     if (dups.length) console.error('[FST] IDs duplicados:', dups.map(function(s){ return s.id; }));
     // Presentación: más reciente primero (fecha DESC). Copia — no muta `sesiones`,
     // que se usa abajo para "primera sesión registrada" y el conteo.
-    const cards = [...sesiones].sort(_cmpSoapFechaDesc).map(FST_renderCard).join('');
+    const cards = [...sesiones].sort(_cmpSoapFechaDesc).map(s => FST_renderCard(s, pid)).join('');
     const galeria = await FST_renderGaleriaHistorica(pid);
     // LOOP: inyectar "Primera sesión registrada" en placeholder de Datos generales
     var _fstPrimeraSesEl = document.getElementById('fst-primera-sesion');
@@ -904,6 +920,10 @@ let tempAtendio=[];
 // Loop A — Snippet C0: stash estructurado de modalidades detectadas por la IA (para usarSoapIA)
 window._soapIAStash = { modalidades: [], updatedAt: null, source: '' };
 let editingSoapId=null; // null = nueva nota; string = editando nota existente
+let editingSoapPid=null; // pid del paciente cuya nota histórica se edita
+let editingSoapEsHistorico=false; // true si la nota viene del historial Firestore (importado:true)
+let _editingSoapHistoricoNota=null; // snapshot completo de la nota histórica mientras se edita
+let _fstSesionesCache={}; // cache pid→[sesiones] para evitar re-fetch al ver historial
 let _guardandoSOAP = false; // H-02: anti-doble-toque en guardarSOAP
 let modoRapidoIA=true; // true = modo rápido (default); false = modo completo
 let sigCanvas=null, sigCtx=null, sigDrawing=false;
@@ -5023,7 +5043,7 @@ function showNuevoSOAP(){
   if(!currentPatient) return;
   // reset dictado 2.2
   _dictado.activo=false; _dictado.textoFinal=''; _dictado.textoInterino=''; _dictado.palabras=0; _dictadoSoapPreview=null; _dictadoMetadata=null; _dictadoManual=false;
-  tempMods=[]; tempEvaI=5; tempEvaF=3; tempEvolMedia=[]; editingSoapId=null; modoNotaActual=''; _dictadoBanderas=[]; _dictadoActivo=false; _dictadoTransPrecargada=false; _soapV2Resultado=null; limpiarDirty();
+  tempMods=[]; tempEvaI=5; tempEvaF=3; tempEvolMedia=[]; editingSoapId=null; editingSoapPid=null; editingSoapEsHistorico=false; _editingSoapHistoricoNota=null; modoNotaActual=''; _dictadoBanderas=[]; _dictadoActivo=false; _dictadoTransPrecargada=false; _soapV2Resultado=null; limpiarDirty();
   tempEvolucionChips=[];
   const sesNum=currentPatient.sesiones+1;
   const totalSes=parseInt(currentPatient.planTto?.sesiones);
@@ -5122,6 +5142,25 @@ function renderSOAPForm(){
       </div>
     </div>
   </div>
+
+  ${editingSoapId ? `
+  <!-- Edición: terapeuta y texto libre (solo visibles al editar) -->
+  <div class="form-section" id="soap-edit-identificacion">
+    <div class="form-section-title">✏️ Datos de la nota (Edición)</div>
+    <div class="form-group">
+      <div class="form-field">
+        <div class="form-label">Terapeuta</div>
+        <select class="form-input" id="f-soap-terapeuta" style="max-width:200px">
+          ${_listaTerapeutasAtienden().map(t=>`<option value="${t}">${t}</option>`).join('')}
+        </select>
+      </div>
+      ${editingSoapEsHistorico && _editingSoapHistoricoNota?.formatoOriginal==='texto_libre' ? `
+      <div class="form-field">
+        <div class="form-label">Texto original de la nota <span style="font-size:11px;color:var(--gray-400)">(importada)</span></div>
+        <textarea class="form-input" id="f-soap-textoriginal" style="min-height:100px">${escapeHTML(_editingSoapHistoricoNota.textoOriginal||'')}</textarea>
+      </div>` : ''}
+    </div>
+  </div>` : ''}
 
   <!-- EVA -->
   <div class="form-section">
@@ -5429,6 +5468,7 @@ function toggleMod(m){
 // H-02: liberar guard anti-doble-toque de guardarSOAP
 function _liberarGuardSOAP(){
   _guardandoSOAP = false;
+  editingSoapId=null; editingSoapPid=null; editingSoapEsHistorico=false; _editingSoapHistoricoNota=null;
   const btn = document.querySelector('[onclick="guardarSOAP()"]');
   if(btn){ btn.disabled = false; btn.style.opacity = ''; }
 }
@@ -5440,7 +5480,9 @@ async function guardarSOAP(){
   if(_btnGuardarSOAP){ _btnGuardarSOAP.disabled = true; _btnGuardarSOAP.style.opacity = '0.6'; }
   detenerCualquierDictadoSOAP(); // B1: nunca dejar micrófono activo al guardar
   const v=(id)=>document.getElementById(id)?.value.trim()||'';
+  const _esTextoLibreHist=editingSoapEsHistorico&&_editingSoapHistoricoNota?.formatoOriginal==='texto_libre';
   const missing=[];
+  if(!_esTextoLibreHist){
   if(!v('f-sdolor')) missing.push('Dolor (S)');
   if(!v('f-scambios')) missing.push('Cambios (S)');
   if(!v('f-ohallazgos')) missing.push('Hallazgos (O)');
@@ -5450,6 +5492,7 @@ async function guardarSOAP(){
   if(!v('f-ptratamiento')) missing.push('Tratamiento (P)');
   if(!v('f-pindicaciones')) missing.push('Indicaciones (P)');
   if(tempMods.length===0) missing.push('Modalidades');
+  }
   if(missing.length){showToast(`Faltan: ${missing.slice(0,2).join(', ')}${missing.length>2?'...':''}`, 'error');_liberarGuardSOAP();return;}
 
   // Aviso suave si EVA final sigue en default
@@ -5531,9 +5574,69 @@ async function guardarSOAP(){
 
   if(editingSoapId){
     // ── MODO EDICIÓN — actualizar nota existente ───────────────────────────
+    // ── SOAP-E1: rama histórico (importado:true, nota desde Firestore) ─────
+    if(editingSoapEsHistorico){
+      const notaH=_editingSoapHistoricoNota;
+      const sidH=editingSoapId, pidH=editingSoapPid;
+      const terapeutaH=v('f-soap-terapeuta')||notaH.terapeuta||'';
+      const fechaH=fechaConsultaFmt;
+      const snH={
+        fecha:todayFmt(),
+        hora:new Date().toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'}),
+        usuario:ter, accion:'Edición de nota SOAP (histórico)',
+        snapshotAnterior:JSON.parse(JSON.stringify(notaH)),
+        cambios:[]
+      };
+      const compararH=(campo,ant,nvo)=>{const a=String(ant||''),n=String(nvo||'');if(a!==n)snH.cambios.push({campo,anterior:a,nuevo:n});};
+      compararH('s.dolor',notaH.s?.dolor,datosNota.s.dolor);
+      compararH('s.cambios',notaH.s?.cambios,datosNota.s.cambios);
+      compararH('s.actFisica',notaH.s?.actFisica,datosNota.s.actFisica);
+      compararH('o.rom',notaH.o?.rom,datosNota.o.rom);
+      compararH('o.fuerza',notaH.o?.fuerza,datosNota.o.fuerza);
+      compararH('o.hallazgos',notaH.o?.hallazgos,datosNota.o.hallazgos);
+      compararH('a.evolucion',notaH.a?.evolucion,datosNota.a.evolucion);
+      compararH('a.respuesta',notaH.a?.respuesta,datosNota.a.respuesta);
+      compararH('a.analisis',notaH.a?.analisis,datosNota.a.analisis);
+      compararH('p.tratamiento',notaH.p?.tratamiento,datosNota.p.tratamiento);
+      compararH('p.indicaciones',notaH.p?.indicaciones,datosNota.p.indicaciones);
+      compararH('p.contraindicaciones',notaH.p?.contraindicaciones,datosNota.p.contraindicaciones);
+      compararH('evaI',notaH.evaI,datosNota.evaI);
+      compararH('evaF',notaH.evaF,datosNota.evaF);
+      compararH('modalidades',(notaH.modalidades||[]).join(','),(datosNota.modalidades||[]).join(','));
+      compararH('fecha',notaH.fecha,fechaH);
+      compararH('terapeuta',notaH.terapeuta,terapeutaH);
+      if(_esTextoLibreHist) compararH('textoOriginal',notaH.textoOriginal,v('f-soap-textoriginal'));
+      const histH=Array.isArray(notaH.historialEdiciones)?[...notaH.historialEdiciones]:[];
+      if(snH.cambios.length>0) histH.push(snH);
+      const payloadH={
+        s:datosNota.s, o:datosNota.o, a:datosNota.a, p:datosNota.p,
+        evaI:datosNota.evaI, evaF:datosNota.evaF,
+        modalidades:datosNota.modalidades||[], completa:true,
+        modoNota:datosNota.modoNota||notaH.modoNota||'',
+        fecha:fechaH, terapeuta:terapeutaH,
+        revisionPendiente:false,
+        textoOriginal:_esTextoLibreHist?v('f-soap-textoriginal'):(notaH.textoOriginal||''),
+        historialEdiciones:histH,
+        updatedAt:new Date().toISOString()
+      };
+      const cacheList=_fstSesionesCache[pidH];
+      if(Array.isArray(cacheList)){
+        const ci=cacheList.findIndex(s=>s.id===sidH);
+        if(ci>=0) _fstSesionesCache[pidH][ci]={...notaH,...payloadH,id:sidH,historialEdiciones:histH};
+      }
+      editingSoapId=null; editingSoapPid=null; editingSoapEsHistorico=false; _editingSoapHistoricoNota=null;
+      tempEvolMedia=[];
+      goBack();
+      setTimeout(()=>renderExpediente('soap'),300);
+      _guardarEdicionSoapHistorico(sidH,pidH,payloadH).catch(err=>showToast('⚠️ Error al guardar en Firestore: '+err.message,'error'));
+      _liberarGuardSOAP();
+      return;
+    }
+    // ── fin rama histórico — continúa ruta activos ─────────────────────────
     const idx=p.soap.findIndex(s=>s.id===editingSoapId);
     if(idx<0){showToast('Error: nota no encontrada','error');_liberarGuardSOAP();return;}
     const notaAnterior=p.soap[idx];
+    const terapeutaFmt = v('f-soap-terapeuta') || notaAnterior.terapeuta || '';
 
     // Guardar snapshot antes de modificar
     const snapshot={
@@ -5541,6 +5644,7 @@ async function guardarSOAP(){
       hora: new Date().toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'}),
       usuario: ter,
       accion: 'Edición de nota SOAP',
+      snapshotAnterior: JSON.parse(JSON.stringify(notaAnterior)),
       cambios: []
     };
     // Comparar todos los campos relevantes
@@ -5563,6 +5667,8 @@ async function guardarSOAP(){
     comparar('evaI',                notaAnterior.evaI,                 datosNota.evaI);
     comparar('evaF',                notaAnterior.evaF,                 datosNota.evaF);
     comparar('modalidades',         (notaAnterior.modalidades||[]).join(','), datosNota.modalidades.join(','));
+    comparar('fecha',               notaAnterior.fecha, fechaConsultaFmt);
+    comparar('terapeuta',           notaAnterior.terapeuta, terapeutaFmt);
 
     // Inicializar historial si no existe
     if(!Array.isArray(notaAnterior.historialEdiciones)) notaAnterior.historialEdiciones=[];
@@ -5573,6 +5679,7 @@ async function guardarSOAP(){
     // LOOP4: preservar modoNota original si no se seleccionó uno nuevo al editar
     if(!datosNota.modoNota && notaAnterior.modoNota) datosNota.modoNota = notaAnterior.modoNota;
     if((!Array.isArray(datosNota.atendidoPor)||!datosNota.atendidoPor.length) && Array.isArray(notaAnterior.atendidoPor)) datosNota.atendidoPor = notaAnterior.atendidoPor;
+    if(terapeutaFmt) datosNota.terapeuta = terapeutaFmt;
     p.soap[idx]={...notaAnterior, ...datosNota, historialEdiciones:notaAnterior.historialEdiciones};
     p.soap[idx].fecha = fechaConsultaFmt; // FECHA EDITABLE: usar la fecha del campo (puede corregirse al editar)
     // MIGRACIÓN: al estructurar una nota importada, queda revisada y completa
@@ -5638,8 +5745,16 @@ async function guardarSOAP(){
 // SOAP MEDIA
 function readFile(f){return new Promise((res,rej)=>{const r=new FileReader();r.onload=e=>res(e.target.result);r.onerror=rej;r.readAsDataURL(f)})}
 
-function verHistorialEdicionesSOAP(soapId){
-  const nota=currentPatient?.soap?.find(s=>s.id===soapId);
+function verHistorialEdicionesSOAP(soapId, esHistorico){
+  var nota;
+  if(esHistorico){
+    for(var _pid in _fstSesionesCache){
+      nota=_fstSesionesCache[_pid].find(function(s){return s.id===soapId;});
+      if(nota) break;
+    }
+  } else {
+    nota=currentPatient?.soap?.find(s=>s.id===soapId);
+  }
   if(!nota?.historialEdiciones?.length){
     showToast('Sin historial de ediciones','');
     return;
@@ -5657,6 +5772,7 @@ function editarSOAP(soapId){
   if(!nota){showToast('Nota no encontrada','error');return;}
 
   editingSoapId=soapId;
+  editingSoapPid=p.id||''; editingSoapEsHistorico=false; _editingSoapHistoricoNota=null;
   // Cargar datos en variables globales
   tempMods=Array.isArray(nota.modalidades)?[...nota.modalidades]:[];
   tempEvaI=nota.evaI??5;
@@ -5721,11 +5837,82 @@ function editarSOAP(soapId){
       const chk=tempMods.includes(mod);
       return `<div class="checkbox-item ${chk?'checked':''}" onclick="toggleMod('${mod}')"><div class="cb-box">${chk?'✓':''}</div><div class="cb-label">${mod}</div></div>`;
     }).join('');
+    // Pre-seleccionar terapeuta en el selector de edición
+    const stEl=document.getElementById('f-soap-terapeuta');
+    if(stEl && nota.terapeuta) stEl.value=nota.terapeuta;
     // Cambiar título del botón guardar
     const btnGuardar=document.querySelector('[onclick="guardarSOAP()"]');
     if(btnGuardar) btnGuardar.textContent='💾 Guardar cambios';
     limpiarDirty(); // recién precargado: aún no hay cambios del usuario
   },150);
+}
+
+// ── SOAP-E1: edición de sesiones históricas (importado:true, origen Firestore) ──
+
+async function editarSoapHistorico(sid, pid){
+  if(!sid || !pid){ showToast('Error: sesión o paciente no identificados','error'); return; }
+  let nota=null;
+  if(_fstSesionesCache[pid]) nota=_fstSesionesCache[pid].find(function(s){return s.id===sid;});
+  if(!nota){ showToast('Nota no encontrada en caché. Recarga el historial.','error'); return; }
+  editingSoapId=sid;
+  editingSoapPid=pid;
+  editingSoapEsHistorico=true;
+  _editingSoapHistoricoNota=nota;
+  tempMods=Array.isArray(nota.modalidades)?[...nota.modalidades]:[];
+  tempEvaI=nota.evaI!=null?Number(nota.evaI):5;
+  tempEvaF=nota.evaF!=null?Number(nota.evaF):3;
+  tempEvolMedia=[];
+  document.getElementById('soap-topbar-meta').textContent='✏️ Editando (histórico) — Sesión '+nota.num;
+  screenStack.push('screen-soap'); showScreen('screen-soap',false);
+  renderSOAPForm();
+  setTimeout(function(){
+    const set=function(id,val){var el=document.getElementById(id);if(el)el.value=val||'';};
+    set('f-sdolor',      nota.s?.dolor);
+    set('f-scambios',    nota.s?.cambios);
+    set('f-sactfisica',  nota.s?.actFisica);
+    set('f-orom',        nota.o?.rom);
+    set('f-ofuerza',     nota.o?.fuerza);
+    set('f-ohallazgos',  nota.o?.hallazgos);
+    set('f-aevolucion',  nota.a?.evolucion);
+    set('f-arespuesta',  nota.a?.respuesta);
+    set('f-aanalisis',   nota.a?.analisis);
+    set('f-ptratamiento',nota.p?.tratamiento);
+    set('f-pindicaciones',nota.p?.indicaciones);
+    set('f-pcontra',     nota.p?.contraindicaciones);
+    // Fecha: convertir DD/MM/YYYY → YYYY-MM-DD para el input type=date
+    var fcEl=document.getElementById('f-fecha-consulta');
+    if(fcEl && nota.fecha){ var fi=_normalizarFechaParaInput(nota.fecha); if(fi) fcEl.value=fi; }
+    // Terapeuta
+    var stEl=document.getElementById('f-soap-terapeuta');
+    if(stEl && nota.terapeuta) stEl.value=nota.terapeuta;
+    // Modo de nota
+    if(nota.modoNota) seleccionarModoNota(nota.modoNota);
+    // EVA sliders
+    var slI=document.getElementById('sl-i'),valI=document.getElementById('vi');
+    if(slI) slI.value=tempEvaI;
+    if(valI){valI.textContent=tempEvaI;valI.className='eva-val '+getEvaClass(tempEvaI);}
+    var slF=document.getElementById('sl-f'),valF=document.getElementById('vf');
+    if(slF) slF.value=tempEvaF;
+    if(valF){valF.textContent=tempEvaF;valF.className='eva-val '+getEvaClass(tempEvaF);}
+    // Grid modalidades
+    var g=document.getElementById('mod-grid');
+    if(g) g.innerHTML=MODALIDADES.map(function(mod){var chk=tempMods.includes(mod);return '<div class="checkbox-item '+(chk?'checked':'')+'" onclick="toggleMod(\''+mod+'\')"><div class="cb-box">'+(chk?'✓':'')+'</div><div class="cb-label">'+mod+'</div></div>';}).join('');
+    // Cambiar título del botón guardar
+    var btnGuardar=document.querySelector('[onclick="guardarSOAP()"]');
+    if(btnGuardar) btnGuardar.textContent='💾 Guardar cambios (histórico)';
+    limpiarDirty();
+  },150);
+}
+
+async function _guardarEdicionSoapHistorico(sid, pid, sesion){
+  if(!window._fstDb) throw new Error('Firestore no inicializado');
+  const payload=Object.assign({},sesion);
+  // Campos de identidad/origen — NO enviar; el servidor los conserva intactos
+  delete payload._origen; delete payload.importado;
+  delete payload.createdAt; delete payload.creadoPor;
+  delete payload.id; delete payload.num; delete payload.fechaHoraISO;
+  await window._fstDb.collection('pacientes').doc(pid).collection('sesiones').doc(sid).update(payload);
+  showToast('✅ Nota histórica actualizada en Firestore','success');
 }
 
 // ── ASISTENTE IA PARA NOTAS SOAP ──────────────────────────────────────────
