@@ -10167,6 +10167,18 @@ async function enviarEjerciciosWhatsApp(){
   }
 }
 
+// Botón "Enviar por WhatsApp": abre WhatsApp con el mensaje prellenado dirigido al
+// número FIJO de la clínica. url = el mismo linkUrl mostrado en pantalla.
+function enviarEjerciciosWhatsAppClinica(url){
+  var p = currentPatient;
+  var nombre = (p && p.name) ? p.name : '';
+  var msg = 'Hola '+nombre+', te compartimos tu programa de ejercicios indicado en Clínica Sinergia.\n'
+    +'Realízalo según la dosificación de cada ejercicio. Si alguno aumenta dolor, inflamación, mareo o molestia importante, suspéndelo y avísanos.\n'
+    +'Tu rutina: '+url;
+  var wa = 'https://wa.me/524424795588?text='+encodeURIComponent(msg);
+  window.open(wa, '_blank'); // URL externa de WhatsApp — window.open es correcto aquí
+}
+
 function renderEjercicios(){
   const p = currentPatient;
   const ejs = p.ejercicios || [];
@@ -10191,7 +10203,7 @@ function renderEjercicios(){
       <div class="link-url">${linkUrl}</div>
       <div class="link-btns">
         <button class="btn-copy" onclick="copyLink('${linkUrl}')">📋 Copiar link</button>
-        <button class="btn-wa" onclick="enviarEjerciciosWhatsApp()"${!ejs.length?' disabled title="Sin ejercicios asignados" style="opacity:.45;cursor:not-allowed"':''}>📲 Enviar por WhatsApp</button>
+        <button class="btn-wa" onclick="enviarEjerciciosWhatsAppClinica('${linkUrl}')"${(!activo||!ejs.length)?' disabled title="Link desactivado o sin ejercicios" style="opacity:.45;cursor:not-allowed"':''}>📲 Enviar por WhatsApp</button>
         <button class="btn-copy" onclick="verComoPaciente()" style="background:#E8F5E9;color:var(--green);border:1px solid var(--green)">👀 Ver como paciente</button>
         <button class="btn-toggle-link" onclick="toggleLink()">${activo?'🔒 Desactivar':'🔓 Activar'}</button>
       </div>
