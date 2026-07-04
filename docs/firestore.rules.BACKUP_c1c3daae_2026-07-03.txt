@@ -1,0 +1,83 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function userEmail() { return request.auth.token.email; }
+    function isWriter() {
+      return signedIn()
+        && userEmail() != null
+        && userEmail() in [
+          'lftaranda@gmail.com',
+          'gutierrezgarciazaray96@gmail.com',
+          'camislerma26@gmail.com',
+          'agoretti.mr@gmail.com',
+          'dafnend26@gmail.com',
+          'jriveare2000@hotmail.com'
+        ];
+    }
+    function pacienteLiveCreateOK() {
+      return request.resource.data.keys().hasOnly([
+        'id','appSourceId','name','nombreNormalizado','dxLive',
+        'terapeutaActualLive','ultimaSesionLive','tieneAppLive',
+        'origenLive','pidMatchType','updatedAt'
+      ])
+      && (request.resource.data.tieneAppLive == true
+        || request.resource.data.origenLive == 'app_live');
+    }
+    function pacienteLiveUpdateOK() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+        'id','appSourceId','name','nombreNormalizado','dxLive',
+        'terapeutaActualLive','ultimaSesionLive','tieneAppLive',
+        'origenLive','pidMatchType','updatedAt'
+      ])
+      && (request.resource.data.tieneAppLive == true
+        || request.resource.data.origenLive == 'app_live');
+    }
+    function pacienteClinicoUpdateOK() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+        'estudiosDocs','name','nombreNormalizado','age','telefono','terapeuta','updatedAt'
+      ]);
+    }
+    function sesionLiveCreateOK() {
+      return request.resource.data.keys().hasOnly([
+        'id','num','fecha','fechaHoraISO','semana','terapeuta',
+        's','o','a','p','evaI','evaF','modalidades','completa','modoNota',
+        'textoOriginal','importado','formatoOriginal','revisionPendiente',
+        'origen','creadoPor','actualizadoPor','updatedAt','createdAt'
+      ])
+      && request.resource.data.origen == 'app_live'
+      && request.resource.data.formatoOriginal == 'soap'
+      && request.resource.data.importado == false;
+    }
+    function sesionLiveUpdateOK() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+        'id','num','fecha','fechaHoraISO','semana','terapeuta',
+        's','o','a','p','evaI','evaF','modalidades','completa','modoNota',
+        'textoOriginal','importado','formatoOriginal','revisionPendiente',
+        'origen','creadoPor','actualizadoPor','updatedAt','createdAt'
+      ])
+      && request.resource.data.origen == 'app_live'
+      && request.resource.data.formatoOriginal == 'soap'
+      && request.resource.data.importado == false;
+    }
+    match /pacientes/{pid} {
+      allow read: if signedIn();
+      allow create: if isWriter() && pacienteLiveCreateOK();
+      allow update: if isWriter() && (pacienteLiveUpdateOK() || pacienteClinicoUpdateOK());
+      allow delete: if false;
+      match /sesiones/{sid} {
+        allow read: if signedIn();
+        allow create: if isWriter() && sesionLiveCreateOK();
+        allow update: if isWriter() && sesionLiveUpdateOK();
+        allow delete: if false;
+      }
+    }
+    match /revision/{rid} {
+      allow read: if signedIn();
+      allow create, update, delete: if false;
+    }
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
