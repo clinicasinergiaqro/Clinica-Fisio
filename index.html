@@ -3368,6 +3368,79 @@ function actualizarFechasClinicas(paciente){
   }
 }
 
+function _renderSoapCard(s,p,readOnly){
+  var inc=!s.completa;
+  var _hasEp=(typeof s.motivoIndex==='number'&&s.motivoIndex>=0&&Array.isArray(p.motivosAnteriores)&&p.motivosAnteriores.length>0);
+  var sesionLine=_hasEp
+    ?`Sesión ${s.numEpisodio} · Episodio ${s.motivoIndex+1}`
+    :`Sesión ${s.num}${(s.totalSesiones&&!isNaN(s.totalSesiones))?' de '+s.totalSesiones:''}`;
+  var expedienteLine=_hasEp?`<div style="font-size:10px;color:var(--gray-400);margin-top:1px">Sesión ${s.num} del expediente</div>`:'';
+  var bodyHTML=(s.importado&&s.formatoOriginal==='texto_libre')
+    ? `<div class="soap-section">
+        <div class="soap-label"><span class="soap-s">📝 Nota importada — texto original</span>
+          ${s.revisionPendiente?'<span class="badge badge-alert" style="font-size:10px;margin-left:6px">⚠ Revisión pendiente</span>':'<span style="font-size:10px;color:var(--green);font-weight:700;margin-left:6px">✅ Revisada</span>'}
+        </div>
+        <div class="soap-text" style="white-space:pre-wrap">${escapeHTML(s.textoOriginal||'(sin texto)')}</div>
+        ${s.sugerenciaIA&&s.sugerenciaIA.soapSugerido?`<div style="margin-top:8px;padding:8px 10px;background:#E8F0FE;border-radius:8px"><div style="font-size:11px;font-weight:700;color:var(--navy)">🤖 Sugerencia IA (sin aprobar)</div><div style="font-size:12px;color:#1B3A6B;white-space:pre-wrap;margin-top:4px">${escapeHTML(JSON.stringify(s.sugerenciaIA.soapSugerido,null,1))}</div></div>`:''}
+        ${!readOnly?`<div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap">
+          <button data-sid="${escapeAttr_(s.id)}" onclick="aprobarComoSOAP_(this.dataset.sid)" style="background:var(--navy);color:white;border:none;border-radius:18px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">✏️ Estructurar a SOAP</button>
+          <button data-sid="${escapeAttr_(s.id)}" onclick="mantenerComoTexto_(this.dataset.sid)" style="background:var(--gray-100);color:var(--gray-600);border:none;border-radius:18px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">📄 Mantener como texto · marcar revisada</button>
+        </div>`:''}
+      </div>`
+    : `<div class="soap-section">
+        <div class="soap-label"><span class="soap-s">S — Subjetivo</span></div>
+        <div class="soap-sub">Dolor:</div><div class="soap-text">${s.s.dolor}</div>
+        <div class="soap-sub">Cambios desde última sesión:</div><div class="soap-text">${s.s.cambios}</div>
+        <div class="soap-sub">Actividad física:</div><div class="soap-text">${s.s.actFisica}</div>
+      </div>
+      <div class="soap-section">
+        <div class="soap-label"><span class="soap-o">O — Objetivo</span></div>
+        <div class="soap-sub">ROM:</div><div class="soap-text">${s.o.rom}</div>
+        <div class="soap-sub">Fuerza:</div><div class="soap-text">${s.o.fuerza}</div>
+        <div class="soap-sub">Hallazgos:</div><div class="soap-text">${s.o.hallazgos}</div>
+      </div>
+      <div class="soap-section">
+        <div class="soap-label"><span class="soap-a">A — Análisis</span></div>
+        <div class="soap-sub">Evolución:</div><div class="soap-text">${s.a.evolucion}</div>
+        <div class="soap-sub">Respuesta al tratamiento:</div><div class="soap-text">${s.a.respuesta}</div>
+        <div class="soap-sub">Análisis clínico:</div><div class="soap-text">${s.a.analisis}</div>
+      </div>
+      <div class="soap-section">
+        <div class="soap-label"><span class="soap-p">P — Plan</span></div>
+        <div class="soap-sub">Tratamiento aplicado:</div><div class="soap-text">${s.p.tratamiento}</div>
+        <div class="soap-sub">Indicaciones para casa:</div><div class="soap-text">${s.p.indicaciones}</div>
+        <div class="soap-sub">Contraindicaciones vigentes:</div><div class="soap-text" style="color:var(--red);font-weight:600;">${s.p.contraindicaciones}</div>
+      </div>`;
+  var mediaHTML=(s.media&&s.media.length)?`<div style="margin-top:10px;">
+    <div style="font-size:11px;font-weight:700;color:var(--navy);margin-bottom:6px;">📷 Fotos (${s.media.length})</div>
+    <div class="media-grid">${s.media.map((m,mi)=>`<div class="media-thumb" data-pid="${escapeAttr_(p.id)}" data-sid="${escapeAttr_(s.id)}" onclick="previewSoapMedia(this.dataset.pid,this.dataset.sid,${mi})">
+      ${m.type&&m.type.startsWith('image')?`<img src="${m.url||m.data}" loading="lazy" decoding="async" alt="" onerror="this.style.opacity=.3">`:
+        m.name&&m.name.endsWith('.pdf')?`<div style="width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:22px">📄<div style="font-size:8px;color:#5A6478">PDF</div></div>`:
+        m.name&&(m.name.endsWith('.docx')||m.name.endsWith('.doc'))?`<div style="width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:22px">📝<div style="font-size:8px;color:#5A6478">Word</div></div>`:
+        m.name&&(m.name.endsWith('.xlsx')||m.name.endsWith('.xls'))?`<div style="width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:22px">📊<div style="font-size:8px;color:#5A6478">Excel</div></div>`:
+        `<div style="width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:22px">📎<div style="font-size:8px;color:#5A6478">${(m.name||'').split('.').pop().toUpperCase()}</div></div>`}
+      <div class="media-label">${m.label||m.name}</div></div>`).join('')}
+    </div></div>`:'';
+  return `<div class="soap-card">
+    <div class="soap-header">
+      <div>
+        <div class="soap-sesion">${sesionLine} ${inc?'<span class="badge badge-alert" style="font-size:10px;">⚠ Incompleta</span>':'<span style="font-size:10px;color:var(--green);font-weight:600">✅ Completa</span>'}</div>
+        ${expedienteLine}
+        <div class="soap-meta">${s.fecha}${s.horaCreacion?' · '+escapeHTML(s.horaCreacion):''} · <span style="font-weight:700;color:var(--navy)">${s.terapeuta}</span>${(Array.isArray(s.atendidoPor)&&s.atendidoPor.length&&!(s.atendidoPor.length===1&&s.atendidoPor[0]===s.terapeuta))?' · <span style="font-size:11px;color:var(--gray-500)">👥 Atendió: '+s.atendidoPor.map(escapeHTML).join(', ')+'</span>':''} · Semana ${s.semana}${s.modoNota?' · <span style="background:#E8EEF7;color:var(--navy);font-size:10px;font-weight:700;padding:2px 7px;border-radius:8px">'+escapeHTML(s.modoNota)+'</span>':''}</div>
+      </div>
+      <div style="display:flex;gap:6px;align-items:center;">
+        <div class="eva-num ${getEvaClass(s.s?.dolor?.split('/')[0]||5)}" style="width:28px;height:28px;font-size:12px;">${s.s?.dolor?.split('/')[0]||'?'}</div>
+        ${!readOnly?`<button data-sid="${escapeAttr_(s.id)}" onclick="editarSOAP(this.dataset.sid)" style="background:var(--navy);color:white;border:none;border-radius:20px;padding:3px 10px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">✏️ Editar</button>`:''}
+        ${s.historialEdiciones&&s.historialEdiciones.length?`<button data-sid="${escapeAttr_(s.id)}" onclick="verHistorialEdicionesSOAP(this.dataset.sid)" style="background:var(--gray-100);color:var(--gray-600);border:none;border-radius:20px;padding:3px 10px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">🕘 Ver historial</button>`:''}
+      </div>
+    </div>
+    ${s.historialEdiciones&&s.historialEdiciones.length?`<div style="font-size:11px;color:var(--gray-400);padding:4px 14px 0;border-top:1px solid var(--gray-100)">✏️ Última edición: ${s.historialEdiciones[s.historialEdiciones.length-1].fecha} ${s.historialEdiciones[s.historialEdiciones.length-1].hora||''} por <b>${s.historialEdiciones[s.historialEdiciones.length-1].usuario}</b></div>`:''}
+    <div class="soap-body">
+      ${bodyHTML}
+      ${mediaHTML}
+    </div></div>`;
+}
+
 function renderExpediente(tab='historia'){
   currentTab=tab;
   const p=currentPatient;
@@ -3453,16 +3526,29 @@ function renderExpediente(tab='historia'){
       </div>
     </div>`;
     if(Array.isArray(p.motivosAnteriores)&&p.motivosAnteriores.length>0){
+      const _epSoaps=Array.isArray(p.soap)?p.soap:[];
       html+=`
       <div class="section-card" style="margin-bottom:12px">
         <div class="section-title" style="cursor:pointer" onclick="toggleMotivosAnteriores()">
           <span id="motivos-ant-arrow">▶</span> Motivos anteriores (${p.motivosAnteriores.length})
         </div>
         <div id="motivos-ant-body" style="display:none;padding:0 14px 12px">
-          ${p.motivosAnteriores.map(m=>`<div style="padding:9px 0;border-bottom:1px solid var(--gray-100)">
-            <div style="font-size:14px;color:var(--navy);font-weight:600">"${m.motivoConsulta||m.dx||'Motivo sin título'}"</div>
-            <div style="font-size:11.5px;color:var(--gray-400)">${m.fechaInicio||'—'} → ${m.fechaCierre||'—'}${m.creadoPor?' · '+m.creadoPor:''}</div>
-          </div>`).join('')}
+          ${p.motivosAnteriores.map((m,i)=>{
+            const epIdx=(typeof m.motivoIndex==='number')?m.motivoIndex:undefined;
+            const epSesiones=(epIdx!==undefined)?_epSoaps.filter(s=>s.motivoIndex===epIdx).sort((a,b)=>(Number(b.num)||0)-(Number(a.num)||0)):[];
+            return `<div style="border-bottom:1px solid var(--gray-100)">
+              <div style="padding:9px 0;cursor:pointer" onclick="toggleMotivoEpisodio(${i})">
+                <span id="mep-arrow-${i}" style="font-size:11px">▶</span>
+                <span style="font-size:14px;color:var(--navy);font-weight:600">${escapeHTML(m.motivoConsulta||m.dx||'Motivo sin título')}</span>
+                <div style="font-size:11.5px;color:var(--gray-400);margin-top:2px">${escapeHTML(m.fechaInicio||'—')} → ${escapeHTML(m.fechaCierre||'—')}${m.creadoPor?' · '+escapeHTML(m.creadoPor):''}${epIdx!==undefined?' · Episodio '+(epIdx+1):''}${epSesiones.length?' · '+epSesiones.length+' sesión'+(epSesiones.length!==1?'es':''):''}</div>
+              </div>
+              <div id="mep-body-${i}" style="display:none;padding-bottom:8px">
+                ${epSesiones.length
+                  ?epSesiones.map(s=>_renderSoapCard(s,p,true)).join('')
+                  :'<div style="padding:10px 0;color:var(--gray-400);font-size:13px">Sesiones no ligadas a este episodio</div>'}
+              </div>
+            </div>`;
+          }).join('')}
         </div>
       </div>`;
     }
@@ -3605,74 +3691,64 @@ function renderExpediente(tab='historia'){
 
   if(tab==='soap'){
     html+=generarGraficaEVA(p);
-    const soaps=[...p.soap].sort(_cmpSoapFechaDesc); // más reciente primero (fecha DESC, fallback num)
-    if(!soaps.length) html+=`<div class="empty-state"><div class="emoji">📝</div><p>Sin notas SOAP.<br>Toca 📝 para agregar la primera sesión.</p></div>`;
-    else soaps.forEach(s=>{
-      const inc=!s.completa;
-      html+=`<div class="soap-card">
-        <div class="soap-header">
+    const soaps=[...p.soap].sort(_cmpSoapFechaDesc);
+    if(!soaps.length){
+      html+=`<div class="empty-state"><div class="emoji">📝</div><p>Sin notas SOAP.<br>Toca 📝 para agregar la primera sesión.</p></div>`;
+    } else if(Array.isArray(p.motivosAnteriores)&&p.motivosAnteriores.length>0){
+      const midxActual=p.motivoActualIndex||0;
+      const soapsCurrent=soaps.filter(s=>typeof s.motivoIndex==='number'&&s.motivoIndex===midxActual);
+      html+=`<div style="margin-bottom:12px">
+        <div style="background:var(--navy);color:white;border-radius:10px;padding:10px 14px;cursor:pointer;display:flex;justify-content:space-between;align-items:center" onclick="toggleSoapEpisodio('act')">
           <div>
-            <div class="soap-sesion">Sesión ${s.num}${(s.totalSesiones&&!isNaN(s.totalSesiones))?' de '+s.totalSesiones:''} ${inc?'<span class="badge badge-alert" style="font-size:10px;">⚠ Incompleta</span>':'<span style="font-size:10px;color:var(--green);font-weight:600">✅ Completa</span>'}</div>
-            <div class="soap-meta">${s.fecha}${s.horaCreacion?' · '+escapeHTML(s.horaCreacion):''} · <span style="font-weight:700;color:var(--navy)">${s.terapeuta}</span>${(Array.isArray(s.atendidoPor)&&s.atendidoPor.length&&!(s.atendidoPor.length===1&&s.atendidoPor[0]===s.terapeuta))?' · <span style="font-size:11px;color:var(--gray-500)">👥 Atendió: '+s.atendidoPor.map(escapeHTML).join(', ')+'</span>':''} · Semana ${s.semana}${s.modoNota?' · <span style="background:#E8EEF7;color:var(--navy);font-size:10px;font-weight:700;padding:2px 7px;border-radius:8px">'+escapeHTML(s.modoNota)+'</span>':''}</div>
+            <div style="font-size:13px;font-weight:700">Episodio ${midxActual+1} · ${soapsCurrent.length} sesión${soapsCurrent.length!==1?'es':''} · En curso</div>
+            <div style="font-size:11px;opacity:.8">${escapeHTML(p.fechaCreacion||'')} → Hoy</div>
           </div>
-          <div style="display:flex;gap:6px;align-items:center;">
-            <div class="eva-num ${getEvaClass(s.s?.dolor?.split('/')[0]||5)}" style="width:28px;height:28px;font-size:12px;">${s.s?.dolor?.split('/')[0]||'?'}</div>
-            <button data-sid="${escapeAttr_(s.id)}" onclick="editarSOAP(this.dataset.sid)" style="background:var(--navy);color:white;border:none;border-radius:20px;padding:3px 10px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">✏️ Editar</button>
-            ${s.historialEdiciones&&s.historialEdiciones.length?`<button data-sid="${escapeAttr_(s.id)}" onclick="verHistorialEdicionesSOAP(this.dataset.sid)" style="background:var(--gray-100);color:var(--gray-600);border:none;border-radius:20px;padding:3px 10px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">🕘 Ver historial</button>`:''}
-          </div>
+          <span id="ep-act-arrow" style="font-size:16px">▼</span>
         </div>
-        ${s.historialEdiciones&&s.historialEdiciones.length?`<div style="font-size:11px;color:var(--gray-400);padding:4px 14px 0;border-top:1px solid var(--gray-100)">✏️ Última edición: ${s.historialEdiciones[s.historialEdiciones.length-1].fecha} ${s.historialEdiciones[s.historialEdiciones.length-1].hora||''} por <b>${s.historialEdiciones[s.historialEdiciones.length-1].usuario}</b></div>`:''}
-        <div class="soap-body">
-          ${(s.importado && s.formatoOriginal==='texto_libre') ? `
-          <div class="soap-section">
-            <div class="soap-label"><span class="soap-s">📝 Nota importada — texto original</span>
-              ${s.revisionPendiente?'<span class="badge badge-alert" style="font-size:10px;margin-left:6px">⚠ Revisión pendiente</span>':'<span style="font-size:10px;color:var(--green);font-weight:700;margin-left:6px">✅ Revisada</span>'}
+        <div id="ep-act-body">`;
+      if(!soapsCurrent.length){
+        html+=`<div style="padding:14px;color:var(--gray-400);font-size:13px;text-align:center">Sin sesiones en el episodio actual</div>`;
+      } else {
+        soapsCurrent.forEach(s=>{ html+=_renderSoapCard(s,p,false); });
+      }
+      html+=`</div></div>`;
+      for(let i=p.motivosAnteriores.length-1;i>=0;i--){
+        const m=p.motivosAnteriores[i];
+        const epIdx=(typeof m.motivoIndex==='number')?m.motivoIndex:i;
+        const soapsEp=soaps.filter(s=>typeof s.motivoIndex==='number'&&s.motivoIndex===epIdx);
+        html+=`<div style="margin-bottom:8px">
+          <div style="background:var(--gray-100);border-radius:10px;padding:10px 14px;cursor:pointer;display:flex;justify-content:space-between;align-items:center" onclick="toggleSoapEpisodio(${i})">
+            <div>
+              <div style="font-size:13px;font-weight:700;color:var(--navy)">Episodio ${epIdx+1} · ${escapeHTML(m.motivoConsulta||m.dx||'Sin título')} · ${soapsEp.length} sesión${soapsEp.length!==1?'es':''}</div>
+              <div style="font-size:11px;color:var(--gray-500)">${escapeHTML(m.fechaInicio||'—')} → ${escapeHTML(m.fechaCierre||'—')}</div>
             </div>
-            <div class="soap-text" style="white-space:pre-wrap">${escapeHTML(s.textoOriginal||'(sin texto)')}</div>
-            ${s.sugerenciaIA&&s.sugerenciaIA.soapSugerido?`<div style="margin-top:8px;padding:8px 10px;background:#E8F0FE;border-radius:8px"><div style="font-size:11px;font-weight:700;color:var(--navy)">🤖 Sugerencia IA (sin aprobar)</div><div style="font-size:12px;color:#1B3A6B;white-space:pre-wrap;margin-top:4px">${escapeHTML(JSON.stringify(s.sugerenciaIA.soapSugerido,null,1))}</div></div>`:''}
-            <div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap">
-              <button data-sid="${escapeAttr_(s.id)}" onclick="aprobarComoSOAP_(this.dataset.sid)" style="background:var(--navy);color:white;border:none;border-radius:18px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">✏️ Estructurar a SOAP</button>
-              <button data-sid="${escapeAttr_(s.id)}" onclick="mantenerComoTexto_(this.dataset.sid)" style="background:var(--gray-100);color:var(--gray-600);border:none;border-radius:18px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">📄 Mantener como texto · marcar revisada</button>
+            <span id="ep-${i}-arrow" style="font-size:16px;color:var(--navy)">▶</span>
+          </div>
+          <div id="ep-${i}-body" style="display:none">`;
+        if(!soapsEp.length){
+          html+=`<div style="padding:14px;color:var(--gray-400);font-size:13px;text-align:center">Sin sesiones registradas para este episodio</div>`;
+        } else {
+          soapsEp.forEach(s=>{ html+=_renderSoapCard(s,p,false); });
+        }
+        html+=`</div></div>`;
+      }
+      const soapsLegacy=soaps.filter(s=>typeof s.motivoIndex!=='number');
+      if(soapsLegacy.length){
+        html+=`<div style="margin-bottom:8px">
+          <div style="background:var(--gray-50);border:1px solid var(--gray-100);border-radius:10px;padding:10px 14px;cursor:pointer;display:flex;justify-content:space-between;align-items:center" onclick="toggleSoapEpisodio('legacy')">
+            <div>
+              <div style="font-size:13px;font-weight:700;color:var(--gray-500)">Sesiones anteriores · ${soapsLegacy.length} sesión${soapsLegacy.length!==1?'es':''}</div>
+              <div style="font-size:11px;color:var(--gray-400)">Registradas antes de habilitar episodios</div>
             </div>
+            <span id="ep-legacy-arrow" style="font-size:16px;color:var(--gray-500)">▶</span>
           </div>
-          ` : `
-          <div class="soap-section">
-            <div class="soap-label"><span class="soap-s">S — Subjetivo</span></div>
-            <div class="soap-sub">Dolor:</div><div class="soap-text">${s.s.dolor}</div>
-            <div class="soap-sub">Cambios desde última sesión:</div><div class="soap-text">${s.s.cambios}</div>
-            <div class="soap-sub">Actividad física:</div><div class="soap-text">${s.s.actFisica}</div>
-          </div>
-          <div class="soap-section">
-            <div class="soap-label"><span class="soap-o">O — Objetivo</span></div>
-            <div class="soap-sub">ROM:</div><div class="soap-text">${s.o.rom}</div>
-            <div class="soap-sub">Fuerza:</div><div class="soap-text">${s.o.fuerza}</div>
-            <div class="soap-sub">Hallazgos:</div><div class="soap-text">${s.o.hallazgos}</div>
-          </div>
-          <div class="soap-section">
-            <div class="soap-label"><span class="soap-a">A — Análisis</span></div>
-            <div class="soap-sub">Evolución:</div><div class="soap-text">${s.a.evolucion}</div>
-            <div class="soap-sub">Respuesta al tratamiento:</div><div class="soap-text">${s.a.respuesta}</div>
-            <div class="soap-sub">Análisis clínico:</div><div class="soap-text">${s.a.analisis}</div>
-          </div>
-          <div class="soap-section">
-            <div class="soap-label"><span class="soap-p">P — Plan</span></div>
-            <div class="soap-sub">Tratamiento aplicado:</div><div class="soap-text">${s.p.tratamiento}</div>
-            <div class="soap-sub">Indicaciones para casa:</div><div class="soap-text">${s.p.indicaciones}</div>
-            <div class="soap-sub">Contraindicaciones vigentes:</div><div class="soap-text" style="color:var(--red);font-weight:600;">${s.p.contraindicaciones}</div>
-          </div>
-          `}
-          ${s.media&&s.media.length?`<div style="margin-top:10px;">
-            <div style="font-size:11px;font-weight:700;color:var(--navy);margin-bottom:6px;">📷 Fotos (${s.media.length})</div>
-            <div class="media-grid">${s.media.map((m,mi)=>`<div class="media-thumb" data-pid="${escapeAttr_(p.id)}" data-sid="${escapeAttr_(s.id)}" onclick="previewSoapMedia(this.dataset.pid,this.dataset.sid,${mi})">
-              ${m.type&&m.type.startsWith('image')?`<img src="${m.url||m.data}" loading="lazy" decoding="async" alt="" onerror="this.style.opacity=.3">`:
-                m.name&&m.name.endsWith('.pdf')?`<div style="width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:22px">📄<div style="font-size:8px;color:#5A6478">PDF</div></div>`:
-                m.name&&(m.name.endsWith('.docx')||m.name.endsWith('.doc'))?`<div style="width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:22px">📝<div style="font-size:8px;color:#5A6478">Word</div></div>`:
-                m.name&&(m.name.endsWith('.xlsx')||m.name.endsWith('.xls'))?`<div style="width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:22px">📊<div style="font-size:8px;color:#5A6478">Excel</div></div>`:
-                `<div style="width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:22px">📎<div style="font-size:8px;color:#5A6478">${(m.name||'').split('.').pop().toUpperCase()}</div></div>`}
-              <div class="media-label">${m.label||m.name}</div></div>`).join('')}
-            </div></div>`:''}
-        </div></div>`;
-    });
+          <div id="ep-legacy-body" style="display:none">`;
+        soapsLegacy.forEach(s=>{ html+=_renderSoapCard(s,p,false); });
+        html+=`</div></div>`;
+      }
+    } else {
+      soaps.forEach(s=>{ html+=_renderSoapCard(s,p,false); });
+    }
   }
 
   if(tab==='estudios'){
@@ -5727,8 +5803,15 @@ async function guardarSOAP(){
       semana, totalSesiones:parseInt(p.planTto?.sesiones)||10,
       ...datosNota
     };
+    if(Array.isArray(p.motivosAnteriores)&&p.motivosAnteriores.length>0){
+      nuevaSOAP.motivoIndex=p.motivoActualIndex||0;
+      nuevaSOAP.numEpisodio=(p.numSesionEpisodioActual||0)+1;
+    }
     p.soap.push(nuevaSOAP);
     p.sesiones=sesNum;
+    if(Array.isArray(p.motivosAnteriores)&&p.motivosAnteriores.length>0){
+      p.numSesionEpisodioActual=(p.numSesionEpisodioActual||0)+1;
+    }
     p.fechaActualizacion=todayFmt();
     p.ultimoUsuario=ter;
     tempEvolMedia=[];
@@ -9592,6 +9675,22 @@ function toggleMotivosAnteriores(){
   const a=document.getElementById('motivos-ant-arrow');
   if(b){ const o=b.style.display==='none'; b.style.display=o?'block':'none'; if(a) a.textContent=o?'▼':'▶'; }
 }
+function toggleSoapEpisodio(idx){
+  const b=document.getElementById('ep-'+idx+'-body');
+  const a=document.getElementById('ep-'+idx+'-arrow');
+  if(!b) return;
+  const open=b.style.display!=='none';
+  b.style.display=open?'none':'block';
+  if(a) a.textContent=open?'▶':'▼';
+}
+function toggleMotivoEpisodio(i){
+  const b=document.getElementById('mep-body-'+i);
+  const a=document.getElementById('mep-arrow-'+i);
+  if(!b) return;
+  const open=b.style.display!=='none';
+  b.style.display=open?'none':'block';
+  if(a) a.textContent=open?'▶':'▼';
+}
 
 function abrirNuevoMotivoConsulta(){
   const p=currentPatient;
@@ -9608,11 +9707,15 @@ function abrirNuevoMotivoConsulta(){
     planTto: {...(p.planTto||{})},
     fechaInicio: p.fechaCreacion||p.date||'',
     fechaCierre: todayFmt(),
-    creadoPor: p.creadoPor||''
+    creadoPor: p.creadoPor||'',
+    motivoIndex: p.motivoActualIndex||0,
+    numSesionesEpisodio: Array.isArray(p.soap)?p.soap.filter(function(s){return s.motivoIndex===(p.motivoActualIndex||0);}).length:0
   };
   // b. Archivar
   if(!Array.isArray(p.motivosAnteriores)) p.motivosAnteriores=[];
   p.motivosAnteriores.push(snapshot);
+  p.motivoActualIndex=(p.motivoActualIndex||0)+1;
+  p.numSesionEpisodioActual=0;
   // c. Limpiar SOLO el motivo actual
   p.motivoConsulta='';
   p.dx='';
@@ -10175,7 +10278,7 @@ function _RPT_htmlLegal(){
 function _RPT_pintarGrafica(pid, sesiones){
   var box=document.getElementById('rpt-grafica-'+pid);
   if(!box) return;
-  var pts=sesiones.map(function(s,i){ return { i:i, eva:_RPT_evaDeSesion(s), fecha:s.fecha||s.date||'', num:s.num||(i+1) }; }).filter(function(x){ return x.eva!=null; });
+  var pts=sesiones.map(function(s,i){ return { i:i, eva:_RPT_evaDeSesion(s), fecha:s.fecha||s.date||'', num:(s.numEpisodio!=null?s.numEpisodio:(s.num||(i+1))) }; }).filter(function(x){ return x.eva!=null; });
   if(!pts.length){ box.innerHTML='<div style="color:var(--gray-400);font-size:12px;padding:8px">Sin datos de EVA para graficar</div>'; return; }
   var W=Math.max(320,40+pts.length*46), H=200, padL=28, padR=12, padT=12, padB=42;
   var plotW=W-padL-padR, plotH=H-padT-padB;
@@ -10202,7 +10305,8 @@ function _RPT_pintarGrafica(pid, sesiones){
 }
 
 // Orquestador principal de la pestaña Reporte.
-async function RPT_pintarPestanaReporte(pid){
+async function RPT_pintarPestanaReporte(pid, filtroEpisodio){
+  if(filtroEpisodio===undefined) filtroEpisodio=null;
   var root=document.getElementById('rpt-root');
   if(!root) return;
   try{
@@ -10220,23 +10324,56 @@ async function RPT_pintarPestanaReporte(pid){
     var sesiones=await _RPT_obtenerSesionesDedup(pid);
     var hash=_RPT_hashEntradas(p, sesiones);
     var sintesis=_RPT_buscarSintesisCache(p, hash);
+    // SOAP-E2: episode filter
+    var tieneEpisodios=Array.isArray(p.motivosAnteriores)&&p.motivosAnteriores.length>0;
+    var pCtx=p;
+    var sesionesFiltradas=sesiones;
+    if(tieneEpisodios&&filtroEpisodio!==null){
+      if(filtroEpisodio==='actual'){
+        var midx=p.motivoActualIndex||0;
+        sesionesFiltradas=sesiones.filter(function(s){ return typeof s.motivoIndex==='number'&&s.motivoIndex===midx; });
+      } else if(typeof filtroEpisodio==='number'){
+        var ep=p.motivosAnteriores[filtroEpisodio];
+        if(ep){
+          pCtx=Object.assign({},p,{motivoConsulta:ep.motivoConsulta||'',dx:ep.dx||'',motivo:ep.motivo||{},valoracion:ep.valoracion||{},dxFuncional:ep.dxFuncional||{},planTto:ep.planTto||{}});
+          if(typeof ep.motivoIndex==='number'){
+            sesionesFiltradas=sesiones.filter(function(s){ return s.motivoIndex===ep.motivoIndex; });
+          }
+        }
+      }
+    }
+    // Episode selector bar (no-print)
+    var selectorHTML='';
+    if(tieneEpisodios){
+      var midxActual=p.motivoActualIndex||0;
+      var _bsty='border:none;border-radius:16px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;';
+      var btns='<button onclick="RPT_pintarPestanaReporte(\''+escapeAttr_(pid)+'\',\'actual\')" style="'+_bsty+(filtroEpisodio==='actual'?'background:var(--navy);color:white;':'background:var(--gray-100);color:var(--navy);')+'">Episodio '+(midxActual+1)+' (actual)</button>';
+      for(var _ei=p.motivosAnteriores.length-1;_ei>=0;_ei--){
+        var _em=p.motivosAnteriores[_ei];
+        var _eidx=(typeof _em.motivoIndex==='number')?_em.motivoIndex:_ei;
+        btns+='<button onclick="RPT_pintarPestanaReporte(\''+escapeAttr_(pid)+'\','+_ei+')" style="'+_bsty+(filtroEpisodio===_ei?'background:var(--navy);color:white;':'background:var(--gray-100);color:var(--navy);')+'">Episodio '+(_eidx+1)+'</button>';
+      }
+      btns+='<button onclick="RPT_pintarPestanaReporte(\''+escapeAttr_(pid)+'\',null)" style="'+_bsty+(filtroEpisodio===null?'background:var(--navy);color:white;':'background:var(--gray-100);color:var(--navy);')+'">Expediente completo</button>';
+      selectorHTML='<div class="no-print" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:10px;padding:8px 12px;background:var(--gray-50);border-radius:10px"><span style="font-size:11px;font-weight:700;color:var(--gray-500);white-space:nowrap;margin-right:4px">Ver episodio:</span>'+btns+'</div>';
+    }
     root.innerHTML='<div class="rpt-container">'
       + _RPT_css()
       + '<div class="no-print" style="display:flex;justify-content:flex-end;margin-bottom:10px"><button onclick="RPT_imprimirReporte(\''+escapeAttr_(pid)+'\')" style="background:#2E3192;color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:6px">🖨️ Imprimir / Guardar PDF</button></div>'
-      + _RPT_htmlCabecera(p, sesiones)
-      + _RPT_htmlFranjaPaciente(p, sesiones)
-      + _RPT_htmlResumen(p)
+      + selectorHTML
+      + _RPT_htmlCabecera(p, sesionesFiltradas)
+      + _RPT_htmlFranjaPaciente(p, sesionesFiltradas)
+      + _RPT_htmlResumen(pCtx)
       + _RPT_htmlAntecedentes(p)
       + _RPT_htmlSeguridad(p)
-      + _RPT_htmlValoracion(p, sesiones)
+      + _RPT_htmlValoracion(pCtx, sesionesFiltradas)
       + _RPT_secHead(4,'Evolución del dolor')
       + '<div class="rc-avoid" style="border:0.5px solid #E2E4E0;border-radius:6px;padding:14px"><div id="rpt-grafica-'+escapeAttr_(pid)+'">…</div></div>'
-      + _RPT_htmlSoap(sesiones)
-      + _RPT_htmlMetricas(p, sesiones)
+      + _RPT_htmlSoap(sesionesFiltradas)
+      + _RPT_htmlMetricas(pCtx, sesionesFiltradas)
       + _RPT_htmlFirmas(p)
       + _RPT_htmlLegal()
       + '</div>';
-    _RPT_pintarGrafica(pid, sesiones);
+    _RPT_pintarGrafica(pid, sesionesFiltradas);
   }catch(e){
     console.warn('[RPT] pintar:', e.message);
     root.innerHTML='<div style="padding:16px;color:var(--red)">Error al generar reporte: '+escapeHTML(e.message)+'</div>';
@@ -12623,8 +12760,10 @@ function showSupervision(){
 // ── B1: Gráfica EVA en SVG puro (sin librerías) ──
 function generarGraficaEVA(p){
   const toNum=v=>{ const n=Number(v); return isNaN(n)?null:n; };
-  const sesiones=(p.soap||[]).map((s,i)=>({
-    num:i+1,
+  const _tieneEp=Array.isArray(p.motivosAnteriores)&&p.motivosAnteriores.length>0;
+  const _soapFilt=_tieneEp?(p.soap||[]).filter(s=>typeof s.motivoIndex==='number'&&s.motivoIndex===(p.motivoActualIndex||0)):(p.soap||[]);
+  const sesiones=_soapFilt.map((s,i)=>({
+    num:_tieneEp?(s.numEpisodio||i+1):(i+1),
     ei: toNum(s.evaI ?? s.eva?.inicial ?? s.evaInicial),
     ef: toNum(s.evaF ?? s.eva?.final ?? s.evaFinal)
   })).filter(s=>s.ei!==null||s.ef!==null);
