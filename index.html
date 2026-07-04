@@ -1515,6 +1515,7 @@ async function loadFromCloud(){
           // Sheets gana (comportamiento normal): preservar base64 que no viaja a Sheets
           if(Array.isArray(pLocal.fotos)&&pLocal.fotos.some(f=>f.data)) pSano.fotos = pLocal.fotos;
           if(Array.isArray(pLocal.docs)&&pLocal.docs.some(d=>d.data)) pSano.docs = pLocal.docs;
+          if(Array.isArray(pLocal.estudiosDocs)&&pLocal.estudiosDocs.length&&!Array.isArray(pSano.estudiosDocs)) pSano.estudiosDocs = pLocal.estudiosDocs;
           // Preservar consentimientos locales (el array incluye las firmas base64 que no van a Sheets)
           if(Array.isArray(pLocal.consentimientos)&&pLocal.consentimientos.length){
             pSano.consentimientos = pLocal.consentimientos;
