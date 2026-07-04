@@ -1129,8 +1129,14 @@ async function saveDB(k, v){
     if(!p || !p.id) continue;
     // GUARDIA DUAL-WRITE: históricos (mig_pac_) SOLO en Firestore; y pacientes
     // bloqueados/test (p002 corrupto, etc.) nunca deben re-escribirse a Sheets.
-    if(String(p.id).startsWith('mig_pac_') || _esPacienteTest(p)) {
-      console.warn('[saveDB] Bloqueado: no se escribe a Sheets (histórico o bloqueado):', p.id);
+    if(_esPacienteTest(p)) {
+      console.warn('[saveDB] Bloqueado (test/bloqueado): no persiste en ningún lado:', p.id);
+      continue;                                   // test/p002/pruebas: nunca persiste
+    }
+    if(String(p.id).startsWith('mig_pac_')) {
+      // GUARDA DURA (Bug 1): un mig_pac_ NUNCA se escribe al Sheet.
+      // Histórico → Firestore (v1: ejercicios/token/linkActivo, que antes se tiraban).
+      await _persistirHistoricoFirestore(p);
       continue;
     }
 
@@ -1319,6 +1325,29 @@ async function saveDB(k, v){
 
   if(errores===0) return {ok:true, guardados};
   return {ok:false, error:`${errores} de ${lista.length} pacientes no se guardaron`, guardados};
+}
+// v1 fix — persiste a Firestore los campos huérfanos de un histórico (mig_pac_) que saveDB tiraba.
+// SOLO 3 campos: ejercicios + ejerciciosToken + ejerciciosLinkActivo. NUNCA toca el Sheet (guarda dura Bug 1).
+// SOAP no va aquí (persiste vía subcolección sesiones); campos clínicos → v2.
+async function _persistirHistoricoFirestore(p){
+  try{
+    var ok = (typeof FST_init==='function') ? await FST_init() : false;
+    if(!ok || !window._fstDb){ console.warn('[saveDB] Firestore no disponible; histórico no persistido:', p.id); return; }
+    var out = {};
+    if(Array.isArray(p.ejercicios)){
+      // video/imagen ya trae media.data:null (fbPath+url en Storage); el strip de base64 legacy es no-op defensivo (evita >1MB/doc)
+      out.ejercicios = p.ejercicios.map(function(x){
+        if(x && x.media && typeof x.media.data==='string' && x.media.data.indexOf('data:')===0){
+          var m = Object.assign({}, x.media); m.data = null; return Object.assign({}, x, {media:m});
+        }
+        return x;
+      });
+    }
+    if(p.ejerciciosToken!=null) out.ejerciciosToken = p.ejerciciosToken;
+    if(p.ejerciciosLinkActivo!=null) out.ejerciciosLinkActivo = p.ejerciciosLinkActivo;
+    if(!Object.keys(out).length) return;
+    await window._fstDb.collection('pacientes').doc(p.id).set(out, { merge:true }); // sin updatedAt (no pisar el serverTimestamp del dual-write SOAP)
+  }catch(e){ console.warn('[saveDB] persistir histórico falló:', p.id, e.message); }
 }
 function loadDB(k){return loadLocal(k);}
 
@@ -4240,6 +4269,10 @@ async function FST_hidratarCamposClinicos(p, id) {
       p.dxFuncional = d.dxFuncional;
     if (d.planTto && typeof d.planTto === 'object' && !Array.isArray(d.planTto))
       p.planTto = d.planTto;
+    // v1 fix — leer de vuelta lo que _persistirHistoricoFirestore escribió (condicional estricto, no clobberear con vacío)
+    if (Array.isArray(d.ejercicios) && d.ejercicios.length) p.ejercicios = d.ejercicios;
+    if (d.ejerciciosToken) p.ejerciciosToken = d.ejerciciosToken;
+    if (d.ejerciciosLinkActivo != null) p.ejerciciosLinkActivo = d.ejerciciosLinkActivo;
 
   } catch(e) {
     console.warn('[FST-LISTA] hidratar campos clínicos falló (no bloqueante):', e.message);
