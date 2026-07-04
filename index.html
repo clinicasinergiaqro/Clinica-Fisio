@@ -10265,14 +10265,30 @@ function renderEjercicios(){
 }
 
 function copyLink(url){
-  if(navigator.clipboard) {
-    navigator.clipboard.writeText(url).then(()=>showToast('✅ Link copiado','success'));
+  // "Copiar link" copia el MENSAJE COMPLETO (saludo + seguridad + link), no solo la URL.
+  var p = currentPatient;
+  var nombre = (p && p.name) ? p.name : '';
+  var msg = 'Hola '+nombre+', te compartimos tu programa de ejercicios indicado en Clínica Sinergia.\n'
+    +'Realízalo según la dosificación de cada ejercicio. Si alguno aumenta dolor, inflamación, mareo o molestia importante, suspéndelo y avísanos.\n'
+    +'Tu rutina: '+url;
+  // 1) Copiar DENTRO del gesto (sin await antes — crítico en iPad PWA standalone).
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(msg).catch(function(){});
   } else {
-    const ta=document.createElement('textarea');
-    ta.value=url; document.body.appendChild(ta); ta.select();
-    document.execCommand('copy'); document.body.removeChild(ta);
-    showToast('✅ Link copiado','success');
+    try{
+      var ta=document.createElement('textarea'); ta.value=msg;
+      ta.setAttribute('readonly',''); ta.style.cssText='position:fixed;top:-1000px;left:-1000px;opacity:0';
+      document.body.appendChild(ta); ta.focus(); ta.select();
+      document.execCommand('copy'); document.body.removeChild(ta);
+    }catch(e){}
   }
+  // 2) DESPUÉS de copiar (fuera del path crítico): validar solo para el toast. La copia SIEMPRE ocurrió.
+  var token = (p && p.ejerciciosToken) ? p.ejerciciosToken : '';
+  if(!token){ showToast('Mensaje copiado ⚠️ — verifica que el link esté activo','warning'); return; }
+  _validarLinkEjercicios(token).then(function(v){
+    if(v && v.ok){ showToast('Mensaje copiado ✅','success'); }
+    else { showToast('Mensaje copiado ⚠️ — verifica que el link esté activo','warning'); }
+  }).catch(function(){ showToast('Mensaje copiado ⚠️ — verifica que el link esté activo','warning'); });
 }
 
 // ── M1-C2: Duplicar ejercicio ─────────────────────────────────────────────
@@ -10369,17 +10385,36 @@ function verMediaEjercicio(idx){
   if(!ej || !ej.media) return;
   const src = ej.media.url || ej.media.data || '';
   if(!src){ showToast('Archivo no disponible','error'); return; }
-  const isVideo = ej.media.type && ej.media.type.startsWith('video');
-  const w = window.open('','_blank');
+  const isVideo = (ej.media.type && ej.media.type.indexOf('video') !== -1)
+    || (ej.media.mimeType && ej.media.mimeType.indexOf('video/') === 0);
+  // Overlay interno in-app — SIN window.open / _blank / document.write.
+  // Funciona igual en Chrome laptop y iPad Safari PWA standalone (no saca al usuario de la app).
+  const prev = document.getElementById('_ejMediaOverlay'); if(prev) prev.remove();
+  const ov = document.createElement('div');
+  ov.id = '_ejMediaOverlay';
+  ov.style.cssText = 'position:fixed;inset:0;z-index:100000;background:#000;display:flex;align-items:center;justify-content:center;padding:56px 12px 12px';
+  function cerrar(){ ov.remove(); } // regresa a la vista de ejercicios sin navegar fuera
+  ov.addEventListener('click', function(e){ if(e.target === ov) cerrar(); }); // tap en el fondo oscuro cierra
+  const btn = document.createElement('button');
+  btn.textContent = '✕ Cerrar';
+  btn.style.cssText = 'position:absolute;top:12px;right:12px;z-index:1;background:rgba(255,255,255,.2);border:none;color:#fff;font-size:15px;font-weight:700;padding:8px 14px;border-radius:20px;cursor:pointer;font-family:inherit';
+  btn.onclick = cerrar;
+  ov.appendChild(btn);
+  let media;
   if(isVideo){
-    w.document.write(`<html><body style="margin:0;background:#000;display:flex;align-items:center;justify-content:center;min-height:100vh">
-      <video src="${src}" controls playsinline autoplay style="max-width:100%;max-height:100vh"></video>
-    </body></html>`);
+    media = document.createElement('video');
+    media.setAttribute('controls','');
+    media.setAttribute('playsinline','');
+    media.setAttribute('webkit-playsinline','');
+    media.setAttribute('preload','metadata');
+    media.style.cssText = 'max-width:100%;max-height:90vh';
   } else {
-    w.document.write(`<html><body style="margin:0;background:#000;display:flex;align-items:center;justify-content:center;min-height:100vh">
-      <img src="${src}" style="max-width:100%;max-height:100vh;object-fit:contain">
-    </body></html>`);
+    media = document.createElement('img');
+    media.style.cssText = 'max-width:100%;max-height:90vh;object-fit:contain';
   }
+  media.src = src;
+  ov.appendChild(media);
+  document.body.appendChild(ov);
 }
 
 // ── NUEVO / EDITAR EJERCICIO ───────────────────────────────────────────────
