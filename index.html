@@ -5134,7 +5134,7 @@ function showNuevoSOAP(){
 
 function renderSOAPForm(){
   const p=currentPatient;
-  const sesNum=p.sesiones+1;
+  const sesNum=(editingSoapEsHistorico&&_editingSoapHistoricoNota)?_editingSoapHistoricoNota.num:(p.sesiones+1);
   // Terapeuta de la nota = quien está llenando la nota, no el terapeuta asignado
   const ter=currentUser.name;
   // F3: quién atendió la sesión (default: el terapeuta de la nota; en edición, lo guardado)
@@ -5146,7 +5146,7 @@ function renderSOAPForm(){
     var chk=tempAtendio.indexOf(t)>=0;
     return '<div class="checkbox-item '+(chk?'checked':'')+'" onclick="toggleAtendio(\''+t+'\')"><div class="cb-box">'+(chk?'✓':'')+'</div><div class="cb-label">'+t+'</div></div>';
   }).join('');
-  const semana=Math.ceil(sesNum/2);
+  const semana=(editingSoapEsHistorico&&_editingSoapHistoricoNota&&Number.isFinite(_editingSoapHistoricoNota.semana))?_editingSoapHistoricoNota.semana:Math.ceil(sesNum/2);
 
   // FECHA EDITABLE: valor inicial del campo (edición = fecha de la nota; nueva = hoy). Formato YYYY-MM-DD para type=date.
   var _fechaConsultaVal = _isoMasDias(0);
