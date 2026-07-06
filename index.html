@@ -4409,6 +4409,24 @@ async function FST_hidratarCamposClinicos(p, id) {
     if (d.ejerciciosToken) p.ejerciciosToken = d.ejerciciosToken;
     if (d.ejerciciosLinkActivo != null) p.ejerciciosLinkActivo = d.ejerciciosLinkActivo;
 
+    // v2 fix (Cambio C) — leer de vuelta los campos clínicos que saveDB-v2 escribe.
+    // Guards estrictos: NO clobberear datos locales con vacíos de Firestore (mismo patrón que ejercicios).
+    if (d.dx)                    p.dx = d.dx;                             // string
+    if (d.contraindicaciones)    p.contraindicaciones = d.contraindicaciones; // string
+    if (d.seguridadClinica && typeof d.seguridadClinica === 'object' && !Array.isArray(d.seguridadClinica))
+      p.seguridadClinica = d.seguridadClinica;
+    if (d.altaClinica && typeof d.altaClinica === 'object' && !Array.isArray(d.altaClinica))
+      p.altaClinica = d.altaClinica;
+    if (Array.isArray(d.revaloraciones) && d.revaloraciones.length) p.revaloraciones = d.revaloraciones;
+    if (Array.isArray(d.consentimientos) && d.consentimientos.length) p.consentimientos = d.consentimientos;
+    if (d.consentimientoDatos    != null) p.consentimientoDatos    = d.consentimientoDatos;    // bool (false válido)
+    if (d.consentimientoImagen   != null) p.consentimientoImagen   = d.consentimientoImagen;   // bool (false válido)
+    if (d.consentimientoWhatsApp != null) p.consentimientoWhatsApp = d.consentimientoWhatsApp; // bool (false válido)
+    // CRÍTICO episodios (SOAP-E2): sin esto los episodios se persisten pero NO reaparecen al reabrir (caso Dalia).
+    if (Array.isArray(d.motivosAnteriores) && d.motivosAnteriores.length) p.motivosAnteriores = d.motivosAnteriores;
+    if (d.motivoActualIndex       != null) p.motivoActualIndex       = d.motivoActualIndex;       // number (0 válido)
+    if (d.numSesionEpisodioActual != null) p.numSesionEpisodioActual = d.numSesionEpisodioActual; // number (0 válido)
+
   } catch(e) {
     console.warn('[FST-LISTA] hidratar campos clínicos falló (no bloqueante):', e.message);
   }
