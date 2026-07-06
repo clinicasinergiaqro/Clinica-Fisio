@@ -1346,27 +1346,65 @@ async function saveDB(k, v){
   if(errores===0) return {ok:true, guardados};
   return {ok:false, error:`${errores} de ${lista.length} pacientes no se guardaron`, guardados};
 }
-// v1 fix — persiste a Firestore los campos huérfanos de un histórico (mig_pac_) que saveDB tiraba.
-// SOLO 3 campos: ejercicios + ejerciciosToken + ejerciciosLinkActivo. NUNCA toca el Sheet (guarda dura Bug 1).
-// SOAP no va aquí (persiste vía subcolección sesiones); campos clínicos → v2.
+// v2 fix — persiste a Firestore los campos huérfanos de un histórico (mig_pac_) que saveDB tiraba.
+// DOS writes SEPARADOS al mismo doc (merge:true), obligatorio por las reglas:
+//   Write 1 (ejercicios)  → subconjunto de pacienteEjerciciosUpdateOK
+//   Write 2 (clínicos v4) → subconjunto de pacienteClinicoUpdateOK (whitelist v4)
+// NO se pueden fusionar: son dos hasOnly distintos en un OR; un write mixto no es
+// subconjunto de ninguno → Firestore lo rechazaría entero (mismo bug que ejercicios en su día).
+// NUNCA toca el Sheet (guarda dura Bug 1). SOAP no va aquí (persiste vía subcolección sesiones).
+// NUNCA escribe id/appSourceId/creadoPor/origen/fechaNacimiento/nombreNormalizado (identidad de migración).
 async function _persistirHistoricoFirestore(p){
   try{
     var ok = (typeof FST_init==='function') ? await FST_init() : false;
     if(!ok || !window._fstDb){ console.warn('[saveDB] Firestore no disponible; histórico no persistido:', p.id); return; }
-    var out = {};
+    var ref = window._fstDb.collection('pacientes').doc(p.id);
+
+    // ── Write 1: EJERCICIOS (pasa pacienteEjerciciosUpdateOK) ──
+    var outEj = {};
     if(Array.isArray(p.ejercicios)){
       // video/imagen ya trae media.data:null (fbPath+url en Storage); el strip de base64 legacy es no-op defensivo (evita >1MB/doc)
-      out.ejercicios = p.ejercicios.map(function(x){
+      outEj.ejercicios = p.ejercicios.map(function(x){
         if(x && x.media && typeof x.media.data==='string' && x.media.data.indexOf('data:')===0){
           var m = Object.assign({}, x.media); m.data = null; return Object.assign({}, x, {media:m});
         }
         return x;
       });
     }
-    if(p.ejerciciosToken!=null) out.ejerciciosToken = p.ejerciciosToken;
-    if(p.ejerciciosLinkActivo!=null) out.ejerciciosLinkActivo = p.ejerciciosLinkActivo;
-    if(!Object.keys(out).length) return;
-    await window._fstDb.collection('pacientes').doc(p.id).set(out, { merge:true }); // sin updatedAt (no pisar el serverTimestamp del dual-write SOAP)
+    if(p.ejerciciosToken!=null)      outEj.ejerciciosToken = p.ejerciciosToken;
+    if(p.ejerciciosLinkActivo!=null) outEj.ejerciciosLinkActivo = p.ejerciciosLinkActivo;
+    if(p.reportesClinicosIA!=null)   outEj.reportesClinicosIA = p.reportesClinicosIA;
+    if(Object.keys(outEj).length){
+      await ref.set(outEj, { merge:true }); // sin updatedAt (no pisar el serverTimestamp del dual-write SOAP)
+    }
+
+    // ── Write 2: CLÍNICOS (pasa pacienteClinicoUpdateOK v4) ──
+    // SOLO campos dentro de la whitelist v4; un campo fuera → hasOnly rechaza el write entero.
+    // Guards con != null: 0 (motivoActualIndex/numSesionEpisodioActual) y false (consentimientos) son válidos.
+    var outCl = {};
+    if(p.name!=null)                     outCl.name = p.name;
+    if(p.dx!=null)                       outCl.dx = p.dx;
+    if(p.motivoConsulta!=null)           outCl.motivoConsulta = p.motivoConsulta;
+    if(p.motivo!=null)                   outCl.motivo = p.motivo;
+    if(p.valoracion!=null)               outCl.valoracion = p.valoracion;
+    if(p.dxFuncional!=null)              outCl.dxFuncional = p.dxFuncional;
+    if(p.planTto!=null)                  outCl.planTto = p.planTto;
+    if(p.antecedentes!=null)             outCl.antecedentes = p.antecedentes;
+    if(p.alergias!=null)                 outCl.alergias = p.alergias;
+    if(p.contraindicaciones!=null)       outCl.contraindicaciones = p.contraindicaciones;
+    if(p.seguridadClinica!=null)         outCl.seguridadClinica = p.seguridadClinica;
+    if(Array.isArray(p.motivosAnteriores)) outCl.motivosAnteriores = p.motivosAnteriores;
+    if(p.motivoActualIndex!=null)        outCl.motivoActualIndex = p.motivoActualIndex;
+    if(p.numSesionEpisodioActual!=null)  outCl.numSesionEpisodioActual = p.numSesionEpisodioActual;
+    if(p.altaClinica!=null)              outCl.altaClinica = p.altaClinica;
+    if(Array.isArray(p.revaloraciones))  outCl.revaloraciones = p.revaloraciones;
+    if(Array.isArray(p.consentimientos)) outCl.consentimientos = p.consentimientos;
+    if(p.consentimientoDatos!=null)      outCl.consentimientoDatos = p.consentimientoDatos;
+    if(p.consentimientoImagen!=null)     outCl.consentimientoImagen = p.consentimientoImagen;
+    if(p.consentimientoWhatsApp!=null)   outCl.consentimientoWhatsApp = p.consentimientoWhatsApp;
+    if(Object.keys(outCl).length){
+      await ref.set(outCl, { merge:true }); // sin updatedAt (mismo criterio que Write 1)
+    }
   }catch(e){ console.warn('[saveDB] persistir histórico falló:', p.id, e.message); }
 }
 function loadDB(k){return loadLocal(k);}
