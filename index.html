@@ -7343,7 +7343,7 @@ function _pedirTipoReclasificar(tipoActual){
 }
 
 async function handleMedia(ev,tipo,pid){
-  const p=patientsDB.find(x=>x.id===pid);if(!p) return;
+  const p=_resolverPaciente(pid);if(!p) return;   // 04h: cae a currentPatient para históricos (mig_pac_ no vive en patientsDB tras fix fuga 04b)
   const files=Array.from(ev.target.files);
   if(!files.length) return;
   ev.target.value='';
@@ -7470,7 +7470,7 @@ async function restaurarMedia(p){
   if(Array.isArray(p.soap)){ for(const s of p.soap){ if(s && Array.isArray(s.media)) await restaurarArr(s.media); } }
 }
 async function deleteMedia(pid,tipo,i){
-  const p=patientsDB.find(x=>x.id===pid);if(!p)return;
+  const p=_resolverPaciente(pid);if(!p)return;   // 04h: cae a currentPatient para históricos (mismo bug que handleMedia)
   const arr = tipo==='foto'?p.fotos:p.docs;
   const item = Array.isArray(arr)?arr[i]:null;
   if(!item) return;
@@ -7499,7 +7499,7 @@ async function deleteMedia(pid,tipo,i){
   });
 }
 async function previewMedia(pid,tipo,i){
-  const p=patientsDB.find(x=>x.id===pid);if(!p)return;
+  const p=_resolverPaciente(pid);if(!p)return;   // 04h: cae a currentPatient para históricos (la grilla de Fotos clínicas se pinta para mig_pac_)
   const item=(tipo==='foto'?p.fotos:p.docs)[i];if(!item)return;
 
   // Si tiene URL de Firebase, úsala directamente
