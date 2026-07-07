@@ -3836,8 +3836,16 @@ function renderExpediente(tab='historia'){
 
   if(tab==='soap'){
     html+=generarGraficaEVA(p);
-    const soaps=[...p.soap].sort(_cmpSoapFechaDesc);
-    if(!soaps.length){
+    // BUG 1 fix — histórico (mig_pac_): Firestore es la ÚNICA fuente de verdad de sus sesiones.
+    // NO renderizar el p.soap local (puede haber quedado congelado con un valor viejo si el mig_pac_
+    // se filtró a localStorage). Las sesiones se pintan FRESCAS por FST_renderHistorialSoap
+    // (#fst-hist-block, se inyecta tras este render) y se editan por la rama histórica
+    // (editarSoapHistorico → _guardarEdicionSoapHistorico, que SÍ persiste historialEdiciones).
+    const _esMigSoap = String(p.id||'').startsWith('mig_pac_');
+    const soaps = _esMigSoap ? [] : [...p.soap].sort(_cmpSoapFechaDesc);
+    if(_esMigSoap){
+      html+=`<div style="padding:12px 14px;font-size:12px;color:var(--gray-400)">📂 Historial clínico desde la nube (abajo).</div>`;
+    } else if(!soaps.length){
       html+=`<div class="empty-state"><div class="emoji">📝</div><p>Sin notas SOAP.<br>Toca 📝 para agregar la primera sesión.</p></div>`;
     } else if(Array.isArray(p.motivosAnteriores)&&p.motivosAnteriores.length>0){
       const midxActual=p.motivoActualIndex||0;
