@@ -11526,8 +11526,8 @@ function renderVistaPublica(p, opts={}){
   html += `<div class="pub-header">
     <div style="font-size:36px;margin-bottom:8px">🫀</div>
     <div style="font-size:11px;color:rgba(255,255,255,.6);text-transform:uppercase;letter-spacing:1px;font-weight:600">Clínica Sinergia · Fisioterapia y Rehabilitación</div>
-    <div style="font-size:20px;font-weight:800;margin-top:6px">${p.name}</div>
-    <div style="font-size:12px;color:rgba(255,255,255,.6);margin-top:4px">Programa de ejercicios · ${fechaPrograma}</div>
+    <div style="font-size:20px;font-weight:800;margin-top:6px">${escapeHTML(p.name)}</div>
+    <div style="font-size:12px;color:rgba(255,255,255,.6);margin-top:4px">Programa de ejercicios · ${escapeHTML(fechaPrograma)}</div>
   </div>
   <div style="padding:16px;padding-bottom:40px">`;
 
@@ -11541,18 +11541,18 @@ function renderVistaPublica(p, opts={}){
       html += `<div class="pub-card">
         <div class="pub-card-hdr">
           <div class="pub-card-num">Ejercicio ${i+1}</div>
-          <div class="pub-card-nombre">${ej.nombre}</div>
-          <div style="font-size:11px;color:rgba(255,255,255,.6);margin-top:2px">${ej.terapeuta} · ${ej.fecha}</div>
+          <div class="pub-card-nombre">${escapeHTML(ej.nombre)}</div>
+          <div style="font-size:11px;color:rgba(255,255,255,.6);margin-top:2px">${escapeHTML(ej.terapeuta)} · ${escapeHTML(ej.fecha)}</div>
         </div>
         <div style="padding:14px">
           ${ej.media ? `<div style="border-radius:10px;overflow:hidden;margin-bottom:12px;background:#111;display:flex;align-items:center;justify-content:center;min-height:${isVideo?'220':'180'}px">
             ${!src
               ? `<p style="color:#9BA3B5;padding:20px">Video no disponible</p>`
               : isVideo
-                ? `<video src="${src}" controls playsinline preload="metadata" style="width:100%;max-height:280px;object-fit:cover"></video>`
+                ? `<video src="${escapeAttr_(src)}" controls playsinline preload="metadata" style="width:100%;max-height:280px;object-fit:cover"></video>`
                 : isImg
-                  ? `<img src="${src}" loading="lazy" decoding="async" style="width:100%;max-height:280px;object-fit:cover">`
-                  : `<div style="padding:20px;color:white;text-align:center">📎 ${ej.media.label}</div>`}
+                  ? `<img src="${escapeAttr_(src)}" loading="lazy" decoding="async" style="width:100%;max-height:280px;object-fit:cover">`
+                  : `<div style="padding:20px;color:white;text-align:center">📎 ${escapeHTML(ej.media.label)}</div>`}
           </div>` : ''}
 
           ${ej.objetivo?'':''}
@@ -11561,19 +11561,19 @@ function renderVistaPublica(p, opts={}){
             ${(ej.dosis||[ej.series,ej.repeticiones,ej.tiempo,ej.frecuencia,ej.duracion].filter(Boolean).join(' · '))?
               `<div class="pub-dosis-item" style="text-align:left;padding:10px 14px">
                 <div class="pub-dosis-lbl" style="margin-bottom:4px">Dosificación</div>
-                <div class="pub-dosis-val" style="font-size:16px">${ej.dosis||[ej.series,ej.repeticiones,ej.tiempo,ej.frecuencia,ej.duracion].filter(Boolean).join(' · ')}</div>
+                <div class="pub-dosis-val" style="font-size:16px">${escapeHTML(ej.dosis||[ej.series,ej.repeticiones,ej.tiempo,ej.frecuencia,ej.duracion].filter(Boolean).join(' · '))}</div>
               </div>`:''
             }
           </div>
 
           ${ej.indicaciones?`<div style="background:#F0F4FF;border-radius:8px;padding:10px 12px;margin-bottom:8px">
             <div style="font-size:11px;font-weight:700;color:#1B3A6B;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Indicaciones</div>
-            <div style="font-size:13px;color:#2D3344;line-height:1.6">${ej.indicaciones}</div>
+            <div style="font-size:13px;color:#2D3344;line-height:1.6">${escapeHTML(ej.indicaciones)}</div>
           </div>`:''}
 
           ${ej.precauciones?`<div style="background:#FEF3C7;border-radius:8px;padding:10px 12px;margin-bottom:8px">
             <div style="font-size:11px;font-weight:700;color:#B7791F;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">⚠ Precauciones</div>
-            <div style="font-size:13px;color:#92400E;line-height:1.6">${ej.precauciones}</div>
+            <div style="font-size:13px;color:#92400E;line-height:1.6">${escapeHTML(ej.precauciones)}</div>
           </div>`:''}
 
           ${ej.observaciones?'':''}
