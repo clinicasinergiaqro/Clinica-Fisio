@@ -1468,31 +1468,77 @@ function _encolarSoapHistoricoNueva(pid, sesion){
     localStorage.setItem('COLA_SYNC_HIST', JSON.stringify(q));
   }catch(e){ console.warn('[SOAP-hist-nueva] no se pudo encolar:', e && e.message); }
 }
+// FIX robustez cola — utilidades: timeout de write, clasificación de error, lista de fallidos permanentes.
+function _conTimeout(promise, ms){
+  return Promise.race([
+    promise,
+    new Promise(function(_, rej){ setTimeout(function(){ rej(new Error('timeout')); }, ms||10000); })
+  ]);
+}
+function _esErrorPermanenteHist(e){
+  var s = String((e && (e.code||e.name)) || '') + ' ' + String((e && e.message) || '');
+  // Permanentes: NO se resuelven reintentando (permiso, campo inválido, doc inexistente, sin sesión).
+  // Temporales (unavailable/deadline-exceeded/internal/aborted/red/timeout) → sí reintentan.
+  return /permission-denied|permission_denied|insufficient permissions|invalid-argument|invalid_argument|not-found|failed-precondition|unauthenticated/i.test(s);
+}
+function _persistirFallidosHist(items){
+  try{
+    var f = JSON.parse(localStorage.getItem('COLA_SYNC_HIST_FALLIDOS')||'[]');
+    if(!Array.isArray(f)) f = [];
+    f = f.concat(items);
+    if(f.length > 50) f = f.slice(f.length - 50); // cap de inspección
+    localStorage.setItem('COLA_SYNC_HIST_FALLIDOS', JSON.stringify(f));
+  }catch(e){ console.warn('[SOAP-hist] no se pudo guardar fallidos:', e && e.message); }
+}
 let _DRENANDO_HIST = false;
+const _MAX_INTENTOS_HIST = 5;
 async function drenarColaSoapHistorico(){
   if(_DRENANDO_HIST || !navigator.onLine) return; // guard: seguro de llamar desde 'online' y sincronizarPendientes sin carrera
   var q;
   try{ q = JSON.parse(localStorage.getItem('COLA_SYNC_HIST')||'[]'); }catch(e){ q = []; }
   if(!Array.isArray(q) || !q.length) return;
   _DRENANDO_HIST = true;
-  var restantes = [];
+  var restantes = [], fallidos = [], ahora = Date.now();
   try{
     for(const it of q){
+      // Backoff: si aún no toca reintentar, conservar el item sin tocarlo.
+      if(it && it.proximoIntento && ahora < it.proximoIntento){ restantes.push(it); continue; }
       try{
         if(it && it.tipo==='nueva'){
-          // Bug B fix — reintentar nota nueva de histórico: write directo de la sesión.
+          // reintentar nota nueva de histórico: write directo de la sesión.
           // FST_buildSesionPayload recrea los serverTimestamp (no serializables en la cola).
           if(!window._fstDb && typeof FST_init==='function') await FST_init();
-          if(!window._fstDb) throw new Error('firestore-no-disponible');
+          if(!window._fstDb) throw new Error('unavailable: firestore-no-disponible'); // temporal → reintenta
           var sesPayload = FST_buildSesionPayload(it.sesion, 'nueva');
           await window._fstDb.collection('pacientes').doc(it.pid).collection('sesiones').doc(String(it.sesion.id)).set(sesPayload, { merge:true });
         } else {
           await _guardarEdicionSoapHistorico(it.sid, it.pid, it.payload);
         }
+        // éxito → no se re-encola
+      }catch(e){
+        var _cod = String((e && (e.code||e.message)) || '');
+        if(_esErrorPermanenteHist(e)){
+          // FIX 1 — error PERMANENTE: no reintentar. Sacar de la cola y conservar para inspección.
+          fallidos.push(Object.assign({}, it, {error:_cod||'permanente', falladoEn:ahora}));
+          console.warn('[SOAP-hist] descartado por error PERMANENTE:', _cod);
+        } else {
+          // FIX 1 — error TEMPORAL: reintentar con backoff y tope de intentos (no infinito).
+          var n = (Number(it && it.intentos)||0) + 1;
+          if(n >= _MAX_INTENTOS_HIST){
+            fallidos.push(Object.assign({}, it, {error:'max-reintentos('+n+') '+_cod, falladoEn:ahora}));
+            console.warn('[SOAP-hist] descartado tras', n, 'reintentos:', _cod);
+          } else {
+            var espera = Math.min(60000, 2000 * Math.pow(2, n-1)); // 2s,4s,8s,16s → cap 60s
+            restantes.push(Object.assign({}, it, {intentos:n, proximoIntento: ahora + espera}));
+          }
+        }
       }
-      catch(e){ restantes.push(it); } // sigue sin conexión/permiso → se conserva para el próximo intento
     }
     try{ localStorage.setItem('COLA_SYNC_HIST', JSON.stringify(restantes)); }catch(e){}
+    if(fallidos.length){
+      _persistirFallidosHist(fallidos);
+      try{ showToastCritico_('⚠️ '+fallidos.length+' nota(s) histórica(s) NO se pudieron guardar (permiso/formato). Guardadas para revisión — avisa al administrador.'); }catch(_){}
+    }
     if(restantes.length) console.warn('[SOAP-hist]', restantes.length, 'ediciones históricas aún sin sincronizar');
   } finally { _DRENANDO_HIST = false; }
 }
@@ -5822,13 +5868,19 @@ async function guardarSOAP(){
       editingSoapId=null; editingSoapPid=null; editingSoapEsHistorico=false; _editingSoapHistoricoNota=null;
       tempEvolMedia=[];
       // 1.1 fix — persistir ANTES de navegar; Firestore es el ÚNICO almacén del histórico.
-      // Si falla, respaldar en cola local (COLA_SYNC_HIST) y avisar fuerte; ya NO se pierde.
-      try{
-        await _guardarEdicionSoapHistorico(sidH,pidH,payloadH);
-      }catch(err){
+      // FIX 2 — offline: Firestore NO rechaza sin conexión (deja el write pendiente/colgado) → el catch
+      // nunca dispararía. Detectar offline y encolar directo. Online: intentar con timeout de 10s.
+      if(!navigator.onLine){
         _encolarSoapHistorico(sidH,pidH,payloadH);
-        showToastCritico_('⚠️ Nota histórica NO guardada en la nube — respaldada en este equipo. Se reintentará al reconectar.');
-        console.warn('[SOAP-hist] guardado falló, encolado:', err && err.message);
+        showToast('📴 Sin conexión — nota histórica respaldada en este equipo. Se sincronizará al reconectar.','warning');
+      } else {
+        try{
+          await _conTimeout(_guardarEdicionSoapHistorico(sidH,pidH,payloadH), 10000);
+        }catch(err){
+          _encolarSoapHistorico(sidH,pidH,payloadH);
+          showToastCritico_('⚠️ Nota histórica NO guardada en la nube — respaldada en este equipo. Se reintentará al reconectar.');
+          console.warn('[SOAP-hist] guardado falló, encolado:', err && err.message);
+        }
       }
       goBack();
       setTimeout(()=>renderExpediente('soap'),300);
@@ -5943,13 +5995,24 @@ async function guardarSOAP(){
     p.ultimoUsuario=ter;
     tempEvolMedia=[];
     const _esHistNueva = String(p.id).startsWith('mig_pac_');
+    // FIX 2 — offline + histórico: saveDB colgaría (su _persistirHistoricoFirestore hace await set() pendiente
+    // sin conexión) y el .then nunca correría → la nota no se encolaría. Detectar offline y encolar directo,
+    // sin llamar a saveDB. (El contador de episodio se recomputa al sincronizar; la NOTA es lo prioritario.)
+    if(_esHistNueva && !navigator.onLine){
+      _encolarSoapHistoricoNueva(p.id, nuevaSOAP);
+      showToast('📴 Sin conexión — nota respaldada en este equipo. Se sincronizará al reconectar.','warning');
+      _liberarGuardSOAP();
+      goBack();
+      setTimeout(()=>renderExpediente('soap'),300);
+      return;
+    }
     saveDB('pts',[p]).then(async res=>{
       if(_esHistNueva){
         // Bug B fix — nota NUEVA de histórico: Firestore es el ÚNICO almacén. Await + encolar si falla
         // (NO fire-and-forget). Desacoplado de res.ok clínico: la nota se persiste aunque los campos clínicos fallen.
         let _rOk=false, _rWhy='';
         try{
-          const r = (typeof FST_guardarSesionFirestore === 'function') ? await FST_guardarSesionFirestore(p, nuevaSOAP, 'nueva') : {ok:false, reason:'FN_MISSING'};
+          const r = (typeof FST_guardarSesionFirestore === 'function') ? await _conTimeout(FST_guardarSesionFirestore(p, nuevaSOAP, 'nueva'), 10000) : {ok:false, reason:'FN_MISSING'};
           _rOk = !!(r && r.ok); _rWhy = (r && r.reason) || '';
         }catch(err){ _rOk=false; _rWhy=(err && err.message) || 'excepción'; }
         if(_rOk){ showToast('✅ Nota SOAP guardada — Sesión '+sesNum,'success'); }
