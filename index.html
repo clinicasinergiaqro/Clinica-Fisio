@@ -1064,7 +1064,10 @@ function saveLocal(k,v){
     let toSave=v;
     // Para pacientes: quitar base64 (ya está en IndexedDB), guardar solo mediaId
     if(k==='pts' && Array.isArray(v)){
-      toSave=v.map(p=>({
+      // Regla arquitectural: los históricos (mig_pac_) viven SOLO en Firestore, NUNCA en localStorage.
+      // Se excluyen aquí, en el punto de escritura, para que su p.soap no pueda congelarse localmente.
+      // Siguen en memoria mientras el expediente está abierto (no se toca patientsDB, solo el disco).
+      toSave=v.filter(p=>!String(p&&p.id||'').startsWith('mig_pac_')).map(p=>({
         ...p,
         fotos:(Array.isArray(p.fotos)?p.fotos:[]).map(f=>({...f,data:f.mediaId?undefined:f.data})),
         docs:(Array.isArray(p.docs)?p.docs:[]).map(d=>({...d,data:d.mediaId?undefined:d.data})),
@@ -1873,7 +1876,19 @@ function _esPacienteTest(p){
   return false;
 }
 // Patients — datos demo compartidos para todos
-let patientsDB = (loadDB('pts') || []).filter(function(p){ return !(typeof _esPacienteTest==='function' && _esPacienteTest(p)); });
+// Limpieza única al boot: sacar históricos (mig_pac_) fantasma que se hayan filtrado a localStorage
+// en versiones anteriores (su p.soap quedaba congelado). Se purgan del disco una vez; de ahí en
+// adelante saveLocal ya nunca los persiste. Los históricos se abren frescos desde Firestore (FST_*).
+let patientsDB = (function(){
+  var _raw = loadDB('pts') || [];
+  var _hadMig = Array.isArray(_raw) && _raw.some(function(p){ return String(p&&p.id||'').startsWith('mig_pac_'); });
+  var _limpio = (Array.isArray(_raw)?_raw:[]).filter(function(p){
+    return !(typeof _esPacienteTest==='function' && _esPacienteTest(p))
+        && !String(p&&p.id||'').startsWith('mig_pac_');
+  });
+  if(_hadMig){ try{ saveLocal('pts', _limpio); console.warn('[fuga] mig_pac_ fantasma purgados de localStorage'); }catch(_){} }
+  return _limpio;
+})();
 
 
 // ── UTILS ──────────────────────────────────────────────────────────────────
