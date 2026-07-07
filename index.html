@@ -4408,6 +4408,7 @@ async function FST_hidratarCamposClinicos(p, id) {
     if (Array.isArray(d.ejercicios) && d.ejercicios.length) p.ejercicios = d.ejercicios;
     if (d.ejerciciosToken) p.ejerciciosToken = d.ejerciciosToken;
     if (d.ejerciciosLinkActivo != null) p.ejerciciosLinkActivo = d.ejerciciosLinkActivo;
+    if (Array.isArray(d.reportesClinicosIA) && d.reportesClinicosIA.length) p.reportesClinicosIA = d.reportesClinicosIA; // v2: escrito en Write 1 (whitelist ejercicios)
 
     // v2 fix (Cambio C) — leer de vuelta los campos clínicos que saveDB-v2 escribe.
     // Guards estrictos: NO clobberear datos locales con vacíos de Firestore (mismo patrón que ejercicios).
