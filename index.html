@@ -6789,9 +6789,9 @@ async function _FST_extraerEstudiosDeNotas(p){
 // Render del apartado (async). Llena #estudios-apartado: manuales (estudiosDocs) + extraídos (en nota).
 // I-F — Resuelve el paciente por pid: patientsDB (activos) → currentPatient (histórico abierto, no está en patientsDB).
 function _resolverPaciente(pid){
+  if (typeof currentPatient !== 'undefined' && currentPatient && currentPatient.id===pid) return currentPatient;  // id estricto — currentPatient primero
   var p = patientsDB.find(function(x){ return x.id===pid; });
   if (p) return p;
-  if (typeof currentPatient !== 'undefined' && currentPatient && currentPatient.id===pid) return currentPatient;  // id estricto
   return null;
 }
 
