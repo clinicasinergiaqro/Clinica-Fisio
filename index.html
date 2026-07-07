@@ -147,6 +147,8 @@ async function FST_fetchSesiones(pid){
       const d = doc.data() || {};
       return {
         id: d.id || doc.id, num: Number(d.num || 0), fecha: d.fecha || '', semana: Number(d.semana || 1),
+        // FIX A — fallback de fecha para sesiones sin `fecha` (que caían al fondo del historial):
+        fechaHoraISO: d.fechaHoraISO || (d.createdAt && typeof d.createdAt.toDate==='function' ? d.createdAt.toDate().toISOString() : ''),
         terapeuta: d.terapeuta || d.terapeutaCodigoHistorico || 'REVISAR', terapeutaEstado: d.terapeutaEstado || '',
         s: (typeof d.s === 'object' && d.s) ? d.s : { dolor:'', cambios:'', actFisica:'' },
         o: (typeof d.o === 'object' && d.o) ? d.o : { rom:'', fuerza:'', hallazgos:'' },
@@ -2118,7 +2120,8 @@ function buscarPacientesDebounce_(val, filtro){
 
 // ── Helpers de fecha SOAP (base para alertas semanales) ──
 function obtenerFechaSoapISO(s){
-  const raw = s?.fecha||s?.date||s?.createdAt||s?.fechaCreacion||s?.fechaSesion||'';
+  // FIX A — fecha vacía → usar fechaHoraISO/createdAt (posición cronológica real, no al fondo). fecha válida gana.
+  const raw = s?.fecha||s?.date||s?.fechaHoraISO||s?.createdAt||s?.fechaCreacion||s?.fechaSesion||'';
   if(!raw) return null;
   if(typeof raw==='number') return new Date(raw).toISOString().slice(0,10);
   let str=String(raw).trim();
@@ -10048,7 +10051,12 @@ async function _RPT_obtenerSesionesDedup(pid){
   fs.forEach(function(s){ mapa[key(s)]=s; });
   local.forEach(function(s){ if(!mapa[key(s)]) mapa[key(s)]=s; });
   return Object.keys(mapa).map(function(k){ return mapa[k]; })
-    .sort(function(a,b){ return String(a.fecha||a.date||'').localeCompare(String(b.fecha||b.date||'')); });
+    // 2.2 fix — ordenar por FECHA REAL, no string: localeCompare sobre DD/MM/YYYY ordenaba por día.
+    // parseFechaClinicaSegura maneja DD/MM/YYYY, ISO y mezcladas; fechaHoraISO como fallback (fecha vacía).
+    .sort(function(a,b){
+      var da=parseFechaClinicaSegura(a.fecha||a.date||a.fechaHoraISO), db=parseFechaClinicaSegura(b.fecha||b.date||b.fechaHoraISO);
+      return (da?da.getTime():0) - (db?db.getTime():0); // cronológico ascendente
+    });
 }
 
 function _RPT_hashEntradas(p, sesiones){
@@ -10066,7 +10074,8 @@ function _RPT_tieneSintesisValidada(p){
   return arr.some(function(r){ return r&&r.sintesisIA&&r.validado; });
 }
 function _RPT_periodo(sesiones){
-  var fechas=sesiones.map(function(s){ return s.fecha||s.date||''; }).filter(Boolean).sort();
+  // 2.2 fix — mismo bug: período inicio–fin se calculaba con sort de string DD/MM/YYYY. Ordenar por Date real.
+  var fechas=sesiones.map(function(s){ return parseFechaClinicaSegura(s.fecha||s.date||s.fechaHoraISO); }).filter(Boolean).sort(function(a,b){ return a-b; });
   if(!fechas.length) return '—';
   var a=_RPT_fechaLarga(fechas[0]), b=_RPT_fechaLarga(fechas[fechas.length-1]);
   return a===b?a:(a+' – '+b);
