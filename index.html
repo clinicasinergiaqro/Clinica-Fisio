@@ -924,6 +924,18 @@ let editingSoapPid=null; // pid del paciente cuya nota histórica se edita
 let editingSoapEsHistorico=false; // true si la nota viene del historial Firestore (importado:true)
 let _editingSoapHistoricoNota=null; // snapshot completo de la nota histórica mientras se edita
 let _fstSesionesCache={}; // cache pid→[sesiones] para evitar re-fetch al ver historial
+// Helper unificado de sesiones para vistas SÍNCRONAS (gráfica EVA, completitud, inactividad):
+//   activo (p-uuid) → p.soap ; histórico (mig_pac_) → _fstSesionesCache (sesiones de Firestore).
+// Histórico con el cache aún NO poblado → devuelve null (señal "cargando", NO [] silencioso).
+// openExpediente pre-carga el cache para históricos y re-renderiza; aquí es SÍNCRONO (no hace fetch).
+function obtenerSesiones(p){
+  if(!p) return [];
+  if(String(p.id||'').startsWith('mig_pac_')){
+    var c = _fstSesionesCache[p.id];
+    return Array.isArray(c) ? c : null; // null = histórico aún cargando
+  }
+  return Array.isArray(p.soap) ? p.soap : [];
+}
 let _guardandoSOAP = false; // H-02: anti-doble-toque en guardarSOAP
 let modoRapidoIA=true; // true = modo rápido (default); false = modo completo
 let sigCanvas=null, sigCtx=null, sigDrawing=false;
@@ -2126,7 +2138,9 @@ function _cmpSoapFechaDesc(a,b){
   return (Number(b&&b.num)||0)-(Number(a&&a.num)||0); // empate/sin fecha → num descendente
 }
 function obtenerUltimaFechaSoap(p){
-  const fechas=((p&&p.soap)||[]).map(obtenerFechaSoapISO).filter(Boolean).sort();
+  // Sesiones vía helper: activo → p.soap; histórico → Firestore. Histórico cargando (null) → [] → sin fecha.
+  const _ses = (typeof obtenerSesiones==='function' ? obtenerSesiones(p) : (p&&p.soap)) || [];
+  const fechas=_ses.map(obtenerFechaSoapISO).filter(Boolean).sort();
   return fechas.length ? fechas[fechas.length-1] : null;
 }
 function diasDesdeUltimoSoap(p){
@@ -3364,6 +3378,15 @@ function openExpediente(pid){
   restaurarMedia(currentPatient).then(()=>{
     if(document.getElementById('content-expediente')) renderExpediente(currentTab||'historia');
   });
+  // Históricos (mig_pac_): pre-cargar sus sesiones de Firestore al cache para que obtenerSesiones()
+  // las tenga en las vistas SÍNCRONAS (gráfica EVA, completitud). Una lectura por apertura; al llegar,
+  // re-renderiza. Solo LLAMA a FST_fetchSesiones (no la modifica).
+  if(String(pid).startsWith('mig_pac_') && typeof FST_fetchSesiones==='function'){
+    FST_fetchSesiones(pid).then(function(ses){
+      _fstSesionesCache[pid] = Array.isArray(ses)?ses:[];
+      if(currentPatient && currentPatient.id===pid && document.getElementById('content-expediente')) renderExpediente(currentTab||'historia');
+    }).catch(function(){});
+  }
 }
 
 function renderIndicadorCompletitud(p){
@@ -3374,19 +3397,22 @@ function renderIndicadorCompletitud(p){
     (p.dxFuncional?.dxFuncional && p.dxFuncional.dxFuncional !== '[pendiente]' && p.dxFuncional.dxFuncional !== 'Pendiente')
   );
   const cons = tieneConsentimientoFirmado(p);
+  // Sesiones vía helper unificado: activo → p.soap; histórico → Firestore (obtenerSesiones).
+  // Histórico aún cargando → [] (breve; se corrige al re-render que dispara el pre-fetch de openExpediente).
+  const _ses = obtenerSesiones(p) || [];
   // Loop2 P1: consentimiento previo — en primera cita (sin SOAP) pendiente es normal
-  const esPrimeraCita = !Array.isArray(p.soap) || p.soap.length === 0;
+  const esPrimeraCita = _ses.length === 0;
   const datos = !!(p.consentimientoDatos && p.consentimientoDatos.aceptado);
   const sexoOk = !!(p.sexo && p.sexo!=='No especificado');
   const tieneRevalor = Array.isArray(p.revaloraciones) && p.revaloraciones.length>0;
   const tieneAlta = !!(p.altaClinica?.activa);
   const nEventos = (p.eventosAdversos||[]).length;
-  const muchasSesiones = (Array.isArray(p.soap)?p.soap.length:0) > 5;
+  const muchasSesiones = _ses.length > 5;
   // Loop2 P2: seguridad clínica — distinguir capturada / con precaución / pendiente
   const segCapturada = !!(p.seguridadClinica &&
     (Array.isArray(p.seguridadClinica.implantes) || Array.isArray(p.seguridadClinica.condiciones)));
   const segTienePrecaucion = !!(p.seguridadClinica?.tienePrecaucion);
-  const nSoap = p.soap?.length || 0;
+  const nSoap = _ses.length;
   const semanal = nSoap>0 && !necesitaAlertaSoapSemanal(p);
   const chip=(ok,txt,bad)=>`<span style="font-size:11px;font-weight:600;padding:4px 10px;border-radius:20px;background:${ok?'#DCFCE7':bad?'#FEE2E2':'#FEF3C7'};color:${ok?'#166534':bad?'#991B1B':'#92400E'}">${txt}</span>`;
   return `<div style="display:flex;flex-wrap:wrap;gap:6px;padding:10px 14px;background:#F8FAFB;border-radius:10px;margin-bottom:12px">
@@ -12990,9 +13016,13 @@ function showSupervision(){
 }
 // ── B1: Gráfica EVA en SVG puro (sin librerías) ──
 function generarGraficaEVA(p){
+  const _ses=obtenerSesiones(p);
+  if(_ses===null) return '<div style="padding:14px;font-size:12px;color:var(--gray-400);text-align:center">⏳ Cargando gráfica de dolor…</div>';
   const toNum=v=>{ const n=Number(v); return isNaN(n)?null:n; };
-  const _tieneEp=Array.isArray(p.motivosAnteriores)&&p.motivosAnteriores.length>0;
-  const _soapFilt=_tieneEp?(p.soap||[]).filter(s=>typeof s.motivoIndex==='number'&&s.motivoIndex===(p.motivoActualIndex||0)):(p.soap||[]);
+  // Históricos leen de Firestore (FST_fetchSesiones no devuelve motivoIndex) → no filtrar por episodio: mostrar todas.
+  const _esMig=String(p.id||'').startsWith('mig_pac_');
+  const _tieneEp=!_esMig && Array.isArray(p.motivosAnteriores)&&p.motivosAnteriores.length>0;
+  const _soapFilt=_tieneEp?_ses.filter(s=>typeof s.motivoIndex==='number'&&s.motivoIndex===(p.motivoActualIndex||0)):_ses;
   const sesiones=_soapFilt.map((s,i)=>({
     num:_tieneEp?(s.numEpisodio||i+1):(i+1),
     ei: toNum(s.evaI ?? s.eva?.inicial ?? s.evaInicial),
