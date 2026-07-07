@@ -1422,6 +1422,19 @@ async function _persistirHistoricoFirestore(p){
     if(p.consentimientoDatos!=null)      outCl.consentimientoDatos = p.consentimientoDatos;
     if(p.consentimientoImagen!=null)     outCl.consentimientoImagen = p.consentimientoImagen;
     if(p.consentimientoWhatsApp!=null)   outCl.consentimientoWhatsApp = p.consentimientoWhatsApp;
+    // fix (d)+(e) — media de históricos: estudiosDocs (whitelist v4) + fotos/docs (whitelist v5).
+    // Sin esto, la galería de un histórico subía la foto a Storage pero no persistía la
+    // referencia → desaparecía al reabrir. Los 3 van en outCl (Write 2 clínico), NO en outEj.
+    // fotos/docs: strip de base64 top-level (mismo criterio que ejercicios arriba) — el fallback
+    // offline guarda 'data' base64; escribirlo podría pasar 1MB/doc y rechazar el Write 2 entero.
+    // La referencia persistente (url/fbPath/mediaId) se conserva; el base64 vive en IndexedDB.
+    var _stripB64 = function(x){
+      if(x && typeof x.data==='string' && x.data.indexOf('data:')===0){ var c=Object.assign({},x); c.data=null; return c; }
+      return x;
+    };
+    if(Array.isArray(p.estudiosDocs))    outCl.estudiosDocs = p.estudiosDocs;
+    if(Array.isArray(p.fotos))           outCl.fotos = p.fotos.map(_stripB64);
+    if(Array.isArray(p.docs))            outCl.docs  = p.docs.map(_stripB64);
     if(Object.keys(outCl).length){
       await ref.set(outCl, { merge:true }); // sin updatedAt (mismo criterio que Write 1)
     }
@@ -3951,7 +3964,7 @@ function renderExpediente(tab='historia'){
   if(tab==='estudios'){
     const fotos=p.fotos||[], docs=p.docs||[];
     html+=`<input type="file" id="inp-foto" accept="image/*" capture="environment" style="display:none" onchange="handleMedia(event,'foto','${p.id}')">
-    <input type="file" id="inp-galeria" accept="image/*" multiple style="display:none" onchange="handleMedia(event,'galeria','${p.id}')">
+    <input type="file" id="inp-galeria" accept="image/*" style="display:none" onchange="handleMedia(event,'galeria','${p.id}')">
     <input type="file" id="inp-doc" accept="*/*" multiple style="display:none" onchange="handleMedia(event,'doc','${p.id}')">
     <div style="background:var(--blue-light);border-radius:10px;padding:10px 12px;margin-bottom:12px;font-size:11px;color:var(--navy);display:flex;gap:8px;align-items:flex-start">
       <span style="font-size:14px">ℹ️</span>
@@ -4585,6 +4598,11 @@ async function FST_hidratarCamposClinicos(p, id) {
     if (Array.isArray(d.motivosAnteriores) && d.motivosAnteriores.length) p.motivosAnteriores = d.motivosAnteriores;
     if (d.motivoActualIndex       != null) p.motivoActualIndex       = d.motivoActualIndex;       // number (0 válido)
     if (d.numSesionEpisodioActual != null) p.numSesionEpisodioActual = d.numSesionEpisodioActual; // number (0 válido)
+    // fix (d)+(e) — leer de vuelta la media que Write 2 persiste (estudiosDocs=v4; fotos/docs=v5).
+    // Sin esto, la galería de un histórico se veía pero desaparecía al reabrir. Guard estricto: no clobberear con vacío.
+    if (Array.isArray(d.estudiosDocs) && d.estudiosDocs.length) p.estudiosDocs = d.estudiosDocs;
+    if (Array.isArray(d.fotos) && d.fotos.length)               p.fotos = d.fotos;
+    if (Array.isArray(d.docs)  && d.docs.length)                p.docs  = d.docs;
 
   } catch(e) {
     console.warn('[FST-LISTA] hidratar campos clínicos falló (no bloqueante):', e.message);
