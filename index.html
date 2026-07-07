@@ -1455,6 +1455,19 @@ function _encolarSoapHistorico(sid, pid, payload){
     localStorage.setItem('COLA_SYNC_HIST', JSON.stringify(q));
   }catch(e){ console.warn('[SOAP-hist] no se pudo encolar:', e && e.message); }
 }
+// Bug B fix — cola local para NOTAS NUEVAS de históricos cuyo write a Firestore falló.
+// (media no se guarda aquí: FST_buildSesionPayload no la usa; evita inflar localStorage.)
+function _encolarSoapHistoricoNueva(pid, sesion){
+  try{
+    var q = JSON.parse(localStorage.getItem('COLA_SYNC_HIST')||'[]');
+    if(!Array.isArray(q)) q = [];
+    var sid = String((sesion && sesion.id) || '');
+    var sLimpia = Object.assign({}, sesion); delete sLimpia.media;
+    q = q.filter(function(it){ return !(it && it.tipo==='nueva' && String(it.sesion && it.sesion.id)===sid); });
+    q.push({tipo:'nueva', pid:pid, sesion:sLimpia, ts:Date.now()});
+    localStorage.setItem('COLA_SYNC_HIST', JSON.stringify(q));
+  }catch(e){ console.warn('[SOAP-hist-nueva] no se pudo encolar:', e && e.message); }
+}
 let _DRENANDO_HIST = false;
 async function drenarColaSoapHistorico(){
   if(_DRENANDO_HIST || !navigator.onLine) return; // guard: seguro de llamar desde 'online' y sincronizarPendientes sin carrera
@@ -1465,7 +1478,18 @@ async function drenarColaSoapHistorico(){
   var restantes = [];
   try{
     for(const it of q){
-      try{ await _guardarEdicionSoapHistorico(it.sid, it.pid, it.payload); }
+      try{
+        if(it && it.tipo==='nueva'){
+          // Bug B fix — reintentar nota nueva de histórico: write directo de la sesión.
+          // FST_buildSesionPayload recrea los serverTimestamp (no serializables en la cola).
+          if(!window._fstDb && typeof FST_init==='function') await FST_init();
+          if(!window._fstDb) throw new Error('firestore-no-disponible');
+          var sesPayload = FST_buildSesionPayload(it.sesion, 'nueva');
+          await window._fstDb.collection('pacientes').doc(it.pid).collection('sesiones').doc(String(it.sesion.id)).set(sesPayload, { merge:true });
+        } else {
+          await _guardarEdicionSoapHistorico(it.sid, it.pid, it.payload);
+        }
+      }
       catch(e){ restantes.push(it); } // sigue sin conexión/permiso → se conserva para el próximo intento
     }
     try{ localStorage.setItem('COLA_SYNC_HIST', JSON.stringify(restantes)); }catch(e){}
@@ -5918,9 +5942,26 @@ async function guardarSOAP(){
     p.fechaActualizacion=todayFmt();
     p.ultimoUsuario=ter;
     tempEvolMedia=[];
-    saveDB('pts',[p]).then(res=>{
-      showToast(res?.ok?'✅ Nota SOAP guardada — Sesión '+sesNum:'⚠️ SOAP guardada local, Sheets no confirmó',res?.ok?'success':'warning');
-      if (res?.ok === true && typeof FST_guardarSesionFirestore === 'function') FST_guardarSesionFirestore(p, nuevaSOAP, 'nueva').catch(()=>{});
+    const _esHistNueva = String(p.id).startsWith('mig_pac_');
+    saveDB('pts',[p]).then(async res=>{
+      if(_esHistNueva){
+        // Bug B fix — nota NUEVA de histórico: Firestore es el ÚNICO almacén. Await + encolar si falla
+        // (NO fire-and-forget). Desacoplado de res.ok clínico: la nota se persiste aunque los campos clínicos fallen.
+        let _rOk=false, _rWhy='';
+        try{
+          const r = (typeof FST_guardarSesionFirestore === 'function') ? await FST_guardarSesionFirestore(p, nuevaSOAP, 'nueva') : {ok:false, reason:'FN_MISSING'};
+          _rOk = !!(r && r.ok); _rWhy = (r && r.reason) || '';
+        }catch(err){ _rOk=false; _rWhy=(err && err.message) || 'excepción'; }
+        if(_rOk){ showToast('✅ Nota SOAP guardada — Sesión '+sesNum,'success'); }
+        else {
+          _encolarSoapHistoricoNueva(p.id, nuevaSOAP);
+          showToastCritico_('⚠️ Nota NO guardada en la nube — respaldada en este equipo. Se reintentará al reconectar.');
+          console.warn('[SOAP-hist-nueva] falló, encolada:', _rWhy);
+        }
+      } else {
+        showToast(res?.ok?'✅ Nota SOAP guardada — Sesión '+sesNum:'⚠️ SOAP guardada local, Sheets no confirmó',res?.ok?'success':'warning');
+        if (res?.ok === true && typeof FST_guardarSesionFirestore === 'function') FST_guardarSesionFirestore(p, nuevaSOAP, 'nueva').catch(()=>{});
+      }
     }).catch(()=>showToast('⚠️ Sin conexión — SOAP guardada solo en este equipo','warning'))
     .finally(()=>_liberarGuardSOAP());
     goBack();
