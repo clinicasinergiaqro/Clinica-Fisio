@@ -1156,7 +1156,10 @@ async function saveDB(k, v){
     if(String(p.id).startsWith('mig_pac_')) {
       // GUARDA DURA (Bug 1): un mig_pac_ NUNCA se escribe al Sheet.
       // Histórico → Firestore (v1: ejercicios/token/linkActivo, que antes se tiraban).
-      await _persistirHistoricoFirestore(p);
+      // 1.2 fix — contar el resultado real: si Firestore falló, encolar y NO reportar éxito.
+      const rHist = await _persistirHistoricoFirestore(p);
+      if(rHist && rHist.ok){ guardados++; desencolarSync(p.id); }
+      else { errores++; encolarSync(p.id); }
       continue;
     }
 
@@ -1357,7 +1360,7 @@ async function saveDB(k, v){
 async function _persistirHistoricoFirestore(p){
   try{
     var ok = (typeof FST_init==='function') ? await FST_init() : false;
-    if(!ok || !window._fstDb){ console.warn('[saveDB] Firestore no disponible; histórico no persistido:', p.id); return; }
+    if(!ok || !window._fstDb){ console.warn('[saveDB] Firestore no disponible; histórico no persistido:', p.id); return {ok:false, error:'firestore-no-disponible'}; }
     var ref = window._fstDb.collection('pacientes').doc(p.id);
 
     // ── Write 1: EJERCICIOS (pasa pacienteEjerciciosUpdateOK) ──
@@ -1405,7 +1408,8 @@ async function _persistirHistoricoFirestore(p){
     if(Object.keys(outCl).length){
       await ref.set(outCl, { merge:true }); // sin updatedAt (mismo criterio que Write 1)
     }
-  }catch(e){ console.warn('[saveDB] persistir histórico falló:', p.id, e.message); }
+    return {ok:true}; // 1.2 fix — señalar éxito para que saveDB no reporte ok:true falso
+  }catch(e){ console.warn('[saveDB] persistir histórico falló:', p.id, e.message); return {ok:false, error:e.message}; }
 }
 function loadDB(k){return loadLocal(k);}
 
@@ -1437,6 +1441,36 @@ function encolarSync(id){
 function desencolarSync(id){
   const cola = getColaSync().filter(x=>x!==id);
   setColaSync(cola);
+}
+
+// 1.1 fix — cola local para ediciones SOAP de históricos cuyo write a Firestore falló.
+// Firestore es el ÚNICO almacén de los históricos (no van a Sheets); sin esta cola la
+// edición solo vivía en _fstSesionesCache (memoria) y se perdía al recargar.
+function _encolarSoapHistorico(sid, pid, payload){
+  try{
+    var q = JSON.parse(localStorage.getItem('COLA_SYNC_HIST')||'[]');
+    if(!Array.isArray(q)) q = [];
+    q = q.filter(function(it){ return it && it.sid!==sid; }); // quedarse solo con la edición más reciente de esa nota
+    q.push({sid:sid, pid:pid, payload:payload, ts:Date.now()});
+    localStorage.setItem('COLA_SYNC_HIST', JSON.stringify(q));
+  }catch(e){ console.warn('[SOAP-hist] no se pudo encolar:', e && e.message); }
+}
+let _DRENANDO_HIST = false;
+async function drenarColaSoapHistorico(){
+  if(_DRENANDO_HIST || !navigator.onLine) return; // guard: seguro de llamar desde 'online' y sincronizarPendientes sin carrera
+  var q;
+  try{ q = JSON.parse(localStorage.getItem('COLA_SYNC_HIST')||'[]'); }catch(e){ q = []; }
+  if(!Array.isArray(q) || !q.length) return;
+  _DRENANDO_HIST = true;
+  var restantes = [];
+  try{
+    for(const it of q){
+      try{ await _guardarEdicionSoapHistorico(it.sid, it.pid, it.payload); }
+      catch(e){ restantes.push(it); } // sigue sin conexión/permiso → se conserva para el próximo intento
+    }
+    try{ localStorage.setItem('COLA_SYNC_HIST', JSON.stringify(restantes)); }catch(e){}
+    if(restantes.length) console.warn('[SOAP-hist]', restantes.length, 'ediciones históricas aún sin sincronizar');
+  } finally { _DRENANDO_HIST = false; }
 }
 
 // Indicador visual de estado de sincronización (Pieza 5)
@@ -1472,6 +1506,7 @@ function actualizarIndicadorSync(){
 async function sincronizarPendientes(){
   if(SYNC_EN_CURSO) return;
   if(!navigator.onLine) return;
+  drenarColaSoapHistorico(); // 1.1 fix — drenar ediciones SOAP históricas pendientes (independiente de COLA_SYNC de activos)
   const cola = getColaSync();
   if(cola.length===0){ actualizarIndicadorSync(); return; }
 
@@ -1519,6 +1554,7 @@ async function sincronizarPendientes(){
 window.addEventListener('online', ()=>{
   actualizarIndicadorSync();
   setTimeout(sincronizarPendientes, 800); // pequeño respiro tras reconectar
+  setTimeout(drenarColaSoapHistorico, 900); // 1.1 fix — reintentar ediciones SOAP históricas pendientes al reconectar
 });
 window.addEventListener('offline', ()=>{ actualizarIndicadorSync(); });
 
@@ -5637,6 +5673,7 @@ async function guardarSOAP(){
   }
 
   const p=currentPatient;
+  if(!p){ showToast('No hay paciente activo — recarga la app e intenta de nuevo','error'); _liberarGuardSOAP(); return; } // guard: sin esto un currentPatient nulo lanzaba y dejaba _guardandoSOAP=true (botón bloqueado hasta recargar)
   const ter=currentUser.name;
 
   limpiarDirty(); // pasó validación: los cambios se persistirán
@@ -5760,9 +5797,17 @@ async function guardarSOAP(){
       }
       editingSoapId=null; editingSoapPid=null; editingSoapEsHistorico=false; _editingSoapHistoricoNota=null;
       tempEvolMedia=[];
+      // 1.1 fix — persistir ANTES de navegar; Firestore es el ÚNICO almacén del histórico.
+      // Si falla, respaldar en cola local (COLA_SYNC_HIST) y avisar fuerte; ya NO se pierde.
+      try{
+        await _guardarEdicionSoapHistorico(sidH,pidH,payloadH);
+      }catch(err){
+        _encolarSoapHistorico(sidH,pidH,payloadH);
+        showToastCritico_('⚠️ Nota histórica NO guardada en la nube — respaldada en este equipo. Se reintentará al reconectar.');
+        console.warn('[SOAP-hist] guardado falló, encolado:', err && err.message);
+      }
       goBack();
       setTimeout(()=>renderExpediente('soap'),300);
-      _guardarEdicionSoapHistorico(sidH,pidH,payloadH).catch(err=>showToast('⚠️ Error al guardar en Firestore: '+err.message,'error'));
       _liberarGuardSOAP();
       return;
     }
@@ -6052,7 +6097,8 @@ async function _guardarEdicionSoapHistorico(sid, pid, sesion){
   delete payload._origen; delete payload.importado;
   delete payload.createdAt; delete payload.creadoPor;
   delete payload.id; delete payload.num; delete payload.fechaHoraISO;
-  await window._fstDb.collection('pacientes').doc(pid).collection('sesiones').doc(sid).update(payload);
+  // 1.1 fix — set(merge) en vez de update(): no falla duro si el doc no estuviera presente
+  await window._fstDb.collection('pacientes').doc(pid).collection('sesiones').doc(sid).set(payload, { merge:true });
   showToast('✅ Nota histórica actualizada en Firestore','success');
 }
 
