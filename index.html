@@ -9090,7 +9090,8 @@ function guardarAntecedentesCompleto(){
 function editarHistoria(seccion){
   const p = currentPatient;
   const c = document.getElementById('content-expediente');
-  const v = p.valoracion;
+  // 2.1 fix — guard: sin esto, si p.valoracion (o motivo/dxFuncional/planTto) es undefined el form crasheaba.
+  const v = p.valoracion||{};
 
   let formHtml = `<div data-dblenter="1" style="padding-bottom:100px">`;
 
@@ -9103,7 +9104,7 @@ function editarHistoria(seccion){
           <div class="form-label">Fecha de nacimiento</div>
           <input class="form-input" type="text" id="ed-fechanac" inputmode="numeric"
             placeholder="DD/MM/AAAA — o escribe DDMMAAAA"
-            value="${p.fechaNacimiento||''}"
+            value="${escapeAttr_(p.fechaNacimiento||'')}"
             data-edad-target="ed-edad"
             onblur="autoformatoFechaNac(this)"
             oninput="if(this.value.replace(/\\D/g,'').length===8){autoformatoFechaNac(this)}">
@@ -9112,7 +9113,7 @@ function editarHistoria(seccion){
         <div class="form-field">
           <div class="form-label">Edad</div>
           <input class="form-input" type="number" id="ed-edad"
-            value="${p.age||''}"
+            value="${escapeAttr_(p.age||'')}"
             ${p.fechaNacimiento?'readonly style="background:var(--gray-50)"':''}
             placeholder="Edad en años">
           <div style="font-size:11px;color:var(--gray-400);padding:3px 14px">${p.fechaNacimiento?'Calculada automáticamente desde fecha de nacimiento':'Se calcula automáticamente si hay fecha de nacimiento'}</div>
@@ -9120,19 +9121,19 @@ function editarHistoria(seccion){
         <div class="form-field">
           <div class="form-label">Teléfono</div>
           <input class="form-input" type="tel" id="ed-telefono" inputmode="numeric"
-            value="${p.telefono||''}" placeholder="Ej: 4421234567">
+            value="${escapeAttr_(p.telefono||'')}" placeholder="Ej: 4421234567">
         </div>
         <div class="form-field">
           <div class="form-label">Motivo de consulta <span style="color:var(--gray-400);font-weight:400">(breve)</span></div>
           <input class="form-input" type="text" id="ed-motivoconsulta" autocapitalize="sentences"
-            value="${p.motivoConsulta||p.motivo?.padecimiento?.substring(0,120)||''}"
+            value="${escapeAttr_(p.motivoConsulta||p.motivo?.padecimiento?.substring(0,120)||'')}"
             placeholder="Ej: Dolor lumbar de 2 semanas, postquirúrgico LCA">
         </div>
-        <div class="form-field"><div class="form-label">Médico referente</div><input class="form-input" type="text" id="ed-medico" value="${p.medicoReferente||''}"></div>
-        <div class="form-field"><div class="form-label">Diagnóstico <span class="req">*</span></div><input class="form-input" type="text" id="ed-dx" value="${p.dx}"></div>
-        <div class="form-field"><div class="form-label">Contraindicaciones</div><textarea class="form-input" id="ed-contra">${p.contraindicaciones}</textarea></div>
+        <div class="form-field"><div class="form-label">Médico referente</div><input class="form-input" type="text" id="ed-medico" value="${escapeAttr_(p.medicoReferente||'')}"></div>
+        <div class="form-field"><div class="form-label">Diagnóstico <span class="req">*</span></div><input class="form-input" type="text" id="ed-dx" value="${escapeAttr_(typeof p.dx==='string'?p.dx:((p.dx&&(p.dx.dxClinico||p.dx.dxMedico))||''))}"></div>
+        <div class="form-field"><div class="form-label">Contraindicaciones</div><textarea class="form-input" id="ed-contra">${escapeHTML(p.contraindicaciones||'')}</textarea></div>
         <div class="form-label" style="padding:13px 14px 0">Alergias <span class="req">*</span></div>
-        <div class="form-field"><input class="form-input" type="text" id="ed-alergias" value="${p.alergias}"></div>
+        <div class="form-field"><input class="form-input" type="text" id="ed-alergias" value="${escapeAttr_(p.alergias||'')}"></div>
       </div>
     </div>`;
   }
@@ -9142,11 +9143,11 @@ function editarHistoria(seccion){
     <div class="form-section">
       <div class="form-section-title">🏥 Antecedentes</div>
       <div class="form-group">
-        <div class="form-field"><div class="form-label">Heredofamiliares</div><textarea class="form-input" id="ed-patologicos">${(p.antecedentes?.patologicos||'—')}</textarea></div>
-        <div class="form-field"><div class="form-label">Deportivos</div><input class="form-input" type="text" id="ed-deportivos" value="${(p.antecedentes?.deportivos||'—')}"></div>
-        <div class="form-field"><div class="form-label">Deporte y frecuencia</div><input class="form-input" type="text" id="ed-deporte-freq" value="${(p.antecedentes?.deporteFrecuencia||'—')}"></div>
-        <div class="form-field"><div class="form-label">Cirugías previas</div><input class="form-input" type="text" id="ed-cirugias" value="${(p.antecedentes?.cirugias||'—')}"></div>
-        <div class="form-field"><div class="form-label">Medicamentos</div><textarea class="form-input" id="ed-medicamentos">${(p.antecedentes?.medicamentos||'—')}</textarea></div>
+        <div class="form-field"><div class="form-label">Heredofamiliares</div><textarea class="form-input" id="ed-patologicos">${escapeHTML(p.antecedentes?.patologicos||'—')}</textarea></div>
+        <div class="form-field"><div class="form-label">Deportivos</div><input class="form-input" type="text" id="ed-deportivos" value="${escapeAttr_(p.antecedentes?.deportivos||'—')}"></div>
+        <div class="form-field"><div class="form-label">Deporte y frecuencia</div><input class="form-input" type="text" id="ed-deporte-freq" value="${escapeAttr_(p.antecedentes?.deporteFrecuencia||'—')}"></div>
+        <div class="form-field"><div class="form-label">Cirugías previas</div><input class="form-input" type="text" id="ed-cirugias" value="${escapeAttr_(p.antecedentes?.cirugias||'—')}"></div>
+        <div class="form-field"><div class="form-label">Medicamentos</div><textarea class="form-input" id="ed-medicamentos">${escapeHTML(p.antecedentes?.medicamentos||'—')}</textarea></div>
       </div>
     </div>`;
   }
@@ -9156,12 +9157,12 @@ function editarHistoria(seccion){
     <div class="form-section">
       <div class="form-section-title">💬 Motivo de consulta</div>
       <div class="form-group">
-        <div class="form-field"><div class="form-label">Diagnóstico médico <span class="req">*</span></div><input class="form-input" type="text" id="ed-dxmedico" value="${p.motivo.dxMedico}"></div>
-        <div class="form-field"><div class="form-label">Padecimiento actual</div><textarea class="form-input" id="ed-padecimiento" style="min-height:80px">${p.motivo.padecimiento}</textarea></div>
-        <div class="form-field"><div class="form-label">Mecanismo de lesión</div><input class="form-input" type="text" id="ed-mecanismo" value="${p.motivo.mecanismo}"></div>
-        <div class="form-field"><div class="form-label">Tiempo de evolución</div><input class="form-input" type="text" id="ed-evolucion" value="${p.motivo.evolucion}"></div>
-        <div class="form-field"><div class="form-label">Estudios de imagen</div><input class="form-input" type="text" id="ed-estudios" value="${p.motivo.estudios}"></div>
-        <div class="form-field"><div class="form-label">Hallazgos / conclusión</div><textarea class="form-input" id="ed-hallazgos" style="min-height:80px">${p.motivo.hallazgos}</textarea></div>
+        <div class="form-field"><div class="form-label">Diagnóstico médico <span class="req">*</span></div><input class="form-input" type="text" id="ed-dxmedico" value="${escapeAttr_(p.motivo?.dxMedico||'')}"></div>
+        <div class="form-field"><div class="form-label">Padecimiento actual</div><textarea class="form-input" id="ed-padecimiento" style="min-height:80px">${escapeHTML(p.motivo?.padecimiento||'')}</textarea></div>
+        <div class="form-field"><div class="form-label">Mecanismo de lesión</div><input class="form-input" type="text" id="ed-mecanismo" value="${escapeAttr_(p.motivo?.mecanismo||'')}"></div>
+        <div class="form-field"><div class="form-label">Tiempo de evolución</div><input class="form-input" type="text" id="ed-evolucion" value="${escapeAttr_(p.motivo?.evolucion||'')}"></div>
+        <div class="form-field"><div class="form-label">Estudios de imagen</div><input class="form-input" type="text" id="ed-estudios" value="${escapeAttr_(p.motivo?.estudios||'')}"></div>
+        <div class="form-field"><div class="form-label">Hallazgos / conclusión</div><textarea class="form-input" id="ed-hallazgos" style="min-height:80px">${escapeHTML(p.motivo?.hallazgos||'')}</textarea></div>
       </div>
     </div>`;
   }
@@ -9174,19 +9175,19 @@ function editarHistoria(seccion){
         <div class="form-field">
           <div class="form-label">EVA inicial</div>
           <div class="eva-slider-wrap">
-            <input type="range" class="eva-slider" min="0" max="10" value="${v.eva}" id="ed-eva"
+            <input type="range" class="eva-slider" min="0" max="10" value="${escapeAttr_(v.eva??5)}" id="ed-eva"
               oninput="document.getElementById('ed-eva-v').textContent=this.value;updateEvaVal('ed-eva-v',+this.value)">
-            <div class="eva-val ${getEvaClass(v.eva)}" id="ed-eva-v">${v.eva}</div>
+            <div class="eva-val ${getEvaClass(v.eva??5)}" id="ed-eva-v">${escapeHTML(v.eva??5)}</div>
           </div>
         </div>
-        <div class="form-field"><div class="form-label">Inflamación</div><input class="form-input" type="text" id="ed-inflamacion" value="${v.inflamacion}"></div>
-        <div class="form-field"><div class="form-label">Marcha / postura</div><input class="form-input" type="text" id="ed-marcha" value="${v.marcha}"></div>
-        <div class="form-field"><div class="form-label">ROM</div><input class="form-input" type="text" id="ed-rom" value="${v.rom}"></div>
-        <div class="form-field"><div class="form-label">Fuerza muscular</div><input class="form-input" type="text" id="ed-fuerza" value="${v.fuerza}"></div>
-        <div class="form-field"><div class="form-label">Flexibilidad</div><input class="form-input" type="text" id="ed-flex" value="${v.flexibilidad}"></div>
-        <div class="form-field"><div class="form-label">Pruebas especiales</div><input class="form-input" type="text" id="ed-pruebas" value="${v.pruebasEspeciales}"></div>
-        <div class="form-field"><div class="form-label">Palpación</div><input class="form-input" type="text" id="ed-palpacion" value="${v.palpacion}"></div>
-        <div class="form-field"><div class="form-label">🚩 Banderas rojas</div><input class="form-input" type="text" id="ed-banderas" value="${v.banderasRojas}"></div>
+        <div class="form-field"><div class="form-label">Inflamación</div><input class="form-input" type="text" id="ed-inflamacion" value="${escapeAttr_(v.inflamacion||'')}"></div>
+        <div class="form-field"><div class="form-label">Marcha / postura</div><input class="form-input" type="text" id="ed-marcha" value="${escapeAttr_(v.marcha||'')}"></div>
+        <div class="form-field"><div class="form-label">ROM</div><input class="form-input" type="text" id="ed-rom" value="${escapeAttr_(v.rom||'')}"></div>
+        <div class="form-field"><div class="form-label">Fuerza muscular</div><input class="form-input" type="text" id="ed-fuerza" value="${escapeAttr_(v.fuerza||'')}"></div>
+        <div class="form-field"><div class="form-label">Flexibilidad</div><input class="form-input" type="text" id="ed-flex" value="${escapeAttr_(v.flexibilidad||'')}"></div>
+        <div class="form-field"><div class="form-label">Pruebas especiales</div><input class="form-input" type="text" id="ed-pruebas" value="${escapeAttr_(v.pruebasEspeciales||'')}"></div>
+        <div class="form-field"><div class="form-label">Palpación</div><input class="form-input" type="text" id="ed-palpacion" value="${escapeAttr_(v.palpacion||'')}"></div>
+        <div class="form-field"><div class="form-label">🚩 Banderas rojas</div><input class="form-input" type="text" id="ed-banderas" value="${escapeAttr_(v.banderasRojas||'')}"></div>
       </div>
     </div>`;
   }
@@ -9196,12 +9197,12 @@ function editarHistoria(seccion){
     <div class="form-section">
       <div class="form-section-title">🔎 Diagnóstico funcional</div>
       <div class="form-group">
-        <div class="form-field"><div class="form-label">Dx clínico</div><input class="form-input" type="text" id="ed-dxclinico" value="${p.dxFuncional.dxClinico}"></div>
-        <div class="form-field"><div class="form-label">Dx funcional</div><textarea class="form-input" id="ed-dxfuncional" style="min-height:72px">${p.dxFuncional.dxFuncional}</textarea></div>
-        <div class="form-field"><div class="form-label">Limitaciones</div><input class="form-input" type="text" id="ed-limitaciones" value="${p.dxFuncional.limitaciones}"></div>
-        <div class="form-field"><div class="form-label">Objetivos CP</div><input class="form-input" type="text" id="ed-objcp" value="${p.dxFuncional.objetivosCP}"></div>
-        <div class="form-field"><div class="form-label">Objetivos LP</div><input class="form-input" type="text" id="ed-objlp" value="${p.dxFuncional.objetivosLP}"></div>
-        <div class="form-field"><div class="form-label">Pronóstico</div><input class="form-input" type="text" id="ed-pronostico" value="${p.dxFuncional.pronostico}"></div>
+        <div class="form-field"><div class="form-label">Dx clínico</div><input class="form-input" type="text" id="ed-dxclinico" value="${escapeAttr_(p.dxFuncional?.dxClinico||'')}"></div>
+        <div class="form-field"><div class="form-label">Dx funcional</div><textarea class="form-input" id="ed-dxfuncional" style="min-height:72px">${escapeHTML(p.dxFuncional?.dxFuncional||'')}</textarea></div>
+        <div class="form-field"><div class="form-label">Limitaciones</div><input class="form-input" type="text" id="ed-limitaciones" value="${escapeAttr_(p.dxFuncional?.limitaciones||'')}"></div>
+        <div class="form-field"><div class="form-label">Objetivos CP</div><input class="form-input" type="text" id="ed-objcp" value="${escapeAttr_(p.dxFuncional?.objetivosCP||'')}"></div>
+        <div class="form-field"><div class="form-label">Objetivos LP</div><input class="form-input" type="text" id="ed-objlp" value="${escapeAttr_(p.dxFuncional?.objetivosLP||'')}"></div>
+        <div class="form-field"><div class="form-label">Pronóstico</div><input class="form-input" type="text" id="ed-pronostico" value="${escapeAttr_(p.dxFuncional?.pronostico||'')}"></div>
       </div>
     </div>`;
   }
@@ -9211,12 +9212,12 @@ function editarHistoria(seccion){
     <div class="form-section">
       <div class="form-section-title">🎯 Plan de tratamiento</div>
       <div class="form-group">
-        <div class="form-field"><div class="form-label">Frecuencia</div><input class="form-input" type="text" id="ed-frecuencia" value="${p.planTto.frecuencia}"></div>
-        <div class="form-field"><div class="form-label">Sesiones</div><input class="form-input" type="number" id="ed-sesiones" value="${p.planTto.sesiones}"></div>
-        <div class="form-field"><div class="form-label">Ejercicio terapéutico</div><textarea class="form-input" id="ed-ejercicio">${p.planTto.ejercicioTerapeutico}</textarea></div>
-        <div class="form-field"><div class="form-label">Terapia manual</div><input class="form-input" type="text" id="ed-tmanual" value="${p.planTto.terapiaManual}"></div>
-        <div class="form-field"><div class="form-label">Agentes físicos</div><input class="form-input" type="text" id="ed-agentes" value="${p.planTto.agentesFisicos}"></div>
-        <div class="form-field"><div class="form-label">Contraindicaciones</div><input class="form-input" type="text" id="ed-plancontra" value="${p.planTto.contraindicaciones}"></div>
+        <div class="form-field"><div class="form-label">Frecuencia</div><input class="form-input" type="text" id="ed-frecuencia" value="${escapeAttr_(p.planTto?.frecuencia||'')}"></div>
+        <div class="form-field"><div class="form-label">Sesiones</div><input class="form-input" type="number" id="ed-sesiones" value="${escapeAttr_(p.planTto?.sesiones??'')}"></div>
+        <div class="form-field"><div class="form-label">Ejercicio terapéutico</div><textarea class="form-input" id="ed-ejercicio">${escapeHTML(p.planTto?.ejercicioTerapeutico||'')}</textarea></div>
+        <div class="form-field"><div class="form-label">Terapia manual</div><input class="form-input" type="text" id="ed-tmanual" value="${escapeAttr_(p.planTto?.terapiaManual||'')}"></div>
+        <div class="form-field"><div class="form-label">Agentes físicos</div><input class="form-input" type="text" id="ed-agentes" value="${escapeAttr_(p.planTto?.agentesFisicos||'')}"></div>
+        <div class="form-field"><div class="form-label">Contraindicaciones</div><input class="form-input" type="text" id="ed-plancontra" value="${escapeAttr_(p.planTto?.contraindicaciones||'')}"></div>
       </div>
     </div>`;
   }
@@ -9233,7 +9234,7 @@ function editarHistoria(seccion){
   c.innerHTML = `
     <div style="background:linear-gradient(135deg,var(--navy),var(--navy-light));color:white;padding:12px 16px;margin:-16px -16px 16px;display:flex;align-items:center;gap:10px">
       <button onclick="renderExpediente('${tabRetorno}')" style="background:none;border:none;color:white;font-size:22px;cursor:pointer;padding:0 8px 0 0">‹</button>
-      <div style="font-weight:700;font-size:15px">Editando — ${p.name.split(' ')[0]}</div>
+      <div style="font-weight:700;font-size:15px">Editando — ${escapeHTML((p.name||'').split(' ')[0])}</div>
     </div>
     ${formHtml}`;
 }
