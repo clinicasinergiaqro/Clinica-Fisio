@@ -158,6 +158,9 @@ async function FST_fetchSesiones(pid){
         revisionPendiente: !!d.revisionPendiente, motivosRevision: Array.isArray(d.motivosRevision) ? d.motivosRevision : [],
         imagenesPendientes: !!d.imagenesPendientes,
         evaI: d.evaI != null ? Number(d.evaI) : null, evaF: d.evaF != null ? Number(d.evaF) : null,
+        // DIAG 1 (BUG 2): episodio en históricos — null si el doc no lo trae
+        motivoIndex: d.motivoIndex != null ? Number(d.motivoIndex) : null,
+        numEpisodio: d.numEpisodio != null ? Number(d.numEpisodio) : null,
         modalidades: Array.isArray(d.modalidades) ? d.modalidades : [], modoNota: d.modoNota || '',
         historialEdiciones: Array.isArray(d.historialEdiciones) ? d.historialEdiciones : [],
         completa: false, importado: true, _origen: 'firestore_historico'
@@ -199,7 +202,7 @@ function FST_renderCard(s, pid){
     : '';
   return '<div class="soap-card" style="opacity:.92;border-left:3px solid var(--navy)">'
     + '<div class="soap-header" style="cursor:default"><div>'
-    + '<div class="soap-sesion">Sesión ' + escapeHTML(s.num) + '</div>'
+    + '<div class="soap-sesion">Sesión ' + escapeHTML(s.numEpisodio != null ? s.numEpisodio : s.num) + (s.numEpisodio != null ? ' <span style="font-size:10px;color:var(--gray-400);font-weight:400">· Episodio ' + escapeHTML((s.motivoIndex||0)+1) + '</span>' : '') + '</div>'
     + '<div class="soap-meta">' + fecha + ' · <span style="font-weight:700;color:var(--navy)">' + terapeuta + '</span> · Semana ' + escapeHTML(semana) + '</div>'
     + '</div><div style="display:flex;flex-wrap:wrap;gap:4px;align-items:center">' + FST_badgesSesion(s) + '</div></div>'
     + '<div class="soap-body">'
@@ -361,6 +364,9 @@ function FST_buildSesionPayload(sesion, modo) {
     evaI: (sesion.evaI !== undefined && sesion.evaI !== null) ? sesion.evaI : null,
     evaF: (sesion.evaF !== undefined && sesion.evaF !== null) ? sesion.evaF : null,
     modalidades: Array.isArray(sesion.modalidades) ? sesion.modalidades : [],
+    // DIAG 1 (BUG 2): episodio — condicional para no escribir null en sesiones sin episodio
+    ...(sesion.motivoIndex != null ? { motivoIndex: Number(sesion.motivoIndex) } : {}),
+    ...(sesion.numEpisodio != null ? { numEpisodio: Number(sesion.numEpisodio) } : {}),
     completa: !!sesion.completa, modoNota: sesion.modoNota || '',
     importado: false, formatoOriginal: 'soap', revisionPendiente: false,
     origen: 'app_live', creadoPor: sesion.terapeuta || 'APP',
