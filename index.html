@@ -3238,14 +3238,18 @@ function _scoreSoapCalidad(s){
   if(Array.isArray(s.modalidades) && s.modalidades.length) pts+=10;
   return pts;
 }
-async function FST_leerAsignacionesAgenda(){
+async function FST_leerAsignacionesAgenda(forzar){
+  // PERF(e): cache de sesión — se lee de Firestore 1 vez por sesión de app; al asignar se
+  // actualiza el mapa en memoria (FST_guardarAsignacionAgenda). forzar=true relee de red.
+  if(!forzar && window._asigAgendaCache && window._asigAgendaCache.map) return window._asigAgendaCache.map;
   var map={};
   try{
     var ok=await FST_init();
     if(!ok||!window._fstDb) return map;
     var snap=await window._fstDb.collection('agendaAsignaciones').get();
     snap.forEach(function(d){ var x=d.data()||{}; if(x.terapeuta) map[d.id]=x.terapeuta; });
-  }catch(e){ console.warn('[Rendimiento] leer asignaciones:', e&&e.message); }
+  }catch(e){ console.warn('[Rendimiento] leer asignaciones:', e&&e.message); return map; }
+  window._asigAgendaCache={ts:Date.now(), map:map};
   return map;
 }
 async function FST_guardarAsignacionAgenda(nombreNorm, nombreOriginal, terapeuta){
@@ -3256,6 +3260,8 @@ async function FST_guardarAsignacionAgenda(nombreNorm, nombreOriginal, terapeuta
     asignadoPor:(currentUser&&currentUser.name)||'', fechaAsignacion:_hoyISOlocal(),
     updatedAt: firebase.firestore.FieldValue.serverTimestamp()
   });
+  // PERF(e): reflejar la asignación en el cache de sesión — el recálculo del dashboard la ve al instante
+  if(window._asigAgendaCache && window._asigAgendaCache.map) window._asigAgendaCache.map[nombreNorm]=String(terapeuta||'');
 }
 function _computarRendimiento(eventos, diasISO, asigMap){
   var diasDDMM={}; diasISO.forEach(function(i){ var k=_ddmmFromISO(i); if(k) diasDDMM[k]=true; });
@@ -3280,7 +3286,7 @@ function _computarRendimiento(eventos, diasISO, asigMap){
   });
   return {stats:stats, sinAsignar:sinAsignar};
 }
-function _rendimientoHTML(datos, noId, ventana, etiqueta, aviso){
+function _rendimientoHTML(datos, noId, ventana, etiqueta, aviso, refresco){
   var btnV=function(v,txt){
     return '<button onclick="mostrarRendimientoEquipo(\''+v+'\')" style="font-size:12px;font-weight:700;border:none;border-radius:10px;padding:6px 12px;cursor:pointer;font-family:inherit;'
       +(v===ventana?'background:var(--navy);color:#fff':'background:#EEF1F6;color:var(--navy)')+'">'+txt+'</button>';
@@ -3314,7 +3320,10 @@ function _rendimientoHTML(datos, noId, ventana, etiqueta, aviso){
   return '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">'
     +'<div style="font-size:16px;font-weight:800;color:var(--navy)">📊 Rendimiento del equipo</div>'
     +'<button onclick="this.closest(\'[data-rendov]\').remove()" style="background:none;border:none;font-size:22px;color:var(--gray-400);cursor:pointer">×</button></div>'
-    +'<div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap">'+btnV('hoy','Hoy')+btnV('7dias','7 días')+btnV('mes','Mes')+'</div>'
+    +'<div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap;align-items:center">'+btnV('hoy','Hoy')+btnV('7dias','7 días')+btnV('mes','Mes')
+    +'<button onclick="mostrarRendimientoEquipo(\''+ventana+'\', true)" style="font-size:11px;font-weight:700;border:none;border-radius:10px;padding:5px 10px;cursor:pointer;font-family:inherit;background:#EEF1F6;color:var(--navy)">🔄 Actualizar</button>'
+    +((refresco&&refresco.desdeCache)?('<span style="font-size:10px;color:var(--gray-400)">cache · hace '+Math.max(1,Math.round((Date.now()-(refresco.ts||Date.now()))/1000))+' s</span>'):'')
+    +'</div>'
     +'<div style="font-size:12px;color:var(--gray-500);margin-bottom:8px">'+escapeHTML(etiqueta)+' · Citas de Google Calendar vs notas SOAP de pacientes activos</div>'
     +(aviso?('<div style="font-size:11px;background:#FEF3C7;color:#92400E;border-radius:8px;padding:6px 10px;margin-bottom:8px">'+escapeHTML(aviso)+'</div>'):'')
     +'<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px">'
@@ -3324,35 +3333,13 @@ function _rendimientoHTML(datos, noId, ventana, etiqueta, aviso){
     +filaSA+bloqueNI
     +'<div style="font-size:10px;color:var(--gray-400);margin-top:10px">Score = calidad promedio de nota (0-100): campos SOAP llenos, EVA capturada y modalidades. Cobertura = notas ÷ citas.</div>';
 }
-async function mostrarRendimientoEquipo(ventana){
-  if(!esSupervisorUI()){ showToast('Solo supervisor','error'); return; }
-  ventana=(ventana==='7dias'||ventana==='mes')?ventana:'hoy';
-  var prev=document.querySelector('[data-rendov]'); if(prev) prev.remove();
-  var ov=document.createElement('div');
-  ov.setAttribute('data-rendov','1');
-  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:10001;display:flex;align-items:flex-start;justify-content:center;overflow:auto;padding:40px 12px';
-  ov.onclick=function(e){ if(e.target===ov) ov.remove(); };
-  ov.innerHTML='<div style="background:#fff;border-radius:16px;width:100%;max-width:640px;padding:18px"><div style="font-size:12px;color:var(--gray-400)">⏳ Calculando rendimiento…</div></div>';
-  document.body.appendChild(ov);
-  var card=ov.firstChild;
-  var dias=_diasVentanaRendimiento(ventana);
-  var res=null, aviso='';
-  try{ res=await FST_fetchAgendaRango(dias[0], dias[dias.length-1]); }catch(e){ res=null; }
-  if(res && res.ok && (!res.apiAgenda || res.apiAgenda<2) && dias.length>1){
-    // Backend viejo: leerAgenda ignora rango_fechas y devuelve solo HOY (con ok:true). Degradar con aviso.
-    aviso='El backend de agenda aún no soporta rangos (falta desplegar Codigo.gs actualizado) — mostrando solo HOY.';
-    dias=[_hoyISOlocal()];
-  }
-  if(!res||!res.ok){
-    try{ res=await FST_fetchAgendaCalendar('dia'); dias=[_hoyISOlocal()]; if(ventana!=='hoy') aviso='No se pudo leer el rango — mostrando solo HOY.'; }catch(e2){ res=null; }
-  }
-  if(!res||!res.ok){
-    card.innerHTML='<div style="color:var(--red);font-size:13px">⚠️ No se pudo leer la agenda.</div>'
-      +'<div style="text-align:right;margin-top:12px"><button onclick="this.closest(\'[data-rendov]\').remove()" style="padding:8px 14px;border:none;border-radius:10px;background:var(--navy);color:#fff;font-weight:700;cursor:pointer">Cerrar</button></div>';
-    return;
-  }
-  try{ var dPac=await loadFromCloud(); if(Array.isArray(dPac)&&dPac.length) patientsDB=dPac; }catch(_){}
-  var asigMap=await FST_leerAsignacionesAgenda();
+// PERF: caches en memoria del dashboard. La lógica de cálculo NO cambia — solo se evita red repetida.
+var REND_CACHE_TTL_MS=5*60*1000;
+window._rendCacheVentanas={};      // (a) por ventana: {ts, eventos, dias, aviso} — respuesta de agenda (Apps Script)
+window._idxHistRendCache=null;     // {ts, arr} — tokens de nombres de históricos (lectura completa de 'pacientes', ~2400 docs)
+async function _rendIdxHist(forzar){
+  var c=window._idxHistRendCache;
+  if(!forzar && c && (Date.now()-c.ts)<REND_CACHE_TTL_MS) return c.arr;
   var idxHist=[];
   try{
     var okF=await FST_init();
@@ -3365,10 +3352,67 @@ async function mostrarRendimientoEquipo(ventana){
       });
     }
   }catch(_h){ idxHist=[]; }
-  var datos=_computarRendimiento(res.eventos||[], dias, asigMap);
-  var noId=_computarPendientesSOAP(res.eventos||[], dias, idxHist, asigMap).noId;
+  window._idxHistRendCache={ts:Date.now(), arr:idxHist};
+  return idxHist;
+}
+async function mostrarRendimientoEquipo(ventana, forzar){
+  if(!esSupervisorUI()){ showToast('Solo supervisor','error'); return; }
+  ventana=(ventana==='7dias'||ventana==='mes')?ventana:'hoy';
+  var prev=document.querySelector('[data-rendov]'); if(prev) prev.remove();
+  var ov=document.createElement('div');
+  ov.setAttribute('data-rendov','1');
+  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:10001;display:flex;align-items:flex-start;justify-content:center;overflow:auto;padding:40px 12px';
+  ov.onclick=function(e){ if(e.target===ov) ov.remove(); };
+  ov.innerHTML='<div style="background:#fff;border-radius:16px;width:100%;max-width:640px;padding:18px"><div style="font-size:12px;color:var(--gray-400)">⏳ Calculando rendimiento…</div></div>';
+  document.body.appendChild(ov);
+  var card=ov.firstChild;
+  var _now=function(){ return (window.performance&&performance.now)?performance.now():Date.now(); };
+  var _tm=function(fase,ini){ try{ console.debug('[Rendimiento][perf] '+fase+': '+Math.round(_now()-ini)+' ms'); }catch(_){} };
+  var t0=_now();
+  var dias, eventos, aviso='', desdeCache=false, cacheTs=0;
+  var cacheV=window._rendCacheVentanas[ventana];
+  if(!forzar && cacheV && (Date.now()-cacheV.ts)<REND_CACHE_TTL_MS){
+    // PERF(a): reabrir en <5 min pinta al instante desde cache; 🔄 Actualizar fuerza red.
+    dias=cacheV.dias; eventos=cacheV.eventos; aviso=cacheV.aviso; desdeCache=true; cacheTs=cacheV.ts;
+  } else {
+    dias=_diasVentanaRendimiento(ventana);
+    // PERF(c): agenda + pacientes + asignaciones + índice de históricos EN PARALELO (antes: 4 esperas secuenciales).
+    var tRed=_now();
+    var pAgenda=FST_fetchAgendaRango(dias[0], dias[dias.length-1]).catch(function(){ return null; });
+    var pPac=loadFromCloud().catch(function(){ return null; });
+    var pAsig=FST_leerAsignacionesAgenda(!!forzar);
+    var pHist=_rendIdxHist(!!forzar);
+    var res=await pAgenda;
+    if(res && res.ok && (!res.apiAgenda || res.apiAgenda<2) && dias.length>1){
+      // Backend viejo: leerAgenda ignora rango_fechas y devuelve solo HOY (con ok:true). Degradar con aviso.
+      aviso='El backend de agenda aún no soporta rangos (falta desplegar Codigo.gs actualizado) — mostrando solo HOY.';
+      dias=[_hoyISOlocal()];
+    }
+    if(!res||!res.ok){
+      try{ res=await FST_fetchAgendaCalendar('dia'); dias=[_hoyISOlocal()]; if(ventana!=='hoy') aviso='No se pudo leer el rango — mostrando solo HOY.'; }catch(e2){ res=null; }
+    }
+    if(!res||!res.ok){
+      card.innerHTML='<div style="color:var(--red);font-size:13px">⚠️ No se pudo leer la agenda.</div>'
+        +'<div style="text-align:right;margin-top:12px"><button onclick="this.closest(\'[data-rendov]\').remove()" style="padding:8px 14px;border:none;border-radius:10px;background:var(--navy);color:#fff;font-weight:700;cursor:pointer">Cerrar</button></div>';
+      return;
+    }
+    var dPac=await pPac; if(Array.isArray(dPac)&&dPac.length) patientsDB=dPac;
+    await pAsig; await pHist;   // corrían en paralelo con la agenda; a esta altura ya casi siempre resolvieron
+    _tm('red (4 fuentes en paralelo)', tRed);
+    eventos=res.eventos||[];
+    cacheTs=Date.now();
+    window._rendCacheVentanas[ventana]={ts:cacheTs, eventos:eventos, dias:dias, aviso:aviso};
+  }
+  // Cálculo SIEMPRE fresco (ms, en memoria) — así una asignación nueva se refleja aun sirviendo agenda desde cache
+  var asigMap=await FST_leerAsignacionesAgenda(false);
+  var idxHist=await _rendIdxHist(false);
+  var tCalc=_now();
+  var datos=_computarRendimiento(eventos, dias, asigMap);
+  var noId=_computarPendientesSOAP(eventos, dias, idxHist, asigMap).noId;
+  _tm('cálculo en memoria', tCalc);
   var etiqueta=(dias.length>1)?(_ddmmFromISO(dias[0])+' — '+_ddmmFromISO(dias[dias.length-1])):'Hoy';
-  card.innerHTML=_rendimientoHTML(datos, noId, ventana, etiqueta, aviso);
+  card.innerHTML=_rendimientoHTML(datos, noId, ventana, etiqueta, aviso, {desdeCache:desdeCache, ts:cacheTs});
+  _tm('total'+(desdeCache?' (desde cache)':''), t0);
 }
 function _abrirModalAsignacion(nombre, ventana){
   if(!esSupervisorUI()){ showToast('Solo supervisor','error'); return; }
