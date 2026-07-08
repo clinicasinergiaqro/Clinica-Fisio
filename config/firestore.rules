@@ -1,13 +1,102 @@
-// ══════════════════════════════════════════════════════════════════════════
-// PLACEHOLDER — config/firestore.rules (espejo de las reglas vivas)
-// ══════════════════════════════════════════════════════════════════════════
-// Carlos: pega aquí el contenido COMPLETO de las reglas actualmente publicadas
-// en Firebase Console (Firestore → Reglas; hoy: v8 = v7 + agendaAsignaciones)
-// y haz commit.
-//
-// A partir de ese commit aplica el protocolo de config/README.md:
-// todo cambio se hace PRIMERO en este archivo (commit en GitHub), y LUEGO se
-// pega en Firebase Console y se publica. Nunca al revés.
-//
-// Mientras este placeholder siga aquí, este archivo NO refleja producción.
-// ══════════════════════════════════════════════════════════════════════════
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isWriter() {
+      return request.auth != null && request.auth.token.email in [
+        'lftaranda@gmail.com',
+        'gutierrezgarciazaray96@gmail.com',
+        'camislerma26@gmail.com',
+        'agoretti.mr@gmail.com',
+        'dafnend26@gmail.com',
+        'jriveare2000@hotmail.com'
+      ];
+    }
+    function isSupervisor() {
+      return request.auth != null &&
+             request.auth.token.email == 'lftaranda@gmail.com';
+    }
+    function pacienteLiveUpdateOK() {
+      return request.resource.data.diff(resource.data).affectedKeys()
+        .hasOnly(['id','appSourceId','name','nombreNormalizado','dxLive',
+                  'terapeutaActualLive','ultimaSesionLive','tieneAppLive',
+                  'origenLive','pidMatchType','updatedAt']);
+    }
+    function pacienteEjerciciosUpdateOK() {
+      return request.resource.data.diff(resource.data).affectedKeys()
+        .hasOnly(['ejercicios','ejerciciosToken','ejerciciosLinkActivo',
+                  'reportesClinicosIA']);
+    }
+    function pacienteClinicoUpdateOK() {
+      return request.resource.data.diff(resource.data).affectedKeys()
+        .hasOnly(['name','dx','motivoConsulta','motivo','valoracion',
+                  'dxFuncional','planTto','antecedentes','alergias',
+                  'contraindicaciones','seguridadClinica',
+                  'motivosAnteriores','motivoActualIndex','numSesionEpisodioActual',
+                  'altaClinica','revaloraciones','consentimientos',
+                  'consentimientoDatos','consentimientoImagen','consentimientoWhatsApp',
+                  'estudiosDocs','fotos','docs']);
+    }
+    function sesionCreateOK() {
+      return request.resource.data.keys().hasOnly([
+        'id','num','fecha','fechaHoraISO','semana','terapeuta',
+        's','o','a','p','evaI','evaF','modalidades',
+        'completa','modoNota','importado','formatoOriginal',
+        'revisionPendiente','origen','creadoPor',
+        'updatedAt','createdAt',
+        'horaCreacion','totalSesiones','objetivoSesion','respuestaTratamiento',
+        'tolerancia','eventosAdversosSesion','cambiosPlan','criteriosProgreso',
+        'indicacionesDomiciliarias','dictado','dictadoUnico','dictadoV2',
+        'pacienteId','media','historialEdiciones',
+        'motivoIndex','numEpisodio'
+      ]);
+    }
+    function sesionUpdateOK() {
+      return request.resource.data.diff(resource.data).affectedKeys()
+        .hasOnly([
+          'num','fecha','fechaHoraISO','semana','terapeuta',
+          's','o','a','p','evaI','evaF','modalidades',
+          'completa','modoNota','revisionPendiente',
+          'updatedAt','historialEdiciones',
+          'objetivoSesion','respuestaTratamiento','tolerancia',
+          'eventosAdversosSesion','cambiosPlan','criteriosProgreso',
+          'indicacionesDomiciliarias','dictado','dictadoUnico','dictadoV2',
+          'media','motivoIndex','numEpisodio',
+          'terapeutaEstado','terapeutaOriginal','motivosRevision',
+          'imagenesPendientes','motivoImagenesPendientes','hashesImagenesPendientes',
+          'textoOriginal','textoOriginalUrl'
+        ]);
+    }
+    // ── v8: asignaciones persistentes de agenda (LOOP S3) ──
+    // Doc id = nombre normalizado del calendario. Solo el supervisor asigna;
+    // todas las terapeutas pueden leer el mapa (lo usan pendientes y rendimiento).
+    function asignacionAgendaOK() {
+      return request.resource.data.keys().hasOnly([
+        'nombreOriginal','terapeuta','asignadoPor','fechaAsignacion','updatedAt'
+      ]);
+    }
+    match /pacientes/{pacienteId} {
+      allow read: if isWriter();
+      allow create: if isWriter();
+      allow update: if isWriter() && (
+        pacienteLiveUpdateOK() ||
+        pacienteEjerciciosUpdateOK() ||
+        pacienteClinicoUpdateOK()
+      );
+      allow delete: if isSupervisor();
+    }
+    match /pacientes/{pacienteId}/sesiones/{sesionId} {
+      allow read: if isWriter();
+      allow create: if isWriter() && sesionCreateOK();
+      allow update: if isWriter() && sesionUpdateOK();
+      allow delete: if isSupervisor();
+    }
+    match /revision/{docId} {
+      allow read, write: if isSupervisor();
+    }
+    match /agendaAsignaciones/{nombreNorm} {
+      allow read: if isWriter();
+      allow create, update: if isSupervisor() && asignacionAgendaOK();
+      allow delete: if isSupervisor();
+    }
+  }
+}
