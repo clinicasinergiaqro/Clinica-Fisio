@@ -2680,7 +2680,7 @@ async function FST_montarAgendaCalendar(rango){
     + '<div style="font-size:13px;font-weight:700;color:var(--navy);margin-bottom:8px">📅 Agenda del calendario</div>'
     + '<div style="font-size:10px;color:var(--gray-400);margin:-4px 0 8px">Sincronizado desde Google Calendar · Solo lectura</div>'
     + '<div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap">'+btn('dia','Hoy')+btn('manana','Mañana')+btn('pasado','Pasado')+btn('semana','Semana')+btn('semanaSiguiente','Próxima')+'</div>'
-    + (esSupervisorUI()?'<div style="margin-bottom:10px;display:flex;gap:6px;flex-wrap:wrap"><button onclick="mostrarPendientesSOAP()" style="font-size:12px;font-weight:700;border:none;border-radius:10px;padding:6px 12px;cursor:pointer;font-family:inherit;background:#FEF3C7;color:#92400E">📋 Notas pendientes</button><button onclick="mostrarRevaloraciones()" style="font-size:12px;font-weight:700;border:none;border-radius:10px;padding:6px 12px;cursor:pointer;font-family:inherit;background:#E0E7FF;color:#3730A3">🔄 Revalorar'+((typeof _countRevaloraciones==="function"&&_countRevaloraciones()>0)?(" ("+_countRevaloraciones()+")"):"")+'</button><button onclick="toggleVistaTerapeuta()" style="font-size:12px;font-weight:700;border:none;border-radius:10px;padding:6px 12px;cursor:pointer;font-family:inherit;background:#EEF1F6;color:var(--navy)">👁️ Ver como terapeuta</button></div>':'')
+    + (esSupervisorUI()?'<div style="margin-bottom:10px;display:flex;gap:6px;flex-wrap:wrap"><button onclick="mostrarPendientesSOAP()" style="font-size:12px;font-weight:700;border:none;border-radius:10px;padding:6px 12px;cursor:pointer;font-family:inherit;background:#FEF3C7;color:#92400E">📋 Notas pendientes</button><button onclick="mostrarRendimientoEquipo(\'hoy\')" style="font-size:12px;font-weight:700;border:none;border-radius:10px;padding:6px 12px;cursor:pointer;font-family:inherit;background:#E8F5EE;color:#2E7D52">📊 Rendimiento</button><button onclick="mostrarRevaloraciones()" style="font-size:12px;font-weight:700;border:none;border-radius:10px;padding:6px 12px;cursor:pointer;font-family:inherit;background:#E0E7FF;color:#3730A3">🔄 Revalorar'+((typeof _countRevaloraciones==="function"&&_countRevaloraciones()>0)?(" ("+_countRevaloraciones()+")"):"")+'</button><button onclick="toggleVistaTerapeuta()" style="font-size:12px;font-weight:700;border:none;border-radius:10px;padding:6px 12px;cursor:pointer;font-family:inherit;background:#EEF1F6;color:var(--navy)">👁️ Ver como terapeuta</button></div>':'')
     + '<div id="agenda-cal-list"><div style="font-size:12px;color:var(--gray-400);padding:6px 0">⏳ Cargando agenda…</div></div>'
     + '</div></div>';
   const reqId = (window._agendaCalReq = (window._agendaCalReq||0) + 1);
@@ -3093,7 +3093,7 @@ function toggleVistaTerapeuta(forzar){
   try{ if(currentPatient && typeof renderExpediente==='function' && document.getElementById('content-expediente')) renderExpediente(currentTab||'historia'); }catch(_){}
   try{ if(document.getElementById('agenda-cal-block') && typeof FST_montarAgendaCalendar==='function') FST_montarAgendaCalendar('dia'); }catch(_){}
 }
-function _computarPendientesSOAP(eventos, diasISO, idxHist){
+function _computarPendientesSOAP(eventos, diasISO, idxHist, asigMap){
   var diasDDMM={}; diasISO.forEach(function(i){ var k=_ddmmFromISO(i); if(k) diasDDMM[k]=true; });
   var idx={};
   (Array.isArray(patientsDB)?patientsDB:[]).forEach(function(p){
@@ -3106,6 +3106,8 @@ function _computarPendientesSOAP(eventos, diasISO, idxHist){
     var nombre=ev.paciente||'';
     var ter=(Array.isArray(ev.terapeutas)&&ev.terapeutas.length)?ev.terapeutas[0]:'Sin asignar';
     var clave=_normPend(nombre);
+    // S3: asignación persistente — resuelve "Sin asignar" con el mapa agendaAsignaciones
+    if(asigMap && ter==='Sin asignar' && asigMap[clave]) ter=asigMap[clave];
     var p=idx[clave];
     if(p){
       var e=porPac[p.id]||(porPac[p.id]={p:p, ter:ter, visitas:0});
@@ -3119,7 +3121,7 @@ function _computarPendientesSOAP(eventos, diasISO, idxHist){
       var esHist=idxHist.some(function(te){ return tc.every(function(w){ return te.indexOf(w)!==-1; }); });
       if(esHist){ return; }
     }
-    noId.push({nombre:nombre||'(sin nombre)', ter:ter});
+    noId.push({nombre:nombre||'(sin nombre)', ter:ter, asignado:!!(asigMap&&asigMap[clave])});
   });
   var porTer={};
   Object.keys(porPac).forEach(function(pid){
@@ -3198,10 +3200,208 @@ async function mostrarPendientesSOAP(){
       });
     }
   }catch(_h){ idxHist=[]; }
-  var rep=_computarPendientesSOAP(res.eventos||[], dias, idxHist);
+  var asigMapPend={}; try{ asigMapPend=await FST_leerAsignacionesAgenda(); }catch(_a){}
+  var rep=_computarPendientesSOAP(res.eventos||[], dias, idxHist, asigMapPend);
   var etiqueta=(dias.length>1)?('Desde '+_ddmmFromISO(dias[0])):'Hoy';
   card.innerHTML=_pendientesHTML(rep, etiqueta);
 }
+// ── LOOP S1+S2+S3: Dashboard de rendimiento de equipo (solo supervisor) ─────────────
+// S1: citas (Google Calendar vía leerAgenda) vs notas SOAP escritas, ventanas hoy/7días/mes.
+// S2: score de calidad de nota (JS puro, 0-100).
+// S3: asignación persistente para "Sin asignar"/"Por identificar" (colección agendaAsignaciones, reglas v8).
+var TERAPEUTA_CAL2COD={Carlos:'CARLOS', Zara:'ZARA', Camila:'CAMI', Dafne:'DAF', Goretti:'GORE', Jess:'JESS'};
+function _diasVentanaRendimiento(ventana){
+  function iso(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+  var hoy=new Date(); hoy.setHours(12,0,0,0);
+  var out=[], d;
+  if(ventana==='mes'){ d=new Date(hoy.getFullYear(), hoy.getMonth(), 1, 12); }
+  else if(ventana==='7dias'){ d=new Date(hoy); d.setDate(d.getDate()-6); }
+  else { d=new Date(hoy); }
+  while(d<=hoy){ out.push(iso(d)); d.setDate(d.getDate()+1); }
+  return out;
+}
+// S2: puntos por campo con contenido real ("[pendiente]"/"No especificado" no cuentan).
+// EVA solo si fue capturada — excluye el par sentinela 5/3 que persiste el default del formulario.
+function _scoreSoapCalidad(s){
+  if(!s) return 0;
+  function lleno(x){
+    var t=String(x||'').trim().toLowerCase();
+    return !!t && t!=='[pendiente]' && t!=='pendiente' && t.indexOf('no especificad')===-1;
+  }
+  var so=s.s||{}, oo=s.o||{}, aa=s.a||{}, pp=s.p||{}, pts=0;
+  if(lleno(so.dolor)) pts+=10; if(lleno(so.cambios)) pts+=5; if(lleno(so.actFisica)) pts+=5;
+  if(lleno(oo.rom)) pts+=7; if(lleno(oo.fuerza)) pts+=6; if(lleno(oo.hallazgos)) pts+=7;
+  if(lleno(aa.evolucion)) pts+=7; if(lleno(aa.respuesta)) pts+=6; if(lleno(aa.analisis)) pts+=7;
+  if(lleno(pp.tratamiento)) pts+=8; if(lleno(pp.indicaciones)) pts+=7;
+  var evaReal = s.evaI!=null && !isNaN(Number(s.evaI)) && !(Number(s.evaI)===5 && Number(s.evaF)===3);
+  if(evaReal) pts+=15;
+  if(Array.isArray(s.modalidades) && s.modalidades.length) pts+=10;
+  return pts;
+}
+async function FST_leerAsignacionesAgenda(){
+  var map={};
+  try{
+    var ok=await FST_init();
+    if(!ok||!window._fstDb) return map;
+    var snap=await window._fstDb.collection('agendaAsignaciones').get();
+    snap.forEach(function(d){ var x=d.data()||{}; if(x.terapeuta) map[d.id]=x.terapeuta; });
+  }catch(e){ console.warn('[Rendimiento] leer asignaciones:', e&&e.message); }
+  return map;
+}
+async function FST_guardarAsignacionAgenda(nombreNorm, nombreOriginal, terapeuta){
+  var ok=await FST_init();
+  if(!ok||!window._fstDb) throw new Error('Firestore no disponible');
+  await window._fstDb.collection('agendaAsignaciones').doc(nombreNorm).set({
+    nombreOriginal:String(nombreOriginal||''), terapeuta:String(terapeuta||''),
+    asignadoPor:(currentUser&&currentUser.name)||'', fechaAsignacion:_hoyISOlocal(),
+    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+  });
+}
+function _computarRendimiento(eventos, diasISO, asigMap){
+  var diasDDMM={}; diasISO.forEach(function(i){ var k=_ddmmFromISO(i); if(k) diasDDMM[k]=true; });
+  var stats={};
+  Object.keys(TERAPEUTA_CAL2COD).forEach(function(n){ stats[n]={citas:0, notas:0, scoreSum:0, scoreN:0}; });
+  var sinAsignar={};
+  (Array.isArray(eventos)?eventos:[]).forEach(function(ev){
+    var ter=(Array.isArray(ev.terapeutas)&&ev.terapeutas.length)?ev.terapeutas[0]:'Sin asignar';
+    var clave=_normPend(ev.paciente||'');
+    if(ter==='Sin asignar' && asigMap && asigMap[clave]) ter=asigMap[clave];
+    if(stats[ter]){ stats[ter].citas++; }
+    else { var nm=ev.paciente||'(sin nombre)'; sinAsignar[nm]=(sinAsignar[nm]||0)+1; }
+  });
+  (Array.isArray(patientsDB)?patientsDB:[]).forEach(function(p){
+    (Array.isArray(p&&p.soap)?p.soap:[]).forEach(function(s){
+      if(!s || !diasDDMM[s.fecha]) return;
+      var cod=String(s.terapeuta||'').toUpperCase();
+      for(var cal in TERAPEUTA_CAL2COD){
+        if(TERAPEUTA_CAL2COD[cal]===cod){ stats[cal].notas++; stats[cal].scoreSum+=_scoreSoapCalidad(s); stats[cal].scoreN++; break; }
+      }
+    });
+  });
+  return {stats:stats, sinAsignar:sinAsignar};
+}
+function _rendimientoHTML(datos, noId, ventana, etiqueta, aviso){
+  var btnV=function(v,txt){
+    return '<button onclick="mostrarRendimientoEquipo(\''+v+'\')" style="font-size:12px;font-weight:700;border:none;border-radius:10px;padding:6px 12px;cursor:pointer;font-family:inherit;'
+      +(v===ventana?'background:var(--navy);color:#fff':'background:#EEF1F6;color:var(--navy)')+'">'+txt+'</button>';
+  };
+  var filas=Object.keys(TERAPEUTA_CAL2COD).map(function(n){
+    var st=datos.stats[n], c=(typeof AGENDA_COLORES!=='undefined'&&AGENDA_COLORES[n])?AGENDA_COLORES[n]:'#9BA3B5';
+    var cob=st.citas>0 ? Math.min(100, Math.round(st.notas*100/st.citas)) : null;
+    var cobColor=cob==null?'var(--gray-400)':(cob>=90?'#2E7D52':(cob>=60?'#B7791F':'#C0392B'));
+    return '<tr style="border-bottom:1px solid var(--gray-100)">'
+      +'<td style="padding:6px 8px;font-weight:700;color:'+c+'">'+escapeHTML(n)+'</td>'
+      +'<td style="padding:6px 8px;text-align:center">'+st.citas+'</td>'
+      +'<td style="padding:6px 8px;text-align:center">'+st.notas+'</td>'
+      +'<td style="padding:6px 8px;text-align:center;font-weight:700;color:'+cobColor+'">'+(cob==null?'—':(cob+'%'))+'</td>'
+      +'<td style="padding:6px 8px;text-align:center">'+(st.scoreN?Math.round(st.scoreSum/st.scoreN):'—')+'</td></tr>';
+  }).join('');
+  var nombresSA=Object.keys(datos.sinAsignar);
+  var chipSA=nombresSA.map(function(nm){
+    return '<button data-nombre="'+escapeAttr_(nm)+'" data-v="'+escapeAttr_(ventana)+'" onclick="_abrirModalAsignacion(this.dataset.nombre,this.dataset.v)" style="font-size:11px;font-weight:700;border:1px dashed #92400E;border-radius:10px;padding:4px 10px;margin:2px;cursor:pointer;background:#FFFBEB;color:#92400E">'+escapeHTML(nm)+(datos.sinAsignar[nm]>1?(' ×'+datos.sinAsignar[nm]):'')+'</button>';
+  }).join('');
+  var filaSA=nombresSA.length
+    ? '<div style="margin-top:12px"><div style="font-size:12px;font-weight:800;color:#92400E">⚠️ Sin asignar ('+nombresSA.length+') — toca un nombre para asignar terapeuta</div><div style="margin-top:4px">'+chipSA+'</div></div>'
+    : '';
+  var noIdU={}; (Array.isArray(noId)?noId:[]).forEach(function(x){ if(x && !x.asignado) noIdU[x.nombre]=true; });
+  var nombresNI=Object.keys(noIdU);
+  var chipNI=nombresNI.map(function(nm){
+    return '<button data-nombre="'+escapeAttr_(nm)+'" data-v="'+escapeAttr_(ventana)+'" onclick="_abrirModalAsignacion(this.dataset.nombre,this.dataset.v)" style="font-size:11px;font-weight:700;border:1px dashed var(--gray-400);border-radius:10px;padding:4px 10px;margin:2px;cursor:pointer;background:#F7F8FA;color:var(--gray-600)">'+escapeHTML(nm)+'</button>';
+  }).join('');
+  var bloqueNI=nombresNI.length
+    ? '<div style="margin-top:10px"><div style="font-size:12px;font-weight:800;color:var(--gray-600)">❔ Por identificar ('+nombresNI.length+') — sin expediente activo ni histórico</div><div style="margin-top:4px">'+chipNI+'</div></div>'
+    : '';
+  return '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">'
+    +'<div style="font-size:16px;font-weight:800;color:var(--navy)">📊 Rendimiento del equipo</div>'
+    +'<button onclick="this.closest(\'[data-rendov]\').remove()" style="background:none;border:none;font-size:22px;color:var(--gray-400);cursor:pointer">×</button></div>'
+    +'<div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap">'+btnV('hoy','Hoy')+btnV('7dias','7 días')+btnV('mes','Mes')+'</div>'
+    +'<div style="font-size:12px;color:var(--gray-500);margin-bottom:8px">'+escapeHTML(etiqueta)+' · Citas de Google Calendar vs notas SOAP de pacientes activos</div>'
+    +(aviso?('<div style="font-size:11px;background:#FEF3C7;color:#92400E;border-radius:8px;padding:6px 10px;margin-bottom:8px">'+escapeHTML(aviso)+'</div>'):'')
+    +'<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px">'
+    +'<thead><tr style="border-bottom:2px solid var(--gray-200);color:var(--gray-600);font-size:11px;text-transform:uppercase">'
+    +'<th style="padding:6px 8px;text-align:left">Terapeuta</th><th style="padding:6px 8px">Citas</th><th style="padding:6px 8px">Notas</th><th style="padding:6px 8px">Cobertura</th><th style="padding:6px 8px">Score</th></tr></thead>'
+    +'<tbody>'+filas+'</tbody></table></div>'
+    +filaSA+bloqueNI
+    +'<div style="font-size:10px;color:var(--gray-400);margin-top:10px">Score = calidad promedio de nota (0-100): campos SOAP llenos, EVA capturada y modalidades. Cobertura = notas ÷ citas.</div>';
+}
+async function mostrarRendimientoEquipo(ventana){
+  if(!esSupervisorUI()){ showToast('Solo supervisor','error'); return; }
+  ventana=(ventana==='7dias'||ventana==='mes')?ventana:'hoy';
+  var prev=document.querySelector('[data-rendov]'); if(prev) prev.remove();
+  var ov=document.createElement('div');
+  ov.setAttribute('data-rendov','1');
+  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:10001;display:flex;align-items:flex-start;justify-content:center;overflow:auto;padding:40px 12px';
+  ov.onclick=function(e){ if(e.target===ov) ov.remove(); };
+  ov.innerHTML='<div style="background:#fff;border-radius:16px;width:100%;max-width:640px;padding:18px"><div style="font-size:12px;color:var(--gray-400)">⏳ Calculando rendimiento…</div></div>';
+  document.body.appendChild(ov);
+  var card=ov.firstChild;
+  var dias=_diasVentanaRendimiento(ventana);
+  var res=null, aviso='';
+  try{ res=await FST_fetchAgendaRango(dias[0], dias[dias.length-1]); }catch(e){ res=null; }
+  if(res && res.ok && (!res.apiAgenda || res.apiAgenda<2) && dias.length>1){
+    // Backend viejo: leerAgenda ignora rango_fechas y devuelve solo HOY (con ok:true). Degradar con aviso.
+    aviso='El backend de agenda aún no soporta rangos (falta desplegar Codigo.gs actualizado) — mostrando solo HOY.';
+    dias=[_hoyISOlocal()];
+  }
+  if(!res||!res.ok){
+    try{ res=await FST_fetchAgendaCalendar('dia'); dias=[_hoyISOlocal()]; if(ventana!=='hoy') aviso='No se pudo leer el rango — mostrando solo HOY.'; }catch(e2){ res=null; }
+  }
+  if(!res||!res.ok){
+    card.innerHTML='<div style="color:var(--red);font-size:13px">⚠️ No se pudo leer la agenda.</div>'
+      +'<div style="text-align:right;margin-top:12px"><button onclick="this.closest(\'[data-rendov]\').remove()" style="padding:8px 14px;border:none;border-radius:10px;background:var(--navy);color:#fff;font-weight:700;cursor:pointer">Cerrar</button></div>';
+    return;
+  }
+  try{ var dPac=await loadFromCloud(); if(Array.isArray(dPac)&&dPac.length) patientsDB=dPac; }catch(_){}
+  var asigMap=await FST_leerAsignacionesAgenda();
+  var idxHist=[];
+  try{
+    var okF=await FST_init();
+    if(okF && window._fstDb){
+      var snapH=await window._fstDb.collection('pacientes').get();
+      snapH.forEach(function(d){
+        var data=d.data()||{};
+        var nn=_normPend(data.nombreNormalizado || data.name || '');
+        if(nn){ var tk=nn.split(' ').filter(Boolean); if(tk.length) idxHist.push(tk); }
+      });
+    }
+  }catch(_h){ idxHist=[]; }
+  var datos=_computarRendimiento(res.eventos||[], dias, asigMap);
+  var noId=_computarPendientesSOAP(res.eventos||[], dias, idxHist, asigMap).noId;
+  var etiqueta=(dias.length>1)?(_ddmmFromISO(dias[0])+' — '+_ddmmFromISO(dias[dias.length-1])):'Hoy';
+  card.innerHTML=_rendimientoHTML(datos, noId, ventana, etiqueta, aviso);
+}
+function _abrirModalAsignacion(nombre, ventana){
+  if(!esSupervisorUI()){ showToast('Solo supervisor','error'); return; }
+  var nombreNorm=_normPend(nombre);
+  if(!nombreNorm){ showToast('Nombre vacío','error'); return; }
+  var m=document.createElement('div');
+  m.setAttribute('data-asigov','1');
+  m.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:10002;display:flex;align-items:center;justify-content:center;padding:20px';
+  m.onclick=function(e){ if(e.target===m) m.remove(); };
+  var botones=Object.keys(TERAPEUTA_CAL2COD).map(function(t){
+    var c=(typeof AGENDA_COLORES!=='undefined'&&AGENDA_COLORES[t])?AGENDA_COLORES[t]:'#9BA3B5';
+    return '<button data-ter="'+escapeAttr_(t)+'" style="font-size:13px;font-weight:700;border:none;border-radius:12px;padding:10px 14px;margin:4px;cursor:pointer;background:'+c+';color:#fff">'+escapeHTML(t)+'</button>';
+  }).join('');
+  m.innerHTML='<div style="background:#fff;border-radius:16px;max-width:340px;width:100%;padding:18px">'
+    +'<div style="font-size:14px;font-weight:800;color:var(--navy);margin-bottom:4px">Asignar terapeuta</div>'
+    +'<div style="font-size:12px;color:var(--gray-600);margin-bottom:10px">'+escapeHTML(nombre)+'</div>'
+    +'<div style="display:flex;flex-wrap:wrap;justify-content:center">'+botones+'</div>'
+    +'<div style="text-align:right;margin-top:10px"><button data-cerrar="1" style="padding:8px 14px;border:none;border-radius:10px;background:#EEF1F6;color:var(--navy);font-weight:700;cursor:pointer">Cancelar</button></div></div>';
+  m.querySelectorAll('button[data-ter]').forEach(function(b){
+    b.onclick=async function(){
+      b.disabled=true;
+      try{
+        await FST_guardarAsignacionAgenda(nombreNorm, nombre, b.dataset.ter);
+        showToast('Asignado a '+b.dataset.ter,'success');
+        m.remove();
+        mostrarRendimientoEquipo(ventana||'hoy');
+      }catch(e){ showToast('Error al asignar: '+(e&&e.message||''),'error'); b.disabled=false; }
+    };
+  });
+  m.querySelector('button[data-cerrar]').onclick=function(){ m.remove(); };
+  document.body.appendChild(m);
+}
+// ── fin LOOP S1+S2+S3 ────────────────────────────────────────────────────────────────
 // REFRESCO-PACIENTES: recarga la lista desde el Sheet en segundo plano, sin bloquear.
 // Pinta primero lo que hay en memoria (el caller ya renderizó); cuando lleguen datos
 // frescos, actualiza patientsDB, invalida la vista fusionada y re-renderiza si la
