@@ -1,0 +1,13 @@
+// ══════════════════════════════════════════════════════════════════════════
+// PLACEHOLDER — config/firestore.rules (espejo de las reglas vivas)
+// ══════════════════════════════════════════════════════════════════════════
+// Carlos: pega aquí el contenido COMPLETO de las reglas actualmente publicadas
+// en Firebase Console (Firestore → Reglas; hoy: v8 = v7 + agendaAsignaciones)
+// y haz commit.
+//
+// A partir de ese commit aplica el protocolo de config/README.md:
+// todo cambio se hace PRIMERO en este archivo (commit en GitHub), y LUEGO se
+// pega en Firebase Console y se publica. Nunca al revés.
+//
+// Mientras este placeholder siga aquí, este archivo NO refleja producción.
+// ══════════════════════════════════════════════════════════════════════════
