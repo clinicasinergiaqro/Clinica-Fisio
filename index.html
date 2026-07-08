@@ -6347,6 +6347,70 @@ async function generarSoapConIA(){
     if(evaIVal!==5 || notaMencionaEva) eva+=`EVA inicio sesión: ${evaIVal}/10`;
     if(evaFVal!==3) eva+=(eva?' — ':'')+`EVA final sesión: ${evaFVal}/10`;
     payloadDatos.eva = eva || 'No capturada. No inventar EVA final.';
+
+    // ── Loop P1 — contexto clínico longitudinal (A1-A6) ──────────────────────
+    // A1: dentro de if(!modoRapidoIA) → modo rápido lo salta.
+    // A5: históricos mig_pac_ tienen p.soap poco fiable en memoria y sin motivoIndex;
+    //     se envían solo campos de nivel paciente, se omiten los derivados del episodio.
+    const _esHistP1 = String(p.id||'').startsWith('mig_pac_');
+
+    // Campos de nivel paciente (seguros en cualquier caso)
+    const _motivoP1 = (p.motivoConsulta||p.motivo?.padecimiento||'').trim();
+    if(_motivoP1) payloadDatos.motivoEpisodio = _motivoP1;
+
+    const _planP1 = p.planTto||{};
+    const _planTxt = [_planP1.ejercicioTerapeutico, _planP1.terapiaManual, _planP1.agentesFisicos]
+      .map(x=>String(x||'').trim()).filter(x=>x && x!=='Pendiente').join(' · ');
+    if(_planTxt) payloadDatos.planTratamiento = _planTxt;
+
+    const _contraP1 = String(p.contraindicaciones||_planP1.contraindicaciones||'').trim();
+    if(_contraP1 && _contraP1!=='Ninguna') payloadDatos.contraindicaciones = _contraP1;
+
+    const _brP1 = p.seguridadClinica?.banderasRojas;
+    const _brTxt = Array.isArray(_brP1) ? _brP1.filter(Boolean).join(', ')
+                 : (typeof _brP1==='string' && _brP1!=='Ninguna' ? _brP1 : '');
+    if(_brTxt) payloadDatos.banderasRojas = _brTxt;
+
+    // Campos derivados del episodio — solo activos con historial (A2/A4)
+    if(!_esHistP1 && Array.isArray(p.soap) && p.soap.length){
+      // A2: aislar episodio actual SOLO si hay episodios previos;
+      //     si no, todo el historial ES el episodio actual (patrón de líneas 3907/3959).
+      const _tieneEpP1 = Array.isArray(p.motivosAnteriores) && p.motivosAnteriores.length>0;
+      const _midxP1 = p.motivoActualIndex||0;   // A3: nunca asumir 0 literal; usar ||0
+      const _soapsEpP1 = _tieneEpP1
+        ? p.soap.filter(s=>typeof s.motivoIndex==='number' && s.motivoIndex===_midxP1)
+        : p.soap.slice();
+      const _ordEpP1 = _soapsEpP1.slice().sort((a,b)=>(Number(a.num)||0)-(Number(b.num)||0));
+
+      // numSesionEpisodio: solo si hay episodios (si no, duplicaría numSesion)
+      if(_tieneEpP1) payloadDatos.numSesionEpisodio = String(_ordEpP1.length + 1);
+
+      // sesionAnterior: última sesión del episodio actual (EVA suprimida si es sentinela 5/3)
+      const _antP1 = _ordEpP1[_ordEpP1.length-1];
+      if(_antP1){
+        const _evaAnt = (_antP1.evaI!=null && !(Number(_antP1.evaI)===5 && Number(_antP1.evaF)===3))
+          ? 'EVA '+_antP1.evaI+(_antP1.evaF!=null?'→'+_antP1.evaF:'') : '';
+        const _antTxt = [
+          _antP1.s?.dolor && ('Dolor: '+_antP1.s.dolor),
+          _antP1.a?.evolucion && ('Evolución: '+_antP1.a.evolucion),
+          _antP1.p?.tratamiento && ('Tratamiento: '+_antP1.p.tratamiento),
+          _evaAnt
+        ].filter(Boolean).join(' | ').slice(0,600);
+        if(_antTxt) payloadDatos.sesionAnterior = _antTxt;
+      }
+
+      // tendenciaEVA: serie sobre evaI, excluyendo null Y el sentinela default 5/3 (A4)
+      const _serieP1 = _ordEpP1
+        .filter(s=> s.evaI!=null && !(Number(s.evaI)===5 && Number(s.evaF)===3))
+        .map(s=>Number(s.evaI)).filter(n=>!isNaN(n));
+      if(_serieP1.length>=2){
+        const _diffP1 = _serieP1[0]-_serieP1[_serieP1.length-1];   // baja EVA = mejora; umbral MCID >=2
+        payloadDatos.tendenciaEVA = _diffP1>=2 ? 'Mejorando' : (_diffP1<=-2 ? 'Empeorando' : 'Estable');
+      } else {
+        payloadDatos.tendenciaEVA = 'Insuficientes datos';
+      }
+    }
+    // ── fin Loop P1 ──────────────────────────────────────────────────────────
   }
 
   // Timeout de 25 segundos con AbortController + contador visual + 1 retry
