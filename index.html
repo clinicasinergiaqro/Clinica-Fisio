@@ -13093,8 +13093,18 @@ function generarGraficaEVA(p){
 }
 
 // ── B1: Nueva sesión SOAP rápida desde lista/agenda ──
-function nuevaSesionRapida(patientId){
-  const p=patientsDB.find(x=>x.id===patientId);
+async function nuevaSesionRapida(patientId){
+  let p = patientsDB.find(x=>x.id===patientId);
+  if(!p){
+    p = (window._FST_listaPacientesPorId||{})[patientId];
+    if(p && String(patientId).startsWith('mig_pac_')){
+      await FST_hidratarCamposClinicos(p, patientId);
+      if(!Array.isArray(p.soap)) p.soap=[];
+      if(typeof FST_fetchSesiones==='function' && window._fstDb){
+        try{ _fstSesionesCache[patientId] = await FST_fetchSesiones(patientId); }catch(e){}
+      }
+    }
+  }
   if(!p){ showToast('Paciente no encontrado','error'); return; }
   currentPatient=p;
   showNuevoSOAP();
