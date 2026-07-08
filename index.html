@@ -6028,6 +6028,14 @@ async function guardarSOAP(){
     // en bloque aparte) y p.sesiones puede ser 0 → antes daba num=1 duplicado.
     // Tomamos el máximo real de todas las fuentes disponibles.
     let _maxNum = 0;
+    // BUG A fix — históricos: obtenerSesiones(p) devuelve las sesiones REALES de Firestore
+    // (_fstSesionesCache, pre-cargado por openExpediente). p.soap está vacío para mig_pac_,
+    // así que sin esto _maxNum quedaba en el conteo de memoria → num duplicado/bajo (ej. 2 con 29 reales).
+    // Guard estricto: obtenerSesiones puede devolver null si el cache aún no cargó → cae al fallback de abajo.
+    const _ses = obtenerSesiones(p);
+    if(Array.isArray(_ses)){
+      _ses.forEach(s => { _maxNum = Math.max(_maxNum, Number(s.num)||0); });
+    }
     if (Array.isArray(p.soap)) p.soap.forEach(s => { const n = Number(s.num)||0; if (n>_maxNum) _maxNum=n; });
     _maxNum = Math.max(_maxNum, Number(p.sesiones)||0, Number(p.sesionesCount)||0);
     // Histórico Firestore no cargado en memoria (migrados): leer el num real.
