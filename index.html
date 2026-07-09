@@ -4090,27 +4090,27 @@ function _renderSoapCard(s,p,readOnly){
       </div>`
     : `<div class="soap-section">
         <div class="soap-label"><span class="soap-s">S — Subjetivo</span></div>
-        <div class="soap-sub">Dolor:</div><div class="soap-text">${s.s.dolor}</div>
-        <div class="soap-sub">Cambios desde última sesión:</div><div class="soap-text">${s.s.cambios}</div>
-        <div class="soap-sub">Actividad física:</div><div class="soap-text">${s.s.actFisica}</div>
+        <div class="soap-sub">Dolor:</div><div class="soap-text">${escapeHTML(s.s.dolor)}</div>
+        <div class="soap-sub">Cambios desde última sesión:</div><div class="soap-text">${escapeHTML(s.s.cambios)}</div>
+        <div class="soap-sub">Actividad física:</div><div class="soap-text">${escapeHTML(s.s.actFisica)}</div>
       </div>
       <div class="soap-section">
         <div class="soap-label"><span class="soap-o">O — Objetivo</span></div>
-        <div class="soap-sub">ROM:</div><div class="soap-text">${s.o.rom}</div>
-        <div class="soap-sub">Fuerza:</div><div class="soap-text">${s.o.fuerza}</div>
-        <div class="soap-sub">Hallazgos:</div><div class="soap-text">${s.o.hallazgos}</div>
+        <div class="soap-sub">ROM:</div><div class="soap-text">${escapeHTML(s.o.rom)}</div>
+        <div class="soap-sub">Fuerza:</div><div class="soap-text">${escapeHTML(s.o.fuerza)}</div>
+        <div class="soap-sub">Hallazgos:</div><div class="soap-text">${escapeHTML(s.o.hallazgos)}</div>
       </div>
       <div class="soap-section">
         <div class="soap-label"><span class="soap-a">A — Análisis</span></div>
-        <div class="soap-sub">Evolución:</div><div class="soap-text">${s.a.evolucion}</div>
-        <div class="soap-sub">Respuesta al tratamiento:</div><div class="soap-text">${s.a.respuesta}</div>
-        <div class="soap-sub">Análisis clínico:</div><div class="soap-text">${s.a.analisis}</div>
+        <div class="soap-sub">Evolución:</div><div class="soap-text">${escapeHTML(s.a.evolucion)}</div>
+        <div class="soap-sub">Respuesta al tratamiento:</div><div class="soap-text">${escapeHTML(s.a.respuesta)}</div>
+        <div class="soap-sub">Análisis clínico:</div><div class="soap-text">${escapeHTML(s.a.analisis)}</div>
       </div>
       <div class="soap-section">
         <div class="soap-label"><span class="soap-p">P — Plan</span></div>
-        <div class="soap-sub">Tratamiento aplicado:</div><div class="soap-text">${s.p.tratamiento}</div>
-        <div class="soap-sub">Indicaciones para casa:</div><div class="soap-text">${s.p.indicaciones}</div>
-        <div class="soap-sub">Contraindicaciones vigentes:</div><div class="soap-text" style="color:var(--red);font-weight:600;">${s.p.contraindicaciones}</div>
+        <div class="soap-sub">Tratamiento aplicado:</div><div class="soap-text">${escapeHTML(s.p.tratamiento)}</div>
+        <div class="soap-sub">Indicaciones para casa:</div><div class="soap-text">${escapeHTML(s.p.indicaciones)}</div>
+        <div class="soap-sub">Contraindicaciones vigentes:</div><div class="soap-text" style="color:var(--red);font-weight:600;">${escapeHTML(s.p.contraindicaciones)}</div>
       </div>`;
   var mediaHTML=(s.media&&s.media.length)?`<div style="margin-top:10px;">
     <div style="font-size:11px;font-weight:700;color:var(--navy);margin-bottom:6px;">📷 Fotos (${s.media.length})</div>
@@ -4170,9 +4170,9 @@ function renderExpediente(tab='historia'){
 
   let html=`<div class="exp-header">
     <div class="exp-name">${escapeHTML(p.name)}</div>
-    <div class="exp-meta"><span>👤 ${p.age} años</span><span>🩺 ${p.terapeuta}</span><span>Ses. ${p.sesiones}</span></div>
+    <div class="exp-meta"><span>👤 ${escapeHTML(p.age)} años</span><span>🩺 ${escapeHTML(p.terapeuta)}</span><span>Ses. ${escapeHTML(p.sesiones)}</span></div>
     <div class="exp-pills">
-      <span class="exp-pill">${(typeof p.dx==='string'?p.dx.split(',')[0]:(p.dx?.dxClinico||p.dx?.dxMedico||'—'))}</span>
+      <span class="exp-pill">${escapeHTML(typeof p.dx==='string'?p.dx.split(',')[0]:(p.dx?.dxClinico||p.dx?.dxMedico||'—'))}</span>
       ${hasContra?'<span class="exp-pill red">⚠ Contraindicación</span>':''}
       ${hasAllergy?'<span class="exp-pill" style="background:rgba(173,20,87,.3);color:#FFC0D4;">🚫 Alergia</span>':''}
       ${!hasConsent?'<span class="exp-pill" style="background:rgba(183,121,31,.3);color:#FFD580;">📋 Sin consentimiento</span>':'<span class="exp-pill gold">✅ Consentimiento</span>'}
@@ -4211,8 +4211,8 @@ function renderExpediente(tab='historia'){
         </div>
       </div>
     </div>`;
-    if(hasContra) html+=`<div class="contraindication-box">⚠️ ${p.contraindicaciones}</div>`;
-    if(hasAllergy) html+=`<div class="allergy-box">🚫 Alergia: ${p.alergias}</div>`;
+    if(hasContra) html+=`<div class="contraindication-box">⚠️ ${escapeHTML(p.contraindicaciones)}</div>`;
+    if(hasAllergy) html+=`<div class="allergy-box">🚫 Alergia: ${escapeHTML(p.alergias)}</div>`;
     // Tarjeta de motivo de consulta activo
     const motivoActivo=p.motivoConsulta||p.motivo?.padecimiento||'Sin motivo registrado';
     const desdeFecha=p.fechaCreacion||p.date||'';
@@ -4380,11 +4380,11 @@ function renderExpediente(tab='historia'){
       <div id="hist-body-${escapeAttr_(p.id)}" class="hist-body" style="display:none">
         ${[...p.historialCambios].reverse().map((h,i,arr)=>`
           <div style="font-size:12px;padding:10px 14px;${i<arr.length-1?'border-bottom:1px solid var(--gray-100)':''}">
-            <span style="font-weight:700;color:var(--navy)">${h.usuario}</span>
-            <span style="color:var(--gray-400)"> · ${h.fecha}</span>
-            <div style="color:var(--gray-600);margin-top:2px">${h.accion}</div>
-            ${h.antes?`<div style="font-size:11px;margin-top:3px"><span style="color:var(--red);font-weight:600">Antes:</span> <span style="color:var(--gray-500)">${h.antes}</span></div>`:''}
-            ${h.despues?`<div style="font-size:11px;margin-top:1px"><span style="color:var(--green);font-weight:600">Después:</span> <span style="color:var(--gray-500)">${h.despues}</span></div>`:''}
+            <span style="font-weight:700;color:var(--navy)">${escapeHTML(h.usuario)}</span>
+            <span style="color:var(--gray-400)"> · ${escapeHTML(h.fecha)}</span>
+            <div style="color:var(--gray-600);margin-top:2px">${escapeHTML(h.accion)}</div>
+            ${h.antes?`<div style="font-size:11px;margin-top:3px"><span style="color:var(--red);font-weight:600">Antes:</span> <span style="color:var(--gray-500)">${escapeHTML(h.antes)}</span></div>`:''}
+            ${h.despues?`<div style="font-size:11px;margin-top:1px"><span style="color:var(--green);font-weight:600">Después:</span> <span style="color:var(--gray-500)">${escapeHTML(h.despues)}</span></div>`:''}
           </div>`).join('')}
       </div>
     </div>`:''}`;
@@ -4484,7 +4484,7 @@ function renderExpediente(tab='historia'){
       <div class="section-title">📄 Documentos y estudios</div>
       ${docs.map((d,i)=>`<div class="doc-item" data-pid="${escapeAttr_(p.id)}" onclick="previewMedia(this.dataset.pid,'doc',${i})">
         <div class="doc-icon ${d.type&&d.type.startsWith('image')?'img':d.type&&d.type.includes('pdf')?'pdf':'img'}">${d.type&&d.type.startsWith('image')?'🖼️':d.type&&d.type.includes('pdf')?'📄':d.name&&(d.name.endsWith('.docx')||d.name.endsWith('.doc'))?'📝':d.name&&(d.name.endsWith('.xlsx')||d.name.endsWith('.xls'))?'📊':'📎'}</div>
-        <div class="doc-info"><div class="doc-name">${d.label}</div><div class="doc-meta">${d.fecha}</div></div>
+        <div class="doc-info"><div class="doc-name">${escapeHTML(d.label)}</div><div class="doc-meta">${escapeHTML(d.fecha)}</div></div>
         <button data-pid="${escapeAttr_(p.id)}" onclick="event.stopPropagation();deleteMedia(this.dataset.pid,'doc',${i})" style="background:none;border:none;color:var(--gray-400);font-size:18px;cursor:pointer">×</button>
       </div>`).join('')}
       ${!docs.length?`<div style="text-align:center;padding:20px;color:var(--gray-400);font-size:13px">Sin documentos — escanea con el botón de arriba</div>`:''}
@@ -5905,7 +5905,7 @@ function renderSOAPForm(){
   <div class="form-section">
     <div class="form-section-title">📋 Identificación</div>
     <div class="form-group">
-      <div class="form-field"><div class="form-label">Paciente</div><div style="font-size:15px;font-weight:700;color:var(--navy)">${p.name}</div></div>
+      <div class="form-field"><div class="form-label">Paciente</div><div style="font-size:15px;font-weight:700;color:var(--navy)">${escapeHTML(p.name)}</div></div>
       <div class="form-field"><div class="form-label">Sesión</div><div style="font-size:15px;font-weight:700;color:var(--navy)">${sesNum}${(()=>{const t=parseInt(p.planTto?.sesiones);return(t&&t>0)?' de '+t:''})()}</div></div>
       <div class="form-field"><div class="form-label">Semana</div><div style="font-size:15px;font-weight:700;color:var(--navy)">${semana}</div></div>
       <div class="form-field"><div class="form-label">Terapeuta</div><div style="font-size:15px;font-weight:700;color:var(--navy)">${ter}</div></div>
@@ -8297,11 +8297,11 @@ function renderConsentForm(){
     </div>
     <div class="form-field" style="border-bottom:1px solid var(--gray-100)">
       <div class="form-label">Teléfono</div>
-      <input class="form-input" type="tel" id="con-tel" placeholder="10 dígitos" value="${p.telefono||''}">
+      <input class="form-input" type="tel" id="con-tel" placeholder="10 dígitos" value="${escapeAttr_(p.telefono||'')}">
     </div>
     <div class="form-field" style="border-bottom:1px solid var(--gray-100)">
       <div class="form-label">Motivo de consulta</div>
-      <input class="form-input" type="text" id="con-motivo-consulta" placeholder="Ej: Dolor lumbar, postquirúrgico..." value="${p.motivoConsulta||''}">
+      <input class="form-input" type="text" id="con-motivo-consulta" placeholder="Ej: Dolor lumbar, postquirúrgico..." value="${escapeAttr_(p.motivoConsulta||'')}">
     </div>
     <div class="form-field" style="border-bottom:1px solid var(--gray-100)">
       <div class="form-label">Contacto de emergencia (nombre y tel.)</div>
@@ -8309,7 +8309,7 @@ function renderConsentForm(){
     </div>
     <div class="form-field">
       <div class="form-label">Motivo de consulta / Área a tratar</div>
-      <input class="form-input" type="text" id="con-area" placeholder="Ej: Rodilla izquierda — Tendinopatía rotuliana" value="${p.dx}">
+      <input class="form-input" type="text" id="con-area" placeholder="Ej: Rodilla izquierda — Tendinopatía rotuliana" value="${escapeAttr_(typeof p.dx==='string'?p.dx:'')}">
     </div>
   </div>
 
@@ -9551,7 +9551,7 @@ function abrirEditarAntecedentesCompleto(){
   c.innerHTML = `
     <div style="background:linear-gradient(135deg,var(--navy),var(--navy-light));color:white;padding:12px 16px;margin:-16px -16px 16px;display:flex;align-items:center;gap:10px">
       <button onclick="renderExpediente('historia')" style="background:none;border:none;color:white;font-size:22px;cursor:pointer;padding:0 8px 0 0">‹</button>
-      <div style="font-weight:700;font-size:15px">Editando antecedentes — ${p.name.split(' ')[0]}</div>
+      <div style="font-weight:700;font-size:15px">Editando antecedentes — ${escapeHTML(p.name.split(' ')[0])}</div>
     </div>
     ${formHtml}`;
 }
