@@ -3380,9 +3380,50 @@ async function _fetchUltimaSesionHistoricos(resueltos, forzar){
 // Núcleo: por terapeuta {citas, conNota, sinNota, sinNotaPacs[]} sobre los eventos de la ventana.
 // Activo: nota exacta del día en p.soap. Histórico: ultimaSesionLive === día de la cita.
 // Sin expediente: cuenta como sin nota (no hay dónde escribirla) pero sin botón.
-function _triangularCitasNotas(eventos, resueltos, ultimaHist, asigMap){
+// V2: citasResueltas — el supervisor marca a mano una cita 🔴 como resuelta (justificada sin nota).
+// Colección citasResueltas (reglas v9): doc id = claveNorm + '__' + DD-MM-YYYY;
+// campos {fecha, claveNorm, resueltoPor, updatedAt}. Cache de sesión, actualizado al resolver.
+function _keyCitaResuelta(clave, ddmm){ return String(clave||'')+'|'+String(ddmm||''); }
+async function FST_leerCitasResueltas(forzar){
+  if(!forzar && window._citasResueltasCache && window._citasResueltasCache.map) return window._citasResueltasCache.map;
+  var map={};
+  try{
+    var ok=await FST_init();
+    if(!ok||!window._fstDb) return map;
+    var snap=await window._fstDb.collection('citasResueltas').get();
+    snap.forEach(function(d){
+      var x=d.data()||{};
+      if(x.claveNorm && x.fecha) map[_keyCitaResuelta(x.claveNorm, x.fecha)]=true;
+    });
+  }catch(e){ console.warn('[Rendimiento] leer citasResueltas:', e&&e.message); return map; }
+  window._citasResueltasCache={ts:Date.now(), map:map};
+  return map;
+}
+async function _marcarCitaResuelta(nombre, fecha){
+  if(!esSupervisorUI()){ showToast('Solo supervisor','error'); return; }
+  var clave=_normPend(nombre);
+  var ddmm=String(fecha||'');
+  if(!clave||!ddmm){ showToast('Cita no válida','error'); return; }
+  try{
+    var ok=await FST_init();
+    if(!ok||!window._fstDb) throw new Error('Firestore no disponible');
+    var docId=clave+'__'+ddmm.replace(/\//g,'-');   // '/' no es válido en un id de doc
+    await window._fstDb.collection('citasResueltas').doc(docId).set({
+      fecha:ddmm, claveNorm:clave,
+      resueltoPor:(currentUser&&currentUser.name)||'',
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    window._citasResueltasCache=window._citasResueltasCache||{ts:Date.now(), map:{}};
+    window._citasResueltasCache.map[_keyCitaResuelta(clave, ddmm)]=true;
+    showToast('✓ Cita marcada como resuelta','success');
+    if(document.querySelector('[data-rendov]')) mostrarRendimientoEquipo(window._rendVentanaActualTri||'hoy');
+  }catch(e){
+    showToast('⚠️ No se pudo marcar'+((e&&e.message)?(': '+e.message):'')+' — ¿reglas v9 desplegadas?','error');
+  }
+}
+function _triangularCitasNotas(eventos, resueltos, ultimaHist, asigMap, resueltas){
   var porTer={};
-  Object.keys(TERAPEUTA_CAL2COD).forEach(function(n){ porTer[n]={citas:0, conNota:0, sinNota:0, sinNotaPacs:[]}; });
+  Object.keys(TERAPEUTA_CAL2COD).forEach(function(n){ porTer[n]={citas:0, conNota:0, sinNota:0, resueltas:0, sinNotaPacs:[]}; });
   var vistosSinNota={};
   (Array.isArray(eventos)?eventos:[]).forEach(function(ev){
     var ter=(Array.isArray(ev.terapeutas)&&ev.terapeutas.length)?ev.terapeutas[0]:'Sin asignar';
@@ -3391,14 +3432,18 @@ function _triangularCitasNotas(eventos, resueltos, ultimaHist, asigMap){
     if(!porTer[ter]) return;   // "Sin asignar" conserva su bloque de chips propio
     var ddmm=_ddmmDeISOEvento(ev.inicio);
     var r=(resueltos||{})[clave]||{pid:null,tipo:null};
+    // V2: nota POR PACIENTE — cualquier terapeuta cuenta (p.soap no se filtra por terapeuta)
     var tiene=false;
     if(r.tipo==='activo' && r.p){
       tiene=(Array.isArray(r.p.soap)?r.p.soap:[]).some(function(s){ return s && s.fecha===ddmm; });
     } else if(r.tipo==='historico'){
       tiene=!!(ddmm && ultimaHist && ultimaHist[clave]===ddmm);
     }
+    // V2: resuelta a mano por el supervisor → cuenta como atendida, no aparece en 🔴
+    var resuelta=!tiene && !!(resueltas && resueltas[_keyCitaResuelta(clave, ddmm)]);
     porTer[ter].citas++;
     if(tiene){ porTer[ter].conNota++; }
+    else if(resuelta){ porTer[ter].conNota++; porTer[ter].resueltas++; }
     else {
       porTer[ter].sinNota++;
       var kdup=ter+'|'+clave+'|'+ddmm;
@@ -3433,13 +3478,18 @@ async function _abrirExpedienteDesdeRendimiento(pid){
 }
 function _chipSinNota(x){
   var base='font-size:11px;font-weight:700;border-radius:10px;padding:4px 10px;margin:2px;font-family:inherit;';
+  // V2: "✓ Resolver" (solo supervisor — el dashboard ya es supervisor-only; _marcarCitaResuelta re-valida)
+  var btnResolver='<button data-nombre="'+escapeAttr_(x.nombre)+'" data-fecha="'+escapeAttr_(x.fecha||'')+'" '
+    +'onclick="_marcarCitaResuelta(this.dataset.nombre, this.dataset.fecha)" '
+    +'style="'+base+'border:1px solid #A7F3D0;background:#ECFDF5;color:#065F46;cursor:pointer">✓ Resolver</button>';
   if(x.pid){
-    return '<button data-pid="'+escapeAttr_(x.pid)+'" onclick="_abrirExpedienteDesdeRendimiento(this.dataset.pid)" '
+    return '<span style="white-space:nowrap;display:inline-block">'
+      +'<button data-pid="'+escapeAttr_(x.pid)+'" onclick="_abrirExpedienteDesdeRendimiento(this.dataset.pid)" '
       +'style="'+base+'border:1px solid #FCA5A5;background:#FEF2F2;color:#B91C1C;cursor:pointer">🔴 '
-      +escapeHTML(x.nombre)+' <span style="font-weight:400">→ abrir</span></button>';
+      +escapeHTML(x.nombre)+' <span style="font-weight:400">→ abrir</span></button>'+btnResolver+'</span>';
   }
-  return '<span style="'+base+'border:1px dashed #FCA5A5;background:#FFF;color:#B91C1C;display:inline-block">🔴 '
-    +escapeHTML(x.nombre)+' <span style="font-weight:400">(sin expediente)</span></span>';
+  return '<span style="white-space:nowrap;display:inline-block"><span style="'+base+'border:1px dashed #FCA5A5;background:#FFF;color:#B91C1C;display:inline-block">🔴 '
+    +escapeHTML(x.nombre)+' <span style="font-weight:400">(sin expediente)</span></span>'+btnResolver+'</span>';
 }
 function _computarRendimiento(eventos, diasISO, asigMap){
   var diasDDMM={}; diasISO.forEach(function(i){ var k=_ddmmFromISO(i); if(k) diasDDMM[k]=true; });
@@ -3522,7 +3572,7 @@ function _rendimientoHTML(datos, noId, ventana, etiqueta, aviso, refresco, tri){
     +'<tbody>'+filas+'</tbody></table></div>'
     +seccionSinNota
     +filaSA+bloqueNI
-    +'<div style="font-size:10px;color:var(--gray-400);margin-top:10px">✅/🔴 por cita: nota fechada el día exacto de la cita (activos por expediente; históricos por ultimaSesionLive del doc). Score = calidad promedio de nota (0-100) de pacientes activos.</div>';
+    +'<div style="font-size:10px;color:var(--gray-400);margin-top:10px">✅/🔴 por PACIENTE y día: nota fechada el día exacto de la cita, sin importar qué terapeuta la escribió (activos por expediente; históricos por ultimaSesionLive). ✅ incluye citas resueltas a mano con ✓. Score = calidad promedio de nota (0-100) de pacientes activos.</div>';
 }
 // PERF: caches en memoria del dashboard. La lógica de cálculo NO cambia — solo se evita red repetida.
 var REND_CACHE_TTL_MS=5*60*1000;
@@ -3603,9 +3653,11 @@ async function mostrarRendimientoEquipo(ventana, forzar){
   _tm('cálculo en memoria', tCalc);
   // DASHBOARD-NOTAS: triangulación por cita (activos por p.soap; históricos por ultimaSesionLive, 1 doc c/u)
   var tTri=_now();
+  window._rendVentanaActualTri=ventana;   // V2: para re-render tras "✓ Resolver"
   var resueltos=await _resolverPacientesCalendario(eventos);
   var ultimaHist=await _fetchUltimaSesionHistoricos(resueltos, !!forzar);
-  var tri=_triangularCitasNotas(eventos, resueltos, ultimaHist, asigMap);
+  var resueltas=await FST_leerCitasResueltas(!!forzar);
+  var tri=_triangularCitasNotas(eventos, resueltos, ultimaHist, asigMap, resueltas);
   _tm('triangulación históricos', tTri);
   var etiqueta=(dias.length>1)?(_ddmmFromISO(dias[0])+' — '+_ddmmFromISO(dias[dias.length-1])):'Hoy';
   card.innerHTML=_rendimientoHTML(datos, noId, ventana, etiqueta, aviso, {desdeCache:desdeCache, ts:cacheTs}, tri);

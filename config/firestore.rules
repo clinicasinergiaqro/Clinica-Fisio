@@ -74,6 +74,14 @@ service cloud.firestore {
         'nombreOriginal','terapeuta','asignadoPor','fechaAsignacion','updatedAt'
       ]);
     }
+    // ── v9: citas resueltas a mano (dashboard triangulación V2) ──
+    // Doc id = claveNorm + '__' + DD-MM-YYYY. Solo el supervisor resuelve;
+    // todas las terapeutas pueden leer (el dashboard las descuenta de 🔴).
+    function citaResueltaOK() {
+      return request.resource.data.keys().hasOnly([
+        'fecha','claveNorm','resueltoPor','updatedAt'
+      ]);
+    }
     match /pacientes/{pacienteId} {
       allow read: if isWriter();
       allow create: if isWriter();
@@ -96,6 +104,11 @@ service cloud.firestore {
     match /agendaAsignaciones/{nombreNorm} {
       allow read: if isWriter();
       allow create, update: if isSupervisor() && asignacionAgendaOK();
+      allow delete: if isSupervisor();
+    }
+    match /citasResueltas/{citaId} {
+      allow read: if isWriter();
+      allow create, update: if isSupervisor() && citaResueltaOK();
       allow delete: if isSupervisor();
     }
   }
