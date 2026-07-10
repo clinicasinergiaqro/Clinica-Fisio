@@ -2688,7 +2688,7 @@ async function FST_montarAgendaCalendar(rango){
     + '<div style="font-size:13px;font-weight:700;color:var(--navy);margin-bottom:8px">📅 Agenda del calendario</div>'
     + '<div style="font-size:10px;color:var(--gray-400);margin:-4px 0 8px">Sincronizado desde Google Calendar · Solo lectura</div>'
     + '<div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap">'+btn('dia','Hoy')+btn('manana','Mañana')+btn('pasado','Pasado')+btn('semana','Semana')+btn('semanaSiguiente','Próxima')+'</div>'
-    + (esSupervisorUI()?'<div style="margin-bottom:10px;display:flex;gap:6px;flex-wrap:wrap"><button onclick="mostrarPendientesSOAP()" style="font-size:12px;font-weight:700;border:none;border-radius:10px;padding:6px 12px;cursor:pointer;font-family:inherit;background:#FEF3C7;color:#92400E">📋 Notas pendientes</button><button onclick="mostrarRendimientoEquipo(\'hoy\')" style="font-size:12px;font-weight:700;border:none;border-radius:10px;padding:6px 12px;cursor:pointer;font-family:inherit;background:#E8F5EE;color:#2E7D52">📊 Rendimiento</button><button onclick="mostrarRevaloraciones()" style="font-size:12px;font-weight:700;border:none;border-radius:10px;padding:6px 12px;cursor:pointer;font-family:inherit;background:#E0E7FF;color:#3730A3">🔄 Revalorar'+((typeof _countRevaloraciones==="function"&&_countRevaloraciones()>0)?(" ("+_countRevaloraciones()+")"):"")+'</button><button onclick="toggleVistaTerapeuta()" style="font-size:12px;font-weight:700;border:none;border-radius:10px;padding:6px 12px;cursor:pointer;font-family:inherit;background:#EEF1F6;color:var(--navy)">👁️ Ver como terapeuta</button></div>':'')
+    + (esSupervisorUI()?'<div style="margin-bottom:10px;display:flex;gap:6px;flex-wrap:wrap"><button onclick="mostrarPendientesSOAP()" style="font-size:12px;font-weight:700;border:none;border-radius:10px;padding:6px 12px;cursor:pointer;font-family:inherit;background:#FEF3C7;color:#92400E">📋 Notas pendientes</button><button onclick="mostrarRendimientoEquipo(\'hoy\')" style="font-size:12px;font-weight:700;border:none;border-radius:10px;padding:6px 12px;cursor:pointer;font-family:inherit;background:#E8F5EE;color:#2E7D52">📊 Rendimiento</button><button onclick="mostrarColaRevision()" style="font-size:12px;font-weight:700;border:none;border-radius:10px;padding:6px 12px;cursor:pointer;font-family:inherit;background:#FDE8E8;color:#B91C1C">🔍 Cola de revisión</button><button onclick="mostrarRevaloraciones()" style="font-size:12px;font-weight:700;border:none;border-radius:10px;padding:6px 12px;cursor:pointer;font-family:inherit;background:#E0E7FF;color:#3730A3">🔄 Revalorar'+((typeof _countRevaloraciones==="function"&&_countRevaloraciones()>0)?(" ("+_countRevaloraciones()+")"):"")+'</button><button onclick="toggleVistaTerapeuta()" style="font-size:12px;font-weight:700;border:none;border-radius:10px;padding:6px 12px;cursor:pointer;font-family:inherit;background:#EEF1F6;color:var(--navy)">👁️ Ver como terapeuta</button></div>':'')
     + '<div id="agenda-cal-list"><div style="font-size:12px;color:var(--gray-400);padding:6px 0">⏳ Cargando agenda…</div></div>'
     + '</div></div>';
   const reqId = (window._agendaCalReq = (window._agendaCalReq||0) + 1);
@@ -3511,6 +3511,118 @@ function _chipSinNota(x){
   }
   return '<span style="white-space:nowrap;display:inline-block"><span style="'+base+'border:1px dashed #FCA5A5;background:#FFF;color:#B91C1C;display:inline-block">🔴 '
     +escapeHTML(x.nombre)+' <span style="font-weight:400">(sin expediente)</span></span>'+btnResolver+'</span>';
+}
+// ── LOOP COLA-REVISIÓN: sesiones con revisionPendiente:true (SOLO supervisor) ──
+// Query collectionGroup('sesiones') — REQUIERE: (1) reglas v10 (match /{path=**}/sesiones
+// con read isWriter) y (2) índice single-field de revisionPendiente en alcance
+// collection-group (Firebase Console; sin él la query da failed-precondition con link).
+// Cache de sesión; 🔄 Actualizar fuerza relectura. Validar = set {revisionPendiente:false}
+// (dentro de sesionUpdateOK). Costo por lectura: ~1 doc por sesión flageada (~235).
+var MOTIVO_LABELS={
+  FECHA_INTERPOLADA:'📆 Fecha interpolada', FECHA_DESDE_TEXTO:'📝 Fecha desde texto',
+  FECHA_CORREGIDA_AUTO:'🛠️ Fecha corregida (año)', SIN_FECHA:'❓ Sin fecha',
+  TERAPEUTA_NO_RECONOCIDO:'👤 Terapeuta no reconocido', IMPORTADA_SIN_FECHA:'❓ Importada sin fecha',
+  VALORACION_INICIAL:'🩺 Valoración inicial', EXTRAIDA_DE_BLOB:'📦 Extraída de blob',
+  FECHA_RARA:'⚠️ Fecha rara', DUP_INTRA:'🔁 Posible duplicado', SOLO_SUBJETIVO:'✂️ Solo subjetivo', OTRO:'Otro'
+};
+function _motivosDe(x){
+  if(Array.isArray(x.motivosRevision)&&x.motivosRevision.length) return x.motivosRevision.map(String);
+  if(x.motivoRevision) return [String(x.motivoRevision)];   // legacy singular (importador)
+  return ['OTRO'];
+}
+async function _fetchColaRevision(forzar){
+  if(!forzar && window._colaRevisionCache && Array.isArray(window._colaRevisionCache.items)) return window._colaRevisionCache;
+  var ok=await FST_init();
+  if(!ok||!window._fstDb) throw new Error('Firestore no disponible');
+  var snap=await window._fstDb.collectionGroup('sesiones').where('revisionPendiente','==',true).get();
+  var nombres={};
+  try{ ((await FST_cargarIndicePacientes())||[]).forEach(function(pp){ if(pp&&pp.id) nombres[pp.id]=pp.name||''; }); }catch(_e){}
+  var items=[];
+  snap.forEach(function(d){
+    var x=d.data()||{};
+    var pid=d.ref.parent.parent?d.ref.parent.parent.id:'';
+    items.push({ path:d.ref.path, pid:pid, sid:d.id, num:Number(x.num||0),
+      fecha:String(x.fecha||''), nombre:nombres[pid]||pid, motivos:_motivosDe(x) });
+  });
+  items.sort(function(a,b){ return a.nombre.localeCompare(b.nombre,'es') || (a.num-b.num); });
+  window._colaRevisionCache={ts:Date.now(), items:items};
+  return window._colaRevisionCache;
+}
+function _colaRevisionHTML(items, filtro, desdeCache){
+  var conteos={};
+  items.forEach(function(it){ it.motivos.forEach(function(m){ conteos[m]=(conteos[m]||0)+1; }); });
+  var chipTodas='<button onclick="mostrarColaRevision(false, null)" style="font-size:11px;font-weight:700;border:none;border-radius:10px;padding:5px 10px;margin:2px;cursor:pointer;font-family:inherit;'+(!filtro?'background:var(--navy);color:#fff':'background:#EEF1F6;color:var(--navy)')+'">Todas ('+items.length+')</button>';
+  var chips=Object.keys(conteos).sort(function(a,b){return conteos[b]-conteos[a];}).map(function(m){
+    var sel=(filtro===m);
+    return '<button data-m="'+escapeAttr_(m)+'" onclick="mostrarColaRevision(false, this.dataset.m)" style="font-size:11px;font-weight:700;border:none;border-radius:10px;padding:5px 10px;margin:2px;cursor:pointer;font-family:inherit;'+(sel?'background:var(--navy);color:#fff':'background:#EEF1F6;color:var(--navy)')+'">'+escapeHTML(MOTIVO_LABELS[m]||m)+' ('+conteos[m]+')</button>';
+  }).join('');
+  var visibles=filtro?items.filter(function(it){ return it.motivos.indexOf(filtro)!==-1; }):items;
+  var porMotivo={};
+  visibles.forEach(function(it){ var m=filtro||it.motivos[0]||'OTRO'; (porMotivo[m]=porMotivo[m]||[]).push(it); });
+  var cuerpo='';
+  Object.keys(porMotivo).sort(function(a,b){return porMotivo[b].length-porMotivo[a].length;}).forEach(function(m){
+    cuerpo+='<div style="margin-top:12px"><div style="font-size:13px;font-weight:800;color:var(--navy);border-bottom:2px solid var(--gray-200);padding-bottom:3px">'+escapeHTML(MOTIVO_LABELS[m]||m)+' — '+porMotivo[m].length+'</div>';
+    porMotivo[m].forEach(function(it){
+      cuerpo+='<div style="display:flex;align-items:center;gap:6px;padding:5px 0;border-bottom:1px solid #F0F2F7;flex-wrap:wrap">'
+        +'<div style="flex:1;min-width:150px;font-size:12px;color:#374151"><b>'+escapeHTML(it.nombre)+'</b> · ses '+(it.num||'—')+' · '+(it.fecha?escapeHTML(it.fecha):'<span style="color:#B91C1C;font-weight:700">(sin fecha)</span>')
+        +(it.motivos.length>1?' <span style="font-size:10px;color:var(--gray-400)">['+escapeHTML(it.motivos.join(', '))+']</span>':'')+'</div>'
+        +'<button data-pid="'+escapeAttr_(it.pid)+'" onclick="_abrirExpedienteDesdeRendimiento(this.dataset.pid)" style="font-size:10px;font-weight:700;border:1px solid #C7D2FE;border-radius:8px;padding:2px 8px;cursor:pointer;background:#EEF2FF;color:#3730A3;font-family:inherit">abrir →</button>'
+        +'<button data-path="'+escapeAttr_(it.path)+'" onclick="_validarSesionRevision(this.dataset.path)" style="font-size:10px;font-weight:700;border:1px solid #A7F3D0;border-radius:8px;padding:2px 8px;cursor:pointer;background:#ECFDF5;color:#065F46;font-family:inherit">✓ Validada</button>'
+        +'</div>';
+    });
+    cuerpo+='</div>';
+  });
+  if(!visibles.length) cuerpo='<div style="text-align:center;padding:24px;color:#2E7D52;font-weight:700">✅ Cola vacía — nada pendiente de revisión'+(filtro?' con este filtro':'')+'</div>';
+  return '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">'
+    +'<div style="font-size:16px;font-weight:800;color:var(--navy)">🔍 Cola de revisión</div>'
+    +'<button onclick="this.closest(\'[data-colarev]\').remove()" style="background:none;border:none;font-size:22px;color:var(--gray-400);cursor:pointer">×</button></div>'
+    +'<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:4px">'
+    +'<button onclick="mostrarColaRevision(true, window._colaRevFiltro||null)" style="font-size:11px;font-weight:700;border:none;border-radius:10px;padding:5px 10px;cursor:pointer;font-family:inherit;background:#EEF1F6;color:var(--navy)">🔄 Actualizar</button>'
+    +(desdeCache?'<span style="font-size:10px;color:var(--gray-400)">cache de sesión</span>':'')
+    +'</div>'
+    +'<div style="margin-bottom:6px">'+chipTodas+chips+'</div>'
+    +'<div style="font-size:11px;color:var(--gray-500)">Sesiones flageadas por las reparaciones de migración. "✓ Validada" quita el flag (los datos quedan como están); para corregir usa "abrir →".</div>'
+    +cuerpo;
+}
+async function mostrarColaRevision(forzar, filtro){
+  if(!esSupervisorUI()){ showToast('Solo supervisor','error'); return; }
+  window._colaRevFiltro=filtro||null;
+  var prev=document.querySelector('[data-colarev]'); if(prev) prev.remove();
+  var ov=document.createElement('div');
+  ov.setAttribute('data-colarev','1');
+  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:10001;display:flex;align-items:flex-start;justify-content:center;overflow:auto;padding:40px 12px';
+  ov.onclick=function(e){ if(e.target===ov) ov.remove(); };
+  ov.innerHTML='<div style="background:#fff;border-radius:16px;width:100%;max-width:640px;padding:18px"><div style="font-size:12px;color:var(--gray-400)">⏳ Cargando cola de revisión…</div></div>';
+  document.body.appendChild(ov);
+  var card=ov.firstChild;
+  try{
+    var teniaCache=!forzar && !!window._colaRevisionCache;
+    var cache=await _fetchColaRevision(!!forzar);
+    card.innerHTML=_colaRevisionHTML(cache.items, window._colaRevFiltro, teniaCache);
+  }catch(e){
+    var msg=String((e&&e.message)||e);
+    var pista='';
+    if(/failed.precondition|index/i.test(msg)) pista='<div style="font-size:11px;background:#FEF3C7;color:#92400E;border-radius:8px;padding:8px;margin-top:8px">Falta el índice collection-group de <b>revisionPendiente</b>. El mensaje de arriba trae el link directo para crearlo en Firebase Console (1 clic + esperar a que construya).</div>';
+    else if(/permission|insufficient/i.test(msg)) pista='<div style="font-size:11px;background:#FEF3C7;color:#92400E;border-radius:8px;padding:8px;margin-top:8px">Las reglas v10 (lectura collection-group de sesiones) aún no están publicadas en Firebase Console.</div>';
+    card.innerHTML='<div style="color:var(--red);font-size:12px;word-break:break-all">⚠️ '+escapeHTML(msg)+'</div>'+pista
+      +'<div style="text-align:right;margin-top:12px"><button onclick="this.closest(\'[data-colarev]\').remove()" style="padding:8px 14px;border:none;border-radius:10px;background:var(--navy);color:#fff;font-weight:700;cursor:pointer">Cerrar</button></div>';
+  }
+}
+async function _validarSesionRevision(path){
+  if(!esSupervisorUI()){ showToast('Solo supervisor','error'); return; }
+  if(!confirm('¿Marcar esta sesión como VALIDADA? Se quita el flag de revisión (los datos quedan como están).')) return;
+  try{
+    var ok=await FST_init();
+    if(!ok||!window._fstDb) throw new Error('Firestore no disponible');
+    await window._fstDb.doc(path).set({revisionPendiente:false},{merge:true});
+    if(window._colaRevisionCache&&Array.isArray(window._colaRevisionCache.items)){
+      window._colaRevisionCache.items=window._colaRevisionCache.items.filter(function(it){ return it.path!==path; });
+    }
+    showToast('✓ Sesión validada','success');
+    if(document.querySelector('[data-colarev]')) mostrarColaRevision(false, window._colaRevFiltro||null);
+  }catch(e){
+    showToast('⚠️ No se pudo validar: '+((e&&e.message)||''),'error');
+  }
 }
 function _computarRendimiento(eventos, diasISO, asigMap){
   var diasDDMM={}; diasISO.forEach(function(i){ var k=_ddmmFromISO(i); if(k) diasDDMM[k]=true; });

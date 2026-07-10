@@ -111,5 +111,12 @@ service cloud.firestore {
       allow create, update: if isSupervisor() && citaResueltaOK();
       allow delete: if isSupervisor();
     }
+    // ── v10: lectura por collection group de 'sesiones' (cola de revisión) ──
+    // Habilita collectionGroup('sesiones').where(...) para writers. NO amplía la
+    // audiencia: los writers ya pueden leer cada sesión por la ruta anidada de arriba.
+    // Solo lectura — los writes siguen exclusivamente por la ruta anidada con whitelists.
+    match /{path=**}/sesiones/{sesionId} {
+      allow read: if isWriter();
+    }
   }
 }
