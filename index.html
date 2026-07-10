@@ -3253,11 +3253,16 @@ var TERAPEUTA_CAL2COD={Carlos:'CARLOS', Zara:'ZARA', Camila:'CAMI', Dafne:'DAF',
 function _diasVentanaRendimiento(ventana){
   function iso(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
   var hoy=new Date(); hoy.setHours(12,0,0,0);
-  var out=[], d;
+  var out=[], d, fin=new Date(hoy);
   if(ventana==='mes'){ d=new Date(hoy.getFullYear(), hoy.getMonth(), 1, 12); }
   else if(ventana==='7dias'){ d=new Date(hoy); d.setDate(d.getDate()-6); }
+  else if(ventana==='semana'){
+    // VISTA-SEMANAL: lunes a domingo de la SEMANA ACTUAL (incluye días futuros)
+    d=new Date(hoy); var dow=(d.getDay()+6)%7; d.setDate(d.getDate()-dow);
+    fin=new Date(d); fin.setDate(d.getDate()+6);
+  }
   else { d=new Date(hoy); }
-  while(d<=hoy){ out.push(iso(d)); d.setDate(d.getDate()+1); }
+  while(d<=fin){ out.push(iso(d)); d.setDate(d.getDate()+1); }
   return out;
 }
 // S2: puntos por campo con contenido real ("[pendiente]"/"No especificado" no cuentan).
@@ -3428,6 +3433,7 @@ async function _marcarCitaResuelta(nombre, fecha){
 function _triangularCitasNotas(eventos, resueltos, ultimaHist, asigMap, resueltas){
   var porTer={};
   Object.keys(TERAPEUTA_CAL2COD).forEach(function(n){ porTer[n]={citas:0, conNota:0, sinNota:0, resueltas:0, sinNotaPacs:[]}; });
+  var porDia={};   // VISTA-SEMANAL: desglose por día DD/MM/YYYY (mismo universo que la tabla: citas con terapeuta)
   var vistosSinNota={};
   (Array.isArray(eventos)?eventos:[]).forEach(function(ev){
     var ter=(Array.isArray(ev.terapeutas)&&ev.terapeutas.length)?ev.terapeutas[0]:'Sin asignar';
@@ -3445,6 +3451,12 @@ function _triangularCitasNotas(eventos, resueltos, ultimaHist, asigMap, resuelta
     }
     // V2: resuelta a mano por el supervisor → cuenta como atendida, no aparece en 🔴
     var resuelta=!tiene && !!(resueltas && resueltas[_keyCitaResuelta(clave, ddmm)]);
+    // VISTA-SEMANAL: acumular por día (misma semántica ✅/🔴 que la tabla)
+    if(ddmm){
+      var dd=porDia[ddmm]||(porDia[ddmm]={citas:0, conNota:0, sinNota:0});
+      dd.citas++;
+      if(tiene||resuelta) dd.conNota++; else dd.sinNota++;
+    }
     porTer[ter].citas++;
     if(tiene){ porTer[ter].conNota++; }
     else if(resuelta){ porTer[ter].conNota++; porTer[ter].resueltas++; }
@@ -3457,6 +3469,7 @@ function _triangularCitasNotas(eventos, resueltos, ultimaHist, asigMap, resuelta
       }
     }
   });
+  porTer._porDia=porDia;   // VISTA-SEMANAL: clave interna (no colisiona: los nombres de terapeuta no llevan _)
   return porTer;
 }
 // Abre el expediente desde el dashboard/pendientes: cierra overlays y delega en
@@ -3546,6 +3559,28 @@ function _rendimientoHTML(datos, noId, ventana, etiqueta, aviso, refresco, tri){
   var seccionSinNota=bloquesSinNota
     ? '<div style="margin-top:12px"><div style="font-size:12px;font-weight:800;color:var(--navy)">📝 Citas sin nota — toca para abrir el expediente</div>'+bloquesSinNota+'</div>'
     : '<div style="margin-top:12px;font-size:12px;font-weight:700;color:#2E7D52">✅ Todas las citas identificadas de la ventana tienen nota</div>';
+  // VISTA-SEMANAL: una columna por día (Lun..Vie; Sáb/Dom solo si tienen citas). Días futuros = "por venir".
+  var bloqueSemana='';
+  if(ventana==='semana' && tri._porDia && Array.isArray(tri._diasDDMM)){
+    var NOMBRES_DIA=['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'];
+    var hoyDDMM=_ddmmFromISO(_hoyISOlocal());
+    var idxHoy=tri._diasDDMM.indexOf(hoyDDMM);
+    var cols=tri._diasDDMM.map(function(dd,i){
+      var st=tri._porDia[dd]||{citas:0, conNota:0, sinNota:0};
+      if(i>=5 && !st.citas) return '';   // fin de semana sin citas → sin columna
+      var esHoy=(dd===hoyDDMM);
+      var futuro=(idxHoy>=0 && i>idxHoy);
+      var linea3=futuro
+        ? '<div style="font-size:11px;color:var(--gray-400);margin-top:1px">por venir</div>'
+        : '<div style="font-size:12px;margin-top:1px;color:'+(st.sinNota>0?'#B91C1C':'var(--gray-400)')+';font-weight:'+(st.sinNota>0?'800':'400')+'">🔴 '+st.sinNota+'</div>';
+      return '<div style="flex:1;min-width:84px;border:1px solid '+(esHoy?'var(--navy)':'var(--gray-200)')+';border-radius:10px;padding:8px 6px;text-align:center'+(esHoy?';background:#F5F8FF':'')+(futuro?';opacity:.8':'')+'">'
+        +'<div style="font-size:11px;font-weight:800;color:'+(esHoy?'var(--navy)':'var(--gray-600)')+'">'+NOMBRES_DIA[i]+' <span style="font-weight:400;color:var(--gray-400)">'+dd.slice(0,5)+'</span></div>'
+        +'<div style="font-size:12px;margin-top:4px;color:#374151">'+st.citas+' cita'+(st.citas!==1?'s':'')+'</div>'
+        +'<div style="font-size:12px;color:#2E7D52;margin-top:1px">✅ '+st.conNota+'</div>'
+        +linea3+'</div>';
+    }).join('');
+    bloqueSemana='<div style="display:flex;gap:6px;margin-bottom:10px;overflow-x:auto">'+cols+'</div>';
+  }
   var nombresSA=Object.keys(datos.sinAsignar);
   var chipSA=nombresSA.map(function(nm){
     return '<button data-nombre="'+escapeAttr_(nm)+'" data-v="'+escapeAttr_(ventana)+'" onclick="_abrirModalAsignacion(this.dataset.nombre,this.dataset.v)" style="font-size:11px;font-weight:700;border:1px dashed #92400E;border-radius:10px;padding:4px 10px;margin:2px;cursor:pointer;background:#FFFBEB;color:#92400E">'+escapeHTML(nm)+(datos.sinAsignar[nm]>1?(' ×'+datos.sinAsignar[nm]):'')+'</button>';
@@ -3564,12 +3599,13 @@ function _rendimientoHTML(datos, noId, ventana, etiqueta, aviso, refresco, tri){
   return '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">'
     +'<div style="font-size:16px;font-weight:800;color:var(--navy)">📊 Rendimiento del equipo</div>'
     +'<button onclick="this.closest(\'[data-rendov]\').remove()" style="background:none;border:none;font-size:22px;color:var(--gray-400);cursor:pointer">×</button></div>'
-    +'<div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap;align-items:center">'+btnV('hoy','Hoy')+btnV('7dias','7 días')+btnV('mes','Mes')
+    +'<div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap;align-items:center">'+btnV('hoy','Hoy')+btnV('semana','Esta semana')+btnV('7dias','7 días')+btnV('mes','Mes')
     +'<button onclick="mostrarRendimientoEquipo(\''+ventana+'\', true)" style="font-size:11px;font-weight:700;border:none;border-radius:10px;padding:5px 10px;cursor:pointer;font-family:inherit;background:#EEF1F6;color:var(--navy)">🔄 Actualizar</button>'
     +((refresco&&refresco.desdeCache)?('<span style="font-size:10px;color:var(--gray-400)">cache · hace '+Math.max(1,Math.round((Date.now()-(refresco.ts||Date.now()))/1000))+' s</span>'):'')
     +'</div>'
     +'<div style="font-size:12px;color:var(--gray-500);margin-bottom:8px">'+escapeHTML(etiqueta)+' · Citas de Google Calendar vs notas SOAP (activos + históricos)</div>'
     +(aviso?('<div style="font-size:11px;background:#FEF3C7;color:#92400E;border-radius:8px;padding:6px 10px;margin-bottom:8px">'+escapeHTML(aviso)+'</div>'):'')
+    +bloqueSemana
     +'<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px">'
     +'<thead><tr style="border-bottom:2px solid var(--gray-200);color:var(--gray-600);font-size:11px;text-transform:uppercase">'
     +'<th style="padding:6px 8px;text-align:left">Terapeuta</th><th style="padding:6px 8px">Citas</th><th style="padding:6px 8px">✅ Nota</th><th style="padding:6px 8px">🔴 Sin</th><th style="padding:6px 8px">Score</th></tr></thead>'
@@ -3602,7 +3638,7 @@ async function _rendIdxHist(forzar){
 }
 async function mostrarRendimientoEquipo(ventana, forzar){
   if(!esSupervisorUI()){ showToast('Solo supervisor','error'); return; }
-  ventana=(ventana==='7dias'||ventana==='mes')?ventana:'hoy';
+  ventana=(ventana==='7dias'||ventana==='mes'||ventana==='semana')?ventana:'hoy';
   var prev=document.querySelector('[data-rendov]'); if(prev) prev.remove();
   var ov=document.createElement('div');
   ov.setAttribute('data-rendov','1');
@@ -3662,6 +3698,7 @@ async function mostrarRendimientoEquipo(ventana, forzar){
   var ultimaHist=await _fetchUltimaSesionHistoricos(resueltos, !!forzar);
   var resueltas=await FST_leerCitasResueltas(!!forzar);
   var tri=_triangularCitasNotas(eventos, resueltos, ultimaHist, asigMap, resueltas);
+  tri._diasDDMM=dias.map(_ddmmFromISO);   // VISTA-SEMANAL: orden de columnas (lunes primero)
   _tm('triangulación históricos', tTri);
   var etiqueta=(dias.length>1)?(_ddmmFromISO(dias[0])+' — '+_ddmmFromISO(dias[dias.length-1])):'Hoy';
   card.innerHTML=_rendimientoHTML(datos, noId, ventana, etiqueta, aviso, {desdeCache:desdeCache, ts:cacheTs}, tri);
