@@ -4107,7 +4107,14 @@ function actualizarFechasClinicas(paciente){
     if(currentPatient&&currentPatient.id===pid) renderResumenFechas(res,'fechas-clinicas-body');
   });
   if(typeof FST_fetchSesiones==='function'){
-    FST_fetchSesiones(pid).then(function(sesFS){
+    // OPT2 — Cache entre tabs: si openExpediente ya pobló _fstSesionesCache, no re-leer Firestore
+    // en cada visita al tab Historia. El cache se actualiza en los puntos de escritura (guardar/editar
+    // sesión histórica) y se refresca de red al reabrir el expediente — no al cambiar de tab.
+    var sesCached = (typeof _fstSesionesCache==='object' && _fstSesionesCache && Array.isArray(_fstSesionesCache[pid])) ? _fstSesionesCache[pid] : null;
+    var pSes = sesCached
+      ? Promise.resolve(sesCached)
+      : FST_fetchSesiones(pid).then(function(s){ var arr=Array.isArray(s)?s:[]; try{ _fstSesionesCache[pid]=arr; }catch(_){} return arr; });
+    pSes.then(function(sesFS){
       return obtenerResumenFechasClinicas(paciente, sesFS||[]);
     }).then(function(res2){
       if(res2&&currentPatient&&currentPatient.id===pid) renderResumenFechas(res2,'fechas-clinicas-body');
