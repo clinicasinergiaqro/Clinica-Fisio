@@ -3481,7 +3481,7 @@ function _triangularCitasNotas(eventos, resueltos, ultimaHist, asigMap, resuelta
 // Si la vista fusionada aún no existe (no se ha abierto Pacientes), la siembra desde el índice.
 async function _abrirExpedienteDesdeRendimiento(pid){
   pid=String(pid||''); if(!pid) return;
-  document.querySelectorAll('[data-rendov],[data-pendov]').forEach(function(o){ o.remove(); });
+  document.querySelectorAll('[data-rendov],[data-pendov],[data-colarev]').forEach(function(o){ o.remove(); });
   var esLocal=Array.isArray(patientsDB)&&patientsDB.some(function(p){ return String((p&&p.id)||'')===pid; });
   if(!esLocal && !(window._FST_listaPacientesPorId||{})[pid]){
     try{
