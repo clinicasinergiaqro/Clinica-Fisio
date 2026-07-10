@@ -3924,6 +3924,29 @@ function renderPacientes(q='', filtro='todos', fuenteLista=null){
   }
 
   c.innerHTML=html;
+  _autoVerMasPacientes_(); // OPT1: activa la carga incremental por scroll (si hay botón "Ver más")
+}
+
+// OPT1 — Render incremental: auto-carga el siguiente lote cuando "Ver más" se acerca al viewport
+// (300px antes). El botón manual queda como respaldo: sin IntersectionObserver todo sigue como antes.
+let _verMasIO = null;
+function _autoVerMasPacientes_(){
+  if(typeof IntersectionObserver === 'undefined') return;
+  if(_verMasIO){ _verMasIO.disconnect(); _verMasIO = null; }
+  const btn = document.getElementById('ver-mas-pacientes');
+  if(!btn) return;
+  _verMasIO = new IntersectionObserver(function(entries){
+    if(!entries.some(function(en){ return en.isIntersecting; })) return;
+    const b = document.getElementById('ver-mas-pacientes');
+    if(!b){ if(_verMasIO){ _verMasIO.disconnect(); _verMasIO = null; } return; }
+    _verMasIO.unobserve(b);
+    verMasPacientes_(b);
+    // Re-observar dispara un chequeo inicial: si el botón sigue visible, carga el siguiente lote.
+    const b2 = document.getElementById('ver-mas-pacientes');
+    if(b2) _verMasIO.observe(b2);
+    else { _verMasIO.disconnect(); _verMasIO = null; }
+  }, {rootMargin:'300px 0px'});
+  _verMasIO.observe(btn);
 }
 
 // ── EXPEDIENTE ─────────────────────────────────────────────────────────────
