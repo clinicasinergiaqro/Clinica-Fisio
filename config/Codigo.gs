@@ -44,8 +44,29 @@ const HEADERS = [
 ];
 
 // ── SPRINT TOKEN PASO 1: validación de Firebase ID Token ──
+// feat/appsscript-auth: decodifica el payload del JWT (base64url) para chequeos locales
+// de exp/aud/iss ANTES del lookup de red. NO verifica firma (eso lo hace accounts:lookup,
+// que sigue siendo la autoridad); esto agrega fail-fast y ata el token al proyecto.
+function _decodificarJwtPayload_(idToken){
+  try{
+    var parts = String(idToken).split('.');
+    if(parts.length !== 3) return null;
+    var b64 = parts[1].replace(/-/g,'+').replace(/_/g,'/');
+    while(b64.length % 4) b64 += '=';
+    var json = Utilities.newBlob(Utilities.base64Decode(b64)).getDataAsString();
+    return JSON.parse(json);
+  }catch(e){ return null; }
+}
 function validarFirebaseIdToken(idToken){
   if(!idToken || typeof idToken!=='string') return {ok:false, error:'Token vacío'};
+  // feat/appsscript-auth — endurecimiento local (sin red): estructura, expiración y proyecto.
+  // aud = project id; iss = securetoken del MISMO proyecto (clinicasinergia-ec2cf).
+  const claims = _decodificarJwtPayload_(idToken);
+  if(!claims) return {ok:false, error:'Token malformado'};
+  const ahoraSec = Math.floor(Date.now()/1000);
+  if(!(Number(claims.exp) > ahoraSec)) return {ok:false, error:'Token expirado'};
+  if(claims.aud !== 'clinicasinergia-ec2cf') return {ok:false, error:'Audiencia inválida (aud!=clinicasinergia-ec2cf)'};
+  if(claims.iss !== 'https://securetoken.google.com/clinicasinergia-ec2cf') return {ok:false, error:'Emisor inválido'};
   try{
     const apiKey = PropertiesService.getScriptProperties().getProperty('FIREBASE_WEB_API_KEY');
     if(!apiKey) return {ok:false, error:'FIREBASE_WEB_API_KEY no configurada'};

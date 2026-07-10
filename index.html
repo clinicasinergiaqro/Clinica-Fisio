@@ -1041,8 +1041,12 @@ async function getFirebaseIdToken(forceRefresh=false){
 
 // Llamada autenticada a Apps Script: exclusivamente con Firebase ID Token
 async function callAppsScriptPrivado(action, payload={}, opts={}){
-  const idToken = await getFirebaseIdToken(opts.forceRefresh||false);
+  // feat/appsscript-auth: token FRESCO en cada llamada — getIdToken(true) fuerza renovación
+  // (evita mandar un token a punto de expirar). opts.forceRefresh:false permite optar por cache.
+  const idToken = await getFirebaseIdToken(opts.forceRefresh!==false);
   if(!idToken){
+    // Sesión nula/expirada: avisar y NO llamar a Apps Script
+    if(typeof showToast==='function') showToast('Sesión expirada, recarga la app','error');
     return {ok:false, error:'AUTH_REQUIRED'};
   }
   try{
@@ -6927,8 +6931,8 @@ async function generarSoapConIA(){
     const controller = new AbortController();
     const timeoutId = setTimeout(()=>controller.abort(), 25000);
     try{
-      const _idTok = await getFirebaseIdToken();
-      if(!_idTok){ throw new Error('AUTH_REQUIRED'); }
+      const _idTok = await getFirebaseIdToken(true);   // feat/appsscript-auth: token fresco por llamada
+      if(!_idTok){ if(typeof showToast==='function') showToast('Sesión expirada, recarga la app','error'); throw new Error('AUTH_REQUIRED'); }
       payloadDatos.idToken = _idTok;
       const resp = await fetch(APPS_SCRIPT_URL, {
         method: 'POST',
@@ -13403,8 +13407,13 @@ async function qaProbarPOST(){
       indice: i
     }))
   };
-  const _idTokQA = await getFirebaseIdToken();
-  if(_idTokQA) payload.idToken = _idTokQA;
+  const _idTokQA = await getFirebaseIdToken(true);   // feat/appsscript-auth: token fresco por llamada
+  if(!_idTokQA){
+    if(typeof showToast==='function') showToast('Sesión expirada, recarga la app','error');
+    QA_POST.error = 'AUTH_REQUIRED — sin sesión activa';
+    renderQA(); return;
+  }
+  payload.idToken = _idTokQA;
   const bodyStr = JSON.stringify(payload);
   QA_POST.enviado = true;
   showToast(`Payload: ${bodyStr.length.toLocaleString()} chars — esperando respuesta...`,'');
