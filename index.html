@@ -958,6 +958,7 @@ function confirmarSalidaSiDirty(callback){
 }
 let tempMods=[], tempEvaI=5, tempEvaF=3, tempEvolMedia=[];
 let tempAtendio=[];
+let tempMotivoIndex=null; // FASE B: motivo elegido para la nota nueva (null = sin episodios / default actual)
 // Loop A — Snippet C0: stash estructurado de modalidades detectadas por la IA (para usarSoapIA)
 window._soapIAStash = { modalidades: [], updatedAt: null, source: '' };
 let editingSoapId=null; // null = nueva nota; string = editando nota existente
@@ -6154,6 +6155,24 @@ function showNuevoSOAP(){
   setTimeout(renderEvolucionChips_,0);
 }
 
+// FASE B — selección de motivo para la nota nueva. Aviso 2-B al elegir un motivo cerrado.
+function seleccionarMotivoSesion(sel){
+  var p=currentPatient; if(!p) return;
+  var previo=tempMotivoIndex;
+  if(sel==='actual'){
+    tempMotivoIndex=p.motivoActualIndex||0;
+  } else {
+    var m=(p.motivosAnteriores||[])[sel]; if(!m) return;
+    var altaTxt=(p.altaClinica&&p.altaClinica.activa)?'\nEl paciente además tiene ALTA clínica activa.':'';
+    if(!confirm('Este motivo se cerró el '+(m.fechaCierre||'(sin fecha)')+'.'+altaTxt+'\n\n¿Agregar la sesión a ese episodio de todas formas (nota tardía)?')) return;
+    tempMotivoIndex=(typeof m.motivoIndex==='number')?m.motivoIndex:sel;
+  }
+  if(tempMotivoIndex!==previo) marcarDirty();
+  var todos=document.querySelectorAll('[id^="chip-motivo-"]');
+  todos.forEach(function(b){ b.style.background=''; b.style.color=''; });
+  var act=(sel==='actual')?document.getElementById('chip-motivo-actual'):document.getElementById('chip-motivo-'+sel);
+  if(act){ act.style.background='var(--navy)'; act.style.color='white'; }
+}
 function renderSOAPForm(){
   const p=currentPatient;
   const sesNum=(editingSoapEsHistorico&&_editingSoapHistoricoNota)?_editingSoapHistoricoNota.num:(p.sesiones+1);
@@ -6190,6 +6209,22 @@ function renderSOAPForm(){
   const alertaPrecaucion=(p.seguridadClinica&&p.seguridadClinica.tienePrecaucion)
     ? `<div class="alerta-precaucion">⚠️ Precaución clínica — revisar contraindicaciones antes de aplicar agentes físicos o técnicas invasivas.</div>`
     : '';
+  // FASE B — selector de motivo (solo NOTA NUEVA y solo si el paciente tiene episodios).
+  // Default: motivo actual (0 taps extra). En edición el motivo es fijo (no se renumera).
+  const _tieneEps=Array.isArray(p.motivosAnteriores)&&p.motivosAnteriores.length>0;
+  tempMotivoIndex=_tieneEps?(p.motivoActualIndex||0):null;
+  let selectorMotivoHtml='';
+  if(_tieneEps && !editingSoapId && !editingSoapEsHistorico){
+    let chipsM=`<button type="button" class="chip-quick" id="chip-motivo-actual" onclick="seleccionarMotivoSesion('actual')" style="background:var(--navy);color:white">● ${escapeHTML(String(p.motivoConsulta||'Motivo actual').slice(0,26))} (actual)</button>`;
+    p.motivosAnteriores.forEach((m,i)=>{
+      chipsM+=`<button type="button" class="chip-quick" id="chip-motivo-${i}" onclick="seleccionarMotivoSesion(${i})">○ ${escapeHTML(String(m.motivoConsulta||('Motivo '+(i+1))).slice(0,26))} — cerrado ${escapeHTML(m.fechaCierre||'')}</button>`;
+    });
+    selectorMotivoHtml=`
+  <div class="form-section">
+    <div class="form-section-title">🗂️ Motivo de esta sesión</div>
+    <div style="padding:0 14px 10px;display:flex;flex-wrap:wrap;gap:6px">${chipsM}</div>
+  </div>`;
+  }
   c.innerHTML=alertaPrecaucion+`
   <!-- ENCABEZADO -->
   <div class="form-section">
@@ -6200,7 +6235,7 @@ function renderSOAPForm(){
       <div class="form-field"><div class="form-label">Semana</div><div style="font-size:15px;font-weight:700;color:var(--navy)">${semana}</div></div>
       <div class="form-field"><div class="form-label">Terapeuta</div><div style="font-size:15px;font-weight:700;color:var(--navy)">${ter}</div></div>
     </div>
-  </div>
+  </div>`+selectorMotivoHtml+`
 
   <!-- MODO CLÍNICO DE NOTA (LOOP4) -->
   <div class="form-section">
@@ -6850,13 +6885,20 @@ async function guardarSOAP(){
       ...datosNota
     };
     if(Array.isArray(p.motivosAnteriores)&&p.motivosAnteriores.length>0){
-      nuevaSOAP.motivoIndex=p.motivoActualIndex||0;
-      nuevaSOAP.numEpisodio=(p.numSesionEpisodioActual||0)+1;
+      // FASE B (autorizado): motivo elegido en el form; default y fallback = motivo actual.
+      var _mIdxSel=(typeof tempMotivoIndex==='number'&&tempMotivoIndex>=0)?tempMotivoIndex:(p.motivoActualIndex||0);
+      nuevaSOAP.motivoIndex=_mIdxSel;
+      if(_mIdxSel===(p.motivoActualIndex||0)){
+        nuevaSOAP.numEpisodio=(p.numSesionEpisodioActual||0)+1;   // camino actual: idéntico al comportamiento previo
+      } else {
+        // Motivo anterior (nota tardía): numEpisodio = conteo de ESE episodio (fallback ep-0 incluido)
+        nuevaSOAP.numEpisodio=p.soap.filter(function(s){ var mi=(s&&typeof s.motivoIndex==='number')?s.motivoIndex:0; return mi===_mIdxSel; }).length+1;
+      }
     }
     p.soap.push(nuevaSOAP);
     p.sesiones=sesNum;
-    if(Array.isArray(p.motivosAnteriores)&&p.motivosAnteriores.length>0){
-      p.numSesionEpisodioActual=(p.numSesionEpisodioActual||0)+1;
+    if(Array.isArray(p.motivosAnteriores)&&p.motivosAnteriores.length>0 && nuevaSOAP.motivoIndex===(p.motivoActualIndex||0)){
+      p.numSesionEpisodioActual=(p.numSesionEpisodioActual||0)+1; // el contador del episodio ACTUAL no avanza al insertar en otro
     }
     p.fechaActualizacion=todayFmt();
     p.ultimoUsuario=ter;
@@ -10295,23 +10337,35 @@ function toggleTodasSecciones(abrir){
   });
 }
 
-function abrirEditarValoracion(){
+function abrirEditarValoracion(esNuevoMotivo){
   limpiarDirty();
   if(!currentPatient) return;
   const p=currentPatient;
   const a=p.antecedentes||{}, m=p.motivo||{}, val=p.valoracion||{}, dxf=p.dxFuncional||{}, plan=p.planTto||{};
   const sc=p.seguridadClinica||{implantes:[],condiciones:[],banderasRojas:[]};
+  // FASE A — modo nuevo motivo: los permanentes se HEREDAN pre-llenados y colapsados.
+  // Stash de heredados para el guard de guardado (no pisar permanentes con vacíos).
+  window._valEsNuevoMotivo = !!esNuevoMotivo;
+  window._valHeredados = {
+    patologicos:a.patologicos||'', deportivos:a.deportivos||'', deporteFrecuencia:a.deporteFrecuencia||'',
+    cirugias:a.cirugias||'', medicamentos:a.medicamentos||'',
+    alergias:p.alergias||'', contraindicaciones:p.contraindicaciones||'',
+    sc:{implantes:(sc.implantes||[]).slice(),implantesDetalle:sc.implantesDetalle||'',
+        condiciones:(sc.condiciones||[]).slice(),condicionesObs:sc.condicionesObs||'',
+        banderasRojas:(sc.banderasRojas||[]).slice(),banderasDetalle:sc.banderasDetalle||''}
+  };
 
   const alerta=(sc.tienePrecaucion)
     ? `<div class="alerta-precaucion">⚠️ Precaución clínica — revisar contraindicaciones antes de aplicar agentes físicos o técnicas invasivas.</div>`
     : '';
 
-  const seccion=(n,titulo,contenido)=>`
+  // FASE A — 4º parámetro: sección colapsada por default (modo nuevo motivo, permanentes heredados)
+  const seccion=(n,titulo,contenido,colapsada)=>`
     <div class="form-section" style="margin-bottom:10px">
       <div class="form-section-title" style="cursor:pointer;display:flex;align-items:center" onclick="toggleSeccionVal('${n}')">
-        <span id="secarrow-${n}" style="margin-right:6px">▼</span>${titulo}
+        <span id="secarrow-${n}" style="margin-right:6px">${colapsada?'▶':'▼'}</span>${titulo}
       </div>
-      <div id="secval-${n}" style="display:block">${contenido}</div>
+      <div id="secval-${n}" style="display:${colapsada?'none':'block'}">${contenido}</div>
     </div>`;
 
   const campo=(label,id,valor,opciones,esTextarea)=>`
@@ -10364,7 +10418,14 @@ function abrirEditarValoracion(){
     </div>
   </div>`;
 
-  c.innerHTML=alerta+indicador+tarjetaExpress+
+  // FASE A — banners de zona (solo en modo nuevo motivo)
+  const bannerNuevo = esNuevoMotivo
+    ? `<div style="background:#EBF3FF;border:1.5px solid #2E5BBE;border-radius:var(--radius);padding:10px 12px;margin-bottom:10px;font-size:13px;color:#1B3A6B"><b>🆕 Datos de este motivo</b> — captura el motivo nuevo; la valoración, diagnóstico y plan empiezan en blanco.</div>`
+    : '';
+  const bannerHeredados = esNuevoMotivo
+    ? `<div style="background:#F6F8FB;border:1.5px solid var(--gray-200);border-radius:var(--radius);padding:10px 12px;margin:4px 0 10px;font-size:13px;color:var(--gray-600)"><b>📋 Datos del paciente (ya registrados)</b> — heredados del expediente y pre-llenados. Ábrelos y edítalos <b>solo si algo cambió</b>.</div>`
+    : '';
+  c.innerHTML=alerta+indicador+tarjetaExpress+bannerNuevo+
     seccion('1','📋 Datos de consulta',
       campo('Motivo de consulta breve','ev-motivoconsulta',p.motivoConsulta)+
       `<div class="form-field"><div class="form-label">Diagnóstico médico</div><input class="form-input" type="text" id="ev-dxmedico" value="${(m.dxMedico||'').replace(/"/g,'&quot;')}">${chipsHTML2('ev-dxmedico',[['Sin diagnóstico médico referido','No cuenta con diagnóstico médico referido']])}</div>`+
@@ -10374,6 +10435,7 @@ function abrirEditarValoracion(){
       campo('Estudios de imagen','ev-estudios',m.estudios)+
       campo('Hallazgos / conclusión','ev-hallazgos',m.hallazgos)
     )+
+    bannerHeredados+
     seccion('2','🩺 Antecedentes',
       `<div class="form-field"><div class="form-label">Antecedentes heredofamiliares</div><textarea class="form-input" id="ev-patologicos" placeholder="Ej. diabetes, hipertensión, cáncer, cardiopatías u otros antecedentes familiares relevantes">${a.patologicos||''}</textarea>${chipsHTML2('ev-patologicos',[['Sin antecedentes heredofamiliares relevantes','Sin antecedentes heredofamiliares relevantes']])}</div>`+
       `<div class="form-field"><div class="form-label">Antecedentes deportivos</div><input class="form-input" type="text" id="ev-deportivos" value="${(a.deportivos||'').replace(/"/g,'&quot;')}">${chipsHTML2('ev-deportivos',[['No practica','No practica actividad deportiva']])}</div>`+
@@ -10382,12 +10444,12 @@ function abrirEditarValoracion(){
       `<div class="form-field"><div class="form-label">Medicamentos actuales</div><input class="form-input" type="text" id="ev-medicamentos" value="${(a.medicamentos||'').replace(/"/g,'&quot;')}">${chipsHTML2('ev-medicamentos',[['No toma medicamentos actualmente','No toma medicamentos actualmente']])}</div>`+
       `<div class="form-field"><div class="form-label">🚫 Alergias</div><input class="form-input" type="text" id="ev-alergias" value="${(p.alergias||'').replace(/"/g,'&quot;')}">${chipsHTML2('ev-alergias',[['Sin alergias conocidas','Sin alergias conocidas']])}</div>`+
       `<div class="form-field"><div class="form-label">Contraindicaciones</div><input class="form-input" type="text" id="ev-contra" value="${(p.contraindicaciones||'').replace(/"/g,'&quot;')}">${chipsHTML2('ev-contra',[['Sin contraindicaciones referidas','Sin contraindicaciones referidas']])}</div>`
-    )+
+    ,esNuevoMotivo)+
     seccion('3','🛡️ Seguridad clínica',
       `<div class="form-field"><div class="form-label">Aparatos / implantes</div>${cbGroup('ev-sc-implante',['Marcapasos','Prótesis articular','Prótesis metálica','Material de osteosíntesis','Implante electrónico','Otro'],sc.implantes)}<input class="form-input" id="ev-sc-implantes-detalle" type="text" placeholder="Especificar ubicación / tipo" value="${(sc.implantesDetalle||'').replace(/"/g,'&quot;')}" style="margin-top:8px"></div>`+
       `<div class="form-field"><div class="form-label">Condiciones médicas</div>${cbGroup('ev-sc-condicion',['Cáncer activo','Antecedente de cáncer','Hemofilia / trastorno de coagulación','Anticoagulantes','Diabetes','Hipertensión','Osteoporosis','Embarazo','Epilepsia','Alteración de sensibilidad','Alteración vascular','Infección activa','Herida abierta','Otro','Ninguna referida'],sc.condiciones)}<input class="form-input" id="ev-sc-condiciones-obs" type="text" placeholder="Especificar otra enfermedad o condición médica relevante" value="${(sc.condicionesObs||'').replace(/"/g,'&quot;')}" style="margin-top:8px"></div>`+
       `<div class="form-field"><div class="form-label">🚩 Banderas rojas</div>${cbGroup('ev-sc-bandera',['Fiebre','Pérdida de peso inexplicable','Dolor nocturno severo no mecánico','Trauma importante reciente','Alteración neurológica progresiva','Pérdida de control de esfínteres','Sospecha de TVP','Dolor torácico','Disnea','Sangrado anormal','Ninguna referida'],sc.banderasRojas)}<input class="form-input" id="ev-sc-banderas-detalle" type="text" placeholder="Detalle / conducta tomada" value="${(sc.banderasDetalle||'').replace(/"/g,'&quot;')}" style="margin-top:8px"></div>`
-    )+
+    ,esNuevoMotivo)+
     seccion('4','📐 Valoración física',
       `<div class="form-field"><div class="form-label">Dolor / EVA (0-10)</div><input class="form-input" type="number" min="0" max="10" id="ev-eva" value="${val.eva!==undefined&&val.eva!==''?val.eva:''}"></div>`+
       campo('Inflamación','ev-inflamacion',val.inflamacion,['Sin inflamación','Leve','Moderada','Severa'])+
@@ -10438,11 +10500,18 @@ function guardarValoracionCompleta(){
   if(!v('ev-alergias')){ showToast('Falta: Alergias','error'); return; }
   if(!v('ev-motivoconsulta')){ showToast('Falta: Motivo de consulta','error'); return; }
 
+  // FASE A (v2) — semántica de permanentes por COMPARACIÓN contra el valor heredado:
+  // no editado (valor idéntico al heredado) → se conserva el dato del expediente tal cual;
+  // editado (difiere, INCLUYENDO vaciado intencional) → se guarda lo que puso el usuario.
+  // El pre-llenado garantiza que "no tocar" == "idéntico al heredado".
+  const her=window._valHeredados||{};
+  const permanente=(nuevo,clave)=>{ return (nuevo===String(her[clave]||'')) ? (her[clave]||'') : nuevo; };
+
   // Datos planos
   p.motivoConsulta = v('ev-motivoconsulta');
   p.dx = v('ev-dxmedico') || 'No cuenta con diagnóstico médico referido';
   p.alergias = v('ev-alergias');
-  p.contraindicaciones = v('ev-contra') || 'Ninguna';
+  p.contraindicaciones = permanente(v('ev-contra'),'contraindicaciones') || 'Ninguna';
 
   // motivo
   p.motivo = {...(p.motivo||{}),
@@ -10453,13 +10522,13 @@ function guardarValoracionCompleta(){
     estudios: vp('ev-estudios'),
     hallazgos: vp('ev-hallazgos')
   };
-  // antecedentes
+  // antecedentes (FASE A: vacío → conserva lo heredado del expediente)
   p.antecedentes = {...(p.antecedentes||{}),
-    patologicos: v('ev-patologicos'),
-    deportivos: v('ev-deportivos'),
-    deporteFrecuencia: v('ev-deporte-freq'),
-    cirugias: v('ev-cirugias'),
-    medicamentos: v('ev-medicamentos')
+    patologicos: permanente(v('ev-patologicos'),'patologicos'),
+    deportivos: permanente(v('ev-deportivos'),'deportivos'),
+    deporteFrecuencia: permanente(v('ev-deporte-freq'),'deporteFrecuencia'),
+    cirugias: permanente(v('ev-cirugias'),'cirugias'),
+    medicamentos: permanente(v('ev-medicamentos'),'medicamentos')
   };
   // valoración (campos opcionales → [pendiente])
   p.valoracion = {...(p.valoracion||{}),
@@ -10501,8 +10570,22 @@ function guardarValoracionCompleta(){
     banderasDetalle: v('ev-sc-banderas-detalle'),
     tienePrecaucion: false
   };
-  sc.tienePrecaucion = calcularTienePrecaucion(sc);
-  p.seguridadClinica = sc;
+  // FASE A (v2) — seguridad clínica por COMPARACIÓN PROFUNDA (arrays incluidos, orden-insensible):
+  // idéntica a la heredada → se conserva el objeto del expediente (no editado);
+  // difiere en cualquier cosa (agregar, quitar, vaciar, detalle) → se guarda lo del formulario.
+  const _scNorm=o=>JSON.stringify({
+    i:(o.implantes||[]).slice().sort(), id:String(o.implantesDetalle||''),
+    c:(o.condiciones||[]).slice().sort(), co:String(o.condicionesObs||''),
+    b:(o.banderasRojas||[]).slice().sort(), bd:String(o.banderasDetalle||'')
+  });
+  const scHer = her.sc || {};
+  if(_scNorm(sc)===_scNorm(scHer) && p.seguridadClinica){
+    // No editada: conservar el objeto vigente del expediente (recalculando el flag por consistencia)
+    p.seguridadClinica.tienePrecaucion = calcularTienePrecaucion(p.seguridadClinica);
+  } else {
+    sc.tienePrecaucion = calcularTienePrecaucion(sc);
+    p.seguridadClinica = sc;
+  }
 
   // Metadatos
   p.fechaActualizacion = todayFmt();
@@ -10872,7 +10955,20 @@ function toggleMotivoEpisodio(i){
 function abrirNuevoMotivoConsulta(){
   const p=currentPatient;
   if(!p) return;
-  if(!confirm('¿El paciente viene por un motivo diferente al registrado actualmente?\n\nEl motivo actual quedará en el historial.')) return;
+  // FASE A — guard anti-doble-tap: dos confirms rápidos creaban dos episodios vacíos
+  if(window._nuevoMotivoEnCurso) return;
+  window._nuevoMotivoEnCurso=true;
+  try{
+  // FASE A — backfill: sesiones creadas antes del PRIMER episodio no traen motivoIndex
+  // (guardarSOAP solo lo asigna cuando ya existen episodios). Esas sesiones pertenecen
+  // siempre al episodio 0 — sellarlas para que el conteo del snapshot, los filtros del
+  // reporte y la numeración por episodio sean correctos.
+  var _bkSeq=0;
+  (Array.isArray(p.soap)?p.soap:[]).forEach(function(s){
+    if(s && typeof s.motivoIndex!=='number'){ s.motivoIndex=0; s.numEpisodio=++_bkSeq; }
+  });
+  var _nSesEp=(Array.isArray(p.soap)?p.soap:[]).filter(function(s){ return s && s.motivoIndex===(p.motivoActualIndex||0); }).length;
+  if(!confirm('¿El paciente viene por un motivo diferente al registrado actualmente?\n\nEl motivo actual ('+((p.motivoConsulta||'sin descripción').slice(0,60))+', '+_nSesEp+' sesión'+(_nSesEp===1?'':'es')+') quedará en el historial.')){ return; }
 
   // a. Snapshot del motivo actual
   const snapshot={
@@ -10915,8 +11011,12 @@ function abrirNuevoMotivoConsulta(){
   saveDB('pts',[p]).then(res=>{
     showToast(res?.ok?'Nuevo motivo iniciado. El anterior quedó en el historial ✅':'⚠️ Guardado local, Sheets no confirmó',res?.ok?'success':'warning');
   }).catch(()=>showToast('⚠️ Sin conexión — guardado local','warning'));
-  // f. Abrir editar valoración para el nuevo motivo
-  abrirEditarValoracion();
+  // FASE A — el borrador de valoración es POR PACIENTE, no por episodio: uno viejo del
+  // episodio anterior podía "recuperarse" encima del form nuevo y pisar los permanentes.
+  borrarBorradorValoracion(p.id);
+  // f. Abrir editar valoración para el nuevo motivo (modo herencia: permanentes colapsados)
+  abrirEditarValoracion(true);
+  } finally { window._nuevoMotivoEnCurso=false; }
 }
 
 // ── EJERCICIOS ────────────────────────────────────────────────────────────
@@ -11401,8 +11501,15 @@ async function RPT_generarSintesisIA(pid){
     var p=_resolverPaciente(pid);
     if(!p) throw new Error('Paciente no encontrado');
     var sesiones=await _RPT_obtenerSesionesDedup(pid);
-    var payload=_RPT_armarPayloadCorto(p, sesiones);
-    var hash=_RPT_hashEntradas(p, sesiones); // MISMO hash que usa el orquestador para el caché
+    // FASE C: la síntesis respeta el episodio seleccionado en la pestaña (mismo helper y
+    // mismo hash filtrado que el orquestador → cache independiente por episodio).
+    // pCtx conserva SIEMPRE los permanentes del paciente (antecedentes/alergias/seguridad)
+    // y sustituye solo los específicos del episodio.
+    var _filtroSint=(window._rptFiltroEpisodio!==undefined)?window._rptFiltroEpisodio:'todos';
+    var _fS=_RPT_filtrarPorEpisodio(p, sesiones, _filtroSint);
+    var payload=_RPT_armarPayloadCorto(_fS.pCtx, _fS.sesiones);
+    if(_fS.etiqueta) payload.episodio=_fS.etiqueta;
+    var hash=_RPT_hashEntradas(_fS.pCtx, _fS.sesiones); // MISMO hash que usa el orquestador para el caché
 
     var r=await callAppsScriptPrivado('generarSintesisIA', { payload:payload });
     if(!r || !r.ok || !r.sintesis) throw new Error(r&&r.error?r.error:'Sin respuesta');
@@ -11425,7 +11532,7 @@ async function RPT_generarSintesisIA(pid){
       await saveDB('pts', [p]);
     }
     showToast('🧠 Síntesis generada','success');
-    RPT_pintarPestanaReporte(pid); // re-render completo del reporte
+    RPT_pintarPestanaReporte(pid, _filtroSint); // FASE C: re-render conservando el episodio seleccionado
   }catch(e){
     console.warn('[IC síntesis]', e.message);
     showToast('No se pudo generar: '+e.message,'warning');
@@ -11487,9 +11594,33 @@ function _RPT_pintarGrafica(pid, sesiones){
   box.innerHTML=svg;
 }
 
+// FASE C — filtro por episodio compartido entre el orquestador y la síntesis IA.
+// Regla ep-0: sesiones sin motivoIndex (creadas antes del primer episodio) cuentan como episodio 0.
+// filtro: 'actual' | número (índice en motivosAnteriores) | 'todos' (sin filtro).
+// Devuelve pCtx con los ESPECÍFICOS del episodio elegido; los PERMANENTES (antecedentes,
+// alergias, seguridadClinica) siempre son los del paciente porque pCtx parte de {...p}.
+function _RPT_filtrarPorEpisodio(p, sesiones, filtro){
+  var out={ pCtx:p, sesiones:sesiones, etiqueta:'' };
+  var tieneEpisodios=Array.isArray(p.motivosAnteriores)&&p.motivosAnteriores.length>0;
+  if(!tieneEpisodios||filtro==null||filtro==='todos') return out;
+  var _mi=function(s){ return (s&&typeof s.motivoIndex==='number')?s.motivoIndex:0; };
+  if(filtro==='actual'){
+    var midx=p.motivoActualIndex||0;
+    out.sesiones=sesiones.filter(function(s){ return _mi(s)===midx; });
+    out.etiqueta='Episodio '+(midx+1)+' (actual)'+(p.motivoConsulta?' — '+p.motivoConsulta:'');
+  } else if(typeof filtro==='number'){
+    var ep=p.motivosAnteriores[filtro];
+    if(ep){
+      out.pCtx=Object.assign({},p,{motivoConsulta:ep.motivoConsulta||'',dx:ep.dx||'',motivo:ep.motivo||{},valoracion:ep.valoracion||{},dxFuncional:ep.dxFuncional||{},planTto:ep.planTto||{}});
+      var eidx=(typeof ep.motivoIndex==='number')?ep.motivoIndex:filtro;
+      out.sesiones=sesiones.filter(function(s){ return _mi(s)===eidx; });
+      out.etiqueta='Episodio '+(eidx+1)+(ep.motivoConsulta?' — '+ep.motivoConsulta:'')+(ep.fechaCierre?' (cerrado '+ep.fechaCierre+')':'');
+    }
+  }
+  return out;
+}
 // Orquestador principal de la pestaña Reporte.
 async function RPT_pintarPestanaReporte(pid, filtroEpisodio){
-  if(filtroEpisodio===undefined) filtroEpisodio=null;
   var root=document.getElementById('rpt-root');
   if(!root) return;
   try{
@@ -11505,44 +11636,38 @@ async function RPT_pintarPestanaReporte(pid, filtroEpisodio){
       }catch(e){ console.warn('[RPT] hidratar histórico:', e.message); }
     }
     var sesiones=await _RPT_obtenerSesionesDedup(pid);
-    var hash=_RPT_hashEntradas(p, sesiones);
-    var sintesis=_RPT_buscarSintesisCache(p, hash);
-    // SOAP-E2: episode filter
+    // SOAP-E2 + FASE C: filtro por episodio con helper compartido y fallback ep-0.
     var tieneEpisodios=Array.isArray(p.motivosAnteriores)&&p.motivosAnteriores.length>0;
-    var pCtx=p;
-    var sesionesFiltradas=sesiones;
-    if(tieneEpisodios&&filtroEpisodio!==null){
-      if(filtroEpisodio==='actual'){
-        var midx=p.motivoActualIndex||0;
-        sesionesFiltradas=sesiones.filter(function(s){ return typeof s.motivoIndex==='number'&&s.motivoIndex===midx; });
-      } else if(typeof filtroEpisodio==='number'){
-        var ep=p.motivosAnteriores[filtroEpisodio];
-        if(ep){
-          pCtx=Object.assign({},p,{motivoConsulta:ep.motivoConsulta||'',dx:ep.dx||'',motivo:ep.motivo||{},valoracion:ep.valoracion||{},dxFuncional:ep.dxFuncional||{},planTto:ep.planTto||{}});
-          if(typeof ep.motivoIndex==='number'){
-            sesionesFiltradas=sesiones.filter(function(s){ return s.motivoIndex===ep.motivoIndex; });
-          }
-        }
-      }
-    }
+    // FASE C (Opción 2): default = episodio ACTUAL cuando hay episodios; 'todos' = expediente completo.
+    if(filtroEpisodio===undefined||filtroEpisodio===null) filtroEpisodio=tieneEpisodios?'actual':'todos';
+    window._rptFiltroEpisodio=filtroEpisodio; // la síntesis IA lo lee para filtrar el mismo episodio
+    var _filt=_RPT_filtrarPorEpisodio(p, sesiones, filtroEpisodio);
+    var pCtx=_filt.pCtx;
+    var sesionesFiltradas=_filt.sesiones;
+    // FASE C: el hash del cache de síntesis se calcula sobre el CONTEXTO FILTRADO — así cada
+    // episodio tiene su propia entrada en reportesClinicosIA y el expediente completo la suya.
+    var hash=_RPT_hashEntradas(pCtx, sesionesFiltradas);
+    var sintesis=_RPT_buscarSintesisCache(p, hash);
     // Episode selector bar (no-print)
     var selectorHTML='';
     if(tieneEpisodios){
       var midxActual=p.motivoActualIndex||0;
       var _bsty='border:none;border-radius:16px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;';
-      var btns='<button onclick="RPT_pintarPestanaReporte(\''+escapeAttr_(pid)+'\',\'actual\')" style="'+_bsty+(filtroEpisodio==='actual'?'background:var(--navy);color:white;':'background:var(--gray-100);color:var(--navy);')+'">Episodio '+(midxActual+1)+' (actual)</button>';
+      var btns='<button onclick="RPT_pintarPestanaReporte(\''+escapeAttr_(pid)+'\',\'actual\')" style="'+_bsty+(filtroEpisodio==='actual'?'background:var(--navy);color:white;':'background:var(--gray-100);color:var(--navy);')+'">Episodio '+(midxActual+1)+' (actual)'+(p.motivoConsulta?' · '+escapeHTML(String(p.motivoConsulta).slice(0,18)):'')+'</button>';
       for(var _ei=p.motivosAnteriores.length-1;_ei>=0;_ei--){
         var _em=p.motivosAnteriores[_ei];
         var _eidx=(typeof _em.motivoIndex==='number')?_em.motivoIndex:_ei;
-        btns+='<button onclick="RPT_pintarPestanaReporte(\''+escapeAttr_(pid)+'\','+_ei+')" style="'+_bsty+(filtroEpisodio===_ei?'background:var(--navy);color:white;':'background:var(--gray-100);color:var(--navy);')+'">Episodio '+(_eidx+1)+'</button>';
+        btns+='<button onclick="RPT_pintarPestanaReporte(\''+escapeAttr_(pid)+'\','+_ei+')" style="'+_bsty+(filtroEpisodio===_ei?'background:var(--navy);color:white;':'background:var(--gray-100);color:var(--navy);')+'">Episodio '+(_eidx+1)+(_em.motivoConsulta?' · '+escapeHTML(String(_em.motivoConsulta).slice(0,18)):'')+'</button>';
       }
-      btns+='<button onclick="RPT_pintarPestanaReporte(\''+escapeAttr_(pid)+'\',null)" style="'+_bsty+(filtroEpisodio===null?'background:var(--navy);color:white;':'background:var(--gray-100);color:var(--navy);')+'">Expediente completo</button>';
+      btns+='<button onclick="RPT_pintarPestanaReporte(\''+escapeAttr_(pid)+'\',\'todos\')" style="'+_bsty+(filtroEpisodio==='todos'?'background:var(--navy);color:white;':'background:var(--gray-100);color:var(--navy);')+'">Expediente completo</button>';
       selectorHTML='<div class="no-print" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:10px;padding:8px 12px;background:var(--gray-50);border-radius:10px"><span style="font-size:11px;font-weight:700;color:var(--gray-500);white-space:nowrap;margin-right:4px">Ver episodio:</span>'+btns+'</div>';
     }
     root.innerHTML='<div class="rpt-container">'
       + _RPT_css()
       + '<div class="no-print" style="display:flex;justify-content:flex-end;margin-bottom:10px"><button onclick="RPT_imprimirReporte(\''+escapeAttr_(pid)+'\')" style="background:#2E3192;color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:6px">🖨️ Imprimir / Guardar PDF</button></div>'
       + selectorHTML
+      // FASE C: título imprimible con el episodio seleccionado
+      + (_filt.etiqueta?'<div class="rc-avoid" style="font-size:14px;font-weight:800;color:#1B3A6B;margin:0 0 8px;padding:6px 0;border-bottom:2px solid #1B3A6B">📄 Reporte del '+escapeHTML(_filt.etiqueta)+'</div>':'')
       + _RPT_htmlCabecera(p, sesionesFiltradas)
       + _RPT_htmlFranjaPaciente(p, sesionesFiltradas)
       + _RPT_htmlResumen(pCtx)
