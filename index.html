@@ -4570,10 +4570,10 @@ function renderExpediente(tab='historia'){
           <div class="field-row"><div class="field-label">Firma</div><div class="field-value">
             ${con.firmaUrl
               ? (con.firmaUrl.startsWith('data:')
-                  ? `<img src="${con.firmaUrl}" style="max-width:160px;border:1px solid var(--gray-200);border-radius:8px">`
-                  : `<img src="${con.firmaUrl}" style="max-width:160px;border:1px solid var(--gray-200);border-radius:8px" onerror="this.replaceWith(document.createTextNode('Firma en nube ☁️'))">`)
+                  ? `<img src="${con.firmaUrl}" loading="lazy" decoding="async" style="max-width:160px;border:1px solid var(--gray-200);border-radius:8px">`
+                  : `<img src="${con.firmaUrl}" loading="lazy" decoding="async" style="max-width:160px;border:1px solid var(--gray-200);border-radius:8px" onerror="this.replaceWith(document.createTextNode('Firma en nube ☁️'))">`)
               : (con.firma
-                  ? `<img src="${con.firma}" style="max-width:160px;border:1px solid var(--gray-200);border-radius:8px">`
+                  ? `<img src="${con.firma}" loading="lazy" decoding="async" style="max-width:160px;border:1px solid var(--gray-200);border-radius:8px">`
                   : '<span style="color:var(--gray-400)">Registrada</span>')}
           </div></div>
           ${con.pdfEnFirebase?`<div style="padding:4px 0 2px 0;font-size:11px;color:var(--green)">☁️ PDF guardado en nube</div>`:''}
@@ -11794,7 +11794,7 @@ function renderEjMediaPreview(media){
   }
   if((media.type||'').startsWith('image/')){
     return `<div style="position:relative;border-radius:var(--radius-sm);overflow:hidden;background:#111">
-      <img src="${src}" style="width:100%;max-height:280px;object-fit:cover;border-radius:8px">
+      <img src="${src}" loading="lazy" decoding="async" style="width:100%;max-height:280px;object-fit:cover;border-radius:8px">
       <button onclick="clearEjMedia()" style="position:absolute;top:6px;right:6px;background:rgba(192,57,43,.9);border:none;border-radius:50%;width:26px;height:26px;color:white;font-size:14px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center">×</button>
     </div>`;
   }
