@@ -3561,11 +3561,27 @@ function _colaRevisionHTML(items, filtro, desdeCache){
   visibles.forEach(function(it){ var m=filtro||it.motivos[0]||'OTRO'; (porMotivo[m]=porMotivo[m]||[]).push(it); });
   var cuerpo='';
   Object.keys(porMotivo).sort(function(a,b){return porMotivo[b].length-porMotivo[a].length;}).forEach(function(m){
-    cuerpo+='<div style="margin-top:12px"><div style="font-size:13px;font-weight:800;color:var(--navy);border-bottom:2px solid var(--gray-200);padding-bottom:3px">'+escapeHTML(MOTIVO_LABELS[m]||m)+' — '+porMotivo[m].length+'</div>';
-    porMotivo[m].forEach(function(it){
-      cuerpo+='<div style="display:flex;align-items:center;gap:6px;padding:5px 0;border-bottom:1px solid #F0F2F7;flex-wrap:wrap">'
-        +'<div style="flex:1;min-width:150px;font-size:12px;color:#374151"><b>'+escapeHTML(it.nombre)+'</b> · ses '+(it.num||'—')+' · '+(it.fecha?escapeHTML(it.fecha):'<span style="color:#B91C1C;font-weight:700">(sin fecha)</span>')
+    var grupo=porMotivo[m];
+    // M2: validación masiva del grupo (con confirm dentro de la función)
+    cuerpo+='<div style="margin-top:12px"><div style="display:flex;align-items:center;gap:8px;border-bottom:2px solid var(--gray-200);padding-bottom:3px">'
+      +'<div style="flex:1;font-size:13px;font-weight:800;color:var(--navy)">'+escapeHTML(MOTIVO_LABELS[m]||m)+' — '+grupo.length+'</div>'
+      +'<button data-m="'+escapeAttr_(m)+'" onclick="_validarGrupoRevision(this.dataset.m)" style="font-size:10px;font-weight:700;border:1px solid #A7F3D0;border-radius:8px;padding:2px 8px;cursor:pointer;background:#ECFDF5;color:#065F46;font-family:inherit">✓ Validar todas ('+grupo.length+')</button>'
+      +'</div>';
+    // M3: sub-agrupación visual por paciente (items ya vienen ordenados nombre+num)
+    var pidPrev=null;
+    grupo.forEach(function(it,ix){
+      var mismo=(it.pid===pidPrev); pidPrev=it.pid;
+      var idInp='colarev-f-'+m.replace(/[^A-Za-z0-9]/g,'')+'-'+ix;
+      var esFecha=_esMotivoFecha(it.motivos);
+      // M1: editor de fecha inline solo en motivos de fecha
+      var editor=esFecha
+        ? '<input type="date" id="'+idInp+'" value="'+escapeAttr_(_fechaAInputISO(it.fecha))+'" style="font-size:11px;border:1px solid var(--gray-200);border-radius:8px;padding:2px 4px;font-family:inherit">'
+          +'<button data-path="'+escapeAttr_(it.path)+'" data-inp="'+idInp+'" onclick="_guardarFechaRevision(this.dataset.path, this.dataset.inp)" style="font-size:10px;font-weight:700;border:1px solid #C7D2FE;border-radius:8px;padding:2px 8px;cursor:pointer;background:#EEF2FF;color:#3730A3;font-family:inherit">💾 Fecha</button>'
+        : '';
+      cuerpo+='<div style="display:flex;align-items:center;gap:6px;padding:5px 0 5px '+(mismo?'18px':'0')+';border-bottom:1px solid #F0F2F7;flex-wrap:wrap">'
+        +'<div style="flex:1;min-width:140px;font-size:12px;color:#374151">'+(mismo?'<span style="color:var(--gray-400)">↳</span> ':'<b>'+escapeHTML(it.nombre)+'</b> · ')+'ses '+(it.num||'—')+' · '+(it.fecha?escapeHTML(it.fecha):'<span style="color:#B91C1C;font-weight:700">(sin fecha)</span>')
         +(it.motivos.length>1?' <span style="font-size:10px;color:var(--gray-400)">['+escapeHTML(it.motivos.join(', '))+']</span>':'')+'</div>'
+        +editor
         +'<button data-pid="'+escapeAttr_(it.pid)+'" onclick="_abrirExpedienteDesdeRendimiento(this.dataset.pid)" style="font-size:10px;font-weight:700;border:1px solid #C7D2FE;border-radius:8px;padding:2px 8px;cursor:pointer;background:#EEF2FF;color:#3730A3;font-family:inherit">abrir →</button>'
         +'<button data-path="'+escapeAttr_(it.path)+'" onclick="_validarSesionRevision(this.dataset.path)" style="font-size:10px;font-weight:700;border:1px solid #A7F3D0;border-radius:8px;padding:2px 8px;cursor:pointer;background:#ECFDF5;color:#065F46;font-family:inherit">✓ Validada</button>'
         +'</div>';
@@ -3581,8 +3597,65 @@ function _colaRevisionHTML(items, filtro, desdeCache){
     +(desdeCache?'<span style="font-size:10px;color:var(--gray-400)">cache de sesión</span>':'')
     +'</div>'
     +'<div style="margin-bottom:6px">'+chipTodas+chips+'</div>'
-    +'<div style="font-size:11px;color:var(--gray-500)">Sesiones flageadas por las reparaciones de migración. "✓ Validada" quita el flag (los datos quedan como están); para corregir usa "abrir →".</div>'
+    +'<div style="font-size:11px;color:var(--gray-500)">"💾 Fecha" corrige la fecha Y quita el flag en un solo paso. "✓ Validada" solo quita el flag. "abrir →" para correcciones mayores.</div>'
     +cuerpo;
+}
+// M1: helpers de fecha del editor inline
+var MOTIVOS_FECHA=['FECHA_INTERPOLADA','FECHA_DESDE_TEXTO','FECHA_CORREGIDA_AUTO','SIN_FECHA','IMPORTADA_SIN_FECHA','FECHA_RARA'];
+function _esMotivoFecha(motivos){ return (motivos||[]).some(function(m){ return MOTIVOS_FECHA.indexOf(m)!==-1; }); }
+function _fechaAInputISO(f){   // 'DD/MM/YYYY' o 'YYYY-MM-DD…' → 'YYYY-MM-DD' (value del <input type=date>)
+  var s2=String(f||'');
+  var m=s2.match(/^(\d{2})\/(\d{2})\/(\d{4})/); if(m) return m[3]+'-'+m[2]+'-'+m[1];
+  m=s2.match(/^(\d{4})-(\d{2})-(\d{2})/); if(m) return m[1]+'-'+m[2]+'-'+m[3];
+  return '';
+}
+async function _guardarFechaRevision(path, inputId){
+  if(!esSupervisorUI()){ showToast('Solo supervisor','error'); return; }
+  var inp=document.getElementById(inputId);
+  var v=(inp&&inp.value)||'';   // YYYY-MM-DD del input date
+  var m=v.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if(!m){ showToast('Elige una fecha válida','error'); return; }
+  var anio=+m[1];
+  if(anio<2015||anio>2027){ showToast('Año fuera de rango (2015-2027)','error'); return; }
+  var fecha=m[3]+'/'+m[2]+'/'+m[1];                      // DD/MM/YYYY (formato nativo de la app)
+  var iso=v+'T12:00:00.000Z';
+  try{
+    var ok=await FST_init();
+    if(!ok||!window._fstDb) throw new Error('Firestore no disponible');
+    // Un solo write: fecha corregida + flag fuera (dentro de sesionUpdateOK)
+    await window._fstDb.doc(path).set({fecha:fecha, fechaHoraISO:iso, revisionPendiente:false},{merge:true});
+    if(window._colaRevisionCache&&Array.isArray(window._colaRevisionCache.items)){
+      window._colaRevisionCache.items=window._colaRevisionCache.items.filter(function(it){ return it.path!==path; });
+    }
+    showToast('💾 Fecha guardada y sesión validada ('+fecha+')','success');
+    if(document.querySelector('[data-colarev]')) mostrarColaRevision(false, window._colaRevFiltro||null);
+  }catch(e){ showToast('⚠️ No se pudo guardar: '+((e&&e.message)||''),'error'); }
+}
+// M2: validación masiva por grupo (mismo criterio de agrupación que el render)
+async function _validarGrupoRevision(motivo){
+  if(!esSupervisorUI()){ showToast('Solo supervisor','error'); return; }
+  var cache=window._colaRevisionCache;
+  if(!cache||!Array.isArray(cache.items)) return;
+  var filtro=window._colaRevFiltro||null;
+  var visibles=filtro?cache.items.filter(function(it){ return it.motivos.indexOf(filtro)!==-1; }):cache.items;
+  var grupo=visibles.filter(function(it){ return (filtro||it.motivos[0]||'OTRO')===motivo; });
+  if(!grupo.length) return;
+  if(!confirm('¿Marcar como VALIDADAS las '+grupo.length+' sesiones de "'+(MOTIVO_LABELS[motivo]||motivo)+'"? Se quita el flag de revisión de todas (los datos quedan como están).')) return;
+  try{
+    var ok=await FST_init();
+    if(!ok||!window._fstDb) throw new Error('Firestore no disponible');
+    // batch con tope (límite Firestore: 500 writes/batch)
+    for(var i=0;i<grupo.length;i+=450){
+      var lote=grupo.slice(i,i+450);
+      var batch=window._fstDb.batch();
+      lote.forEach(function(it){ batch.set(window._fstDb.doc(it.path), {revisionPendiente:false}, {merge:true}); });
+      await batch.commit();
+    }
+    var paths={}; grupo.forEach(function(it){ paths[it.path]=true; });
+    cache.items=cache.items.filter(function(it){ return !paths[it.path]; });
+    showToast('✓ '+grupo.length+' sesiones validadas','success');
+    if(document.querySelector('[data-colarev]')) mostrarColaRevision(false, filtro);
+  }catch(e){ showToast('⚠️ Validación masiva falló: '+((e&&e.message)||''),'error'); }
 }
 async function mostrarColaRevision(forzar, filtro){
   if(!esSupervisorUI()){ showToast('Solo supervisor','error'); return; }
