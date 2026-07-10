@@ -7,7 +7,11 @@
 <!-- LOOP 1 — Preconnect: acelera descarga de CDN sin tocar el orden de carga -->
 <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
 <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
-<link rel="dns-prefetch" href="https://script.google.com">
+<!-- OPT5 — Preconnect del camino crítico de arranque/login (TLS listo antes de la 1ª llamada) -->
+<link rel="preconnect" href="https://script.google.com">
+<link rel="preconnect" href="https://identitytoolkit.googleapis.com">
+<link rel="dns-prefetch" href="https://securetoken.googleapis.com">
+<link rel="dns-prefetch" href="https://firestore.googleapis.com">
 <link rel="dns-prefetch" href="https://firebasestorage.googleapis.com">
 <!-- Firebase Storage SDK -->
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
