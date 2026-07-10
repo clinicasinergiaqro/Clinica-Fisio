@@ -166,6 +166,8 @@ async function FST_fetchSesiones(pid){
         motivoIndex: d.motivoIndex != null ? Number(d.motivoIndex) : null,
         numEpisodio: d.numEpisodio != null ? Number(d.numEpisodio) : null,
         modalidades: Array.isArray(d.modalidades) ? d.modalidades : [], modoNota: d.modoNota || '',
+        // FIX SOAP-MEDIA (B): rehidratar adjuntos de la nota (referencias url/fbPath)
+        media: Array.isArray(d.media) ? d.media : [],
         historialEdiciones: Array.isArray(d.historialEdiciones) ? d.historialEdiciones : [],
         completa: false, importado: true, _origen: 'firestore_historico'
       };
@@ -204,6 +206,22 @@ function FST_renderCard(s, pid){
       + linksNota.map(function(l){ var u=escapeAttr_(l.url); return '<a href="'+u+'" target="_blank" rel="noopener noreferrer" style="color:var(--navy);text-decoration:underline;word-break:break-all">'+escapeHTML(l.url)+'</a>'; }).join('<br>')
       + '</div></div>'
     : '';
+  // FIX SOAP-MEDIA (C): adjuntos de la nota — mismo patrón visual que _renderSoapCard de activos.
+  // previewSoapMedia ya resuelve históricos vía _fstSesionesCache (fallback agregado en este fix).
+  var bloqueFotos = (Array.isArray(s.media) && s.media.length)
+    ? '<div class="soap-section"><div class="soap-label"><span class="soap-s">\u{1F4F7} Fotos (' + s.media.length + ')</span></div>'
+      + '<div class="media-grid" style="margin-top:6px">'
+      + s.media.map(function(m, mi){
+          var src = (m && (m.url || m.data)) || '';
+          var esImg = m && m.type && String(m.type).indexOf('image') === 0;
+          return '<div class="media-thumb" data-pid="' + escapeAttr_(pid || '') + '" data-sid="' + escapeAttr_(s.id || '') + '" onclick="previewSoapMedia(this.dataset.pid,this.dataset.sid,' + mi + ')">'
+            + ((esImg && src)
+                ? '<img src="' + escapeAttr_(src) + '" loading="lazy" decoding="async" style="width:100%;height:100%;object-fit:cover">'
+                : '<div style="width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:22px;gap:2px">\u{1F4CE}<div style="font-size:8px;color:#5A6478">' + escapeHTML((((m && m.name) || '').split('.').pop() || 'DOC').toUpperCase()) + '</div></div>')
+            + '<div class="media-label">' + escapeHTML((m && (m.label || m.name)) || '') + '</div></div>';
+        }).join('')
+      + '</div></div>'
+    : '';
   return '<div class="soap-card" style="opacity:.92;border-left:3px solid var(--navy)">'
     + '<div class="soap-header" style="cursor:default"><div>'
     + '<div class="soap-sesion">Sesión ' + escapeHTML(s.numEpisodio != null ? s.numEpisodio : s.num) + (s.numEpisodio != null ? ' <span style="font-size:10px;color:var(--gray-400);font-weight:400">· Episodio ' + escapeHTML((s.motivoIndex||0)+1) + '</span>' : '') + '</div>'
@@ -217,6 +235,7 @@ function FST_renderCard(s, pid){
           + '<div class="soap-section"><div class="soap-label"><span class="soap-a">A</span></div><div class="soap-text">' + escapeHTML((s.a&&s.a.evolucion)||'') + ' ' + escapeHTML((s.a&&s.a.analisis)||'') + '</div></div>'
           + '<div class="soap-section"><div class="soap-label"><span class="soap-p">P</span></div><div class="soap-text">' + escapeHTML((s.p&&s.p.tratamiento)||'') + ' ' + escapeHTML((s.p&&s.p.indicaciones)||'') + '</div></div>'
           + bloqueLinks)
+    + bloqueFotos
     + '</div>'
     + bannerEdicion + botonesEdicion
     + '</div>';
@@ -368,6 +387,16 @@ function FST_buildSesionPayload(sesion, modo) {
     evaI: (sesion.evaI !== undefined && sesion.evaI !== null) ? sesion.evaI : null,
     evaF: (sesion.evaF !== undefined && sesion.evaF !== null) ? sesion.evaF : null,
     modalidades: Array.isArray(sesion.modalidades) ? sesion.modalidades : [],
+    // FIX SOAP-MEDIA (A): adjuntos de la nota — SOLO referencias (url/fbPath), NUNCA base64 al doc.
+    // Mismo criterio de strip que el chunking a Sheets (data:null). Condicional: sin adjuntos no se escribe.
+    ...(Array.isArray(sesion.media) && sesion.media.length ? {
+      media: sesion.media.map(m => ({
+        mediaId: (m && (m.mediaId || m.id)) || '', name: (m && m.name) || '', label: (m && m.label) || '',
+        type: (m && m.type) || '', fecha: (m && m.fecha) || '',
+        url: (m && m.url) || '', fbPath: (m && m.fbPath) || '',
+        data: null
+      }))
+    } : {}),
     // DIAG 1 (BUG 2): episodio — condicional para no escribir null en sesiones sin episodio
     ...(sesion.motivoIndex != null ? { motivoIndex: Number(sesion.motivoIndex) } : {}),
     ...(sesion.numEpisodio != null ? { numEpisodio: Number(sesion.numEpisodio) } : {}),
@@ -6844,6 +6873,7 @@ async function guardarSOAP(){
       setTimeout(()=>renderExpediente('soap'),300);
       return;
     }
+    _espejarSoapMediaAEstudios_(p, nuevaSOAP); // FIX SOAP-MEDIA (D)/I-B: espejo a Estudios — viaja en el MISMO saveDB de abajo
     saveDB('pts',[p]).then(async res=>{
       if(_esHistNueva){
         // Bug B fix — nota NUEVA de histórico: Firestore es el ÚNICO almacén. Await + encolar si falla
@@ -7454,9 +7484,45 @@ async function handleSoapPhoto(ev,tipo){
     <div class="media-label">${f.label}</div></div>`).join('');
 }
 function removeSoapMedia(i){tempEvolMedia.splice(i,1);handleSoapPhoto({target:{files:[],value:''}},'_')}
+// FIX SOAP-MEDIA (D) — Loop I-B: espeja los adjuntos de una nota SOAP recién guardada a p.estudiosDocs.
+// Solo referencias (url/fbPath), nunca base64. Dedup por mediaId/fbPath/url. Muta p ANTES del saveDB de
+// guardarSOAP, así la persistencia viaja en el mismo write (activos: localStorage; históricos: outCl
+// estudiosDocs whitelist v4 vía _persistirHistoricoFirestore). Adjuntos solo-locales (fallback IDB sin
+// url ni fbPath) NO se espejan: no habría nada que mostrar en otros dispositivos.
+function _espejarSoapMediaAEstudios_(p, sesion){
+  try{
+    var media=Array.isArray(sesion&&sesion.media)?sesion.media:[];
+    if(!media.length||!p) return 0;
+    if(!Array.isArray(p.estudiosDocs)) p.estudiosDocs=[];
+    var ya={};
+    p.estudiosDocs.forEach(function(e){ if(!e) return; if(e.mediaId) ya['m:'+e.mediaId]=1; if(e.fbPath) ya['f:'+e.fbPath]=1; if(e.url) ya['u:'+e.url]=1; });
+    var fechaEst=(function(fx){ var mm=String(fx||'').match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/); return mm?(mm[3]+'-'+mm[2].padStart(2,'0')+'-'+mm[1].padStart(2,'0')):new Date().toISOString().slice(0,10); })(sesion.fecha);
+    var n=0;
+    media.forEach(function(m){
+      if(!m) return;
+      if(!m.url && !m.fbPath) return;
+      if((m.mediaId&&ya['m:'+m.mediaId])||(m.fbPath&&ya['f:'+m.fbPath])||(m.url&&ya['u:'+m.url])) return;
+      var esImg=m.type&&String(m.type).indexOf('image')===0;
+      p.estudiosDocs.push({
+        id:'est_'+Date.now()+'_'+Math.random().toString(36).slice(2,6),
+        tipo:(esImg?'imagen':'doc'), url:m.url||'', fbPath:m.fbPath||'',
+        descripcion:(m.label||m.name||'').replace(/\.[^.]+$/,''),
+        fechaEstudio:fechaEst,
+        fechaAgregado:new Date().toLocaleDateString('es-MX'),
+        agregadoPor:(currentUser&&currentUser.name)||'',
+        origen:'soap', mediaId:(m.mediaId||m.id||''), sesionId:sesion.id||''
+      });
+      if(m.mediaId) ya['m:'+m.mediaId]=1; if(m.fbPath) ya['f:'+m.fbPath]=1; if(m.url) ya['u:'+m.url]=1;
+      n++;
+    });
+    return n;
+  }catch(_e){ console.warn('[I-B] espejo a Estudios falló:', _e&&_e.message); return 0; }
+}
 function previewSoapMedia(pid,sid,idx){
-  const p=patientsDB.find(x=>x.id===pid);const s=p?.soap.find(x=>x.id===sid);
-  const item=s?.media[idx];if(!item) return;
+  const p=patientsDB.find(x=>x.id===pid);let s=(p&&Array.isArray(p.soap))?p.soap.find(x=>x.id===sid):null;
+  // FIX SOAP-MEDIA (C): históricos mig_pac_ — la nota vive en _fstSesionesCache, no en patientsDB
+  if(!s && Array.isArray(_fstSesionesCache[pid])) s=_fstSesionesCache[pid].find(x=>x.id===sid);
+  const item=s?.media?.[idx];if(!item) return;
   const _src=item.url||item.data;
   if(!_src){ showToast('Imagen no disponible offline','warning'); return; }
   // Overlay interno — sin window.open (evita quedar atrapado en Safari iPad)
