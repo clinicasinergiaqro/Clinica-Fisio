@@ -3540,7 +3540,8 @@ function _rendimientoHTML(datos, noId, ventana, etiqueta, aviso, refresco, tri){
   var filas=Object.keys(TERAPEUTA_CAL2COD).map(function(n){
     var st=datos.stats[n], c=(typeof AGENDA_COLORES!=='undefined'&&AGENDA_COLORES[n])?AGENDA_COLORES[n]:'#9BA3B5';
     var t=tri[n]||{citas:st.citas, conNota:null, sinNota:null};
-    return '<tr style="border-bottom:1px solid var(--gray-100)">'
+    // VISTA-SEMANAL: terapeuta con pendientes 🔴 esa semana → fila en rojo suave (de un vistazo)
+    return '<tr style="border-bottom:1px solid var(--gray-100)'+((ventana==='semana'&&t.sinNota>0)?';background:#FEF2F2':'')+'">'
       +'<td style="padding:6px 8px;font-weight:700;color:'+c+'">'+escapeHTML(n)+'</td>'
       +'<td style="padding:6px 8px;text-align:center">'+t.citas+'</td>'
       +'<td style="padding:6px 8px;text-align:center;font-weight:700;color:#2E7D52">'+(t.conNota==null?'—':('✅ '+t.conNota))+'</td>'
