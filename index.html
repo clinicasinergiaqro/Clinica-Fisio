@@ -2538,7 +2538,8 @@ function _agendaEventoHTML(ev){
   var pac = escapeHTML(ev.paciente || '(sin nombre)');
   var _colorTer = (Array.isArray(ev.terapeutas) && ev.terapeutas.length && AGENDA_COLORES[ev.terapeutas[0]]) ? AGENDA_COLORES[ev.terapeutas[0]] : AGENDA_COLOR_SIN;
   // 1 renglón: hora fija (der) | paciente flexible (truncado) | chips a la derecha
-  return '<div style="display:flex;align-items:center;gap:10px;padding:7px 8px;border-left:4px solid '+_colorTer+';border-bottom:1px solid #F0F2F7;border-radius:6px;margin-bottom:2px">'
+  // FLUJO-AGENDA: el fallback también es tocable (mismo handler que la tarjeta del timeline)
+  return '<div data-nombre="'+escapeAttr_(ev.paciente||'')+'" onclick="_abrirCitaAgenda(this.dataset.nombre)" style="cursor:pointer;display:flex;align-items:center;gap:10px;padding:7px 8px;border-left:4px solid '+_colorTer+';border-bottom:1px solid #F0F2F7;border-radius:6px;margin-bottom:2px">'
     + '<div style="font-size:12px;font-weight:800;color:var(--navy);min-width:62px;text-align:right">'+escapeHTML(hora)+'</div>'
     + '<div style="flex:1;min-width:0;font-size:13px;font-weight:600;color:#1F2937;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+pac+'</div>'
     + '<div style="display:flex;align-items:center;flex-wrap:wrap;justify-content:flex-end;gap:4px;flex-shrink:0">'+chips+bNuevo+bSin+'</div>'
@@ -2556,11 +2557,18 @@ function _agendaTarjetaTimeline(ev){
   var bNuevo = ev.esNuevo ? '<span style="font-size:9px;font-weight:700;color:#0E7C66;background:#D1FAE5;border-radius:6px;padding:1px 6px">🆕</span>' : '';
   var bSin = ev.sinAsignar ? '<span style="font-size:9px;font-weight:700;color:#fff;background:'+AGENDA_COLOR_SIN+';border-radius:6px;padding:1px 6px">sin asignar</span>' : '';
   var pac = escapeHTML(ev.paciente || '(sin nombre)');
-  return '<div data-nombre="'+escapeAttr_(ev.paciente||'')+'" onclick="_abrirCitaAgenda(this.dataset.nombre)" '
+  // FLUJO-AGENDA: nombre con affordance de tocable (navy + subrayado punteado + ›) y botón 📝
+  // que abre expediente + nueva nota SOAP directa (Opción 1). El tap en el resto de la tarjeta
+  // sigue abriendo el expediente normal (comportamiento previo intacto).
+  return '<div data-nombre="'+escapeAttr_(ev.paciente||'')+'" data-agcita="1" onclick="_abrirCitaAgenda(this.dataset.nombre)" '
     + 'style="flex:1 1 140px;min-width:128px;cursor:pointer;background:#fff;border:1px solid #EEF1F6;border-left:4px solid '+colorTer+';border-radius:8px;box-shadow:0 1px 3px rgba(20,40,80,.06);padding:6px 8px">'
-    + '<div style="font-size:13px;font-weight:700;color:#1F2937;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+pac+'</div>'
+    + '<div style="display:flex;align-items:center;gap:6px">'
+    +   '<div data-agnombre="1" style="flex:1;min-width:0;font-size:13px;font-weight:700;color:var(--navy);text-decoration:underline dotted;text-underline-offset:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+pac+' <span style="color:#9BA3B5;text-decoration:none;font-weight:800">›</span></div>'
+    +   '<button type="button" data-agbtn="1" data-nombre="'+escapeAttr_(ev.paciente||'')+'" onclick="event.stopPropagation();_nuevaNotaDesdeCita(this.dataset.nombre)" aria-label="Nueva nota SOAP" '
+    +     'style="flex-shrink:0;font-size:14px;line-height:1;background:#EBF3FF;border:1px solid #C7D8F5;border-radius:8px;padding:5px 8px;cursor:pointer;font-family:inherit">📝</button>'
+    + '</div>'
     + '<div style="font-size:10px;color:var(--gray-400);margin:2px 0 4px">'+escapeHTML(franja)+'</div>'
-    + '<div style="display:flex;align-items:center;flex-wrap:wrap;gap:4px">'+chips+bNuevo+bSin+'</div>'
+    + '<div style="display:flex;align-items:center;flex-wrap:wrap;gap:4px"><span data-agchip="1"></span>'+chips+bNuevo+bSin+'</div>'
     + '</div>';
 }
 // Construye el timeline: columna de horas (izq) + fila por hora + tarjetas (columnas si simultáneas) + línea "ahora".
@@ -2594,66 +2602,127 @@ function _agendaTimelineHTML(evs, rango){
   }
   return '<div style="margin-top:4px">'+filas+'</div>';
 }
-// Tap en una cita: match único activo → expediente; único histórico → expediente; 0/ambiguo → buscador prellenado.
+// FLUJO-AGENDA — matching compartido cita→expediente (mismo _normPend del dashboard).
+// Match por tokens: todas las palabras del calendario deben estar en el nombre del expediente.
+function _casaCitaExpediente(toks, p){
+  var ne=_normPend(p.nombreNormalizado || p.name || '');
+  if(!ne) return false;
+  var te=ne.split(' ').filter(Boolean);
+  return toks.every(function(w){ return te.indexOf(w)!==-1; });
+}
+// Resuelve el nombre de una cita: {tipo:'unico',p} | {tipo:'multiple',lista} | {tipo:'ninguno'}.
+// 1) activos síncronos; 2) lista fusionada (incluye históricos), dedupe por id.
+async function _resolverCitaAgenda(nombre){
+  var nq=_normPend(nombre);
+  var toks=nq?nq.split(' ').filter(Boolean):[];
+  if(!toks.length) return {tipo:'ninguno'};
+  var casa=function(p){ return _casaCitaExpediente(toks, p); };
+  var act=(Array.isArray(patientsDB)?patientsDB:[]).filter(casa);
+  if(act.length===1) return {tipo:'unico', p:act[0]};
+  var pool=act;
+  if(typeof FST_obtenerListaParaRender==='function'){
+    var fus=[];
+    try{ fus=await FST_obtenerListaParaRender(); }catch(e){ fus=patientsDB||[]; }
+    pool=(Array.isArray(fus)?fus:[]).filter(casa);
+  }
+  var vistos={}, uniq=[];
+  pool.forEach(function(p){ var id=String(p&&p.id||''); if(id&&!vistos[id]){ vistos[id]=1; uniq.push(p); } });
+  if(uniq.length===1) return {tipo:'unico', p:uniq[0]};
+  if(uniq.length>1) return {tipo:'multiple', lista:uniq};
+  return {tipo:'ninguno'};
+}
+function _agendaSinMatchABuscador_(nombre){
+  showPacientes();
+  setTimeout(function(){
+    var inp=document.getElementById('buscador-pacientes');
+    if(inp){ inp.value=nombre; }
+    if(typeof renderPacientes==='function') renderPacientes(nombre,'todos');
+    var inp2=document.getElementById('buscador-pacientes');
+    if(inp2){ inp2.focus(); }
+    showToast('Sin expediente con ese nombre — ¿paciente nuevo? Usa ＋ Nuevo paciente','warning');
+  },80);
+}
+// Tap en una cita: match único → expediente; ambiguo → mini-selector; 0 → buscador prellenado.
 async function _abrirCitaAgenda(nombre){
   try{
-    var nq=_normPend(nombre);
-    if(!nq){ showPacientes(); return; }
-    var toks=nq.split(' ').filter(Boolean);
-    if(!toks.length){ showPacientes(); return; }
-    // match por tokens: todas las palabras del calendario deben estar en el expediente
-    var casa=function(p){
-      var ne=_normPend(p.nombreNormalizado || p.name || '');
-      if(!ne) return false;
-      var te=ne.split(' ').filter(Boolean);
-      return toks.every(function(w){ return te.indexOf(w)!==-1; });
-    };
-    // 1) activos (síncrono)
-    var act=(Array.isArray(patientsDB)?patientsDB:[]).filter(casa);
-    if(act.length===1){ openExpediente(act[0].id); return; }
-    // 2) lista fusionada (incluye históricos si FST_LISTA_ACTIVA)
-    var pool=act;
-    if(typeof FST_obtenerListaParaRender==='function'){
-      var fus=[];
-      try{ fus=await FST_obtenerListaParaRender(); }catch(e){ fus=patientsDB||[]; }
-      pool=(Array.isArray(fus)?fus:[]).filter(casa);
+    var r=await _resolverCitaAgenda(nombre);
+    if(r.tipo==='unico'){
+      // Activo local → flujo original directo; histórico/fusionado → apertura con hidratación
+      if(Array.isArray(patientsDB)&&patientsDB.some(function(x){return x.id===r.p.id;})) openExpediente(r.p.id);
+      else FST_abrirPacienteDesdeLista(r.p.id);
+      return;
     }
-    // dedupe por id
-    var vistos={}, uniq=[];
-    pool.forEach(function(p){ var id=String(p&&p.id||''); if(id&&!vistos[id]){ vistos[id]=1; uniq.push(p); } });
-    if(uniq.length===1){ FST_abrirPacienteDesdeLista(uniq[0].id); return; }
-    if(uniq.length>1){ _modalElegirPaciente(nombre, uniq); return; }
-    // 3) 0 matches → buscador prellenado (comportamiento original)
-    showPacientes();
-    setTimeout(function(){
-      var inp=document.getElementById('buscador-pacientes');
-      if(inp){ inp.value=nombre; }
-      if(typeof renderPacientes==='function') renderPacientes(nombre,'todos');
-      var inp2=document.getElementById('buscador-pacientes');
-      if(inp2){ inp2.focus(); }
-    },80);
+    if(r.tipo==='multiple'){ _modalElegirPaciente(nombre, r.lista, 'abrir'); return; }
+    _agendaSinMatchABuscador_(nombre);
   }catch(e){ console.warn('[Agenda tap]', e&&e.message); try{ showPacientes(); }catch(_){} }
 }
+// FLUJO-AGENDA (Opción 1) — botón 📝: abre expediente Y dispara nueva nota SOAP directa.
+// nuevaSesionRapida ya resuelve activos e históricos (hidrata + cache de sesiones, post-DIAG3).
+async function _nuevaNotaDesdeCita(nombre){
+  try{
+    var r=await _resolverCitaAgenda(nombre);
+    if(r.tipo==='unico'){ nuevaSesionRapida(r.p.id); return; }
+    if(r.tipo==='multiple'){ _modalElegirPaciente(nombre, r.lista, 'nota'); return; }
+    _agendaSinMatchABuscador_(nombre);
+  }catch(e){ console.warn('[Agenda 📝]', e&&e.message); showToast('No se pudo abrir la nota','error'); }
+}
 
-function _modalElegirPaciente(nombreCal, lista){
+function _modalElegirPaciente(nombreCal, lista, accion){
+  accion=(accion==='nota')?'nota':'abrir'; // FLUJO-AGENDA: 'abrir' = expediente; 'nota' = nueva nota SOAP
   var ex=document.querySelector('[data-elegirpac]'); if(ex) ex.remove();
   var ov=document.createElement('div');
   ov.setAttribute('data-elegirpac','1');
   ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:10002;display:flex;align-items:flex-start;justify-content:center;overflow:auto;padding:40px 12px';
   ov.onclick=function(e){ if(e.target===ov) ov.remove(); };
+  var fnDestino=(accion==='nota')?'nuevaSesionRapida':'FST_abrirPacienteDesdeLista';
   var filas=(Array.isArray(lista)?lista:[]).map(function(p){
-    var sub=p.terapeuta?('<div style="font-size:11px;color:var(--gray-500)">'+escapeHTML(p.terapeuta)+'</div>'):'';
+    // CASO AMBIGUO: última visita por candidato para que la terapeuta distinga homónimos
+    var ult='';
+    try{
+      if(Array.isArray(p.soap)&&p.soap.length){ ult=p.soap[p.soap.length-1].fecha||''; }
+      else { ult=p.ultimaSesionLive||p.ultimaSesion||''; }
+    }catch(_u){}
+    var extras=[p.terapeuta?escapeHTML(p.terapeuta):'', p.age?escapeHTML(p.age)+' años':'', ult?('últ. sesión: '+escapeHTML(ult)):'últ. sesión: —'].filter(Boolean).join(' · ');
+    var sub=extras?('<div style="font-size:11px;color:var(--gray-500)">'+extras+'</div>'):'';
     var esHist=(String(p.id||'').indexOf('mig_pac_')===0)?'<span style="font-size:9px;font-weight:700;color:#fff;background:#9BA3B5;border-radius:6px;padding:1px 6px;margin-left:6px">histórico</span>':'';
-    return '<div data-pid="'+escapeAttr_(p.id)+'" onclick="var ov=this.closest(\'[data-elegirpac]\');var id=this.dataset.pid;if(ov)ov.remove();FST_abrirPacienteDesdeLista(id)" style="padding:10px 12px;border-bottom:1px solid var(--gray-100);cursor:pointer;display:flex;flex-direction:column">'
+    return '<div data-pid="'+escapeAttr_(p.id)+'" onclick="var ov=this.closest(\'[data-elegirpac]\');var id=this.dataset.pid;if(ov)ov.remove();'+fnDestino+'(id)" style="padding:10px 12px;border-bottom:1px solid var(--gray-100);cursor:pointer;display:flex;flex-direction:column">'
       +'<div style="font-size:14px;font-weight:700;color:var(--navy)">'+escapeHTML(p.name||'(sin nombre)')+esHist+'</div>'+sub+'</div>';
   }).join('');
   ov.innerHTML='<div style="background:#fff;border-radius:16px;width:100%;max-width:460px;padding:18px">'
     +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">'
     +'<div style="font-size:15px;font-weight:800;color:var(--navy)">Varios pacientes coinciden</div>'
     +'<button onclick="this.closest(\'[data-elegirpac]\').remove()" style="background:none;border:none;font-size:22px;color:var(--gray-400);cursor:pointer">×</button></div>'
-    +'<div style="font-size:12px;color:var(--gray-500);margin-bottom:10px">Cita: <b>'+escapeHTML(nombreCal||'')+'</b> — elige cuál abrir:</div>'
+    +'<div style="font-size:12px;color:var(--gray-500);margin-bottom:10px">Cita: <b>'+escapeHTML(nombreCal||'')+'</b> — elige cuál '+(accion==='nota'?'para la nueva nota:':'abrir:')+'</div>'
     +'<div style="border:1px solid var(--gray-100);border-radius:10px;overflow:hidden">'+filas+'</div></div>';
   document.body.appendChild(ov);
+}
+// FLUJO-AGENDA — pase perezoso: marca con chip "❔ sin expediente" las citas cuyo nombre no
+// matchea ningún expediente. SOLO corre si la lista fusionada YA está cacheada en memoria
+// (window._FST_listaPacientesActual): sin ella no se puede distinguir "histórico" de "no existe"
+// y marcaríamos falsos positivos; tampoco forzamos la descarga del índice solo para esto.
+function _marcarCitasSinExpediente(){
+  try{
+    var fus=window._FST_listaPacientesActual;
+    if(!Array.isArray(fus)||!fus.length) return;
+    var pool=(Array.isArray(patientsDB)?patientsDB:[]).concat(fus);
+    document.querySelectorAll('[data-agcita]').forEach(function(card){
+      var nombre=card.dataset.nombre||'';
+      var slot=card.querySelector('[data-agchip]');
+      if(!slot||!nombre) return;
+      var nq=_normPend(nombre);
+      var toks=nq?nq.split(' ').filter(Boolean):[];
+      var hay=toks.length&&pool.some(function(p){ return p&&_casaCitaExpediente(toks,p); });
+      if(hay){ slot.innerHTML=''; return; }
+      // CASO 2 — sin expediente: nombre claramente NO-tocable (gris, sin subrayado, sin ›),
+      // botón 📝 oculto, chip discreto. El tap en la tarjeta sigue llevando al buscador
+      // prellenado (útil para dar de alta al paciente), pero visualmente no invita a abrir.
+      slot.innerHTML='<span style="font-size:9px;font-weight:700;color:#6B7280;background:#EEF1F6;border:1px dashed #C9CFDB;border-radius:6px;padding:1px 6px">❔ sin expediente</span>';
+      var nom=card.querySelector('[data-agnombre]');
+      if(nom){ nom.style.color='#9BA3B5'; nom.style.textDecoration='none'; nom.textContent=nombre; }
+      var btn=card.querySelector('[data-agbtn]');
+      if(btn){ btn.style.display='none'; }
+    });
+  }catch(e){ console.warn('[Agenda chip]', e&&e.message); }
 }
 // G-4(5): cita SIN la columna de hora (para agrupar por hora en semana/próxima). No toca _agendaEventoHTML.
 function _agendaCitaSinHoraHTML(ev){
@@ -2742,6 +2811,7 @@ async function FST_montarAgendaCalendar(rango){
   }
   if (rango === 'dia' || rango === 'manana' || rango === 'pasado') {
     listEl.innerHTML = _agendaTimelineHTML(evs, rango);   // G-7/G-9: timeline de un día (hoy/mañana/pasado)
+    setTimeout(_marcarCitasSinExpediente, 0);             // FLUJO-AGENDA: chips sin bloquear el render
   } else {
     // Semana / Próxima: AGRUPAR por día
     var grupos = {};
@@ -2779,6 +2849,7 @@ async function FST_montarAgendaCalendar(rango){
         + '</div>';
     }).join('');
     listEl.innerHTML = htmlSem;
+    setTimeout(_marcarCitasSinExpediente, 0);             // FLUJO-AGENDA: también en Semana/Próxima
   }
 }
 // ── G-3: agrupación por día para vista semana/próxima (reusa funciones G-2) ──
