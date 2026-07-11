@@ -225,6 +225,8 @@ function FST_renderCard(s, pid){
   return '<div class="soap-card" style="opacity:.92;border-left:3px solid var(--navy)">'
     + '<div class="soap-header" style="cursor:default"><div>'
     + '<div class="soap-sesion">Sesión ' + escapeHTML(s.numEpisodio != null ? s.numEpisodio : s.num) + (s.numEpisodio != null ? ' <span style="font-size:10px;color:var(--gray-400);font-weight:400">· Episodio ' + escapeHTML((s.motivoIndex||0)+1) + '</span>' : '') + '</div>'
+    // FIX CONTADOR: línea secundaria con el num global (paridad con _renderSoapCard de activos)
+    + (s.numEpisodio != null && s.num ? '<div style="font-size:10px;color:var(--gray-400);margin-top:1px">Sesión ' + escapeHTML(s.num) + ' del expediente</div>' : '')
     + '<div class="soap-meta">' + fecha + ' · <span style="font-weight:700;color:var(--navy)">' + terapeuta + '</span> · Semana ' + escapeHTML(semana) + '</div>'
     + '</div><div style="display:flex;flex-wrap:wrap;gap:4px;align-items:center">' + FST_badgesSesion(s) + '</div></div>'
     + '<div class="soap-body">'
@@ -6282,6 +6284,11 @@ function renderSOAPForm(){
   const alertaPrecaucion=(p.seguridadClinica&&p.seguridadClinica.tienePrecaucion)
     ? `<div class="alerta-precaucion">⚠️ Precaución clínica — revisar contraindicaciones antes de aplicar agentes físicos o técnicas invasivas.</div>`
     : '';
+  // FIX CONTADOR (Opción A confirmada): numeración PRINCIPAL por episodio + total informativo.
+  // totalPrevias cuenta TODAS las sesiones reales (con y sin motivoIndex): activos → p.soap;
+  // históricos → _fstSesionesCache vía obtenerSesiones (ya hidratado por ambos flujos).
+  const _sesTodas=obtenerSesiones(p);
+  const totalPrevias=Array.isArray(_sesTodas)?_sesTodas.length:(typeof p.sesiones==='number'?p.sesiones:0);
   // FASE B — selector de motivo (solo NOTA NUEVA y solo si el paciente tiene episodios).
   // Default: motivo actual (0 taps extra). En edición el motivo es fijo (no se renumera).
   const _tieneEps=Array.isArray(p.motivosAnteriores)&&p.motivosAnteriores.length>0;
@@ -6304,7 +6311,11 @@ function renderSOAPForm(){
     <div class="form-section-title">📋 Identificación</div>
     <div class="form-group">
       <div class="form-field"><div class="form-label">Paciente</div><div style="font-size:15px;font-weight:700;color:var(--navy)">${escapeHTML(p.name)}</div></div>
-      <div class="form-field"><div class="form-label">Sesión</div><div style="font-size:15px;font-weight:700;color:var(--navy)">${sesNum}${(()=>{const t=parseInt(p.planTto?.sesiones);return(t&&t>0)?' de '+t:''})()}</div></div>
+      <div class="form-field"><div class="form-label">Sesión</div><div style="font-size:15px;font-weight:700;color:var(--navy)">${
+        (_tieneEps&&!editingSoapId&&!editingSoapEsHistorico)
+          ? `${(p.numSesionEpisodioActual||0)+1} <span style="font-size:11px;color:var(--gray-400);font-weight:400">· Episodio ${(p.motivoActualIndex||0)+1}</span>`
+          : `${sesNum}${(()=>{const t=parseInt(p.planTto?.sesiones);return(t&&t>0)?' de '+t:''})()}`
+      }</div>${(_tieneEps&&!editingSoapId&&!editingSoapEsHistorico)?`<div style="font-size:10px;color:var(--gray-400);margin-top:1px">${totalPrevias+1}ª visita del paciente</div>`:''}</div>
       <div class="form-field"><div class="form-label">Semana</div><div style="font-size:15px;font-weight:700;color:var(--navy)">${semana}</div></div>
       <div class="form-field"><div class="form-label">Terapeuta</div><div style="font-size:15px;font-weight:700;color:var(--navy)">${ter}</div></div>
     </div>
