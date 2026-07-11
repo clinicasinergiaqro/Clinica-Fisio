@@ -225,6 +225,8 @@ function FST_renderCard(s, pid){
   return '<div class="soap-card" style="opacity:.92;border-left:3px solid var(--navy)">'
     + '<div class="soap-header" style="cursor:default"><div>'
     + '<div class="soap-sesion">Sesión ' + escapeHTML(s.numEpisodio != null ? s.numEpisodio : s.num) + (s.numEpisodio != null ? ' <span style="font-size:10px;color:var(--gray-400);font-weight:400">· Episodio ' + escapeHTML((s.motivoIndex||0)+1) + '</span>' : '') + '</div>'
+    // FIX CONTADOR: línea secundaria con el num global (paridad con _renderSoapCard de activos)
+    + (s.numEpisodio != null && s.num ? '<div style="font-size:10px;color:var(--gray-400);margin-top:1px">Sesión ' + escapeHTML(s.num) + ' del expediente</div>' : '')
     + '<div class="soap-meta">' + fecha + ' · <span style="font-weight:700;color:var(--navy)">' + terapeuta + '</span> · Semana ' + escapeHTML(semana) + '</div>'
     + '</div><div style="display:flex;flex-wrap:wrap;gap:4px;align-items:center">' + FST_badgesSesion(s) + '</div></div>'
     + '<div class="soap-body">'
@@ -4524,7 +4526,9 @@ function renderExpediente(tab='historia'){
   if(!p.consentimiento||typeof p.consentimiento!=='object'||Array.isArray(p.consentimiento)) p.consentimiento={};
   if(typeof p.alergias!=='string') p.alergias='Ninguna';
   if(typeof p.dx!=='string') p.dx=(p.dx?.dxClinico||p.dx?.dxMedico||'Sin diagnóstico');
-  if(typeof p.sesiones!=='number') p.sesiones=p.soap.length;
+  // FIX SESIÓN-NaN: preferir el conteo real del índice (sesionesCount) sobre soap.length,
+  // que para históricos siempre es 0 y pintaba un falso "Sesión 1" (el num guardado era 15).
+  if(typeof p.sesiones!=='number') p.sesiones=(Number(p.sesionesCount)||0)||p.soap.length;
   const c=document.getElementById('content-expediente');
   const hasContra=p.contraindicaciones&&p.contraindicaciones!=='Ninguna';
   const hasAllergy=p.alergias&&p.alergias!=='Ninguna';
@@ -6216,7 +6220,7 @@ function showNuevoSOAP(){
   _dictado.activo=false; _dictado.textoFinal=''; _dictado.textoInterino=''; _dictado.palabras=0; _dictadoSoapPreview=null; _dictadoMetadata=null; _dictadoManual=false;
   tempMods=[]; tempEvaI=5; tempEvaF=3; tempEvolMedia=[]; editingSoapId=null; editingSoapPid=null; editingSoapEsHistorico=false; _editingSoapHistoricoNota=null; modoNotaActual=''; _dictadoBanderas=[]; _dictadoActivo=false; _dictadoTransPrecargada=false; _soapV2Resultado=null; limpiarDirty();
   tempEvolucionChips=[];
-  const sesNum=currentPatient.sesiones+1;
+  const sesNum=(typeof currentPatient.sesiones==='number'?currentPatient.sesiones:0)+1; // FIX SESIÓN-NaN: guard defensivo
   const totalSes=parseInt(currentPatient.planTto?.sesiones);
   const totalTxt=(totalSes&&totalSes>0)?' de '+totalSes:'';
   document.getElementById('soap-topbar-meta').textContent=
@@ -6246,7 +6250,7 @@ function seleccionarMotivoSesion(sel){
 }
 function renderSOAPForm(){
   const p=currentPatient;
-  const sesNum=(editingSoapEsHistorico&&_editingSoapHistoricoNota)?_editingSoapHistoricoNota.num:(p.sesiones+1);
+  const sesNum=(editingSoapEsHistorico&&_editingSoapHistoricoNota)?_editingSoapHistoricoNota.num:((typeof p.sesiones==='number'?p.sesiones:0)+1); // FIX SESIÓN-NaN: guard defensivo
   // Terapeuta de la nota = quien está llenando la nota, no el terapeuta asignado
   const ter=currentUser.name;
   // F3: quién atendió la sesión (default: el terapeuta de la nota; en edición, lo guardado)
@@ -6280,6 +6284,11 @@ function renderSOAPForm(){
   const alertaPrecaucion=(p.seguridadClinica&&p.seguridadClinica.tienePrecaucion)
     ? `<div class="alerta-precaucion">⚠️ Precaución clínica — revisar contraindicaciones antes de aplicar agentes físicos o técnicas invasivas.</div>`
     : '';
+  // FIX CONTADOR (Opción A confirmada): numeración PRINCIPAL por episodio + total informativo.
+  // totalPrevias cuenta TODAS las sesiones reales (con y sin motivoIndex): activos → p.soap;
+  // históricos → _fstSesionesCache vía obtenerSesiones (ya hidratado por ambos flujos).
+  const _sesTodas=obtenerSesiones(p);
+  const totalPrevias=Array.isArray(_sesTodas)?_sesTodas.length:(typeof p.sesiones==='number'?p.sesiones:0);
   // FASE B — selector de motivo (solo NOTA NUEVA y solo si el paciente tiene episodios).
   // Default: motivo actual (0 taps extra). En edición el motivo es fijo (no se renumera).
   const _tieneEps=Array.isArray(p.motivosAnteriores)&&p.motivosAnteriores.length>0;
@@ -6302,7 +6311,11 @@ function renderSOAPForm(){
     <div class="form-section-title">📋 Identificación</div>
     <div class="form-group">
       <div class="form-field"><div class="form-label">Paciente</div><div style="font-size:15px;font-weight:700;color:var(--navy)">${escapeHTML(p.name)}</div></div>
-      <div class="form-field"><div class="form-label">Sesión</div><div style="font-size:15px;font-weight:700;color:var(--navy)">${sesNum}${(()=>{const t=parseInt(p.planTto?.sesiones);return(t&&t>0)?' de '+t:''})()}</div></div>
+      <div class="form-field"><div class="form-label">Sesión</div><div style="font-size:15px;font-weight:700;color:var(--navy)">${
+        (_tieneEps&&!editingSoapId&&!editingSoapEsHistorico)
+          ? `${(p.numSesionEpisodioActual||0)+1} <span style="font-size:11px;color:var(--gray-400);font-weight:400">· Episodio ${(p.motivoActualIndex||0)+1}</span>`
+          : `${sesNum}${(()=>{const t=parseInt(p.planTto?.sesiones);return(t&&t>0)?' de '+t:''})()}`
+      }</div>${(_tieneEps&&!editingSoapId&&!editingSoapEsHistorico)?`<div style="font-size:10px;color:var(--gray-400);margin-top:1px">${totalPrevias+1}ª visita del paciente</div>`:''}</div>
       <div class="form-field"><div class="form-label">Semana</div><div style="font-size:15px;font-weight:700;color:var(--navy)">${semana}</div></div>
       <div class="form-field"><div class="form-label">Terapeuta</div><div style="font-size:15px;font-weight:700;color:var(--navy)">${ter}</div></div>
     </div>
@@ -14197,6 +14210,16 @@ async function nuevaSesionRapida(patientId){
     }
   }
   if(!p){ showToast('Paciente no encontrado','error'); return; }
+  // FIX SESIÓN-NaN (autorizado): el objeto del índice trae `sesionesCount`, no `sesiones` —
+  // renderSOAPForm hacía p.sesiones+1 = NaN. Normalizar DESPUÉS de la hidratación (ya esperada
+  // arriba) con el mismo criterio que usa guardarSOAP para el num real: máximo num de las
+  // sesiones hidratadas → sesionesCount → soap.length. Así el encabezado coincide con lo que
+  // se va a guardar (ej. Inesa: 14 previas → "Sesión 15", no NaN ni un falso "Sesión 1").
+  if(typeof p.sesiones!=='number'){
+    var _mxNSR=0;
+    (_fstSesionesCache[patientId]||[]).forEach(function(s){ var n=Number(s&&s.num)||0; if(n>_mxNSR)_mxNSR=n; });
+    p.sesiones=_mxNSR || Number(p.sesionesCount)||0 || (Array.isArray(p.soap)?p.soap.length:0);
+  }
   currentPatient=p;
   showNuevoSOAP();
 }
