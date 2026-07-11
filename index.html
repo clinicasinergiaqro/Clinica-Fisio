@@ -4237,6 +4237,30 @@ function _autoVerMasPacientes_(){
   _verMasIO.observe(btn);
 }
 
+// ── FIX HISTORIA (Opción A): helper reutilizable del MOTIVO VIGENTE ─────────
+// Resuelve la fuente única del episodio en curso para cualquier render:
+// 1) motivosAnteriores[motivoActualIndex] si existiera (defensivo — en el modelo actual ese
+//    índice apunta SIEMPRE al siguiente hueco: los snapshots son episodios CERRADOS 0..N-1 y
+//    el vigente vive en los campos raíz; si un dato inconsistente dejara un snapshot ahí, gana).
+// 2) Fallback robusto: campos raíz (p.motivoConsulta, p.motivo, p.valoracion, p.dxFuncional,
+//    p.planTto) — que son el episodio vigente en el modelo actual Y el único lugar para
+//    pacientes viejos sin episodios. Cero cambio de datos para pacientes sin motivosAnteriores.
+function _motivoVigenteDe(p){
+  const tieneEps=Array.isArray(p&&p.motivosAnteriores)&&p.motivosAnteriores.length>0;
+  const idx=(p&&typeof p.motivoActualIndex==='number')?p.motivoActualIndex:0;
+  const snap=tieneEps?(p.motivosAnteriores[idx]||null):null;
+  const src=snap||p||{};
+  const obj=x=>(x&&typeof x==='object'&&!Array.isArray(x))?x:{};
+  const out={
+    tieneEps:tieneEps, epNum:idx+1, fuente:snap?'episodio':'raiz',
+    motivoConsulta:src.motivoConsulta||'',
+    dx:(typeof src.dx==='string')?src.dx:'',
+    motivo:obj(src.motivo), valoracion:obj(src.valoracion),
+    dxFuncional:obj(src.dxFuncional), planTto:obj(src.planTto)
+  };
+  out.capturado=!!(out.motivoConsulta||out.motivo.padecimiento||out.motivo.dxMedico);
+  return out;
+}
 // ── EXPEDIENTE ─────────────────────────────────────────────────────────────
 function openExpediente(pid){
   currentPatient=patientsDB.find(p=>p.id===pid);
@@ -4529,6 +4553,9 @@ function renderExpediente(tab='historia'){
   // FIX SESIÓN-NaN: preferir el conteo real del índice (sesionesCount) sobre soap.length,
   // que para históricos siempre es 0 y pintaba un falso "Sesión 1" (el num guardado era 15).
   if(typeof p.sesiones!=='number') p.sesiones=(Number(p.sesionesCount)||0)||p.soap.length;
+  // FIX HISTORIA (Opción A): fuente única del episodio vigente para todos los tabs
+  const mv=_motivoVigenteDe(p);
+  const _epSufijo=mv.tieneEps?(' · Episodio '+mv.epNum+' (actual)'):'';
   const c=document.getElementById('content-expediente');
   const hasContra=p.contraindicaciones&&p.contraindicaciones!=='Ninguna';
   const hasAllergy=p.alergias&&p.alergias!=='Ninguna';
@@ -4579,14 +4606,17 @@ function renderExpediente(tab='historia'){
     </div>`;
     if(hasContra) html+=`<div class="contraindication-box">⚠️ ${escapeHTML(p.contraindicaciones)}</div>`;
     if(hasAllergy) html+=`<div class="allergy-box">🚫 Alergia: ${escapeHTML(p.alergias)}</div>`;
-    // Tarjeta de motivo de consulta activo
-    const motivoActivo=p.motivoConsulta||p.motivo?.padecimiento||'Sin motivo registrado';
+    // Tarjeta de motivo de consulta activo — FIX HISTORIA: lee del motivo VIGENTE (helper) y
+    // avisa en ámbar cuando el episodio nuevo aún no tiene motivo capturado (antes: filas vacías).
+    const motivoActivo=mv.motivoConsulta||mv.motivo.padecimiento||(mv.tieneEps?'Motivo nuevo pendiente de captura':'Sin motivo registrado');
+    const _pendienteCaptura=mv.tieneEps&&!mv.capturado;
     const desdeFecha=p.fechaCreacion||p.date||'';
     html+=`
-    <div class="section-card" style="border:1.5px solid var(--navy);margin-bottom:12px">
+    <div class="section-card" style="border:1.5px solid ${_pendienteCaptura?'#F59E0B':'var(--navy)'};margin-bottom:12px">
       <div style="padding:12px 14px">
-        <div style="font-size:12px;color:var(--gray-400);font-weight:700;margin-bottom:4px">📋 MOTIVO DE CONSULTA ACTIVO</div>
-        <div style="font-size:15px;color:var(--navy);font-weight:600;margin-bottom:2px">"${escapeHTML(motivoActivo)}"</div>
+        <div style="font-size:12px;color:var(--gray-400);font-weight:700;margin-bottom:4px">📋 MOTIVO DE CONSULTA ACTIVO${mv.tieneEps?' · EPISODIO '+mv.epNum:''}</div>
+        <div style="font-size:15px;color:${_pendienteCaptura?'#92400E':'var(--navy)'};font-weight:600;margin-bottom:2px">${_pendienteCaptura?'⚠️ ':'"'}${escapeHTML(motivoActivo)}${_pendienteCaptura?'':'"'}</div>
+        ${_pendienteCaptura?`<div style="font-size:12px;color:#92400E;background:#FEF3C7;border-radius:8px;padding:6px 10px;margin-bottom:8px">Toca <b>✏️ Editar valoración completa</b> para capturar el motivo del Episodio ${mv.epNum}.</div>`:''}
         ${desdeFecha?`<div style="font-size:12px;color:var(--gray-400);margin-bottom:10px">Desde: ${desdeFecha}</div>`:'<div style="margin-bottom:10px"></div>'}
         <button onclick="abrirEditarValoracion()" style="width:100%;background:linear-gradient(135deg,#1B3A6B,#2E5BBE);color:white;border:none;border-radius:var(--radius);padding:12px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;margin-bottom:8px">✏️ Editar valoración completa</button>
         <button onclick="abrirNuevoMotivoConsulta()" style="width:100%;background:transparent;color:var(--navy);border:1.5px solid var(--navy);border-radius:var(--radius);padding:11px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">➕ Nuevo motivo de consulta</button>
@@ -4634,7 +4664,7 @@ function renderExpediente(tab='historia'){
       ${(p.age&&!isNaN(p.age))?`<div class="field-row"><div class="field-label">Edad</div><div class="field-value">${escapeHTML(p.age)} años</div></div>`:''}
       <div class="field-row"><div class="field-label">Sexo</div><div class="field-value">${escapeHTML(p.sexo||'Pendiente')}</div></div>
       ${p.telefono?`<div class="field-row"><div class="field-label">Teléfono</div><div class="field-value">${escapeHTML(p.telefono)}</div></div>`:''}
-      ${p.motivoConsulta?`<div class="field-row"><div class="field-label">Motivo de consulta</div><div class="field-value">${escapeHTML(p.motivoConsulta)}</div></div>`:''}
+      ${mv.motivoConsulta?`<div class="field-row"><div class="field-label">Motivo de consulta</div><div class="field-value">${escapeHTML(mv.motivoConsulta)}</div></div>`:''}
       <div class="field-row"><div class="field-label">Médico referente</div><div class="field-value">${escapeHTML(p.medicoReferente||'—')}</div></div>
       <div class="field-row"><div class="field-label">Terapeuta</div><div class="field-value">${escapeHTML(p.terapeuta)}${p.terapeutaSeguimiento?` <span style="color:var(--green);font-size:12px">→ Seguimiento: ${escapeHTML(p.terapeutaSeguimiento)}</span>`:''}</div></div>
       <div class="field-row"><div class="field-label">Creado por</div><div class="field-value" style="color:var(--gray-400);font-size:13px">${escapeHTML(p.creadoPor||'—')} · ${escapeHTML(p.fechaCreacion||'—')}</div></div>
@@ -4684,23 +4714,25 @@ function renderExpediente(tab='historia'){
       <div class="field-row"><div class="field-label">Medicamentos</div><div class="field-value">${(p.antecedentes?.medicamentos||'—')}</div></div>
     </div>
     <div class="section-card">
-      <div class="section-title">💬 Motivo de consulta
+      <div class="section-title">💬 Motivo de consulta${_epSufijo}
         <button onclick="editarHistoria('motivo')" style="margin-left:auto;background:var(--navy);color:white;border:none;border-radius:20px;padding:3px 12px;font-size:11px;font-weight:700;cursor:pointer">✏️ Editar</button>
       </div>
-      <div class="field-row"><div class="field-label">Dx médico</div><div class="field-value">${escapeHTML(p.motivo.dxMedico)}</div></div>
-      <div class="field-row"><div class="field-label">Padecimiento</div><div class="field-value narrative">${escapeHTML(p.motivo.padecimiento)}</div></div>
-      <div class="field-row"><div class="field-label">Mecanismo</div><div class="field-value">${escapeHTML(p.motivo.mecanismo)}</div></div>
-      <div class="field-row"><div class="field-label">Evolución</div><div class="field-value">${escapeHTML(p.motivo.evolucion)}</div></div>
-      <div class="field-row"><div class="field-label">Estudios</div><div class="field-value">${escapeHTML(p.motivo.estudios)}</div></div>
-      <div class="field-row"><div class="field-label">Hallazgos</div><div class="field-value narrative">${escapeHTML(p.motivo.hallazgos)}</div></div>
+      ${(mv.tieneEps&&!mv.capturado)
+        ?`<div style="margin:10px 14px;font-size:13px;color:#92400E;background:#FEF3C7;border-radius:10px;padding:10px 12px">⚠️ Este episodio aún no tiene motivo capturado. Los motivos cerrados están en «Motivos anteriores».</div>`
+        :`<div class="field-row"><div class="field-label">Dx médico</div><div class="field-value">${escapeHTML(mv.motivo.dxMedico)}</div></div>
+      <div class="field-row"><div class="field-label">Padecimiento</div><div class="field-value narrative">${escapeHTML(mv.motivo.padecimiento)}</div></div>
+      <div class="field-row"><div class="field-label">Mecanismo</div><div class="field-value">${escapeHTML(mv.motivo.mecanismo)}</div></div>
+      <div class="field-row"><div class="field-label">Evolución</div><div class="field-value">${escapeHTML(mv.motivo.evolucion)}</div></div>
+      <div class="field-row"><div class="field-label">Estudios</div><div class="field-value">${escapeHTML(mv.motivo.estudios)}</div></div>
+      <div class="field-row"><div class="field-label">Hallazgos</div><div class="field-value narrative">${escapeHTML(mv.motivo.hallazgos)}</div></div>`}
     </div>`;
   }
 
   if(tab==='valoracion'){
-    const v=p.valoracion;
+    const v=mv.valoracion; // FIX HISTORIA: valoración del episodio vigente (raíz para pacientes sin episodios)
     html+=`
     <div class="section-card">
-      <div class="section-title">📊 Valoración inicial
+      <div class="section-title">📊 Valoración inicial${_epSufijo}
         <button onclick="editarHistoria('valoracion')" style="margin-left:auto;background:var(--navy);color:white;border:none;border-radius:20px;padding:3px 12px;font-size:11px;font-weight:700;cursor:pointer">✏️ Editar</button>
       </div>
       <div class="field-row"><div class="field-label">Dolor (EVA)</div>
@@ -4715,26 +4747,26 @@ function renderExpediente(tab='historia'){
       <div class="field-row"><div class="field-label">🚩 Banderas rojas</div><div class="field-value" style="color:${v.banderasRojas&&v.banderasRojas!=='Ninguna'?'var(--red)':'var(--green)'};font-weight:600;">${valorSeguroHTML(v.banderasRojas,'Ninguna')}</div></div>
     </div>
     <div class="section-card">
-      <div class="section-title">🔎 Diagnóstico funcional
+      <div class="section-title">🔎 Diagnóstico funcional${_epSufijo}
         <button onclick="editarHistoria('dxfuncional')" style="margin-left:auto;background:var(--navy);color:white;border:none;border-radius:20px;padding:3px 12px;font-size:11px;font-weight:700;cursor:pointer">✏️ Editar</button>
       </div>
-      <div class="field-row"><div class="field-label">Dx clínico</div><div class="field-value">${valorSeguroHTML(p.dxFuncional.dxClinico)}</div></div>
-      <div class="field-row"><div class="field-label">Dx funcional</div><div class="field-value narrative">${valorSeguroHTML(p.dxFuncional.dxFuncional)}</div></div>
-      <div class="field-row"><div class="field-label">Limitaciones</div><div class="field-value">${valorSeguroHTML(p.dxFuncional.limitaciones)}</div></div>
-      <div class="field-row"><div class="field-label">Objetivos CP</div><div class="field-value">${valorSeguroHTML(p.dxFuncional.objetivosCP)}</div></div>
-      <div class="field-row"><div class="field-label">Objetivos LP</div><div class="field-value">${valorSeguroHTML(p.dxFuncional.objetivosLP)}</div></div>
-      <div class="field-row"><div class="field-label">Pronóstico</div><div class="field-value">${valorSeguroHTML(p.dxFuncional.pronostico)}</div></div>
+      <div class="field-row"><div class="field-label">Dx clínico</div><div class="field-value">${valorSeguroHTML(mv.dxFuncional.dxClinico)}</div></div>
+      <div class="field-row"><div class="field-label">Dx funcional</div><div class="field-value narrative">${valorSeguroHTML(mv.dxFuncional.dxFuncional)}</div></div>
+      <div class="field-row"><div class="field-label">Limitaciones</div><div class="field-value">${valorSeguroHTML(mv.dxFuncional.limitaciones)}</div></div>
+      <div class="field-row"><div class="field-label">Objetivos CP</div><div class="field-value">${valorSeguroHTML(mv.dxFuncional.objetivosCP)}</div></div>
+      <div class="field-row"><div class="field-label">Objetivos LP</div><div class="field-value">${valorSeguroHTML(mv.dxFuncional.objetivosLP)}</div></div>
+      <div class="field-row"><div class="field-label">Pronóstico</div><div class="field-value">${valorSeguroHTML(mv.dxFuncional.pronostico)}</div></div>
     </div>
     <div class="section-card">
-      <div class="section-title">🎯 Plan de tratamiento
+      <div class="section-title">🎯 Plan de tratamiento${_epSufijo}
         <button onclick="editarHistoria('plan')" style="margin-left:auto;background:var(--navy);color:white;border:none;border-radius:20px;padding:3px 12px;font-size:11px;font-weight:700;cursor:pointer">✏️ Editar</button>
       </div>
-      <div class="field-row"><div class="field-label">Frecuencia</div><div class="field-value">${valorSeguroHTML(p.planTto.frecuencia)}</div></div>
-      <div class="field-row"><div class="field-label">Sesiones</div><div class="field-value">${p.planTto.sesiones}</div></div>
-      <div class="field-row"><div class="field-label">Ejercicio</div><div class="field-value">${valorSeguroHTML(p.planTto.ejercicioTerapeutico)}</div></div>
-      <div class="field-row"><div class="field-label">Terapia manual</div><div class="field-value">${valorSeguroHTML(p.planTto.terapiaManual)}</div></div>
-      <div class="field-row"><div class="field-label">Agentes físicos</div><div class="field-value">${valorSeguroHTML(p.planTto.agentesFisicos)}</div></div>
-      <div class="field-row"><div class="field-label">Contraindicaciones</div><div class="field-value">${p.planTto.contraindicaciones}</div></div>
+      <div class="field-row"><div class="field-label">Frecuencia</div><div class="field-value">${valorSeguroHTML(mv.planTto.frecuencia)}</div></div>
+      <div class="field-row"><div class="field-label">Sesiones</div><div class="field-value">${mv.planTto.sesiones}</div></div>
+      <div class="field-row"><div class="field-label">Ejercicio</div><div class="field-value">${valorSeguroHTML(mv.planTto.ejercicioTerapeutico)}</div></div>
+      <div class="field-row"><div class="field-label">Terapia manual</div><div class="field-value">${valorSeguroHTML(mv.planTto.terapiaManual)}</div></div>
+      <div class="field-row"><div class="field-label">Agentes físicos</div><div class="field-value">${valorSeguroHTML(mv.planTto.agentesFisicos)}</div></div>
+      <div class="field-row"><div class="field-label">Contraindicaciones</div><div class="field-value">${mv.planTto.contraindicaciones}</div></div>
     </div>
     ${Array.isArray(p.historialCambios)&&p.historialCambios.length>0?`
     <div class="section-card">
@@ -6250,7 +6282,12 @@ function seleccionarMotivoSesion(sel){
 }
 function renderSOAPForm(){
   const p=currentPatient;
-  const sesNum=(editingSoapEsHistorico&&_editingSoapHistoricoNota)?_editingSoapHistoricoNota.num:((typeof p.sesiones==='number'?p.sesiones:0)+1); // FIX SESIÓN-NaN: guard defensivo
+  // FIX HEADER: total real PRIMERO (cache hidratado vía obtenerSesiones) — inmune al campo
+  // sesionesCount desactualizado del doc índice que hacía divergir header (12) vs cuerpo (15ª).
+  const _sesTodas=obtenerSesiones(p);
+  const totalPrevias=Array.isArray(_sesTodas)?_sesTodas.length:(typeof p.sesiones==='number'?p.sesiones:0);
+  const _mxRealNum=(Array.isArray(_sesTodas)?_sesTodas:[]).reduce(function(mx,s){var n=Number(s&&s.num)||0;return n>mx?n:mx;},0);
+  const sesNum=(editingSoapEsHistorico&&_editingSoapHistoricoNota)?_editingSoapHistoricoNota.num:(Math.max((typeof p.sesiones==='number'?p.sesiones:0),_mxRealNum)+1); // FIX SESIÓN-NaN + stale
   // Terapeuta de la nota = quien está llenando la nota, no el terapeuta asignado
   const ter=currentUser.name;
   // F3: quién atendió la sesión (default: el terapeuta de la nota; en edición, lo guardado)
@@ -6284,11 +6321,7 @@ function renderSOAPForm(){
   const alertaPrecaucion=(p.seguridadClinica&&p.seguridadClinica.tienePrecaucion)
     ? `<div class="alerta-precaucion">⚠️ Precaución clínica — revisar contraindicaciones antes de aplicar agentes físicos o técnicas invasivas.</div>`
     : '';
-  // FIX CONTADOR (Opción A confirmada): numeración PRINCIPAL por episodio + total informativo.
-  // totalPrevias cuenta TODAS las sesiones reales (con y sin motivoIndex): activos → p.soap;
-  // históricos → _fstSesionesCache vía obtenerSesiones (ya hidratado por ambos flujos).
-  const _sesTodas=obtenerSesiones(p);
-  const totalPrevias=Array.isArray(_sesTodas)?_sesTodas.length:(typeof p.sesiones==='number'?p.sesiones:0);
+  // FIX CONTADOR: _sesTodas/totalPrevias ahora se calculan arriba, junto a sesNum (una sola fuente).
   // FASE B — selector de motivo (solo NOTA NUEVA y solo si el paciente tiene episodios).
   // Default: motivo actual (0 taps extra). En edición el motivo es fijo (no se renumera).
   const _tieneEps=Array.isArray(p.motivosAnteriores)&&p.motivosAnteriores.length>0;
@@ -6304,6 +6337,15 @@ function renderSOAPForm(){
     <div class="form-section-title">🗂️ Motivo de esta sesión</div>
     <div style="padding:0 14px 10px;display:flex;flex-wrap:wrap;gap:6px">${chipsM}</div>
   </div>`;
+  }
+  // FIX HEADER (BUG 2): el topbar dice LO MISMO que el cuerpo — una sola fuente de verdad.
+  // showNuevoSOAP pone un placeholder; aquí se sobreescribe en el mismo tick (sin parpadeo).
+  const _tbSoap=document.getElementById('soap-topbar-meta');
+  if(_tbSoap){
+    const _nom=String(p.name||'').split(' ')[0];
+    _tbSoap.textContent=(_tieneEps&&!editingSoapId&&!editingSoapEsHistorico)
+      ? `${_nom} · Sesión ${(p.numSesionEpisodioActual||0)+1} · Ep ${(p.motivoActualIndex||0)+1} · ${totalPrevias+1}ª visita`
+      : `${_nom} · Sesión ${sesNum}${(()=>{const t=parseInt(p.planTto?.sesiones);return(t&&t>0)?' de '+t:''})()}`;
   }
   c.innerHTML=alertaPrecaucion+`
   <!-- ENCABEZADO -->
