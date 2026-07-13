@@ -11203,11 +11203,21 @@ function _RPT_numEva(v){
   var n=parseInt(String(v).replace(/\/.*$/,''),10);
   return isNaN(n)?null:n;
 }
+// FIX EVA (A1): par sentinel evaI=5 & evaF=3 simultáneos = sliders NO tocados (defaults del
+// formulario) → NO es dato clínico. Mismo criterio que la tendencia IA (serie P1).
+function _RPT_esSentinelEva(s){ return !!s && Number(s.evaI)===5 && Number(s.evaF)===3; }
 function _RPT_evaDeSesion(s){
   if(!s) return null;
+  // 1) eva explícito (objeto final/inicio o número) — máxima confianza
   var e=s.eva;
-  if(e && typeof e==='object'){ var f=_RPT_numEva(e.final); var i=_RPT_numEva(e.inicio); return f!=null?f:i; }
+  if(e && typeof e==='object'){ var f=_RPT_numEva(e.final); var i=_RPT_numEva(e.inicio); if(f!=null||i!=null) return f!=null?f:i; }
   var n=_RPT_numEva(e); if(n!=null) return n;
+  // 2) FIX EVA (A1): evaF/evaI de los sliders (donde guardarSOAP puntúa) — excluyendo el sentinel 5/3
+  if(!_RPT_esSentinelEva(s)){
+    var sf=_RPT_numEva(s.evaF); if(sf!=null) return sf;
+    var si=_RPT_numEva(s.evaI); if(si!=null) return si;
+  }
+  // 3) parse de texto ("N/10" o "eva: N") — último recurso
   var txt=(((s.s&&s.s.dolor)||'')+' '+(s.textoOriginal||''));
   var m=txt.match(/(\d{1,2})\s*\/\s*10/); if(m){ var v=parseInt(m[1],10); if(v>=0&&v<=10) return v; }
   m=txt.match(/eva\s*[:=]?\s*(\d{1,2})/i); if(m){ var v2=parseInt(m[1],10); if(v2>=0&&v2<=10) return v2; }
@@ -14287,14 +14297,28 @@ function generarGraficaEVA(p){
   const _ses=obtenerSesiones(p);
   if(_ses===null) return '<div style="padding:14px;font-size:12px;color:var(--gray-400);text-align:center">⏳ Cargando gráfica de dolor…</div>';
   const toNum=v=>{ const n=Number(v); return isNaN(n)?null:n; };
-  // Históricos leen de Firestore (FST_fetchSesiones no devuelve motivoIndex) → no filtrar por episodio: mostrar todas.
-  const _esMig=String(p.id||'').startsWith('mig_pac_');
-  const _tieneEp=!_esMig && Array.isArray(p.motivosAnteriores)&&p.motivosAnteriores.length>0;
-  const _soapFilt=_tieneEp?_ses.filter(s=>typeof s.motivoIndex==='number'&&s.motivoIndex===(p.motivoActualIndex||0)):_ses;
-  const sesiones=_soapFilt.map((s,i)=>({
+  // FIX EVA (A2): guard _esMig ELIMINADO — su comentario ("FST_fetchSesiones no devuelve
+  // motivoIndex") quedó obsoleto: la línea ~162 SÍ lo mapea desde SOAP-E2. Ahora históricos
+  // con episodios también filtran por episodio ACTIVO con el MISMO criterio del reporte
+  // (_RPT_filtrarPorEpisodio): s.motivoIndex===motivoActualIndex con fallback ep-0.
+  const _tieneEp=Array.isArray(p.motivosAnteriores)&&p.motivosAnteriores.length>0;
+  const _miDe=s=>(s&&typeof s.motivoIndex==='number')?s.motivoIndex:0; // fallback ep-0 (igual que el reporte)
+  const _soapFilt=_tieneEp?_ses.filter(s=>_miDe(s)===(p.motivoActualIndex||0)):_ses;
+  // FIX EVA (A4): ordenar por FECHA CLÍNICA (mismo criterio que el reporte, 11237) — el orden
+  // por num/array se distorsiona cuando las fechas se corrigieron después (cola de revisión).
+  // Empate o fecha no parseable → conserva el orden original (índice como desempate estable).
+  const _ordenadas=_soapFilt.map((s,ix)=>({s:s,ix:ix})).sort((a,b)=>{
+    const da=(typeof parseFechaClinicaSegura==='function')?parseFechaClinicaSegura(a.s.fecha||a.s.date||a.s.fechaHoraISO):null;
+    const db=(typeof parseFechaClinicaSegura==='function')?parseFechaClinicaSegura(b.s.fecha||b.s.date||b.s.fechaHoraISO):null;
+    if(da&&db&&da.getTime()!==db.getTime()) return da-db;
+    return a.ix-b.ix;
+  }).map(x=>x.s);
+  const sesiones=_ordenadas.map((s,i)=>({
     num:_tieneEp?(s.numEpisodio||i+1):(i+1),
-    ei: toNum(s.evaI ?? s.eva?.inicial ?? s.evaInicial),
-    ef: toNum(s.evaF ?? s.eva?.final ?? s.evaFinal)
+    // FIX EVA (A3): excluir el par sentinel evaI=5 & evaF=3 (sliders no tocados) — mismo
+    // filtro que la tendencia IA (serie P1). Elimina las falsas caídas 5→3 de la curva.
+    ei: (Number(s.evaI)===5&&Number(s.evaF)===3)?null:toNum(s.evaI ?? s.eva?.inicial ?? s.evaInicial),
+    ef: (Number(s.evaI)===5&&Number(s.evaF)===3)?null:toNum(s.evaF ?? s.eva?.final ?? s.evaFinal)
   })).filter(s=>s.ei!==null||s.ef!==null);
   if(sesiones.length<2) return '';
   const W=320,H=160,padL=28,padB=24,padT=12,padR=12;
