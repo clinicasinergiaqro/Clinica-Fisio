@@ -7862,10 +7862,34 @@ function _resolverPaciente(pid){
 }
 
 // I-G — Persiste estudiosDocs según tipo de paciente. Activo → saveDB (Sheet). Histórico → Firestore merge (NO toca el Sheet).
+// FIX estudios-activos-sync: unión con dedup de dos listas de estudiosDocs (local + remota).
+// Clave por id → url → fbPath → descripcion|fecha; el LOCAL gana en empate (conserva
+// reclasificaciones/resúmenes locales). Sin id ni claves → se incluye (no se pierde). Unión pura.
+function _fusionarEstudiosDocs(local, remoto){
+  var out=[], vistos={};
+  function key(e){ return String((e&&e.id) || (e&&e.url) || (e&&e.fbPath) || ((e&&e.descripcion||'')+'|'+(e&&e.fechaEstudio||'')) || ''); }
+  (Array.isArray(local)?local:[]).concat(Array.isArray(remoto)?remoto:[]).forEach(function(e){
+    if(!e) return; var k=key(e); if(!k){ out.push(e); return; } if(vistos[k]) return; vistos[k]=1; out.push(e);
+  });
+  return out;
+}
 async function _persistirEstudios(p){
   if (patientsDB.some(function(x){ return x.id===p.id; })) {
-    return await saveDB('pts',[p]);                                  // activo: igual que hoy
+    // ACTIVO: la fuente sigue siendo Sheets (SIN estudiosDocs — no se toca pLimpio).
+    var r = await saveDB('pts',[p]);
+    // FIX estudios-activos-sync: además, estudiosDocs a Firestore (backend COMPARTIDO entre equipos;
+    // NUNCA a Sheets). Best-effort: si Firestore no responde, el guardado de Sheets ya fue válido.
+    try {
+      var okA = (typeof FST_init==='function') ? await FST_init() : false;
+      if (okA && window._fstDb) {
+        await window._fstDb.collection('pacientes').doc(p.id).set(
+          { estudiosDocs: Array.isArray(p.estudiosDocs)?p.estudiosDocs:[] }, { merge:true }
+        );
+      }
+    } catch(e){ console.warn('[estudios-sync] Firestore activo falló (Sheets OK):', e&&e.message); }
+    return r;
   }
+  // HISTÓRICO (mig_pac_): Firestore es la fuente — igual que hoy.
   var initOk = (typeof FST_init==='function') ? await FST_init() : false;
   if (!initOk || !window._fstDb) throw new Error('Firestore no disponible');
   await window._fstDb.collection('pacientes').doc(p.id).set(
@@ -7955,13 +7979,28 @@ async function FST_renderEstudiosApartado(pid){
   try {
     var p = _resolverPaciente(pid);
     if (!p) { box.innerHTML=''; return; }
-    // I-G: histórico → cargar estudiosDocs persistidos en Firestore (evita perderlos en el próximo alta)
-    if (!patientsDB.some(function(x){ return x.id===pid; }) && window._fstDb) {
+    // Cargar estudiosDocs desde Firestore (backend compartido):
+    //  · HISTÓRICO → Firestore es la fuente (comportamiento previo, overwrite).
+    //  · ACTIVO (FIX estudios-activos-sync) → FUSIONAR remoto + local (unión con dedup, sin overwrite
+    //    ciego) y, si la fusión amplía lo que hay en Firestore, escribir de vuelta la unión → así abrir
+    //    el expediente de un activo propaga sus estudios locales a los demás equipos.
+    if (window._fstDb) {
+      var esActivo = patientsDB.some(function(x){ return x.id===pid; });
       try {
         var dsnap = await window._fstDb.collection('pacientes').doc(pid).get();
         var fe = (dsnap.data()||{}).estudiosDocs;
-        if (Array.isArray(fe)) p.estudiosDocs = fe;
-      } catch(e){ console.warn('[I-G] carga estudiosDocs histórico:', e.message); }
+        if (esActivo) {
+          var remoto = Array.isArray(fe) ? fe : [];
+          var fusion = _fusionarEstudiosDocs(Array.isArray(p.estudiosDocs)?p.estudiosDocs:[], remoto);
+          p.estudiosDocs = fusion;
+          if (fusion.length > remoto.length) { // local aportó estudios que faltaban en la nube → propagar
+            try { await window._fstDb.collection('pacientes').doc(pid).set({ estudiosDocs: fusion }, { merge:true }); }
+            catch(e){ console.warn('[estudios-sync] write-back activo:', e&&e.message); }
+          }
+        } else {
+          if (Array.isArray(fe)) p.estudiosDocs = fe;
+        }
+      } catch(e){ console.warn('[estudios-sync] carga estudiosDocs:', e&&e.message); }
     }
     var manuales = (Array.isArray(p.estudiosDocs) ? p.estudiosDocs : []).map(function(e){ return Object.assign({ origen:'manual' }, e); });
     var enNota = await _FST_extraerEstudiosDeNotas(p);
