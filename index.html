@@ -11655,6 +11655,31 @@ function _RPT_armarPayloadCorto(p, sesiones){
 }
 
 // Slice 3 · Síntesis IA bajo demanda (~$0.003). Cachea por hash; Firestore-only para mig_pac_*.
+// FIX reportes-ia-activos-sync: unión de dos listas de reportesClinicosIA (local + remota).
+// Clave por hashEntradas (o id). En COLISIÓN gana el validado; si empatan, el generadoEn más
+// reciente. Conserva un reporte por hash (con episodios, uno por episodio). Sin clave → se incluye.
+function _fusionarReportesIA(local, remoto){
+  var map={}, orden=[], sinClave=[];
+  function mejor(a,b){
+    var av=a&&a.validado?1:0, bv=b&&b.validado?1:0;
+    if(bv>av) return b; if(av>bv) return a;
+    var ag=String((a&&a.generadoEn)||''), bg=String((b&&b.generadoEn)||'');
+    return (bg>ag)?b:a;
+  }
+  function tomar(e){
+    if(!e) return;
+    var k=String(e.hashEntradas||e.id||'');
+    if(!k){ sinClave.push(e); return; }
+    if(map[k]===undefined){ map[k]=e; orden.push(k); } else { map[k]=mejor(map[k],e); }
+  }
+  (Array.isArray(local)?local:[]).forEach(tomar);
+  (Array.isArray(remoto)?remoto:[]).forEach(tomar);
+  return orden.map(function(k){ return map[k]; }).concat(sinClave);
+}
+// Firma order-independiente (hash|generadoEn|validado) para decidir write-back sin churn.
+function _sigReportesIA(arr){
+  return (Array.isArray(arr)?arr:[]).map(function(e){ return String((e&&e.hashEntradas)||(e&&e.id)||'')+'|'+String((e&&e.generadoEn)||'')+'|'+((e&&e.validado)?'1':'0'); }).sort().join(';');
+}
 async function RPT_generarSintesisIA(pid){
   if (!currentUser || (currentUser.role !== 'supervisor' && currentUser.name !== 'CARLOS')) {
     showToast('Solo el supervisor puede generar síntesis IA', 'warn');
@@ -11689,12 +11714,18 @@ async function RPT_generarSintesisIA(pid){
     var idx=p.reportesClinicosIA.findIndex(function(x){ return x.hashEntradas===hash; });
     if(idx>=0) p.reportesClinicosIA[idx]=entrada; else p.reportesClinicosIA.push(entrada);
 
-    // Persistir — guard-safe: histórico → Firestore; activo → saveDB
+    // Persistir — guard-safe: histórico → Firestore; activo → saveDB + Firestore (compartido)
     if(String(p.id||'').startsWith('mig_pac_')){
       if(typeof FST_init==='function') await FST_init();
       await window._fstDb.collection('pacientes').doc(p.id).set({ reportesClinicosIA:p.reportesClinicosIA }, { merge:true });
     } else {
       await saveDB('pts', [p]);
+      // FIX reportes-ia-activos-sync: reportesClinicosIA a Firestore (backend COMPARTIDO; NUNCA a Sheets).
+      // Best-effort: si Firestore no responde, el guardado a Sheets (sin este campo) ya fue válido.
+      try {
+        var okR=(typeof FST_init==='function')?await FST_init():false;
+        if(okR && window._fstDb) await window._fstDb.collection('pacientes').doc(p.id).set({ reportesClinicosIA:p.reportesClinicosIA }, { merge:true });
+      } catch(e){ console.warn('[reportes-ia-sync] Firestore activo falló (Sheets OK) · pid='+p.id+':', e&&e.message); }
     }
     showToast('🧠 Síntesis generada','success');
     RPT_pintarPestanaReporte(pid, _filtroSint); // FASE C: re-render conservando el episodio seleccionado
@@ -11791,14 +11822,30 @@ async function RPT_pintarPestanaReporte(pid, filtroEpisodio){
   try{
     var p=_resolverPaciente(pid);
     if(!p){ root.innerHTML='<div style="padding:16px;color:var(--red)">Paciente no encontrado</div>'; return; }
-    // Histórico: hidratar estudiosDocs + reportesClinicosIA desde Firestore (solo lectura)
-    if(!patientsDB.some(function(x){ return x.id===pid; }) && window._fstDb){
+    // Hidratar desde Firestore (backend compartido):
+    //  · HISTÓRICO → Firestore es la fuente (overwrite, comportamiento previo).
+    //  · ACTIVO (FIX reportes-ia-activos-sync) → FUSIONAR reportesClinicosIA (unión por hashEntradas;
+    //    en colisión gana validado y, si empatan, el generadoEn más reciente) y write-back si la
+    //    fusión cambia lo de la nube → abrir el reporte propaga las síntesis a los demás equipos.
+    //    estudiosDocs de activos NO se toca aquí (lo maneja FST_renderEstudiosApartado).
+    if(window._fstDb){
+      var esActivoR = patientsDB.some(function(x){ return x.id===pid; });
       try{
         var ds=await window._fstDb.collection('pacientes').doc(pid).get();
         var dd=ds.data()||{};
-        if(Array.isArray(dd.estudiosDocs)) p.estudiosDocs=dd.estudiosDocs;
-        if(Array.isArray(dd.reportesClinicosIA)) p.reportesClinicosIA=dd.reportesClinicosIA;
-      }catch(e){ console.warn('[RPT] hidratar histórico:', e.message); }
+        if(esActivoR){
+          var remotoR = Array.isArray(dd.reportesClinicosIA)?dd.reportesClinicosIA:[];
+          var fusionR = _fusionarReportesIA(Array.isArray(p.reportesClinicosIA)?p.reportesClinicosIA:[], remotoR);
+          p.reportesClinicosIA = fusionR;
+          if(_sigReportesIA(fusionR)!==_sigReportesIA(remotoR)){
+            try{ await window._fstDb.collection('pacientes').doc(pid).set({ reportesClinicosIA:fusionR }, { merge:true }); }
+            catch(e){ console.warn('[reportes-ia-sync] write-back activo · pid='+pid+':', e&&e.message); }
+          }
+        } else {
+          if(Array.isArray(dd.estudiosDocs)) p.estudiosDocs=dd.estudiosDocs;
+          if(Array.isArray(dd.reportesClinicosIA)) p.reportesClinicosIA=dd.reportesClinicosIA;
+        }
+      }catch(e){ console.warn('[RPT] hidratar · pid='+pid+':', e&&e.message); }
     }
     var sesiones=await _RPT_obtenerSesionesDedup(pid);
     // SOAP-E2 + FASE C: filtro por episodio con helper compartido y fallback ep-0.
