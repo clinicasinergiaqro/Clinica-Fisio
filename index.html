@@ -7886,7 +7886,7 @@ async function _persistirEstudios(p){
           { estudiosDocs: Array.isArray(p.estudiosDocs)?p.estudiosDocs:[] }, { merge:true }
         );
       }
-    } catch(e){ console.warn('[estudios-sync] Firestore activo falló (Sheets OK):', e&&e.message); }
+    } catch(e){ console.warn('[estudios-sync] Firestore activo falló (Sheets OK) · pid='+p.id+':', e&&e.message); }
     return r;
   }
   // HISTÓRICO (mig_pac_): Firestore es la fuente — igual que hoy.
@@ -7995,12 +7995,12 @@ async function FST_renderEstudiosApartado(pid){
           p.estudiosDocs = fusion;
           if (fusion.length > remoto.length) { // local aportó estudios que faltaban en la nube → propagar
             try { await window._fstDb.collection('pacientes').doc(pid).set({ estudiosDocs: fusion }, { merge:true }); }
-            catch(e){ console.warn('[estudios-sync] write-back activo:', e&&e.message); }
+            catch(e){ console.warn('[estudios-sync] write-back activo · pid='+pid+':', e&&e.message); }
           }
         } else {
           if (Array.isArray(fe)) p.estudiosDocs = fe;
         }
-      } catch(e){ console.warn('[estudios-sync] carga estudiosDocs:', e&&e.message); }
+      } catch(e){ console.warn('[estudios-sync] carga estudiosDocs · pid='+pid+':', e&&e.message); }
     }
     var manuales = (Array.isArray(p.estudiosDocs) ? p.estudiosDocs : []).map(function(e){ return Object.assign({ origen:'manual' }, e); });
     var enNota = await _FST_extraerEstudiosDeNotas(p);
