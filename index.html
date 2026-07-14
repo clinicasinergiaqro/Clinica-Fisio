@@ -3656,7 +3656,7 @@ async function _marcarCitaResuelta(nombre, fecha){
 }
 function _triangularCitasNotas(eventos, resueltos, ultimaHist, asigMap, resueltas){
   var porTer={};
-  Object.keys(TERAPEUTA_CAL2COD).forEach(function(n){ porTer[n]={citas:0, conNota:0, sinNota:0, resueltas:0, sinNotaPacs:[], noIdentificados:0, noIdentPacs:[]}; });
+  Object.keys(TERAPEUTA_CAL2COD).forEach(function(n){ porTer[n]={citas:0, conNota:0, sinNota:0, resueltas:0, sinNotaPacs:[], noIdentificados:0, noIdentPacs:[], atendidasOtro:[]}; });
   var porDia={};   // VISTA-SEMANAL: desglose por día DD/MM/YYYY (mismo universo que la tabla: citas con terapeuta)
   var vistosSinNota={};
   (Array.isArray(eventos)?eventos:[]).forEach(function(ev){
@@ -3667,9 +3667,11 @@ function _triangularCitasNotas(eventos, resueltos, ultimaHist, asigMap, resuelta
     var ddmm=_ddmmDeISOEvento(ev.inicio);
     var r=(resueltos||{})[clave]||{pid:null,tipo:null};
     // V2: nota POR PACIENTE — cualquier terapeuta cuenta (p.soap no se filtra por terapeuta)
-    var tiene=false;
+    var tiene=false, sMatch=null;
     if(r.tipo==='activo' && r.p){
-      tiene=(Array.isArray(r.p.soap)?r.p.soap:[]).some(function(s){ return s && s.fecha===ddmm; });
+      // AUTORÍA: .find (no .some) para tener a la mano la sesión que casó la fecha (terapeuta/atendidoPor).
+      sMatch=(Array.isArray(r.p.soap)?r.p.soap:[]).find(function(s){ return s && s.fecha===ddmm; })||null;
+      tiene=!!sMatch;
     } else if(r.tipo==='historico'){
       tiene=!!(ddmm && ultimaHist && ultimaHist[clave]===ddmm);
     }
@@ -3683,7 +3685,22 @@ function _triangularCitasNotas(eventos, resueltos, ultimaHist, asigMap, resuelta
       if(tiene||resuelta) dd.conNota++; else if(r.pid) dd.sinNota++;
     }
     porTer[ter].citas++;
-    if(tiene){ porTer[ter].conNota++; }
+    if(tiene){
+      porTer[ter].conNota++;
+      // AUTORÍA: la cita con nota SIGUE contando ✅ (nunca 🔴). Solo AÑADE una etiqueta informativa
+      // cuando quien atendió/escribió la nota difiere del terapeuta del calendario. Degrada suave:
+      // sin sesión a la mano (históricos) o sin autor conocido → no marcar (asumir que coincide).
+      if(sMatch){
+        var calCod=String(TERAPEUTA_CAL2COD[ter]||'').toUpperCase();
+        var escrito=(Array.isArray(sMatch.atendidoPor)&&sMatch.atendidoPor.length)?sMatch.atendidoPor:(sMatch.terapeuta?[sMatch.terapeuta]:[]);
+        var validCods=Object.keys(TERAPEUTA_CAL2COD).map(function(k){ return TERAPEUTA_CAL2COD[k]; });
+        var codsCon=escrito.map(function(x){ return String(x||'').toUpperCase(); }).filter(function(c){ return validCods.indexOf(c)!==-1; });
+        // Solo si hay autor(es) conocido(s) y NINGUNO es el terapeuta del calendario.
+        if(calCod && codsCon.length && codsCon.indexOf(calCod)===-1){
+          porTer[ter].atendidasOtro.push({nombre:ev.paciente||'(sin nombre)', fecha:ddmm, atendioPor:escrito.join(', ')});
+        }
+      }
+    }
     else if(resuelta){ porTer[ter].conNota++; porTer[ter].resueltas++; }
     else if(!r.pid){
       // EXACTITUD: nombre de calendario sin expediente → "🔎 Revisar", NO cuenta como falta.
@@ -4000,6 +4017,23 @@ function _rendimientoHTML(datos, noId, ventana, etiqueta, aviso, refresco, tri){
   var seccionRevisar=bloquesRevisar
     ? '<div style="margin-top:12px"><div style="font-size:12px;font-weight:800;color:#92400E">🔎 Revisar — '+totalRevisar+' cita'+(totalRevisar!==1?'s':'')+' sin identificar <span style="font-weight:400;color:var(--gray-500)">(no cuentan como falta; vincula para resolver)</span></div>'+bloquesRevisar+'</div>'
     : '';
+  // AUTORÍA: citas CON nota (✅) escritas/atendidas por alguien distinto al terapeuta del calendario.
+  // Solo informativo — no cambia el conteo. Casi siempre vacío (excepción rara de cruce de agenda).
+  var bloquesAutoria=Object.keys(TERAPEUTA_CAL2COD).map(function(n){
+    var t=tri[n];
+    if(!t || !t.atendidasOtro || !t.atendidasOtro.length) return '';
+    var c=(typeof AGENDA_COLORES!=='undefined'&&AGENDA_COLORES[n])?AGENDA_COLORES[n]:'#9BA3B5';
+    var chips=t.atendidasOtro.map(function(x){
+      return '<span style="white-space:nowrap;display:inline-block;font-size:11px;font-weight:700;border-radius:10px;padding:4px 10px;margin:2px;border:1px solid #C7D2FE;background:#EEF2FF;color:#3730A3">✅ '
+        +escapeHTML(x.nombre)+' <span style="font-weight:400">— atendida por '+escapeHTML(x.atendioPor)+'</span></span>';
+    }).join('');
+    return '<div style="margin-top:8px;border-left:4px solid '+c+';padding-left:8px">'
+      +'<div style="font-size:12px;font-weight:800;color:'+c+'">'+escapeHTML(n)+' — '+t.atendidasOtro.length+' atendida'+(t.atendidasOtro.length!==1?'s':'')+' por otro</div>'
+      +'<div style="margin-top:2px">'+chips+'</div></div>';
+  }).join('');
+  var seccionAutoria=bloquesAutoria
+    ? '<div style="margin-top:12px"><div style="font-size:12px;font-weight:800;color:#3730A3">👥 Atendidas por otro terapeuta <span style="font-weight:400;color:var(--gray-500)">(cuenta como ✅; solo informa quién la atendió)</span></div>'+bloquesAutoria+'</div>'
+    : '';
   // VISTA-SEMANAL: una columna por día (Lun..Vie; Sáb/Dom solo si tienen citas). Días futuros = "por venir".
   var bloqueSemana='';
   if(ventana==='semana' && tri._porDia && Array.isArray(tri._diasDDMM)){
@@ -4053,6 +4087,7 @@ function _rendimientoHTML(datos, noId, ventana, etiqueta, aviso, refresco, tri){
     +'<tbody>'+filas+'</tbody></table></div>'
     +seccionSinNota
     +seccionRevisar
+    +seccionAutoria
     +filaSA+bloqueNI
     +'<div style="font-size:10px;color:var(--gray-400);margin-top:10px">✅/🔴 por PACIENTE y día: nota fechada el día exacto de la cita, sin importar qué terapeuta la escribió (activos por expediente; históricos por ultimaSesionLive). ✅ incluye citas resueltas a mano con ✓. Score = calidad promedio de nota (0-100) de pacientes activos.</div>';
 }
