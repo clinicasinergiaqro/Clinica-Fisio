@@ -6869,6 +6869,11 @@ async function guardarSOAP(){
       if(_esTextoLibreHist) compararH('textoOriginal',notaH.textoOriginal,v('f-soap-textoriginal'));
       const histH=Array.isArray(notaH.historialEdiciones)?[...notaH.historialEdiciones]:[];
       if(snH.cambios.length>0) histH.push(snH);
+      // FIX media-edición: media al editar histórica. datosNota.media ya trae la existente
+      // (precargada en editarSoapHistorico) + la nueva. Mismo strip data:null que FST_buildSesionPayload.
+      // sesionUpdateOK YA permite 'media' → set(merge) la escribe sin tocar reglas.
+      var _mediaH=(Array.isArray(datosNota.media)&&datosNota.media.length)?datosNota.media
+                 :((Array.isArray(notaH.media)&&notaH.media.length)?notaH.media:null);
       const payloadH={
         s:datosNota.s, o:datosNota.o, a:datosNota.a, p:datosNota.p,
         evaI:datosNota.evaI, evaF:datosNota.evaF,
@@ -6878,6 +6883,11 @@ async function guardarSOAP(){
         revisionPendiente:false,
         textoOriginal:_esTextoLibreHist?v('f-soap-textoriginal'):(notaH.textoOriginal||''),
         historialEdiciones:histH,
+        ...(_mediaH ? { media:_mediaH.map(function(m){ return {
+          mediaId:(m&&(m.mediaId||m.id))||'', name:(m&&m.name)||'', label:(m&&m.label)||'',
+          type:(m&&m.type)||'', fecha:(m&&m.fecha)||'',
+          url:(m&&m.url)||'', fbPath:(m&&m.fbPath)||'', data:null
+        }; }) } : {}),
         updatedAt:new Date().toISOString()
       };
       const cacheList=_fstSesionesCache[pidH];
@@ -6887,6 +6897,14 @@ async function guardarSOAP(){
       }
       editingSoapId=null; editingSoapPid=null; editingSoapEsHistorico=false; _editingSoapHistoricoNota=null;
       tempEvolMedia=[];
+      // FIX media-edición: espejar a Estudios y persistir estudiosDocs. Esta rama NO llama saveDB
+      // (usa _guardarEdicionSoapHistorico, que solo toca el doc de la sesión), así que el espejo
+      // al doc del paciente se persiste aparte con _persistirEstudios (histórico → Firestore merge).
+      // Idempotente: el dedup del espejo evita duplicar la media ya reflejada.
+      try{
+        var _nEsp = _espejarSoapMediaAEstudios_(p, {id:sidH, fecha:fechaH, media:_mediaH||[]});
+        if(_nEsp>0 && typeof _persistirEstudios==='function'){ _persistirEstudios(p).catch(function(e){ console.warn('[media-edición] estudiosDocs hist no persistió:', e&&e.message); }); }
+      }catch(_e){ console.warn('[media-edición] espejo hist falló:', _e&&_e.message); }
       // 1.1 fix — persistir ANTES de navegar; Firestore es el ÚNICO almacén del histórico.
       // FIX 2 — offline: Firestore NO rechaza sin conexión (deja el write pendiente/colgado) → el catch
       // nunca dispararía. Detectar offline y encolar directo. Online: intentar con timeout de 10s.
@@ -6954,6 +6972,8 @@ async function guardarSOAP(){
     // LOOP4: preservar modoNota original si no se seleccionó uno nuevo al editar
     if(!datosNota.modoNota && notaAnterior.modoNota) datosNota.modoNota = notaAnterior.modoNota;
     if((!Array.isArray(datosNota.atendidoPor)||!datosNota.atendidoPor.length) && Array.isArray(notaAnterior.atendidoPor)) datosNota.atendidoPor = notaAnterior.atendidoPor;
+    // FIX media-edición: defensa anti-WIPE — si el form quedó sin media pero la nota tenía, conservar la previa (mismo patrón que modoNota/atendidoPor)
+    if((!Array.isArray(datosNota.media)||!datosNota.media.length) && Array.isArray(notaAnterior.media) && notaAnterior.media.length) datosNota.media = notaAnterior.media;
     if(terapeutaFmt) datosNota.terapeuta = terapeutaFmt;
     p.soap[idx]={...notaAnterior, ...datosNota, historialEdiciones:notaAnterior.historialEdiciones};
     p.soap[idx].fecha = fechaConsultaFmt; // FECHA EDITABLE: usar la fecha del campo (puede corregirse al editar)
@@ -6963,6 +6983,7 @@ async function guardarSOAP(){
     p.fechaActualizacion=todayFmt();
     p.ultimoUsuario=ter;
     tempEvolMedia=[];
+    _espejarSoapMediaAEstudios_(p, p.soap[idx]); // FIX media-edición: espejar a Estudios también al editar (idempotente; propaga a FS por la fusión de la pestaña Estudios, igual que la nota nueva)
     saveDB('pts',[p]).then(res=>{
       showToast(res?.ok?'✅ Nota SOAP actualizada':'⚠️ Actualizada local, Sheets pendiente',res?.ok?'success':'warning');
       if (res?.ok === true && typeof FST_guardarSesionFirestore === 'function') FST_guardarSesionFirestore(p, p.soap[idx], 'edicion').catch(()=>{});
@@ -7103,7 +7124,7 @@ function editarSOAP(soapId){
   tempMods=Array.isArray(nota.modalidades)?[...nota.modalidades]:[];
   tempEvaI=nota.evaI??5;
   tempEvaF=nota.evaF??3;
-  tempEvolMedia=[];
+  tempEvolMedia=Array.isArray(nota.media)?nota.media.map(m=>({...m})):[]; // FIX media-edición: precargar media existente (evita WIPE al guardar)
 
   // Actualizar topbar
   const totalSes=parseInt(p.planTto?.sesiones);
@@ -7169,6 +7190,7 @@ function editarSOAP(soapId){
     // Cambiar título del botón guardar
     const btnGuardar=document.querySelector('[onclick="guardarSOAP()"]');
     if(btnGuardar) btnGuardar.textContent='💾 Guardar cambios';
+    _pintarSoapMediaPreview(); // FIX media-edición: mostrar la media ya adjunta a la nota
     limpiarDirty(); // recién precargado: aún no hay cambios del usuario
   },150);
 }
@@ -7187,7 +7209,7 @@ async function editarSoapHistorico(sid, pid){
   tempMods=Array.isArray(nota.modalidades)?[...nota.modalidades]:[];
   tempEvaI=nota.evaI!=null?Number(nota.evaI):5;
   tempEvaF=nota.evaF!=null?Number(nota.evaF):3;
-  tempEvolMedia=[];
+  tempEvolMedia=Array.isArray(nota.media)?nota.media.map(function(m){return Object.assign({},m);}):[]; // FIX media-edición: precargar media existente de la nota histórica
   document.getElementById('soap-topbar-meta').textContent='✏️ Editando (histórico) — Sesión '+nota.num;
   screenStack.push('screen-soap'); showScreen('screen-soap',false);
   renderSOAPForm();
@@ -7226,6 +7248,7 @@ async function editarSoapHistorico(sid, pid){
     // Cambiar título del botón guardar
     var btnGuardar=document.querySelector('[onclick="guardarSOAP()"]');
     if(btnGuardar) btnGuardar.textContent='💾 Guardar cambios (histórico)';
+    _pintarSoapMediaPreview(); // FIX media-edición: mostrar la media ya adjunta a la nota histórica
     limpiarDirty();
   },150);
 }
@@ -7641,8 +7664,16 @@ async function handleSoapPhoto(ev,tipo){
     });
   }
   ev.target.value='';
+  _pintarSoapMediaPreview();
+}
+function removeSoapMedia(i){tempEvolMedia.splice(i,1);handleSoapPhoto({target:{files:[],value:''}},'_')}
+// FIX media-edición: preview de adjuntos SOAP reutilizable. Lo usan handleSoapPhoto y también
+// editarSOAP/editarSoapHistorico al precargar la media EXISTENTE de la nota (antes el form
+// arrancaba con tempEvolMedia=[] y al guardar borraba la media previa).
+function _pintarSoapMediaPreview(){
   const g=document.getElementById('soap-media-preview');
-  if(g) g.innerHTML=tempEvolMedia.map((f,i)=>`<div class="media-thumb">
+  if(!g) return;
+  g.innerHTML=tempEvolMedia.map((f,i)=>`<div class="media-thumb">
     ${f.type&&f.type.startsWith('image')?`<img src="${f.url||f.data}" loading="lazy" decoding="async">`:
       f.name&&f.name.endsWith('.pdf')?`<div style="width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:22px;gap:2px">📄<div style="font-size:8px;color:#5A6478">PDF</div></div>`:
       f.name&&(f.name.endsWith('.docx')||f.name.endsWith('.doc'))?`<div style="width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:22px;gap:2px">📝<div style="font-size:8px;color:#5A6478">Word</div></div>`:
@@ -7651,7 +7682,6 @@ async function handleSoapPhoto(ev,tipo){
     <button class="media-del" aria-label="Eliminar archivo" onclick="removeSoapMedia(${i})">×</button>
     <div class="media-label">${f.label}</div></div>`).join('');
 }
-function removeSoapMedia(i){tempEvolMedia.splice(i,1);handleSoapPhoto({target:{files:[],value:''}},'_')}
 // FIX SOAP-MEDIA (D) — Loop I-B: espeja los adjuntos de una nota SOAP recién guardada a p.estudiosDocs.
 // Solo referencias (url/fbPath), nunca base64. Dedup por mediaId/fbPath/url. Muta p ANTES del saveDB de
 // guardarSOAP, así la persistencia viaja en el mismo write (activos: localStorage; históricos: outCl
