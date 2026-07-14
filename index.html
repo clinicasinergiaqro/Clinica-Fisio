@@ -463,8 +463,8 @@ async function FST_guardarSesionFirestore(paciente, sesion, modo) {
     const pid = pidInfo.pid;
     const pacPayload = FST_buildPacientePayload(paciente, sesion, pidInfo);
     const sesPayload = FST_buildSesionPayload(sesion, modo);
-    await window._fstDb.collection('pacientes').doc(pid).set(pacPayload, { merge: true });
-    await window._fstDb.collection('pacientes').doc(pid).collection('sesiones').doc(sid).set(sesPayload, { merge: true });
+    await window._fstDb.collection('pacientes').doc(pid).set(_sinUndefined(pacPayload), { merge: true });
+    await window._fstDb.collection('pacientes').doc(pid).collection('sesiones').doc(sid).set(_sinUndefined(sesPayload), { merge: true });
     console.log('[FST] dual-write OK · modo=' + modo + ' · pid=' + pid + ' · sid=' + sid + ' · match=' + pidInfo.matchType);
     return { ok: true, pid: pid, sid: sid, matchType: pidInfo.matchType };
   } catch (e) {
@@ -1451,6 +1451,22 @@ async function saveDB(k, v){
   if(errores===0) return {ok:true, guardados};
   return {ok:false, error:`${errores} de ${lista.length} pacientes no se guardaron`, guardados};
 }
+// FUGA-HISTÓRICOS: Firestore RECHAZA cualquier set() que contenga un valor `undefined` a
+// CUALQUIER profundidad y explota el write ENTERO (permission NO tiene nada que ver). Si el
+// error se traga, el dato se pierde en silencio. Este helper elimina recursivamente las claves
+// con valor undefined antes de escribir. Preserva Date y los sentinels de Firestore
+// (serverTimestamp/FieldValue): solo recorre arrays y objetos PLANOS (constructor Object).
+function _sinUndefined(v){
+  if(Array.isArray(v)) return v.map(function(x){ return _sinUndefined(x); });
+  if(v && typeof v==='object' && (v.constructor===Object || v.constructor===undefined)){
+    var out={};
+    for(var k in v){
+      if(Object.prototype.hasOwnProperty.call(v,k) && v[k]!==undefined){ out[k]=_sinUndefined(v[k]); }
+    }
+    return out;
+  }
+  return v; // primitivos, Date, FieldValue (serverTimestamp), etc. → intactos
+}
 // v2 fix — persiste a Firestore los campos huérfanos de un histórico (mig_pac_) que saveDB tiraba.
 // DOS writes SEPARADOS al mismo doc (merge:true), obligatorio por las reglas:
 //   Write 1 (ejercicios)  → subconjunto de pacienteEjerciciosUpdateOK
@@ -1480,7 +1496,7 @@ async function _persistirHistoricoFirestore(p){
     if(p.ejerciciosLinkActivo!=null) outEj.ejerciciosLinkActivo = p.ejerciciosLinkActivo;
     if(p.reportesClinicosIA!=null)   outEj.reportesClinicosIA = p.reportesClinicosIA;
     if(Object.keys(outEj).length){
-      await ref.set(outEj, { merge:true }); // sin updatedAt (no pisar el serverTimestamp del dual-write SOAP)
+      await ref.set(_sinUndefined(outEj), { merge:true }); // sin updatedAt (no pisar el serverTimestamp del dual-write SOAP); _sinUndefined: Firestore no acepta undefined
     }
 
     // ── Write 2: CLÍNICOS (pasa pacienteClinicoUpdateOK v4) ──
@@ -1534,10 +1550,10 @@ async function _persistirHistoricoFirestore(p){
     if(Array.isArray(p.fotos))           outCl.fotos = p.fotos.map(_stripB64);
     if(Array.isArray(p.docs))            outCl.docs  = p.docs.map(_stripB64);
     if(Object.keys(outCl).length){
-      await ref.set(outCl, { merge:true }); // sin updatedAt (mismo criterio que Write 1)
+      await ref.set(_sinUndefined(outCl), { merge:true }); // sin updatedAt (mismo criterio que Write 1); _sinUndefined: Firestore no acepta undefined
     }
     return {ok:true}; // 1.2 fix — señalar éxito para que saveDB no reporte ok:true falso
-  }catch(e){ console.warn('[saveDB] persistir histórico falló:', p.id, e.message); return {ok:false, error:e.message}; }
+  }catch(e){ console.error('[saveDB] persistir histórico FALLÓ (dato NO guardado):', p.id, e && (e.code||''), e && e.message); return {ok:false, error:(e&&e.message)||'error'}; }
 }
 function loadDB(k){return loadLocal(k);}
 
@@ -8255,11 +8271,13 @@ async function _persistirDatosPaciente(p){
   }
   var initOk = (typeof FST_init==='function') ? await FST_init() : false;
   if (!initOk || !window._fstDb) throw new Error('Firestore no disponible');
+  // _sinUndefined: si p.age o p.name vienen undefined (histórico migrado sin edad), Firestore
+  // reventaba el write ENTERO ("Unsupported field value: undefined in field age") y se perdía todo.
   await window._fstDb.collection('pacientes').doc(p.id).set(
-    { name: p.name, nombreNormalizado: p.nombreNormalizado || FST_normalizarNombreLive(p.name||''),
+    _sinUndefined({ name: p.name, nombreNormalizado: p.nombreNormalizado || FST_normalizarNombreLive(p.name||''),
       age: p.age, telefono: p.telefono||'', terapeuta: p.terapeuta||'',
       // Loop editar-datos: sexo/fechaNacimiento/medicoReferente (ya en pacienteClinicoUpdateOK v12).
-      sexo: p.sexo||'', fechaNacimiento: p.fechaNacimiento||'', medicoReferente: p.medicoReferente||'' },
+      sexo: p.sexo||'', fechaNacimiento: p.fechaNacimiento||'', medicoReferente: p.medicoReferente||'' }),
     { merge:true }
   );
   return { ok:true, via:'firestore' };
@@ -8339,7 +8357,8 @@ async function _guardarEdicionPaciente(pid){
     var tm = document.getElementById('exp-topbar-meta'); if(tm) tm.textContent = (p.age!=null?p.age+' años · ':'')+(p.terapeuta||'');
     var av = document.getElementById('exp-avatar'); if(av) av.textContent = initials(p.name);
     if(typeof renderExpediente==='function') renderExpediente(currentTab||'historia');
-    showToast(ok?'✅ Datos actualizados':'⚠️ Guardado local, Sheets no confirmó', ok?'success':'warning');
+    var _esHistPac = String(p.id||'').startsWith('mig_pac_');
+    showToast(ok?'✅ Datos actualizados':(_esHistPac?'❌ No se pudo guardar en la nube — el cambio NO se guardó':'⚠️ Guardado local, Sheets no confirmó'), ok?'success':(_esHistPac?'error':'warning'));
   }catch(err){
     console.error('editarPaciente:', err);
     showToast('No se pudo guardar: '+((err&&err.message)||'error inesperado'), 'error');
@@ -10857,15 +10876,20 @@ function guardarEdicionHistoria(seccion, tabRetorno){
     despues: valorNuevo
   });
 
+  // Un histórico (mig_pac_) NO tiene almacén local ni Sheets: Firestore es su único destino.
+  // Si el write falla, el cambio NO se guardó → error ROJO, nunca "Guardado local OK" (sería mentira).
+  var esHist = String(p.id||'').startsWith('mig_pac_');
   saveDB('pts', [p]).then(res => {
     if(res && res.ok){
       showToast('✅ Cambios guardados — ' + fechaHora, 'success');
+    } else if(esHist){
+      showToast('❌ No se pudo guardar en la nube — el cambio NO se guardó. Reintenta o avisa a Carlos.', 'error');
     } else {
       showToast('⚠️ Guardado local OK, pero Sheets no confirmó. Revisa conexión.', 'warning');
     }
     renderExpediente(tabRetorno);
   }).catch(() => {
-    showToast('⚠️ Sin conexión — cambios guardados localmente.', 'warning');
+    showToast(esHist ? '❌ No se pudo guardar en la nube — el cambio NO se guardó.' : '⚠️ Sin conexión — cambios guardados localmente.', esHist ? 'error' : 'warning');
     renderExpediente(tabRetorno);
   });
 }
