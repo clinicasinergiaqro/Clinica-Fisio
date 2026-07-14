@@ -13056,12 +13056,12 @@ function initApp(){
   if(localStorage.getItem('modoOscuro')==='1') document.body.classList.add('modo-oscuro');
 }
 
-// ── AUTO-LOGOUT POR INACTIVIDAD (30 min) ─────────────────────────────────
+// ── AUTO-LOGOUT POR INACTIVIDAD (60 min) ─────────────────────────────────
 // Mecanismo por MARCA DE TIEMPO (no setTimeout congelable): en iPad, al
 // bloquearse la pantalla iOS congela los setTimeout; al desbloquear, un
 // setTimeout vencido disparaba y mandaba a login de inmediato (se percibía
 // como "<5 min"). Con setInterval + Date.now() se evalúa el tiempo REAL de
-// inactividad tras el sleep, así solo cierra si de verdad pasaron 30 min sin
+// inactividad tras el sleep, así solo cierra si de verdad pasaron 60 min sin
 // actividad. La política (guard de operación clínica, aviso previo, signOut +
 // login) no cambia; solo el mecanismo.
 let _autoLogoutInterval = null;
@@ -13079,8 +13079,8 @@ function hayOperacionClinicaCritica_(){
     );
   }catch(e){ return false; }
 }
-const AUTO_LOGOUT_MS = 30 * 60 * 1000;      // 30 minutos (equipo personal — riesgo de sesión heredada bajo)
-const AUTO_LOGOUT_WARN_MS = 29 * 60 * 1000; // aviso 1 min antes
+const AUTO_LOGOUT_MS = 60 * 60 * 1000;      // 60 minutos (sesión de fisio ~60 min; equipo personal, sin sesión heredada)
+const AUTO_LOGOUT_WARN_MS = 59 * 60 * 1000; // aviso 1 min antes
 const AUTO_LOGOUT_CHECK_MS = 30 * 1000;     // frecuencia de evaluación (timestamp, robusto a sleep de iOS)
 
 // Marca actividad: reinicia el conteo de inactividad y rehabilita el aviso previo.
