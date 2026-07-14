@@ -4527,6 +4527,7 @@ function _motivoVigenteDe(p){
     tieneEps:tieneEps, epNum:idx+1, fuente:snap?'episodio':'raiz',
     motivoConsulta:src.motivoConsulta||'',
     dx:(typeof src.dx==='string')?src.dx:'',
+    fechaInicio: src.fechaInicio || src.fechaCreacion || '',
     motivo:obj(src.motivo), valoracion:obj(src.valoracion),
     dxFuncional:obj(src.dxFuncional), planTto:obj(src.planTto)
   };
@@ -4989,6 +4990,7 @@ function renderExpediente(tab='historia'){
       <div class="section-title">💬 Motivo de consulta${_epSufijo}
         <button onclick="editarHistoria('motivo')" style="margin-left:auto;background:var(--navy);color:white;border:none;border-radius:20px;padding:3px 12px;font-size:11px;font-weight:700;cursor:pointer">✏️ Editar</button>
       </div>
+      <div class="field-row"><div class="field-label">Registrado</div><div class="field-value">${escapeHTML(mv.fechaInicio||p.fechaCreacion||p.date||'—')}</div></div>
       ${(mv.tieneEps&&!mv.capturado)
         ?`<div style="margin:10px 14px;font-size:13px;color:#92400E;background:#FEF3C7;border-radius:10px;padding:10px 12px">⚠️ Este episodio aún no tiene motivo capturado. Los motivos cerrados están en «Motivos anteriores».</div>`
         :`<div class="field-row"><div class="field-label">Dx médico</div><div class="field-value">${escapeHTML(mv.motivo.dxMedico)}</div></div>
