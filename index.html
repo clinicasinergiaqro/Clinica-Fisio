@@ -3688,7 +3688,7 @@ function _triangularCitasNotas(eventos, resueltos, ultimaHist, asigMap, resuelta
     else if(!r.pid){
       // EXACTITUD: nombre de calendario sin expediente → "🔎 Revisar", NO cuenta como falta.
       porTer[ter].noIdentificados++;
-      var kni=ter+'|'+clave+'|'+ddmm;
+      var kni='NI|'+ter+'|'+clave+'|'+ddmm;   // espacio de clave propio: nunca colisiona con sinNota real
       if(!vistosSinNota[kni]){
         vistosSinNota[kni]=true;
         porTer[ter].noIdentPacs.push({nombre:ev.paciente||'(sin nombre)', pid:r.pid, tipo:r.tipo, fecha:ddmm});
@@ -3696,7 +3696,7 @@ function _triangularCitasNotas(eventos, resueltos, ultimaHist, asigMap, resuelta
     }
     else {
       porTer[ter].sinNota++;
-      var kdup=ter+'|'+clave+'|'+ddmm;
+      var kdup='SN|'+ter+'|'+clave+'|'+ddmm;   // espacio de clave propio (simetría con NI|)
       if(!vistosSinNota[kdup]){
         vistosSinNota[kdup]=true;
         porTer[ter].sinNotaPacs.push({nombre:ev.paciente||'(sin nombre)', pid:r.pid, tipo:r.tipo, fecha:ddmm});
