@@ -1383,6 +1383,11 @@ async function saveDB(k, v){
       motivoConsulta:  p.motivoConsulta||'',
       seguridadClinica: p.seguridadClinica||{},
       motivosAnteriores: Array.isArray(p.motivosAnteriores)?p.motivosAnteriores:[],
+      // Loop puntero-activos: el puntero de episodio activo y su contador ahora VIAJAN a Sheets
+      // (antes solo vivían en memoria → otro equipo recalculaba mal el episodio activo).
+      motivoActualIndex: (typeof p.motivoActualIndex==='number' ? p.motivoActualIndex : (Array.isArray(p.motivosAnteriores)?p.motivosAnteriores.length:0)),
+      numSesionEpisodioActual: (typeof p.numSesionEpisodioActual==='number' ? p.numSesionEpisodioActual : 0),
+      fechaInicio: p.fechaInicio||'',
       etiquetas: Array.isArray(p.etiquetas)?p.etiquetas:[],
       consentimientoDatos: p.consentimientoDatos||{aceptado:false,fecha:null,hora:null,responsable:'',versionAviso:'v3.0',fechaVersionAviso:null,avisoLegalRevisado:false,medio:'app'},
       sexo: p.sexo || '',
@@ -1867,6 +1872,23 @@ function sanearPaciente(p){
   const toArr = v => Array.isArray(v)?v:(typeof v==='string'&&v.startsWith('[')?tryParse(v,[]):[]);
   const toObj = v => (v&&typeof v==='object'&&!Array.isArray(v))?v:(typeof v==='string'&&v.startsWith('{')?tryParse(v,null):null);
   const toStr = v => (typeof v==='string')?v:(v?String(v):'');
+  // Loop puntero-activos: saneo del puntero de episodio con fallback canónico (simetría con pLimpio).
+  // El episodio ACTIVO vive en la raíz → motivoActualIndex debe ser motivosAnteriores.length.
+  // Vacío / no numérico / colgante (>len) → fallback a length. numSesionEpisodioActual vacío →
+  // recomputar del conteo de sesiones del episodio activo (sin motivoIndex → episodio 0).
+  const _maLen = Array.isArray(p.motivosAnteriores) ? p.motivosAnteriores.length : 0;
+  const _maRaw = p.motivoActualIndex;
+  const _maNum = (_maRaw===''||_maRaw==null) ? NaN : Number(_maRaw);
+  const _motivoActualIndexSano = (isFinite(_maNum) && _maNum>=0 && _maNum<=_maLen) ? _maNum : _maLen;
+  const _nseaRaw = p.numSesionEpisodioActual;
+  const _nseaNum = (_nseaRaw===''||_nseaRaw==null) ? NaN : Number(_nseaRaw);
+  let _numSesEpSano;
+  if(isFinite(_nseaNum) && _nseaNum>=0){ _numSesEpSano = _nseaNum; }
+  else {
+    const _parseSoap = v => { if(Array.isArray(v)) return v; try{ return JSON.parse(v||'[]'); }catch{ return []; } };
+    const _soapAll = [..._parseSoap(p.soap), ..._parseSoap(p.soap2), ..._parseSoap(p.soap3)];
+    _numSesEpSano = _soapAll.filter(s => { const mi=(s&&typeof s.motivoIndex==='number')?s.motivoIndex:0; return mi===_motivoActualIndexSano; }).length;
+  }
   return Object.assign({}, p, {
     alergias:       typeof p.alergias==='string'?p.alergias:'Ninguna',
     contraindicaciones: typeof p.contraindicaciones==='string'?p.contraindicaciones:'Ninguna',
@@ -1924,6 +1946,10 @@ function sanearPaciente(p){
     })(),
     // Historial de motivos de consulta (compatible con pacientes viejos)
     motivosAnteriores: Array.isArray(p.motivosAnteriores)?p.motivosAnteriores:[],
+    // Loop puntero-activos: puntero de episodio saneado (lee de vuelta lo que pLimpio escribe) + fechaInicio.
+    motivoActualIndex: _motivoActualIndexSano,
+    numSesionEpisodioActual: _numSesEpSano,
+    fechaInicio: toStr(p.fechaInicio),
     etiquetas: Array.isArray(p.etiquetas)?p.etiquetas:[],
     // LOOP3A: sexo (NOM-004) compatible con pacientes antiguos
     sexo: p.sexo || '',
