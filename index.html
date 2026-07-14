@@ -13056,9 +13056,17 @@ function initApp(){
   if(localStorage.getItem('modoOscuro')==='1') document.body.classList.add('modo-oscuro');
 }
 
-// ── AUTO-LOGOUT POR INACTIVIDAD (20 min) ─────────────────────────────────
-let _autoLogoutTimer = null;
-let _autoLogoutWarnTimer = null;
+// ── AUTO-LOGOUT POR INACTIVIDAD (60 min) ─────────────────────────────────
+// Mecanismo por MARCA DE TIEMPO (no setTimeout congelable): en iPad, al
+// bloquearse la pantalla iOS congela los setTimeout; al desbloquear, un
+// setTimeout vencido disparaba y mandaba a login de inmediato (se percibía
+// como "<5 min"). Con setInterval + Date.now() se evalúa el tiempo REAL de
+// inactividad tras el sleep, así solo cierra si de verdad pasaron 60 min sin
+// actividad. La política (guard de operación clínica, aviso previo, signOut +
+// login) no cambia; solo el mecanismo.
+let _autoLogoutInterval = null;
+let _avisoInactividadMostrado = false;
+window._ultimaActividad = Date.now();
 function hayOperacionClinicaCritica_(){
   try{
     return !!(
@@ -13071,19 +13079,29 @@ function hayOperacionClinicaCritica_(){
     );
   }catch(e){ return false; }
 }
-const AUTO_LOGOUT_MS = 20 * 60 * 1000;      // 20 minutos
-const AUTO_LOGOUT_WARN_MS = 19 * 60 * 1000; // aviso 1 min antes
+const AUTO_LOGOUT_MS = 60 * 60 * 1000;      // 60 minutos (sesión de fisio ~60 min; equipo personal, sin sesión heredada)
+const AUTO_LOGOUT_WARN_MS = 59 * 60 * 1000; // aviso 1 min antes
+const AUTO_LOGOUT_CHECK_MS = 30 * 1000;     // frecuencia de evaluación (timestamp, robusto a sleep de iOS)
 
+// Marca actividad: reinicia el conteo de inactividad y rehabilita el aviso previo.
 function _resetAutoLogout(){
-  clearTimeout(_autoLogoutTimer);
-  clearTimeout(_autoLogoutWarnTimer);
+  window._ultimaActividad = Date.now();
+  _avisoInactividadMostrado = false;
+}
+
+// Evalúa la inactividad REAL por diferencia de timestamps (no depende de un
+// setTimeout que iOS pudo congelar mientras el iPad dormía).
+function _evaluarAutoLogout(){
   if(!currentUser) return; // solo si hay sesión activa
-  _autoLogoutWarnTimer = setTimeout(()=>{
+  const inactivo = Date.now() - (window._ultimaActividad || Date.now());
+  // Aviso 1 min antes (una sola vez por ciclo de inactividad).
+  if(!_avisoInactividadMostrado && inactivo >= AUTO_LOGOUT_WARN_MS && inactivo < AUTO_LOGOUT_MS){
+    _avisoInactividadMostrado = true;
     showToast('Tu sesión se cerrará en 1 minuto por inactividad','warning');
-  }, AUTO_LOGOUT_WARN_MS);
-  _autoLogoutTimer = setTimeout(async ()=>{
+  }
+  if(inactivo >= AUTO_LOGOUT_MS){
     if(typeof hayOperacionClinicaCritica_==='function' && hayOperacionClinicaCritica_()){
-      // Operación clínica activa — posponer y volver a revisar
+      // Operación clínica activa — posponer (re-arma el conteo completo) y revisar luego.
       showToast('Operación en curso — cierre de sesión pospuesto.','warning');
       _resetAutoLogout();
       return;
@@ -13091,7 +13109,7 @@ function _resetAutoLogout(){
     showToast('Sesión cerrada por inactividad','warning');
     try{ fbAuth.signOut(); }catch(e){}
     setTimeout(()=>showScreen('screen-login',false), 800);
-  }, AUTO_LOGOUT_MS);
+  }
 }
 
 let _autoLogoutEnganchado = false;
@@ -13103,11 +13121,13 @@ function _iniciarAutoLogout(){
     _autoLogoutEnganchado = true;
   }
   _resetAutoLogout();
+  clearInterval(_autoLogoutInterval);
+  _autoLogoutInterval = setInterval(_evaluarAutoLogout, AUTO_LOGOUT_CHECK_MS);
 }
 
 function _detenerAutoLogout(){
-  clearTimeout(_autoLogoutTimer);
-  clearTimeout(_autoLogoutWarnTimer);
+  clearInterval(_autoLogoutInterval);
+  _autoLogoutInterval = null;
 }
 
 // ── PANEL QA ───────────────────────────────────────────────────────────────
