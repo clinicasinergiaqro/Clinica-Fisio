@@ -959,6 +959,11 @@ function confirmarSalidaSiDirty(callback){
   }
 }
 let tempMods=[], tempEvaI=5, tempEvaF=3, tempEvolMedia=[];
+// FIX media-edición (flag sentinel): distingue "el usuario tocó el preview de media" (agregó/quitó)
+// de "el form nunca cargó la media". Se pone true en handleSoapPhoto/removeSoapMedia y se resetea a
+// false al abrir cualquier form (después del preload). Permite VACIAR media a propósito sin que la
+// defensa anti-WIPE la reviva. NO usar window.* (currentUser confirma que no funciona en este código).
+let _soapMediaTocada=false;
 let tempAtendio=[];
 let tempMotivoIndex=null; // FASE B: motivo elegido para la nota nueva (null = sin episodios / default actual)
 // Loop A — Snippet C0: stash estructurado de modalidades detectadas por la IA (para usarSoapIA)
@@ -6250,7 +6255,7 @@ function showNuevoSOAP(){
   if(!currentPatient) return;
   // reset dictado 2.2
   _dictado.activo=false; _dictado.textoFinal=''; _dictado.textoInterino=''; _dictado.palabras=0; _dictadoSoapPreview=null; _dictadoMetadata=null; _dictadoManual=false;
-  tempMods=[]; tempEvaI=5; tempEvaF=3; tempEvolMedia=[]; editingSoapId=null; editingSoapPid=null; editingSoapEsHistorico=false; _editingSoapHistoricoNota=null; modoNotaActual=''; _dictadoBanderas=[]; _dictadoActivo=false; _dictadoTransPrecargada=false; _soapV2Resultado=null; limpiarDirty();
+  tempMods=[]; tempEvaI=5; tempEvaF=3; tempEvolMedia=[]; _soapMediaTocada=false; editingSoapId=null; editingSoapPid=null; editingSoapEsHistorico=false; _editingSoapHistoricoNota=null; modoNotaActual=''; _dictadoBanderas=[]; _dictadoActivo=false; _dictadoTransPrecargada=false; _soapV2Resultado=null; limpiarDirty();
   tempEvolucionChips=[];
   const sesNum=(typeof currentPatient.sesiones==='number'?currentPatient.sesiones:0)+1; // FIX SESIÓN-NaN: guard defensivo
   const totalSes=parseInt(currentPatient.planTto?.sesiones);
@@ -6872,8 +6877,12 @@ async function guardarSOAP(){
       // FIX media-edición: media al editar histórica. datosNota.media ya trae la existente
       // (precargada en editarSoapHistorico) + la nueva. Mismo strip data:null que FST_buildSesionPayload.
       // sesionUpdateOK YA permite 'media' → set(merge) la escribe sin tocar reglas.
+      // Distinción con el flag: si el usuario vació a propósito (_soapMediaTocada) → _mediaH=[] (se
+      // escribe media:[] y merge la limpia). Si quedó vacío SIN tocar (preload falló) → red de
+      // seguridad: notaH.media. Con ítems → esos. null → se omite (merge conserva lo que hubiera).
+      var _mediaVaciadaAProposito = _soapMediaTocada && (!Array.isArray(datosNota.media)||!datosNota.media.length);
       var _mediaH=(Array.isArray(datosNota.media)&&datosNota.media.length)?datosNota.media
-                 :((Array.isArray(notaH.media)&&notaH.media.length)?notaH.media:null);
+                 :(_mediaVaciadaAProposito?[]:((Array.isArray(notaH.media)&&notaH.media.length)?notaH.media:null));
       const payloadH={
         s:datosNota.s, o:datosNota.o, a:datosNota.a, p:datosNota.p,
         evaI:datosNota.evaI, evaF:datosNota.evaF,
@@ -6972,8 +6981,10 @@ async function guardarSOAP(){
     // LOOP4: preservar modoNota original si no se seleccionó uno nuevo al editar
     if(!datosNota.modoNota && notaAnterior.modoNota) datosNota.modoNota = notaAnterior.modoNota;
     if((!Array.isArray(datosNota.atendidoPor)||!datosNota.atendidoPor.length) && Array.isArray(notaAnterior.atendidoPor)) datosNota.atendidoPor = notaAnterior.atendidoPor;
-    // FIX media-edición: defensa anti-WIPE — si el form quedó sin media pero la nota tenía, conservar la previa (mismo patrón que modoNota/atendidoPor)
-    if((!Array.isArray(datosNota.media)||!datosNota.media.length) && Array.isArray(notaAnterior.media) && notaAnterior.media.length) datosNota.media = notaAnterior.media;
+    // FIX media-edición: defensa anti-WIPE — restaurar la media previa SOLO si el form quedó vacío
+    // Y el usuario NO tocó el preview (preload falló / no interactuó). Si tocó (_soapMediaTocada) se
+    // respeta datosNota.media aunque quede [] → permite VACIAR media a propósito.
+    if((!Array.isArray(datosNota.media)||!datosNota.media.length) && !_soapMediaTocada && Array.isArray(notaAnterior.media) && notaAnterior.media.length) datosNota.media = notaAnterior.media;
     if(terapeutaFmt) datosNota.terapeuta = terapeutaFmt;
     p.soap[idx]={...notaAnterior, ...datosNota, historialEdiciones:notaAnterior.historialEdiciones};
     p.soap[idx].fecha = fechaConsultaFmt; // FECHA EDITABLE: usar la fecha del campo (puede corregirse al editar)
@@ -7125,6 +7136,7 @@ function editarSOAP(soapId){
   tempEvaI=nota.evaI??5;
   tempEvaF=nota.evaF??3;
   tempEvolMedia=Array.isArray(nota.media)?nota.media.map(m=>({...m})):[]; // FIX media-edición: precargar media existente (evita WIPE al guardar)
+  _soapMediaTocada=false; // FIX media-edición: reset tras preload — el usuario aún no tocó el preview
 
   // Actualizar topbar
   const totalSes=parseInt(p.planTto?.sesiones);
@@ -7210,6 +7222,7 @@ async function editarSoapHistorico(sid, pid){
   tempEvaI=nota.evaI!=null?Number(nota.evaI):5;
   tempEvaF=nota.evaF!=null?Number(nota.evaF):3;
   tempEvolMedia=Array.isArray(nota.media)?nota.media.map(function(m){return Object.assign({},m);}):[]; // FIX media-edición: precargar media existente de la nota histórica
+  _soapMediaTocada=false; // FIX media-edición: reset tras preload — el usuario aún no tocó el preview
   document.getElementById('soap-topbar-meta').textContent='✏️ Editando (histórico) — Sesión '+nota.num;
   screenStack.push('screen-soap'); showScreen('screen-soap',false);
   renderSOAPForm();
@@ -7636,7 +7649,7 @@ function _comprimirImagenSoap(file){
 async function handleSoapPhoto(ev,tipo){
   const pid = currentPatient && currentPatient.id;
   const files = Array.from(ev.target.files);
-  if(files.length) showToast('☁️ Procesando foto(s)…','');
+  if(files.length){ _soapMediaTocada=true; showToast('☁️ Procesando foto(s)…',''); } // FIX media-edición: marcar preview tocado
   for(const f of files){
     const ts=Date.now();
     const esImg = !!(f.type && f.type.startsWith('image'));
@@ -7666,7 +7679,7 @@ async function handleSoapPhoto(ev,tipo){
   ev.target.value='';
   _pintarSoapMediaPreview();
 }
-function removeSoapMedia(i){tempEvolMedia.splice(i,1);handleSoapPhoto({target:{files:[],value:''}},'_')}
+function removeSoapMedia(i){_soapMediaTocada=true;tempEvolMedia.splice(i,1);handleSoapPhoto({target:{files:[],value:''}},'_')} // FIX media-edición: marcar preview tocado (permite vaciar a propósito)
 // FIX media-edición: preview de adjuntos SOAP reutilizable. Lo usan handleSoapPhoto y también
 // editarSOAP/editarSoapHistorico al precargar la media EXISTENTE de la nota (antes el form
 // arrancaba con tempEvolMedia=[] y al guardar borraba la media previa).
