@@ -4186,7 +4186,12 @@ async function _abrirModalVincular(nombre){
   var claveNorm=_normPend(nombre);
   if(!claveNorm){ showToast('Nombre vacío','error'); return; }
   var indice=[];
-  try{ indice=(await FST_cargarIndicePacientes())||[]; }catch(_e){ indice=[]; }
+  try{
+    indice=(await FST_cargarIndicePacientes())||[];
+    // Incluir activos frescos de patientsDB (fuente de verdad local) además del índice cacheado:
+    // un paciente creado hoy no está en el índice de 24h. Dedup por id/nombre (locales primero).
+    if(typeof FST_fusionarPacientes==='function') indice=FST_fusionarPacientes(Array.isArray(patientsDB)?patientsDB:[], indice);
+  }catch(_e){ indice=[]; }
   var yaVinc=(window._citasVinculadasCache && window._citasVinculadasCache.map && window._citasVinculadasCache.map[claveNorm])||null;
   var m=document.createElement('div');
   m.setAttribute('data-vincov','1');
@@ -4210,14 +4215,21 @@ async function _abrirModalVincular(nombre){
     var toks=t.split(' ').filter(Boolean);
     var res=(Array.isArray(indice)?indice:[]).filter(function(p){
       var nn=_normPend(p.nombreNormalizado||p.name||'');
-      return nn && toks.every(function(w){ return nn.indexOf(w)!==-1; });
+      if(!nn) return false;
+      // Match bidireccional: término ⊆ expediente (comportamiento previo) O expediente ⊆ término
+      // (para nombres de calendario con palabras extra, ej. "Sholto", que no están en el expediente).
+      var netoks=nn.split(' ').filter(Boolean);
+      var termEnExp=toks.every(function(w){ return nn.indexOf(w)!==-1; });
+      var expEnTerm=netoks.length && netoks.every(function(w){ return t.indexOf(w)!==-1; });
+      return termEnExp || expEnTerm;
     }).slice(0,40);
     if(!res.length){ cont.innerHTML='<div style="font-size:12px;color:var(--gray-400);padding:8px 2px">Sin coincidencias.</div>'; return; }
     cont.innerHTML=res.map(function(p){
       var esHist=(p._origenLista==='firestore_migracion');
       var badge=esHist?'<span style="font-size:10px;font-weight:700;color:#6D28D9;background:#EDE9FE;border-radius:6px;padding:1px 6px">histórico</span>'
                       :'<span style="font-size:10px;font-weight:700;color:#065F46;background:#D1FAE5;border-radius:6px;padding:1px 6px">activo</span>';
-      var sub=[p.dx||'', p.terapeuta||'', p.age?(p.age+'a'):''].filter(Boolean).join(' · ');
+      var dxStr=(typeof p.dx==='string'?p.dx:((p.dx&&(p.dx.dxClinico||p.dx.dxMedico))||''));   // activos frescos pueden traer dx objeto
+      var sub=[dxStr, p.terapeuta||'', p.age?(p.age+'a'):''].filter(Boolean).join(' · ');
       return '<button data-pid="'+escapeAttr_(p.id)+'" data-tipo="'+(esHist?'historico':'activo')+'" '
         +'style="display:block;width:100%;text-align:left;border:1px solid var(--gray-200);border-radius:10px;padding:8px 10px;margin:3px 0;background:#fff;cursor:pointer;font-family:inherit">'
         +'<div style="font-size:13px;font-weight:700;color:var(--navy)">'+escapeHTML(p.name||'(sin nombre)')+' '+badge+'</div>'
@@ -10314,6 +10326,9 @@ function guardarNuevoPaciente(){
   patientsDB.push(nuevo);
   // Fase 5: alta local → invalidar SOLO la vista fusionada (no relee Firestore)
   if (typeof window._FST_invalidarVistaPacientes === 'function') { window._FST_invalidarVistaPacientes(); }
+  // Buscador de vincular / resolver del dashboard: el índice cacheado (24h) no veía activos recién
+  // creados. Invalidarlo también para que el paciente nuevo aparezca sin recargar la app.
+  if (typeof window._FST_invalidarIndicePacientes === 'function') { window._FST_invalidarIndicePacientes(); }
   saveDB('pts', [nuevo]).then(res => {
     if(res && res.ok){
       borrarBorradorNuevoSiGuardado();
