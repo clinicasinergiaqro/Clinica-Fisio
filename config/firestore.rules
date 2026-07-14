@@ -39,7 +39,10 @@ service cloud.firestore {
                   // los editó y no viajaban a Firestore (auditoría "todo en la nube" 🔴P2).
                   'sexo','eventosAdversos','revalSolicitada','etiquetas','historialCambios',
                   'telefono','fechaNacimiento','medicoReferente','age',
-                  'fechaCreacion','fechaInicio']);
+                  'fechaCreacion','fechaInicio',
+                  // ── v12: _persistirDatosPaciente (LOOP E) escribe estos junto a name/age/telefono
+                  // en un solo set(merge); sin ellos hasOnly rechaza TODO el write (permission-denied).
+                  'nombreNormalizado','terapeuta']);
     }
     function sesionCreateOK() {
       return request.resource.data.keys().hasOnly([
