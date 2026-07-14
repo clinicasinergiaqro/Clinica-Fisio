@@ -34,7 +34,12 @@ service cloud.firestore {
                   'motivosAnteriores','motivoActualIndex','numSesionEpisodioActual',
                   'altaClinica','revaloraciones','consentimientos',
                   'consentimientoDatos','consentimientoImagen','consentimientoWhatsApp',
-                  'estudiosDocs','fotos','docs']);
+                  'estudiosDocs','fotos','docs',
+                  // ── v12: campos de históricos (mig_pac_) que solo vivían en el iPad que
+                  // los editó y no viajaban a Firestore (auditoría "todo en la nube" 🔴P2).
+                  'sexo','eventosAdversos','revalSolicitada','etiquetas','historialCambios',
+                  'telefono','fechaNacimiento','medicoReferente','age',
+                  'fechaCreacion','fechaInicio']);
     }
     function sesionCreateOK() {
       return request.resource.data.keys().hasOnly([
@@ -47,7 +52,8 @@ service cloud.firestore {
         'tolerancia','eventosAdversosSesion','cambiosPlan','criteriosProgreso',
         'indicacionesDomiciliarias','dictado','dictadoUnico','dictadoV2',
         'pacienteId','media','historialEdiciones',
-        'motivoIndex','numEpisodio'
+        'motivoIndex','numEpisodio',
+        'atendidoPor'   // v12: quién atendió la sesión (no viajaba a subcolección de históricos)
       ]);
     }
     function sesionUpdateOK() {
@@ -63,7 +69,8 @@ service cloud.firestore {
           'media','motivoIndex','numEpisodio',
           'terapeutaEstado','terapeutaOriginal','motivosRevision',
           'imagenesPendientes','motivoImagenesPendientes','hashesImagenesPendientes',
-          'textoOriginal','textoOriginalUrl'
+          'textoOriginal','textoOriginalUrl',
+          'atendidoPor'   // v12: quién atendió la sesión (edición de nota histórica)
         ]);
     }
     // ── v8: asignaciones persistentes de agenda (LOOP S3) ──
