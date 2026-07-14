@@ -11499,7 +11499,7 @@ function _RPT_htmlValoracion(p, sesiones){
   return _RPT_secHead(3,'Valoración funcional inicial')
     + '<table style="width:100%;border-collapse:collapse">'
     + row('Mecanismo de lesión', mo.mecanismo)
-    + row('Dolor inicial (EVA)', dolorIni)
+    + row('EVA en valoración inicial', dolorIni)
     + row('Irradiación', v.irradiacion)
     + row('Palpación', v.palpacion)
     + row('ROM', v.rom)
@@ -11592,8 +11592,8 @@ function _RPT_htmlMetricas(p, sesiones){
   function m(val,lbl){ return '<div style="text-align:center"><div style="font-size:22px;font-weight:700;line-height:1">'+val+'</div><div style="font-size:8px;letter-spacing:0.5px;text-transform:uppercase;color:#A8C8BC;margin-top:4px">'+lbl+'</div></div>'; }
   return _RPT_secHead(6,'Métricas del tratamiento')
     + '<div class="rc-avoid" style="background:#1F5C4D;color:#fff;border-radius:8px;padding:16px 18px;display:grid;grid-template-columns:repeat(4,1fr);gap:16px;-webkit-print-color-adjust:exact;print-color-adjust:exact">'
-    + m((ini!=null?ini+'/10':'—'),'Dolor inicial')
-    + m((act!=null?act+'/10':'—'),'Dolor actual')
+    + m((ini!=null?ini+'/10':'—'),'EVA 1ª sesión')
+    + m((act!=null?act+'/10':'—'),'EVA última sesión')
     + m((red!=null?'↓ '+red+'%':'—'),'Reducción')
     + m(String(sesiones.length),'Total sesiones')
     + '</div>';
