@@ -10408,6 +10408,16 @@ function editarHistoria(seccion){
           <div style="font-size:11px;color:var(--gray-400);padding:3px 14px">${p.fechaNacimiento?'Calculada automáticamente desde fecha de nacimiento':'Se calcula automáticamente si hay fecha de nacimiento'}</div>
         </div>
         <div class="form-field">
+          <div class="form-label">Sexo</div>
+          <select class="form-input" id="ed-sexo">
+            <option value=""${!p.sexo?' selected':''}>Seleccionar...</option>
+            <option${p.sexo==='Masculino'?' selected':''}>Masculino</option>
+            <option${p.sexo==='Femenino'?' selected':''}>Femenino</option>
+            <option${p.sexo==='Indeterminado'?' selected':''}>Indeterminado</option>
+            ${(p.sexo&&['Masculino','Femenino','Indeterminado'].indexOf(p.sexo)===-1)?`<option selected>${escapeHTML(p.sexo)}</option>`:''}
+          </select>
+        </div>
+        <div class="form-field">
           <div class="form-label">Teléfono</div>
           <input class="form-input" type="tel" id="ed-telefono" inputmode="numeric"
             value="${escapeAttr_(p.telefono||'')}" placeholder="Ej: 4421234567">
@@ -10550,6 +10560,7 @@ function guardarEdicionHistoria(seccion, tabRetorno){
       if(edadManual > 0) p.age = edadManual;
     }
     p.telefono       = v('ed-telefono');
+    p.sexo           = v('ed-sexo'); // Opción A: sexo editable desde el botón de "Datos generales"
     p.motivoConsulta = v('ed-motivoconsulta');
     p.medicoReferente = v('ed-medico');
     p.dx = v('ed-dx') || p.dx;
