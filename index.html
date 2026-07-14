@@ -169,6 +169,15 @@ async function FST_fetchSesiones(pid){
         // FIX SOAP-MEDIA (B): rehidratar adjuntos de la nota (referencias url/fbPath)
         media: Array.isArray(d.media) ? d.media : [],
         historialEdiciones: Array.isArray(d.historialEdiciones) ? d.historialEdiciones : [],
+        // v12: rehidratar NOM + atendidoPor + dictado + metadatos (antes 0 matches → se perdían al recargar)
+        atendidoPor: Array.isArray(d.atendidoPor) ? d.atendidoPor : [],
+        objetivoSesion: d.objetivoSesion || '', respuestaTratamiento: d.respuestaTratamiento || '',
+        tolerancia: d.tolerancia || '', eventosAdversosSesion: d.eventosAdversosSesion || '',
+        cambiosPlan: d.cambiosPlan || '', criteriosProgreso: d.criteriosProgreso || '',
+        indicacionesDomiciliarias: d.indicacionesDomiciliarias || '',
+        horaCreacion: d.horaCreacion || '', totalSesiones: (d.totalSesiones != null ? Number(d.totalSesiones) : null),
+        dictado: (d.dictado != null ? d.dictado : null), dictadoUnico: (d.dictadoUnico != null ? d.dictadoUnico : null),
+        dictadoV2: (d.dictadoV2 != null ? d.dictadoV2 : null),
         completa: false, importado: true, _origen: 'firestore_historico'
       };
     });
@@ -402,12 +411,32 @@ function FST_buildSesionPayload(sesion, modo) {
     // DIAG 1 (BUG 2): episodio — condicional para no escribir null en sesiones sin episodio
     ...(sesion.motivoIndex != null ? { motivoIndex: Number(sesion.motivoIndex) } : {}),
     ...(sesion.numEpisodio != null ? { numEpisodio: Number(sesion.numEpisodio) } : {}),
+    // v12: NOM + atendidoPor + dictado. En históricos la subcolección es el ÚNICO almacén (para
+    // activos ya viajan completos a Sheets). Reglas v12 los permiten en create y update. Los NOM
+    // van como texto ('' persiste el borrado); atendidoPor/dictado condicionales (no escribir vacío).
+    objetivoSesion: sesion.objetivoSesion || '',
+    respuestaTratamiento: sesion.respuestaTratamiento || '',
+    tolerancia: sesion.tolerancia || '',
+    eventosAdversosSesion: sesion.eventosAdversosSesion || '',
+    cambiosPlan: sesion.cambiosPlan || '',
+    criteriosProgreso: sesion.criteriosProgreso || '',
+    indicacionesDomiciliarias: sesion.indicacionesDomiciliarias || '',
+    ...(Array.isArray(sesion.atendidoPor) && sesion.atendidoPor.length ? { atendidoPor: sesion.atendidoPor } : {}),
+    ...(sesion.dictado != null ? { dictado: sesion.dictado } : {}),
+    ...(sesion.dictadoUnico != null ? { dictadoUnico: sesion.dictadoUnico } : {}),
+    ...(sesion.dictadoV2 != null ? { dictadoV2: sesion.dictadoV2 } : {}),
     completa: !!sesion.completa, modoNota: sesion.modoNota || '',
     importado: false, formatoOriginal: 'soap', revisionPendiente: false,
     origen: 'app_live', creadoPor: sesion.terapeuta || 'APP',
     updatedAt: firebase.firestore.FieldValue.serverTimestamp()
   };
-  if (modo === 'nueva') payload.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+  // horaCreacion/totalSesiones: metadatos de creación. Solo en 'nueva' — sesionUpdateOK NO los
+  // permite, y en una edición no cambian (merge conserva los del create).
+  if (modo === 'nueva') {
+    payload.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+    payload.horaCreacion = sesion.horaCreacion || '';
+    if (sesion.totalSesiones != null) payload.totalSesiones = Number(sesion.totalSesiones);
+  }
   return payload;
 }
 function FST_buildPacientePayload(paciente, sesion, pidInfo) {
@@ -1473,6 +1502,19 @@ async function _persistirHistoricoFirestore(p){
     if(p.consentimientoDatos!=null)      outCl.consentimientoDatos = p.consentimientoDatos;
     if(p.consentimientoImagen!=null)     outCl.consentimientoImagen = p.consentimientoImagen;
     if(p.consentimientoWhatsApp!=null)   outCl.consentimientoWhatsApp = p.consentimientoWhatsApp;
+    // v12: campos de históricos que antes rechazaba la whitelist (auditoría "todo en la nube" 🔴P2).
+    // Guards con != null / Array.isArray: solo se escribe lo presente (evita pisar con vacío).
+    if(p.sexo!=null)                     outCl.sexo = p.sexo;
+    if(Array.isArray(p.eventosAdversos)) outCl.eventosAdversos = p.eventosAdversos;
+    if(p.revalSolicitada!=null)          outCl.revalSolicitada = p.revalSolicitada;
+    if(Array.isArray(p.etiquetas))       outCl.etiquetas = p.etiquetas;
+    if(Array.isArray(p.historialCambios))outCl.historialCambios = p.historialCambios;
+    if(p.telefono!=null)                 outCl.telefono = p.telefono;
+    if(p.fechaNacimiento!=null)          outCl.fechaNacimiento = p.fechaNacimiento;
+    if(p.medicoReferente!=null)          outCl.medicoReferente = p.medicoReferente;
+    if(p.age!=null)                      outCl.age = p.age;
+    if(p.fechaCreacion!=null)            outCl.fechaCreacion = p.fechaCreacion;
+    if(p.fechaInicio!=null)              outCl.fechaInicio = p.fechaInicio;
     // fix (d)+(e) — media de históricos: estudiosDocs (whitelist v4) + fotos/docs (whitelist v5).
     // Sin esto, la galería de un histórico subía la foto a Storage pero no persistía la
     // referencia → desaparecía al reabrir. Los 3 van en outCl (Write 2 clínico), NO en outEj.
@@ -6883,6 +6925,13 @@ async function guardarSOAP(){
       var _mediaVaciadaAProposito = _soapMediaTocada && (!Array.isArray(datosNota.media)||!datosNota.media.length);
       var _mediaH=(Array.isArray(datosNota.media)&&datosNota.media.length)?datosNota.media
                  :(_mediaVaciadaAProposito?[]:((Array.isArray(notaH.media)&&notaH.media.length)?notaH.media:null));
+      // v12: NOM + atendidoPor + dictado al editar histórica. El form del histórico NO precarga
+      // estos campos, así que se conserva lo de notaH cuando el form viene vacío (evita wipe). Todos
+      // están en sesionUpdateOK. horaCreacion/totalSesiones NO se tocan (no en update; merge conserva).
+      var _txtH=function(nv,prev){ return (typeof nv==='string'&&nv.trim()!=='')?nv:(prev||''); };
+      var _atendidoH=(Array.isArray(datosNota.atendidoPor)&&datosNota.atendidoPor.length)?datosNota.atendidoPor
+                    :(Array.isArray(notaH.atendidoPor)?notaH.atendidoPor:[]);
+      var _dictadoH=(datosNota.dictado&&datosNota.dictado.usado)?datosNota.dictado:(notaH.dictado||null);
       const payloadH={
         s:datosNota.s, o:datosNota.o, a:datosNota.a, p:datosNota.p,
         evaI:datosNota.evaI, evaF:datosNota.evaF,
@@ -6892,6 +6941,17 @@ async function guardarSOAP(){
         revisionPendiente:false,
         textoOriginal:_esTextoLibreHist?v('f-soap-textoriginal'):(notaH.textoOriginal||''),
         historialEdiciones:histH,
+        objetivoSesion:_txtH(datosNota.objetivoSesion,notaH.objetivoSesion),
+        respuestaTratamiento:_txtH(datosNota.respuestaTratamiento,notaH.respuestaTratamiento),
+        tolerancia:_txtH(datosNota.tolerancia,notaH.tolerancia),
+        eventosAdversosSesion:_txtH(datosNota.eventosAdversosSesion,notaH.eventosAdversosSesion),
+        cambiosPlan:_txtH(datosNota.cambiosPlan,notaH.cambiosPlan),
+        criteriosProgreso:_txtH(datosNota.criteriosProgreso,notaH.criteriosProgreso),
+        indicacionesDomiciliarias:_txtH(datosNota.indicacionesDomiciliarias,notaH.indicacionesDomiciliarias),
+        ...(_atendidoH.length ? { atendidoPor:_atendidoH } : {}),
+        ...(_dictadoH!=null ? { dictado:_dictadoH } : {}),
+        ...(datosNota.dictadoUnico!=null ? { dictadoUnico:datosNota.dictadoUnico } : (notaH.dictadoUnico!=null ? { dictadoUnico:notaH.dictadoUnico } : {})),
+        ...(datosNota.dictadoV2!=null ? { dictadoV2:datosNota.dictadoV2 } : (notaH.dictadoV2!=null ? { dictadoV2:notaH.dictadoV2 } : {})),
         ...(_mediaH ? { media:_mediaH.map(function(m){ return {
           mediaId:(m&&(m.mediaId||m.id))||'', name:(m&&m.name)||'', label:(m&&m.label)||'',
           type:(m&&m.type)||'', fecha:(m&&m.fecha)||'',
