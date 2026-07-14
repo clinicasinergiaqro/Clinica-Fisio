@@ -11208,11 +11208,12 @@ function _RPT_numEva(v){
 function _RPT_esSentinelEva(s){ return !!s && Number(s.evaI)===5 && Number(s.evaF)===3; }
 function _RPT_evaDeSesion(s){
   if(!s) return null;
-  // FIX EVA (A1 · orden confirmado con Carlos): el SLIDER (evaF/evaI) es la FUENTE DE VERDAD de
-  // la clínica — gana SIEMPRE que sea un valor real, por encima de eva explícito y del texto.
-  // 1) SLIDER real (no sentinel 5/3 = sliders no tocados)
+  // FIX EVA (A1 · decisión Carlos): el valor de la sesión es el EVA INICIAL (evaI = dolor con el
+  // que LLEGA el paciente), NO el final (evaF, que mide solo el efecto intra-sesión). El slider es
+  // la fuente de verdad → gana sobre eva explícito y texto. Orden: evaI real → eva → texto.
+  // 1) SLIDER inicial (evaI). El sentinel se evalúa sobre el PAR (evaI===5 && evaF===3 = no tocado),
+  //    aunque el valor devuelto sea evaI.
   if(!_RPT_esSentinelEva(s)){
-    var sf=_RPT_numEva(s.evaF); if(sf!=null) return sf;
     var si=_RPT_numEva(s.evaI); if(si!=null) return si;
   }
   // 2) eva explícito (objeto final/inicio o número) — solo cuando NO hay slider real
@@ -14317,11 +14318,11 @@ function generarGraficaEVA(p){
   }).map(x=>x.s);
   const sesiones=_ordenadas.map((s,i)=>({
     num:_tieneEp?(s.numEpisodio||i+1):(i+1),
-    // FIX EVA (A3): excluir el par sentinel evaI=5 & evaF=3 (sliders no tocados) — mismo
-    // filtro que la tendencia IA (serie P1). Elimina las falsas caídas 5→3 de la curva.
-    ei: (Number(s.evaI)===5&&Number(s.evaF)===3)?null:toNum(s.evaI ?? s.eva?.inicial ?? s.evaInicial),
-    ef: (Number(s.evaI)===5&&Number(s.evaF)===3)?null:toNum(s.evaF ?? s.eva?.final ?? s.evaFinal)
-  })).filter(s=>s.ei!==null||s.ef!==null);
+    // FIX EVA (A3 + decisión Carlos): UNA sola serie = EVA INICIAL (evaI, dolor con el que llega
+    // el paciente a cada sesión) → muestra la evolución ENTRE sesiones. Excluye el par sentinel
+    // evaI=5 & evaF=3 (sliders no tocados), mismo criterio que la tendencia IA.
+    ei: (Number(s.evaI)===5&&Number(s.evaF)===3)?null:toNum(s.evaI ?? s.eva?.inicial ?? s.evaInicial)
+  })).filter(s=>s.ei!==null);
   if(sesiones.length<2) return '';
   const W=320,H=160,padL=28,padB=24,padT=12,padR=12;
   const plotW=W-padL-padR, plotH=H-padT-padB;
@@ -14340,11 +14341,9 @@ function generarGraficaEVA(p){
       <svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;max-width:360px">
         ${ejeY}${ejeX}
         ${linea('ei','#F59E0B')}
-        ${linea('ef','#1B7A3D')}
       </svg>
       <div style="display:flex;gap:14px;justify-content:center;font-size:11px;margin-top:4px">
-        <span style="color:#F59E0B;font-weight:700">● EVA inicial</span>
-        <span style="color:#1B7A3D;font-weight:700">● EVA final</span>
+        <span style="color:#F59E0B;font-weight:700">● EVA al llegar a cada sesión</span>
       </div>
     </div>
   </div>`;
