@@ -3488,6 +3488,40 @@ async function FST_guardarAsignacionAgenda(nombreNorm, nombreOriginal, terapeuta
   // PERF(e): reflejar la asignación en el cache de sesión — el recálculo del dashboard la ve al instante
   if(window._asigAgendaCache && window._asigAgendaCache.map) window._asigAgendaCache.map[nombreNorm]=String(terapeuta||'');
 }
+// ── v13: vinculación permanente nombre-calendario → PACIENTE (colección citasVinculadas) ──
+// Mismo patrón que agendaAsignaciones, pero une claveNorm → {pid, tipo}. Doc id = claveNorm
+// (nombreNormalizado del nombre del calendario). Solo el supervisor escribe (regla
+// citaVinculadaOK v13). Reversible con delete. Campos EXACTOS de la whitelist de la regla:
+// pid, tipo, nombreOriginal, vinculadoPor, fecha, updatedAt (no agregar/quitar → permission-denied).
+async function FST_leerCitasVinculadas(forzar){
+  if(!forzar && window._citasVinculadasCache && window._citasVinculadasCache.map) return window._citasVinculadasCache.map;
+  var map={};
+  try{
+    var ok=await FST_init();
+    if(!ok||!window._fstDb) return map;
+    var snap=await window._fstDb.collection('citasVinculadas').get();
+    snap.forEach(function(d){ var x=d.data()||{}; if(x.pid) map[d.id]={pid:String(x.pid), tipo:String(x.tipo||''), nombreOriginal:String(x.nombreOriginal||'')}; });
+  }catch(e){ console.warn('[Rendimiento] leer vinculadas:', e&&e.message); return map; }
+  window._citasVinculadasCache={ts:Date.now(), map:map};
+  return map;
+}
+async function FST_guardarCitaVinculada(claveNorm, nombreOriginal, pid, tipo){
+  var ok=await FST_init();
+  if(!ok||!window._fstDb) throw new Error('Firestore no disponible');
+  await window._fstDb.collection('citasVinculadas').doc(claveNorm).set({
+    pid:String(pid||''), tipo:String(tipo||''), nombreOriginal:String(nombreOriginal||''),
+    vinculadoPor:(currentUser&&currentUser.name)||'', fecha:_hoyISOlocal(),
+    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+  });
+  window._citasVinculadasCache=window._citasVinculadasCache||{ts:Date.now(), map:{}};
+  window._citasVinculadasCache.map[claveNorm]={pid:String(pid||''), tipo:String(tipo||''), nombreOriginal:String(nombreOriginal||'')};
+}
+async function FST_borrarCitaVinculada(claveNorm){
+  var ok=await FST_init();
+  if(!ok||!window._fstDb) throw new Error('Firestore no disponible');
+  await window._fstDb.collection('citasVinculadas').doc(claveNorm).delete();
+  if(window._citasVinculadasCache && window._citasVinculadasCache.map) delete window._citasVinculadasCache.map[claveNorm];
+}
 // ── LOOP DASHBOARD-NOTAS: triangulación calendario vs notas (activos + históricos) ──
 // Históricos: 1 lectura del DOC pacientes/{pid} por paciente que aparezca en el calendario
 // (NUNCA subcolecciones) → ultimaSesionLive (DD/MM/YYYY, la escribe FST_buildPacientePayload
@@ -3515,10 +3549,20 @@ async function _resolverPacientesCalendario(eventos){
     var k=_normPend(x.nombreNormalizado||x.name||'');
     if(k && !idxHistN[k]) idxHistN[k]=x;
   });
+  // v13: vinculaciones manuales (nombre→paciente) — máxima prioridad sobre el match automático.
+  var vinculMap={};
+  try{ vinculMap=await FST_leerCitasVinculadas(false); }catch(_v){ vinculMap={}; }
   var out={};
   (Array.isArray(eventos)?eventos:[]).forEach(function(ev){
     var clave=_normPend(ev.paciente||'');
     if(!clave || out[clave]) return;
+    // v13: si el supervisor vinculó este nombre a un paciente, usarlo con prioridad absoluta.
+    var vv=vinculMap[clave];
+    if(vv && vv.pid){
+      var pvAct=(Array.isArray(patientsDB)?patientsDB:[]).find(function(pp){ return String((pp&&pp.id)||'')===String(vv.pid); });
+      out[clave]=pvAct?{pid:String(vv.pid), tipo:'activo', p:pvAct}:{pid:String(vv.pid), tipo:(vv.tipo||'historico')};
+      return;
+    }
     var pAct=idxAct[clave];
     if(pAct){ out[clave]={pid:String(pAct.id||''), tipo:'activo', p:pAct}; return; }
     var pH=idxHistN[clave];
@@ -3679,14 +3723,21 @@ function _chipSinNota(x){
   var btnResolver='<button data-nombre="'+escapeAttr_(x.nombre)+'" data-fecha="'+escapeAttr_(x.fecha||'')+'" '
     +'onclick="_marcarCitaResuelta(this.dataset.nombre, this.dataset.fecha)" '
     +'style="'+base+'border:1px solid #A7F3D0;background:#ECFDF5;color:#065F46;cursor:pointer">✓ Resolver</button>';
+  // v13: ¿este nombre ya está vinculado a mano? (para ofrecer "Cambiar" en vez de "Vincular")
+  var claveV=_normPend(x.nombre||'');
+  var esVinc=!!(window._citasVinculadasCache && window._citasVinculadasCache.map && window._citasVinculadasCache.map[claveV]);
+  var btnVincular='<button data-nombre="'+escapeAttr_(x.nombre)+'" onclick="_abrirModalVincular(this.dataset.nombre)" '
+    +'style="'+base+'border:1px solid #93C5FD;background:#EFF6FF;color:#1D4ED8;cursor:pointer">🔗 '+(esVinc?'Cambiar':'Vincular')+'</button>';
   if(x.pid){
+    // Con pid: se resolvió (auto o por vinculación). Solo las vinculadas ofrecen "Cambiar".
     return '<span style="white-space:nowrap;display:inline-block">'
       +'<button data-pid="'+escapeAttr_(x.pid)+'" onclick="_abrirExpedienteDesdeRendimiento(this.dataset.pid)" '
       +'style="'+base+'border:1px solid #FCA5A5;background:#FEF2F2;color:#B91C1C;cursor:pointer">🔴 '
-      +escapeHTML(x.nombre)+' <span style="font-weight:400">→ abrir</span></button>'+btnResolver+'</span>';
+      +escapeHTML(x.nombre)+' <span style="font-weight:400">→ abrir</span></button>'+btnResolver+(esVinc?btnVincular:'')+'</span>';
   }
+  // Sin pid: nombre no identificado → ofrecer vincular a mano.
   return '<span style="white-space:nowrap;display:inline-block"><span style="'+base+'border:1px dashed #FCA5A5;background:#FFF;color:#B91C1C;display:inline-block">🔴 '
-    +escapeHTML(x.nombre)+' <span style="font-weight:400">(sin expediente)</span></span>'+btnResolver+'</span>';
+    +escapeHTML(x.nombre)+' <span style="font-weight:400">(sin expediente)</span></span>'+btnVincular+btnResolver+'</span>';
 }
 // ── LOOP COLA-REVISIÓN: sesiones con revisionPendiente:true (SOLO supervisor) ──
 // Query collectionGroup('sesiones') — REQUIERE: (1) reglas v10 (match /{path=**}/sesiones
@@ -4100,6 +4151,82 @@ function _abrirModalAsignacion(nombre, ventana){
   });
   m.querySelector('button[data-cerrar]').onclick=function(){ m.remove(); };
   document.body.appendChild(m);
+}
+// v13: modal buscador para VINCULAR un nombre de calendario a un paciente (activo o histórico).
+// Calcado del layout de _abrirModalAsignacion, pero con <input> de búsqueda sobre el índice
+// completo (FST_cargarIndicePacientes: activos + históricos). Reversible: si ya está vinculado,
+// muestra "Deshacer" (FST_borrarCitaVinculada).
+async function _abrirModalVincular(nombre){
+  if(!esSupervisorUI()){ showToast('Solo supervisor','error'); return; }
+  var claveNorm=_normPend(nombre);
+  if(!claveNorm){ showToast('Nombre vacío','error'); return; }
+  var indice=[];
+  try{ indice=(await FST_cargarIndicePacientes())||[]; }catch(_e){ indice=[]; }
+  var yaVinc=(window._citasVinculadasCache && window._citasVinculadasCache.map && window._citasVinculadasCache.map[claveNorm])||null;
+  var m=document.createElement('div');
+  m.setAttribute('data-vincov','1');
+  m.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:10002;display:flex;align-items:center;justify-content:center;padding:20px';
+  m.onclick=function(e){ if(e.target===m) m.remove(); };
+  m.innerHTML='<div style="background:#fff;border-radius:16px;max-width:420px;width:100%;padding:18px;max-height:82vh;display:flex;flex-direction:column">'
+    +'<div style="font-size:14px;font-weight:800;color:var(--navy);margin-bottom:2px">🔗 Vincular paciente</div>'
+    +'<div style="font-size:12px;color:var(--gray-600);margin-bottom:8px">Cita del calendario: <b>'+escapeHTML(nombre)+'</b></div>'
+    +(yaVinc?('<div style="font-size:11px;color:#92400E;background:#FFFBEB;border:1px solid #FDE68A;border-radius:8px;padding:6px 8px;margin-bottom:8px">Ya vinculada a un paciente. Elige otro para cambiar, o usa “Deshacer”.</div>'):'')
+    +'<input data-buscar type="text" placeholder="Buscar por nombre..." autocomplete="off" autocapitalize="off" style="width:100%;box-sizing:border-box;padding:9px 11px;border:1px solid var(--gray-300);border-radius:10px;font-size:14px;font-family:inherit;margin-bottom:8px">'
+    +'<div data-res style="overflow-y:auto;flex:1;min-height:60px"></div>'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px">'
+      +(yaVinc?('<button data-deshacer="1" style="padding:8px 12px;border:1px solid #FCA5A5;border-radius:10px;background:#FEF2F2;color:#B91C1C;font-weight:700;cursor:pointer">↩︎ Deshacer</button>'):'<span></span>')
+      +'<button data-cerrar="1" style="padding:8px 14px;border:none;border-radius:10px;background:#EEF1F6;color:var(--navy);font-weight:700;cursor:pointer">Cerrar</button>'
+    +'</div></div>';
+  var inp=m.querySelector('[data-buscar]');
+  var cont=m.querySelector('[data-res]');
+  function pintar(term){
+    var t=_normPend(String(term||''));
+    if(t.length<2){ cont.innerHTML='<div style="font-size:12px;color:var(--gray-400);padding:8px 2px">Escribe al menos 2 letras…</div>'; return; }
+    var toks=t.split(' ').filter(Boolean);
+    var res=(Array.isArray(indice)?indice:[]).filter(function(p){
+      var nn=_normPend(p.nombreNormalizado||p.name||'');
+      return nn && toks.every(function(w){ return nn.indexOf(w)!==-1; });
+    }).slice(0,40);
+    if(!res.length){ cont.innerHTML='<div style="font-size:12px;color:var(--gray-400);padding:8px 2px">Sin coincidencias.</div>'; return; }
+    cont.innerHTML=res.map(function(p){
+      var esHist=(p._origenLista==='firestore_migracion');
+      var badge=esHist?'<span style="font-size:10px;font-weight:700;color:#6D28D9;background:#EDE9FE;border-radius:6px;padding:1px 6px">histórico</span>'
+                      :'<span style="font-size:10px;font-weight:700;color:#065F46;background:#D1FAE5;border-radius:6px;padding:1px 6px">activo</span>';
+      var sub=[p.dx||'', p.terapeuta||'', p.age?(p.age+'a'):''].filter(Boolean).join(' · ');
+      return '<button data-pid="'+escapeAttr_(p.id)+'" data-tipo="'+(esHist?'historico':'activo')+'" '
+        +'style="display:block;width:100%;text-align:left;border:1px solid var(--gray-200);border-radius:10px;padding:8px 10px;margin:3px 0;background:#fff;cursor:pointer;font-family:inherit">'
+        +'<div style="font-size:13px;font-weight:700;color:var(--navy)">'+escapeHTML(p.name||'(sin nombre)')+' '+badge+'</div>'
+        +(sub?('<div style="font-size:11px;color:var(--gray-500);margin-top:1px">'+escapeHTML(sub)+'</div>'):'')
+        +'</button>';
+    }).join('');
+    cont.querySelectorAll('button[data-pid]').forEach(function(b){
+      b.onclick=async function(){
+        b.disabled=true;
+        try{
+          await FST_guardarCitaVinculada(claveNorm, nombre, b.dataset.pid, b.dataset.tipo);
+          showToast('🔗 Vinculado','success');
+          m.remove();
+          if(document.querySelector('[data-rendov]')) mostrarRendimientoEquipo(window._rendVentanaActualTri||'hoy');
+        }catch(e){ showToast('Error al vincular: '+((e&&e.message)||''),'error'); b.disabled=false; }
+      };
+    });
+  }
+  inp.addEventListener('input', function(){ pintar(inp.value); });
+  inp.value=String(nombre||''); pintar(inp.value);   // prefill con el nombre del calendario
+  if(yaVinc){
+    m.querySelector('[data-deshacer]').onclick=async function(){
+      var btn=this; btn.disabled=true;
+      try{
+        await FST_borrarCitaVinculada(claveNorm);
+        showToast('↩︎ Vinculación deshecha','success');
+        m.remove();
+        if(document.querySelector('[data-rendov]')) mostrarRendimientoEquipo(window._rendVentanaActualTri||'hoy');
+      }catch(e){ showToast('Error al deshacer: '+((e&&e.message)||''),'error'); btn.disabled=false; }
+    };
+  }
+  m.querySelector('[data-cerrar]').onclick=function(){ m.remove(); };
+  document.body.appendChild(m);
+  setTimeout(function(){ try{ inp.focus(); inp.select(); }catch(_){} }, 50);
 }
 // ── fin LOOP S1+S2+S3 ────────────────────────────────────────────────────────────────
 // REFRESCO-PACIENTES: recarga la lista desde el Sheet en segundo plano, sin bloquear.

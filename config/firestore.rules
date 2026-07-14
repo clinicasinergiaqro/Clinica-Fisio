@@ -92,6 +92,15 @@ service cloud.firestore {
         'fecha','claveNorm','resueltoPor','updatedAt'
       ]);
     }
+    // ── v13: vinculación permanente nombre-calendario → paciente (dashboard) ──
+    // Doc id = claveNorm (nombreNormalizado del nombre del calendario). Solo el
+    // supervisor vincula; todas las terapeutas leen (el resolver del dashboard la
+    // aplica antes del match automático). Reversible: overwrite o delete del doc.
+    function citaVinculadaOK() {
+      return request.resource.data.keys().hasOnly([
+        'pid','tipo','nombreOriginal','vinculadoPor','fecha','updatedAt'
+      ]);
+    }
     match /pacientes/{pacienteId} {
       allow read: if isWriter();
       allow create: if isWriter();
@@ -119,6 +128,11 @@ service cloud.firestore {
     match /citasResueltas/{citaId} {
       allow read: if isWriter();
       allow create, update: if isSupervisor() && citaResueltaOK();
+      allow delete: if isSupervisor();
+    }
+    match /citasVinculadas/{claveNorm} {
+      allow read: if isWriter();
+      allow create, update: if isSupervisor() && citaVinculadaOK();
       allow delete: if isSupervisor();
     }
     // ── v10: lectura por collection group de 'sesiones' (cola de revisión) ──
