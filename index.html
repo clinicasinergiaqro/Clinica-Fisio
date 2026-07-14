@@ -5707,6 +5707,10 @@ async function FST_hidratarCamposClinicos(p, id) {
     // truthy (no pisar valor local con '' de nube), arrays por .length, revalSolicitada por != null
     // (objeto|null; != null no clobberea con null). fechaNacimiento es el canónico (el d.fechaNac
     // del índice es otro campo legacy, no lo escribe outCl).
+    // Simetría del nombre: _persistirDatosPaciente escribe name/nombreNormalizado (whitelist v12),
+    // pero sin releerlos aquí un histórico renombrado revertía al nombre viejo del índice al reabrir.
+    if (d.name)                          p.name = d.name;
+    if (d.nombreNormalizado)             p.nombreNormalizado = d.nombreNormalizado;
     if (d.sexo)                          p.sexo = d.sexo;
     if (d.telefono)                      p.telefono = d.telefono;
     if (d.fechaNacimiento)               p.fechaNacimiento = d.fechaNacimiento;
@@ -8254,6 +8258,8 @@ async function _guardarEdicionPaciente(pid){
   try{
     var res = await _persistirDatosPaciente(p);
     var ok = !!(res && res.ok);
+    // Invalidar el índice cacheado (24 h) para que lista/dashboard/buscador dejen de mostrar el nombre viejo.
+    if(ok && typeof window._FST_invalidarIndicePacientes==='function') window._FST_invalidarIndicePacientes();
     var ov = document.getElementById('_edit-pac-ov'); if(ov) ov.remove();
     var tn = document.getElementById('exp-topbar-name'); if(tn) tn.textContent = p.name.split(' ').slice(0,2).join(' ');
     var tm = document.getElementById('exp-topbar-meta'); if(tm) tm.textContent = (p.age!=null?p.age+' años · ':'')+(p.terapeuta||'');
