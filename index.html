@@ -5548,6 +5548,22 @@ async function FST_hidratarCamposClinicos(p, id) {
     if (Array.isArray(d.fotos) && d.fotos.length)               p.fotos = d.fotos;
     if (Array.isArray(d.docs)  && d.docs.length)                p.docs  = d.docs;
 
+    // Fase 2b — SIMETRÍA escribe→lee. outCl (v12) escribe 11 campos de paciente, pero solo
+    // etiquetas (índice 5368) y age (parcial, 5509) se leían de vuelta → los otros 9 se guardaban
+    // en Firestore pero eran invisibles al reabrir/en otro equipo. Guards estrictos: strings por
+    // truthy (no pisar valor local con '' de nube), arrays por .length, revalSolicitada por != null
+    // (objeto|null; != null no clobberea con null). fechaNacimiento es el canónico (el d.fechaNac
+    // del índice es otro campo legacy, no lo escribe outCl).
+    if (d.sexo)                          p.sexo = d.sexo;
+    if (d.telefono)                      p.telefono = d.telefono;
+    if (d.fechaNacimiento)               p.fechaNacimiento = d.fechaNacimiento;
+    if (d.medicoReferente)               p.medicoReferente = d.medicoReferente;
+    if (d.fechaCreacion)                 p.fechaCreacion = d.fechaCreacion;
+    if (d.fechaInicio)                   p.fechaInicio = d.fechaInicio;
+    if (Array.isArray(d.eventosAdversos) && d.eventosAdversos.length)   p.eventosAdversos = d.eventosAdversos;
+    if (Array.isArray(d.historialCambios) && d.historialCambios.length) p.historialCambios = d.historialCambios;
+    if (d.revalSolicitada != null)       p.revalSolicitada = d.revalSolicitada;
+
   } catch(e) {
     console.warn('[FST-LISTA] hidratar campos clínicos falló (no bloqueante):', e.message);
   }
