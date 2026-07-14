@@ -11208,16 +11208,18 @@ function _RPT_numEva(v){
 function _RPT_esSentinelEva(s){ return !!s && Number(s.evaI)===5 && Number(s.evaF)===3; }
 function _RPT_evaDeSesion(s){
   if(!s) return null;
-  // 1) eva explícito (objeto final/inicio o número) — máxima confianza
-  var e=s.eva;
-  if(e && typeof e==='object'){ var f=_RPT_numEva(e.final); var i=_RPT_numEva(e.inicio); if(f!=null||i!=null) return f!=null?f:i; }
-  var n=_RPT_numEva(e); if(n!=null) return n;
-  // 2) FIX EVA (A1): evaF/evaI de los sliders (donde guardarSOAP puntúa) — excluyendo el sentinel 5/3
+  // FIX EVA (A1 · orden confirmado con Carlos): el SLIDER (evaF/evaI) es la FUENTE DE VERDAD de
+  // la clínica — gana SIEMPRE que sea un valor real, por encima de eva explícito y del texto.
+  // 1) SLIDER real (no sentinel 5/3 = sliders no tocados)
   if(!_RPT_esSentinelEva(s)){
     var sf=_RPT_numEva(s.evaF); if(sf!=null) return sf;
     var si=_RPT_numEva(s.evaI); if(si!=null) return si;
   }
-  // 3) parse de texto ("N/10" o "eva: N") — último recurso
+  // 2) eva explícito (objeto final/inicio o número) — solo cuando NO hay slider real
+  var e=s.eva;
+  if(e && typeof e==='object'){ var f=_RPT_numEva(e.final); var i=_RPT_numEva(e.inicio); if(f!=null||i!=null) return f!=null?f:i; }
+  var n=_RPT_numEva(e); if(n!=null) return n;
+  // 3) parse de texto ("N/10" o "eva: N") — RESPALDO, solo si no hubo slider ni eva
   var txt=(((s.s&&s.s.dolor)||'')+' '+(s.textoOriginal||''));
   var m=txt.match(/(\d{1,2})\s*\/\s*10/); if(m){ var v=parseInt(m[1],10); if(v>=0&&v<=10) return v; }
   m=txt.match(/eva\s*[:=]?\s*(\d{1,2})/i); if(m){ var v2=parseInt(m[1],10); if(v2>=0&&v2<=10) return v2; }
