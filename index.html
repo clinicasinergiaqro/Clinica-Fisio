@@ -8026,7 +8026,9 @@ async function _persistirDatosPaciente(p){
   if (!initOk || !window._fstDb) throw new Error('Firestore no disponible');
   await window._fstDb.collection('pacientes').doc(p.id).set(
     { name: p.name, nombreNormalizado: p.nombreNormalizado || FST_normalizarNombreLive(p.name||''),
-      age: p.age, telefono: p.telefono||'', terapeuta: p.terapeuta||'' },
+      age: p.age, telefono: p.telefono||'', terapeuta: p.terapeuta||'',
+      // Loop editar-datos: sexo/fechaNacimiento/medicoReferente (ya en pacienteClinicoUpdateOK v12).
+      sexo: p.sexo||'', fechaNacimiento: p.fechaNacimiento||'', medicoReferente: p.medicoReferente||'' },
     { merge:true }
   );
   return { ok:true, via:'firestore' };
@@ -8038,6 +8040,10 @@ function _abrirEditarPaciente(pid){
   var ters = ['CARLOS','DAF','ZARA','CAMI','GORE','JESS'];
   var opts = ters.map(function(t){ return '<option value="'+t+'"'+(p.terapeuta===t?' selected':'')+'>'+t+'</option>'; }).join('');
   if(p.terapeuta && ters.indexOf(p.terapeuta)===-1){ opts = '<option value="'+escapeAttr_(p.terapeuta)+'" selected>'+escapeHTML(p.terapeuta)+'</option>'+opts; }
+  // Sexo: mismas opciones que el alta inicial (n-sexo, NOM-004). Preserva valor no estándar existente.
+  var sexosStd = ['Masculino','Femenino','Indeterminado'];
+  var sexoOpts = '<option value="">Seleccionar...</option>' + sexosStd.map(function(o){ return '<option'+(p.sexo===o?' selected':'')+'>'+o+'</option>'; }).join('');
+  if(p.sexo && sexosStd.indexOf(p.sexo)===-1){ sexoOpts += '<option selected>'+escapeHTML(p.sexo)+'</option>'; }
   var ov = document.createElement('div');
   ov.id = '_edit-pac-ov';
   ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:10001;display:flex;align-items:flex-end;justify-content:center';
@@ -8048,10 +8054,16 @@ function _abrirEditarPaciente(pid){
     + '<div style="font-weight:800;color:var(--navy);margin-bottom:12px">✏️ Editar datos del paciente</div>'
     + '<label style="'+lbl+'">Nombre</label>'
     + '<input id="_ep-nombre" type="text" value="'+escapeAttr_(p.name||'')+'" style="'+inp+'">'
+    + '<label style="'+lbl+'">Sexo</label>'
+    + '<select id="_ep-sexo" style="'+inp+'">'+sexoOpts+'</select>'
+    + '<label style="'+lbl+'">Fecha de nacimiento</label>'
+    + '<input id="_ep-fnac" type="text" inputmode="numeric" placeholder="DD/MM/AAAA" value="'+escapeAttr_(p.fechaNacimiento||'')+'" style="'+inp+'">'
     + '<label style="'+lbl+'">Edad</label>'
     + '<input id="_ep-edad" type="number" inputmode="numeric" value="'+escapeAttr_(String(p.age==null?'':p.age))+'" style="'+inp+'">'
     + '<label style="'+lbl+'">Teléfono</label>'
     + '<input id="_ep-tel" type="tel" inputmode="tel" value="'+escapeAttr_(p.telefono||'')+'" style="'+inp+'">'
+    + '<label style="'+lbl+'">Médico referente</label>'
+    + '<input id="_ep-medico" type="text" value="'+escapeAttr_(p.medicoReferente||'')+'" style="'+inp+'">'
     + '<label style="'+lbl+'">Terapeuta</label>'
     + '<select id="_ep-ter" style="'+inp+'">'+opts+'</select>'
     + '<button id="_ep-ok" style="width:100%;padding:12px;border:none;border-radius:10px;background:var(--navy);color:#fff;font-size:14px;font-weight:700;cursor:pointer;margin-top:4px">Guardar cambios</button>'
@@ -8076,6 +8088,13 @@ async function _guardarEdicionPaciente(pid){
   if(edadRaw!==''){ var e=parseInt(edadRaw,10); if(!isNaN(e)) p.age = e; }
   p.telefono = tel;
   if(ter) p.terapeuta = ter;
+  // Nuevos campos del form (grifo que faltaba): sexo (NOM-004), fecha de nacimiento, médico referente.
+  var sexoV = (document.getElementById('_ep-sexo') && document.getElementById('_ep-sexo').value || '').trim();
+  var fnacV = (document.getElementById('_ep-fnac') && document.getElementById('_ep-fnac').value || '').trim();
+  var medV  = (document.getElementById('_ep-medico') && document.getElementById('_ep-medico').value || '').trim();
+  p.sexo = sexoV;
+  p.fechaNacimiento = fnacV;
+  p.medicoReferente = medV;
   p.updatedAt = Date.now();
   try{
     var res = await _persistirDatosPaciente(p);
