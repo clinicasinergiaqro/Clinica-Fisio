@@ -3656,7 +3656,7 @@ async function _marcarCitaResuelta(nombre, fecha){
 }
 function _triangularCitasNotas(eventos, resueltos, ultimaHist, asigMap, resueltas){
   var porTer={};
-  Object.keys(TERAPEUTA_CAL2COD).forEach(function(n){ porTer[n]={citas:0, conNota:0, sinNota:0, resueltas:0, sinNotaPacs:[]}; });
+  Object.keys(TERAPEUTA_CAL2COD).forEach(function(n){ porTer[n]={citas:0, conNota:0, sinNota:0, resueltas:0, sinNotaPacs:[], noIdentificados:0, noIdentPacs:[]}; });
   var porDia={};   // VISTA-SEMANAL: desglose por día DD/MM/YYYY (mismo universo que la tabla: citas con terapeuta)
   var vistosSinNota={};
   (Array.isArray(eventos)?eventos:[]).forEach(function(ev){
@@ -3679,14 +3679,24 @@ function _triangularCitasNotas(eventos, resueltos, ultimaHist, asigMap, resuelta
     if(ddmm){
       var dd=porDia[ddmm]||(porDia[ddmm]={citas:0, conNota:0, sinNota:0});
       dd.citas++;
-      if(tiene||resuelta) dd.conNota++; else dd.sinNota++;
+      // EXACTITUD: pid:null (no identificado) no entra al 🔴 del día — falso positivo hasta vincularlo.
+      if(tiene||resuelta) dd.conNota++; else if(r.pid) dd.sinNota++;
     }
     porTer[ter].citas++;
     if(tiene){ porTer[ter].conNota++; }
     else if(resuelta){ porTer[ter].conNota++; porTer[ter].resueltas++; }
+    else if(!r.pid){
+      // EXACTITUD: nombre de calendario sin expediente → "🔎 Revisar", NO cuenta como falta.
+      porTer[ter].noIdentificados++;
+      var kni='NI|'+ter+'|'+clave+'|'+ddmm;   // espacio de clave propio: nunca colisiona con sinNota real
+      if(!vistosSinNota[kni]){
+        vistosSinNota[kni]=true;
+        porTer[ter].noIdentPacs.push({nombre:ev.paciente||'(sin nombre)', pid:r.pid, tipo:r.tipo, fecha:ddmm});
+      }
+    }
     else {
       porTer[ter].sinNota++;
-      var kdup=ter+'|'+clave+'|'+ddmm;
+      var kdup='SN|'+ter+'|'+clave+'|'+ddmm;   // espacio de clave propio (simetría con NI|)
       if(!vistosSinNota[kdup]){
         vistosSinNota[kdup]=true;
         porTer[ter].sinNotaPacs.push({nombre:ev.paciente||'(sin nombre)', pid:r.pid, tipo:r.tipo, fecha:ddmm});
@@ -3961,7 +3971,7 @@ function _rendimientoHTML(datos, noId, ventana, etiqueta, aviso, refresco, tri){
       +'<td style="padding:6px 8px;font-weight:700;color:'+c+'">'+escapeHTML(n)+'</td>'
       +'<td style="padding:6px 8px;text-align:center">'+t.citas+'</td>'
       +'<td style="padding:6px 8px;text-align:center;font-weight:700;color:#2E7D52">'+(t.conNota==null?'—':('✅ '+t.conNota))+'</td>'
-      +'<td style="padding:6px 8px;text-align:center;font-weight:700;color:'+((t.sinNota>0)?'#B91C1C':'var(--gray-400)')+'">'+(t.sinNota==null?'—':(t.sinNota>0?('🔴 '+t.sinNota):'0'))+'</td>'
+      +'<td style="padding:6px 8px;text-align:center;font-weight:700;color:'+((t.sinNota>0)?'#B91C1C':'var(--gray-400)')+'">'+(t.sinNota==null?'—':(t.sinNota>0?('🔴 '+t.sinNota):'0'))+((t.noIdentificados>0)?(' <span style="color:#92400E;font-weight:700;white-space:nowrap">🔎 '+t.noIdentificados+'</span>'):'')+'</td>'
       +'<td style="padding:6px 8px;text-align:center">'+(st.scoreN?Math.round(st.scoreSum/st.scoreN):'—')+'</td></tr>';
   }).join('');
   // Bloques por terapeuta: pacientes con cita SIN nota → botón directo al expediente
@@ -3976,6 +3986,20 @@ function _rendimientoHTML(datos, noId, ventana, etiqueta, aviso, refresco, tri){
   var seccionSinNota=bloquesSinNota
     ? '<div style="margin-top:12px"><div style="font-size:12px;font-weight:800;color:var(--navy)">📝 Citas sin nota — toca para abrir el expediente</div>'+bloquesSinNota+'</div>'
     : '<div style="margin-top:12px;font-size:12px;font-weight:700;color:#2E7D52">✅ Todas las citas identificadas de la ventana tienen nota</div>';
+  // EXACTITUD: nombres de calendario sin expediente (pid:null) → sección aparte "🔎 Revisar".
+  // NO cuentan como falta (🔴); reutilizan _chipSinNota, que ya trae el botón 🔗 Vincular por ser pid:null.
+  var bloquesRevisar=Object.keys(TERAPEUTA_CAL2COD).map(function(n){
+    var t=tri[n];
+    if(!t || !t.noIdentPacs || !t.noIdentPacs.length) return '';
+    var c=(typeof AGENDA_COLORES!=='undefined'&&AGENDA_COLORES[n])?AGENDA_COLORES[n]:'#9BA3B5';
+    return '<div style="margin-top:8px;border-left:4px solid '+c+';padding-left:8px">'
+      +'<div style="font-size:12px;font-weight:800;color:'+c+'">'+escapeHTML(n)+' — '+t.noIdentPacs.length+' sin identificar</div>'
+      +'<div style="margin-top:2px">'+t.noIdentPacs.map(function(x){ return _chipSinNota(x); }).join('')+'</div></div>';
+  }).join('');
+  var totalRevisar=Object.keys(TERAPEUTA_CAL2COD).reduce(function(a,n){ var t=tri[n]; return a+((t&&t.noIdentificados)||0); },0);
+  var seccionRevisar=bloquesRevisar
+    ? '<div style="margin-top:12px"><div style="font-size:12px;font-weight:800;color:#92400E">🔎 Revisar — '+totalRevisar+' cita'+(totalRevisar!==1?'s':'')+' sin identificar <span style="font-weight:400;color:var(--gray-500)">(no cuentan como falta; vincula para resolver)</span></div>'+bloquesRevisar+'</div>'
+    : '';
   // VISTA-SEMANAL: una columna por día (Lun..Vie; Sáb/Dom solo si tienen citas). Días futuros = "por venir".
   var bloqueSemana='';
   if(ventana==='semana' && tri._porDia && Array.isArray(tri._diasDDMM)){
@@ -4028,6 +4052,7 @@ function _rendimientoHTML(datos, noId, ventana, etiqueta, aviso, refresco, tri){
     +'<th style="padding:6px 8px;text-align:left">Terapeuta</th><th style="padding:6px 8px">Citas</th><th style="padding:6px 8px">✅ Nota</th><th style="padding:6px 8px">🔴 Sin</th><th style="padding:6px 8px">Score</th></tr></thead>'
     +'<tbody>'+filas+'</tbody></table></div>'
     +seccionSinNota
+    +seccionRevisar
     +filaSA+bloqueNI
     +'<div style="font-size:10px;color:var(--gray-400);margin-top:10px">✅/🔴 por PACIENTE y día: nota fechada el día exacto de la cita, sin importar qué terapeuta la escribió (activos por expediente; históricos por ultimaSesionLive). ✅ incluye citas resueltas a mano con ✓. Score = calidad promedio de nota (0-100) de pacientes activos.</div>';
 }
