@@ -1240,7 +1240,7 @@ async function saveDB(k, v, opts){
   const lista = Array.isArray(v) ? v : [];
   if(!lista.length) return {ok:true, guardados:0};
 
-  let guardados=0, errores=0;
+  let guardados=0, errores=0, _pendienteHist=false;
 
   for(const p of lista){
     if(!p || !p.id) continue;
@@ -1259,6 +1259,7 @@ async function saveDB(k, v, opts){
       else if(rHist && rHist.error==='conflicto-cancelado'){ errores++; } // el usuario canceló a propósito — NO reintentar
       else {
         errores++;
+        if(rHist && rHist.pendiente) _pendienteHist=true; // CAPA 3: offline → el caller mostrará amarillo, no rojo
         // LOOP C: cola PROPIA de históricos con el diff filtrado del Loop B. encolarSync (COLA_SYNC)
         // queda FUERA: esa cola es de activos y descartaba los mig_pac_ sin reintentar (el toast
         // "📴 N pendientes" mentía). Sin camposHist declarado no se encola (no hay diff seguro).
@@ -1456,7 +1457,7 @@ async function saveDB(k, v, opts){
   }
 
   if(errores===0) return {ok:true, guardados};
-  return {ok:false, error:`${errores} de ${lista.length} pacientes no se guardaron`, guardados};
+  return {ok:false, pendiente:_pendienteHist, error:`${errores} de ${lista.length} pacientes no se guardaron`, guardados};
 }
 // FUGA-HISTÓRICOS: Firestore RECHAZA cualquier set() que contenga un valor `undefined` a
 // CUALQUIER profundidad y explota el write ENTERO (permission NO tiene nada que ver). Si el
@@ -1577,7 +1578,9 @@ async function _persistirHistoricoFirestore(p, camposHist){
     // Sin baseline (p._updatedAtNube ausente: sesión vieja) o sin red → no hay chequeo (sin falsos positivos).
     try{
       if(navigator.onLine && p._updatedAtNube != null){
-        var _docPre = await ref.get();
+        // CAPA 3: _conTimeout para que un get() colgado (online pero red muerta) no bloquee — al
+        // timeout el catch(_c) de abajo sigue al write, que a su vez hará timeout y encolará.
+        var _docPre = await _conTimeout(ref.get(), 8000);
         var _dPre = (_docPre && _docPre.data()) || {};
         var _remoteMs = (_dPre.updatedAt && typeof _dPre.updatedAt.toMillis==='function') ? _dPre.updatedAt.toMillis() : 0;
         if(_remoteMs > p._updatedAtNube){
@@ -1612,10 +1615,21 @@ async function _persistirHistoricoFirestore(p, camposHist){
     outCl.ultimosCampos = Object.keys(outCl).concat(Object.keys(outEj)).filter(function(k){ return ['updatedAt','ultimoUsuario','fechaActualizacion','ultimosCampos'].indexOf(k)===-1; });
 
     // ── Writes (1: ejercicios — whitelist propia, sin metadatos; 2: clínico — con rastro) ──
-    if(Object.keys(outEj).length){
-      await ref.set(_sinUndefined(outEj), { merge:true }); // _sinUndefined: Firestore no acepta undefined
+    // CAPA 3: sin conexión el SDK NO rechaza el set() (queda pendiente indefinidamente) → sin
+    // _conTimeout el await se colgaba y la cola del Loop C nunca se activaba. Al timeout devolvemos
+    // {ok:false, pendiente:true} → saveDB encola el DIFF completo (camposHist) en COLA_SYNC_HIST_DOC.
+    // Doble write: si outEj pasó y outCl hace timeout, se encola el diff COMPLETO igual — el replay
+    // reescribe outEj con los MISMOS valores (idempotente con merge) y outCl que faltaba; el guard de
+    // recencia del drenado protege de clobber. Por eso encolar todo es seguro.
+    try{
+      if(Object.keys(outEj).length){
+        await _conTimeout(ref.set(_sinUndefined(outEj), { merge:true }), 8000); // _sinUndefined: Firestore no acepta undefined
+      }
+      await _conTimeout(ref.set(_sinUndefined(outCl), { merge:true }), 8000);
+    }catch(_wt){
+      if(_wt && _wt.message==='timeout') return {ok:false, pendiente:true}; // offline → saveDB encola (toast amarillo de _encolarHistDoc)
+      throw _wt; // error REAL → catch de abajo (dato NO guardado)
     }
-    await ref.set(_sinUndefined(outCl), { merge:true });
     // Refrescar el baseline de recencia de ESTE dispositivo (para el próximo chequeo de conflicto).
     try{
       var _docPost = await ref.get(); var _dPost=(_docPost&&_docPost.data())||{};
@@ -11260,6 +11274,9 @@ function guardarEdicionHistoria(seccion, tabRetorno){
   saveDB('pts', [p], {camposHist:_camposHistSec}).then(res => {
     if(res && res.ok){
       showToast('✅ Cambios guardados — ' + fechaHora, 'success');
+    } else if(res && res.pendiente){
+      // CAPA 3: sin conexión — se encoló en COLA_SYNC_HIST_DOC y _encolarHistDoc ya mostró el toast
+      // amarillo honesto ("se reintentará solo"). NO mostrar el rojo de "NO se guardó" (sí se guardará).
     } else if(esHist){
       showToast('❌ No se pudo guardar en la nube — el cambio NO se guardó. Reintenta o avisa a Carlos.', 'error');
     } else {
