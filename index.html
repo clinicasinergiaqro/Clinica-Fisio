@@ -1958,6 +1958,9 @@ async function loadFromCloud(){
     if(Array.isArray(d)&&d.length>0){
       // Cargar versión local actual para preservar base64 (fotos, firmas, docs)
       const local = loadLocal('pts') || [];
+      // PAPELERA (Loop 1): ids de pacientes borrados (tombstone). Se usa para NO re-inyectar
+      // ni re-subir un activo borrado desde el local de otro iPad, y para purgarlo del local.
+      const idsBorrados = await _cargarSetPacientesBorrados();
       const MARGEN = 3000; // ms — margen contra relojes desfasados entre iPads
       const idsDeNube = new Set();
 
@@ -2006,13 +2009,16 @@ async function loadFromCloud(){
       // NO son "creados offline sin subir" — son basura que resucitaría en Sheets.
       local.forEach(pLocal=>{
         if(pLocal && pLocal.id && !idsDeNube.has(pLocal.id)
-           && !String(pLocal.id).startsWith('mig_pac_') && !_esPacienteTest(pLocal)){
+           && !String(pLocal.id).startsWith('mig_pac_') && !_esPacienteTest(pLocal)
+           && !idsBorrados.has(pLocal.id)){   // PAPELERA: un activo borrado no revive ni se re-sube
           saneados.push(pLocal);
           encolarSync(pLocal.id);
         }
       });
 
-      var saneadosLimpios=saneados.filter(function(p){ return !_esPacienteTest(p); });
+      // PAPELERA: purga defensiva — quita de la vista/local cualquier id en el tombstone
+      // (auto-limpieza del iPad rezagado que aún lo tuviera en sinergia_pts).
+      var saneadosLimpios=saneados.filter(function(p){ return !_esPacienteTest(p) && !idsBorrados.has(p.id); });
       saveLocal('pts',saneadosLimpios);
       try{ localStorage.setItem('sinergia_ultimaSyncOk', new Date().toLocaleString('es-MX')); }catch(e){}
       return saneadosLimpios;
@@ -3276,63 +3282,12 @@ async function _aplicarPosponer(pid, dias){
   try{ await saveDB('pts',[p],{camposHist:['revalSolicitada']}); var ovMenu=document.querySelector('[data-posponer]'); if(ovMenu) ovMenu.remove(); showToast('⏰ Pospuesta '+dias+' días','success'); mostrarRevaloraciones(); }
   catch(e){ showToast('❌ '+((e&&e.message)||'error'),'error'); }
 }
+// Loop 1 — el borrado de un activo YA NO es permanente: va a la PAPELERA (recuperable).
+// Este entry-point (botón 🗑️ del modal de revaloración) se conserva por compatibilidad y
+// enruta al flujo de papelera. El hard-delete permanente se retiró; la limpieza definitiva
+// vive en la papelera (Loop 4). Los TEST siguen con hard-delete vía _limpiarTodosLosTest.
 async function _eliminarPacienteRevalorar(pid, tarjetaEl) {
-  var confirmado = await new Promise(function(resolve) {
-    var m = document.createElement('div');
-    m.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px';
-    m.innerHTML = '<div style="background:#fff;border-radius:16px;padding:24px;max-width:320px;width:100%;text-align:center">'
-      + '<div style="font-size:18px;font-weight:800;color:#1e293b;margin-bottom:8px">¿Eliminar paciente?</div>'
-      + '<div style="font-size:13px;color:#64748b;margin-bottom:20px">Se eliminará permanentemente de la lista y base de datos.</div>'
-      + '<div style="display:flex;gap:10px;justify-content:center">'
-      + '<button id="_elim_cancel" style="padding:10px 20px;border-radius:10px;border:1px solid #e2e8f0;background:#f8fafc;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">Cancelar</button>'
-      + '<button id="_elim_ok" style="padding:10px 20px;border-radius:10px;border:none;background:#ef4444;color:#fff;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">Eliminar</button>'
-      + '</div></div>';
-    document.body.appendChild(m);
-    m.querySelector('#_elim_cancel').onclick = function() { m.remove(); resolve(false); };
-    m.querySelector('#_elim_ok').onclick = function() { m.remove(); resolve(true); };
-  });
-  if (!confirmado) return;
-
-  // Agujero #2: mover los archivos del paciente a borrados/ ANTES de eliminarlo (no dejar huérfanos).
-  // Cubre los archivos con referencia estructurada (estudios/fotos/docs/media SOAP). Los históricos
-  // migrados / ejercicios (sin fbPath en estos arrays) los recoge el barrido de fantasmas server-side.
-  try {
-    var _pDel = _resolverPaciente(pid);
-    if (_pDel){
-      var _archivos = [];
-      (Array.isArray(_pDel.estudiosDocs)?_pDel.estudiosDocs:[]).forEach(function(e){ if(e&&e.fbPath) _archivos.push({fbPath:e.fbPath, tipoDoc:e.tipo||'estudio'}); });
-      (Array.isArray(_pDel.fotos)?_pDel.fotos:[]).forEach(function(e){ if(e&&e.fbPath) _archivos.push({fbPath:e.fbPath, tipoDoc:'foto'}); });
-      (Array.isArray(_pDel.docs)?_pDel.docs:[]).forEach(function(e){ if(e&&e.fbPath) _archivos.push({fbPath:e.fbPath, tipoDoc:'doc'}); });
-      (Array.isArray(_pDel.soap)?_pDel.soap:[]).forEach(function(s){ (s&&Array.isArray(s.media)?s.media:[]).forEach(function(m){ if(m&&m.fbPath) _archivos.push({fbPath:m.fbPath, tipoDoc:'soap-media'}); }); });
-      for (var _k=0; _k<_archivos.length; _k++){
-        await _moverArchivoABorrados(_archivos[_k].fbPath, {tipo:'paciente-eliminado', pid:pid, tipoDoc:_archivos[_k].tipoDoc, nombre:(_pDel.name||'')});
-      }
-    }
-  } catch(e){ console.warn('[eliminar] mover archivos a borrados:', e.message); }
-
-  // 1. Borrar de patientsDB
-  patientsDB = patientsDB.filter(function(p) { return p.id !== pid; });
-
-  // 2. Borrar de localStorage sinergia_pts
-  try {
-    var pts = JSON.parse(localStorage.getItem('sinergia_pts') || '[]');
-    localStorage.setItem('sinergia_pts', JSON.stringify(pts.filter(function(p){ return p.id !== pid; })));
-  } catch(e) {}
-
-  // 3. Si NO es histórico: borrar de Firestore y del Sheet
-  if (String(pid).indexOf('mig_pac_') !== 0) {
-    try {
-      if (window._fstDb) await window._fstDb.collection('pacientes').doc(pid).delete();
-    } catch(e) { console.warn('[eliminar] Firestore:', e); }
-    try {
-      await qaFetchPrivado('deletePaciente', { id: pid });
-    } catch(e) { console.warn('[eliminar] Sheet:', e); }
-  }
-
-  // 4. Quitar del DOM
-  if (tarjetaEl) tarjetaEl.remove();
-
-  showToast('🗑️ Paciente eliminado', 'success');
+  return _borrarExpedienteAPapelera(pid, { tarjetaEl: tarjetaEl });
 }
 async function _limpiarTodosLosTest(){
   if(!(currentUser && currentUser.role==='supervisor')){ showToast('Solo supervisor','error'); return; }
@@ -3409,6 +3364,7 @@ async function mostrarRevaloraciones(){
   card.innerHTML='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">'
     +'<div style="font-size:16px;font-weight:800;color:var(--navy)">🔄 Pacientes para revalorar</div>'
     +'<div style="display:flex;align-items:center">'
+    +(currentUser&&currentUser.role==='supervisor'?'<button onclick="_abrirPapelera()" style="font-size:11px;font-weight:700;border:none;border-radius:10px;padding:6px 10px;cursor:pointer;background:#E5EDFF;color:#1E40AF;margin-right:8px">🗑️ Papelera</button>':'')
     +(currentUser&&currentUser.role==='supervisor'?'<button onclick="_limpiarTodosLosTest()" style="font-size:11px;font-weight:700;border:none;border-radius:10px;padding:6px 10px;cursor:pointer;background:#FEE2E2;color:#B91C1C;margin-right:8px">🧹 Limpiar pruebas</button>':'')
     +'<button onclick="this.closest(\'[data-revalov]\').remove()" style="background:none;border:none;font-size:22px;color:var(--gray-400);cursor:pointer">×</button></div></div>'
     +'<div style="font-size:11px;color:var(--gray-400);margin-bottom:12px">🙋 pedida · 📈 EVA sin/poca mejoría · 🚩 banderas/contraindicaciones</div>'
@@ -8896,6 +8852,315 @@ async function _moverArchivoABorrados(fbPath, tomb){
   }
   await _tombstoneBorrado(Object.assign({}, tomb, {fbPath:fbPath, destino:destPath}));
   return true;
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// PAPELERA — Loop 1: borrar-a-papelera + recuperar de expediente ACTIVO (p-uuid),
+// con tombstone anti-resurrección. Solo supervisor. Históricos y notas SOAP sueltas
+// se manejan en loops posteriores. Reglas Firestore: colecciones 'papelera'
+// (supervisor-only, contenido) y 'pacientesBorrados' (tombstone ligero, read=writers).
+// ══════════════════════════════════════════════════════════════════════════
+
+// Set de pids en el tombstone. Cachea en localStorage para seguir filtrando sin red.
+async function _cargarSetPacientesBorrados(){
+  try{
+    if(!window._fstDb && typeof FST_init==='function'){ await FST_init(); }
+    if(window._fstDb){
+      var snap = await window._fstDb.collection('pacientesBorrados').get();
+      var ids = snap.docs.map(function(d){ return d.id; });
+      try{ localStorage.setItem('sinergia_pacientesBorrados', JSON.stringify(ids)); }catch(_){}
+      return new Set(ids);
+    }
+  }catch(e){ console.warn('[papelera] lectura tombstone falló:', e && e.message); }
+  // fail-safe: usar cache local (sigue filtrando aunque no haya red/Firestore)
+  try{ return new Set(JSON.parse(localStorage.getItem('sinergia_pacientesBorrados')||'[]')); }
+  catch(_){ return new Set(); }
+}
+
+// Strippea SOLO el base64 respaldado en Storage (data: con fbPath/url). Conserva firmas
+// de consentimiento y media base64 sin respaldo (para no perderlos al restaurar). Lo que
+// quede grande lo absorbe la guarda de 900KB (snapshot a Storage).
+function _papeleraStripBase64(p){
+  var c = JSON.parse(JSON.stringify(p));
+  function limpiarArr(arr){
+    if(!Array.isArray(arr)) return;
+    arr.forEach(function(it){
+      if(it && typeof it==='object' && typeof it.data==='string'
+         && it.data.indexOf('data:')===0 && (it.fbPath||it.url)){ it.data = null; }
+    });
+  }
+  limpiarArr(c.fotos); limpiarArr(c.docs); limpiarArr(c.estudiosDocs);
+  if(Array.isArray(c.soap)){
+    c.soap.forEach(function(s){
+      if(s && Array.isArray(s.media)){
+        s.media.forEach(function(m){
+          if(m && typeof m.data==='string' && m.data.indexOf('data:')===0 && (m.fbPath||m.url)) m.data=null;
+        });
+      }
+    });
+  }
+  return c;
+}
+
+// Mueve un archivo a papelera/{pid}/{ts}/{fbPath} y DEVUELVE el destino (a diferencia de
+// _moverArchivoABorrados). copy(download+put)+delete original. Reversible.
+async function _moverArchivoAPapelera(fbPath, pid, ts, meta){
+  if(!fbPath) return { ok:true, destino:null, nota:'sin archivo' };
+  var destino = 'papelera/' + pid + '/' + ts + '/' + fbPath;
+  var origen = fbStorage.ref(fbPath);
+  try{
+    var url = await origen.getDownloadURL();
+    var blob = await (await fetch(url)).blob();
+    await fbStorage.ref(destino).put(blob);
+  }catch(err){
+    if(err && err.code==='storage/object-not-found') return { ok:true, destino:null, nota:'objeto ya ausente' };
+    console.warn('[papelera] copia falló:', err && err.message);
+    return { ok:false, destino:null, nota:'copia falló' };
+  }
+  try{
+    await origen.delete();
+  }catch(err){
+    if(!(err && err.code==='storage/object-not-found')){
+      try{ await fbStorage.ref(destino).delete(); }catch(_){}  // rollback: no dejar duplicado
+      console.warn('[papelera] delete original falló:', err && err.message);
+      return { ok:false, destino:null, nota:'delete original falló' };
+    }
+  }
+  try{ await _tombstoneBorrado(Object.assign({}, meta||{}, {fbPath:fbPath, destino:destino, tipo:'papelera-activo', pid:pid})); }catch(_){}
+  return { ok:true, destino:destino };
+}
+
+// Reverso: copia de papelera de vuelta a fbPath. Idempotente, reversible, no aborta el
+// restore si un archivo falla. a = { fbPath, destino, tipoDoc }.
+async function _restaurarArchivoDesdePapelera(a){
+  if(!a || !a.fbPath) return { ok:true, nota:'sin fbPath' };
+  if(!a.destino) return { ok:true, nota:'sin archivo que restaurar' };
+  var target = fbStorage.ref(a.fbPath);
+  // Idempotencia: ¿ya está en fbPath? → borrar la copia de papelera y listo
+  try{
+    await target.getDownloadURL();
+    try{ await fbStorage.ref(a.destino).delete(); }catch(_){}
+    return { ok:true, nota:'ya restaurado' };
+  }catch(_){ /* no está → restaurar */ }
+  var origen = fbStorage.ref(a.destino);
+  try{
+    var url = await origen.getDownloadURL();
+    var blob = await (await fetch(url)).blob();
+    await target.put(blob);   // copiar ANTES de borrar
+  }catch(err){
+    if(err && err.code==='storage/object-not-found') return { ok:false, nota:'copia ausente en papelera' };
+    console.warn('[papelera] restore copia falló:', err && err.message);
+    return { ok:false, nota:'restore copia falló' };
+  }
+  try{ await origen.delete(); }catch(_){ /* duplicado benigno: fbPath es el canónico */ }
+  return { ok:true };
+}
+
+// BORRAR-A-PAPELERA (expediente activo). Orden seguro: snapshot+papelera+tombstone NO
+// destructivos; recién luego los deletes idempotentes. Reanudable si truena a medias.
+async function _borrarExpedienteAPapelera(pid, opts){
+  opts = opts || {};
+  if(!(currentUser && currentUser.role==='supervisor')){ showToast('Solo supervisor','error'); return; }
+  var p = _resolverPaciente(pid);
+  if(!p){ showToast('Paciente no encontrado','error'); return; }
+  if(String(pid).indexOf('mig_pac_')===0){ showToast('Este loop solo maneja activos','warning'); return; }
+
+  var confirmado = await new Promise(function(resolve){
+    var m = document.createElement('div');
+    m.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px';
+    m.innerHTML='<div style="background:#fff;border-radius:16px;padding:24px;max-width:340px;width:100%;text-align:center">'
+      +'<div style="font-size:18px;font-weight:800;color:#1e293b;margin-bottom:8px">¿Mover a la papelera?</div>'
+      +'<div style="font-size:13px;color:#64748b;margin-bottom:20px">Se moverá a la PAPELERA. Podrás recuperarlo desde 🗑️ Papelera.</div>'
+      +'<div style="display:flex;gap:10px;justify-content:center">'
+      +'<button id="_pap_cancel" style="padding:10px 20px;border-radius:10px;border:1px solid #e2e8f0;background:#f8fafc;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">Cancelar</button>'
+      +'<button id="_pap_ok" style="padding:10px 20px;border-radius:10px;border:none;background:#ef4444;color:#fff;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">Mover a papelera</button>'
+      +'</div></div>';
+    document.body.appendChild(m);
+    m.querySelector('#_pap_cancel').onclick=function(){ m.remove(); resolve(false); };
+    m.querySelector('#_pap_ok').onclick=function(){ m.remove(); resolve(true); };
+  });
+  if(!confirmado) return;
+
+  var email = (currentUser&&currentUser.email)||(currentUser&&currentUser.username)||'';
+  var okF = (typeof FST_init==='function') ? await FST_init() : false;
+  if(!okF || !window._fstDb){ showToast('Sin conexión a la base — intenta con internet','error'); return; }
+
+  try{
+    // ¿Ya hay tombstone? → borrado a medias: NO re-snapshotear, reanudar.
+    var yaTomb = false;
+    try{ yaTomb = (await window._fstDb.collection('pacientesBorrados').doc(pid).get()).exists; }catch(_){}
+
+    if(!yaTomb){
+      showToast('🗑️ Moviendo a la papelera…','');
+      var ts = Date.now();
+      // (b) SNAPSHOT no destructivo
+      var snapshotDocLive = null;
+      try{ snapshotDocLive = (await window._fstDb.collection('pacientes').doc(pid).get()).data() || null; }catch(_){}
+      var snapshotSesiones = [];
+      var ss = await window._fstDb.collection('pacientes').doc(pid).collection('sesiones').get(); // si falla → throw → aborta sin tocar nada
+      snapshotSesiones = ss.docs.map(function(d){ return Object.assign({ id:d.id }, d.data()); });
+      var snapshotPaciente = _papeleraStripBase64(p);
+
+      // refs de archivos (aún sin mover)
+      var archivosRef = [];
+      (Array.isArray(p.estudiosDocs)?p.estudiosDocs:[]).forEach(function(e){ if(e&&e.fbPath) archivosRef.push({fbPath:e.fbPath, tipoDoc:e.tipo||'estudio'}); });
+      (Array.isArray(p.fotos)?p.fotos:[]).forEach(function(e){ if(e&&e.fbPath) archivosRef.push({fbPath:e.fbPath, tipoDoc:'foto'}); });
+      (Array.isArray(p.docs)?p.docs:[]).forEach(function(e){ if(e&&e.fbPath) archivosRef.push({fbPath:e.fbPath, tipoDoc:'doc'}); });
+      (Array.isArray(p.soap)?p.soap:[]).forEach(function(s){ (s&&Array.isArray(s.media)?s.media:[]).forEach(function(m){ if(m&&m.fbPath) archivosRef.push({fbPath:m.fbPath, tipoDoc:'soap-media'}); }); });
+
+      var docPap = {
+        tipo:'expedienteActivo', pid:pid, origen:'activo', nombre:p.name||'',
+        snapshotPaciente:snapshotPaciente, snapshotDocLive:snapshotDocLive, snapshotSesiones:snapshotSesiones,
+        archivos: archivosRef.map(function(r){ return { fbPath:r.fbPath, destino:null, tipoDoc:r.tipoDoc }; }),
+        teniaFilaSheet:true, borradoPor:email,
+        fecha:firebase.firestore.FieldValue.serverTimestamp(), motivo:opts.motivo||''
+      };
+      // Guarda de 900KB: si el snapshot es enorme (base64 sin respaldo), va a Storage.
+      try{
+        var aprox = JSON.stringify({a:snapshotPaciente,b:snapshotDocLive,c:snapshotSesiones}).length;
+        if(aprox > 900000){
+          var spath = 'papelera/' + pid + '/' + ts + '/snapshot.json';
+          await fbStorage.ref(spath).putString(JSON.stringify({snapshotPaciente:snapshotPaciente,snapshotDocLive:snapshotDocLive,snapshotSesiones:snapshotSesiones}), 'raw', {contentType:'application/json'});
+          delete docPap.snapshotPaciente; delete docPap.snapshotDocLive; delete docPap.snapshotSesiones;
+          docPap.snapshotStoragePath = spath;
+        }
+      }catch(e){ console.warn('[papelera] guarda de tamaño:', e && e.message); }
+
+      // (c) escribir papelera y CONFIRMAR (obtener ref para actualizar destinos luego)
+      var papRef = await window._fstDb.collection('papelera').add(docPap);
+      // (d) tombstone (desde aquí el paciente es invisible+recuperable; archivos aún en fbPath)
+      await window._fstDb.collection('pacientesBorrados').doc(pid).set({ pid:pid, nombre:p.name||'', borradoPor:email, fecha:firebase.firestore.FieldValue.serverTimestamp() });
+      try{ var cache=JSON.parse(localStorage.getItem('sinergia_pacientesBorrados')||'[]'); if(cache.indexOf(pid)<0){ cache.push(pid); localStorage.setItem('sinergia_pacientesBorrados', JSON.stringify(cache)); } }catch(_){}
+
+      // (e1) mover archivos y registrar destinos en el doc de papelera
+      var archivos = [];
+      for(var k=0;k<archivosRef.length;k++){
+        var r = await _moverArchivoAPapelera(archivosRef[k].fbPath, pid, ts, {nombre:p.name||'', tipoDoc:archivosRef[k].tipoDoc});
+        archivos.push({ fbPath:archivosRef[k].fbPath, destino:r.destino||null, tipoDoc:archivosRef[k].tipoDoc });
+      }
+      try{ await papRef.update({ archivos: archivos }); }catch(e){ console.warn('[papelera] update archivos:', e && e.message); }
+    }
+
+    // (e2) DESTRUCTIVO idempotente (borrar algo ausente = no-op)
+    try{
+      var sesDel = await window._fstDb.collection('pacientes').doc(pid).collection('sesiones').get();
+      for(var i=0;i<sesDel.docs.length;i++){ try{ await sesDel.docs[i].ref.delete(); }catch(_){} }
+    }catch(_){}
+    try{ await window._fstDb.collection('pacientes').doc(pid).delete(); }catch(e){ console.warn('[papelera] delete doc:', e && e.message); }
+    try{ await qaFetchPrivado('deletePaciente', { id: pid }); }catch(e){ console.warn('[papelera] Sheet:', e && e.message); }
+    patientsDB = (Array.isArray(patientsDB)?patientsDB:[]).filter(function(x){ return x.id!==pid; });
+    try{ var pts=JSON.parse(localStorage.getItem('sinergia_pts')||'[]'); localStorage.setItem('sinergia_pts', JSON.stringify(pts.filter(function(x){ return x.id!==pid; }))); }catch(_){}
+    try{ if(typeof desencolarSync==='function') desencolarSync(pid); }catch(_){}
+
+    if(opts.tarjetaEl) opts.tarjetaEl.remove();
+    try{ if(typeof window._FST_invalidarVistaPacientes==='function') window._FST_invalidarVistaPacientes(); }catch(_){}
+    try{ if(typeof renderPacientes==='function') renderPacientes(); }catch(_){}
+    showToast('🗑️ Movido a la papelera (recuperable)','success');
+  }catch(e){
+    console.warn('[papelera] borrado:', e && e.message);
+    // Antes del tombstone: nada se tocó (paciente intacto). Después: quedó invisible+recuperable.
+    showToast('Borrado incompleto (sin red). Si quedó en papelera, reintenta con conexión.','warning');
+  }
+}
+
+// RECUPERAR-DE-PAPELERA (expediente activo). Re-crea Sheet+doc+subcolección+archivos+local
+// y quita papelera+tombstone. Reconcilia cualquier huérfano (re-setea todo).
+async function _restaurarExpedienteDePapelera(papeleraDocId){
+  if(!(currentUser && currentUser.role==='supervisor')){ showToast('Solo supervisor','error'); return; }
+  var okF = (typeof FST_init==='function') ? await FST_init() : false;
+  if(!okF || !window._fstDb){ showToast('Sin conexión a la base','error'); return; }
+  try{
+    var ref = window._fstDb.collection('papelera').doc(papeleraDocId);
+    var snap = await ref.get();
+    if(!snap.exists){ showToast('Ya no está en la papelera','warning'); return; }
+    var doc = snap.data()||{};
+    if(doc.tipo!=='expedienteActivo'){ showToast('Tipo no soportado en este loop','warning'); return; }
+    showToast('♻️ Restaurando…','');
+
+    var snapshotPaciente = doc.snapshotPaciente, snapshotDocLive = doc.snapshotDocLive, snapshotSesiones = doc.snapshotSesiones;
+    if(doc.snapshotStoragePath){
+      try{
+        var u = await fbStorage.ref(doc.snapshotStoragePath).getDownloadURL();
+        var big = await (await fetch(u)).json();
+        snapshotPaciente = big.snapshotPaciente; snapshotDocLive = big.snapshotDocLive; snapshotSesiones = big.snapshotSesiones;
+      }catch(e){ console.warn('[papelera] leer snapshot Storage:', e && e.message); showToast('No se pudo leer el snapshot','error'); return; }
+    }
+    if(!snapshotPaciente){ showToast('Snapshot incompleto','error'); return; }
+    var pid = doc.pid;
+
+    // 1) Sheet (recrea fila)
+    if(doc.teniaFilaSheet){ try{ await callAppsScriptPrivado('savePacientes', { data:[snapshotPaciente] }); }catch(e){ console.warn('[papelera] restore Sheet:', e && e.message); } }
+    // 2) Doc Firestore Live
+    if(snapshotDocLive){ try{ await window._fstDb.collection('pacientes').doc(pid).set(snapshotDocLive); }catch(e){ console.warn('[papelera] restore doc:', e && e.message); } }
+    // 3) Subcolección sesiones
+    if(Array.isArray(snapshotSesiones)){
+      for(var i=0;i<snapshotSesiones.length;i++){
+        var s = snapshotSesiones[i]; var sid = String((s&&s.id)||''); if(!sid) continue;
+        var sBody = Object.assign({}, s); delete sBody.id;
+        try{ await window._fstDb.collection('pacientes').doc(pid).collection('sesiones').doc(sid).set(sBody, { merge:true }); }catch(e){ console.warn('[papelera] restore sesion', sid, e && e.message); }
+      }
+    }
+    // 4) Archivos
+    var okArch=0, totArch=0;
+    if(Array.isArray(doc.archivos)){
+      totArch = doc.archivos.length;
+      for(var a=0;a<doc.archivos.length;a++){ var rr = await _restaurarArchivoDesdePapelera(doc.archivos[a]); if(rr && rr.ok) okArch++; }
+    }
+    // 5) Local
+    try{
+      patientsDB = (Array.isArray(patientsDB)?patientsDB:[]).filter(function(x){ return x.id!==pid; });
+      patientsDB.push(snapshotPaciente);
+      saveLocal('pts', patientsDB);
+    }catch(e){ console.warn('[papelera] restore local:', e && e.message); }
+    // 6) Quitar papelera + tombstone (vuelve a fluir)
+    try{ await ref.delete(); }catch(_){}
+    try{ await window._fstDb.collection('pacientesBorrados').doc(pid).delete(); }catch(_){}
+    try{ var cache=JSON.parse(localStorage.getItem('sinergia_pacientesBorrados')||'[]'); localStorage.setItem('sinergia_pacientesBorrados', JSON.stringify(cache.filter(function(x){ return x!==pid; }))); }catch(_){}
+
+    try{ if(typeof window._FST_invalidarVistaPacientes==='function') window._FST_invalidarVistaPacientes(); }catch(_){}
+    try{ if(typeof renderPacientes==='function') renderPacientes(); }catch(_){}
+    try{ var ov=document.querySelector('[data-papelera-ov]'); if(ov) ov.remove(); }catch(_){}
+    showToast('♻️ Expediente recuperado'+(totArch?(' ('+okArch+'/'+totArch+' archivos)'):''),'success');
+  }catch(e){ console.warn('[papelera] restaurar:', e && e.message); showToast('Error al restaurar','error'); }
+}
+
+// UI MÍNIMA de papelera (Opción A) — lista expedientes activos borrados con ♻️ Restaurar.
+// La UI pulida (notas SOAP, vaciar definitivo) llega en el Loop 4.
+async function _abrirPapelera(){
+  if(!(currentUser && currentUser.role==='supervisor')){ showToast('Solo supervisor','error'); return; }
+  var ex=document.querySelector('[data-papelera-ov]'); if(ex) ex.remove();
+  var ov=document.createElement('div');
+  ov.setAttribute('data-papelera-ov','1');
+  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:10002;display:flex;align-items:flex-start;justify-content:center;overflow:auto;padding:40px 12px';
+  ov.onclick=function(e){ if(e.target===ov) ov.remove(); };
+  ov.innerHTML='<div style="background:#fff;border-radius:16px;width:100%;max-width:520px;padding:18px"><div style="text-align:center;color:#64748b;padding:20px">Cargando papelera…</div></div>';
+  document.body.appendChild(ov);
+  var card=ov.firstChild;
+  var okF = (typeof FST_init==='function') ? await FST_init() : false;
+  if(!okF || !window._fstDb){ card.innerHTML='<div style="text-align:center;color:#B91C1C;padding:20px">Sin conexión a la base</div>'; return; }
+  var docs=[];
+  try{
+    var snap = await window._fstDb.collection('papelera').where('tipo','==','expedienteActivo').get();
+    docs = snap.docs.map(function(d){ return Object.assign({ _id:d.id }, d.data()); });
+  }catch(e){ card.innerHTML='<div style="text-align:center;color:#B91C1C;padding:20px">No se pudo leer la papelera: '+escapeHTML((e&&e.message)||'')+'</div>'; return; }
+  docs.sort(function(a,b){ var ta=(a.fecha&&a.fecha.seconds)||0, tb=(b.fecha&&b.fecha.seconds)||0; return tb-ta; });
+  var cuerpo;
+  if(!docs.length){ cuerpo='<div style="text-align:center;padding:20px;color:#2E7D52;font-weight:700">🗑️ Papelera vacía</div>'; }
+  else {
+    cuerpo=docs.map(function(d){
+      var f=''; try{ if(d.fecha&&d.fecha.seconds) f=new Date(d.fecha.seconds*1000).toLocaleString('es-MX'); }catch(_){}
+      return '<div style="margin-bottom:12px;padding:10px;border:1px solid #E6EAF2;border-radius:12px">'
+        +'<div style="font-size:14px;font-weight:800;color:var(--navy)">'+escapeHTML(d.nombre||'(sin nombre)')+'</div>'
+        +'<div style="font-size:11px;color:var(--gray-400)">Borrado'+(f?(' el '+escapeHTML(f)):'')+(d.borradoPor?(' · por '+escapeHTML(d.borradoPor)):'')+(d.motivo?(' · '+escapeHTML(d.motivo)):'')+'</div>'
+        +'<div style="margin-top:8px"><button data-docid="'+escapeAttr_(d._id)+'" onclick="_restaurarExpedienteDePapelera(this.dataset.docid)" style="font-size:12px;font-weight:700;border:none;border-radius:10px;padding:6px 12px;cursor:pointer;font-family:inherit;background:#DCFCE7;color:#166534">♻️ Restaurar</button></div>'
+        +'</div>';
+    }).join('');
+  }
+  card.innerHTML='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">'
+    +'<div style="font-size:16px;font-weight:800;color:var(--navy)">🗑️ Papelera</div>'
+    +'<button onclick="this.closest(\'[data-papelera-ov]\').remove()" style="background:none;border:none;font-size:22px;color:var(--gray-400);cursor:pointer">×</button></div>'
+    +'<div style="font-size:11px;color:var(--gray-400);margin-bottom:12px">Expedientes activos borrados. Restaurar los devuelve íntegros.</div>'
+    +cuerpo;
 }
 
 async function borrarEstudio(pid, eid){
