@@ -107,7 +107,7 @@ async function FST_init(){
         window._FST_invalidarVistaPacientes();
         // Diferir al siguiente tick: evita competir con el callback de auth en curso.
         if (typeof renderPacientes === 'function') {
-          setTimeout(() => { if (window._fstDb) renderPacientes(); }, 0);
+          setTimeout(() => { if (window._fstDb && currentUser) renderPacientes(); }, 0); // + currentUser: el drenado de colas llama FST_init antes del login → no re-renderizar sin sesión
         }
       }
       return true;
@@ -4751,6 +4751,7 @@ function verMasPacientes_(btn){
 }
 
 function renderPacientes(q='', filtro='todos', fuenteLista=null){
+  if(!currentUser) return; // sin sesión no hay lista de pacientes que pintar (evita crash currentUser.name)
   // Puerta única — elige la base: flag OFF = patientsDB; flag ON = vista fusionada (validada por firma)
   let baseLista;
   if(Array.isArray(fuenteLista)){
@@ -4810,7 +4811,7 @@ function renderPacientes(q='', filtro='todos', fuenteLista=null){
     html+=`<div style="font-size:11px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:.7px;margin-bottom:8px">
       Pacientes de la clínica (${list.length})
     </div>`;
-    list.slice(0, LOTE).forEach(p=>{
+    list.slice(0, LOTE).filter(Boolean).forEach(p=>{
       const hasConsent=Array.isArray(p.consentimientos)&&p.consentimientos.some(c=>c.firmado);
       const inc=Array.isArray(p.soap)&&p.soap.some(s=>!s.completa);
       const soapAtrasado=!String(p.name||'').startsWith('TEST_QA_')&&necesitaAlertaSoapSemanal(p)&&Array.isArray(p.soap)&&p.soap.length>0;
