@@ -1220,7 +1220,7 @@ async function idbGet(key){
 // saveDB — guarda lista de pacientes en Sheets uno por uno con confirmación real
 // saveDB — Guarda en Sheets usando POST (sin límite de URL)
 // Elimina campos base64 antes de enviar. Base64 se mantiene en memoria local.
-async function saveDB(k, v){
+async function saveDB(k, v, opts){
   // Fusionar los pacientes modificados en la base completa (preserva base64 local)
   if(k==='pts'){
     const lista = Array.isArray(v) ? v : [];
@@ -1254,7 +1254,7 @@ async function saveDB(k, v){
       // GUARDA DURA (Bug 1): un mig_pac_ NUNCA se escribe al Sheet.
       // Histórico → Firestore (v1: ejercicios/token/linkActivo, que antes se tiraban).
       // 1.2 fix — contar el resultado real: si Firestore falló, encolar y NO reportar éxito.
-      const rHist = await _persistirHistoricoFirestore(p);
+      const rHist = await _persistirHistoricoFirestore(p, opts && opts.camposHist);
       if(rHist && rHist.ok){ guardados++; desencolarSync(p.id); }
       else { errores++; encolarSync(p.id); }
       continue;
@@ -1475,7 +1475,11 @@ function _sinUndefined(v){
 // subconjunto de ninguno → Firestore lo rechazaría entero (mismo bug que ejercicios en su día).
 // NUNCA toca el Sheet (guarda dura Bug 1). SOAP no va aquí (persiste vía subcolección sesiones).
 // NUNCA escribe id/appSourceId/creadoPor/origen/fechaNacimiento/nombreNormalizado (identidad de migración).
-async function _persistirHistoricoFirestore(p){
+// LOOP B (anti-clobber): camposHist = lista de claves TOP-LEVEL que el caller realmente tocó.
+// Con lista → se escribe SOLO eso (con merge, lo no enviado se conserva en el doc y no se puede
+// pisar). '*' → bloque completo INTENCIONAL (importación masiva). Sin declarar → bloque completo
+// como siempre + console.warn (contrato: todo caller nuevo debe declarar sus campos).
+async function _persistirHistoricoFirestore(p, camposHist){
   try{
     var ok = (typeof FST_init==='function') ? await FST_init() : false;
     if(!ok || !window._fstDb){ console.warn('[saveDB] Firestore no disponible; histórico no persistido:', p.id); return {ok:false, error:'firestore-no-disponible'}; }
@@ -1495,9 +1499,8 @@ async function _persistirHistoricoFirestore(p){
     if(p.ejerciciosToken!=null)      outEj.ejerciciosToken = p.ejerciciosToken;
     if(p.ejerciciosLinkActivo!=null) outEj.ejerciciosLinkActivo = p.ejerciciosLinkActivo;
     if(p.reportesClinicosIA!=null)   outEj.reportesClinicosIA = p.reportesClinicosIA;
-    if(Object.keys(outEj).length){
-      await ref.set(_sinUndefined(outEj), { merge:true }); // sin updatedAt (no pisar el serverTimestamp del dual-write SOAP); _sinUndefined: Firestore no acepta undefined
-    }
+    // (LOOP B: el write de outEj se difiere — primero se arma outCl y se aplican filtro de
+    // campos tocados + detección de conflicto; ambos writes salen juntos al final.)
 
     // ── Write 2: CLÍNICOS (pasa pacienteClinicoUpdateOK v4) ──
     // SOLO campos dentro de la whitelist v4; un campo fuera → hasOnly rechaza el write entero.
@@ -1552,9 +1555,65 @@ async function _persistirHistoricoFirestore(p){
     if(Array.isArray(p.estudiosDocs))    outCl.estudiosDocs = p.estudiosDocs;
     if(Array.isArray(p.fotos))           outCl.fotos = p.fotos.map(_stripB64);
     if(Array.isArray(p.docs))            outCl.docs  = p.docs.map(_stripB64);
-    if(Object.keys(outCl).length){
-      await ref.set(_sinUndefined(outCl), { merge:true }); // sin updatedAt (mismo criterio que Write 1); _sinUndefined: Firestore no acepta undefined
+    // ── LOOP B: filtro "solo lo que el usuario tocó" ──
+    if(Array.isArray(camposHist)){
+      Object.keys(outEj).forEach(function(k){ if(camposHist.indexOf(k)===-1) delete outEj[k]; });
+      Object.keys(outCl).forEach(function(k){ if(camposHist.indexOf(k)===-1) delete outCl[k]; });
+    } else if(camposHist !== '*'){
+      console.warn('[saveDB] histórico SIN camposHist — se escribe el bloque COMPLETO (puede pisar cambios de otros equipos). Declara los campos tocados:', p.id);
     }
+    if(!Object.keys(outEj).length && !Object.keys(outCl).length) return {ok:true, sinCambios:true};
+
+    // ── LOOP B (v14): detección de conflicto por DOCUMENTO — opción B: avisar, no bloquear ──
+    // Si otro equipo guardó DESPUÉS de que este dispositivo hidrató el expediente, avisar antes
+    // de escribir, listando los campos propios y (si el doc trae ultimosCampos) los del otro.
+    // Sin baseline (p._updatedAtNube ausente: sesión vieja) o sin red → no hay chequeo (sin falsos positivos).
+    try{
+      if(navigator.onLine && p._updatedAtNube != null){
+        var _docPre = await ref.get();
+        var _dPre = (_docPre && _docPre.data()) || {};
+        var _remoteMs = (_dPre.updatedAt && typeof _dPre.updatedAt.toMillis==='function') ? _dPre.updatedAt.toMillis() : 0;
+        if(_remoteMs > p._updatedAtNube){
+          var _mins = Math.max(1, Math.round((Date.now()-_remoteMs)/60000));
+          var _mios = Object.keys(outCl).concat(Object.keys(outEj));
+          var _suyos = (Array.isArray(_dPre.ultimosCampos) && _dPre.ultimosCampos.length) ? _dPre.ultimosCampos.join(', ') : 'no disponible';
+          var _quien = _dPre.ultimoUsuario || 'otro equipo';
+          var _msg = '⚠️ Este expediente fue modificado por '+_quien+' hace ~'+_mins+' min.\n\n'
+            +'Tus campos a escribir: '+(_mios.join(', ')||'—')+'\n'
+            +'Campos que tocó '+_quien+': '+_suyos+'\n\n'
+            +'¿Reemplazar con tu versión? (Cancelar = traer la versión más nueva sin escribir)';
+          if(!window.confirm(_msg)){
+            // Abortar y rehidratar: este dispositivo se trae la versión más nueva de la nube.
+            try{
+              if(typeof FST_hidratarCamposClinicos==='function'){
+                await FST_hidratarCamposClinicos(p, p.id);
+                if(typeof renderExpediente==='function' && window.currentPatient===p) renderExpediente(currentTab||'historia');
+              }
+            }catch(_r){}
+            return {ok:false, error:'conflicto-cancelado'};
+          }
+        }
+      }
+    }catch(_c){ /* lectura previa falló (red) → seguir con el write normal, como siempre */ }
+
+    // ── LOOP B (v14): rastro de recencia — quién, cuándo y QUÉ campos escribió este write ──
+    // Va en outCl (updatedAt/ultimoUsuario/fechaActualizacion/ultimosCampos están en pacienteClinicoUpdateOK v14).
+    var _ahoraTr = new Date();
+    outCl.updatedAt = firebase.firestore.FieldValue.serverTimestamp();
+    outCl.ultimoUsuario = (currentUser && currentUser.name) || '';
+    outCl.fechaActualizacion = _ahoraTr.toLocaleDateString('es-MX')+' '+_ahoraTr.toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'});
+    outCl.ultimosCampos = Object.keys(outCl).concat(Object.keys(outEj)).filter(function(k){ return ['updatedAt','ultimoUsuario','fechaActualizacion','ultimosCampos'].indexOf(k)===-1; });
+
+    // ── Writes (1: ejercicios — whitelist propia, sin metadatos; 2: clínico — con rastro) ──
+    if(Object.keys(outEj).length){
+      await ref.set(_sinUndefined(outEj), { merge:true }); // _sinUndefined: Firestore no acepta undefined
+    }
+    await ref.set(_sinUndefined(outCl), { merge:true });
+    // Refrescar el baseline de recencia de ESTE dispositivo (para el próximo chequeo de conflicto).
+    try{
+      var _docPost = await ref.get(); var _dPost=(_docPost&&_docPost.data())||{};
+      p._updatedAtNube = (_dPost.updatedAt && typeof _dPost.updatedAt.toMillis==='function') ? _dPost.updatedAt.toMillis() : Date.now();
+    }catch(_pb){ p._updatedAtNube = Date.now(); }
     return {ok:true}; // 1.2 fix — señalar éxito para que saveDB no reporte ok:true falso
   }catch(e){ console.error('[saveDB] persistir histórico FALLÓ (dato NO guardado):', p.id, e && (e.code||''), e && e.message); return {ok:false, error:(e&&e.message)||'error'}; }
 }
@@ -2322,7 +2381,7 @@ function agregarEtiquetaPaciente(etiqueta){
   currentPatient.etiquetas.push(etiqueta);
   const idxP=patientsDB.findIndex(x=>x.id===currentPatient.id);
   if(idxP>=0) patientsDB[idxP]=currentPatient;
-  saveDB('pts',[currentPatient]).catch(()=>{});
+  saveDB('pts',[currentPatient],{camposHist:['etiquetas']}).catch(()=>{});
   renderExpediente(currentTab||'historia');
 }
 function quitarEtiquetaPaciente(etiqueta){
@@ -2330,7 +2389,7 @@ function quitarEtiquetaPaciente(etiqueta){
   currentPatient.etiquetas=currentPatient.etiquetas.filter(e=>e!==etiqueta);
   const idxP=patientsDB.findIndex(x=>x.id===currentPatient.id);
   if(idxP>=0) patientsDB[idxP]=currentPatient;
-  saveDB('pts',[currentPatient]).catch(()=>{});
+  saveDB('pts',[currentPatient],{camposHist:['etiquetas']}).catch(()=>{});
   renderExpediente(currentTab||'historia');
 }
 
@@ -3068,7 +3127,7 @@ async function pedirRevaloracion(pid){
   var motivo=await _pedirMotivoReval();
   if(motivo===null) return;
   p.revalSolicitada={activa:true, por:(currentUser&&currentUser.name)||'', fecha:todayFmt(), motivo:motivo||''};
-  try{ await saveDB('pts',[p]); showToast('🆘 Solicitud enviada a Carlos','success'); }
+  try{ await saveDB('pts',[p],{camposHist:['revalSolicitada']}); showToast('🆘 Solicitud enviada a Carlos','success'); }
   catch(e){ showToast('❌ '+((e&&e.message)||'error'),'error'); }
 }
 // Supervisor: marcar resuelta.
@@ -3077,7 +3136,7 @@ async function resolverRevaloracion(pid){
   var p=_resolverPaciente(pid); if(!p) return;
   if(!p.revalSolicitada) p.revalSolicitada={};
   p.revalSolicitada=Object.assign({}, p.revalSolicitada, {activa:false, resueltaPor:(currentUser&&currentUser.name)||'', fechaResuelta:todayFmt(), resueltaManualmente:true});
-  try{ await saveDB('pts',[p]); showToast('✅ Revaloración resuelta','success'); mostrarRevaloraciones(); }
+  try{ await saveDB('pts',[p],{camposHist:['revalSolicitada']}); showToast('✅ Revaloración resuelta','success'); mostrarRevaloraciones(); }
   catch(e){ showToast('❌ '+((e&&e.message)||'error'),'error'); }
 }
 function _isoMasDias(n){ var d=new Date(); d.setDate(d.getDate()+n); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
@@ -3099,7 +3158,7 @@ function _posponerRevaloracion(pid){
 async function _aplicarPosponer(pid, dias){
   var p=_resolverPaciente(pid); if(!p){ showToast('Paciente no encontrado','error'); return; }
   p.revalSolicitada=Object.assign({}, p.revalSolicitada||{}, {pospuestaHasta:_isoMasDias(dias), pospuestaPor:(currentUser&&currentUser.name)||'', pospuestaFecha:todayFmt()});
-  try{ await saveDB('pts',[p]); var ovMenu=document.querySelector('[data-posponer]'); if(ovMenu) ovMenu.remove(); showToast('⏰ Pospuesta '+dias+' días','success'); mostrarRevaloraciones(); }
+  try{ await saveDB('pts',[p],{camposHist:['revalSolicitada']}); var ovMenu=document.querySelector('[data-posponer]'); if(ovMenu) ovMenu.remove(); showToast('⏰ Pospuesta '+dias+' días','success'); mostrarRevaloraciones(); }
   catch(e){ showToast('❌ '+((e&&e.message)||'error'),'error'); }
 }
 async function _eliminarPacienteRevalorar(pid, tarjetaEl) {
@@ -5813,6 +5872,12 @@ async function FST_hidratarCamposClinicos(p, id) {
     if (Array.isArray(d.eventosAdversos) && d.eventosAdversos.length)   p.eventosAdversos = d.eventosAdversos;
     if (Array.isArray(d.historialCambios) && d.historialCambios.length) p.historialCambios = d.historialCambios;
     if (d.revalSolicitada != null)       p.revalSolicitada = d.revalSolicitada;
+    // LOOP B (v14) — baseline de recencia para la detección de conflictos: guarda el updatedAt
+    // del doc al momento de hidratar (campo local con _, nunca se persiste). Y simetría
+    // escribe↔lee del rastro nuevo (ultimoUsuario/fechaActualizacion).
+    try{ p._updatedAtNube = (d.updatedAt && typeof d.updatedAt.toMillis==='function') ? d.updatedAt.toMillis() : 0; }catch(_u){ p._updatedAtNube = 0; }
+    if (d.ultimoUsuario)                 p.ultimoUsuario = d.ultimoUsuario;
+    if (d.fechaActualizacion)            p.fechaActualizacion = d.fechaActualizacion;
 
   } catch(e) {
     console.warn('[FST-LISTA] hidratar campos clínicos falló (no bloqueante):', e.message);
@@ -7400,7 +7465,7 @@ async function guardarSOAP(){
       return;
     }
     _espejarSoapMediaAEstudios_(p, nuevaSOAP); // FIX SOAP-MEDIA (D)/I-B: espejo a Estudios — viaja en el MISMO saveDB de abajo
-    saveDB('pts',[p]).then(async res=>{
+    saveDB('pts',[p],{camposHist:['numSesionEpisodioActual','estudiosDocs','fechaActualizacion','ultimoUsuario']}).then(async res=>{
       if(_esHistNueva){
         // Bug B fix — nota NUEVA de histórico: Firestore es el ÚNICO almacén. Await + encolar si falla
         // (NO fire-and-forget). Desacoplado de res.ok clínico: la nota se persiste aunque los campos clínicos fallen.
@@ -8948,7 +9013,7 @@ async function handleMedia(ev,tipo,pid){
     p.historialCambios.push({usuario:currentUser.name,seccion:'archivos',fecha:ahoraStr,accion:`Subió ${agregados} ${tipo==='doc'?'documento(s)':'foto(s)'} a la nube`,antes:'',despues:`${agregados} archivo(s)`});
     p.fechaActualizacion=ahoraStr;
     p.ultimoUsuario=currentUser.name;
-    const res = await saveDB('pts',[p]);
+    const res = await saveDB('pts',[p],{camposHist:['fotos','docs','estudiosDocs','historialCambios','fechaActualizacion','ultimoUsuario']});
     if(res && res.ok===true){
       showToast(`✅ ${agregados} archivo(s) guardado(s) en la nube`,'success');
     } else {
@@ -8994,7 +9059,7 @@ async function deleteMedia(pid,tipo,i){
   p.historialCambios.push({usuario:currentUser.name,seccion:'archivos',fecha:ahoraStr,accion:`Movió a papelera ${tipo==='foto'?'una foto':'un documento'}`,antes:'archivo presente',despues:'en papelera'});
   p.fechaActualizacion=ahoraStr;
   p.ultimoUsuario=currentUser.name;
-  saveDB('pts',[p]).then(res => {
+  saveDB('pts',[p],{camposHist:['fotos','docs','historialCambios','fechaActualizacion','ultimoUsuario']}).then(res => {
     if(res && res.ok){
       showToast('🗑️ Archivo movido a la papelera','success');
     } else {
@@ -9985,7 +10050,7 @@ async function guardarConsentimiento(){
   const saved=document.getElementById('sig-saved');
   if(saved) saved.style.display='block';
 
-  saveDB('pts',[currentPatient]).then(res => {
+  saveDB('pts',[currentPatient],{camposHist:['consentimientos','historialCambios','fechaActualizacion','ultimoUsuario']}).then(res => {
     const pdfOk = !!(pdfResult && pdfResult.url);
     const enNube = pdfOk?' — PDF en nube ☁️':(firmaResult?.url?' — firma en nube ☁️':'');
     if(res && res.ok){
@@ -10515,7 +10580,7 @@ function registrarAltaClinica(){
     indicaciones, terapeuta:currentUser?.name||'', observaciones
   };
   p.updatedAt = Date.now();
-  saveDB('pts',[p]).then(res=>{
+  saveDB('pts',[p],{camposHist:['altaClinica']}).then(res=>{
     showToast(res?.ok?'Alta clínica registrada ✅':'⚠️ Alta local, Sheets pendiente',res?.ok?'success':'warning');
   }).catch(()=>showToast('⚠️ Sin conexión — alta local','warning'));
   renderExpediente(currentTab||'historia');
@@ -10539,7 +10604,7 @@ function agregarRevaloracion(){
     terapeuta:currentUser?.name||''
   });
   p.updatedAt = Date.now();
-  saveDB('pts',[p]).then(res=>{
+  saveDB('pts',[p],{camposHist:['revaloraciones']}).then(res=>{
     showToast(res?.ok?'Revaloración registrada ✅':'⚠️ Revaloración local, Sheets pendiente',res?.ok?'success':'warning');
   }).catch(()=>showToast('⚠️ Sin conexión — revaloración local','warning'));
   renderExpediente(currentTab||'historia');
@@ -10564,7 +10629,7 @@ function registrarEventoAdverso(){
     terapeuta:currentUser?.name||''
   });
   p.updatedAt = Date.now();
-  saveDB('pts',[p]).then(res=>{
+  saveDB('pts',[p],{camposHist:['eventosAdversos']}).then(res=>{
     showToast(res?.ok?'Evento adverso registrado ✅':'⚠️ Evento local, Sheets pendiente',res?.ok?'success':'warning');
   }).catch(()=>showToast('⚠️ Sin conexión — evento local','warning'));
   renderExpediente(currentTab||'historia');
@@ -10610,7 +10675,7 @@ function guardarAntecedentesCompleto(){
   const idx = patientsDB.findIndex(x=>x.id===p.id);
   if(idx>=0) patientsDB[idx]=p;
 
-  saveDB('pts',[p]).then(res=>{
+  saveDB('pts',[p],{camposHist:['antecedentes','alergias','contraindicaciones','sexo','fechaActualizacion','ultimoUsuario','historialCambios']}).then(res=>{
     showToast(res?.ok?'Antecedentes guardados ✅':'⚠️ Guardado local, Sheets no confirmó',res?.ok?'success':'warning');
     renderExpediente('historia');
   }).catch(()=>{ showToast('⚠️ Sin conexión — guardado local','warning'); renderExpediente('historia'); });
@@ -10890,7 +10955,17 @@ function guardarEdicionHistoria(seccion, tabRetorno){
   // Un histórico (mig_pac_) NO tiene almacén local ni Sheets: Firestore es su único destino.
   // Si el write falla, el cambio NO se guardó → error ROJO, nunca "Guardado local OK" (sería mentira).
   var esHist = String(p.id||'').startsWith('mig_pac_');
-  saveDB('pts', [p]).then(res => {
+  // LOOP B: campos tocados según la sección del formulario (del inventario de callers).
+  var _camposSec = {
+    generales:['fechaNacimiento','age','telefono','sexo','motivoConsulta','medicoReferente','dx','contraindicaciones','alergias'],
+    antecedentes:['antecedentes'],
+    motivo:['motivo'],
+    valoracion:['valoracion'],
+    dxfuncional:['dxFuncional'],
+    plan:['planTto']
+  };
+  var _camposHistSec = (_camposSec[seccion]||[]).concat(['fechaActualizacion','ultimoUsuario','historialCambios']);
+  saveDB('pts', [p], {camposHist:_camposHistSec}).then(res => {
     if(res && res.ok){
       showToast('✅ Cambios guardados — ' + fechaHora, 'success');
     } else if(esHist){
@@ -11183,7 +11258,7 @@ function guardarValoracionCompleta(){
   const idx = patientsDB.findIndex(x=>x.id===p.id);
   if(idx>=0) patientsDB[idx]=p;
 
-  saveDB('pts',[p]).then(res=>{
+  saveDB('pts',[p],{camposHist:['motivoConsulta','dx','alergias','contraindicaciones','motivo','antecedentes','valoracion','dxFuncional','planTto','seguridadClinica','fechaActualizacion','ultimoUsuario']}).then(res=>{
     if(res?.ok){
       borrarBorradorValoracion(p.id);
       showToast('Valoración guardada ✅','success');
@@ -11595,7 +11670,7 @@ function abrirNuevoMotivoConsulta(){
   const idx=patientsDB.findIndex(x=>x.id===p.id);
   if(idx>=0) patientsDB[idx]=p;
   // e. Guardar solo este paciente
-  saveDB('pts',[p]).then(res=>{
+  saveDB('pts',[p],{camposHist:['motivosAnteriores','motivoActualIndex','numSesionEpisodioActual','motivoConsulta','dx','motivo','valoracion','dxFuncional','planTto','fechaCreacion','fechaActualizacion','ultimoUsuario']}).then(res=>{
     showToast(res?.ok?'Nuevo motivo iniciado. El anterior quedó en el historial ✅':'⚠️ Guardado local, Sheets no confirmó',res?.ok?'success':'warning');
   }).catch(()=>showToast('⚠️ Sin conexión — guardado local','warning'));
   // FASE A — el borrador de valoración es POR PACIENTE, no por episodio: uno viejo del
@@ -12343,7 +12418,7 @@ function showEjercicios(){
     currentPatient.ejerciciosLinkActivo = true;
     const idxP=patientsDB.findIndex(x=>x.id===currentPatient.id);
     if(idxP>=0) patientsDB[idxP]=currentPatient;
-    saveDB('pts', [currentPatient]).then(res => {
+    saveDB('pts', [currentPatient],{camposHist:['ejerciciosToken','ejerciciosLinkActivo']}).then(res => {
       if(!(res && res.ok)){
         showToast('⚠️ Link generado local, pero Sheets no confirmó. Revisa conexión.','warning');
       }
@@ -12417,11 +12492,11 @@ async function enviarEjerciciosWhatsApp(){
   if(p.ejerciciosLinkActivo===false){ showToast('El link está desactivado. Actívalo primero (🔓).','warning'); return; }
   showToast('⏳ Preparando link…','');
   // PART 1: sincroniza token+ejercicios ACTUALES al Sheet y valida que resuelve (link nunca roto ni viejo)
-  try{ await saveDB('pts',[p]); }catch(e){}
+  try{ await saveDB('pts',[p],{camposHist:['ejercicios','ejerciciosToken','ejerciciosLinkActivo']}); }catch(e){}
   var v=await _validarLinkEjercicios(p.ejerciciosToken);
   if(!v.ok && v.code===403){ showToast('El link está desactivado. Actívalo primero.','warning'); return; }
   if(!v.ok && v.code===404){
-    try{ await saveDB('pts',[p]); }catch(e){}     // reintento: fuerza guardado y revalida
+    try{ await saveDB('pts',[p],{camposHist:['ejercicios','ejerciciosToken','ejerciciosLinkActivo']}); }catch(e){}     // reintento: fuerza guardado y revalida
     v=await _validarLinkEjercicios(p.ejerciciosToken);
     if(!v.ok && v.code===404){ showToast('⚠️ El link aún no sincroniza con la nube. Espera unos segundos y reintenta (revisa conexión).','warning'); return; }
   }
@@ -12604,7 +12679,7 @@ function duplicarEjercicio(idx){
   currentPatient.ejercicios.push(copia);
   const idxP=patientsDB.findIndex(x=>x.id===currentPatient.id);
   if(idxP>=0) patientsDB[idxP]=currentPatient;
-  saveDB('pts',[currentPatient]).catch(()=>{});
+  saveDB('pts',[currentPatient],{camposHist:['ejercicios']}).catch(()=>{});
   // Abrir edición del duplicado
   currentEjercicio = {...copia, _editIdx: currentPatient.ejercicios.length-1};
   tempEjMedia = null;
@@ -12621,7 +12696,7 @@ function moverEjercicio(idx, direccion){
   [arr[idx], arr[otro]] = [arr[otro], arr[idx]];
   const idxP=patientsDB.findIndex(x=>x.id===currentPatient.id);
   if(idxP>=0) patientsDB[idxP]=currentPatient;
-  saveDB('pts',[currentPatient]).catch(()=>{});
+  saveDB('pts',[currentPatient],{camposHist:['ejercicios']}).catch(()=>{});
   renderEjercicios();
 }
 
@@ -12633,7 +12708,7 @@ function verComoPaciente(){
     currentPatient.ejerciciosLinkActivo = true;
     const idxP=patientsDB.findIndex(x=>x.id===currentPatient.id);
     if(idxP>=0) patientsDB[idxP]=currentPatient;
-    saveDB('pts',[currentPatient]).catch(()=>{});
+    saveDB('pts',[currentPatient],{camposHist:['ejerciciosToken','ejerciciosLinkActivo']}).catch(()=>{});
   }
   const base=window.location.href.split('?')[0].split('#')[0];
   window.open(`${base}?ejercicios=${currentPatient.ejerciciosToken}`,'_blank');
@@ -12646,7 +12721,7 @@ function cambiarEstadoEjercicio(idx, estado){
   ej.estado = estado;
   const idxP=patientsDB.findIndex(x=>x.id===currentPatient.id);
   if(idxP>=0) patientsDB[idxP]=currentPatient;
-  saveDB('pts',[currentPatient]).catch(()=>{});
+  saveDB('pts',[currentPatient],{camposHist:['ejercicios']}).catch(()=>{});
   renderEjercicios();
 }
 
@@ -12660,7 +12735,7 @@ function toggleLink(){
   currentPatient.ejerciciosLinkActivo = !currentPatient.ejerciciosLinkActivo;
   const idx=patientsDB.findIndex(x=>x.id===currentPatient.id);
   if(idx>=0) patientsDB[idx]=currentPatient;
-  saveDB('pts', [currentPatient]).then(res => {
+  saveDB('pts', [currentPatient],{camposHist:['ejerciciosLinkActivo']}).then(res => {
     if(!(res && res.ok)){
       showToast('⚠️ Cambio local, pero Sheets no confirmó. Revisa conexión.','warning');
     }
@@ -13075,7 +13150,7 @@ function guardarEjercicio(continuar=false){
   // Actualizar en patientsDB y guardar solo este paciente
   const idxP = patientsDB.findIndex(x=>x.id===currentPatient.id);
   if(idxP>=0) patientsDB[idxP]=currentPatient;
-  saveDB('pts', [currentPatient]).then(res => {
+  saveDB('pts', [currentPatient],{camposHist:['ejercicios']}).then(res => {
     if(res && res.ok){
       if(continuar){
         showToast('✅ Ejercicio guardado. Puedes agregar otro.','success');
@@ -13103,7 +13178,7 @@ function eliminarEjercicio(idx){
   currentPatient.ejercicios.splice(idx,1);
   const idxP=patientsDB.findIndex(x=>x.id===currentPatient.id);
   if(idxP>=0) patientsDB[idxP]=currentPatient;
-  saveDB('pts',[currentPatient]).then(res=>{
+  saveDB('pts',[currentPatient],{camposHist:['ejercicios']}).then(res=>{
     if(res&&res.ok){
       showToast('✅ Ejercicio eliminado','success');
     }else{
@@ -15314,7 +15389,7 @@ async function _impCargar(batchSize){
     (p.soap||[]).forEach(s=>{ s.terapeuta=normalizaTerapeutaImport_(s.terapeuta); if(s.terapeuta==='REVISAR'){ s.revisionPendiente=true; s.motivoRevision=s.motivoRevision||'Terapeuta no reconocido'; } });
     try{
       await subirMediaImportacion_(p);             // media -> Storage -> url
-      const res=await saveDB('pts',[p]);           // reutiliza ruta probada (chunking, retries, cola)
+      const res=await saveDB('pts',[p],{camposHist:'*'});           // reutiliza ruta probada (chunking, retries, cola)
       if(res && res.ok){ ck.cargados++; hechos.add(p.id); }
       else { ck.fallidos++; ck.errores.push({id:p.id,name:p.name,errores:[res&&res.error||'savePacientes no confirmó']}); }
     }catch(e){ ck.fallidos++; ck.errores.push({id:p.id,name:p.name,errores:[String(e&&e.message||e)]}); }
@@ -15349,7 +15424,7 @@ function mantenerComoTexto_(sid){
   if(!confirm('¿Marcar esta nota como revisada y mantenerla como texto libre?')) return;
   s.revisionPendiente=false; s.motivoRevision='';
   p.ultimoUsuario=currentUser.name; p.fechaActualizacion=todayFmt();
-  saveDB('pts',[p]).then(()=>showToast('✅ Nota marcada como revisada','success')).catch(()=>showToast('Guardado local','warning'));
+  saveDB('pts',[p],{camposHist:['fechaActualizacion','ultimoUsuario']}).then(()=>showToast('✅ Nota marcada como revisada','success')).catch(()=>showToast('Guardado local','warning'));
   renderExpediente('soap');
 }
 
