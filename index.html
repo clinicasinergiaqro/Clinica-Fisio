@@ -1503,7 +1503,10 @@ async function _persistirHistoricoFirestore(p){
     // SOLO campos dentro de la whitelist v4; un campo fuera → hasOnly rechaza el write entero.
     // Guards con != null: 0 (motivoActualIndex/numSesionEpisodioActual) y false (consentimientos) son válidos.
     var outCl = {};
-    if(p.name!=null)                     outCl.name = p.name;
+    // IDENTIDAD FUERA DEL BULK: name/nombreNormalizado NO se escriben aquí. Este write masivo corre
+    // desde muchos disparadores (saveDB de estudios/reportes/etiquetas, colas) con un snapshot que
+    // puede ser STALE; si escribía name, revertía una edición de nombre reciente (hallazgo 4). La
+    // identidad la escribe SOLO el camino de identidad (_persistirDatosPaciente, botón "Editar datos").
     if(p.dx!=null)                       outCl.dx = p.dx;
     if(p.motivoConsulta!=null)           outCl.motivoConsulta = p.motivoConsulta;
     if(p.motivo!=null)                   outCl.motivo = p.motivo;
@@ -1654,7 +1657,7 @@ async function drenarColaSoapHistorico(){
           if(!window._fstDb && typeof FST_init==='function') await FST_init();
           if(!window._fstDb) throw new Error('unavailable: firestore-no-disponible'); // temporal → reintenta
           var sesPayload = FST_buildSesionPayload(it.sesion, 'nueva');
-          await window._fstDb.collection('pacientes').doc(it.pid).collection('sesiones').doc(String(it.sesion.id)).set(sesPayload, { merge:true });
+          await window._fstDb.collection('pacientes').doc(it.pid).collection('sesiones').doc(String(it.sesion.id)).set(_sinUndefined(sesPayload), { merge:true });
         } else {
           await _guardarEdicionSoapHistorico(it.sid, it.pid, it.payload);
         }
@@ -7597,7 +7600,8 @@ async function _guardarEdicionSoapHistorico(sid, pid, sesion){
   delete payload.createdAt; delete payload.creadoPor;
   delete payload.id; delete payload.num; delete payload.fechaHoraISO;
   // 1.1 fix — set(merge) en vez de update(): no falla duro si el doc no estuviera presente
-  await window._fstDb.collection('pacientes').doc(pid).collection('sesiones').doc(sid).set(payload, { merge:true });
+  // _sinUndefined: evaI/evaF pueden venir undefined (sliders sin inicializar) y reventarían el write ENTERO.
+  await window._fstDb.collection('pacientes').doc(pid).collection('sesiones').doc(sid).set(_sinUndefined(payload), { merge:true });
   showToast('✅ Nota histórica actualizada en Firestore','success');
 }
 
@@ -8639,7 +8643,14 @@ async function validarResumenIA(pid, estudioId, validado){
   if (!est || !est.resumenIA) return;
   est.resumenIA.validadoPor = validado ? ((currentUser||{}).name || 'desconocido') : null;
   est.resumenIA.validadoEn = validado ? new Date().toISOString() : null;
-  await _persistirEstudios(p);
+  // Antes: await sin try/catch → si Firestore rechazaba, el rechazo era 100% silencioso.
+  try{
+    await _persistirEstudios(p);
+    if(typeof showToast==='function') showToast(validado?'✅ Resumen validado':'Validación quitada','success');
+  }catch(e){
+    if(typeof showToast==='function') showToast('❌ No se pudo guardar la validación en la nube — reintenta','error');
+    console.error('[validarResumenIA] persistir falló (NO guardado):', e && e.message);
+  }
 }
 
 // Modal de texto libre (Promise<string|null>). Patrón de _pedirLinkEstudio.
