@@ -42,7 +42,12 @@ service cloud.firestore {
                   'fechaCreacion','fechaInicio',
                   // ── v12: _persistirDatosPaciente (LOOP E) escribe estos junto a name/age/telefono
                   // en un solo set(merge); sin ellos hasOnly rechaza TODO el write (permission-denied).
-                  'nombreNormalizado','terapeuta']);
+                  'nombreNormalizado','terapeuta',
+                  // ── v14: rastro de recencia para detección de conflictos en históricos (LOOP B).
+                  // updatedAt = serverTimestamp del último write clínico; ultimoUsuario/fechaActualizacion =
+                  // quién y cuándo (legibles); ultimosCampos = qué campos escribió el último write — permite
+                  // que el aviso de conflicto diga "X tocó [campos]" en vez de avisar a ciegas.
+                  'updatedAt','ultimoUsuario','fechaActualizacion','ultimosCampos']);
     }
     function sesionCreateOK() {
       return request.resource.data.keys().hasOnly([
