@@ -2516,6 +2516,35 @@ async function _persistirEtiquetaHistorico(p, etiqueta, quitar){
     return {ok:false, error:(e&&e.message)||'error'};
   }
 }
+// ARRAYS-ADICIÓN: mismo tratamiento que etiquetas para los demás arrays de adición de históricos
+// (revaloraciones, eventosAdversos, consentimientos + su entrada de historialCambios): el ITEM
+// NUEVO se escribe con FieldValue.arrayUnion — atómico en el servidor, dos sesiones agregando a la
+// vez se FUSIONAN y una copia local vieja no puede pisar el array (mismo ping-pong que etiquetas).
+// No pasa por _persistirHistoricoFirestore: no hay nada que pisar → sin confirm de conflicto.
+// adiciones = { campo: itemNuevo, ... } — cada item va con arrayUnion(_sinUndefined(item)).
+async function _persistirAdicionHistorico(p, adiciones){
+  try{
+    var ok = (typeof FST_init==='function') ? await FST_init() : false;
+    if(!ok || !window._fstDb) throw new Error('firestore-no-disponible');
+    var ref = window._fstDb.collection('pacientes').doc(p.id);
+    var _fv = firebase.firestore.FieldValue;
+    var _ahora = new Date();
+    var payload = {
+      updatedAt: _fv.serverTimestamp(),
+      ultimoUsuario: (currentUser && currentUser.name) || '',
+      fechaActualizacion: _ahora.toLocaleDateString('es-MX')+' '+_ahora.toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'}),
+      ultimosCampos: Object.keys(adiciones||{})
+    };
+    Object.keys(adiciones||{}).forEach(function(k){ payload[k] = _fv.arrayUnion(_sinUndefined(adiciones[k])); });
+    await ref.set(payload, { merge:true });
+    // Refrescar el baseline: nuestro propio write no debe disparar el confirm del siguiente guardado.
+    try{ var _d=(await ref.get()).data()||{}; p._updatedAtNube=(_d.updatedAt&&typeof _d.updatedAt.toMillis==='function')?_d.updatedAt.toMillis():Date.now(); }catch(_b){ p._updatedAtNube=Date.now(); }
+    return {ok:true};
+  }catch(e){
+    console.error('[adición-hist] write falló (NO guardado):', p.id, e&&e.message);
+    return {ok:false, error:(e&&e.message)||'error'};
+  }
+}
 function agregarEtiquetaPaciente(etiqueta){
   if(!currentPatient) return;
   if(!Array.isArray(currentPatient.etiquetas)) currentPatient.etiquetas=[];
@@ -10185,14 +10214,15 @@ async function guardarConsentimiento(){
   // Historial de cambios
   const ahoraStr=fechaStr+' '+horaStr;
   if(!Array.isArray(currentPatient.historialCambios)) currentPatient.historialCambios=[];
-  currentPatient.historialCambios.push({
+  const _histEntryCons = {
     usuario: currentUser.name,
     seccion: 'consentimiento',
     fecha: ahoraStr,
     accion: 'Firmó consentimiento informado',
     antes: `${currentPatient.consentimientos.length-1} consentimientos anteriores`,
     despues: `Firmado por ${nombre}${pdfResult?.url?' — PDF en nube ☁️':''}`,
-  });
+  };
+  currentPatient.historialCambios.push(_histEntryCons);
   currentPatient.fechaActualizacion=ahoraStr;
   currentPatient.ultimoUsuario=currentUser.name;
   currentPatient.updatedAt=Date.now();
@@ -10200,12 +10230,19 @@ async function guardarConsentimiento(){
   const saved=document.getElementById('sig-saved');
   if(saved) saved.style.display='block';
 
-  saveDB('pts',[currentPatient],{camposHist:['consentimientos','historialCambios','fechaActualizacion','ultimoUsuario']}).then(res => {
+  // ARRAYS-ADICIÓN: histórico → arrayUnion del consentimiento + su entrada de historial (atómico,
+  // dos sesiones no se pisan); activo → Sheets como siempre.
+  const _esHistCons = String(currentPatient.id||'').startsWith('mig_pac_');
+  (_esHistCons ? _persistirAdicionHistorico(currentPatient, {consentimientos:nuevoConsentimiento, historialCambios:_histEntryCons})
+               : saveDB('pts',[currentPatient],{camposHist:['consentimientos','historialCambios','fechaActualizacion','ultimoUsuario']})
+  ).then(res => {
     const pdfOk = !!(pdfResult && pdfResult.url);
     const enNube = pdfOk?' — PDF en nube ☁️':(firmaResult?.url?' — firma en nube ☁️':'');
     if(res && res.ok){
       if(pdfOk) showToast('✅ Consentimiento guardado'+enNube,'success');
       else showToast('⚠️ Consentimiento guardado SIN PDF — reintenta generar el PDF','warning');
+    } else if(_esHistCons){
+      showToast('❌ El consentimiento NO se guardó en la nube — reintenta o avisa a Carlos','error');
     } else {
       showToast('⚠️ Consentimiento guardado local, pero Sheets no confirmó. Revisa conexión.','warning');
     }
@@ -10213,7 +10250,7 @@ async function guardarConsentimiento(){
     setTimeout(()=>{_volverAExpedienteConsent()},1400);
   }).catch((errSave) => {
     console.warn('saveDB consentimiento:', errSave);
-    showToast('⚠️ Sin conexión — consentimiento guardado solo en este equipo.','warning');
+    showToast(_esHistCons?'❌ El consentimiento NO se guardó en la nube — reintenta o avisa a Carlos':'⚠️ Sin conexión — consentimiento guardado solo en este equipo.',_esHistCons?'error':'warning');
     setTimeout(()=>{_volverAExpedienteConsent()},1400);
   });
   }catch(errGuardado){
@@ -10748,15 +10785,20 @@ function agregarRevaloracion(){
   const objetivos = prompt('Objetivos actualizados:','')||'';
   const cambiosPlan = prompt('Cambios al plan de tratamiento:','')||'';
   if(!Array.isArray(p.revaloraciones)) p.revaloraciones=[];
-  p.revaloraciones.push({
+  const _revNueva = {
     id:generarIdSeguro_('rev_'), fecha:todayFmt(), hora:_horaActual(),
     motivo:motivo||'', eva, rom, fuerza, funcion, objetivos, cambiosPlan,
     terapeuta:currentUser?.name||''
-  });
+  };
+  p.revaloraciones.push(_revNueva);
   p.updatedAt = Date.now();
-  saveDB('pts',[p],{camposHist:['revaloraciones']}).then(res=>{
-    showToast(res?.ok?'Revaloración registrada ✅':'⚠️ Revaloración local, Sheets pendiente',res?.ok?'success':'warning');
-  }).catch(()=>showToast('⚠️ Sin conexión — revaloración local','warning'));
+  // ARRAYS-ADICIÓN: histórico → arrayUnion del item nuevo (atómico); activo → Sheets como siempre.
+  const _esHistRev = String(p.id||'').startsWith('mig_pac_');
+  (_esHistRev ? _persistirAdicionHistorico(p, {revaloraciones:_revNueva})
+              : saveDB('pts',[p],{camposHist:['revaloraciones']})
+  ).then(res=>{
+    showToast(res?.ok?'Revaloración registrada ✅':(_esHistRev?'❌ La revaloración NO se guardó en la nube — reintenta':'⚠️ Revaloración local, Sheets pendiente'),res?.ok?'success':(_esHistRev?'error':'warning'));
+  }).catch(()=>showToast(_esHistRev?'❌ La revaloración NO se guardó en la nube — reintenta':'⚠️ Sin conexión — revaloración local',_esHistRev?'error':'warning'));
   renderExpediente(currentTab||'historia');
 }
 
@@ -10773,15 +10815,20 @@ function registrarEventoAdverso(){
   const accionTomada = prompt('Acción tomada:','')||'';
   const derivacion = prompt('Derivación médica (si aplica):','')||'';
   if(!Array.isArray(p.eventosAdversos)) p.eventosAdversos=[];
-  p.eventosAdversos.push({
+  const _eaNuevo = {
     id:generarIdSeguro_('ea_'), fecha:todayFmt(), hora:_horaActual(),
     tipo:tipo||'Otro', descripcion, accionTomada, derivacion,
     terapeuta:currentUser?.name||''
-  });
+  };
+  p.eventosAdversos.push(_eaNuevo);
   p.updatedAt = Date.now();
-  saveDB('pts',[p],{camposHist:['eventosAdversos']}).then(res=>{
-    showToast(res?.ok?'Evento adverso registrado ✅':'⚠️ Evento local, Sheets pendiente',res?.ok?'success':'warning');
-  }).catch(()=>showToast('⚠️ Sin conexión — evento local','warning'));
+  // ARRAYS-ADICIÓN: histórico → arrayUnion del item nuevo (atómico); activo → Sheets como siempre.
+  const _esHistEa = String(p.id||'').startsWith('mig_pac_');
+  (_esHistEa ? _persistirAdicionHistorico(p, {eventosAdversos:_eaNuevo})
+             : saveDB('pts',[p],{camposHist:['eventosAdversos']})
+  ).then(res=>{
+    showToast(res?.ok?'Evento adverso registrado ✅':(_esHistEa?'❌ El evento NO se guardó en la nube — reintenta':'⚠️ Evento local, Sheets pendiente'),res?.ok?'success':(_esHistEa?'error':'warning'));
+  }).catch(()=>showToast(_esHistEa?'❌ El evento NO se guardó en la nube — reintenta':'⚠️ Sin conexión — evento local',_esHistEa?'error':'warning'));
   renderExpediente(currentTab||'historia');
 }
 
