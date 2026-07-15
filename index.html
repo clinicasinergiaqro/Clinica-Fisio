@@ -1256,7 +1256,14 @@ async function saveDB(k, v, opts){
       // 1.2 fix — contar el resultado real: si Firestore falló, encolar y NO reportar éxito.
       const rHist = await _persistirHistoricoFirestore(p, opts && opts.camposHist);
       if(rHist && rHist.ok){ guardados++; desencolarSync(p.id); }
-      else { errores++; encolarSync(p.id); }
+      else if(rHist && rHist.error==='conflicto-cancelado'){ errores++; } // el usuario canceló a propósito — NO reintentar
+      else {
+        errores++;
+        // LOOP C: cola PROPIA de históricos con el diff filtrado del Loop B. encolarSync (COLA_SYNC)
+        // queda FUERA: esa cola es de activos y descartaba los mig_pac_ sin reintentar (el toast
+        // "📴 N pendientes" mentía). Sin camposHist declarado no se encola (no hay diff seguro).
+        _encolarHistDoc(p, opts && opts.camposHist);
+      }
       continue;
     }
 
@@ -1749,6 +1756,112 @@ async function drenarColaSoapHistorico(){
   } finally { _DRENANDO_HIST = false; }
 }
 
+// ── LOOP C: cola de reintento para el DOC de paciente HISTÓRICO (COLA_SYNC_HIST_DOC) ──
+// Antes, un write fallido del doc histórico se encolaba en COLA_SYNC (la cola de activos) y
+// sincronizarPendientes lo DESCARTABA (patientsDB.find nunca encuentra un mig_pac_) — el toast
+// "📴 N pendientes" mentía. Esta cola guarda el DIFF FILTRADO que produce el Loop B (solo los
+// campos tocados), con la misma maquinaria que COLA_SYNC_HIST: backoff, tope de intentos,
+// clasificación permanente/temporal y lista de FALLIDOS. Guard de recencia al drenar: si el doc
+// en la nube es más nuevo que el ts del item, el item va a FALLIDOS con motivo 'conflicto' — un
+// reintento NUNCA escribe a ciegas encima de un cambio más nuevo de otro equipo.
+function _stripB64Profundo(v){
+  if(Array.isArray(v)) return v.map(_stripB64Profundo);
+  if(v && typeof v==='object'){
+    var o={};
+    for(var k in v){
+      if(!Object.prototype.hasOwnProperty.call(v,k)) continue;
+      var x=v[k];
+      o[k]=(typeof x==='string' && x.indexOf('data:')===0 && x.length>2048)?null:_stripB64Profundo(x);
+    }
+    return o;
+  }
+  return v;
+}
+function _encolarHistDoc(p, camposHist){
+  // Solo se encola con lista declarada (Loop B): sin lista no hay diff seguro que reintentar
+  // (re-escribir el bloque completo desde una cola sería el clobber diferido que B eliminó).
+  if(!p || !p.id || !Array.isArray(camposHist) || !camposHist.length) return false;
+  try{
+    var campos={};
+    camposHist.forEach(function(k){ if(p[k]!==undefined) campos[k]=p[k]; });
+    if(!Object.keys(campos).length) return false;
+    campos=_stripB64Profundo(campos); // base64 nunca a localStorage (cuota); la referencia url/fbPath se conserva
+    var q=JSON.parse(localStorage.getItem('COLA_SYNC_HIST_DOC')||'[]');
+    if(!Array.isArray(q)) q=[];
+    // Dedup por pid: fusionar con lo ya encolado (lo nuevo gana por clave) y reiniciar backoff.
+    var prev=null;
+    q.forEach(function(it){ if(it && it.pid===p.id) prev=it; });
+    if(prev){ campos=Object.assign({}, prev.campos||{}, campos); }
+    q=q.filter(function(it){ return !(it && it.pid===p.id); });
+    q.push({pid:p.id, campos:campos, ts:Date.now(), intentos:0});
+    localStorage.setItem('COLA_SYNC_HIST_DOC', JSON.stringify(q));
+    try{ showToast('📴 Cambio de expediente histórico pendiente — se reintentará solo','warning'); }catch(_){}
+    return true;
+  }catch(e){ console.warn('[hist-doc] no se pudo encolar:', e && e.message); return false; }
+}
+function _persistirFallidosHistDoc(items){
+  try{
+    var f=JSON.parse(localStorage.getItem('COLA_SYNC_HIST_DOC_FALLIDOS')||'[]');
+    if(!Array.isArray(f)) f=[];
+    f=f.concat(items);
+    if(f.length>50) f=f.slice(f.length-50); // cap de inspección
+    localStorage.setItem('COLA_SYNC_HIST_DOC_FALLIDOS', JSON.stringify(f));
+  }catch(e){ console.warn('[hist-doc] no se pudo guardar fallidos:', e && e.message); }
+}
+let _DRENANDO_HIST_DOC = false;
+async function drenarColaHistDoc(){
+  if(_DRENANDO_HIST_DOC || !navigator.onLine) return;
+  var q;
+  try{ q=JSON.parse(localStorage.getItem('COLA_SYNC_HIST_DOC')||'[]'); }catch(e){ q=[]; }
+  if(!Array.isArray(q) || !q.length) return;
+  _DRENANDO_HIST_DOC = true;
+  var restantes=[], fallidos=[], ahora=Date.now();
+  try{
+    for(const it of q){
+      // Backoff: si aún no toca reintentar, conservar el item sin tocarlo.
+      if(it && it.proximoIntento && ahora < it.proximoIntento){ restantes.push(it); continue; }
+      try{
+        if(!window._fstDb && typeof FST_init==='function') await FST_init();
+        if(!window._fstDb) throw new Error('unavailable: firestore-no-disponible'); // temporal → reintenta
+        // Guard de recencia: si el doc cambió DESPUÉS de encolarse este diff, NO escribir a ciegas.
+        var _doc = await window._fstDb.collection('pacientes').doc(it.pid).get();
+        var _d = (_doc && _doc.data()) || {};
+        var _remoteMs = (_d.updatedAt && typeof _d.updatedAt.toMillis==='function') ? _d.updatedAt.toMillis() : 0;
+        if(_remoteMs > (Number(it.ts)||0)){
+          fallidos.push(Object.assign({}, it, {error:'conflicto: el doc cambió después de encolarse ('+(_d.ultimoUsuario||'otro equipo')+')', falladoEn:ahora}));
+          console.warn('[hist-doc] item a FALLIDOS por conflicto de recencia:', it.pid);
+          continue;
+        }
+        // Reintento por el MISMO camino del Loop B (filtro + rastro v14 + _sinUndefined).
+        var pseudo = Object.assign({id: it.pid}, it.campos);
+        var r = await _persistirHistoricoFirestore(pseudo, Object.keys(it.campos));
+        if(!(r && r.ok)) throw new Error(String((r && r.error) || 'error'));
+        // éxito → no se re-encola
+      }catch(e){
+        var _cod=String((e && (e.code||e.message)) || '');
+        if(_esErrorPermanenteHist(e)){
+          fallidos.push(Object.assign({}, it, {error:_cod||'permanente', falladoEn:ahora}));
+          console.warn('[hist-doc] descartado por error PERMANENTE:', _cod);
+        } else {
+          var n=(Number(it && it.intentos)||0)+1;
+          if(n >= _MAX_INTENTOS_HIST){
+            fallidos.push(Object.assign({}, it, {error:'max-reintentos('+n+') '+_cod, falladoEn:ahora}));
+          } else {
+            var espera=Math.min(60000, 2000*Math.pow(2, n-1)); // 2s,4s,8s,16s → cap 60s
+            restantes.push(Object.assign({}, it, {intentos:n, proximoIntento: ahora+espera}));
+          }
+        }
+      }
+    }
+    try{ localStorage.setItem('COLA_SYNC_HIST_DOC', JSON.stringify(restantes)); }catch(e){}
+    if(fallidos.length){
+      _persistirFallidosHistDoc(fallidos);
+      try{ showToastCritico_('⚠️ '+fallidos.length+' cambio(s) de expediente histórico NO se pudieron guardar (conflicto/permiso). Guardados para revisión — avisa al administrador.'); }catch(_){}
+    }
+    if(restantes.length) console.warn('[hist-doc]', restantes.length, 'cambios de expediente histórico aún sin sincronizar');
+  } finally { _DRENANDO_HIST_DOC = false; }
+}
+
 // Indicador visual de estado de sincronización (Pieza 5)
 function actualizarIndicadorSync(){
   const el = document.getElementById('sync-indicator');
@@ -1783,6 +1896,7 @@ async function sincronizarPendientes(){
   if(SYNC_EN_CURSO) return;
   if(!navigator.onLine) return;
   drenarColaSoapHistorico(); // 1.1 fix — drenar ediciones SOAP históricas pendientes (independiente de COLA_SYNC de activos)
+  drenarColaHistDoc();       // LOOP C — drenar cambios de DOC de históricos pendientes (diffs filtrados del Loop B)
   const cola = getColaSync();
   if(cola.length===0){ actualizarIndicadorSync(); return; }
 
@@ -1831,6 +1945,7 @@ window.addEventListener('online', ()=>{
   actualizarIndicadorSync();
   setTimeout(sincronizarPendientes, 800); // pequeño respiro tras reconectar
   setTimeout(drenarColaSoapHistorico, 900); // 1.1 fix — reintentar ediciones SOAP históricas pendientes al reconectar
+  setTimeout(drenarColaHistDoc, 1000);      // LOOP C — reintentar cambios de doc de históricos al reconectar
 });
 window.addEventListener('offline', ()=>{ actualizarIndicadorSync(); });
 
