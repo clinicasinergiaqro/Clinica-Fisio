@@ -2509,6 +2509,8 @@ async function _persistirEtiquetaHistorico(p, etiqueta, quitar){
     }, { merge:true });
     // Refrescar el baseline: nuestro propio write no debe disparar el confirm del siguiente guardado.
     try{ var _d=(await ref.get()).data()||{}; p._updatedAtNube=(_d.updatedAt&&typeof _d.updatedAt.toMillis==='function')?_d.updatedAt.toMillis():Date.now(); }catch(_b){ p._updatedAtNube=Date.now(); }
+    // Invalidar el índice cacheado (24h) para que la LISTA de pacientes no muestre etiquetas viejas.
+    try{ if(typeof window._FST_invalidarIndicePacientes==='function') window._FST_invalidarIndicePacientes(); }catch(_i){}
     return {ok:true};
   }catch(e){
     console.error('[etiquetas] write falló (NO guardado):', p.id, e&&e.message);
@@ -2539,6 +2541,8 @@ async function _persistirAdicionHistorico(p, adiciones){
     await ref.set(payload, { merge:true });
     // Refrescar el baseline: nuestro propio write no debe disparar el confirm del siguiente guardado.
     try{ var _d=(await ref.get()).data()||{}; p._updatedAtNube=(_d.updatedAt&&typeof _d.updatedAt.toMillis==='function')?_d.updatedAt.toMillis():Date.now(); }catch(_b){ p._updatedAtNube=Date.now(); }
+    // Invalidar el índice cacheado (24h) para que la LISTA de pacientes no muestre etiquetas viejas.
+    try{ if(typeof window._FST_invalidarIndicePacientes==='function') window._FST_invalidarIndicePacientes(); }catch(_i){}
     return {ok:true};
   }catch(e){
     console.error('[adición-hist] write falló (NO guardado):', p.id, e&&e.message);
@@ -6018,6 +6022,10 @@ async function FST_hidratarCamposClinicos(p, id) {
     if (d.altaClinica && typeof d.altaClinica === 'object' && !Array.isArray(d.altaClinica))
       p.altaClinica = d.altaClinica;
     if (Array.isArray(d.revaloraciones) && d.revaloraciones.length) p.revaloraciones = d.revaloraciones;
+    // SIMETRÍA etiquetas: se escriben con arrayUnion al doc, pero la hidratación no las releía y el
+    // objeto arranca con las etiquetas VIEJAS del índice (cache 24h) → el expediente mostraba solo
+    // las de migración. SIN "&& length": el doc es la fuente de verdad y debe ganar al índice stale.
+    if (Array.isArray(d.etiquetas)) p.etiquetas = d.etiquetas;
     if (Array.isArray(d.consentimientos) && d.consentimientos.length) p.consentimientos = d.consentimientos;
     if (d.consentimientoDatos    != null) p.consentimientoDatos    = d.consentimientoDatos;    // bool (false válido)
     if (d.consentimientoImagen   != null) p.consentimientoImagen   = d.consentimientoImagen;   // bool (false válido)
