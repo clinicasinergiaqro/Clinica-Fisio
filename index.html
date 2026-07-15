@@ -1863,32 +1863,35 @@ async function drenarColaHistDoc(){
 }
 
 // Indicador visual de estado de sincronización (Pieza 5)
+// CAPA 2: el indicador contaba SOLO COLA_SYNC (activos) → mentía cuando había writes de históricos
+// pendientes (etiquetas/adiciones/doc) o writes buffered offline. Ahora cuenta TODAS las colas y,
+// sin conexión, NUNCA dice "todo guardado" (offline no se puede confirmar nada en la nube).
+function _contarColaLS(k){ try{ var q=JSON.parse(localStorage.getItem(k)||'[]'); return Array.isArray(q)?q.length:0; }catch(e){ return 0; } }
+function _totalPendientesSync(){ return getColaSync().length + _contarColaLS('COLA_ETIQ_HIST') + _contarColaLS('COLA_SYNC_HIST_DOC') + _contarColaLS('COLA_SYNC_HIST'); }
 function actualizarIndicadorSync(){
   const el = document.getElementById('sync-indicator');
   if(!el) return;
-  const cola = getColaSync();
   const sinNet = !navigator.onLine;
-  if(cola.length===0){
+  const n = _totalPendientesSync();
+  if(n===0 && !sinNet){
     el.className = 'sync-indicator ok';
-    el.textContent = sinNet ? '📴 Sin conexión — todo guardado' : '✅ Todo sincronizado';
-    el.style.display = sinNet ? 'block' : 'block';
-    // Ocultar el "todo sincronizado" tras unos segundos si hay net
-    if(!sinNet){
-      clearTimeout(window._syncHideTimer);
-      window._syncHideTimer = setTimeout(()=>{ if(getColaSync().length===0) el.style.display='none'; }, 4000);
-    }
-  } else {
-    el.className = 'sync-indicator pend';
-    const n = cola.length;
-    if(SYNC_EN_CURSO){
-      el.textContent = `🔄 Sincronizando ${n} cambio${n!==1?'s':''}…`;
-    } else if(sinNet){
-      el.textContent = `⏳ ${n} cambio${n!==1?'s':''} pendiente${n!==1?'s':''} (sin conexión)`;
-    } else {
-      el.textContent = `⏳ ${n} cambio${n!==1?'s':''} pendiente${n!==1?'s':''} de sincronizar`;
-    }
+    el.textContent = '✅ Todo sincronizado';
     el.style.display = 'block';
+    clearTimeout(window._syncHideTimer);
+    window._syncHideTimer = setTimeout(()=>{ if(_totalPendientesSync()===0 && navigator.onLine) el.style.display='none'; }, 4000);
+    return;
   }
+  el.className = 'sync-indicator pend';
+  if(n===0 && sinNet){
+    el.textContent = '📴 Sin conexión'; // sin pendientes conocidos, pero NO afirmar "todo guardado"
+  } else if(SYNC_EN_CURSO){
+    el.textContent = `🔄 Sincronizando ${n} cambio${n!==1?'s':''}…`;
+  } else if(sinNet){
+    el.textContent = `⏳ ${n} cambio${n!==1?'s':''} pendiente${n!==1?'s':''} (sin conexión)`;
+  } else {
+    el.textContent = `⏳ ${n} cambio${n!==1?'s':''} pendiente${n!==1?'s':''} de sincronizar`;
+  }
+  el.style.display = 'block';
 }
 
 // Sincroniza la cola pendiente (Pieza 3) — con reintentos vía saveDB
@@ -1897,6 +1900,7 @@ async function sincronizarPendientes(){
   if(!navigator.onLine) return;
   drenarColaSoapHistorico(); // 1.1 fix — drenar ediciones SOAP históricas pendientes (independiente de COLA_SYNC de activos)
   drenarColaHistDoc();       // LOOP C — drenar cambios de DOC de históricos pendientes (diffs filtrados del Loop B)
+  drenarColaEtiqHist();      // CAPA 1 — drenar etiquetas/adiciones que quedaron pendientes offline (idempotentes)
   const cola = getColaSync();
   if(cola.length===0){ actualizarIndicadorSync(); return; }
 
@@ -1946,6 +1950,7 @@ window.addEventListener('online', ()=>{
   setTimeout(sincronizarPendientes, 800); // pequeño respiro tras reconectar
   setTimeout(drenarColaSoapHistorico, 900); // 1.1 fix — reintentar ediciones SOAP históricas pendientes al reconectar
   setTimeout(drenarColaHistDoc, 1000);      // LOOP C — reintentar cambios de doc de históricos al reconectar
+  setTimeout(drenarColaEtiqHist, 1100);     // CAPA 1 — reintentar etiquetas/adiciones pendientes al reconectar
 });
 window.addEventListener('offline', ()=>{ actualizarIndicadorSync(); });
 
@@ -2500,14 +2505,28 @@ async function _persistirEtiquetaHistorico(p, etiqueta, quitar){
     var ref = window._fstDb.collection('pacientes').doc(p.id);
     var _fv = firebase.firestore.FieldValue;
     var _ahora = new Date();
-    await ref.set({
-      etiquetas: quitar ? _fv.arrayRemove(etiqueta) : _fv.arrayUnion(etiqueta),
-      updatedAt: _fv.serverTimestamp(),
-      ultimoUsuario: (currentUser && currentUser.name) || '',
-      fechaActualizacion: _ahora.toLocaleDateString('es-MX')+' '+_ahora.toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'}),
-      ultimosCampos: ['etiquetas']
-    }, { merge:true });
-    // Refrescar el baseline: nuestro propio write no debe disparar el confirm del siguiente guardado.
+    // CAPA 1: sin conexión el SDK NO rechaza el set() — queda pendiente indefinidamente. _conTimeout
+    // distingue "pendiente offline" (timeout) de éxito o error real, para no colgarse en silencio.
+    try{
+      await _conTimeout(ref.set({
+        etiquetas: quitar ? _fv.arrayRemove(etiqueta) : _fv.arrayUnion(etiqueta),
+        updatedAt: _fv.serverTimestamp(),
+        ultimoUsuario: (currentUser && currentUser.name) || '',
+        fechaActualizacion: _ahora.toLocaleDateString('es-MX')+' '+_ahora.toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'}),
+        ultimosCampos: ['etiquetas']
+      }, { merge:true }), 8000);
+    }catch(_w){
+      if(_w && _w.message==='timeout'){
+        // Sin conexión: encolar DURABLE (localStorage) y avisar honesto. arrayUnion/arrayRemove son
+        // idempotentes → reintentar al reconectar es seguro y cubre "cerrar la app antes de reconectar".
+        _encolarEtiqHist({tipo:'etiqueta', pid:p.id, etiqueta:etiqueta, quitar:!!quitar});
+        if(typeof showToast==='function') showToast('📴 Sin conexión — se sincronizará al reconectar','warning');
+        try{ if(typeof window._FST_invalidarIndicePacientes==='function') window._FST_invalidarIndicePacientes(); }catch(_i){}
+        return {ok:true, pendiente:true};
+      }
+      throw _w; // error REAL (permiso, etc.) → al catch de abajo (toast rojo)
+    }
+    // Servidor confirmó.
     try{ var _d=(await ref.get()).data()||{}; p._updatedAtNube=(_d.updatedAt&&typeof _d.updatedAt.toMillis==='function')?_d.updatedAt.toMillis():Date.now(); }catch(_b){ p._updatedAtNube=Date.now(); }
     // Invalidar el índice cacheado (24h) para que la LISTA de pacientes no muestre etiquetas viejas.
     try{ if(typeof window._FST_invalidarIndicePacientes==='function') window._FST_invalidarIndicePacientes(); }catch(_i){}
@@ -2538,8 +2557,21 @@ async function _persistirAdicionHistorico(p, adiciones){
       ultimosCampos: Object.keys(adiciones||{})
     };
     Object.keys(adiciones||{}).forEach(function(k){ payload[k] = _fv.arrayUnion(_sinUndefined(adiciones[k])); });
-    await ref.set(payload, { merge:true });
-    // Refrescar el baseline: nuestro propio write no debe disparar el confirm del siguiente guardado.
+    // CAPA 1: _conTimeout distingue "pendiente offline" de éxito/error real (offline el set no rechaza).
+    try{
+      await _conTimeout(ref.set(payload, { merge:true }), 8000);
+    }catch(_w){
+      if(_w && _w.message==='timeout'){
+        // Sin conexión: encolar DURABLE. arrayUnion es idempotente → reintentar al reconectar es seguro.
+        var _adSanas={}; Object.keys(adiciones||{}).forEach(function(k){ _adSanas[k]=_sinUndefined(adiciones[k]); });
+        _encolarEtiqHist({tipo:'adicion', pid:p.id, adiciones:_adSanas});
+        if(typeof showToast==='function') showToast('📴 Sin conexión — se sincronizará al reconectar','warning');
+        try{ if(typeof window._FST_invalidarIndicePacientes==='function') window._FST_invalidarIndicePacientes(); }catch(_i){}
+        return {ok:true, pendiente:true};
+      }
+      throw _w; // error REAL → al catch de abajo
+    }
+    // Servidor confirmó.
     try{ var _d=(await ref.get()).data()||{}; p._updatedAtNube=(_d.updatedAt&&typeof _d.updatedAt.toMillis==='function')?_d.updatedAt.toMillis():Date.now(); }catch(_b){ p._updatedAtNube=Date.now(); }
     // Invalidar el índice cacheado (24h) para que la LISTA de pacientes no muestre etiquetas viejas.
     try{ if(typeof window._FST_invalidarIndicePacientes==='function') window._FST_invalidarIndicePacientes(); }catch(_i){}
@@ -2548,6 +2580,56 @@ async function _persistirAdicionHistorico(p, adiciones){
     console.error('[adición-hist] write falló (NO guardado):', p.id, e&&e.message);
     return {ok:false, error:(e&&e.message)||'error'};
   }
+}
+// ── CAPA 1: cola DURABLE para etiquetas/adiciones de históricos cuyo write quedó pendiente offline ──
+// El SDK no rechaza offline (el write se cuelga), así que ni el toast rojo ni la cola de Loop C se
+// activaban → si la app se cerraba antes de reconectar, el dato se perdía. Esta cola guarda la
+// OPERACIÓN idempotente (arrayUnion/arrayRemove) en localStorage y la reintenta al reconectar.
+function _encolarEtiqHist(item){
+  try{
+    var q=JSON.parse(localStorage.getItem('COLA_ETIQ_HIST')||'[]'); if(!Array.isArray(q)) q=[];
+    q.push(Object.assign({ts:Date.now(), intentos:0}, item));
+    localStorage.setItem('COLA_ETIQ_HIST', JSON.stringify(q));
+    try{ if(typeof actualizarIndicadorSync==='function') actualizarIndicadorSync(); }catch(_){}
+  }catch(e){ console.warn('[etiq-hist] no se pudo encolar:', e&&e.message); }
+}
+let _DRENANDO_ETIQ = false;
+async function drenarColaEtiqHist(){
+  if(_DRENANDO_ETIQ || !navigator.onLine) return;
+  var q; try{ q=JSON.parse(localStorage.getItem('COLA_ETIQ_HIST')||'[]'); }catch(e){ q=[]; }
+  if(!Array.isArray(q) || !q.length) return;
+  _DRENANDO_ETIQ = true;
+  var restantes=[], hubo=q.length;
+  try{
+    for(const it of q){
+      try{
+        if(!window._fstDb && typeof FST_init==='function') await FST_init();
+        if(!window._fstDb) throw new Error('unavailable: firestore-no-disponible');
+        var ref=window._fstDb.collection('pacientes').doc(it.pid);
+        var _fv=firebase.firestore.FieldValue;
+        var _ahora=new Date();
+        var payload={ updatedAt:_fv.serverTimestamp(), ultimoUsuario:(currentUser&&currentUser.name)||'',
+          fechaActualizacion:_ahora.toLocaleDateString('es-MX')+' '+_ahora.toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'}) };
+        if(it.tipo==='etiqueta'){
+          payload.etiquetas = it.quitar ? _fv.arrayRemove(it.etiqueta) : _fv.arrayUnion(it.etiqueta);
+          payload.ultimosCampos=['etiquetas'];
+        } else {
+          Object.keys(it.adiciones||{}).forEach(function(k){ payload[k]=_fv.arrayUnion(_sinUndefined(it.adiciones[k])); });
+          payload.ultimosCampos=Object.keys(it.adiciones||{});
+        }
+        await _conTimeout(ref.set(payload,{merge:true}), 8000); // sigue offline → timeout → se conserva abajo
+      }catch(e){
+        var _cod=String((e&&(e.code||e.message))||'');
+        if(_esErrorPermanenteHist(e)){ console.warn('[etiq-hist] descartado por error PERMANENTE:', _cod); continue; }
+        var n=(Number(it.intentos)||0)+1;
+        if(n<_MAX_INTENTOS_HIST){ restantes.push(Object.assign({}, it, {intentos:n})); }
+        else { console.warn('[etiq-hist] descartado tras', n, 'intentos:', _cod); try{ showToastCritico_('⚠️ Una etiqueta/registro no se pudo sincronizar tras varios intentos — avisa al administrador.'); }catch(_){} }
+      }
+    }
+    try{ localStorage.setItem('COLA_ETIQ_HIST', JSON.stringify(restantes)); }catch(e){}
+    if(!restantes.length && hubo){ try{ if(typeof window._FST_invalidarIndicePacientes==='function') window._FST_invalidarIndicePacientes(); }catch(_){} }
+    try{ if(typeof actualizarIndicadorSync==='function') actualizarIndicadorSync(); }catch(_){}
+  } finally { _DRENANDO_ETIQ = false; }
 }
 function agregarEtiquetaPaciente(etiqueta){
   if(!currentPatient) return;
@@ -10244,6 +10326,9 @@ async function guardarConsentimiento(){
   (_esHistCons ? _persistirAdicionHistorico(currentPatient, {consentimientos:nuevoConsentimiento, historialCambios:_histEntryCons})
                : saveDB('pts',[currentPatient],{camposHist:['consentimientos','historialCambios','fechaActualizacion','ultimoUsuario']})
   ).then(res => {
+    if(res && res.pendiente){ // el helper ya avisó "📴 se sincronizará al reconectar"
+      setTimeout(()=>{_volverAExpedienteConsent()},1400); return;
+    }
     const pdfOk = !!(pdfResult && pdfResult.url);
     const enNube = pdfOk?' — PDF en nube ☁️':(firmaResult?.url?' — firma en nube ☁️':'');
     if(res && res.ok){
@@ -10805,6 +10890,7 @@ function agregarRevaloracion(){
   (_esHistRev ? _persistirAdicionHistorico(p, {revaloraciones:_revNueva})
               : saveDB('pts',[p],{camposHist:['revaloraciones']})
   ).then(res=>{
+    if(res && res.pendiente) return; // el helper ya mostró "📴 se sincronizará al reconectar"
     showToast(res?.ok?'Revaloración registrada ✅':(_esHistRev?'❌ La revaloración NO se guardó en la nube — reintenta':'⚠️ Revaloración local, Sheets pendiente'),res?.ok?'success':(_esHistRev?'error':'warning'));
   }).catch(()=>showToast(_esHistRev?'❌ La revaloración NO se guardó en la nube — reintenta':'⚠️ Sin conexión — revaloración local',_esHistRev?'error':'warning'));
   renderExpediente(currentTab||'historia');
@@ -10835,6 +10921,7 @@ function registrarEventoAdverso(){
   (_esHistEa ? _persistirAdicionHistorico(p, {eventosAdversos:_eaNuevo})
              : saveDB('pts',[p],{camposHist:['eventosAdversos']})
   ).then(res=>{
+    if(res && res.pendiente) return; // el helper ya mostró "📴 se sincronizará al reconectar"
     showToast(res?.ok?'Evento adverso registrado ✅':(_esHistEa?'❌ El evento NO se guardó en la nube — reintenta':'⚠️ Evento local, Sheets pendiente'),res?.ok?'success':(_esHistEa?'error':'warning'));
   }).catch(()=>showToast(_esHistEa?'❌ El evento NO se guardó en la nube — reintenta':'⚠️ Sin conexión — evento local',_esHistEa?'error':'warning'));
   renderExpediente(currentTab||'historia');
