@@ -2489,6 +2489,33 @@ function tieneConsentimientoFirmado(p){
 
 // ── B2: Etiquetas por paciente ──
 const ETIQUETAS_DISPONIBLES=['En tratamiento','Alta funcional','Postquirúrgico','Dermatofuncional','Deportivo','Pediátrico','Neurológico','Geriátrico','Domicilio','Seguimiento','Prioritario','Revaloración'];
+// ETIQUETAS-ARRAYUNION: para históricos, la etiqueta se escribe con arrayUnion/arrayRemove —
+// ATÓMICO en el servidor: dos sesiones agregando a la vez se FUSIONAN, una copia local vieja ya
+// no puede pisar el array (el mega-bug del ping-pong entre sesiones). A propósito NO pasa por
+// _persistirHistoricoFirestore: no hay nada que pisar → el confirm de conflicto NO aplica aquí.
+async function _persistirEtiquetaHistorico(p, etiqueta, quitar){
+  try{
+    var ok = (typeof FST_init==='function') ? await FST_init() : false;
+    if(!ok || !window._fstDb) throw new Error('firestore-no-disponible');
+    var ref = window._fstDb.collection('pacientes').doc(p.id);
+    var _fv = firebase.firestore.FieldValue;
+    var _ahora = new Date();
+    await ref.set({
+      etiquetas: quitar ? _fv.arrayRemove(etiqueta) : _fv.arrayUnion(etiqueta),
+      updatedAt: _fv.serverTimestamp(),
+      ultimoUsuario: (currentUser && currentUser.name) || '',
+      fechaActualizacion: _ahora.toLocaleDateString('es-MX')+' '+_ahora.toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'}),
+      ultimosCampos: ['etiquetas']
+    }, { merge:true });
+    // Refrescar el baseline: nuestro propio write no debe disparar el confirm del siguiente guardado.
+    try{ var _d=(await ref.get()).data()||{}; p._updatedAtNube=(_d.updatedAt&&typeof _d.updatedAt.toMillis==='function')?_d.updatedAt.toMillis():Date.now(); }catch(_b){ p._updatedAtNube=Date.now(); }
+    return {ok:true};
+  }catch(e){
+    console.error('[etiquetas] write falló (NO guardado):', p.id, e&&e.message);
+    if(typeof showToast==='function') showToast('❌ La etiqueta NO se guardó en la nube — reintenta','error');
+    return {ok:false, error:(e&&e.message)||'error'};
+  }
+}
 function agregarEtiquetaPaciente(etiqueta){
   if(!currentPatient) return;
   if(!Array.isArray(currentPatient.etiquetas)) currentPatient.etiquetas=[];
@@ -2496,7 +2523,11 @@ function agregarEtiquetaPaciente(etiqueta){
   currentPatient.etiquetas.push(etiqueta);
   const idxP=patientsDB.findIndex(x=>x.id===currentPatient.id);
   if(idxP>=0) patientsDB[idxP]=currentPatient;
-  saveDB('pts',[currentPatient],{camposHist:['etiquetas']}).catch(()=>{});
+  if(String(currentPatient.id||'').startsWith('mig_pac_')){
+    _persistirEtiquetaHistorico(currentPatient, etiqueta, false);   // histórico: arrayUnion atómico
+  } else {
+    saveDB('pts',[currentPatient],{camposHist:['etiquetas']}).catch(()=>{}); // activo: Sheets como siempre
+  }
   renderExpediente(currentTab||'historia');
 }
 function quitarEtiquetaPaciente(etiqueta){
@@ -2504,7 +2535,11 @@ function quitarEtiquetaPaciente(etiqueta){
   currentPatient.etiquetas=currentPatient.etiquetas.filter(e=>e!==etiqueta);
   const idxP=patientsDB.findIndex(x=>x.id===currentPatient.id);
   if(idxP>=0) patientsDB[idxP]=currentPatient;
-  saveDB('pts',[currentPatient],{camposHist:['etiquetas']}).catch(()=>{});
+  if(String(currentPatient.id||'').startsWith('mig_pac_')){
+    _persistirEtiquetaHistorico(currentPatient, etiqueta, true);    // histórico: arrayRemove atómico
+  } else {
+    saveDB('pts',[currentPatient],{camposHist:['etiquetas']}).catch(()=>{});
+  }
   renderExpediente(currentTab||'historia');
 }
 
