@@ -3302,7 +3302,8 @@ function _agendaSinMatchABuscador_(nombre){
   setTimeout(function(){
     var inp=document.getElementById('buscador-pacientes');
     if(inp){ inp.value=nombre; }
-    if(typeof renderPacientes==='function') renderPacientes(nombre,'todos');
+    _pacFiltro='todos';                       // sin filtro rápido: el nombre debe poder aparecer
+    renderPacientesLista();                   // repinta SOLO el cuerpo leyendo el input vivo
     var inp2=document.getElementById('buscador-pacientes');
     if(inp2){ inp2.focus(); }
     showToast('Sin expediente con ese nombre — ¿paciente nuevo? Usa ＋ Nuevo paciente','warning');
@@ -5252,7 +5253,13 @@ async function refrescarPacientesDesdeNube(opts){
 }
 function showPacientes(){
   document.querySelectorAll('.nav-item').forEach((n,i)=>n.classList.toggle('active',i===1));
-  screenStack.push('screen-pacientes');showScreen('screen-pacientes',false);renderPacientes();
+  screenStack.push('screen-pacientes');showScreen('screen-pacientes',false);
+  // Entrar a Pacientes SIEMPRE resetea la búsqueda: monta el shell (idempotente), limpia el
+  // input vivo y el filtro rápido, y repinta SOLO el cuerpo. No recrea el input si ya existe.
+  renderPacientesShell();
+  var inp=document.getElementById('buscador-pacientes'); if(inp) inp.value='';
+  _pacFiltro='todos';
+  renderPacientesLista();
   refrescarPacientesDesdeNube(); // refresco en segundo plano (con throttle interno)
 }
 // CAMBIO P1 — Cargar el siguiente lote sin re-renderizar todo
@@ -5277,33 +5284,9 @@ function verMasPacientes_(btn){
   if(filtro==='sin-soap') list=list.filter(p=>{const s=Array.isArray(p.soap)?p.soap:[];return !s.some(x=>x.fecha===todayFmt());});
 
   const siguiente = list.slice(offset, offset + LOTE);
-  let frag = '';
   const abrirFn = FST_LISTA_ACTIVA ? 'FST_abrirPacienteDesdeLista' : 'openExpediente';
-  siguiente.forEach(p=>{
-    // Tarjeta IDÉNTICA a la de renderPacientes (mismos campos, badge, botón, flecha)
-    const hasConsent=Array.isArray(p.consentimientos)&&p.consentimientos.some(c=>c.firmado);
-    const inc=Array.isArray(p.soap)&&p.soap.some(s=>!s.completa);
-    const soapAtrasado=!String(p.name||'').startsWith('TEST_QA_')&&necesitaAlertaSoapSemanal(p)&&Array.isArray(p.soap)&&p.soap.length>0;
-    const esMio=p.terapeuta===currentUser.name;
-    const badge=inc?`<span class="badge badge-alert" style="font-size:10px">⚠</span>`:!hasConsent?`<span class="badge badge-pending" style="font-size:10px">📋</span>`:soapAtrasado?`<span class="badge badge-alert" style="font-size:9px;background:#FEF3C7;color:#92400E">⚠️ +7d</span>`:'';
-    frag+=`<div class="patient-card" data-pid="${escapeAttr_(p.id)}" onclick="${abrirFn}(this.dataset.pid)">
-        <div class="patient-avatar">${initials(p.name)}</div>
-        <div class="patient-info">
-          <div class="patient-name">${escapeHTML(p.name)}</div>
-          <div class="patient-meta">
-            <span>👤 ${escapeHTML(p.age)}a</span>
-            <span style="${!esMio?'color:var(--gold);font-weight:700':''}">🩺 ${escapeHTML(p.terapeuta)}</span>
-            ${(typeof p.terapeutaSeguimiento==='string'&&p.terapeutaSeguimiento&&!p.terapeutaSeguimiento.includes('T00:'))?`<span style="color:var(--green);font-size:10px">→ ${escapeHTML(p.terapeutaSeguimiento)}</span>`:''}
-            <span>${Array.isArray(p.soap)?p.soap.length:(typeof p.sesiones==='number'?p.sesiones:0)} ses.</span>
-          </div>
-          <div class="patient-meta" style="margin-top:3px;font-size:11px;color:#5A6478;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:200px">${escapeHTML(typeof p.dx==='string'?p.dx.split(',')[0]:(p.dx?.dxClinico||p.dx?.dxMedico||'Sin diagnóstico'))}</div>
-          ${Array.isArray(p.etiquetas)&&p.etiquetas.length?`<div style="display:flex;flex-wrap:wrap;gap:3px;margin-top:4px">${p.etiquetas.slice(0,3).map(e=>`<span style="font-size:9px;font-weight:700;background:#E8EEF7;color:var(--navy);padding:2px 7px;border-radius:8px">${escapeHTML(e)}</span>`).join('')}</div>`:''}
-          <button data-pid="${escapeAttr_(p.id)}" onclick="event.stopPropagation();nuevaSesionRapida(this.dataset.pid)" style="font-size:11px;padding:4px 10px;border-radius:12px;background:var(--navy);color:white;border:none;cursor:pointer;margin-top:6px;font-family:inherit;font-weight:700">➕ Sesión</button>
-        </div>
-        ${badge}
-        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" style="color:#9BA3B5;flex-shrink:0"><polyline points="9 18 15 12 9 6"/></svg>
-      </div>`;
-  });
+  // Misma fuente ÚNICA de tarjeta que la lista (incluye el resaltado del nombre).
+  const frag = siguiente.filter(Boolean).map(p=>_pacCardHTML(p, q, abrirFn)).join('');
 
   // Insertar el fragmento antes del botón y actualizar/quitar el botón
   btn.insertAdjacentHTML('beforebegin', frag);
@@ -5312,77 +5295,34 @@ function verMasPacientes_(btn){
   else { btn.dataset.offset = nuevoOffset; btn.textContent = `Ver más (${list.length - nuevoOffset} restantes)`; }
 }
 
-function renderPacientes(q='', filtro='todos', fuenteLista=null){
-  if(!currentUser) return; // sin sesión no hay lista de pacientes que pintar (evita crash currentUser.name)
-  // Puerta única — elige la base: flag OFF = patientsDB; flag ON = vista fusionada (validada por firma)
-  let baseLista;
-  if(Array.isArray(fuenteLista)){
-    baseLista = fuenteLista;
-  }else if(FST_LISTA_ACTIVA){
-    const sigActual = FST_firmaPatientsDBLocal();
-    const cacheFusionadaValida =
-      Array.isArray(window._FST_listaPacientesActual) &&
-      window._FST_listaPacientesActual.length &&
-      window._FST_listaPatientsDBSig === sigActual;
-    if(cacheFusionadaValida){
-      baseLista = window._FST_listaPacientesActual;
-    }else{
-      baseLista = patientsDB || [];
-      if(!window._FST_listaCargando){
-        window._FST_listaCargando = true;
-        FST_obtenerListaParaRender()
-          .then(()=>{ window._FST_listaCargando = false; renderPacientes(q, filtro); })
-          .catch(e=>{ window._FST_listaCargando = false; console.warn('[FST-LISTA] no se pudo cargar lista fusionada:', e.message); });
-      }
-    }
-  }else{
-    baseLista = patientsDB || [];
-  }
-  // Filtro de texto por nombre, dx, terapeuta y nombreNormalizado (helper compartido)
-  let list = FST_filtrarLista(baseLista, q);
-  // Filtros rápidos
-  if(filtro==='hoy') list=list.filter(p=>p.date===todayISO);
-  if(filtro==='precaucion') list=list.filter(p=>p.seguridadClinica?.tienePrecaucion);
-  if(filtro==='sin-soap') list=list.filter(p=>{
-    const soaps=Array.isArray(p.soap)?p.soap:[];
-    return !soaps.some(s=>s.fecha===todayFmt());
-  });
+// ══ BUSCADOR shell/cuerpo ════════════════════════════════════════════════════
+// El input del buscador se pinta UNA vez (shell) y PERSISTE; solo el cuerpo (#pac-lista)
+// se re-pinta. Así ningún render async destruye el input → no se baja el teclado ni se
+// borra lo escrito. La q se lee SIEMPRE del input vivo; el filtro rápido vive en _pacFiltro
+// (fuera del HTML) para sobrevivir a los re-pintados.
+let _pacFiltro = 'todos';
+const _PAC_FILTROS = [['todos','Todos'],['hoy','Hoy'],['precaucion','Con precaución ⚠️'],['sin-soap','Sin SOAP hoy']];
 
-  const c=document.getElementById('content-pacientes');
-  let html=`
-  <button class="btn-primary" style="width:100%;margin-bottom:10px;padding:14px;font-size:15px;font-weight:700;border-radius:var(--radius);position:sticky;top:0;z-index:10" onclick="showNuevoPaciente()">+ Nuevo paciente</button>
-  <div class="search-wrap">
-    <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-    <input class="search-input" id="buscador-pacientes" placeholder="Buscar por nombre, diagnóstico o terapeuta..." oninput="buscarPacientesDebounce_(this.value,'${filtro}')" value="${q}">
-    ${q?`<button onclick="renderPacientes('')" style="background:none;border:none;font-size:18px;cursor:pointer;color:var(--gray-400);flex-shrink:0">×</button>`:''}
-  </div>
-  <div class="chip-row" style="padding:4px 0 10px">
-    ${[['todos','Todos'],['hoy','Hoy'],['precaucion','Con precaución ⚠️'],['sin-soap','Sin SOAP hoy']].map(([k,l])=>`<button class="chip-quick${filtro===k?' chip-active':''}" onclick="renderPacientes('${q}','${k}')" style="${filtro===k?'background:var(--navy);color:white;':''}">${l}</button>`).join('')}
-  </div>`;
-
-  if(!list.length){
-    html+=`<div class="empty-state"><div class="emoji">🔍</div><p>${q?`Sin resultados para "${q}"`:'Sin pacientes aún.'}</p></div>`;
-  } else if(baseLista.length > 500 && filtro!=='hoy' && q && q.trim().length===1){
-    // FIX 7 — Volumen alto: exigir al menos 2 letras para no filtrar miles en cada tecla
-    html+=`<div class="empty-state"><div class="emoji">🔎</div><p>Hay muchos expedientes — escribe al menos 2 letras para buscar.</p></div>`;
-  } else {
-    // CAMBIO P1 — Performance: render por lotes (evita pintar 300+ tarjetas de golpe)
-    const LOTE = 40;
-    // Apertura según flag (no según origen): locales e históricos usan la misma vía
-    const abrirFn = FST_LISTA_ACTIVA ? 'FST_abrirPacienteDesdeLista' : 'openExpediente';
-    html+=`<div style="font-size:11px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:.7px;margin-bottom:8px">
-      Pacientes de la clínica (${list.length})
-    </div>`;
-    list.slice(0, LOTE).filter(Boolean).forEach(p=>{
-      const hasConsent=Array.isArray(p.consentimientos)&&p.consentimientos.some(c=>c.firmado);
-      const inc=Array.isArray(p.soap)&&p.soap.some(s=>!s.completa);
-      const soapAtrasado=!String(p.name||'').startsWith('TEST_QA_')&&necesitaAlertaSoapSemanal(p)&&Array.isArray(p.soap)&&p.soap.length>0;
-      const esMio=p.terapeuta===currentUser.name;
-      const badge=inc?`<span class="badge badge-alert" style="font-size:10px">⚠</span>`:!hasConsent?`<span class="badge badge-pending" style="font-size:10px">📋</span>`:soapAtrasado?`<span class="badge badge-alert" style="font-size:9px;background:#FEF3C7;color:#92400E">⚠️ +7d</span>`:'';
-      html+=`<div class="patient-card" data-pid="${escapeAttr_(p.id)}" onclick="${abrirFn}(this.dataset.pid)">
+// Resalta la 1ª palabra de la búsqueda en el nombre (case-insensitive; índices sobre el nombre CRUDO
+// → sin desalineación). Si no hay match crudo (p.ej. diferencia de acentos) degrada sin resaltar.
+function _resaltarNombre(nombre, qRaw){
+  var n=String(nombre||''); var qw=(String(qRaw||'').trim().split(/\s+/)[0])||'';
+  if(!qw) return escapeHTML(n);
+  var i=n.toLowerCase().indexOf(qw.toLowerCase());
+  if(i<0) return escapeHTML(n);
+  return escapeHTML(n.slice(0,i))+'<mark style="background:#FEF08A;color:inherit;padding:0 1px;border-radius:3px">'+escapeHTML(n.slice(i,i+qw.length))+'</mark>'+escapeHTML(n.slice(i+qw.length));
+}
+// Tarjeta de paciente — fuente ÚNICA (usada por la lista y por "Ver más").
+function _pacCardHTML(p, q, abrirFn){
+  const hasConsent=Array.isArray(p.consentimientos)&&p.consentimientos.some(c=>c.firmado);
+  const inc=Array.isArray(p.soap)&&p.soap.some(s=>!s.completa);
+  const soapAtrasado=!String(p.name||'').startsWith('TEST_QA_')&&necesitaAlertaSoapSemanal(p)&&Array.isArray(p.soap)&&p.soap.length>0;
+  const esMio=p.terapeuta===currentUser.name;
+  const badge=inc?`<span class="badge badge-alert" style="font-size:10px">⚠</span>`:!hasConsent?`<span class="badge badge-pending" style="font-size:10px">📋</span>`:soapAtrasado?`<span class="badge badge-alert" style="font-size:9px;background:#FEF3C7;color:#92400E">⚠️ +7d</span>`:'';
+  return `<div class="patient-card" data-pid="${escapeAttr_(p.id)}" onclick="${abrirFn}(this.dataset.pid)">
         <div class="patient-avatar">${initials(p.name)}</div>
         <div class="patient-info">
-          <div class="patient-name">${escapeHTML(p.name)}</div>
+          <div class="patient-name">${_resaltarNombre(p.name, q)}</div>
           <div class="patient-meta">
             <span>👤 ${escapeHTML(p.age)}a</span>
             <span style="${!esMio?'color:var(--gold);font-weight:700':''}">🩺 ${escapeHTML(p.terapeuta)}</span>
@@ -5396,16 +5336,95 @@ function renderPacientes(q='', filtro='todos', fuenteLista=null){
         ${badge}
         <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" style="color:#9BA3B5;flex-shrink:0"><polyline points="9 18 15 12 9 6"/></svg>
       </div>`;
-    });
-    // CAMBIO P1 — Botón "Ver más" si hay más pacientes que el lote
-    if(list.length > LOTE){
-      html+=`<button id="ver-mas-pacientes" class="chip-quick" style="width:100%;margin-top:10px;padding:12px;font-weight:700" data-offset="${LOTE}" data-q="${escapeAttr_(q)}" data-filtro="${escapeAttr_(filtro)}" onclick="verMasPacientes_(this)">Ver más (${list.length - LOTE} restantes)</button>`;
+}
+// SHELL: botón Nuevo + search-wrap + chips. Sticky top:0. Idempotente: si ya existe, NO lo toca
+// (preserva el input vivo, su foco y su caret). El search-wrap queda fijo → el teclado no lo tapa.
+function renderPacientesShell(){
+  if(!currentUser) return;
+  const c=document.getElementById('content-pacientes'); if(!c) return;
+  if(document.getElementById('pac-shell')) return;
+  _pacFiltro='todos';
+  const chips=_PAC_FILTROS.map(([k,l])=>`<button class="chip-quick" data-k="${k}" onclick="_pacChip('${k}')">${l}</button>`).join('');
+  c.innerHTML=
+    `<div id="pac-shell" style="position:sticky;top:0;z-index:20;background:var(--gray-50);padding-top:2px">`
+    +`<button class="btn-primary" style="width:100%;margin-bottom:10px;padding:14px;font-size:15px;font-weight:700;border-radius:var(--radius)" onclick="showNuevoPaciente()">+ Nuevo paciente</button>`
+    +`<div class="search-wrap">`
+    +`<svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>`
+    +`<input class="search-input" id="buscador-pacientes" placeholder="Buscar por nombre, diagnóstico o terapeuta..." oninput="_pacInput(this.value)" autocomplete="off" autocorrect="off" autocapitalize="off">`
+    +`<button id="pac-clear" onclick="_pacLimpiar()" style="background:none;border:none;font-size:18px;cursor:pointer;color:var(--gray-400);flex-shrink:0;display:none">×</button>`
+    +`</div>`
+    +`<div class="chip-row" id="pac-chips" style="padding:4px 0 10px">${chips}</div>`
+    +`</div>`
+    +`<div id="pac-lista" style="padding-bottom:32vh"></div>`;
+  _pacSyncChips();
+}
+// Refleja el filtro activo en los chips + muestra/oculta la "×" — sin recrear el shell.
+function _pacSyncChips(){
+  document.querySelectorAll('#pac-chips .chip-quick').forEach(function(b){
+    var act=b.dataset.k===_pacFiltro;
+    b.classList.toggle('chip-active', act);
+    b.style.background = act?'var(--navy)':''; b.style.color = act?'white':'';
+  });
+  var inp=document.getElementById('buscador-pacientes'), x=document.getElementById('pac-clear');
+  if(x&&inp) x.style.display = inp.value ? '' : 'none';
+}
+// CUERPO: lo ÚNICO que se re-pinta. Lee q del INPUT VIVO (no de un argumento) → los refrescos
+// async nunca borran lo escrito ni tocan el input.
+function renderPacientesLista(fuenteLista){
+  const cont=document.getElementById('pac-lista'); if(!cont) return;
+  if(!currentUser){ cont.innerHTML=''; return; }
+  const q=(document.getElementById('buscador-pacientes')||{}).value||'';
+  const filtro=_pacFiltro;
+  let baseLista;
+  if(Array.isArray(fuenteLista)){ baseLista=fuenteLista; }
+  else if(FST_LISTA_ACTIVA){
+    const sig=FST_firmaPatientsDBLocal();
+    const ok=Array.isArray(window._FST_listaPacientesActual)&&window._FST_listaPacientesActual.length&&window._FST_listaPatientsDBSig===sig;
+    if(ok){ baseLista=window._FST_listaPacientesActual; }
+    else{
+      baseLista=patientsDB||[];
+      if(!window._FST_listaCargando){
+        window._FST_listaCargando=true;
+        FST_obtenerListaParaRender().then(()=>{ window._FST_listaCargando=false; renderPacientesLista(); }).catch(e=>{ window._FST_listaCargando=false; console.warn('[FST-LISTA] no se pudo cargar lista fusionada:', e.message); });
+      }
+    }
+  } else { baseLista=patientsDB||[]; }
+  let list=FST_filtrarLista(baseLista, q);   // ya viene RANKEADA (empieza-por > contiene > dx/terapeuta)
+  if(filtro==='hoy') list=list.filter(p=>p.date===todayISO);
+  if(filtro==='precaucion') list=list.filter(p=>p.seguridadClinica?.tienePrecaucion);
+  if(filtro==='sin-soap') list=list.filter(p=>{ const s=Array.isArray(p.soap)?p.soap:[]; return !s.some(x=>x.fecha===todayFmt()); });
+
+  let html;
+  if(!list.length){
+    html=`<div class="empty-state"><div class="emoji">🔍</div><p>${q?`Sin resultados para "${escapeHTML(q)}"`:'Sin pacientes aún.'}</p></div>`;
+  } else {
+    const LOTE=40;
+    const abrirFn=FST_LISTA_ACTIVA?'FST_abrirPacienteDesdeLista':'openExpediente';
+    html=`<div style="font-size:11px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:.7px;margin-bottom:8px">Pacientes de la clínica (${list.length})</div>`;
+    html+=list.slice(0,LOTE).filter(Boolean).map(p=>_pacCardHTML(p, q, abrirFn)).join('');
+    if(list.length>LOTE){
+      html+=`<button id="ver-mas-pacientes" class="chip-quick" style="width:100%;margin-top:10px;padding:12px;font-weight:700" data-offset="${LOTE}" data-q="${escapeAttr_(q)}" data-filtro="${escapeAttr_(filtro)}" onclick="verMasPacientes_(this)">Ver más (${list.length-LOTE} restantes)</button>`;
     }
   }
-
-  c.innerHTML=html;
-  _autoVerMasPacientes_(); // OPT1: activa la carga incremental por scroll (si hay botón "Ver más")
+  cont.innerHTML=html;
+  _pacSyncChips();
+  _autoVerMasPacientes_();
 }
+// Wrapper de compatibilidad: TODOS los call sites existentes (incluidos los async que llamaban
+// renderPacientes() SIN q, que antes borraban el texto) caen aquí → montan el shell (idempotente)
+// y re-pintan SOLO el cuerpo leyendo el input vivo. Ignora q/filtro a propósito.
+function renderPacientes(q, filtro, fuenteLista){
+  if(!currentUser) return;
+  renderPacientesShell();
+  renderPacientesLista(fuenteLista);
+}
+function _pacInput(val){
+  var x=document.getElementById('pac-clear'); if(x) x.style.display = val ? '' : 'none';
+  clearTimeout(_busqTimer);
+  _busqTimer=setTimeout(renderPacientesLista, 180);   // debounce 180ms (antes 250)
+}
+function _pacChip(k){ _pacFiltro=k; _pacSyncChips(); renderPacientesLista(); }
+function _pacLimpiar(){ var inp=document.getElementById('buscador-pacientes'); if(inp){ inp.value=''; try{ inp.focus(); }catch(e){} } _pacSyncChips(); renderPacientesLista(); }
 
 // OPT1 — Render incremental: auto-carga el siguiente lote cuando "Ver más" se acerca al viewport
 // (300px antes). El botón manual queda como respaldo: sin IntersectionObserver todo sigue como antes.
@@ -6757,11 +6776,14 @@ function FST_filtrarLista(arr, q) {
   if (!qn) return lista.slice(); // copia sin filtrar
   const palabras = qn.split(/\s+/).filter(Boolean);   // I-F: multi-palabra, cualquier orden
 
-  return lista.filter(p => {
+  const conRank = [];
+  for (let idx = 0; idx < lista.length; idx++) {
+    const p = lista[idx];
     const dx = typeof p.dx === 'string'
       ? p.dx
       : (p.dx?.dxClinico || p.dx?.dxMedico || '');
 
+    const nombreN = FST_normalizarBusqueda((p.name || '') + ' ' + (p.nombreNormalizado || ''));
     const texto = FST_normalizarBusqueda(
       (p.name || '') + ' ' +
       dx + ' ' +
@@ -6769,8 +6791,17 @@ function FST_filtrarLista(arr, q) {
       (p.nombreNormalizado || '')
     );
 
-    return palabras.every(w => texto.includes(w));   // I-F: TODAS las palabras
-  });
+    if (!palabras.every(w => texto.includes(w))) continue;   // I-F: TODAS las palabras
+
+    // Relevancia: nombre empieza por la búsqueda (0) > nombre la contiene (1) > solo dx/terapeuta (2).
+    let rank = 2;
+    if (nombreN.startsWith(qn)) rank = 0;
+    else if (nombreN.includes(qn)) rank = 1;
+    conRank.push({ p, rank, idx });
+  }
+  // Orden ESTABLE: por rango y, a igual rango, por su posición original (no reordena empates).
+  conRank.sort((a, b) => (a.rank - b.rank) || (a.idx - b.idx));
+  return conRank.map(x => x.p);
 }
 
 function detectarModalidadesEnTexto(texto){
@@ -15083,7 +15114,7 @@ function qaVerificarGlobales(){
   const sinFiltro = listaVisible.length === totalDB;
   
   // Verificar también que no haya código de filtro restrictivo activo
-  const renderStr = renderPacientes.toString();
+  const renderStr = renderPacientesLista.toString();   // el cuerpo (no el wrapper) pinta la lista
   const tieneListaCompleta = renderStr.includes('Pacientes de la clínica');
   
   if(sinFiltro && tieneListaCompleta){
