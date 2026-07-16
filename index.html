@@ -8974,29 +8974,39 @@ function _fusionarEstudiosDocs(local, remoto){
   });
   return out;
 }
+// Espejo DURABLE a Firestore de un campo array que vive SOLO en Firestore (estudiosDocs/
+// reportesClinicosIA) para pacientes ACTIVOS. _sinUndefined (Firestore rechaza undefined y explota el
+// write ENTERO — el resumenIA viene de la IA y puede traer undefined anidado) + _conTimeout (offline el
+// SDK no rechaza, se cuelga) + reintento durable REUSANDO COLA_SYNC_HIST_DOC (su replay reescribe el
+// campo a .doc(p.id) vía _persistirHistoricoFirestore; mismo doc que este write). No abre cola nueva.
+async function _espejarCampoFirestore(p, campo){
+  try{
+    var ok = (typeof FST_init==='function') ? await FST_init() : false;
+    if(!ok || !window._fstDb){ _encolarHistDoc(p, [campo]); return {ok:false, pendiente:true}; }
+    var payload = {}; payload[campo] = (p[campo]!=null ? p[campo] : []);
+    await _conTimeout(window._fstDb.collection('pacientes').doc(p.id).set(_sinUndefined(payload), { merge:true }), 8000);
+    return {ok:true};
+  }catch(e){
+    _encolarHistDoc(p, [campo]);   // reintento durable (COLA_SYNC_HIST_DOC)
+    if(e && e.message==='timeout'){ return {ok:false, pendiente:true}; }
+    console.warn('[espejo-firestore] '+campo+' falló, encolado · pid='+(p&&p.id)+':', e&&e.message);
+    return {ok:false, error:(e&&e.message)||'error'};
+  }
+}
 async function _persistirEstudios(p){
   if (patientsDB.some(function(x){ return x.id===p.id; })) {
-    // ACTIVO: la fuente sigue siendo Sheets (SIN estudiosDocs — no se toca pLimpio).
-    var r = await saveDB('pts',[p]);
-    // FIX estudios-activos-sync: además, estudiosDocs a Firestore (backend COMPARTIDO entre equipos;
-    // NUNCA a Sheets). Best-effort: si Firestore no responde, el guardado de Sheets ya fue válido.
-    try {
-      var okA = (typeof FST_init==='function') ? await FST_init() : false;
-      if (okA && window._fstDb) {
-        await window._fstDb.collection('pacientes').doc(p.id).set(
-          { estudiosDocs: Array.isArray(p.estudiosDocs)?p.estudiosDocs:[] }, { merge:true }
-        );
-      }
-    } catch(e){ console.warn('[estudios-sync] Firestore activo falló (Sheets OK) · pid='+p.id+':', e&&e.message); }
-    return r;
+    // ACTIVO: Sheets guarda el resto del paciente (SIN estudiosDocs); estudiosDocs va a Firestore
+    // (compartido) de forma DURABLE (antes: .set directo, sin _sinUndefined/_conTimeout, catch que
+    // tragaba el error → el toast mentía "agregado" y el espejo se perdía sin reintento).
+    await saveDB('pts',[p]);
+    var rf = await _espejarCampoFirestore(p, 'estudiosDocs');
+    if(rf && rf.ok) return {ok:true};
+    if(rf && rf.pendiente) return {ok:false, pendiente:true};
+    return {ok:false, error:(rf&&rf.error)||'espejo-firestore'};
   }
-  // HISTÓRICO (mig_pac_): Firestore es la fuente — igual que hoy.
-  var initOk = (typeof FST_init==='function') ? await FST_init() : false;
-  if (!initOk || !window._fstDb) throw new Error('Firestore no disponible');
-  await window._fstDb.collection('pacientes').doc(p.id).set(
-    { estudiosDocs: Array.isArray(p.estudiosDocs)?p.estudiosDocs:[] }, { merge:true }
-  );
-  return { ok:true, via:'firestore' };
+  // HISTÓRICO (mig_pac_): Firestore es el ÚNICO almacén → vía protegida saveDB→_persistirHistoricoFirestore
+  // (_sinUndefined + _conTimeout + cola COLA_SYNC_HIST_DOC + detección de conflicto). {ok}/{ok:false,pendiente}.
+  return await saveDB('pts',[p],{camposHist:['estudiosDocs']});
 }
 // ── LOOP E: editar datos básicos del paciente (solo supervisor; activos + históricos) ──
 // Persiste datos básicos. Activo → saveDB (Sheet). Histórico → Firestore merge (NO toca el Sheet). Patrón de _persistirEstudios.
@@ -9121,7 +9131,7 @@ async function FST_renderEstudiosApartado(pid){
           var fusion = _fusionarEstudiosDocs(Array.isArray(p.estudiosDocs)?p.estudiosDocs:[], remoto);
           p.estudiosDocs = fusion;
           if (fusion.length > remoto.length) { // local aportó estudios que faltaban en la nube → propagar
-            try { await window._fstDb.collection('pacientes').doc(pid).set({ estudiosDocs: fusion }, { merge:true }); }
+            try { await _conTimeout(window._fstDb.collection('pacientes').doc(pid).set(_sinUndefined({ estudiosDocs: fusion }), { merge:true }), 8000); }
             catch(e){ console.warn('[estudios-sync] write-back activo · pid='+pid+':', e&&e.message); }
           }
         } else {
@@ -9235,7 +9245,14 @@ async function agregarEstudioLink(pid){
   if (!Array.isArray(p.estudiosDocs)) p.estudiosDocs = [];
   var ts = Date.now();
   p.estudiosDocs.push({ id:'est_'+ts+'_'+Math.random().toString(36).slice(2,6), tipo:'link', url:datos.url, descripcion:datos.desc, fechaEstudio:fecha, fechaAgregado:new Date().toLocaleDateString('es-MX'), agregadoPor:currentUser.name });
-  try { await _persistirEstudios(p); if (window._estudiosCache) delete window._estudiosCache[pid]; showToast('✅ Link agregado','success'); FST_renderEstudiosApartado(pid); }
+  try {
+    var _re = await _persistirEstudios(p);
+    if (window._estudiosCache) delete window._estudiosCache[pid];
+    if(_re && _re.pendiente) showToast('📴 Link guardado — se sincronizará al reconectar','warning');
+    else if(_re && _re.ok!==false) showToast('✅ Link agregado','success');
+    else showToast('⚠️ Link guardado local, la nube no confirmó — se reintentará','warning');
+    FST_renderEstudiosApartado(pid);
+  }
   catch(e){ showToast('❌ Error: '+e.message,'error'); }
 }
 
@@ -9263,9 +9280,11 @@ function agregarEstudioArchivo(pid, tipo){
       });
       if (!Array.isArray(p.estudiosDocs)) p.estudiosDocs = [];
       p.estudiosDocs.push({ id:'est_'+ts+'_'+Math.random().toString(36).slice(2,6), tipo:tipo, url:url, fbPath:fbPath, descripcion:(f.name||'').replace(/\.[^.]+$/,''), fechaEstudio:fecha, fechaAgregado:new Date().toLocaleDateString('es-MX'), agregadoPor:currentUser.name });
-      await _persistirEstudios(p);
+      var _re = await _persistirEstudios(p);
       if (window._estudiosCache) delete window._estudiosCache[pid];
-      showToast('✅ Estudio agregado','success');
+      if(_re && _re.pendiente) showToast('📴 Estudio guardado — se sincronizará al reconectar','warning');
+      else if(_re && _re.ok!==false) showToast('✅ Estudio agregado','success');
+      else showToast('⚠️ Estudio guardado local, la nube no confirmó — se reintentará','warning');
       FST_renderEstudiosApartado(pid);
     } catch(e){ showToast('❌ Error subiendo: '+e.message,'error'); }
   };
@@ -12918,20 +12937,21 @@ async function RPT_generarSintesisIA(pid){
     var idx=p.reportesClinicosIA.findIndex(function(x){ return x.hashEntradas===hash; });
     if(idx>=0) p.reportesClinicosIA[idx]=entrada; else p.reportesClinicosIA.push(entrada);
 
-    // Persistir — guard-safe: histórico → Firestore; activo → saveDB + Firestore (compartido)
+    // Persistir DURABLE (antes: .set directo sin _sinUndefined/_conTimeout/cola; el resumenIA viene
+    // de la IA y un undefined anidado reventaba el write ENTERO; offline se colgaba; y en activos el
+    // catch tragaba el error mientras el toast decía "🧠 generada"). Histórico → vía protegida
+    // saveDB→_persistirHistoricoFirestore (cola COLA_SYNC_HIST_DOC). Activo → Sheets (resto) + espejo
+    // Firestore durable de reportesClinicosIA (mismo helper que estudios).
+    var _rRpt;
     if(String(p.id||'').startsWith('mig_pac_')){
-      if(typeof FST_init==='function') await FST_init();
-      await window._fstDb.collection('pacientes').doc(p.id).set({ reportesClinicosIA:p.reportesClinicosIA }, { merge:true });
+      _rRpt = await saveDB('pts',[p],{camposHist:['reportesClinicosIA']});
     } else {
-      await saveDB('pts', [p]);
-      // FIX reportes-ia-activos-sync: reportesClinicosIA a Firestore (backend COMPARTIDO; NUNCA a Sheets).
-      // Best-effort: si Firestore no responde, el guardado a Sheets (sin este campo) ya fue válido.
-      try {
-        var okR=(typeof FST_init==='function')?await FST_init():false;
-        if(okR && window._fstDb) await window._fstDb.collection('pacientes').doc(p.id).set({ reportesClinicosIA:p.reportesClinicosIA }, { merge:true });
-      } catch(e){ console.warn('[reportes-ia-sync] Firestore activo falló (Sheets OK) · pid='+p.id+':', e&&e.message); }
+      await saveDB('pts', [p]);   // Sheets: resto del paciente (reportesClinicosIA NUNCA a Sheets)
+      _rRpt = await _espejarCampoFirestore(p, 'reportesClinicosIA');
     }
-    showToast('🧠 Síntesis generada','success');
+    if(_rRpt && _rRpt.pendiente){ showToast('📴 Síntesis guardada — se sincronizará al reconectar','warning'); }
+    else if(_rRpt && _rRpt.ok!==false){ showToast('🧠 Síntesis generada','success'); }
+    else { showToast('⚠️ Síntesis generada local, la nube no confirmó — se reintentará','warning'); }
     RPT_pintarPestanaReporte(pid, _filtroSint); // FASE C: re-render conservando el episodio seleccionado
   }catch(e){
     console.warn('[IC síntesis]', e.message);
@@ -13042,7 +13062,7 @@ async function RPT_pintarPestanaReporte(pid, filtroEpisodio){
           var fusionR = _fusionarReportesIA(Array.isArray(p.reportesClinicosIA)?p.reportesClinicosIA:[], remotoR);
           p.reportesClinicosIA = fusionR;
           if(_sigReportesIA(fusionR)!==_sigReportesIA(remotoR)){
-            try{ await window._fstDb.collection('pacientes').doc(pid).set({ reportesClinicosIA:fusionR }, { merge:true }); }
+            try{ await _conTimeout(window._fstDb.collection('pacientes').doc(pid).set(_sinUndefined({ reportesClinicosIA:fusionR }), { merge:true }), 8000); }
             catch(e){ console.warn('[reportes-ia-sync] write-back activo · pid='+pid+':', e&&e.message); }
           }
         } else {
