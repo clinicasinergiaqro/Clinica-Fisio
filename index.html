@@ -2984,7 +2984,12 @@ function mostrarBannerActualizacion(){
 function aplicarActualizacionSiSegura(){
   if(_swRecargando || !_swUpdatePendiente) return;
   if(!navigator.onLine){ mostrarBannerActualizacion(); return; } // offline no traería la nueva versión
-  if(esSeguroRecargar()){
+  // Path AUTOMÁTICO: además de esSeguroRecargar(), exige que NO haya nada en las colas de sync. Las
+  // colas son durables (localStorage sobrevive a la recarga), así que esto NO es por pérdida de dato
+  // —el flag en-vuelo ya cubre eso— sino por prudencia: si algo aún no cruzó, se espera al drenado.
+  // El botón "Actualizar ahora" (abajo) NO aplica este extra: el usuario puede forzar (colas durables).
+  var _colasVacias = (typeof _totalPendientesSync!=='function') || (_totalPendientesSync()===0);
+  if(esSeguroRecargar() && _colasVacias){
     _swRecargando=true;
     try{ location.reload(); }catch(e){ location.href=location.href; }
   } else {
@@ -14055,8 +14060,10 @@ function hayOperacionClinicaCritica_(){
       window._guardandoSOAP ||
       (window.scannerState && (scannerState.isSaving || scannerState.liveDetectionActive)) ||
       (window._dictado && window._dictado.activo) ||
-      window._uploadEnCurso ||
-      window._guardadoEnCurso
+      // FLAG REAL de escritura clínica en vuelo: cubre saveDB, todos los _persistir*, el dual-write de
+      // sesión, el drenado de colas y las subidas a Storage (consentimiento/escáner). Reemplaza a
+      // _uploadEnCurso/_guardadoEnCurso, que NUNCA se asignaban → daban falsa seguridad (bug P0).
+      (window._opEscrituraEnVuelo > 0)
     );
   }catch(e){ return false; }
 }
@@ -17099,6 +17106,52 @@ async function guardarPDFScannerMultipagina(){
     c.addEventListener('touchmove', scanner2PointerMove, {passive:false});
     window.addEventListener('touchend', scanner2PointerUp);
   });
+})();
+
+// ── P0 FIX — CONTADOR REAL DE ESCRITURA CLÍNICA EN VUELO ──────────────────────
+// El auto-update (#77) y el auto-logout usan hayOperacionClinicaCritica_(), que dependía de
+// _uploadEnCurso/_guardadoEnCurso — flags que NUNCA se asignaban. Un guardado de HISTÓRICO (que no
+// vive en localStorage) awaitea hasta ~8s sin ningún flag vivo → una recarga en esa ventana lo
+// perdía entero. Aquí envolvemos las funciones-embudo de escritura con un CONTADOR (soporta
+// anidamiento y concurrencia): +1 al entrar, -1 en finally. Mientras el contador sea >0, ni el
+// auto-update ni el auto-logout actúan. Se ejecuta al final del último <script>, cuando TODAS las
+// funciones de todos los bloques ya están definidas (son declaraciones globales reasignables).
+(function(){
+  // Embudos de ESCRITURA a la nube (Sheets/Firestore) + drenado de colas + handlers con subida a
+  // Storage (consentimiento y escáner). Cubrir estos cubre la ventana "dato ni persistido ni
+  // encolado". saveDB llama internamente a otros _persistir* → el contador anidado lo maneja.
+  var _fns = ['saveDB','_persistirHistoricoFirestore','_persistirDatosPaciente','_persistirEstudios',
+    '_persistirAdicionHistorico','_persistirEtiquetaHistorico','FST_guardarSesionFirestore',
+    '_guardarEdicionSoapHistorico','drenarColaSoapHistorico','drenarColaSoapActivo',
+    'drenarColaHistDoc','drenarColaEtiqHist','guardarConsentimiento','guardarPDFScannerMultipagina'];
+  var _ok = [], _fail = [];
+  try{
+    window._opEscrituraEnVuelo = 0;
+    function _wrapEsc(fn){
+      if(typeof fn!=='function' || fn._wrapEsc) return fn;
+      var w = async function(){
+        window._opEscrituraEnVuelo++;
+        try { return await fn.apply(this, arguments); }
+        finally { window._opEscrituraEnVuelo = Math.max(0, window._opEscrituraEnVuelo - 1); }
+      };
+      w._wrapEsc = true;
+      return w;
+    }
+    _fns.forEach(function(n){
+      try{
+        if(typeof window[n]==='function'){ window[n] = _wrapEsc(window[n]); }
+        if(typeof window[n]==='function' && window[n]._wrapEsc===true){ _ok.push(n); }
+        else { _fail.push(n+' (typeof='+typeof window[n]+')'); }   // NO envuelta → se reporta, no se traga
+      }catch(_e){ _fail.push(n+':'+((_e&&_e.message)||'err')); }
+    });
+  }catch(e){ _fail.push('BLOQUE:'+((e&&e.message)||'err')); }
+  // AUTO-VERIFICACIÓN RUIDOSA (contra la falsa seguridad que causó el P0): si alguna NO se envolvió,
+  // GRITA en consola. El reporte completo queda en window._opEscrituraWrapReport para inspección.
+  window._opEscrituraWrapReport = { total:_fns.length, envueltas:_ok.length, ok:_ok, fallidas:_fail };
+  try{
+    if(_fail.length){ console.error('[P0][auto-update] ⚠️ '+_fail.length+'/'+_fns.length+' funciones NO se envolvieron — el flag en-vuelo NO las cubre:', _fail); }
+    else { console.log('[P0][auto-update] ✅ '+_ok.length+'/'+_fns.length+' funciones de escritura envueltas con el flag en-vuelo.'); }
+  }catch(_l){}
 })();
 
 </script>
