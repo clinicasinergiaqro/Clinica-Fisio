@@ -1888,15 +1888,46 @@ function _encolarHistDoc(p, camposHist){
     var q=JSON.parse(localStorage.getItem('COLA_SYNC_HIST_DOC')||'[]');
     if(!Array.isArray(q)) q=[];
     // Dedup por pid: fusionar con lo ya encolado (lo nuevo gana por clave) y reiniciar backoff.
+    // SOLO entre items regulares: los de tipo:'identidad' (name/nombreNormalizado) son otra clase con
+    // su propio replay y NO deben borrarse aquí.
     var prev=null;
-    q.forEach(function(it){ if(it && it.pid===p.id) prev=it; });
+    q.forEach(function(it){ if(it && it.pid===p.id && it.tipo!=='identidad') prev=it; });
     if(prev){ campos=Object.assign({}, prev.campos||{}, campos); }
-    q=q.filter(function(it){ return !(it && it.pid===p.id); });
+    q=q.filter(function(it){ return !(it && it.pid===p.id && it.tipo!=='identidad'); });
     q.push({pid:p.id, campos:campos, ts:Date.now(), intentos:0});
     localStorage.setItem('COLA_SYNC_HIST_DOC', JSON.stringify(q));
     try{ showToast('📴 Cambio de expediente histórico pendiente — se reintentará solo','warning'); }catch(_){}
     return true;
   }catch(e){ console.warn('[hist-doc] no se pudo encolar:', e && e.message); return false; }
+}
+// ── IDENTIDAD de histórico (name/nombreNormalizado/…): reintento durable propio ──────────────
+// _persistirHistoricoFirestore EXCLUYE name/nombreNormalizado del bulk (hallazgo 4: un snapshot stale
+// revertiría un cambio de nombre), así que su reintento NO puede ir por el replay estándar de
+// COLA_SYNC_HIST_DOC (perdería el nombre). Estos items van a la MISMA cola con tipo:'identidad' y su
+// replay escribe el payload directo. updatedAt es sentinel (no serializable) → se añade fresco en cada
+// write, nunca se guarda en la cola.
+function _payloadIdentidadHist(p){
+  return {
+    name: p.name,
+    nombreNormalizado: p.nombreNormalizado || FST_normalizarNombreLive(p.name||''),
+    age: p.age, telefono: p.telefono||'', terapeuta: p.terapeuta||'',
+    sexo: p.sexo||'', fechaNacimiento: p.fechaNacimiento||'', medicoReferente: p.medicoReferente||'',
+    ultimoUsuario: (currentUser && currentUser.name) || ''
+  };
+}
+async function _escribirIdentidadFirestore(pid, campos){
+  var payload = Object.assign({}, campos, { updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
+  return await _conTimeout(window._fstDb.collection('pacientes').doc(pid).set(_sinUndefined(payload), { merge:true }), 8000);
+}
+function _encolarIdentidadHist(pid, campos){
+  try{
+    var q=JSON.parse(localStorage.getItem('COLA_SYNC_HIST_DOC')||'[]');
+    if(!Array.isArray(q)) q=[];
+    q=q.filter(function(it){ return !(it && it.tipo==='identidad' && it.pid===pid); }); // solo la más reciente
+    q.push({tipo:'identidad', pid:pid, campos:campos, ts:Date.now(), intentos:0});
+    localStorage.setItem('COLA_SYNC_HIST_DOC', JSON.stringify(q));
+    try{ actualizarIndicadorSync(); }catch(_){}
+  }catch(e){ console.warn('[identidad-hist] no se pudo encolar:', e && e.message); }
 }
 function _persistirFallidosHistDoc(items){
   try{
@@ -1931,10 +1962,17 @@ async function drenarColaHistDoc(){
           console.warn('[hist-doc] item a FALLIDOS por conflicto de recencia:', it.pid);
           continue;
         }
-        // Reintento por el MISMO camino del Loop B (filtro + rastro v14 + _sinUndefined).
-        var pseudo = Object.assign({id: it.pid}, it.campos);
-        var r = await _persistirHistoricoFirestore(pseudo, Object.keys(it.campos));
-        if(!(r && r.ok)) throw new Error(String((r && r.error) || 'error'));
+        if(it.tipo==='identidad'){
+          // Identidad NO pasa por _persistirHistoricoFirestore (excluye name/nombreNormalizado del
+          // bulk). Reintento directo del snapshot con _sinUndefined + updatedAt fresco. El guard de
+          // recencia de arriba ya protege de pisar un cambio más nuevo.
+          await _escribirIdentidadFirestore(it.pid, it.campos||{});
+        } else {
+          // Reintento por el MISMO camino del Loop B (filtro + rastro v14 + _sinUndefined).
+          var pseudo = Object.assign({id: it.pid}, it.campos);
+          var r = await _persistirHistoricoFirestore(pseudo, Object.keys(it.campos));
+          if(!(r && r.ok)) throw new Error(String((r && r.error) || 'error'));
+        }
         // éxito → no se re-encola
       }catch(e){
         var _cod=String((e && (e.code||e.message)) || '');
@@ -9014,18 +9052,22 @@ async function _persistirDatosPaciente(p){
   if (patientsDB.some(function(x){ return x.id===p.id; })) {
     return await saveDB('pts',[p]);                                  // activo: guarda el objeto como hoy
   }
-  var initOk = (typeof FST_init==='function') ? await FST_init() : false;
-  if (!initOk || !window._fstDb) throw new Error('Firestore no disponible');
-  // _sinUndefined: si p.age o p.name vienen undefined (histórico migrado sin edad), Firestore
-  // reventaba el write ENTERO ("Unsupported field value: undefined in field age") y se perdía todo.
-  await window._fstDb.collection('pacientes').doc(p.id).set(
-    _sinUndefined({ name: p.name, nombreNormalizado: p.nombreNormalizado || FST_normalizarNombreLive(p.name||''),
-      age: p.age, telefono: p.telefono||'', terapeuta: p.terapeuta||'',
-      // Loop editar-datos: sexo/fechaNacimiento/medicoReferente (ya en pacienteClinicoUpdateOK v12).
-      sexo: p.sexo||'', fechaNacimiento: p.fechaNacimiento||'', medicoReferente: p.medicoReferente||'' }),
-    { merge:true }
-  );
-  return { ok:true, via:'firestore' };
+  // HISTÓRICO: Firestore es el ÚNICO almacén → DURABLE. _sinUndefined (si age/name vienen undefined
+  // Firestore reventaba el write ENTERO y se perdía todo) + _conTimeout (offline el SDK no rechaza, se
+  // cuelga) + cola dedicada de identidad (tipo:'identidad' en COLA_SYNC_HIST_DOC; su replay NO puede ir
+  // por _persistirHistoricoFirestore porque ese excluye name/nombreNormalizado del bulk).
+  var _campos = _payloadIdentidadHist(p);
+  try{
+    var initOk = (typeof FST_init==='function') ? await FST_init() : false;
+    if(!initOk || !window._fstDb){ _encolarIdentidadHist(p.id, _campos); return { ok:false, pendiente:true }; }
+    await _escribirIdentidadFirestore(p.id, _campos);
+    return { ok:true, via:'firestore' };
+  }catch(e){
+    _encolarIdentidadHist(p.id, _campos);   // reintento durable (nunca "se perdió")
+    if(e && e.message==='timeout') return { ok:false, pendiente:true };
+    console.warn('[identidad-hist] write falló, encolado · pid='+p.id+':', e&&e.message);
+    return { ok:false, error:(e&&e.message)||'error' };
+  }
 }
 function _abrirEditarPaciente(pid){
   if(!(currentUser && currentUser.role==='supervisor')){ showToast('Sin permiso — solo supervisor','error'); return; }
@@ -9103,7 +9145,10 @@ async function _guardarEdicionPaciente(pid){
     var av = document.getElementById('exp-avatar'); if(av) av.textContent = initials(p.name);
     if(typeof renderExpediente==='function') renderExpediente(currentTab||'historia');
     var _esHistPac = String(p.id||'').startsWith('mig_pac_');
-    showToast(ok?'✅ Datos actualizados':(_esHistPac?'❌ No se pudo guardar en la nube — el cambio NO se guardó':'⚠️ Guardado local, Sheets no confirmó'), ok?'success':(_esHistPac?'error':'warning'));
+    if(ok){ showToast('✅ Datos actualizados','success'); }
+    else if(res && res.pendiente){ showToast('📴 Datos guardados — se sincronizarán al reconectar','warning'); }
+    else if(_esHistPac){ showToast('⚠️ La nube no confirmó — se reintentará solo','warning'); } // ya encolado (no se pierde)
+    else { showToast('⚠️ Guardado local, Sheets no confirmó','warning'); }
   }catch(err){
     console.error('editarPaciente:', err);
     showToast('No se pudo guardar: '+((err&&err.message)||'error inesperado'), 'error');
