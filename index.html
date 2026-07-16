@@ -4013,7 +4013,7 @@ async function _marcarCitaResuelta(nombre, fecha){
 }
 function _triangularCitasNotas(eventos, resueltos, ultimaHist, asigMap, resueltas){
   var porTer={};
-  Object.keys(TERAPEUTA_CAL2COD).forEach(function(n){ porTer[n]={citas:0, conNota:0, sinNota:0, resueltas:0, sinNotaPacs:[], noIdentificados:0, noIdentPacs:[], atendidasOtro:[]}; });
+  Object.keys(TERAPEUTA_CAL2COD).forEach(function(n){ porTer[n]={citas:0, conNota:0, sinNota:0, resueltas:0, sinNotaPacs:[], noIdentificados:0, noIdentPacs:[], atendidasOtro:[], tardias:0, tardiasPacs:[]}; });
   var porDia={};   // VISTA-SEMANAL: desglose por día DD/MM/YYYY (mismo universo que la tabla: citas con terapeuta)
   var vistosSinNota={};
   (Array.isArray(eventos)?eventos:[]).forEach(function(ev){
@@ -4055,6 +4055,20 @@ function _triangularCitasNotas(eventos, resueltos, ultimaHist, asigMap, resuelta
         // Solo si hay autor(es) conocido(s) y NINGUNO es el terapeuta del calendario.
         if(calCod && codsCon.length && codsCon.indexOf(calCod)===-1){
           porTer[ter].atendidasOtro.push({nombre:ev.paciente||'(sin nombre)', fecha:ddmm, atendioPor:escrito.join(', ')});
+        }
+        // OPORTUNIDAD (aditivo, NO cambia el conteo): la nota SIGUE contando ✅. Con el timestamp REAL
+        // de creación (sMatch.fechaHoraISO, incorruptible por la fecha editable) vs la hora de la cita
+        // (ev.inicio), si pasaron >24h → tardía. Guard: sin fechaHoraISO (activos migrados/antiguos)
+        // NO se mide (no inventar con la fecha editable). Históricos ya degradan (sMatch es null aquí).
+        if(sMatch.fechaHoraISO && ev.inicio){
+          var _tCita=new Date(ev.inicio).getTime(), _tNota=new Date(sMatch.fechaHoraISO).getTime();
+          if(isFinite(_tCita) && isFinite(_tNota)){
+            var _horas=(_tNota-_tCita)/3600000;
+            if(_horas>24){
+              porTer[ter].tardias++;
+              porTer[ter].tardiasPacs.push({nombre:ev.paciente||'(sin nombre)', fecha:ddmm, horas:Math.round(_horas)});
+            }
+          }
         }
       }
     }
@@ -4345,7 +4359,7 @@ function _rendimientoHTML(datos, noId, ventana, etiqueta, aviso, refresco, tri){
       +'<td style="padding:6px 8px;font-weight:700;color:'+c+'">'+escapeHTML(n)+'</td>'
       +'<td style="padding:6px 8px;text-align:center">'+t.citas+'</td>'
       +'<td style="padding:6px 8px;text-align:center;font-weight:700;color:#2E7D52">'+(t.conNota==null?'—':('✅ '+t.conNota))+'</td>'
-      +'<td style="padding:6px 8px;text-align:center;font-weight:700;color:'+((t.sinNota>0)?'#B91C1C':'var(--gray-400)')+'">'+(t.sinNota==null?'—':(t.sinNota>0?('🔴 '+t.sinNota):'0'))+((t.noIdentificados>0)?(' <span style="color:#92400E;font-weight:700;white-space:nowrap">🔎 '+t.noIdentificados+'</span>'):'')+'</td>'
+      +'<td style="padding:6px 8px;text-align:center;font-weight:700;color:'+((t.sinNota>0)?'#B91C1C':'var(--gray-400)')+'">'+(t.sinNota==null?'—':(t.sinNota>0?('🔴 '+t.sinNota):'0'))+((t.noIdentificados>0)?(' <span style="color:#92400E;font-weight:700;white-space:nowrap">🔎 '+t.noIdentificados+'</span>'):'')+((t.tardias>0)?(' <span style="color:#B45309;font-weight:700;white-space:nowrap" title="Notas creadas más de 24 h después de la cita">⏱ '+t.tardias+'</span>'):'')+'</td>'
       +'<td style="padding:6px 8px;text-align:center">'+(st.scoreN?Math.round(st.scoreSum/st.scoreN):'—')+'</td></tr>';
   }).join('');
   // Bloques por terapeuta: pacientes con cita SIN nota → botón directo al expediente
@@ -4390,6 +4404,23 @@ function _rendimientoHTML(datos, noId, ventana, etiqueta, aviso, refresco, tri){
   }).join('');
   var seccionAutoria=bloquesAutoria
     ? '<div style="margin-top:12px"><div style="font-size:12px;font-weight:800;color:#3730A3">👥 Atendidas por otro terapeuta <span style="font-weight:400;color:var(--gray-500)">(cuenta como ✅; solo informa quién la atendió)</span></div>'+bloquesAutoria+'</div>'
+    : '';
+  // OPORTUNIDAD: notas creadas >24h después de la cita (timestamp real de creación, no la fecha
+  // editable). Cuentan como ✅ — solo informa la puntualidad. Solo activos (históricos degradan).
+  var bloquesTardias=Object.keys(TERAPEUTA_CAL2COD).map(function(n){
+    var t=tri[n];
+    if(!t || !t.tardiasPacs || !t.tardiasPacs.length) return '';
+    var c=(typeof AGENDA_COLORES!=='undefined'&&AGENDA_COLORES[n])?AGENDA_COLORES[n]:'#9BA3B5';
+    var chips=t.tardiasPacs.map(function(x){
+      return '<span style="white-space:nowrap;display:inline-block;font-size:11px;font-weight:700;border-radius:10px;padding:4px 10px;margin:2px;border:1px solid #FDE68A;background:#FFFBEB;color:#B45309">⏱ '
+        +escapeHTML(x.nombre)+' <span style="font-weight:400">— nota +'+x.horas+' h</span></span>';
+    }).join('');
+    return '<div style="margin-top:8px;border-left:4px solid '+c+';padding-left:8px">'
+      +'<div style="font-size:12px;font-weight:800;color:'+c+'">'+escapeHTML(n)+' — '+t.tardiasPacs.length+' nota'+(t.tardiasPacs.length!==1?'s':'')+' fuera de 24 h</div>'
+      +'<div style="margin-top:2px">'+chips+'</div></div>';
+  }).join('');
+  var seccionTardias=bloquesTardias
+    ? '<div style="margin-top:12px"><div style="font-size:12px;font-weight:800;color:#B45309">⏱ Notas fuera de las 24 h <span style="font-weight:400;color:var(--gray-500)">(cuenta como ✅; solo informa la puntualidad · solo activos)</span></div>'+bloquesTardias+'</div>'
     : '';
   // VISTA-SEMANAL: una columna por día (Lun..Vie; Sáb/Dom solo si tienen citas). Días futuros = "por venir".
   var bloqueSemana='';
@@ -4445,6 +4476,7 @@ function _rendimientoHTML(datos, noId, ventana, etiqueta, aviso, refresco, tri){
     +seccionSinNota
     +seccionRevisar
     +seccionAutoria
+    +seccionTardias
     +filaSA+bloqueNI
     +'<div style="font-size:10px;color:var(--gray-400);margin-top:10px">✅/🔴 por PACIENTE y día: nota fechada el día exacto de la cita, sin importar qué terapeuta la escribió (activos por expediente; históricos por ultimaSesionLive). ✅ incluye citas resueltas a mano con ✓. Score = calidad promedio de nota (0-100) de pacientes activos.</div>';
 }
