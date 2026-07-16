@@ -5412,7 +5412,18 @@ function renderPacientesLista(fuenteLista){
 }
 // Wrapper de compatibilidad: TODOS los call sites existentes (incluidos los async que llamaban
 // renderPacientes() SIN q, que antes borraban el texto) caen aquí → montan el shell (idempotente)
-// y re-pintan SOLO el cuerpo leyendo el input vivo. Ignora q/filtro a propósito.
+// y re-pintan SOLO el cuerpo leyendo el input vivo.
+//
+// ⚠️ OJO: q y filtro se aceptan SOLO por compatibilidad con los ~13 call sites viejos que aún
+// los pasan. Se IGNORAN a propósito — no filtran nada. La q real se lee SIEMPRE del input vivo
+// (#buscador-pacientes) dentro de renderPacientesLista; si este wrapper aplicara el argumento q
+// tendría que reescribir/recrear el input y volveríamos al bug de borrar lo escrito y bajar el
+// teclado. Por eso NO lo hace.
+// ¿Necesitas filtrar programáticamente? Escribe el input y repinta solo el cuerpo:
+//     document.getElementById('buscador-pacientes').value = 'texto';
+//     _pacFiltro = 'todos';            // o el chip que quieras
+//     renderPacientesLista();
+// (No llames renderPacientes('texto') esperando que filtre: no lo hará.)
 function renderPacientes(q, filtro, fuenteLista){
   if(!currentUser) return;
   renderPacientesShell();
