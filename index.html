@@ -1776,7 +1776,7 @@ async function drenarColaSoapHistorico(){
 // el error → "sesiones en Firestore = 0" sin aviso ni reintento. Cola SEPARADA: NO toca COLA_SYNC de
 // activos (la usan otros flujos) ni las colas de históricos. Guarda snapshot de la sesión (sin media,
 // igual que la de históricos) + descriptor mínimo del paciente para resolver el pid al drenar.
-function _encolarSoapActivo(pid, sesion){
+function _encolarSoapActivo(pid, sesion, modo){
   try{
     if(!pid || !sesion || !sesion.id) return;
     var q=JSON.parse(localStorage.getItem('COLA_SOAP_ACT')||'[]');
@@ -1784,8 +1784,16 @@ function _encolarSoapActivo(pid, sesion){
     var sid=String(sesion.id||'');
     var sLimpia=Object.assign({}, sesion); delete sLimpia.media; // base64 nunca a localStorage (cuota)
     var pac=(Array.isArray(patientsDB)?patientsDB:[]).find(function(x){ return x && x.id===pid; }) || {};
+    // MODO: el replay debe usar el mismo modo con que se guardó. 'nueva' escribe createdAt/horaCreacion/
+    // totalSesiones (crea el doc); 'edicion' NO (sesionUpdateOK los rechazaría sobre un doc existente).
+    // Si ya había un item 'nueva' pendiente para esta sesión (el doc AÚN no existe en Firestore) y ahora
+    // llega una edición, se CONSERVA 'nueva' con el contenido más reciente: el replay debe CREAR el doc,
+    // no intentar un update sobre algo que no existe.
+    var prevModo=null;
+    q.forEach(function(it){ if(it && String(it.sesion && it.sesion.id)===sid) prevModo=it.modo||'nueva'; });
+    var modoFinal=(prevModo==='nueva') ? 'nueva' : (modo==='edicion' ? 'edicion' : 'nueva');
     q=q.filter(function(it){ return !(it && String(it.sesion && it.sesion.id)===sid); }); // solo la más reciente de esa sesión
-    q.push({pid:pid, name:pac.name||'', nombreNormalizado:pac.nombreNormalizado||'', sesion:sLimpia, ts:Date.now(), intentos:0});
+    q.push({pid:pid, name:pac.name||'', nombreNormalizado:pac.nombreNormalizado||'', sesion:sLimpia, modo:modoFinal, ts:Date.now(), intentos:0});
     localStorage.setItem('COLA_SOAP_ACT', JSON.stringify(q));
     actualizarIndicadorSync();
   }catch(e){ console.warn('[SOAP-act] no se pudo encolar:', e && e.message); }
@@ -1815,7 +1823,10 @@ async function drenarColaSoapActivo(){
         // Reconstruir el paciente: preferir el vivo de patientsDB; si no, descriptor mínimo del snapshot.
         var pac=(Array.isArray(patientsDB)?patientsDB:[]).find(function(x){ return x && x.id===it.pid; })
                 || {id:it.pid, name:it.name||'', nombreNormalizado:it.nombreNormalizado||''};
-        var r=await _conTimeout(FST_guardarSesionFirestore(pac, it.sesion, 'nueva'), 10000);
+        // Replay con el MODO guardado. Items encolados antes de este fix no tienen it.modo → 'nueva'
+        // (correcto: la cola solo encolaba notas nuevas hasta ahora).
+        var _modoReplay=(it.modo==='edicion') ? 'edicion' : 'nueva';
+        var r=await _conTimeout(FST_guardarSesionFirestore(pac, it.sesion, _modoReplay), 10000);
         if(r && r.ok){ /* éxito → no se re-encola */ }
         else {
           var _reason=(r && r.reason)||'desconocido';
@@ -8008,10 +8019,27 @@ async function guardarSOAP(){
     p.ultimoUsuario=ter;
     tempEvolMedia=[];
     _espejarSoapMediaAEstudios_(p, p.soap[idx]); // FIX media-edición: espejar a Estudios también al editar (idempotente; propaga a FS por la fusión de la pestaña Estudios, igual que la nota nueva)
-    saveDB('pts',[p]).then(res=>{
+    saveDB('pts',[p]).then(async res=>{
       showToast(res?.ok?'✅ Nota SOAP actualizada':'⚠️ Actualizada local, Sheets pendiente',res?.ok?'success':'warning');
-      if (res?.ok === true && typeof FST_guardarSesionFirestore === 'function') FST_guardarSesionFirestore(p, p.soap[idx], 'edicion').catch(()=>{});
-    }).catch(()=>showToast('⚠️ Sin conexión — actualizada local','warning'))
+      // DUAL-WRITE DURABLE de la EDICIÓN (igual que la nota nueva, PR #76): NO gated en Sheets, awaited,
+      // y si falla se encola el SNAPSHOT con modo 'edicion' (antes: fire-and-forget + .catch(()=>{}) que
+      // tragaba el error → el espejo Firestore conservaba la versión vieja sin aviso ni reintento). El modo
+      // viaja en la cola para que el replay use 'edicion' (no 'nueva', que escribiría createdAt y
+      // sesionUpdateOK rechazaría sobre el doc existente). Offline → encolar directo, sin colgar 10 s.
+      if(!navigator.onLine){
+        _encolarSoapActivo(p.id, p.soap[idx], 'edicion');
+      } else {
+        try{
+          const _rf = (typeof FST_guardarSesionFirestore === 'function')
+            ? await _conTimeout(FST_guardarSesionFirestore(p, p.soap[idx], 'edicion'), 10000)
+            : {ok:false, reason:'FN_MISSING'};
+          if(!_rf || !_rf.ok){
+            const _rz=(_rf && _rf.reason)||'desconocido';
+            if(!/FLAG_OFF|NO_STAGING|SKIP_IMPORTADA/.test(_rz)){ _encolarSoapActivo(p.id, p.soap[idx], 'edicion'); console.warn('[SOAP-act] dual-write edición falló, encolado:', _rz); }
+          }
+        }catch(_err){ _encolarSoapActivo(p.id, p.soap[idx], 'edicion'); console.warn('[SOAP-act] dual-write edición excepción, encolado:', _err && _err.message); }
+      }
+    }).catch(()=>{ _encolarSoapActivo(p.id, p.soap[idx], 'edicion'); showToast('⚠️ Sin conexión — actualizada local, se sincronizará','warning'); })
     .finally(()=>_liberarGuardSOAP());
     goBack();
     setTimeout(()=>renderExpediente('soap'),300);
