@@ -1770,6 +1770,80 @@ async function drenarColaSoapHistorico(){
   } finally { _DRENANDO_HIST = false; }
 }
 
+// ── FIX DURABILIDAD SOAP ACTIVOS: cola-snapshot del dual-write de sesión a Firestore (COLA_SOAP_ACT) ──
+// Paridad con _encolarSoapHistoricoNueva pero para ACTIVOS. Antes el dual-write de la sesión
+// (FST_guardarSesionFirestore) era fire-and-forget, gated en Sheets y con .catch(()=>{}) que tragaba
+// el error → "sesiones en Firestore = 0" sin aviso ni reintento. Cola SEPARADA: NO toca COLA_SYNC de
+// activos (la usan otros flujos) ni las colas de históricos. Guarda snapshot de la sesión (sin media,
+// igual que la de históricos) + descriptor mínimo del paciente para resolver el pid al drenar.
+function _encolarSoapActivo(pid, sesion){
+  try{
+    if(!pid || !sesion || !sesion.id) return;
+    var q=JSON.parse(localStorage.getItem('COLA_SOAP_ACT')||'[]');
+    if(!Array.isArray(q)) q=[];
+    var sid=String(sesion.id||'');
+    var sLimpia=Object.assign({}, sesion); delete sLimpia.media; // base64 nunca a localStorage (cuota)
+    var pac=(Array.isArray(patientsDB)?patientsDB:[]).find(function(x){ return x && x.id===pid; }) || {};
+    q=q.filter(function(it){ return !(it && String(it.sesion && it.sesion.id)===sid); }); // solo la más reciente de esa sesión
+    q.push({pid:pid, name:pac.name||'', nombreNormalizado:pac.nombreNormalizado||'', sesion:sLimpia, ts:Date.now(), intentos:0});
+    localStorage.setItem('COLA_SOAP_ACT', JSON.stringify(q));
+    actualizarIndicadorSync();
+  }catch(e){ console.warn('[SOAP-act] no se pudo encolar:', e && e.message); }
+}
+function _persistirFallidosSoapAct(items){
+  try{
+    var f=JSON.parse(localStorage.getItem('COLA_SOAP_ACT_FALLIDOS')||'[]');
+    if(!Array.isArray(f)) f=[];
+    f=f.concat(items);
+    if(f.length>50) f=f.slice(f.length-50); // cap de inspección
+    localStorage.setItem('COLA_SOAP_ACT_FALLIDOS', JSON.stringify(f));
+  }catch(e){ console.warn('[SOAP-act] no se pudo guardar fallidos:', e && e.message); }
+}
+let _DRENANDO_SOAP_ACT = false;
+async function drenarColaSoapActivo(){
+  if(_DRENANDO_SOAP_ACT || !navigator.onLine) return;
+  var q;
+  try{ q=JSON.parse(localStorage.getItem('COLA_SOAP_ACT')||'[]'); }catch(e){ q=[]; }
+  if(!Array.isArray(q) || !q.length) return;
+  _DRENANDO_SOAP_ACT=true;
+  var restantes=[], fallidos=[], ahora=Date.now();
+  try{
+    for(const it of q){
+      if(it && it.proximoIntento && ahora < it.proximoIntento){ restantes.push(it); continue; }
+      try{
+        if(typeof FST_guardarSesionFirestore!=='function') throw new Error('unavailable: FN_MISSING');
+        // Reconstruir el paciente: preferir el vivo de patientsDB; si no, descriptor mínimo del snapshot.
+        var pac=(Array.isArray(patientsDB)?patientsDB:[]).find(function(x){ return x && x.id===it.pid; })
+                || {id:it.pid, name:it.name||'', nombreNormalizado:it.nombreNormalizado||''};
+        var r=await _conTimeout(FST_guardarSesionFirestore(pac, it.sesion, 'nueva'), 10000);
+        if(r && r.ok){ /* éxito → no se re-encola */ }
+        else {
+          var _reason=(r && r.reason)||'desconocido';
+          if(/FLAG_OFF|NO_STAGING|SKIP_IMPORTADA|INPUT_FALTANTE|SID_VACIO/.test(_reason)){
+            // No recuperables reintentando (espejo apagado o input inválido) → a FALLIDOS, no reintentar.
+            fallidos.push(Object.assign({}, it, {error:_reason, falladoEn:ahora}));
+          } else {
+            var n=(Number(it && it.intentos)||0)+1;
+            if(n>=_MAX_INTENTOS_HIST){ fallidos.push(Object.assign({}, it, {error:'max-reintentos('+n+') '+_reason, falladoEn:ahora})); }
+            else { restantes.push(Object.assign({}, it, {intentos:n, proximoIntento: ahora + Math.min(60000, 2000*Math.pow(2, n-1))})); }
+          }
+        }
+      }catch(e){
+        var _cod=String((e && (e.code||e.message))||'');
+        if(_esErrorPermanenteHist(e)){ fallidos.push(Object.assign({}, it, {error:_cod||'permanente', falladoEn:ahora})); }
+        else {
+          var n2=(Number(it && it.intentos)||0)+1;
+          if(n2>=_MAX_INTENTOS_HIST){ fallidos.push(Object.assign({}, it, {error:'max-reintentos('+n2+') '+_cod, falladoEn:ahora})); }
+          else { restantes.push(Object.assign({}, it, {intentos:n2, proximoIntento: ahora + Math.min(60000, 2000*Math.pow(2, n2-1))})); }
+        }
+      }
+    }
+    try{ localStorage.setItem('COLA_SOAP_ACT', JSON.stringify(restantes)); }catch(e){}
+    if(fallidos.length){ _persistirFallidosSoapAct(fallidos); console.warn('[SOAP-act]', fallidos.length, 'sesión(es) a FALLIDOS'); }
+    if(restantes.length) console.warn('[SOAP-act]', restantes.length, 'sesión(es) de activos aún sin sincronizar');
+  } finally { _DRENANDO_SOAP_ACT=false; actualizarIndicadorSync(); }
+}
+
 // ── LOOP C: cola de reintento para el DOC de paciente HISTÓRICO (COLA_SYNC_HIST_DOC) ──
 // Antes, un write fallido del doc histórico se encolaba en COLA_SYNC (la cola de activos) y
 // sincronizarPendientes lo DESCARTABA (patientsDB.find nunca encuentra un mig_pac_) — el toast
@@ -1881,7 +1955,7 @@ async function drenarColaHistDoc(){
 // pendientes (etiquetas/adiciones/doc) o writes buffered offline. Ahora cuenta TODAS las colas y,
 // sin conexión, NUNCA dice "todo guardado" (offline no se puede confirmar nada en la nube).
 function _contarColaLS(k){ try{ var q=JSON.parse(localStorage.getItem(k)||'[]'); return Array.isArray(q)?q.length:0; }catch(e){ return 0; } }
-function _totalPendientesSync(){ return getColaSync().length + _contarColaLS('COLA_ETIQ_HIST') + _contarColaLS('COLA_SYNC_HIST_DOC') + _contarColaLS('COLA_SYNC_HIST'); }
+function _totalPendientesSync(){ return getColaSync().length + _contarColaLS('COLA_ETIQ_HIST') + _contarColaLS('COLA_SYNC_HIST_DOC') + _contarColaLS('COLA_SYNC_HIST') + _contarColaLS('COLA_SOAP_ACT'); }
 function actualizarIndicadorSync(){
   const el = document.getElementById('sync-indicator');
   if(!el) return;
@@ -1913,6 +1987,7 @@ async function sincronizarPendientes(){
   if(SYNC_EN_CURSO) return;
   if(!navigator.onLine) return;
   drenarColaSoapHistorico(); // 1.1 fix — drenar ediciones SOAP históricas pendientes (independiente de COLA_SYNC de activos)
+  drenarColaSoapActivo();    // FIX durabilidad SOAP activos — reintentar el dual-write de sesión a Firestore
   drenarColaHistDoc();       // LOOP C — drenar cambios de DOC de históricos pendientes (diffs filtrados del Loop B)
   drenarColaEtiqHist();      // CAPA 1 — drenar etiquetas/adiciones que quedaron pendientes offline (idempotentes)
   const cola = getColaSync();
@@ -1963,6 +2038,7 @@ window.addEventListener('online', ()=>{
   actualizarIndicadorSync();
   setTimeout(sincronizarPendientes, 800); // pequeño respiro tras reconectar
   setTimeout(drenarColaSoapHistorico, 900); // 1.1 fix — reintentar ediciones SOAP históricas pendientes al reconectar
+  setTimeout(drenarColaSoapActivo, 950);    // FIX durabilidad SOAP activos — reintentar dual-write de sesión al reconectar
   setTimeout(drenarColaHistDoc, 1000);      // LOOP C — reintentar cambios de doc de históricos al reconectar
   setTimeout(drenarColaEtiqHist, 1100);     // CAPA 1 — reintentar etiquetas/adiciones pendientes al reconectar
 });
@@ -2014,6 +2090,23 @@ async function loadFromCloud(){
               if(sLocal&&Array.isArray(sLocal.media)&&sLocal.media.some(m=>m.data)) return {...s, media:sLocal.media};
               return s;
             });
+          }
+          // ── FIX CLOBBER (durabilidad SOAP activos) ──────────────────────────────
+          // Re-unir las sesiones SOAP que existen SOLO en local (creadas aquí y aún no
+          // sincronizadas a Sheets). Antes, la rama "Sheets gana" reconstruía soap iterando
+          // únicamente la lista de la nube → una nota local-only se descartaba en silencio.
+          // Es SEGURO re-unir: las notas SOAP son append-only — no hay borrado de sesión en la
+          // app (isDeleted solo existe en media) — así que una sesión local ausente de la nube
+          // = no sincronizada, NUNCA un borrado intencional. (Se excluyen ids de prueba 'qa-soap'.)
+          if(Array.isArray(pLocal.soap) && pLocal.soap.length){
+            const _nubeSoap = Array.isArray(pSano.soap) ? pSano.soap : [];
+            const _idsNube = new Set(_nubeSoap.map(s=>s&&s.id).filter(Boolean));
+            const _localOnly = pLocal.soap.filter(s=> s&&s.id && !_idsNube.has(s.id) && !String(s.id).startsWith('qa-soap'));
+            if(_localOnly.length){
+              pSano.soap = _nubeSoap.concat(_localOnly);
+              encolarSync(pSano.id); // no están en Sheets → re-subir en el próximo drenado de COLA_SYNC
+              console.warn('[CLOBBER-FIX] '+_localOnly.length+' sesión(es) SOAP local-only preservada(s) para', pSano.id);
+            }
           }
         }
         return pSano;
@@ -7920,7 +8013,23 @@ async function guardarSOAP(){
         }
       } else {
         showToast(res?.ok?'✅ Nota SOAP guardada — Sesión '+sesNum:'⚠️ SOAP guardada local, Sheets no confirmó',res?.ok?'success':'warning');
-        if (res?.ok === true && typeof FST_guardarSesionFirestore === 'function') FST_guardarSesionFirestore(p, nuevaSOAP, 'nueva').catch(()=>{});
+        // DUAL-WRITE DURABLE (activos): NO gated en Sheets, awaited, y si falla se encola el SNAPSHOT
+        // de la sesión con reintento (antes: fire-and-forget + .catch(()=>{}) que tragaba el error →
+        // "sesiones en Firestore = 0" sin aviso). Offline → encolar directo, sin colgar 10 s.
+        if(!navigator.onLine){
+          _encolarSoapActivo(p.id, nuevaSOAP);
+        } else {
+          try{
+            const _rf = (typeof FST_guardarSesionFirestore === 'function')
+              ? await _conTimeout(FST_guardarSesionFirestore(p, nuevaSOAP, 'nueva'), 10000)
+              : {ok:false, reason:'FN_MISSING'};
+            if(!_rf || !_rf.ok){
+              const _rz=(_rf && _rf.reason)||'desconocido';
+              // FLAG_OFF/NO_STAGING/SKIP_IMPORTADA = el espejo está apagado a propósito → no encolar.
+              if(!/FLAG_OFF|NO_STAGING|SKIP_IMPORTADA/.test(_rz)){ _encolarSoapActivo(p.id, nuevaSOAP); console.warn('[SOAP-act] dual-write falló, encolado:', _rz); }
+            }
+          }catch(_err){ _encolarSoapActivo(p.id, nuevaSOAP); console.warn('[SOAP-act] dual-write excepción, encolado:', _err && _err.message); }
+        }
       }
     }).catch(()=>showToast('⚠️ Sin conexión — SOAP guardada solo en este equipo','warning'))
     .finally(()=>_liberarGuardSOAP());
