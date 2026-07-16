@@ -781,6 +781,7 @@ body.modo-oscuro .topbar{background:#141824}
       </div>
     </div>
     <div style="display:flex;align-items:center;gap:10px">
+      <button onclick="mostrarDeteccionDatos()" style="background:none;border:none;font-size:20px;cursor:pointer;padding:0" title="Revisar si hay notas sin subir en este equipo">🔎</button>
       <button onclick="toggleModoOscuro()" style="background:none;border:none;font-size:20px;cursor:pointer;padding:0" title="Modo oscuro">🌙</button>
       <div class="topbar-avatar" id="topbar-avatar" onclick="doLogout()">–</div>
     </div>
@@ -3452,7 +3453,7 @@ async function FST_montarAgendaCalendar(rango){
     + '<div style="font-size:13px;font-weight:700;color:var(--navy);margin-bottom:8px">📅 Agenda del calendario</div>'
     + '<div style="font-size:10px;color:var(--gray-400);margin:-4px 0 8px">Sincronizado desde Google Calendar · Solo lectura</div>'
     + '<div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap">'+btn('dia','Hoy')+btn('manana','Mañana')+btn('pasado','Pasado')+btn('semana','Semana')+btn('semanaSiguiente','Próxima')+'</div>'
-    + (esSupervisorUI()?'<div style="margin-bottom:10px;display:flex;gap:6px;flex-wrap:wrap"><button onclick="mostrarPendientesSOAP()" style="font-size:12px;font-weight:700;border:none;border-radius:10px;padding:6px 12px;cursor:pointer;font-family:inherit;background:#FEF3C7;color:#92400E">📋 Notas pendientes</button><button onclick="mostrarRendimientoEquipo(\'hoy\')" style="font-size:12px;font-weight:700;border:none;border-radius:10px;padding:6px 12px;cursor:pointer;font-family:inherit;background:#E8F5EE;color:#2E7D52">📊 Rendimiento</button><button onclick="mostrarColaRevision()" style="font-size:12px;font-weight:700;border:none;border-radius:10px;padding:6px 12px;cursor:pointer;font-family:inherit;background:#FDE8E8;color:#B91C1C">🔍 Cola de revisión</button><button onclick="mostrarRevaloraciones()" style="font-size:12px;font-weight:700;border:none;border-radius:10px;padding:6px 12px;cursor:pointer;font-family:inherit;background:#E0E7FF;color:#3730A3">🔄 Revalorar'+((typeof _countRevaloraciones==="function"&&_countRevaloraciones()>0)?(" ("+_countRevaloraciones()+")"):"")+'</button><button onclick="toggleVistaTerapeuta()" style="font-size:12px;font-weight:700;border:none;border-radius:10px;padding:6px 12px;cursor:pointer;font-family:inherit;background:#EEF1F6;color:var(--navy)">👁️ Ver como terapeuta</button></div>':'')
+    + (esSupervisorUI()?'<div style="margin-bottom:10px;display:flex;gap:6px;flex-wrap:wrap"><button onclick="mostrarPendientesSOAP()" style="font-size:12px;font-weight:700;border:none;border-radius:10px;padding:6px 12px;cursor:pointer;font-family:inherit;background:#FEF3C7;color:#92400E">📋 Notas pendientes</button><button onclick="mostrarRendimientoEquipo(\'hoy\')" style="font-size:12px;font-weight:700;border:none;border-radius:10px;padding:6px 12px;cursor:pointer;font-family:inherit;background:#E8F5EE;color:#2E7D52">📊 Rendimiento</button><button onclick="mostrarColaRevision()" style="font-size:12px;font-weight:700;border:none;border-radius:10px;padding:6px 12px;cursor:pointer;font-family:inherit;background:#FDE8E8;color:#B91C1C">🔍 Cola de revisión</button><button onclick="mostrarRevaloraciones()" style="font-size:12px;font-weight:700;border:none;border-radius:10px;padding:6px 12px;cursor:pointer;font-family:inherit;background:#E0E7FF;color:#3730A3">🔄 Revalorar'+((typeof _countRevaloraciones==="function"&&_countRevaloraciones()>0)?(" ("+_countRevaloraciones()+")"):"")+'</button><button onclick="toggleVistaTerapeuta()" style="font-size:12px;font-weight:700;border:none;border-radius:10px;padding:6px 12px;cursor:pointer;font-family:inherit;background:#EEF1F6;color:var(--navy)">👁️ Ver como terapeuta</button><button onclick="mostrarDeteccionDatos()" style="font-size:12px;font-weight:700;border:none;border-radius:10px;padding:6px 12px;cursor:pointer;font-family:inherit;background:#FEE2E2;color:#B91C1C">🔎 Detección de datos</button></div>':'')
     + '<div id="agenda-cal-list"><div style="font-size:12px;color:var(--gray-400);padding:6px 0">⏳ Cargando agenda…</div></div>'
     + '</div></div>';
   const reqId = (window._agendaCalReq = (window._agendaCalReq||0) + 1);
@@ -4924,6 +4925,180 @@ async function generarPDFRendimiento(terapeuta){
   }catch(err){
     try{ doc.save(nombreArch); }catch(e2){ showToast('No se pudo generar el PDF: '+(err.message||''),'error'); }
   }
+}
+// ══════════════════════════════════════════════════════════════════════════════
+// PANEL DE DETECCIÓN Y RESCATE DE DATOS — accesible a CUALQUIER usuario en SU iPad.
+// Detecta notas/expedientes que están en ESTE dispositivo pero no cruzaron a la nube
+// (la fuga del 3-15 jul). Los chequeos locales + rescate + export son de este dispositivo
+// (datos que el usuario ya tiene cargados → sin exposición nueva). La sección de citas
+// sin expediente (alcance cruzado, lee la agenda) es supervisor-only.
+// ══════════════════════════════════════════════════════════════════════════════
+function _detBloque(titulo, cuerpoHTML, tipo){
+  var c = {ok:['#E8F5EE','#2E7D52'], alerta:['#FEF2F2','#B91C1C'], warning:['#FEF3C7','#92400E'], info:['#F7F8FA','#475569']}[tipo||'info'];
+  return '<div style="margin-top:10px;border-radius:12px;padding:10px 12px;background:'+c[0]+'">'
+    +'<div style="font-size:12px;font-weight:800;color:'+c[1]+';margin-bottom:4px">'+titulo+'</div>'
+    +'<div style="font-size:12px;color:#334155">'+cuerpoHTML+'</div></div>';
+}
+function mostrarDeteccionDatos(){
+  if(!currentUser){ showToast('Inicia sesión primero','warning'); return; }
+  var prev=document.querySelector('[data-detov]'); if(prev) prev.remove();
+  var ov=document.createElement('div');
+  ov.setAttribute('data-detov','1');
+  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:10002;display:flex;align-items:flex-start;justify-content:center;overflow:auto;padding:32px 12px';
+  ov.onclick=function(e){ if(e.target===ov) ov.remove(); };
+  ov.innerHTML='<div style="background:#fff;border-radius:16px;width:100%;max-width:640px;padding:18px" onclick="event.stopPropagation()">'
+    +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">'
+    +'<div style="font-size:16px;font-weight:800;color:var(--navy)">🔎 Revisión de este dispositivo</div>'
+    +'<button onclick="this.closest(\'[data-detov]\').remove()" style="background:none;border:none;font-size:22px;color:var(--gray-400);cursor:pointer">×</button></div>'
+    +'<div style="font-size:12px;color:var(--gray-500);margin-bottom:10px">Busca notas o datos que se hayan quedado sin subir a la nube y los sube. Ábrelo en cada iPad — cada equipo guarda lo suyo.</div>'
+    +'<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px">'
+    +'<label style="font-size:12px;font-weight:700;color:var(--navy);display:flex;align-items:center;gap:5px;cursor:pointer"><input type="radio" name="det-modo" value="reciente" checked> Desde 3-jul (rápido)</label>'
+    +'<label style="font-size:12px;font-weight:700;color:var(--gray-600);display:flex;align-items:center;gap:5px;cursor:pointer"><input type="radio" name="det-modo" value="completo"> Barrido completo</label>'
+    +'<button id="det-run" onclick="_detEjecutar()" style="margin-left:auto;font-size:13px;font-weight:800;border:none;border-radius:10px;padding:8px 16px;cursor:pointer;font-family:inherit;background:var(--navy);color:#fff">Revisar</button>'
+    +'</div>'
+    +'<div id="det-progreso" style="font-size:12px;color:var(--gray-500);margin-bottom:4px"></div>'
+    +'<div id="det-resultados"></div>'
+    +'</div>';
+  document.body.appendChild(ov);
+}
+async function _detEjecutar(){
+  var cont=document.getElementById('det-resultados'); if(!cont) return;
+  var prog=document.getElementById('det-progreso');
+  var btn=document.getElementById('det-run'); if(btn){ btn.disabled=true; btn.textContent='Revisando…'; }
+  var modo=((document.querySelector('input[name="det-modo"]:checked')||{}).value)||'reciente';
+  var DESDE=new Date(2026,6,3); // 3-jul-2026 (mes 0-indexado)
+  function _pf(s){ if(!s) return null; s=String(s).trim(); var m=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/); if(m) return new Date(+m[3],+m[2]-1,+m[1]); m=s.match(/^(\d{4})-(\d{2})-(\d{2})/); if(m) return new Date(+m[1],+m[2]-1,+m[3]); var d=new Date(s); return isNaN(d)?null:d; }
+  function _reciente(p){ var f=_pf(p.fechaActualizacion||p.fechaCreacion||p.date||''); if(f&&f>=DESDE) return true; return (Array.isArray(p.soap)?p.soap:[]).some(function(s){ var d=_pf(s&&(s.fechaHoraISO||s.fecha)); return d&&d>=DESDE; }); }
+  window.__detEspejo=[];
+  var secciones=[], hayHallazgos=false;
+
+  // ── 1) ESPEJO ROTO (activos con sesiones en este equipo que no están en Firestore) ──
+  try{
+    if(prog) prog.textContent='Conectando a la nube…';
+    if(!window._fstDb && typeof FST_init==='function') await FST_init();
+    if(!window._fstDb){ secciones.push(_detBloque('☁️ Espejo roto (activos)','Necesita conexión a internet — este chequeo no corrió. Los de abajo (locales) sí.','warning')); }
+    else {
+      var activos=(Array.isArray(patientsDB)?patientsDB:[]).filter(function(p){ return p&&p.id&&String(p.id).indexOf('mig_pac_')!==0&&!String(p.name||'').startsWith('TEST_QA_')&&Array.isArray(p.soap)&&p.soap.length>0; });
+      if(modo==='reciente') activos=activos.filter(_reciente);
+      var hall=[], i=0;
+      for(const p of activos){
+        i++; if(prog && (i%4===0||i===activos.length)){ prog.textContent='Revisando espejo… '+i+'/'+activos.length; await new Promise(function(r){ setTimeout(r,0); }); }
+        var propias=p.soap.filter(function(s){ return s&&s.id&&!s.importado&&s._origen!=='firestore_historico'; });
+        if(!propias.length) continue;
+        var pid=null; try{ var r=await FST_resolverPidPaciente(p); if(r&&r.ok&&r.pid) pid=r.pid; }catch(_e){}
+        var ids=new Set();
+        if(pid){ try{ var sn=await window._fstDb.collection('pacientes').doc(pid).collection('sesiones').get(); sn.forEach(function(d){ ids.add(String(d.id)); }); }catch(_e){ continue; } }
+        var faltan=propias.filter(function(s){ return !ids.has(String(s.id)); });
+        if(faltan.length){ hall.push({nombre:p.name, faltan:faltan.length, pid:pid?'':' · ⚠️ sin doc en la nube'}); window.__detEspejo.push({p:p, faltan:faltan}); }
+      }
+      if(hall.length){ hayHallazgos=true;
+        secciones.push(_detBloque('☁️ Sesiones en este equipo que NO están en la nube ('+hall.length+' paciente/s)',
+          '<div style="max-height:160px;overflow:auto">'+hall.map(function(x){ return '<div style="padding:2px 0">'+escapeHTML(x.nombre)+' — <b>'+x.faltan+'</b> sesión'+(x.faltan!==1?'es':'')+x.pid+'</div>'; }).join('')+'</div>', 'alerta'));
+      } else { secciones.push(_detBloque('☁️ Espejo (activos)','✅ Todas las sesiones de este equipo están en la nube.','ok')); }
+    }
+  }catch(e){ secciones.push(_detBloque('☁️ Espejo roto','No se pudo completar: '+(e&&e.message),'warning')); }
+
+  // ── 2) RECIENTES SIN SOAP (creados desde 3-jul con historia pero 0 sesiones) ── local
+  try{
+    var sinSoap=(Array.isArray(patientsDB)?patientsDB:[]).filter(function(p){
+      if(!p||String(p.name||'').startsWith('TEST_QA_')) return false;
+      var f=_pf(p.fechaCreacion||p.date||''); if(!f||f<DESDE) return false;
+      var th=!!((p.motivoConsulta&&String(p.motivoConsulta).trim())||(p.valoracion&&Object.keys(p.valoracion||{}).length)||(p.antecedentes&&Object.keys(p.antecedentes||{}).length));
+      return th&&(!Array.isArray(p.soap)||p.soap.length===0);
+    }).map(function(p){ return {nombre:p.name, creado:p.fechaCreacion||p.date||'', por:p.creadoPor||''}; });
+    if(sinSoap.length){ secciones.push(_detBloque('📝 Creados desde 3-jul con historia y 0 sesiones ('+sinSoap.length+')',
+      '<div style="max-height:140px;overflow:auto">'+sinSoap.map(function(x){ return '<div style="padding:2px 0">'+escapeHTML(x.nombre)+' <span style="color:var(--gray-400)">· '+escapeHTML(x.creado)+(x.por?(' · '+escapeHTML(x.por)):'')+'</span></div>'; }).join('')+'</div><div style="margin-top:4px;color:var(--gray-500)">Normal si es un alta muy reciente; sospechoso si ya tuvo citas.</div>','warning')); }
+    else { secciones.push(_detBloque('📝 Recientes sin nota','✅ Ningún paciente reciente quedó con historia y 0 sesiones.','ok')); }
+  }catch(_e){}
+
+  // ── 3) COLAS (local) ──
+  try{
+    function _n(k){ try{ var a=JSON.parse(localStorage.getItem(k)||'[]'); return Array.isArray(a)?a.length:0; }catch(e){ return 0; } }
+    var pend=_n('COLA_SYNC')+_n('COLA_SYNC_HIST')+_n('COLA_SYNC_HIST_DOC')+_n('COLA_ETIQ_HIST')+_n('COLA_SOAP_ACT');
+    var fSoap=_n('COLA_SOAP_ACT_FALLIDOS'), fHist=_n('COLA_SYNC_HIST_FALLIDOS')+_n('COLA_SYNC_HIST_DOC_FALLIDOS');
+    var cuerpo='Pendientes de sincronizar (se reintentan solas): <b>'+pend+'</b>.';
+    if(fSoap) cuerpo+='<br>SOAP de activos que se rindieron: <b>'+fSoap+'</b> — recuperables con «Rescatar».';
+    if(fHist){ cuerpo+='<br>Cambios de histórico que se rindieron: <b>'+fHist+'</b> — <i>NO se tocan aquí</i> (pueden ser conflicto con otro equipo; requieren revisión manual).'; }
+    var tipoC=(fSoap||fHist)?'warning':(pend?'info':'ok');
+    if(fSoap) hayHallazgos=true;
+    secciones.push(_detBloque('📥 Colas de sincronización', (pend||fSoap||fHist)?cuerpo:'✅ Todo sincronizado, sin colas pendientes.', tipoC));
+  }catch(_e){}
+
+  // ── 4) CITAS SIN EXPEDIENTE (supervisor-only; lee la agenda) ──
+  if((typeof esSupervisorUI==='function') && esSupervisorUI() && navigator.onLine){
+    try{
+      if(prog) prog.textContent='Leyendo agenda (citas)…';
+      var hoy=new Date(); var iso=function(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); };
+      var ra=await FST_fetchAgendaRango('2026-07-03', iso(hoy));
+      if(ra&&ra.ok&&Array.isArray(ra.eventos)){
+        var avisoB=(ra.apiAgenda&&ra.apiAgenda<2)?' ⚠️ el backend solo devolvió HOY (Codigo.gs viejo)':'';
+        var resu=await _resolverPacientesCalendario(ra.eventos);
+        var sinE=[], vis={};
+        ra.eventos.forEach(function(ev){ var cl=_normPend(ev.paciente||''); if(!cl||vis[cl]) return; var r=resu[cl]; if(!r||(!r.pid&&!r.tipo)){ vis[cl]=1; sinE.push({nombre:ev.paciente||'(sin nombre)', fecha:(ev.inicio||'').slice(0,10)}); } });
+        secciones.push(_detBloque('📅 Citas sin expediente que empareje ('+sinE.length+')'+avisoB+' — supervisor',
+          sinE.length ? ('<div style="max-height:150px;overflow:auto">'+sinE.map(function(x){ return '<div style="padding:2px 0">'+escapeHTML(x.nombre)+' <span style="color:var(--gray-400)">· '+escapeHTML(x.fecha)+'</span></div>'; }).join('')+'</div><div style="margin-top:4px;color:var(--gray-500)">Cruza contra Google Calendar: expediente perdido, no vinculado, o typo.</div>') : 'Todas emparejan con un expediente.',
+          sinE.length?'warning':'ok'));
+      }
+    }catch(_e){}
+  }
+
+  // ── Aviso grande si hay hallazgos ──
+  var cabecera = hayHallazgos
+    ? '<div style="border-radius:12px;padding:12px;background:#B91C1C;color:#fff;font-weight:800;font-size:13px;margin-bottom:4px">⚠️ Hay datos en este iPad que aún no están en la nube. NO cierres ni actualices la app hasta tocar «Rescatar» o «Exportar».</div>'
+    : '';
+  // ── Acciones ──
+  var acciones='<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px">'
+    +'<button id="det-rescatar" onclick="_detRescatar()" style="font-size:13px;font-weight:800;border:none;border-radius:10px;padding:9px 16px;cursor:pointer;font-family:inherit;background:'+(hayHallazgos?'#B91C1C':'#EEF1F6')+';color:'+(hayHallazgos?'#fff':'var(--gray-500)')+'">☁️ Rescatar (subir lo pendiente)</button>'
+    +'<button onclick="_detExportar()" style="font-size:13px;font-weight:800;border:none;border-radius:10px;padding:9px 16px;cursor:pointer;font-family:inherit;background:var(--gold);color:var(--navy-dark)">📤 Exportar este dispositivo</button>'
+    +'</div>';
+  cont.innerHTML=cabecera+secciones.join('')+acciones;
+  if(prog) prog.textContent='';
+  if(btn){ btn.disabled=false; btn.textContent='Revisar de nuevo'; }
+}
+async function _detRescatar(){
+  if(!navigator.onLine){ showToast('Sin conexión — conéctate y reintenta','warning'); return; }
+  var esp=Array.isArray(window.__detEspejo)?window.__detEspejo:[];
+  var nSes=esp.reduce(function(a,x){ return a+((x.faltan&&x.faltan.length)||0); },0);
+  var fAct=0; try{ var f0=JSON.parse(localStorage.getItem('COLA_SOAP_ACT_FALLIDOS')||'[]'); fAct=Array.isArray(f0)?f0.length:0; }catch(e){}
+  if(nSes+fAct===0){ showToast('Nada que rescatar en este dispositivo','success'); return; }
+  if(!window.confirm('Se subirán '+nSes+' sesión(es) detectadas'+(fAct?(' y se reintentarán '+fAct+' de la cola SOAP'):'')+'.\n\nSolo toca datos de ESTE dispositivo. ¿Continuar?')) return;
+  var btn=document.getElementById('det-rescatar'); if(btn){ btn.disabled=true; btn.textContent='Rescatando…'; }
+  var n=0;
+  esp.forEach(function(x){ (x.faltan||[]).forEach(function(s){ try{ _encolarSoapActivo(x.p.id, s, 'nueva'); n++; }catch(e){} }); });
+  try{ // reencolar SOLO FALLIDOS de SOAP de activos (sin riesgo de conflicto de recencia)
+    var f=JSON.parse(localStorage.getItem('COLA_SOAP_ACT_FALLIDOS')||'[]');
+    if(Array.isArray(f)&&f.length){
+      var viva=JSON.parse(localStorage.getItem('COLA_SOAP_ACT')||'[]');
+      f.forEach(function(it){ var c=Object.assign({},it); delete c.error; delete c.falladoEn; c.intentos=0; delete c.proximoIntento; viva.push(c); });
+      localStorage.setItem('COLA_SOAP_ACT', JSON.stringify(viva));
+      localStorage.setItem('COLA_SOAP_ACT_FALLIDOS','[]');
+    }
+  }catch(e){}
+  try{ if(typeof drenarColaSoapActivo==='function') await drenarColaSoapActivo(); }catch(e){}
+  try{ if(typeof sincronizarPendientes==='function') await sincronizarPendientes(); }catch(e){}
+  if(btn){ btn.disabled=false; btn.textContent='Rescatar de nuevo'; }
+  showToast('☁️ Rescate disparado — '+n+' sesión(es) encoladas. Revisa de nuevo para confirmar 0 pendientes.','success');
+  setTimeout(_detEjecutar, 800);
+}
+async function _detExportar(){
+  try{
+    var stamp=new Date().toISOString().slice(0,19).replace(/[:T]/g,'-');
+    var CLAVES=['COLA_SYNC','COLA_SYNC_HIST','COLA_SYNC_HIST_DOC','COLA_ETIQ_HIST','COLA_SOAP_ACT','COLA_SOAP_ACT_FALLIDOS','COLA_SYNC_HIST_FALLIDOS','COLA_SYNC_HIST_DOC_FALLIDOS'];
+    var dump={ exportadoEn:new Date().toISOString(), dispositivo:(navigator.userAgent||'').slice(0,120), usuario:(currentUser&&currentUser.name)||'',
+      nPacientes:Array.isArray(patientsDB)?patientsDB.length:0, patientsDB:Array.isArray(patientsDB)?patientsDB:[],
+      colas:CLAVES.reduce(function(o,k){ try{ o[k]=JSON.parse(localStorage.getItem(k)||'[]'); }catch(e){ o[k]=null; } return o; },{}) };
+    var json=JSON.stringify(dump, function(k,v){ return (typeof v==='string' && v.indexOf('data:')===0 && v.length>2048) ? '[base64-omitido]' : v; });
+    var nombre='sinergia_backup_'+String((currentUser&&currentUser.name)||'disp').replace(/[^\w]+/g,'_')+'_'+stamp+'.json';
+    var blob=new Blob([json],{type:'application/json'});
+    var file=new File([blob], nombre, {type:'application/json'});
+    if(navigator.canShare && navigator.canShare({files:[file]})){
+      try{ await navigator.share({files:[file], title:'Backup dispositivo Sinergia', text:'Respaldo local — guardar en Archivos'}); return; }
+      catch(e){ if(e && e.name==='AbortError') return; }
+    }
+    if(typeof descargarArchivo_==='function'){ descargarArchivo_(nombre, json, 'application/json'); }
+    else { var url=URL.createObjectURL(blob); var a=document.createElement('a'); a.href=url; a.download=nombre; document.body.appendChild(a); a.click(); setTimeout(function(){ URL.revokeObjectURL(url); a.remove(); },1000); }
+    showToast('📤 Respaldo generado ('+Math.round(blob.size/1024)+' KB)','success');
+  }catch(err){ showToast('No se pudo exportar: '+((err&&err.message)||''),'error'); }
 }
 function _abrirModalAsignacion(nombre, ventana){
   if(!esSupervisorUI()){ showToast('Solo supervisor','error'); return; }
