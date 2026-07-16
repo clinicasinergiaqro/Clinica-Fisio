@@ -2935,21 +2935,107 @@ document.addEventListener('visibilitychange', function(){
   if(document.visibilityState === 'visible'){ try{ refrescarPacientesDesdeNube(); }catch(_){} }
 });
 
-// ── Service Worker — offline shell ──────────────────────────
+// ── Service Worker — offline shell + AUTO-ACTUALIZACIÓN SEGURA ──────────────
+// El SW hace skipWaiting()+clients.claim(): la versión nueva toma control sola, pero el JS ya
+// cargado sigue siendo el viejo hasta recargar. Aquí recargamos AUTOMÁTICA y SEGURAMENTE — jamás
+// con algo sin guardar (criterio innegociable). Si no es seguro → banner PERSISTENTE que se aplica
+// en cuanto el usuario termina (guarda / deja de escribir) o al tocar "Actualizar ahora". SIN
+// bloqueo por versión: nunca dejar la clínica sin poder trabajar.
+let _swUpdatePendiente = false;
+let _swRecargando = false;
+let _swHabiaController = false;
+
+// Seguro recargar SOLO si: no hay texto sin guardar (_dirty), no hay operación clínica en curso, y
+// el foco NO está en un campo de escritura (textarea/input de texto ≠ buscador). En la duda, NO.
+function esSeguroRecargar(){
+  try{
+    if(typeof _dirty!=='undefined' && _dirty) return false;
+    if(typeof hayOperacionClinicaCritica_==='function' && hayOperacionClinicaCritica_()) return false;
+    var ae = document.activeElement;
+    if(ae){
+      var tag = (ae.tagName||'').toUpperCase();
+      var tipo = String(ae.type||'').toLowerCase();
+      var esTextoInput = (tag==='INPUT' && ['text','search','email','tel','number','url','password',''].indexOf(tipo)!==-1);
+      if((tag==='TEXTAREA' || esTextoInput) && ae.id!=='buscador-pacientes') return false;
+    }
+    return true;
+  }catch(e){ return false; } // ante cualquier error, NO recargar
+}
+
+function mostrarBannerActualizacion(){
+  if(document.getElementById('sw-update-banner')) return;
+  var b=document.createElement('div');
+  b.id='sw-update-banner';
+  b.style.cssText='position:fixed;left:0;right:0;bottom:0;z-index:100000;background:#1B3A6B;color:#fff;'
+    +'padding:12px 16px;padding-bottom:calc(12px + env(safe-area-inset-bottom,0px));display:flex;align-items:center;'
+    +'gap:12px;font-family:inherit;font-size:14px;box-shadow:0 -2px 12px rgba(0,0,0,.25)';
+  b.innerHTML='<span style="flex:1">✨ Actualización lista — guarda tu nota y se instalará sola.</span>'
+    +'<button id="sw-update-btn" style="background:#C9A84C;color:#122950;border:none;border-radius:10px;'
+    +'padding:8px 16px;font-weight:800;font-family:inherit;cursor:pointer;white-space:nowrap">Actualizar ahora</button>';
+  document.body.appendChild(b);
+  var btn=document.getElementById('sw-update-btn');
+  if(btn) btn.onclick=function(){
+    if(esSeguroRecargar()){ _swRecargando=true; try{ location.reload(); }catch(e){ location.href=location.href; } }
+    else { try{ showToast('Guarda tu nota primero — la app se actualizará al terminar','warning'); }catch(e){} }
+  };
+}
+
+// Aplica la actualización pendiente: recarga si es seguro (y online); si no, asegura el banner.
+function aplicarActualizacionSiSegura(){
+  if(_swRecargando || !_swUpdatePendiente) return;
+  if(!navigator.onLine){ mostrarBannerActualizacion(); return; } // offline no traería la nueva versión
+  if(esSeguroRecargar()){
+    _swRecargando=true;
+    try{ location.reload(); }catch(e){ location.href=location.href; }
+  } else {
+    mostrarBannerActualizacion();
+  }
+}
+
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
+    _swHabiaController = !!navigator.serviceWorker.controller;
     navigator.serviceWorker.register('./sw.js').then(reg => {
-      // Detectar nueva versión y avisar al usuario para recargar
+      // Nueva versión detectada (updatefound): marcar pendiente y aplicar/avisar.
       reg.addEventListener('updatefound', () => {
         const nuevo = reg.installing;
         if (!nuevo) return;
         nuevo.addEventListener('statechange', () => {
+          // 'installed' + ya había controller = ES UNA ACTUALIZACIÓN (no la 1ª instalación del equipo).
           if (nuevo.state === 'installed' && navigator.serviceWorker.controller) {
-            try { showToast('Nueva versión disponible — recarga la app','warning'); } catch(e){}
+            _swUpdatePendiente = true;
+            aplicarActualizacionSiSegura();
           }
         });
       });
+      // reg.update() periódico: una PWA que lleva DÍAS abierta (iPad) detecta la versión nueva sin
+      // relanzarse — el caso real que dejaba a los dispositivos en código viejo.
+      setInterval(() => { try{ reg.update(); }catch(e){} }, 20*60*1000);
     }).catch(()=>{});
+
+    // El SW nuevo tomó control (skipWaiting+claim) → aplicar. Solo si ANTES había controller
+    // (evita una recarga espuria en la primera instalación de la vida del dispositivo).
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (_swRecargando) return;
+      if (!_swHabiaController) return;
+      _swUpdatePendiente = true;
+      aplicarActualizacionSiSegura();
+    });
+
+    // Momentos naturales para volver a intentar: regresar de segundo plano y reconectar.
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible'){
+        try{ navigator.serviceWorker.getRegistration().then(r=>{ if(r) r.update(); }).catch(()=>{}); }catch(e){}
+        aplicarActualizacionSiSegura();
+      }
+    });
+    window.addEventListener('online', () => {
+      try{ navigator.serviceWorker.getRegistration().then(r=>{ if(r) r.update(); }).catch(()=>{}); }catch(e){}
+      aplicarActualizacionSiSegura();
+    });
+    // Tic lento: si quedó una actualización pendiente y el usuario ya terminó (guardó / dejó de
+    // escribir), se aplica sola sin que tenga que hacer nada. Solo actúa cuando es seguro.
+    setInterval(aplicarActualizacionSiSegura, 15000);
   });
 }
 async function doLogout(){
