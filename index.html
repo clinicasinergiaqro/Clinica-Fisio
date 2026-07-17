@@ -4145,12 +4145,32 @@ function _ddmmDeISOEvento(iso){
 // Resuelve cada nombre del calendario a {pid, tipo:'activo'|'historico'|null}. Usa patientsDB
 // (activos) y el índice de lista ya cacheado (FST_cargarIndicePacientes, 3 niveles de cache).
 async function _resolverPacientesCalendario(eventos){
+  // D1 — NUNCA resolver con patientsDB vacío: resolvería un activo a su espejo app_live_ (parcial) y
+  // marcaría rojos falsos. Si falta, hidratar de Sheets antes de mapear. Guardado: solo si está vacío.
+  if((!Array.isArray(patientsDB) || !patientsDB.length) && typeof loadFromCloud==='function'){
+    try{ var _dP=await loadFromCloud(); if(Array.isArray(_dP)&&_dP.length) patientsDB=_dP; }catch(_e){}
+  }
   var idxAct={};
   (Array.isArray(patientsDB)?patientsDB:[]).forEach(function(p){
     if(!p) return;
     if(p.name) idxAct[_normPend(p.name)]=p;
     if(p.nombreNormalizado) idxAct[_normPend(p.nombreNormalizado)]=p;
   });
+  // D1 — mapa inverso: cada app_live_ es ESPEJO de un activo (hash determinista de id/nombre, L383-384).
+  // Un espejo NUNCA es histórico; su expediente COMPLETO vive en Sheets (patientsDB). Se usa para recuperar
+  // el activo si el match cae en el espejo (p.ej. patientsDB no casó por nombre exacto) → evita el rojo falso.
+  var _espejoAActivo={};
+  if(typeof FST_hashSimpleLive==='function'){
+    (Array.isArray(patientsDB)?patientsDB:[]).forEach(function(p){
+      if(!p) return;
+      var _id=String(p.id||'').trim();
+      if(_id) _espejoAActivo['app_live_'+FST_hashSimpleLive(_id)]=p;
+      if((p.name||p.nombre) && typeof FST_normalizarNombreLive==='function'){
+        var _nn=FST_normalizarNombreLive(p.name||p.nombre||'');
+        if(_nn){ var _kn='app_live_'+FST_hashSimpleLive(_nn); if(!_espejoAActivo[_kn]) _espejoAActivo[_kn]=p; }
+      }
+    });
+  }
   var lista=[];
   try{ lista=(await FST_cargarIndicePacientes())||[]; }catch(_e){ lista=[]; }
   var idxHistN={};
@@ -4186,7 +4206,19 @@ async function _resolverPacientesCalendario(eventos){
         }
       }
     }
-    if(pH){ out[clave]={pid:String(pH.id||''), tipo:'historico'}; }
+    if(pH){
+      var _pidH=String(pH.id||'');
+      if(_pidH.indexOf('app_live_')===0){
+        // D1 — el match cayó en un ESPEJO de activo (no en un histórico real). Recuperar el activo por
+        // hash y usar su soap de Sheets (verdad COMPLETA). Si no hay activo (no debería: gate huérfanos=0),
+        // NO adjudicar al espejo parcial → 🔎 Revisar, nunca un rojo falso.
+        var _actEsp=_espejoAActivo[_pidH];
+        if(_actEsp){ out[clave]={pid:String(_actEsp.id||''), tipo:'activo', p:_actEsp}; }
+        else { out[clave]={pid:null, tipo:null}; }
+      } else {
+        out[clave]={pid:_pidH, tipo:'historico'};
+      }
+    }
     else { out[clave]={pid:null, tipo:null}; }
   });
   return out;
