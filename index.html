@@ -3885,6 +3885,7 @@ function _computarPendientesSOAP(eventos, diasISO, idxHist, asigMap, histNotas){
   // pendientes de HISTÓRICOS por ultimaSesionLive. Sin él, comportamiento idéntico al previo (se omiten).
   histNotas=(histNotas && typeof histNotas==='object')?histNotas:null;
   var diasDDMM={}; diasISO.forEach(function(i){ var k=_ddmmFromISO(i); if(k) diasDDMM[k]=true; });
+  var diasCanon={}; diasISO.forEach(function(i){ var c=_diaCanon(i); if(c) diasCanon[c]=true; });   // CAPA 3 — días de la ventana en clave canónica
   var idx={};
   (Array.isArray(patientsDB)?patientsDB:[]).forEach(function(p){
     if(p&&p.name) idx[_normPend(p.name)]=p;
@@ -3914,7 +3915,7 @@ function _computarPendientesSOAP(eventos, diasISO, idxHist, asigMap, histNotas){
         var hi=histNotas && histNotas[clave];
         if(hi && hi.pid){
           var kh='hist_'+clave;
-          var eh=porPac[kh]||(porPac[kh]={p:{name:nombre||'(sin nombre)', id:hi.pid}, ter:ter, visitas:0, _esHist:true, _ultimaHist:String(hi.ultima||'')});
+          var eh=porPac[kh]||(porPac[kh]={p:{name:nombre||'(sin nombre)', id:hi.pid}, ter:ter, visitas:0, _esHist:true, _ultimaHist:String(hi.ultima||''), _fechasHist:(Array.isArray(hi.fechas)?hi.fechas:[])});
           eh.visitas++;
           if((!eh.ter||eh.ter==='Sin asignar') && ter!=='Sin asignar') eh.ter=ter;
         }
@@ -3928,10 +3929,17 @@ function _computarPendientesSOAP(eventos, diasISO, idxHist, asigMap, histNotas){
     var e=porPac[pid];
     var notas;
     if(e._esHist){
-      // Histórico: solo conocemos la ÚLTIMA nota (ultimaSesionLive). Si cae en la ventana cuenta 1.
-      notas=(e._ultimaHist && diasDDMM[e._ultimaHist])?1:0;
+      // CAPA 3 — set COMPLETO de fechas del histórico (normalizado): cuenta cuántos días de la ventana
+      // tienen sesión. DEGRADACIÓN: sin fechasSesiones cae a ultimaSesionLive (también normalizada).
+      var setF=Array.isArray(e._fechasHist)?e._fechasHist:[];
+      if(setF.length){
+        var cs={}; setF.forEach(function(f){ var c=_diaCanon(f); if(c) cs[c]=1; });
+        notas=Object.keys(diasCanon).filter(function(dc){ return cs[dc]; }).length;
+      } else {
+        notas=(e._ultimaHist && diasCanon[_diaCanon(e._ultimaHist)])?1:0;
+      }
     } else {
-      notas=(Array.isArray(e.p.soap)?e.p.soap:[]).filter(function(s){ return s && diasDDMM[s.fecha]; }).length;
+      notas=(Array.isArray(e.p.soap)?e.p.soap:[]).filter(function(s){ return s && diasCanon[_diaCanon(s.fecha)]; }).length;
     }
     var deficit=Math.max(0, e.visitas-notas);
     if(deficit<=0) return;
@@ -4018,10 +4026,11 @@ async function mostrarPendientesSOAP(){
   try{
     var resPend=await _resolverPacientesCalendario(res.eventos||[]);
     var ultPend=await _fetchUltimaSesionHistoricos(resPend, false);
+    var _fPend=(window._triUltimaHistCache&&window._triUltimaHistCache.mapFechas)||{};   // CAPA 3
     histNotasPend={};
     Object.keys(resPend).forEach(function(k){
       var r=resPend[k];
-      if(r && r.tipo==='historico' && r.pid) histNotasPend[k]={pid:r.pid, ultima:(ultPend&&ultPend[k])||''};
+      if(r && r.tipo==='historico' && r.pid) histNotasPend[k]={pid:r.pid, ultima:(ultPend&&ultPend[k])||'', fechas:(_fPend[k]||[])};
     });
   }catch(_t){ histNotasPend=null; }
   var rep=_computarPendientesSOAP(res.eventos||[], dias, idxHist, asigMapPend, histNotasPend);
@@ -4186,9 +4195,10 @@ async function _resolverPacientesCalendario(eventos){
 }
 // clave→ultimaSesionLive de los históricos del calendario. Cache TTL 5 min por clave;
 // forzar=true relee todo. Máx 1 doc por paciente, en paralelo.
-window._triUltimaHistCache={ts:0, map:{}};
+window._triUltimaHistCache={ts:0, map:{}, mapFechas:{}};
 async function _fetchUltimaSesionHistoricos(resueltos, forzar){
-  var cache=window._triUltimaHistCache||{ts:0,map:{}};
+  var cache=window._triUltimaHistCache||{ts:0,map:{},mapFechas:{}};
+  if(!cache.mapFechas) cache.mapFechas={};   // CAPA 3 — set de fechas por histórico (se lee del MISMO doc.get)
   var fresco=(Date.now()-cache.ts)<REND_CACHE_TTL_MS;
   var pendientes=[];
   Object.keys(resueltos||{}).forEach(function(k){
@@ -4203,8 +4213,11 @@ async function _fetchUltimaSesionHistoricos(resueltos, forzar){
         await Promise.all(pendientes.map(async function(x){
           try{
             var doc=await window._fstDb.collection('pacientes').doc(x.pid).get();
-            cache.map[x.clave]=String((doc.exists && (doc.data()||{}).ultimaSesionLive)||'');
-          }catch(_e){ cache.map[x.clave]=''; }
+            var _d=(doc.exists && (doc.data()||{}))||{};
+            cache.map[x.clave]=String(_d.ultimaSesionLive||'');
+            // CAPA 3 — set COMPLETO de fechas (no solo la última). El consumidor lo normaliza al comparar.
+            cache.mapFechas[x.clave]=Array.isArray(_d.fechasSesiones)?_d.fechasSesiones:[];
+          }catch(_e){ cache.map[x.clave]=''; cache.mapFechas[x.clave]=[]; }
         }));
       }
     }catch(_e2){}
@@ -4257,7 +4270,15 @@ async function _marcarCitaResuelta(nombre, fecha){
     showToast('⚠️ No se pudo marcar'+((e&&e.message)?(': '+e.message):'')+' — ¿reglas v9 desplegadas?','error');
   }
 }
-function _triangularCitasNotas(eventos, resueltos, ultimaHist, asigMap, resueltas){
+// CAPA 3 — clave canónica de día (YYYY-MM-DD) desde CUALQUIER formato (ISO o DD/MM/YYYY), reusando
+// parseFechaClinicaSegura. Normaliza AMBOS lados de la comparación del dashboard → inmune al formato
+// mixto (migrados en ISO vs notas de la app en DD/MM). Devuelve '' si no parsea.
+function _diaCanon(f){
+  var d=(typeof parseFechaClinicaSegura==='function')?parseFechaClinicaSegura(f):null;
+  if(!d) return '';
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+function _triangularCitasNotas(eventos, resueltos, ultimaHist, asigMap, resueltas, fechasHist){
   var porTer={};
   Object.keys(TERAPEUTA_CAL2COD).forEach(function(n){ porTer[n]={citas:0, conNota:0, sinNota:0, resueltas:0, sinNotaPacs:[], noIdentificados:0, noIdentPacs:[], atendidasOtro:[], tardias:0, tardiasPacs:[]}; });
   var porDia={};   // VISTA-SEMANAL: desglose por día DD/MM/YYYY (mismo universo que la tabla: citas con terapeuta)
@@ -4271,12 +4292,22 @@ function _triangularCitasNotas(eventos, resueltos, ultimaHist, asigMap, resuelta
     var r=(resueltos||{})[clave]||{pid:null,tipo:null};
     // V2: nota POR PACIENTE — cualquier terapeuta cuenta (p.soap no se filtra por terapeuta)
     var tiene=false, sMatch=null;
+    var citaCanon=_diaCanon(ddmm);   // CAPA 3 — día de la cita normalizado (compara siempre en YYYY-MM-DD)
     if(r.tipo==='activo' && r.p){
       // AUTORÍA: .find (no .some) para tener a la mano la sesión que casó la fecha (terapeuta/atendidoPor).
-      sMatch=(Array.isArray(r.p.soap)?r.p.soap:[]).find(function(s){ return s && s.fecha===ddmm; })||null;
+      // Normaliza AMBOS lados (activos ya son DD/MM, pero robusto ante cualquier formato).
+      sMatch=(Array.isArray(r.p.soap)?r.p.soap:[]).find(function(s){ return s && citaCanon && _diaCanon(s.fecha)===citaCanon; })||null;
       tiene=!!sMatch;
     } else if(r.tipo==='historico'){
-      tiene=!!(ddmm && ultimaHist && ultimaHist[clave]===ddmm);
+      // CAPA 3 — set COMPLETO de fechas del histórico (normalizado), no solo la última. DEGRADACIÓN:
+      // si el doc no tiene fechasSesiones (aún sin backfill), cae a ultimaSesionLive, también normalizada
+      // (esto por sí solo ya rescata migrados cuyo ultimaSesionLive quedó en ISO).
+      var setF=(fechasHist && fechasHist[clave]) || null;
+      if(Array.isArray(setF) && setF.length){
+        tiene=!!(citaCanon && setF.some(function(f){ return _diaCanon(f)===citaCanon; }));
+      } else {
+        tiene=!!(citaCanon && ultimaHist && _diaCanon(ultimaHist[clave])===citaCanon);
+      }
     }
     // V2: resuelta a mano por el supervisor → cuenta como atendida, no aparece en 🔴
     var resuelta=!tiene && !!(resueltas && resueltas[_keyCitaResuelta(clave, ddmm)]);
@@ -4809,8 +4840,9 @@ async function mostrarRendimientoEquipo(ventana, forzar){
   window._rendVentanaActualTri=ventana;   // V2: para re-render tras "✓ Resolver"
   var resueltos=await _resolverPacientesCalendario(eventos);
   var ultimaHist=await _fetchUltimaSesionHistoricos(resueltos, !!forzar);
+  var fechasHist=(window._triUltimaHistCache&&window._triUltimaHistCache.mapFechas)||{};   // CAPA 3
   var resueltas=await FST_leerCitasResueltas(!!forzar);
-  var tri=_triangularCitasNotas(eventos, resueltos, ultimaHist, asigMap, resueltas);
+  var tri=_triangularCitasNotas(eventos, resueltos, ultimaHist, asigMap, resueltas, fechasHist);
   tri._diasDDMM=dias.map(_ddmmFromISO);   // VISTA-SEMANAL: orden de columnas (lunes primero)
   _tm('triangulación históricos', tTri);
   var etiqueta=(dias.length>1)?(_ddmmFromISO(dias[0])+' — '+_ddmmFromISO(dias[dias.length-1])):'Hoy';
