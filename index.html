@@ -445,6 +445,10 @@ function FST_buildPacientePayload(paciente, sesion, pidInfo) {
     nombreNormalizado: FST_normalizarNombreLive(paciente.name || ''),
     dxLive: paciente.dx || '', terapeutaActualLive: sesion.terapeuta || '',
     ultimaSesionLive: sesion.fecha || '', tieneAppLive: true, origenLive: 'app_live',
+    // CAPA 3 — set de fechas de TODAS las sesiones del paciente en el doc padre (arrayUnion idempotente,
+    // dedup automático). El dashboard lo lee GRATIS en el mismo doc.get() que ya hace; deja de depender
+    // de ultimaSesionLive (que solo conocía la última). Condicional: sin fecha no se escribe.
+    ...(sesion.fecha ? { fechasSesiones: firebase.firestore.FieldValue.arrayUnion(sesion.fecha) } : {}),
     pidMatchType: pidInfo.matchType || '', updatedAt: firebase.firestore.FieldValue.serverTimestamp()
   };
 }
@@ -1739,6 +1743,13 @@ async function drenarColaSoapHistorico(){
           if(!window._fstDb) throw new Error('unavailable: firestore-no-disponible'); // temporal → reintenta
           var sesPayload = FST_buildSesionPayload(it.sesion, 'nueva');
           await window._fstDb.collection('pacientes').doc(it.pid).collection('sesiones').doc(String(it.sesion.id)).set(_sinUndefined(sesPayload), { merge:true });
+          // CAPA 3 — sumar la fecha al set del doc padre (arrayUnion). Solo fechasSesiones (no toca
+          // updatedAt → no interfiere con la detección de conflictos por recencia). No crítico: si falla,
+          // la sesión ya quedó guardada; se reintenta con el item en el próximo drenado.
+          if(it.sesion && it.sesion.fecha){
+            try{ await window._fstDb.collection('pacientes').doc(it.pid).set({ fechasSesiones: firebase.firestore.FieldValue.arrayUnion(it.sesion.fecha) }, { merge:true }); }
+            catch(_fs){ console.warn('[Capa3] fechasSesiones (replay nueva) no se pudo escribir:', _fs && _fs.message); }
+          }
         } else {
           await _guardarEdicionSoapHistorico(it.sid, it.pid, it.payload);
         }
@@ -8588,6 +8599,13 @@ async function _guardarEdicionSoapHistorico(sid, pid, sesion){
   // 1.1 fix — set(merge) en vez de update(): no falla duro si el doc no estuviera presente
   // _sinUndefined: evaI/evaF pueden venir undefined (sliders sin inicializar) y reventarían el write ENTERO.
   await window._fstDb.collection('pacientes').doc(pid).collection('sesiones').doc(sid).set(_sinUndefined(payload), { merge:true });
+  // CAPA 3 — si la edición cambió la fecha, sumarla al set del doc padre. arrayUnion NO borra las
+  // viejas (el dashboard solo pregunta "¿existe una sesión ese día?"; una fecha vieja de más no crea
+  // un falso ✅ mientras la sesión exista). Solo fechasSesiones (no toca updatedAt). No crítico.
+  if(payload && payload.fecha){
+    try{ await window._fstDb.collection('pacientes').doc(pid).set({ fechasSesiones: firebase.firestore.FieldValue.arrayUnion(payload.fecha) }, { merge:true }); }
+    catch(_fs){ console.warn('[Capa3] fechasSesiones (edición hist) no se pudo escribir:', _fs && _fs.message); }
+  }
   showToast('✅ Nota histórica actualizada en Firestore','success');
 }
 
