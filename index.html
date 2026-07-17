@@ -3931,13 +3931,11 @@ function _computarPendientesSOAP(eventos, diasISO, idxHist, asigMap, histNotas){
     if(e._esHist){
       // CAPA 3 — set COMPLETO de fechas del histórico (normalizado): cuenta cuántos días de la ventana
       // tienen sesión. DEGRADACIÓN: sin fechasSesiones cae a ultimaSesionLive (también normalizada).
-      var setF=Array.isArray(e._fechasHist)?e._fechasHist:[];
-      if(setF.length){
-        var cs={}; setF.forEach(function(f){ var c=_diaCanon(f); if(c) cs[c]=1; });
-        notas=Object.keys(diasCanon).filter(function(dc){ return cs[dc]; }).length;
-      } else {
-        notas=(e._ultimaHist && diasCanon[_diaCanon(e._ultimaHist)])?1:0;
-      }
+      // BLINDAJE (igual que en el dashboard): unir SIEMPRE ultimaSesionLive → un set parcial nunca resta.
+      var cs={};
+      (Array.isArray(e._fechasHist)?e._fechasHist:[]).forEach(function(f){ var c=_diaCanon(f); if(c) cs[c]=1; });
+      if(e._ultimaHist){ var cu=_diaCanon(e._ultimaHist); if(cu) cs[cu]=1; }
+      notas=Object.keys(diasCanon).filter(function(dc){ return cs[dc]; }).length;
     } else {
       notas=(Array.isArray(e.p.soap)?e.p.soap:[]).filter(function(s){ return s && diasCanon[_diaCanon(s.fecha)]; }).length;
     }
@@ -4302,12 +4300,13 @@ function _triangularCitasNotas(eventos, resueltos, ultimaHist, asigMap, resuelta
       // CAPA 3 — set COMPLETO de fechas del histórico (normalizado), no solo la última. DEGRADACIÓN:
       // si el doc no tiene fechasSesiones (aún sin backfill), cae a ultimaSesionLive, también normalizada
       // (esto por sí solo ya rescata migrados cuyo ultimaSesionLive quedó en ISO).
-      var setF=(fechasHist && fechasHist[clave]) || null;
-      if(Array.isArray(setF) && setF.length){
-        tiene=!!(citaCanon && setF.some(function(f){ return _diaCanon(f)===citaCanon; }));
-      } else {
-        tiene=!!(citaCanon && ultimaHist && _diaCanon(ultimaHist[clave])===citaCanon);
-      }
+      // BLINDAJE — fechasSesiones es evidencia POSITIVA, NUNCA afirmación de completitud: se UNE
+      // siempre con ultimaSesionLive. Así un set parcial (nota nueva antes del backfill) jamás
+      // FABRICA un 🔴 — solo puede sumar ✅. (Antes: if(setF.length) apagaba la degradación → un
+      // set incompleto marcaba rojo una cita que la última sesión sí cubría.)
+      var setF=(fechasHist && Array.isArray(fechasHist[clave])) ? fechasHist[clave].slice() : [];
+      if(ultimaHist && ultimaHist[clave]) setF.push(ultimaHist[clave]);
+      tiene=!!(citaCanon && setF.some(function(f){ return _diaCanon(f)===citaCanon; }));
     }
     // V2: resuelta a mano por el supervisor → cuenta como atendida, no aparece en 🔴
     var resuelta=!tiene && !!(resueltas && resueltas[_keyCitaResuelta(clave, ddmm)]);
