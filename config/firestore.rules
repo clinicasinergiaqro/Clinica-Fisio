@@ -19,7 +19,10 @@ service cloud.firestore {
       return request.resource.data.diff(resource.data).affectedKeys()
         .hasOnly(['id','appSourceId','name','nombreNormalizado','dxLive',
                   'terapeutaActualLive','ultimaSesionLive','tieneAppLive',
-                  'origenLive','pidMatchType','updatedAt']);
+                  'origenLive','pidMatchType','updatedAt',
+                  // ── CAPA 3: set de fechas de todas las sesiones (arrayUnion) para que el
+                  // dashboard vea el historial completo del histórico, no solo la última.
+                  'fechasSesiones']);
     }
     function pacienteEjerciciosUpdateOK() {
       return request.resource.data.diff(resource.data).affectedKeys()
