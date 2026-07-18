@@ -40,7 +40,9 @@ const HEADERS = [
   'etiquetas',
   'consentimientoDatos','consentimientoImagen','consentimientoWhatsApp',
   'sexo',
-  'altaClinica','revaloraciones','eventosAdversos'
+  'altaClinica','revaloraciones','eventosAdversos',
+  'motivoActualIndex','numSesionEpisodioActual','fechaInicio',
+  'revalSolicitada'
 ];
 
 // ── SPRINT TOKEN PASO 1: validación de Firebase ID Token ──
@@ -106,7 +108,7 @@ function leerPacientes(ss){
     'planTto','consentimiento','soap','soap2','soap3','ejercicios','fotos','docs','historialCambios',
     'consentimientos','seguridadClinica','motivosAnteriores','etiquetas',
     'consentimientoDatos','consentimientoImagen','consentimientoWhatsApp',
-    'altaClinica','revaloraciones','eventosAdversos'];
+    'altaClinica','revaloraciones','eventosAdversos','revalSolicitada'];
   return data
     .filter(row => row[0] !== '')
     .map(row => {
@@ -319,7 +321,7 @@ function doPost(e) {
         return respuesta({ok:false, error:'LOCK_TIMEOUT', msg:'El sistema está ocupado. Tus cambios se conservarán localmente.'});
       }
       try {
-        return respuesta(guardarPacientesConMerge_(ss, body.data || body.datos || []));
+        return respuesta(guardarPacientesConMerge_(ss, body.data || body.datos || [], {email: auth.email, userAgent: body.userAgent}));
       } catch(eMergeGlobal) {
         var msgE = String(eMergeGlobal.message || '');
         if (msgE.indexOf('MERGE_ERROR') >= 0) {
@@ -773,7 +775,28 @@ function getOrCreateSheet(ss) {
   return sheet;
 }
 
-function guardarPacientes(ss, pacientes) {
+function _logGuardaMigSkip_(ss, ids, meta){
+  try{
+    if(!ids || !ids.length) return;
+    meta = meta || {};
+    var sh = ss.getSheetByName('Bitacora');
+    if(!sh){ sh = ss.insertSheet('Bitacora'); sh.appendRow(['fecha','hora','accion','usuario','correo','rol','userAgent','registradoEn']); }
+    var ahora = new Date();
+    sh.appendRow([
+      Utilities.formatDate(ahora,'America/Mexico_City','yyyy-MM-dd'),
+      Utilities.formatDate(ahora,'America/Mexico_City','HH:mm:ss'),
+      'GUARDA_MIG_SKIP (' + ids.length + '): ' + ids.slice(0,20).join(','),
+      '',
+      String(meta.email || '').slice(0,120),
+      '',
+      String(meta.userAgent || '').slice(0,200),
+      ahora.toISOString()
+    ]);
+    Logger.log('[GUARDA_MIG_SKIP] ' + ids.length + ' fila(s) mig_pac_ saltada(s) de ' + (meta.email||'?') + ' | ' + ids.join(','));
+  }catch(err){ Logger.log('[GUARDA_MIG_SKIP] no se pudo registrar en Bitacora: ' + err.message); }
+}
+
+function guardarPacientes(ss, pacientes, meta) {
   if (!pacientes || !pacientes.length) return;
   const sheet = getOrCreateSheet(ss);
   const lastRow = sheet.getLastRow();
@@ -781,8 +804,10 @@ function guardarPacientes(ss, pacientes) {
     ? sheet.getRange(2, 1, lastRow - 1, 1).getValues().flat()
     : [];
 
+  var saltadosMig = [];
   pacientes.forEach(p => {
     if (!p.id) return;
+    if (String(p.id).indexOf('mig_pac_') === 0) { saltadosMig.push(String(p.id)); return; }
     const row = HEADERS.map(h => {
       const v = p[h];
       if (v === null || v === undefined) return '';
@@ -797,6 +822,7 @@ function guardarPacientes(ss, pacientes) {
       existingIds.push(p.id);
     }
   });
+  if (saltadosMig.length) _logGuardaMigSkip_(ss, saltadosMig, meta);
 }
 
 // ═══════════════════════════════════════════════════════
@@ -941,7 +967,7 @@ function pacienteARow_(p) {
   });
 }
 
-function guardarPacientesConMerge_(ss, pacientes) {
+function guardarPacientesConMerge_(ss, pacientes, meta) {
   if (!pacientes || !pacientes.length) return {ok:true, guardados:0};
   var sheet = getOrCreateSheet(ss);
   var lastRow = sheet.getLastRow();
@@ -949,10 +975,14 @@ function guardarPacientesConMerge_(ss, pacientes) {
     ? sheet.getRange(2, 1, lastRow - 1, 1).getValues().flat()
     : [];
 
-  var guardados = 0, huboMerge = false, mergeWarning = false;
+  var guardados = 0, huboMerge = false, mergeWarning = false, saltadosMig = [];
 
   pacientes.forEach(function(pEntrante) {
     if (!pEntrante || !pEntrante.id) return;
+    // GUARDA DURA (fuga de la Hoja): un mig_pac_ NUNCA se escribe al Sheet. Skip POR FILA — jamas
+    // rechazo del payload entero: activos+migs de un cliente rezagado -> los activos SI se guardan
+    // y solo se saltan los migs. Se registra en Bitacora (GUARDA_MIG_SKIP) con correo+userAgent.
+    if (String(pEntrante.id).indexOf('mig_pac_') === 0) { saltadosMig.push(String(pEntrante.id)); return; }
     var idx = existingIds.indexOf(pEntrante.id);
 
     if (idx < 0) {
@@ -966,7 +996,7 @@ function guardarPacientesConMerge_(ss, pacientes) {
         existingIds.push(pEntrante.id);
         guardados++;
       } catch(eNew) {
-        try { guardarPacientes(ss, [pEntrante]); guardados++; mergeWarning = true; } catch(e2){}
+        try { guardarPacientes(ss, [pEntrante], meta); guardados++; mergeWarning = true; } catch(e2){}
       }
       return;
     }
@@ -986,9 +1016,12 @@ function guardarPacientesConMerge_(ss, pacientes) {
     }
   });
 
+  if (saltadosMig.length) _logGuardaMigSkip_(ss, saltadosMig, meta);
+
   var resp = {ok:true, guardados:guardados};
   if (huboMerge) resp.merged = true;
   if (mergeWarning) resp.mergeWarning = 'merge parcial';
+  if (saltadosMig.length) resp.saltadosMig = saltadosMig.length;
   return resp;
 }
 
@@ -1400,4 +1433,79 @@ function corregirSoapAndrea() {
   Logger.log("Nuevo soap: " + soap.length + " sesiones, " + nuevoJson.length + " chars");
   sheet.getRange(targetRow, colSoap + 1).setValue(nuevoJson);
   Logger.log("✅ Columna soap reescrita en row " + targetRow);
+}
+function verHeaders() {
+  console.log('Total columnas: ' + HEADERS.length);
+  console.log('revalSolicitada en HEADERS? ' + (HEADERS.indexOf('revalSolicitada') !== -1));
+  console.log('Ultimas 3: ' + HEADERS.slice(-3).join(', '));
+}
+function censoForenseMigPac(){
+var ss=SpreadsheetApp.openById('1-8UYgdT4Bmte4BXcbtPfmsJJ6qpyzJXYIxnaCDEZW-s');
+var hojas=ss.getSheets();
+Logger.log('=== PESTANAS ===');
+hojas.forEach(function(h){Logger.log(h.getName()+' | filas='+h.getLastRow()+' | cols='+h.getLastColumn());});
+['LIMPIEZA_20260623_1355','BACKUP_60filas_2jul'].forEach(function(n){Logger.log('EXISTE '+n+'? '+(ss.getSheetByName(n)?'SI':'NO'));});
+function fechaDe_(v){
+ if(v===null||v===undefined||v==='')return null;
+ if(v instanceof Date){return isNaN(v.getTime())?null:v;}
+ var n=Number(v);
+ if(isFinite(n)&&n>1000000000000)return new Date(n);
+ if(isFinite(n)&&n>1000000000&&n<10000000000)return new Date(n*1000);
+ if(!isFinite(n)){var d=new Date(String(v));if(!isNaN(d.getTime()))return d;}
+ return null;
+}
+function censoHoja(nombre){
+ var h=ss.getSheetByName(nombre);
+ if(!h){Logger.log('(no existe: '+nombre+')');return null;}
+ var data=h.getDataRange().getValues();
+ if(data.length<1){Logger.log(nombre+': vacia');return{ids:[],celdas:0};}
+ var headers=data[0].map(String);
+ var colId=headers.indexOf('id'),colName=headers.indexOf('name'),colUpd=headers.indexOf('updatedAt');
+ var usaFallback=(colId===-1);
+ if(usaFallback)Logger.log('>>> '+nombre+': SIN columna id -> USANDO FALLBACK REGEX. Encabezados: '+headers.slice(0,12).join(' | '));
+ var ids=[],celdas=0,vistos={},dup=[],sinFecha=0,crudos=[];
+ var re=/mig_pac_[a-f0-9]+/gi;
+ for(var i=(usaFallback?0:1);i<data.length;i++){
+  var fila=data[i], idsFila={};
+  for(var j=0;j<fila.length;j++){
+   var s=String(fila[j]);
+   if(s.indexOf('mig_pac_')!==-1){celdas++;
+    if(usaFallback){var m=s.match(re); if(m)m.forEach(function(x){idsFila[x]=1;});}
+   }
+  }
+  var encontrados=[];
+  if(usaFallback){encontrados=Object.keys(idsFila);}
+  else{var id=String(fila[colId]||'').trim(); if(id.indexOf('mig_pac_')===0)encontrados=[id];}
+  encontrados.forEach(function(id){
+   if(vistos[id])dup.push(id); vistos[id]=true; ids.push(id);
+   var crudo=(!usaFallback&&colUpd>-1)?fila[colUpd]:null;
+   var f=fechaDe_(crudo);
+   var fecha=f?Utilities.formatDate(f,'America/Mexico_City','yyyy-MM-dd HH:mm'):'(sin fecha)';
+   if(!f){sinFecha++; if(crudos.length<3)crudos.push(String(crudo).slice(0,60));}
+   Logger.log(nombre+' fila '+(i+1)+' | '+id+' | '+((!usaFallback&&colName>-1)?fila[colName]:'?')+' | '+fecha);
+  });
+ }
+ Logger.log('>>> '+nombre+': FILAS/IDS mig_pac_='+ids.length+' | CELDAS con mig_pac_='+celdas+' | sin fecha='+sinFecha+(usaFallback?' | (via FALLBACK)':'')+(dup.length?(' | DUPLICADOS: '+dup.join(', ')):''));
+ if(crudos.length)Logger.log('>>> '+nombre+': updatedAt ilegible ej: '+crudos.join(' || '));
+ return{ids:ids,celdas:celdas};
+}
+var pac=censoHoja('Pacientes');
+var totalCeldas=pac?pac.celdas:0;
+var enRespaldo={};
+hojas.map(function(h){return h.getName();}).filter(function(n){
+ return n!=='Pacientes' && (n.toUpperCase().indexOf('LIMPIEZA')===0||n.toUpperCase().indexOf('BACKUP')===0);
+}).forEach(function(n){
+ var r=censoHoja(n);
+ if(r){totalCeldas+=r.celdas; r.ids.forEach(function(id){ if(!enRespaldo[id])enRespaldo[id]=n; });}
+});
+if(pac){
+ var volvieron=pac.ids.filter(function(id){return enRespaldo[id];});
+ Logger.log('=== CRUCE ===');
+ Logger.log('mig VIVAS en Pacientes: '+pac.ids.length);
+ Logger.log('ids distintos en respaldos: '+Object.keys(enRespaldo).length);
+ Logger.log('VOLVIERON (vivas HOY y presentes en un respaldo previo = REINGRESO PROBADO): '+volvieron.length);
+ volvieron.forEach(function(id){Logger.log('  '+id+' <- '+enRespaldo[id]);});
+ Logger.log('celdas mig_pac_ totales: '+totalCeldas+' (compara vs el 72 del buscador)');
+}
+Logger.log('=== FIN - SOLO LECTURA ===');
 }
