@@ -52,6 +52,12 @@
   // el login normal. No usa la app 'staging' ni auth adicional.
   const FST_PROD_MODE = true;
   const FST_LISTA_ACTIVA = true; // Fase 5: lista local + Firestore. ENCENDIDO en B.6 para validación.
+  // ── PISO DE FECHA (dashboard de rendimiento): el equipo empezó a documentar en la app
+  // el 01/07/2026. Citas ANTERIORES a esta fecha no se evalúan: no son falta ni entran
+  // al denominador de cobertura (medir esa época fabricaría rojos falsos). Se comparan
+  // contra el día LOCAL de la cita (ev.inicio normalizado). Fuente única de verdad de la
+  // época de la app — si algún día se amplían las ventanas del dashboard, este piso protege.
+  const APP_INICIO_OPERACION = '2026-07-01';
   // Fase 5 v4: Promise compartida — DEBE declararse ANTES de FST_init() (L62) y sus call-sites.
   window._FST_dbReady = window._FST_dbReady || null;
   window._FST_dbReadyResolve = window._FST_dbReadyResolve || null;
@@ -4320,7 +4326,7 @@ function _diaCanon(f){
 }
 function _triangularCitasNotas(eventos, resueltos, ultimaHist, asigMap, resueltas, fechasHist){
   var porTer={};
-  Object.keys(TERAPEUTA_CAL2COD).forEach(function(n){ porTer[n]={citas:0, conNota:0, sinNota:0, resueltas:0, sinNotaPacs:[], noIdentificados:0, noIdentPacs:[], atendidasOtro:[], tardias:0, tardiasPacs:[]}; });
+  Object.keys(TERAPEUTA_CAL2COD).forEach(function(n){ porTer[n]={citas:0, conNota:0, sinNota:0, resueltas:0, sinNotaPacs:[], noIdentificados:0, noIdentPacs:[], atendidasOtro:[], tardias:0, tardiasPacs:[], enTiempo:0, enTiempoPacs:[], prePiso:0}; });
   var porDia={};   // VISTA-SEMANAL: desglose por día DD/MM/YYYY (mismo universo que la tabla: citas con terapeuta)
   var vistosSinNota={};
   (Array.isArray(eventos)?eventos:[]).forEach(function(ev){
@@ -4333,6 +4339,22 @@ function _triangularCitasNotas(eventos, resueltos, ultimaHist, asigMap, resuelta
     // V2: nota POR PACIENTE — cualquier terapeuta cuenta (p.soap no se filtra por terapeuta)
     var tiene=false, sMatch=null;
     var citaCanon=_diaCanon(ddmm);   // CAPA 3 — día de la cita normalizado (compara siempre en YYYY-MM-DD)
+    // ── PISO DE FECHA: cita anterior al inicio de operación de la app (APP_INICIO_OPERACION)
+    // → NO se evalúa: ni falta, ni ✅, ni denominador, ni porDia. El equipo no documentaba
+    // aquí antes de esa fecha; medirla fabricaría rojos falsos. Se compara el día LOCAL de la
+    // cita (citaCanon, YYYY-MM-DD — comparación de strings ISO es orden cronológico). Solo se
+    // CUENTA en prePiso para transparencia (línea informativa en dashboard y PDF cuando >0).
+    if(citaCanon && citaCanon < APP_INICIO_OPERACION){
+      porTer[ter].prePiso++;
+      return;
+    }
+    // ── VENTANA 24H (C): una cita de las últimas 24 h — o futura, en vista semanal — sin nota
+    // NO es falta todavía: la terapeuta sigue "en tiempo" para documentarla (simétrico con ⏱
+    // tardías, que marca notas escritas >24 h DESPUÉS de la cita). Se mide ev.inicio (hora real
+    // del calendario) vs ahora. Sale de 🔴 y del denominador; entra al bucket ⏳ enTiempo.
+    // Solo aplica a citas IDENTIFICADAS sin nota (los 🔎 conservan su prioridad de diagnóstico).
+    var _tCitaEv=ev.inicio ? new Date(ev.inicio).getTime() : NaN;
+    var enTiempo24=isFinite(_tCitaEv) && (Date.now()-_tCitaEv) < 86400000;
     if(r.tipo==='activo' && r.p){
       // AUTORÍA: .find (no .some) para tener a la mano la sesión que casó la fecha (terapeuta/atendidoPor).
       // Normaliza AMBOS lados (activos ya son DD/MM, pero robusto ante cualquier formato).
@@ -4357,7 +4379,8 @@ function _triangularCitasNotas(eventos, resueltos, ultimaHist, asigMap, resuelta
       var dd=porDia[ddmm]||(porDia[ddmm]={citas:0, conNota:0, sinNota:0});
       dd.citas++;
       // EXACTITUD: pid:null (no identificado) no entra al 🔴 del día — falso positivo hasta vincularlo.
-      if(tiene||resuelta) dd.conNota++; else if(r.pid) dd.sinNota++;
+      // VENTANA 24H: la cita aún en tiempo tampoco pinta 🔴 en la columna del día.
+      if(tiene||resuelta) dd.conNota++; else if(r.pid && !enTiempo24) dd.sinNota++;
     }
     porTer[ter].citas++;
     if(tiene){
@@ -4398,6 +4421,17 @@ function _triangularCitasNotas(eventos, resueltos, ultimaHist, asigMap, resuelta
       if(!vistosSinNota[kni]){
         vistosSinNota[kni]=true;
         porTer[ter].noIdentPacs.push({nombre:ev.paciente||'(sin nombre)', pid:r.pid, tipo:r.tipo, fecha:ddmm});
+      }
+    }
+    else if(enTiempo24){
+      // VENTANA 24H: identificada, sin nota, pero la cita fue hace <24 h (o es futura) →
+      // ⏳ en tiempo, NO 🔴. No entra al denominador de cobertura. Al pasar las 24 h sin
+      // nota, el siguiente cálculo la moverá sola a 🔴 (el corte es vs Date.now()).
+      porTer[ter].enTiempo++;
+      var ket='ET|'+ter+'|'+clave+'|'+ddmm;   // espacio de clave propio (simetría con NI|/SN|)
+      if(!vistosSinNota[ket]){
+        vistosSinNota[ket]=true;
+        porTer[ter].enTiempoPacs.push({nombre:ev.paciente||'(sin nombre)', pid:r.pid, tipo:r.tipo, fecha:ddmm});
       }
     }
     else {
@@ -4677,7 +4711,7 @@ function _rendimientoHTML(datos, noId, ventana, etiqueta, aviso, refresco, tri){
       +'<td style="padding:6px 8px;font-weight:700;color:'+c+'">'+escapeHTML(n)+'</td>'
       +'<td style="padding:6px 8px;text-align:center">'+t.citas+'</td>'
       +'<td style="padding:6px 8px;text-align:center;font-weight:700;color:#2E7D52">'+(t.conNota==null?'—':('✅ '+t.conNota))+'</td>'
-      +'<td style="padding:6px 8px;text-align:center;font-weight:700;color:'+((t.sinNota>0)?'#B91C1C':'var(--gray-400)')+'">'+(t.sinNota==null?'—':(t.sinNota>0?('🔴 '+t.sinNota):'0'))+((t.noIdentificados>0)?(' <span style="color:#92400E;font-weight:700;white-space:nowrap">🔎 '+t.noIdentificados+'</span>'):'')+((t.tardias>0)?(' <span style="color:#B45309;font-weight:700;white-space:nowrap" title="Notas creadas más de 24 h después de la cita">⏱ '+t.tardias+'</span>'):'')+'</td>'
+      +'<td style="padding:6px 8px;text-align:center;font-weight:700;color:'+((t.sinNota>0)?'#B91C1C':'var(--gray-400)')+'">'+(t.sinNota==null?'—':(t.sinNota>0?('🔴 '+t.sinNota):'0'))+((t.enTiempo>0)?(' <span style="color:#0369A1;font-weight:700;white-space:nowrap" title="Citas de las últimas 24 h (o futuras) aún en tiempo de documentar — no cuentan como falta">⏳ '+t.enTiempo+'</span>'):'')+((t.noIdentificados>0)?(' <span style="color:#92400E;font-weight:700;white-space:nowrap">🔎 '+t.noIdentificados+'</span>'):'')+((t.tardias>0)?(' <span style="color:#B45309;font-weight:700;white-space:nowrap" title="Notas creadas más de 24 h después de la cita">⏱ '+t.tardias+'</span>'):'')+'</td>'
       +'<td style="padding:6px 8px;text-align:center">'+(st.scoreN?Math.round(st.scoreSum/st.scoreN):'—')+'</td>'
       +'<td style="padding:6px 8px;text-align:center"><button data-ter="'+escapeAttr_(n)+'" onclick="generarPDFRendimiento(this.dataset.ter)" title="PDF de desempeño de '+escapeAttr_(n)+'" style="background:none;border:none;font-size:15px;cursor:pointer;padding:2px 4px">📄</button></td></tr>';
   }).join('');
@@ -4741,6 +4775,30 @@ function _rendimientoHTML(datos, noId, ventana, etiqueta, aviso, refresco, tri){
   var seccionTardias=bloquesTardias
     ? '<div style="margin-top:12px"><div style="font-size:12px;font-weight:800;color:#B45309">⏱ Notas fuera de las 24 h <span style="font-weight:400;color:var(--gray-500)">(cuenta como ✅; solo informa la puntualidad · solo activos)</span></div>'+bloquesTardias+'</div>'
     : '';
+  // VENTANA 24H (C): citas identificadas sin nota pero aún dentro de las 24 h (o futuras).
+  // NO son falta ni entran a cobertura — sección informativa; al vencer el plazo pasan solas a 🔴.
+  var bloquesEnTiempo=Object.keys(TERAPEUTA_CAL2COD).map(function(n){
+    var t=tri[n];
+    if(!t || !t.enTiempoPacs || !t.enTiempoPacs.length) return '';
+    var c=(typeof AGENDA_COLORES!=='undefined'&&AGENDA_COLORES[n])?AGENDA_COLORES[n]:'#9BA3B5';
+    var chips=t.enTiempoPacs.map(function(x){
+      return '<span style="white-space:nowrap;display:inline-block;font-size:11px;font-weight:700;border-radius:10px;padding:4px 10px;margin:2px;border:1px solid #BAE6FD;background:#F0F9FF;color:#0369A1">⏳ '
+        +escapeHTML(x.nombre)+' <span style="font-weight:400">— '+escapeHTML(x.fecha||'')+'</span></span>';
+    }).join('');
+    return '<div style="margin-top:8px;border-left:4px solid '+c+';padding-left:8px">'
+      +'<div style="font-size:12px;font-weight:800;color:'+c+'">'+escapeHTML(n)+' — '+t.enTiempoPacs.length+' en tiempo</div>'
+      +'<div style="margin-top:2px">'+chips+'</div></div>';
+  }).join('');
+  var seccionEnTiempo=bloquesEnTiempo
+    ? '<div style="margin-top:12px"><div style="font-size:12px;font-weight:800;color:#0369A1">⏳ En tiempo — últimas 24 h <span style="font-weight:400;color:var(--gray-500)">(aún no es falta; al pasar 24 h de la cita sin nota pasa a 🔴)</span></div>'+bloquesEnTiempo+'</div>'
+    : '';
+  // PISO DE FECHA: transparencia — cuántas citas del período quedaron ANTES del inicio de
+  // operación de la app y por eso no se evalúan. Con las ventanas actuales siempre es 0
+  // (la más amplia arranca el día 1 del mes); la línea solo aparece si algún día llega a >0.
+  var totalPrePiso=Object.keys(TERAPEUTA_CAL2COD).reduce(function(a,n){ var t=tri[n]; return a+((t&&t.prePiso)||0); },0);
+  var lineaPiso=totalPrePiso>0
+    ? '<div style="margin-top:10px;font-size:11px;background:#EEF1F6;color:var(--gray-600);border-radius:8px;padding:6px 10px">📅 '+totalPrePiso+' cita'+(totalPrePiso!==1?'s':'')+' anterior'+(totalPrePiso!==1?'es':'')+' al '+_ddmmFromISO(APP_INICIO_OPERACION)+' (inicio de operación de la app) — excluida'+(totalPrePiso!==1?'s':'')+' del conteo: no son falta ni entran a cobertura.</div>'
+    : '';
   // VISTA-SEMANAL: una columna por día (Lun..Vie; Sáb/Dom solo si tienen citas). Días futuros = "por venir".
   var bloqueSemana='';
   if(ventana==='semana' && tri._porDia && Array.isArray(tri._diasDDMM)){
@@ -4793,11 +4851,13 @@ function _rendimientoHTML(datos, noId, ventana, etiqueta, aviso, refresco, tri){
     +'<th style="padding:6px 8px;text-align:left">Terapeuta</th><th style="padding:6px 8px">Citas</th><th style="padding:6px 8px">✅ Nota</th><th style="padding:6px 8px">🔴 Sin</th><th style="padding:6px 8px">Score</th><th style="padding:6px 8px">📄</th></tr></thead>'
     +'<tbody>'+filas+'</tbody></table></div>'
     +seccionSinNota
+    +seccionEnTiempo
     +seccionRevisar
     +seccionAutoria
     +seccionTardias
     +filaSA+bloqueNI
-    +'<div style="font-size:10px;color:var(--gray-400);margin-top:10px">✅/🔴 por PACIENTE y día: nota fechada el día exacto de la cita, sin importar qué terapeuta la escribió (activos por expediente; históricos por ultimaSesionLive). ✅ incluye citas resueltas a mano con ✓. Score = calidad promedio de nota (0-100) de pacientes activos.</div>';
+    +lineaPiso
+    +'<div style="font-size:10px;color:var(--gray-400);margin-top:10px">✅/🔴 por PACIENTE y día: nota fechada el día exacto de la cita, sin importar qué terapeuta la escribió (activos por expediente; históricos por ultimaSesionLive). ✅ incluye citas resueltas a mano con ✓. ⏳ = cita de las últimas 24 h (o futura) aún en tiempo de documentar — no es falta ni entra a cobertura. Solo se evalúan citas desde el '+_ddmmFromISO(APP_INICIO_OPERACION)+' (inicio de operación de la app). Score = calidad promedio de nota (0-100) de pacientes activos.</div>';
 }
 // PERF: caches en memoria del dashboard. La lógica de cálculo NO cambia — solo se evita red repetida.
 var REND_CACHE_TTL_MS=5*60*1000;
@@ -4922,6 +4982,8 @@ async function generarPDFRendimiento(terapeuta){
   var cobertura=identificadas>0 ? Math.round(conNota/identificadas*100) : null;
   var score=st.scoreN ? Math.round(st.scoreSum/st.scoreN) : null;
   var noIdent=t.noIdentificados||0, tardias=t.tardias||0;
+  // VENTANA 24H + PISO: fuera del denominador ambas; se reportan con transparencia.
+  var enTiempo=t.enTiempo||0, prePiso=t.prePiso||0;
   var atendidasOtro=Array.isArray(t.atendidasOtro)?t.atendidasOtro:[];
   var cod=(typeof TERAPEUTA_CAL2COD!=='undefined' && TERAPEUTA_CAL2COD[n]) ? TERAPEUTA_CAL2COD[n] : String(n).toUpperCase();
   var info=(typeof TERAPEUTAS_INFO!=='undefined' && TERAPEUTAS_INFO[cod]) ? TERAPEUTAS_INFO[cod] : {nombreCompleto:n};
@@ -4967,6 +5029,7 @@ async function generarPDFRendimiento(terapeuta){
   campo('Cobertura', cobertura==null ? 'Sin citas identificadas' : (cobertura+' %  ('+conNota+' de '+identificadas+')'));
   campo('Calidad promedio', score==null ? '—' : (score+' / 100'));
   campo('Notas fuera de 24 h', tardias);
+  campo('En tiempo (últimas 24 h)', enTiempo);
   campo('Atendidas por otro', atendidasOtro.length);
   y+=2;
 
@@ -4975,6 +5038,14 @@ async function generarPDFRendimiento(terapeuta){
   var faltas=Array.isArray(t.sinNotaPacs)?t.sinNotaPacs:[];
   if(!faltas.length){ parrafo('Sin faltas: todas las citas identificadas del período tienen nota.'); }
   else { faltas.forEach(function(x){ bullet((x.nombre||'(sin nombre)')+'  —  '+(x.fecha||'')); }); y+=1; }
+
+  // VENTANA 24H: citas aún en tiempo de documentar (solo si hay) — NO son falta.
+  var enT=Array.isArray(t.enTiempoPacs)?t.enTiempoPacs:[];
+  if(enT.length){
+    seccionTitulo('EN TIEMPO (ÚLTIMAS 24 H)');
+    doc.setTextColor(120,120,120); parrafo('Citas de las últimas 24 h (o futuras) sin nota todavía: aún están en tiempo de documentarse. No cuentan como falta ni entran a la cobertura.'); doc.setTextColor(40,40,40);
+    enT.forEach(function(x){ bullet((x.nombre||'(sin nombre)')+'  —  '+(x.fecha||'')); }); y+=1;
+  }
 
   // Oportunidad (solo si hay)
   var tard=Array.isArray(t.tardiasPacs)?t.tardiasPacs:[];
@@ -4995,6 +5066,9 @@ async function generarPDFRendimiento(terapeuta){
   checkPage(24); y+=2; divider();
   doc.setFontSize(7.5); doc.setTextColor(120,120,120);
   parrafo('Cómo se calcula: Cobertura = notas hechas ÷ citas identificadas. Las citas sin identificar NO cuentan como falta ni como atendida.');
+  parrafo('Las citas de las últimas 24 h al momento de la emisión no cuentan como falta: aún están en tiempo de documentarse.');
+  parrafo('Solo se contabilizan citas a partir del '+_ddmmFromISO(APP_INICIO_OPERACION)+', fecha en que el equipo comenzó a documentar en la app.');
+  if(prePiso>0){ parrafo(prePiso+' cita'+(prePiso!==1?'s':'')+' del período anterior'+(prePiso!==1?'es':'')+' a esa fecha — excluida'+(prePiso!==1?'s':'')+' del cálculo.'); }
   if(noIdent>0){ parrafo(noIdent+' cita'+(noIdent!==1?'s':'')+' sin identificar en el calendario del período — no contada'+(noIdent!==1?'s':'')+' como falta; requiere'+(noIdent!==1?'n':'')+' vincular el nombre a un expediente.'); }
   doc.setTextColor(40,40,40);
 
