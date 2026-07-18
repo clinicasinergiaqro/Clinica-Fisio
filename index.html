@@ -4145,11 +4145,6 @@ function _ddmmDeISOEvento(iso){
 // Resuelve cada nombre del calendario a {pid, tipo:'activo'|'historico'|null}. Usa patientsDB
 // (activos) y el índice de lista ya cacheado (FST_cargarIndicePacientes, 3 niveles de cache).
 async function _resolverPacientesCalendario(eventos){
-  // D1 — NUNCA resolver con patientsDB vacío: resolvería un activo a su espejo app_live_ (parcial) y
-  // marcaría rojos falsos. Si falta, hidratar de Sheets antes de mapear. Guardado: solo si está vacío.
-  if((!Array.isArray(patientsDB) || !patientsDB.length) && typeof loadFromCloud==='function'){
-    try{ var _dP=await loadFromCloud(); if(Array.isArray(_dP)&&_dP.length) patientsDB=_dP; }catch(_e){}
-  }
   var idxAct={};
   (Array.isArray(patientsDB)?patientsDB:[]).forEach(function(p){
     if(!p) return;
