@@ -4161,13 +4161,23 @@ async function _resolverPacientesCalendario(eventos){
   // el activo si el match cae en el espejo (p.ej. patientsDB no casó por nombre exacto) → evita el rojo falso.
   var _espejoAActivo={};
   if(typeof FST_hashSimpleLive==='function'){
+    var _mapEsp=function(k,p){
+      var prev=_espejoAActivo[k];
+      if(prev && String(prev.id||'')!==String(p.id||'')){
+        // COLISIÓN de hash (débil): dos activos DISTINTOS → misma clave app_live_. No debería con ~23.
+        // Conservar el primero y avisar VISIBLE — enterarse el día que pasa, no cuando lo note un reporte.
+        console.error('[D1] COLISIÓN hash app_live_ '+k+': "'+(prev.name||'?')+'" ('+prev.id+') vs "'+(p.name||'?')+'" ('+p.id+') — el mapa espejo→activo puede resolver mal.');
+        return;
+      }
+      _espejoAActivo[k]=p;
+    };
     (Array.isArray(patientsDB)?patientsDB:[]).forEach(function(p){
       if(!p) return;
       var _id=String(p.id||'').trim();
-      if(_id) _espejoAActivo['app_live_'+FST_hashSimpleLive(_id)]=p;
+      if(_id) _mapEsp('app_live_'+FST_hashSimpleLive(_id), p);
       if((p.name||p.nombre) && typeof FST_normalizarNombreLive==='function'){
         var _nn=FST_normalizarNombreLive(p.name||p.nombre||'');
-        if(_nn){ var _kn='app_live_'+FST_hashSimpleLive(_nn); if(!_espejoAActivo[_kn]) _espejoAActivo[_kn]=p; }
+        if(_nn) _mapEsp('app_live_'+FST_hashSimpleLive(_nn), p);
       }
     });
   }
@@ -4879,8 +4889,15 @@ async function mostrarRendimientoEquipo(ventana, forzar){
   var etiqueta=(dias.length>1)?(_ddmmFromISO(dias[0])+' — '+_ddmmFromISO(dias[dias.length-1])):'Hoy';
   // PDF-RENDIMIENTO: snapshot de lo que se está pintando, para que el botón 📄 por fila genere el
   // PDF con EXACTAMENTE los mismos números del dashboard (misma ventana, mismo tri/datos/etiqueta).
-  window._rendUltimo={ventana:ventana, datos:datos, tri:tri, etiqueta:etiqueta, ts:Date.now()};
-  card.innerHTML=_rendimientoHTML(datos, noId, ventana, etiqueta, aviso, {desdeCache:desdeCache, ts:cacheTs}, tri);
+  // D1 — degradación NO silenciosa: si patientsDB no cargó (offline/Sheets/timeout), TODO activo caería a
+  // 🔎 sin aviso. Detectarlo leyendo patientsDB DIRECTO (no el return de loadFromCloud), avisar VISIBLE y
+  // marcar el snapshot para bloquear el PDF (no entregar números de activos no confiables).
+  var _activosNoConf = !Array.isArray(patientsDB) || !patientsDB.length;
+  window._rendUltimo={ventana:ventana, datos:datos, tri:tri, etiqueta:etiqueta, ts:Date.now(), activosNoConfiables:_activosNoConf};
+  var _bannerAct = _activosNoConf
+    ? '<div style="background:#FDECEA;border:2px solid #C0392B;color:#8a2114;border-radius:10px;padding:10px 12px;margin-bottom:10px;font-size:13px;font-weight:700">⚠️ No se pudieron cargar los pacientes activos — los números de ACTIVOS NO son confiables. Revisa tu conexión y toca 🔄 Actualizar. El PDF está deshabilitado en este estado.</div>'
+    : '';
+  card.innerHTML=_bannerAct+_rendimientoHTML(datos, noId, ventana, etiqueta, aviso, {desdeCache:desdeCache, ts:cacheTs}, tri);
   _tm('total'+(desdeCache?' (desde cache)':''), t0);
 }
 // ── PDF DE DESEMPEÑO POR TERAPEUTA (4º pilar del "control total") ───────────────
@@ -4893,6 +4910,7 @@ async function generarPDFRendimiento(terapeuta){
   if(!esSupervisorUI()){ showToast('Solo supervisor','error'); return; }
   var snap=window._rendUltimo;
   if(!snap || !snap.tri || !snap.datos){ showToast('Abre el rendimiento primero','warning'); return; }
+  if(snap.activosNoConfiables){ showToast('⚠️ Pacientes activos no cargados — PDF deshabilitado. Toca 🔄 Actualizar y reintenta','error'); return; }
   var n=String(terapeuta||'');
   var t=snap.tri[n], st=(snap.datos.stats||{})[n];
   if(!t || !st){ showToast('Terapeuta no encontrado','error'); return; }
