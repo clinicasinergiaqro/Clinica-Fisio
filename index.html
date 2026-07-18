@@ -2185,7 +2185,12 @@ async function loadFromCloud(){
         }
       });
 
-      var saneadosLimpios=saneados.filter(function(p){ return !_esPacienteTest(p); });
+      // ── FUGA mig_pac_ (goteo del 04-jul): filas contaminadas de la Hoja NUNCA entran a
+      // patientsDB. patientsDB = SOLO activos; los históricos viven en Firestore (doc + subcolección).
+      // Sin esto, idxAct los trata como activos con p.soap casi vacío → rojos falsos en el dashboard.
+      // Bono: saveLocal (abajo) persiste el resultado filtrado → el localStorage contaminado de cada
+      // dispositivo se auto-purga en su siguiente load, sin migración manual.
+      var saneadosLimpios=saneados.filter(function(p){ return !_esPacienteTest(p) && String((p&&p.id)||'').indexOf('mig_pac_')!==0; });
       saveLocal('pts',saneadosLimpios);
       try{ localStorage.setItem('sinergia_ultimaSyncOk', new Date().toLocaleString('es-MX')); }catch(e){}
       return saneadosLimpios;
