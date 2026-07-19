@@ -15,5 +15,5 @@
 - Tras cada merge a main, RECREAR la rama de trabajo desde main para evitar conflictos en el siguiente loop:
   `git fetch origin main` → `git reset --hard origin/main` → `git push --force origin <rama>`.
   (Equivale a checkout main + pull + rama nueva; deja la rama designada idéntica a main, sin divergencia.)
-- Cada deploy incluye bump de la versión de cache en `sw.js` (`v1-2026-06-22<letra>` → siguiente letra) para forzar refresh del service worker.
+- Cada deploy incluye bump de la versión de cache en `sw.js` para forzar refresh del service worker. Esquema: `sinergia-shell-v1-<fecha del deploy><letra>` (ej. `v1-2026-07-19a`); mismo día → siguiente letra, día nuevo → fecha del día y letra reinicia en `a`. El prefijo `sinergia-shell-` NO se cambia (el auto-update lo usa: `SW_CACHE_PREFIX` en index.html).
 - Verificación de sintaxis: `index.html` no se valida con `node --check` directo (no es .js); extraer los bloques `<script>` inline y validarlos con `vm.Script`.

@@ -1102,7 +1102,7 @@ function registrarAcceso(accion){
 // se autorizan con el ID Token de Firebase del usuario autenticado.
 let _idTokenCache = null;
 let _idTokenTs = 0;
-async function getFirebaseIdToken(forceRefresh=false){
+async function getFirebaseIdToken(forceRefresh=false, diag=null){
   const CACHE_MS = 50*60*1000; // 50 min (los tokens duran 1h)
   const ahora = Date.now();
   if(!forceRefresh && _idTokenCache && (ahora - _idTokenTs) < CACHE_MS) return _idTokenCache;
@@ -1114,8 +1114,16 @@ async function getFirebaseIdToken(forceRefresh=false){
     _idTokenTs = ahora;
     return tok;
   }catch(e){
-    _idTokenCache = null;
-    console.warn('[Auth] getIdToken error:', e.message);
+    // [GRUPO-A #8] Distinguir fallo de RED de fallo de AUTH: un microcorte al renovar el token NO
+    // es "sesión expirada". La clasificación viaja en `diag` POR-LLAMADA (objeto del caller) — sin
+    // flag global (llamadas concurrentes se pisarían la clasificación) y sin string-sentinel que un
+    // caller confunda con un token. En red: NO borrar el cache (si sigue fresco <50 min sirve tal cual).
+    const _msg = String((e && (e.code || e.message)) || '');
+    const _esRed = /network-request-failed|auth\/timeout|deadline|Failed to fetch|Load failed|NetworkError/i.test(_msg);
+    if(diag) diag.red = _esRed;
+    console.warn('[Auth] getIdToken error:', _msg);
+    if(_esRed && _idTokenCache && (ahora - _idTokenTs) < CACHE_MS) return _idTokenCache; // fallback: cacheado aún fresco
+    if(!_esRed) _idTokenCache = null;   // solo un error de AUTH real invalida el cache
     return null;
   }
 }
@@ -1124,8 +1132,14 @@ async function getFirebaseIdToken(forceRefresh=false){
 async function callAppsScriptPrivado(action, payload={}, opts={}){
   // feat/appsscript-auth: token FRESCO en cada llamada — getIdToken(true) fuerza renovación
   // (evita mandar un token a punto de expirar). opts.forceRefresh:false permite optar por cache.
-  const idToken = await getFirebaseIdToken(opts.forceRefresh!==false);
+  const _diag = {red:false};   // [GRUPO-A #8] colector POR-LLAMADA: inmune a llamadas concurrentes
+  const idToken = await getFirebaseIdToken(opts.forceRefresh!==false, _diag);
   if(!idToken){
+    // [GRUPO-A #8] Sin token por RED (diag.red) → RED_ERROR honesto: saveDB reintenta/encola con
+    // mensaje de red. Sin usuario o AUTH real (diag.red=false) pinta "Sesión expirada", como antes.
+    if(_diag.red){
+      return {ok:false, error:'RED_ERROR', msg:'Sin conexión al renovar sesión'};
+    }
     // Sesión nula/expirada: avisar y NO llamar a Apps Script
     if(typeof showToast==='function') showToast('Sesión expirada, recarga la app','error');
     return {ok:false, error:'AUTH_REQUIRED'};
@@ -2023,17 +2037,32 @@ async function drenarColaHistDoc(){
 // sin conexión, NUNCA dice "todo guardado" (offline no se puede confirmar nada en la nube).
 function _contarColaLS(k){ try{ var q=JSON.parse(localStorage.getItem(k)||'[]'); return Array.isArray(q)?q.length:0; }catch(e){ return 0; } }
 function _totalPendientesSync(){ return getColaSync().length + _contarColaLS('COLA_ETIQ_HIST') + _contarColaLS('COLA_SYNC_HIST_DOC') + _contarColaLS('COLA_SYNC_HIST') + _contarColaLS('COLA_SOAP_ACT'); }
+// [GRUPO-A #5] Función NUEVA y SEPARADA: cuenta las colas de FALLIDOS permanentes SOLO para el
+// indicador visual. NO se suma en _totalPendientesSync a propósito: esa función también gobierna
+// el guard del auto-update (aplicarActualizacionSiSegura y _recargarPorUpdate) y un fallido
+// permanente jamás drena → sumarlo ahí bloquearía la recarga automática PARA SIEMPRE.
+function _totalFallidosSync(){ return _contarColaLS('COLA_SOAP_ACT_FALLIDOS') + _contarColaLS('COLA_SYNC_HIST_FALLIDOS') + _contarColaLS('COLA_SYNC_HIST_DOC_FALLIDOS'); }
 function actualizarIndicadorSync(){
   const el = document.getElementById('sync-indicator');
   if(!el) return;
   const sinNet = !navigator.onLine;
   const n = _totalPendientesSync();
-  if(n===0 && !sinNet){
+  const nf = _totalFallidosSync();   // [GRUPO-A #5] fallidos permanentes: el ✅ ya no los ignora
+  if(n===0 && nf===0 && !sinNet){
     el.className = 'sync-indicator ok';
     el.textContent = '✅ Todo sincronizado';
     el.style.display = 'block';
     clearTimeout(window._syncHideTimer);
-    window._syncHideTimer = setTimeout(()=>{ if(_totalPendientesSync()===0 && navigator.onLine) el.style.display='none'; }, 4000);
+    window._syncHideTimer = setTimeout(()=>{ if(_totalPendientesSync()===0 && _totalFallidosSync()===0 && navigator.onLine) el.style.display='none'; }, 4000);
+    return;
+  }
+  // [GRUPO-A #5] Sin pendientes vivos pero con FALLIDOS: avisar en vez de afirmar "todo bien".
+  // Visible TAMBIÉN offline (los fallidos no dependen de la red) y apunta al panel real: la lupa 🔎
+  // de la barra superior ("Revisión de este dispositivo"), que ya lista y reencola fallidos.
+  if(n===0 && nf>0){
+    el.className = 'sync-indicator pend';
+    el.textContent = (sinNet?'📴 ':'⚠️ ')+nf+' cambio'+(nf!==1?'s':'')+' sin sincronizar — toca 🔎 arriba';
+    el.style.display = 'block';
     return;
   }
   el.className = 'sync-indicator pend';
@@ -3250,7 +3279,9 @@ function renderAgenda(){
   // ── Dashboard de hoy ──────────────────────────────────────────────────────
   const conPrecaucion=pts.filter(p=>p.seguridadClinica?.tienePrecaucion).length;
   const sinConsent=pts.filter(p=>!Array.isArray(p.consentimientos)||!p.consentimientos.some(c=>c.firmado)).length;
-  const sinSoapHoy=pts.filter(p=>{const soaps=Array.isArray(p.soap)?p.soap:[];return !soaps.some(s=>s.fecha===todayFmt());}).length;
+  // [GRUPO-A #12] comparación por día CANÓNICO (_diaCanon), no string crudo: una fecha en ISO ya no rompe el conteo
+  const _hoyC=_diaCanon(todayFmt());
+  const sinSoapHoy=pts.filter(p=>{const soaps=Array.isArray(p.soap)?p.soap:[];return !soaps.some(s=>{const c=s&&_diaCanon(s.fecha);return c&&c===_hoyC;});}).length;
   if(pts.length>0){
     html+=`<div class="section-card" style="margin-bottom:12px;background:linear-gradient(135deg,#F0F4FF,#E8EEF7)">
       <div style="padding:12px 14px">
@@ -5587,7 +5618,7 @@ function verMasPacientes_(btn){
   let list = FST_filtrarLista(fuenteVerMas, q);
   if(filtro==='hoy') list=list.filter(p=>p.date===todayISO);
   if(filtro==='precaucion') list=list.filter(p=>p.seguridadClinica?.tienePrecaucion);
-  if(filtro==='sin-soap') list=list.filter(p=>{const s=Array.isArray(p.soap)?p.soap:[];return !s.some(x=>x.fecha===todayFmt());});
+  if(filtro==='sin-soap'){ const _hoyC=_diaCanon(todayFmt()); list=list.filter(p=>{const s=Array.isArray(p.soap)?p.soap:[];return !s.some(x=>{const c=x&&_diaCanon(x.fecha);return c&&c===_hoyC;});}); } // [GRUPO-A #12] día canónico (c truthy: '' jamás casa con '')
 
   const siguiente = list.slice(offset, offset + LOTE);
   const abrirFn = FST_LISTA_ACTIVA ? 'FST_abrirPacienteDesdeLista' : 'openExpediente';
@@ -5698,7 +5729,7 @@ function renderPacientesLista(fuenteLista){
   let list=FST_filtrarLista(baseLista, q);   // ya viene RANKEADA (empieza-por > contiene > dx/terapeuta)
   if(filtro==='hoy') list=list.filter(p=>p.date===todayISO);
   if(filtro==='precaucion') list=list.filter(p=>p.seguridadClinica?.tienePrecaucion);
-  if(filtro==='sin-soap') list=list.filter(p=>{ const s=Array.isArray(p.soap)?p.soap:[]; return !s.some(x=>x.fecha===todayFmt()); });
+  if(filtro==='sin-soap'){ const _hoyC=_diaCanon(todayFmt()); list=list.filter(p=>{ const s=Array.isArray(p.soap)?p.soap:[]; return !s.some(x=>{const c=x&&_diaCanon(x.fecha);return c&&c===_hoyC;}); }); } // [GRUPO-A #12] día canónico (c truthy: '' jamás casa con '')
 
   let html;
   if(!list.length){
@@ -8697,7 +8728,10 @@ async function guardarSOAP(){
         // de la sesión con reintento (antes: fire-and-forget + .catch(()=>{}) que tragaba el error →
         // "sesiones en Firestore = 0" sin aviso). Offline → encolar directo, sin colgar 10 s.
         if(!navigator.onLine){
+          // [GRUPO-A #13] avisar que la copia en nube quedó pendiente (el ✅ de arriba habla de Sheets).
+          // DIFERIDO 2.6s: showToast reemplaza al anterior (vida 2.4s) — así se leen AMBOS mensajes.
           _encolarSoapActivo(p.id, nuevaSOAP);
+          setTimeout(function(){ showToast('⚠️ Copia en la nube pendiente — se sincronizará al reconectar','warning'); }, 2600);
         } else {
           try{
             const _rf = (typeof FST_guardarSesionFirestore === 'function')
@@ -8706,9 +8740,10 @@ async function guardarSOAP(){
             if(!_rf || !_rf.ok){
               const _rz=(_rf && _rf.reason)||'desconocido';
               // FLAG_OFF/NO_STAGING/SKIP_IMPORTADA = el espejo está apagado a propósito → no encolar.
-              if(!/FLAG_OFF|NO_STAGING|SKIP_IMPORTADA/.test(_rz)){ _encolarSoapActivo(p.id, nuevaSOAP); console.warn('[SOAP-act] dual-write falló, encolado:', _rz); }
+              // [GRUPO-A #13] al encolar por fallo real, avisar — antes solo console.warn invisible.
+              if(!/FLAG_OFF|NO_STAGING|SKIP_IMPORTADA/.test(_rz)){ _encolarSoapActivo(p.id, nuevaSOAP); setTimeout(function(){ showToast('⚠️ Copia en la nube pendiente — se reintentará','warning'); }, 2600); console.warn('[SOAP-act] dual-write falló, encolado:', _rz); }
             }
-          }catch(_err){ _encolarSoapActivo(p.id, nuevaSOAP); console.warn('[SOAP-act] dual-write excepción, encolado:', _err && _err.message); }
+          }catch(_err){ _encolarSoapActivo(p.id, nuevaSOAP); setTimeout(function(){ showToast('⚠️ Copia en la nube pendiente — se reintentará','warning'); }, 2600); console.warn('[SOAP-act] dual-write excepción, encolado:', _err && _err.message); }
         }
       }
     }).catch(()=>showToast('⚠️ Sin conexión — SOAP guardada solo en este equipo','warning'))
@@ -16372,6 +16407,11 @@ async function exportarPacientesCSV(){
   // Verificar permiso en backend antes de exportar
   try{
     const permiso = await callAppsScriptPrivado('validarPermisoExportacion', {});
+    // [GRUPO-A #8] corte de red ≠ permiso denegado: no mandar al usuario con el administrador por un blip
+    if(permiso && permiso.error==='RED_ERROR'){
+      showToastCritico_('⚠️ Sin conexión — no se pudo verificar el permiso. Intenta de nuevo.');
+      return;
+    }
     if(!permiso || !permiso.ok){
       showToastCritico_('⚠️ Sin permiso para exportar. Contacta al administrador.');
       return;
@@ -16432,6 +16472,11 @@ async function exportarExpedienteJSON(pacienteId){
   // Validar permiso en backend antes de generar JSON
   try{
     const permiso = await callAppsScriptPrivado('validarPermisoExportacion', {});
+    // [GRUPO-A #8] corte de red ≠ permiso denegado: no mandar al usuario con el administrador por un blip
+    if(permiso && permiso.error==='RED_ERROR'){
+      showToastCritico_('⚠️ Sin conexión — no se pudo verificar el permiso. Intenta de nuevo.');
+      return;
+    }
     if(!permiso || !permiso.ok){
       showToastCritico_('⚠️ Sin permiso para exportar. Contacta al administrador.');
       return;
