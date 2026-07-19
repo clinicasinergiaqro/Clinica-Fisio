@@ -3015,7 +3015,78 @@ document.addEventListener('visibilitychange', function(){
 // bloqueo por versión: nunca dejar la clínica sin poder trabajar.
 let _swUpdatePendiente = false;
 let _swRecargando = false;
-let _swHabiaController = false;
+// [FIX-AUTOUPDATE p5] Discriminador primera-instalación vs actualización por ESTADO de caches,
+// no por navigator.serviceWorker.controller (que en iOS PWA standalone puede ser null tras
+// restaurar el proceso — bug de WebKit — y mataba ambos paths de detección; por eso el banner
+// jamás apareció). Si al cargar YA existía un cache del shell, este dispositivo no es una
+// instalación limpia: la APARICIÓN posterior de un cache nuevo ES una actualización.
+let _swHabiaCacheShell = false;
+let _swCachesAlCargar = null;   // nombres de caches del shell al cargar (baseline); null = lectura falló
+var SW_CACHE_PREFIX = 'sinergia-shell-';   // DEBE coincidir con el prefijo de CACHE en sw.js
+function _cachesShell(){
+  try{
+    return caches.keys().then(function(keys){
+      return keys.filter(function(k){ return k.indexOf(SW_CACHE_PREFIX)===0; }).sort();
+    }).catch(function(){ return null; });
+  }catch(e){ return Promise.resolve(null); }
+}
+// [FIX-AUTOUPDATE p3] Anti-bucle de recarga, dos capas: (1) estructural — solo dispara la
+// APARICIÓN de un cache que no estaba en la foto de carga; tras recargar, la página nueva ya
+// lo tiene en su foto → no puede re-disparar (y el BORRADO del viejo en activate tampoco);
+// (2) freno persistente — la firma aplicada se guarda en localStorage (sobrevive a la recarga):
+// la MISMA firma no vuelve a recargar en automático; peor caso = banner visible, JAMÁS un loop.
+// El botón "Actualizar ahora" (acción del usuario) no pasa por este freno.
+var LS_SW_FIRMA_APLICADA = 'SW_FIRMA_APLICADA';
+var _swAplicandoUpdate = false;   // guard SÍNCRONO: los triggers llegan en ráfaga (visibility+online)
+function _recargarPorUpdate(){
+  if(_swAplicandoUpdate || _swRecargando) return;
+  _swAplicandoUpdate = true;
+  _cachesShell().then(function(ks){
+    ks = ks||[];
+    var base = _swCachesAlCargar;
+    var nuevos = base ? ks.filter(function(k){ return base.indexOf(k)===-1; }) : ks;
+    if(base && !nuevos.length){
+      // Nada más nuevo que lo que esta página ya cargó (evento tardío tras la recarga, o el
+      // activate borrando el cache viejo): recargar no aporta — se descarta el pendiente.
+      _swUpdatePendiente = false; _swAplicandoUpdate = false; return;
+    }
+    var firma = nuevos.sort().join('|');
+    try{
+      var previa = localStorage.getItem(LS_SW_FIRMA_APLICADA)||'';
+      if(firma && firma===previa){ _swAplicandoUpdate = false; mostrarBannerActualizacion(); return; }
+    }catch(e){}
+    // [FIX-AUTOUPDATE p1] RE-VERIFICACIÓN inmediatamente antes de recargar: entre el chequeo del
+    // caller y este punto hubo un await (caches.keys) — si en ese hueco el terapeuta empezó a
+    // escribir o entró una operación clínica, NO se recarga (banner y a esperar). Innegociable.
+    var _colasOk = (typeof _totalPendientesSync!=='function') || (_totalPendientesSync()===0);
+    if(!esSeguroRecargar() || !_colasOk){ _swAplicandoUpdate = false; mostrarBannerActualizacion(); return; }
+    try{ if(firma) localStorage.setItem(LS_SW_FIRMA_APLICADA, firma); }catch(e){}
+    _swRecargando = true;
+    try{ location.reload(); }catch(e2){ location.href = location.href; }
+  });
+}
+// [FIX-AUTOUPDATE p4] Revisor por ESTADO (el corazón del fix): cuando el SW nuevo se instala,
+// su cache nuevo aparece — un cambio DURABLE que caches.keys() puede leer en cualquier momento,
+// sin depender de eventos que iOS congela/pierde ni de controller. Los reg.update() periódicos
+// PROVOCAN la instalación; esto la DETECTA. Una vez detectado (pendiente) deja de sondear.
+function revisarCambioDeCaches(){
+  if(_swRecargando || _swUpdatePendiente) return;
+  if(!_swHabiaCacheShell || !_swCachesAlCargar){
+    // [FIX-AUTOUPDATE p5] RE-ARMADO: en la primera sesión de la vida del dispositivo (o si la
+    // lectura de caches falló al cargar), cuando el cache del shell ya exista se toma como
+    // BASELINE — no como update (cero recargas espurias en instalación limpia) — y el mecanismo
+    // queda armado para el resto de la sesión (un iPad recién provisto que queda abierto días).
+    _cachesShell().then(function(ks){ if(ks && ks.length){ _swCachesAlCargar = ks; _swHabiaCacheShell = true; } });
+    return;
+  }
+  _cachesShell().then(function(ks){
+    if(!ks) return;
+    var base = _swCachesAlCargar;
+    if(!ks.some(function(k){ return base.indexOf(k)===-1; })) return;   // solo APARICIÓN dispara
+    _swUpdatePendiente = true;
+    aplicarActualizacionSiSegura();
+  });
+}
 
 // Seguro recargar SOLO si: no hay texto sin guardar (_dirty), no hay operación clínica en curso, y
 // el foco NO está en un campo de escritura (textarea/input de texto ≠ buscador). En la duda, NO.
@@ -3062,8 +3133,10 @@ function aplicarActualizacionSiSegura(){
   // El botón "Actualizar ahora" (abajo) NO aplica este extra: el usuario puede forzar (colas durables).
   var _colasVacias = (typeof _totalPendientesSync!=='function') || (_totalPendientesSync()===0);
   if(esSeguroRecargar() && _colasVacias){
-    _swRecargando=true;
-    try{ location.reload(); }catch(e){ location.href=location.href; }
+    // [FIX-AUTOUPDATE p3] la recarga automática pasa por el freno anti-bucle (misma firma → banner).
+    // [FIX-AUTOUPDATE p1] las guardas clínicas de arriba quedan EXACTAMENTE iguales: jamás se llega
+    // aquí con nota a medio escribir, operación en vuelo, foco en textarea o colas con pendientes.
+    _recargarPorUpdate();
   } else {
     mostrarBannerActualizacion();
   }
@@ -3071,49 +3144,71 @@ function aplicarActualizacionSiSegura(){
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    _swHabiaController = !!navigator.serviceWorker.controller;
+    // [FIX-AUTOUPDATE p5] BASELINE de caches ANTES de registrar el SW — reemplaza a
+    // _swHabiaController. Registrar después de la foto cierra la carrera del arranque: un update
+    // que se instale durante la carga siempre aparece como cache NUEVO respecto a esta baseline.
+    // En instalación limpia la foto sale vacía → inerte hasta el re-armado del revisor (p5).
+    // Si caches.keys() falla, el freno persistente en localStorage sirve de evidencia de que NO
+    // es primera instalación (los paths por evento siguen vivos; el revisor se re-arma después).
+    _cachesShell().then(function(ks){
+      _swCachesAlCargar = (ks && ks.length) ? ks : null;
+      var previaLS = ''; try{ previaLS = localStorage.getItem(LS_SW_FIRMA_APLICADA)||''; }catch(e){}
+      _swHabiaCacheShell = !!((ks && ks.length) || previaLS);
+      _registrarSW();
+    });
+
+    // Momentos naturales para volver a intentar: regresar de segundo plano y reconectar.
+    // [FIX-AUTOUPDATE p4] en ambos, además del push (reg.update), corre el revisor por estado:
+    // si el SW nuevo se activó mientras la app estaba congelada y el evento se perdió, aquí se
+    // detecta igual — este es el caso real del iPad que los eventos nunca cubrieron.
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible'){
+        try{ navigator.serviceWorker.getRegistration().then(r=>{ if(r) r.update(); }).catch(()=>{}); }catch(e){}
+        revisarCambioDeCaches();
+        aplicarActualizacionSiSegura();
+      }
+    });
+    window.addEventListener('online', () => {
+      try{ navigator.serviceWorker.getRegistration().then(r=>{ if(r) r.update(); }).catch(()=>{}); }catch(e){}
+      revisarCambioDeCaches();
+      aplicarActualizacionSiSegura();
+    });
+    // Tic lento: [FIX-AUTOUPDATE p4] revisa estado y aplica si es seguro. Si quedó una
+    // actualización pendiente y el usuario ya terminó (guardó / dejó de escribir), se aplica
+    // sola sin que tenga que hacer nada.
+    setInterval(function(){ revisarCambioDeCaches(); aplicarActualizacionSiSegura(); }, 15000);
+  });
+  function _registrarSW(){
     navigator.serviceWorker.register('./sw.js').then(reg => {
       // Nueva versión detectada (updatefound): marcar pendiente y aplicar/avisar.
       reg.addEventListener('updatefound', () => {
         const nuevo = reg.installing;
         if (!nuevo) return;
         nuevo.addEventListener('statechange', () => {
-          // 'installed' + ya había controller = ES UNA ACTUALIZACIÓN (no la 1ª instalación del equipo).
-          if (nuevo.state === 'installed' && navigator.serviceWorker.controller) {
+          // [FIX-AUTOUPDATE p5] antes exigía navigator.serviceWorker.controller — null en iOS
+          // standalone tras restaurar proceso (bug WebKit) → este path JAMÁS disparaba. Ahora la
+          // evidencia de cache previa también vale como prueba de "no es primera instalación".
+          if (nuevo.state === 'installed' && (navigator.serviceWorker.controller || _swHabiaCacheShell)) {
             _swUpdatePendiente = true;
             aplicarActualizacionSiSegura();
           }
         });
       });
-      // reg.update() periódico: una PWA que lleva DÍAS abierta (iPad) detecta la versión nueva sin
-      // relanzarse — el caso real que dejaba a los dispositivos en código viejo.
+      // [FIX-AUTOUPDATE p4] reg.update() periódico SE CONSERVA tal cual: es quien PROVOCA la
+      // instalación del SW nuevo en una PWA que lleva días abierta. El revisor solo detecta.
       setInterval(() => { try{ reg.update(); }catch(e){} }, 20*60*1000);
     }).catch(()=>{});
 
-    // El SW nuevo tomó control (skipWaiting+claim) → aplicar. Solo si ANTES había controller
-    // (evita una recarga espuria en la primera instalación de la vida del dispositivo).
+    // El SW nuevo tomó control (skipWaiting+claim) → aplicar. [FIX-AUTOUPDATE p5] discriminador
+    // por estado de caches (no controller): evita recarga espuria en primera instalación SIN
+    // matar el update en iOS standalone.
     navigator.serviceWorker.addEventListener('controllerchange', () => {
       if (_swRecargando) return;
-      if (!_swHabiaController) return;
+      if (!_swHabiaCacheShell) return;
       _swUpdatePendiente = true;
       aplicarActualizacionSiSegura();
     });
-
-    // Momentos naturales para volver a intentar: regresar de segundo plano y reconectar.
-    document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'visible'){
-        try{ navigator.serviceWorker.getRegistration().then(r=>{ if(r) r.update(); }).catch(()=>{}); }catch(e){}
-        aplicarActualizacionSiSegura();
-      }
-    });
-    window.addEventListener('online', () => {
-      try{ navigator.serviceWorker.getRegistration().then(r=>{ if(r) r.update(); }).catch(()=>{}); }catch(e){}
-      aplicarActualizacionSiSegura();
-    });
-    // Tic lento: si quedó una actualización pendiente y el usuario ya terminó (guardó / dejó de
-    // escribir), se aplica sola sin que tenga que hacer nada. Solo actúa cuando es seguro.
-    setInterval(aplicarActualizacionSiSegura, 15000);
-  });
+  }
 }
 async function doLogout(){
   registrarAcceso('LOGOUT');
