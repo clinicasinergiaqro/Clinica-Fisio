@@ -4189,11 +4189,15 @@ async function _resolverPacientesCalendario(eventos){
   }
   var lista=[];
   try{ lista=(await FST_cargarIndicePacientes())||[]; }catch(_e){ lista=[]; }
+  // BUG A — homónimos: el índice guarda TODOS los docs por nombre (array), no first-wins.
+  // Antes solo el primero entraba; si dos históricos comparten nombre normalizado, el segundo
+  // (que podía tener la nota) quedaba invisible → falsa falta.
   var idxHistN={};
   lista.forEach(function(x){
     if(!x||!x.id) return;
     var k=_normPend(x.nombreNormalizado||x.name||'');
-    if(k && !idxHistN[k]) idxHistN[k]=x;
+    if(!k) return;
+    (idxHistN[k]||(idxHistN[k]=[])).push(x);
   });
   // v13: vinculaciones manuales (nombre→paciente) — máxima prioridad sobre el match automático.
   var vinculMap={};
@@ -4211,31 +4215,37 @@ async function _resolverPacientesCalendario(eventos){
     }
     var pAct=idxAct[clave];
     if(pAct){ out[clave]={pid:String(pAct.id||''), tipo:'activo', p:pAct}; return; }
-    var pH=idxHistN[clave];
-    if(!pH){
-      // mismo criterio de tokens (mín. 2 palabras) que el índice de históricos de pendientes
-      var tc=clave.split(' ').filter(Boolean);
-      if(tc.length>=2){
-        for(var i=0;i<lista.length;i++){
-          var nn=_normPend(lista[i].nombreNormalizado||lista[i].name||'');
-          if(nn && tc.every(function(w){ return nn.indexOf(w)!==-1; })){ pH=lista[i]; break; }
-        }
+    // BUG A — homónimos: juntar TODOS los históricos que casan el nombre (exacto + tokens), sin
+    // elegir uno a ciegas. La desambiguación por la nota del día se hace en _triangularCitasNotas.
+    var _cands=[], _seen={};
+    (Array.isArray(idxHistN[clave])?idxHistN[clave]:[]).forEach(function(x){ var id=String(x.id||''); if(id&&!_seen[id]){ _seen[id]=1; _cands.push(x); } });
+    var tc=clave.split(' ').filter(Boolean);
+    if(tc.length>=2){
+      for(var i=0;i<lista.length;i++){
+        var nn=_normPend(lista[i].nombreNormalizado||lista[i].name||'');
+        if(nn && tc.every(function(w){ return nn.indexOf(w)!==-1; })){ var id2=String(lista[i].id||''); if(id2&&!_seen[id2]){ _seen[id2]=1; _cands.push(lista[i]); } }
       }
     }
-    if(pH){
-      var _pidH=String(pH.id||'');
+    // Resolver cada candidato a su forma final (app_live_ ESPEJO → activo; histórico real → pid).
+    var _resCand=[];
+    _cands.forEach(function(x){
+      var _pidH=String(x.id||'');
       if(_pidH.indexOf('app_live_')===0){
-        // D1 — el match cayó en un ESPEJO de activo (no en un histórico real). Recuperar el activo por
-        // hash y usar su soap de Sheets (verdad COMPLETA). Si no hay activo (no debería: gate huérfanos=0),
-        // NO adjudicar al espejo parcial → 🔎 Revisar, nunca un rojo falso.
+        // D1 — match en un ESPEJO de activo: recuperar el activo por hash (verdad COMPLETA en Sheets).
+        // Sin activo (no debería: gate huérfanos=0) → NO adjudicar al espejo parcial (se ignora).
         var _actEsp=_espejoAActivo[_pidH];
-        if(_actEsp){ out[clave]={pid:String(_actEsp.id||''), tipo:'activo', p:_actEsp}; }
-        else { out[clave]={pid:null, tipo:null}; }
+        if(_actEsp) _resCand.push({pid:String(_actEsp.id||''), tipo:'activo', p:_actEsp});
       } else {
-        out[clave]={pid:_pidH, tipo:'historico'};
+        _resCand.push({pid:_pidH, tipo:'historico'});
       }
+    });
+    if(!_resCand.length){ out[clave]={pid:null, tipo:null}; }
+    else if(_resCand.length===1){ out[clave]=_resCand[0]; }
+    else {
+      // AMBIGUO: varios expedientes con el mismo nombre. NO adjudicar aquí — se pasan TODOS; el
+      // triangulador elige por la nota del día (1 con nota → ✅ ese; 0 o >1 → 🔎, nunca 🔴 a ciegas).
+      out[clave]={ pid:_resCand[0].pid, tipo:_resCand[0].tipo, ambiguo:true, candidatos:_resCand };
     }
-    else { out[clave]={pid:null, tipo:null}; }
   });
   return out;
 }
@@ -4245,12 +4255,24 @@ window._triUltimaHistCache={ts:0, map:{}, mapFechas:{}};
 async function _fetchUltimaSesionHistoricos(resueltos, forzar){
   var cache=window._triUltimaHistCache||{ts:0,map:{},mapFechas:{}};
   if(!cache.mapFechas) cache.mapFechas={};   // CAPA 3 — set de fechas por histórico (se lee del MISMO doc.get)
+  if(!cache.mapFechasCand) cache.mapFechasCand={};   // BUG A — fechas por-candidato de homónimos: {clave:{pid:{fechas,ultima}}}
   var fresco=(Date.now()-cache.ts)<REND_CACHE_TTL_MS;
-  var pendientes=[];
+  var pendientes=[], principalPid={};
   Object.keys(resueltos||{}).forEach(function(k){
     var r=resueltos[k];
-    if(!r || r.tipo!=='historico' || !r.pid) return;
-    if(forzar || !fresco || !(k in cache.map)) pendientes.push({clave:k, pid:r.pid});
+    if(!r) return;
+    // BUG A — para claves ambiguas se traen TODOS los históricos candidatos, no solo el principal;
+    // así _triangularCitasNotas puede contar cuál homónimo tiene la nota del día.
+    var pidsH=[];
+    if(r.ambiguo && Array.isArray(r.candidatos)){
+      r.candidatos.forEach(function(c){ if(c && c.tipo==='historico' && c.pid) pidsH.push(c.pid); });
+    } else if(r.tipo==='historico' && r.pid){ pidsH.push(r.pid); }
+    if(r.pid) principalPid[k]=r.pid;   // el principal (candidatos[0]) es el ÚNICO que siembra map/mapFechas (no unión)
+    var _need=(forzar || !fresco || !(k in cache.map));
+    pidsH.forEach(function(pid){
+      var _tieneCand=cache.mapFechasCand[k] && cache.mapFechasCand[k][pid];
+      if(_need || !_tieneCand) pendientes.push({clave:k, pid:pid});
+    });
   });
   if(pendientes.length){
     try{
@@ -4260,10 +4282,15 @@ async function _fetchUltimaSesionHistoricos(resueltos, forzar){
           try{
             var doc=await window._fstDb.collection('pacientes').doc(x.pid).get();
             var _d=(doc.exists && (doc.data()||{}))||{};
-            cache.map[x.clave]=String(_d.ultimaSesionLive||'');
-            // CAPA 3 — set COMPLETO de fechas (no solo la última). El consumidor lo normaliza al comparar.
-            cache.mapFechas[x.clave]=Array.isArray(_d.fechasSesiones)?_d.fechasSesiones:[];
-          }catch(_e){ cache.map[x.clave]=''; cache.mapFechas[x.clave]=[]; }
+            var _ult=String(_d.ultimaSesionLive||'');
+            var _fs=Array.isArray(_d.fechasSesiones)?_d.fechasSesiones:[];
+            // BUG A — por-candidato (desambiguación de homónimos por la nota del día).
+            if(!cache.mapFechasCand[x.clave]) cache.mapFechasCand[x.clave]={};
+            cache.mapFechasCand[x.clave][x.pid]={fechas:_fs, ultima:_ult};
+            // PRINCIPAL: SOLO candidatos[0] siembra map/mapFechas (compat con consumidores actuales).
+            // Los homónimos extra NO pisan mapFechas → NO se vuelve unión (Opción A, nunca B).
+            if(x.pid===principalPid[x.clave]){ cache.map[x.clave]=_ult; cache.mapFechas[x.clave]=_fs; }
+          }catch(_e){ if(x.pid===principalPid[x.clave]){ cache.map[x.clave]=''; cache.mapFechas[x.clave]=[]; } }
         }));
       }
     }catch(_e2){}
@@ -4324,7 +4351,7 @@ function _diaCanon(f){
   if(!d) return '';
   return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
 }
-function _triangularCitasNotas(eventos, resueltos, ultimaHist, asigMap, resueltas, fechasHist){
+function _triangularCitasNotas(eventos, resueltos, ultimaHist, asigMap, resueltas, fechasHist, candFechas){
   var porTer={};
   Object.keys(TERAPEUTA_CAL2COD).forEach(function(n){ porTer[n]={citas:0, conNota:0, sinNota:0, resueltas:0, sinNotaPacs:[], noIdentificados:0, noIdentPacs:[], atendidasOtro:[], tardias:0, tardiasPacs:[], enTiempo:0, enTiempoPacs:[], prePiso:0}; });
   var porDia={};   // VISTA-SEMANAL: desglose por día DD/MM/YYYY (mismo universo que la tabla: citas con terapeuta)
@@ -4337,7 +4364,7 @@ function _triangularCitasNotas(eventos, resueltos, ultimaHist, asigMap, resuelta
     var ddmm=_ddmmDeISOEvento(ev.inicio);
     var r=(resueltos||{})[clave]||{pid:null,tipo:null};
     // V2: nota POR PACIENTE — cualquier terapeuta cuenta (p.soap no se filtra por terapeuta)
-    var tiene=false, sMatch=null;
+    var tiene=false, sMatch=null, ambiguoSinResolver=false;
     var citaCanon=_diaCanon(ddmm);   // CAPA 3 — día de la cita normalizado (compara siempre en YYYY-MM-DD)
     // ── PISO DE FECHA: cita anterior al inicio de operación de la app (APP_INICIO_OPERACION)
     // → NO se evalúa: ni falta, ni ✅, ni denominador, ni porDia. El equipo no documentaba
@@ -4360,6 +4387,21 @@ function _triangularCitasNotas(eventos, resueltos, ultimaHist, asigMap, resuelta
       // Normaliza AMBOS lados (activos ya son DD/MM, pero robusto ante cualquier formato).
       sMatch=(Array.isArray(r.p.soap)?r.p.soap:[]).find(function(s){ return s && citaCanon && _diaCanon(s.fecha)===citaCanon; })||null;
       tiene=!!sMatch;
+    } else if(r.ambiguo && Array.isArray(r.candidatos)){
+      // BUG A — homónimos: NO adjudicar a ciegas. Contar cuántos candidatos tienen nota ESE día.
+      // 1 con nota → ✅ ese (la nota desambigua); 0 o >1 → 🔎 Revisar (ambiguoSinResolver), nunca 🔴.
+      var _cf=(candFechas&&candFechas[clave])||{};
+      var _conNotaCand=r.candidatos.filter(function(c){
+        if(!c) return false;
+        if(c.tipo==='activo' && c.p){ return !!(Array.isArray(c.p.soap)?c.p.soap:[]).find(function(s){ return s && citaCanon && _diaCanon(s.fecha)===citaCanon; }); }
+        if(c.tipo==='historico' && c.pid){ var d=_cf[c.pid]||{fechas:[],ultima:''}; var setC=(Array.isArray(d.fechas)?d.fechas.slice():[]); if(d.ultima) setC.push(d.ultima); return !!(citaCanon && setC.some(function(f){ return _diaCanon(f)===citaCanon; })); }
+        return false;
+      });
+      if(_conNotaCand.length===1){
+        tiene=true;
+        // Si el que casó es activo, recuperar sMatch para autoría/tardías (igual que la rama activo normal).
+        if(_conNotaCand[0].tipo==='activo' && _conNotaCand[0].p){ sMatch=(Array.isArray(_conNotaCand[0].p.soap)?_conNotaCand[0].p.soap:[]).find(function(s){ return s && citaCanon && _diaCanon(s.fecha)===citaCanon; })||null; }
+      } else { tiene=false; ambiguoSinResolver=true; }
     } else if(r.tipo==='historico'){
       // CAPA 3 — set COMPLETO de fechas del histórico (normalizado), no solo la última. DEGRADACIÓN:
       // si el doc no tiene fechasSesiones (aún sin backfill), cae a ultimaSesionLive, también normalizada
@@ -4379,8 +4421,8 @@ function _triangularCitasNotas(eventos, resueltos, ultimaHist, asigMap, resuelta
       var dd=porDia[ddmm]||(porDia[ddmm]={citas:0, conNota:0, sinNota:0});
       dd.citas++;
       // EXACTITUD: pid:null (no identificado) no entra al 🔴 del día — falso positivo hasta vincularlo.
-      // VENTANA 24H: la cita aún en tiempo tampoco pinta 🔴 en la columna del día.
-      if(tiene||resuelta) dd.conNota++; else if(r.pid && !enTiempo24) dd.sinNota++;
+      // VENTANA 24H: la cita aún en tiempo tampoco pinta 🔴. BUG A: homónimo ambiguo tampoco (va a 🔎).
+      if(tiene||resuelta) dd.conNota++; else if(r.pid && !enTiempo24 && !ambiguoSinResolver) dd.sinNota++;
     }
     porTer[ter].citas++;
     if(tiene){
@@ -4414,13 +4456,15 @@ function _triangularCitasNotas(eventos, resueltos, ultimaHist, asigMap, resuelta
       }
     }
     else if(resuelta){ porTer[ter].conNota++; porTer[ter].resueltas++; }
-    else if(!r.pid){
-      // EXACTITUD: nombre de calendario sin expediente → "🔎 Revisar", NO cuenta como falta.
+    else if(!r.pid || ambiguoSinResolver){
+      // EXACTITUD: sin expediente (pid:null) O homónimo ambiguo sin nota que desambigue → "🔎 Revisar",
+      // NO cuenta como falta (nunca 🔴 a ciegas). El chip ofrece vincular a mano al expediente correcto.
       porTer[ter].noIdentificados++;
       var kni='NI|'+ter+'|'+clave+'|'+ddmm;   // espacio de clave propio: nunca colisiona con sinNota real
       if(!vistosSinNota[kni]){
         vistosSinNota[kni]=true;
-        porTer[ter].noIdentPacs.push({nombre:ev.paciente||'(sin nombre)', pid:r.pid, tipo:r.tipo, fecha:ddmm});
+        // BUG A — ambiguo: pid:null en el chip para ofrecer "🔗 Vincular" (no "abrir" un homónimo adivinado).
+        porTer[ter].noIdentPacs.push({nombre:ev.paciente||'(sin nombre)', pid:(ambiguoSinResolver?null:r.pid), tipo:r.tipo, fecha:ddmm});
       }
     }
     else if(enTiempo24){
@@ -4942,8 +4986,9 @@ async function mostrarRendimientoEquipo(ventana, forzar){
   var resueltos=await _resolverPacientesCalendario(eventos);
   var ultimaHist=await _fetchUltimaSesionHistoricos(resueltos, !!forzar);
   var fechasHist=(window._triUltimaHistCache&&window._triUltimaHistCache.mapFechas)||{};   // CAPA 3
+  var candFechas=(window._triUltimaHistCache&&window._triUltimaHistCache.mapFechasCand)||{};   // BUG A — fechas por-candidato de homónimos
   var resueltas=await FST_leerCitasResueltas(!!forzar);
-  var tri=_triangularCitasNotas(eventos, resueltos, ultimaHist, asigMap, resueltas, fechasHist);
+  var tri=_triangularCitasNotas(eventos, resueltos, ultimaHist, asigMap, resueltas, fechasHist, candFechas);
   tri._diasDDMM=dias.map(_ddmmFromISO);   // VISTA-SEMANAL: orden de columnas (lunes primero)
   _tm('triangulación históricos', tTri);
   var etiqueta=(dias.length>1)?(_ddmmFromISO(dias[0])+' — '+_ddmmFromISO(dias[dias.length-1])):'Hoy';
