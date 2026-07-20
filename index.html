@@ -4513,6 +4513,7 @@ async function _resolverPacientesCalendario(eventos){
 // forzar=true relee todo. Máx 1 doc por paciente, en paralelo.
 window._triUltimaHistCache={ts:0, map:{}, mapFechas:{}};
 async function _fetchUltimaSesionHistoricos(resueltos, forzar){
+  window._triHistLecturaIncompleta = false;   // [COLD-GUARD] resetear SIEMPRE (aunque no haya pendientes): no arrastrar el "no confiable" de una corrida fría previa
   var cache=window._triUltimaHistCache||{ts:0,map:{},mapFechas:{}};
   if(!cache.mapFechas) cache.mapFechas={};   // CAPA 3 — set de fechas por histórico (se lee del MISMO doc.get)
   if(!cache.mapFechasCand) cache.mapFechasCand={};   // BUG A — fechas por-candidato de homónimos: {clave:{pid:{fechas,ultima}}}
@@ -4535,25 +4536,47 @@ async function _fetchUltimaSesionHistoricos(resueltos, forzar){
     });
   });
   if(pendientes.length){
+    // [COLD-GUARD] En frío la lectura del histórico puede fallar con permission-denied/unavailable
+    // (auth/reglas de Firestore aún no propagadas). Antes el catch ponía "sin fechas" → el histórico
+    // se contaba como SIN NOTA → FALSA FALTA (caso Luis Vicente 16/07). Ahora: (1) los fallos
+    // TRANSITORIOS se reintentan (recupera solo, sin cerrar/reabrir); (2) si tras los reintentos
+    // siguen fallando, se marca el reporte NO CONFIABLE (window._triHistLecturaIncompleta) para
+    // bloquear el PDF y avisar — jamás inventar faltas con datos incompletos.
     try{
       var ok=await FST_init();
       if(ok && window._fstDb){
-        await Promise.all(pendientes.map(async function(x){
-          try{
-            var doc=await window._fstDb.collection('pacientes').doc(x.pid).get();
-            var _d=(doc.exists && (doc.data()||{}))||{};
-            var _ult=String(_d.ultimaSesionLive||'');
-            var _fs=Array.isArray(_d.fechasSesiones)?_d.fechasSesiones:[];
-            // BUG A — por-candidato (desambiguación de homónimos por la nota del día).
-            if(!cache.mapFechasCand[x.clave]) cache.mapFechasCand[x.clave]={};
-            cache.mapFechasCand[x.clave][x.pid]={fechas:_fs, ultima:_ult};
-            // PRINCIPAL: SOLO candidatos[0] siembra map/mapFechas (compat con consumidores actuales).
-            // Los homónimos extra NO pisan mapFechas → NO se vuelve unión (Opción A, nunca B).
-            if(x.pid===principalPid[x.clave]){ cache.map[x.clave]=_ult; cache.mapFechas[x.clave]=_fs; }
-          }catch(_e){ if(x.pid===principalPid[x.clave]){ cache.map[x.clave]=''; cache.mapFechas[x.clave]=[]; } }
-        }));
-      }
-    }catch(_e2){}
+        var _porHacer = pendientes.slice();
+        for(var _int=0; _int<3 && _porHacer.length; _int++){
+          if(_int>0) await new Promise(function(r){ setTimeout(r, 600); });   // dar margen a que auth/reglas propaguen
+          var _fallaron = [];
+          await Promise.all(_porHacer.map(async function(x){
+            try{
+              var doc=await window._fstDb.collection('pacientes').doc(x.pid).get();
+              var _d=(doc.exists && (doc.data()||{}))||{};
+              var _ult=String(_d.ultimaSesionLive||'');
+              var _fs=Array.isArray(_d.fechasSesiones)?_d.fechasSesiones:[];
+              // BUG A — por-candidato (desambiguación de homónimos por la nota del día).
+              if(!cache.mapFechasCand[x.clave]) cache.mapFechasCand[x.clave]={};
+              cache.mapFechasCand[x.clave][x.pid]={fechas:_fs, ultima:_ult};
+              // PRINCIPAL: SOLO candidatos[0] siembra map/mapFechas (compat con consumidores actuales).
+              // Los homónimos extra NO pisan mapFechas → NO se vuelve unión (Opción A, nunca B).
+              if(x.pid===principalPid[x.clave]){ cache.map[x.clave]=_ult; cache.mapFechas[x.clave]=_fs; }
+            }catch(_e){
+              // [COLD-GUARD] CUALQUIER fallo de lectura (throw) → reintentar; JAMÁS concluir "sin nota"
+              // a ciegas por un error (Rev: un string de error no-transitorio sembraba falta silenciosa).
+              // Un doc que de verdad no existe NO lanza (doc.exists=false → {} → vacío legítimo, no cae aquí).
+              _fallaron.push(x);
+            }
+          }));
+          _porHacer = _fallaron;
+        }
+        if(_porHacer.length){
+          // tras los reintentos SIGUEN fallando → NO inventar faltas: marcar reporte no confiable.
+          window._triHistLecturaIncompleta = true;
+          _porHacer.forEach(function(x){ if(x.pid===principalPid[x.clave] && !(x.clave in cache.map)){ cache.map[x.clave]=''; cache.mapFechas[x.clave]=[]; } });
+        }
+      } else { window._triHistLecturaIncompleta = true; }   // FST no listo → históricos no confiables
+    }catch(_e2){ window._triHistLecturaIncompleta = true; }
     cache.ts=Date.now();
     window._triUltimaHistCache=cache;
   }
@@ -5258,10 +5281,18 @@ async function mostrarRendimientoEquipo(ventana, forzar){
   // 🔎 sin aviso. Detectarlo leyendo patientsDB DIRECTO (no el return de loadFromCloud), avisar VISIBLE y
   // marcar el snapshot para bloquear el PDF (no entregar números de activos no confiables).
   var _activosNoConf = !Array.isArray(patientsDB) || !patientsDB.length;
-  window._rendUltimo={ventana:ventana, datos:datos, tri:tri, etiqueta:etiqueta, ts:Date.now(), activosNoConfiables:_activosNoConf};
+  // [COLD-GUARD] históricos: si sus lecturas fallaron en frío (permission-denied tras reintentos),
+  // los históricos podrían pintar falsas faltas (caso Luis Vicente). Marcar NO confiable igual que activos.
+  var _histNoConf = !!window._triHistLecturaIncompleta;
+  var _datosNoConf = _activosNoConf || _histNoConf;
+  // [COLD-GUARD] activosNoConfiables lo lee el bloqueo del PDF; ahora lleva el flag COMBINADO
+  // (activos vacíos O históricos no leídos). datosNoConfiables es alias explícito para futuros lectores.
+  window._rendUltimo={ventana:ventana, datos:datos, tri:tri, etiqueta:etiqueta, ts:Date.now(), activosNoConfiables:_datosNoConf, datosNoConfiables:_datosNoConf};
   var _bannerAct = _activosNoConf
     ? '<div style="background:#FDECEA;border:2px solid #C0392B;color:#8a2114;border-radius:10px;padding:10px 12px;margin-bottom:10px;font-size:13px;font-weight:700">⚠️ No se pudieron cargar los pacientes activos — los números de ACTIVOS NO son confiables. Revisa tu conexión y toca 🔄 Actualizar. El PDF está deshabilitado en este estado.</div>'
-    : '';
+    : (_histNoConf
+      ? '<div style="background:#FDECEA;border:2px solid #C0392B;color:#8a2114;border-radius:10px;padding:10px 12px;margin-bottom:10px;font-size:13px;font-weight:700">⚠️ El historial de la nube aún se estaba cargando (arranque en frío) — algunos pacientes podrían salir como falta sin serlo. Toca 🔄 Actualizar en unos segundos. El PDF está deshabilitado en este estado.</div>'
+      : '');
   card.innerHTML=_bannerAct+_rendimientoHTML(datos, noId, ventana, etiqueta, aviso, {desdeCache:desdeCache, ts:cacheTs}, tri);
   _tm('total'+(desdeCache?' (desde cache)':''), t0);
 }
