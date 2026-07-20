@@ -301,7 +301,21 @@ async function FST_renderHistorialSoap(pid){
   try {
     const ok = await FST_init();
     if (!ok) { box.innerHTML = '<div style="padding:10px 14px;font-size:12px;color:var(--red)">⚠ No se pudo autenticar con Firestore staging.</div>'; return; }
-    const sesiones = await FST_fetchSesiones(pid);
+    let sesiones = await FST_fetchSesiones(pid);
+    // [COLD-START FIX] En arranque frío del iPad la 1ª lectura de la subcolección puede volver []
+    // porque el token/reglas de Firestore aún no propagaron (permission-denied que FST_fetchSesiones
+    // traga → []). Antes eso pintaba "Sin historial" y el usuario tenía que CERRAR Y REABRIR la app.
+    // Ahora reintentamos breve ANTES de concluir vacío, SOLO mientras la auth no se haya confirmado
+    // caliente en esta sesión (window._fstHistWarm). Un paciente realmente sin sesiones, con auth ya
+    // caliente, no reintenta (no lo penalizamos). Si el usuario cambia de paciente/tab, se aborta.
+    if (!sesiones.length && !window._fstHistWarm) {
+      for (let _i = 0; _i < 3 && !sesiones.length; _i++) {
+        await new Promise(function(r){ setTimeout(r, 500); });
+        if (window._fstRenderInFlight !== pid) return;   // el usuario cambió de tab/paciente: abortar
+        sesiones = await FST_fetchSesiones(pid);
+      }
+    }
+    if (sesiones.length) window._fstHistWarm = true;   // auth confirmada caliente → dejar de reintentar en vacíos
     _fstSesionesCache[pid] = sesiones;
     if (!sesiones.length) {
       const galeriaSola = await FST_renderGaleriaHistorica(pid);
@@ -1171,7 +1185,20 @@ async function getFirebaseIdToken(forceRefresh=false, diag=null){
   const ahora = Date.now();
   if(!forceRefresh && _idTokenCache && (ahora - _idTokenTs) < CACHE_MS) return _idTokenCache;
   try{
-    const user = (typeof fbAuth!=='undefined' && fbAuth) ? fbAuth.currentUser : null;
+    let user = (typeof fbAuth!=='undefined' && fbAuth) ? fbAuth.currentUser : null;
+    // [AUTH-REFRESH d] COLD-START: en el iPad, al abrir/reactivar la PWA, fbAuth.currentUser puede
+    // estar null unos instantes ANTES de que Firebase restaure la sesión persistida. Antes nos
+    // rendíamos de inmediato → callAppsScriptPrivado devolvía AUTH_REQUIRED → banner "Sesión expirada"
+    // FALSO. Ahora damos margen (máx 1.5s) a onAuthStateChanged; si de verdad no hay usuario, cae al
+    // mismo return null de siempre (semántica intacta). Solo se paga la espera en la ventana de arranque.
+    if(!user && typeof fbAuth!=='undefined' && fbAuth && typeof fbAuth.onAuthStateChanged==='function'){
+      user = await new Promise(function(res){
+        var listo=false, off=null;
+        try{ off = fbAuth.onAuthStateChanged(function(u){ if(!listo){ listo=true; if(off) off(); res(u||null); } }); }
+        catch(_e){ res(fbAuth.currentUser||null); return; }
+        setTimeout(function(){ if(!listo){ listo=true; if(off) off(); res((fbAuth&&fbAuth.currentUser)||null); } }, 1500);
+      });
+    }
     if(!user) return null;
     const tok = await user.getIdToken(forceRefresh);
     _idTokenCache = tok;
@@ -1194,10 +1221,11 @@ async function getFirebaseIdToken(forceRefresh=false, diag=null){
 
 // Llamada autenticada a Apps Script: exclusivamente con Firebase ID Token
 async function callAppsScriptPrivado(action, payload={}, opts={}){
-  // feat/appsscript-auth: token FRESCO en cada llamada — getIdToken(true) fuerza renovación
-  // (evita mandar un token a punto de expirar). opts.forceRefresh:false permite optar por cache.
+  // [AUTH-REFRESH a] Antes forzaba token FRESCO (getIdToken(true)) en CADA llamada → round-trip extra
+  // a Firebase por operación e hipersensibilidad a microcortes. Ahora usa el cache <50min por defecto
+  // (los tokens duran 1h; margen holgado). El retry (abajo) fuerza refresh SOLO si el backend rechaza.
   const _diag = {red:false};   // [GRUPO-A #8] colector POR-LLAMADA: inmune a llamadas concurrentes
-  const idToken = await getFirebaseIdToken(opts.forceRefresh!==false, _diag);
+  const idToken = await getFirebaseIdToken(opts.forceRefresh===true, _diag);
   if(!idToken){
     // [GRUPO-A #8] Sin token por RED (diag.red) → RED_ERROR honesto: saveDB reintenta/encola con
     // mensaje de red. Sin usuario o AUTH real (diag.red=false) pinta "Sesión expirada", como antes.
@@ -1214,7 +1242,20 @@ async function callAppsScriptPrivado(action, payload={}, opts={}){
       headers:{'Content-Type':'text/plain;charset=utf-8'},
       body: JSON.stringify({action, ...payload, idToken})
     });
-    return await r.json();
+    const data = await r.json();
+    // [AUTH-REFRESH b/c] El backend rechaza un token vencido con {ok:false, error:'Token …', code:401}.
+    // Antes ese 401 caía en reintento ciego SIN banner (loadFromCloud solo mira AUTH_REQUIRED). Ahora:
+    // 1er 401 → reintentar UNA vez con token FRESCO (el cache pudo quedar viejo). 2º 401 con token
+    // recién emitido = sesión REALMENTE muerta → AUTH_REQUIRED (loadFromCloud ya lo mapea al banner).
+    // El flag opts._retry es POR-LLAMADA (sin global, como _diag): garantiza a lo sumo 1 refresh forzado.
+    if(data && data.code===401){
+      if(!opts._retry){
+        _idTokenCache = null;   // invalida el cache para que el retry pida token nuevo
+        return await callAppsScriptPrivado(action, payload, Object.assign({}, opts, {forceRefresh:true, _retry:true}));
+      }
+      return {ok:false, error:'AUTH_REQUIRED', detalle:(data&&data.error)||''};
+    }
+    return data;
   }catch(e){
     return {ok:false, error:'RED_ERROR', msg:e.message};
   }
