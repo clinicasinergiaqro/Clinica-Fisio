@@ -1180,10 +1180,17 @@ function registrarAcceso(accion){
 // se autorizan con el ID Token de Firebase del usuario autenticado.
 let _idTokenCache = null;
 let _idTokenTs = 0;
+let _idTokenUid = null;   // [AUTH-REFRESH c] uid dueño del token cacheado — invalida el cache si cambia la cuenta
 async function getFirebaseIdToken(forceRefresh=false, diag=null){
   const CACHE_MS = 50*60*1000; // 50 min (los tokens duran 1h)
   const ahora = Date.now();
-  if(!forceRefresh && _idTokenCache && (ahora - _idTokenTs) < CACHE_MS) return _idTokenCache;
+  // [AUTH-REFRESH c] Servir el cache SOLO si es del MISMO usuario que está logueado ahora. Antes
+  // (forceRefresh=true por defecto) cada llamada traía token fresco, así que un cambio de cuenta
+  // (supervisor↔personal, o logout por rutas que no pasan por doLogout: L3096/auto-logout) se
+  // resolvía solo. Con el cache como default hay que atarlo al uid o serviríamos el token del
+  // usuario anterior hasta 50 min. currentUser null (cold-start) → no sirve cache, entra al refresh.
+  var _curUid = (typeof fbAuth!=='undefined' && fbAuth && fbAuth.currentUser) ? fbAuth.currentUser.uid : null;
+  if(!forceRefresh && _idTokenCache && _curUid && _idTokenUid===_curUid && (ahora - _idTokenTs) < CACHE_MS) return _idTokenCache;
   try{
     let user = (typeof fbAuth!=='undefined' && fbAuth) ? fbAuth.currentUser : null;
     // [AUTH-REFRESH d] COLD-START: en el iPad, al abrir/reactivar la PWA, fbAuth.currentUser puede
@@ -1203,6 +1210,7 @@ async function getFirebaseIdToken(forceRefresh=false, diag=null){
     const tok = await user.getIdToken(forceRefresh);
     _idTokenCache = tok;
     _idTokenTs = ahora;
+    _idTokenUid = user.uid || null;   // [AUTH-REFRESH c] atar el cache al usuario que lo generó
     return tok;
   }catch(e){
     // [GRUPO-A #8] Distinguir fallo de RED de fallo de AUTH: un microcorte al renovar el token NO
@@ -3371,7 +3379,7 @@ async function doLogout(){
   document.getElementById('nav-supervision').style.display='none';
   document.getElementById('nav-qa').style.display='none';
   try{ if(typeof fbAuth!=='undefined' && fbAuth.currentUser){ await fbAuth.signOut(); } }catch(e){ console.warn('signOut:',e.message); }
-  _idTokenCache = null; _idTokenTs = 0; // PASO 1: limpiar caché de ID token
+  _idTokenCache = null; _idTokenTs = 0; _idTokenUid = null; // PASO 1: limpiar caché de ID token (+ uid, AUTH-REFRESH c)
   currentUser=null;screenStack=[];
   document.getElementById('login-user').value='';document.getElementById('login-pass').value='';
   showScreen('screen-login',false);
