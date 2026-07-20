@@ -301,7 +301,21 @@ async function FST_renderHistorialSoap(pid){
   try {
     const ok = await FST_init();
     if (!ok) { box.innerHTML = '<div style="padding:10px 14px;font-size:12px;color:var(--red)">⚠ No se pudo autenticar con Firestore staging.</div>'; return; }
-    const sesiones = await FST_fetchSesiones(pid);
+    let sesiones = await FST_fetchSesiones(pid);
+    // [COLD-START FIX] En arranque frío del iPad la 1ª lectura de la subcolección puede volver []
+    // porque el token/reglas de Firestore aún no propagaron (permission-denied que FST_fetchSesiones
+    // traga → []). Antes eso pintaba "Sin historial" y el usuario tenía que CERRAR Y REABRIR la app.
+    // Ahora reintentamos breve ANTES de concluir vacío, SOLO mientras la auth no se haya confirmado
+    // caliente en esta sesión (window._fstHistWarm). Un paciente realmente sin sesiones, con auth ya
+    // caliente, no reintenta (no lo penalizamos). Si el usuario cambia de paciente/tab, se aborta.
+    if (!sesiones.length && !window._fstHistWarm) {
+      for (let _i = 0; _i < 3 && !sesiones.length; _i++) {
+        await new Promise(function(r){ setTimeout(r, 500); });
+        if (window._fstRenderInFlight !== pid) return;   // el usuario cambió de tab/paciente: abortar
+        sesiones = await FST_fetchSesiones(pid);
+      }
+    }
+    if (sesiones.length) window._fstHistWarm = true;   // auth confirmada caliente → dejar de reintentar en vacíos
     _fstSesionesCache[pid] = sesiones;
     if (!sesiones.length) {
       const galeriaSola = await FST_renderGaleriaHistorica(pid);
@@ -329,7 +343,7 @@ async function FST_renderHistorialSoap(pid){
   } catch (e) {
     console.error('[FST] renderHistorialSoap ERROR:', e.message);
     const b2 = document.getElementById('fst-hist-block'); if (b2) b2.innerHTML = '<div style="padding:10px 14px;font-size:12px;color:var(--red)">Error al cargar historial Firestore: ' + escapeHTML(e.message) + '</div>';
-  } finally { window._fstRenderInFlight = null; }
+  } finally { if (window._fstRenderInFlight === pid) window._fstRenderInFlight = null; } // [COLD-START] solo limpiar si SEGUIMOS siendo el render dueño: un abort del reintento no debe borrar el marcador de un render más nuevo (otro paciente)
 }
 
 /* ===== FST_ DUAL-WRITE (Fase 3) — notas nuevas/editadas → Firestore staging ===== */
@@ -391,6 +405,67 @@ async function FST_resolverPidPaciente(paciente) {
   if (cacheKey) window._fstPidCache[cacheKey] = pid;
   return { ok: true, pid: pid, matchType: 'app_live_fallback' };
 }
+// [LOOP-B #3] Guard ÚNICO para el base64 de items de media al persistir. Reemplaza los 4 strips que
+// ponían data:null a ciegas (borraban el único respaldo cuando la subida a Storage falló y no había
+// url/fbPath). Reglas por item:
+//   - hay puntero durable (url/fbPath) → data:null (el binario ya vive en Storage).
+//   - SIN puntero, destino Firestore (permitirB64=true), base64 ≤150KB Y dentro del presupuesto
+//     acumulado del doc → conservar (respaldo cross-device que IndexedDB —por dispositivo— no da).
+//   - en cualquier otro caso (grande, sin cupo, o destino localStorage) → data:null + pendienteSubida:true:
+//     localizable por mediaId, JAMÁS referencia vacía muda; el binario sigue en IndexedDB.
+// El PRESUPUESTO acumulado (budget.acc compartido por doc) evita que N items pequeños sumen >1MB y
+// rechacen el write entero. En localStorage (colas) permitirB64=false SIEMPRE (no inflar la cuota).
+var _B64_MAX_ITEM = 150*1024;         // tope por item (KB) para conservar en un doc Firestore
+var _B64_MAX_DOC_TOTAL = 600*1024;    // presupuesto acumulado de base64 por doc (deja aire para texto bajo 1MB)
+function _guardMediaItem(m, permitirB64, budget){
+  if(!m || typeof m!=='object') return m;
+  var esB64 = (typeof m.data==='string' && m.data.indexOf('data:')===0);
+  if(!esB64) return m;                                    // sin base64 (data null/ref): nada que decidir
+  var tienePuntero = !!(m.url || m.fbPath);
+  if(tienePuntero){ var a=Object.assign({},m); a.data=null; return a; }        // binario ya en Storage
+  budget = budget || {acc:0};
+  if(permitirB64 && m.data.length <= _B64_MAX_ITEM && (budget.acc + m.data.length) <= _B64_MAX_DOC_TOTAL){
+    budget.acc += m.data.length; return m;               // conservar respaldo pequeño dentro del presupuesto
+  }
+  // A punto de SOLTAR el base64 (grande, presupuesto AGOTADO, o destino localStorage) sin puntero:
+  // GARANTIZAR el binario en IndexedDB bajo su mediaId ANTES de marcar pendienteSubida, para que el
+  // replay (_reSubirMediaDesdeIDB → idbGet(mediaId)) SIEMPRE lo encuentre. Cubre el caso que el idbSet
+  // de handleSoapPhoto/handleMedia NO cubre: base64 conservado en Firestore y recargado en OTRO
+  // dispositivo (ahí no pasó por ese idbSet) que se re-edita y cae por presupuesto. Best-effort e
+  // idempotente (idbSet es local y rápido; el replay corre segundos después, al reconectar). Sin
+  // mediaId no hay forma de rescatar → se marca igual (referencia honesta, no vacía muda).
+  if(m.mediaId){ try{ idbSet(m.mediaId, m.data); }catch(_e){} }
+  var b=Object.assign({},m); b.data=null; b.pendienteSubida=true; return b;    // marcador localizable
+}
+function _guardMediaArray(arr, permitirB64, budget){
+  if(!Array.isArray(arr)) return arr;
+  budget = budget || {acc:0};
+  return arr.map(function(m){ return _guardMediaItem(m, permitirB64, budget); });
+}
+// [LOOP-B #2] Re-sube a Storage la media que quedó SOLO en IndexedDB (creada offline: Storage falló y
+// el binario cayó a IDB por handleSoapPhoto/handleMedia). Ruta DETERMINISTA por mediaId → un reintento
+// SOBREESCRIBE, nunca duplica archivos huérfanos. MUTA cada item (url/fbPath) para que el write lleve el
+// puntero y el próximo reintento no re-suba. Se llama en las DOS ramas del replay (nueva y edición).
+// Por-item try/catch: un fallo de subida NO cuenta como intento del write ni manda a fallidos; el item
+// se conserva y se reintenta en el próximo drenado. Devuelve nada (mutación in-place).
+async function _reSubirMediaDesdeIDB(pid, mediaArr){
+  if(!Array.isArray(mediaArr) || !mediaArr.length) return;
+  if(typeof fbStorage==='undefined' || !fbStorage) return;
+  for(const _m of mediaArr){
+    if(!_m || _m.url || !_m.mediaId) continue;   // ya tiene puntero, o sin mediaId no es rescatable
+    try{
+      var _b64 = await idbGet(_m.mediaId);
+      if(!_b64) continue;                        // binario no está en ESTE dispositivo (otro equipo / IDB purgada)
+      var _safe = String(_m.name||'archivo').replace(/[^\w.\-]+/g,'_');
+      var _path = 'clinica/sinergia/'+pid+'/soap/'+_m.mediaId+'_'+_safe;   // DETERMINISTA
+      var _blob = await (await fetch(_b64)).blob();
+      await fbStorage.ref(_path).put(_blob, {contentType: _m.type || 'application/octet-stream'});
+      _m.url = await fbStorage.ref(_path).getDownloadURL();
+      _m.fbPath = _path;
+      if(_m.pendienteSubida) delete _m.pendienteSubida;   // ya subió: la referencia dejó de estar pendiente
+    }catch(_su){ console.warn('[LOOP-B replay] re-subida media falló (se reintenta):', _m.mediaId, _su && _su.message); }
+  }
+}
 function FST_buildSesionPayload(sesion, modo) {
   const sg = x => (typeof x === 'object' && x) ? x : {};
   const payload = {
@@ -407,12 +482,15 @@ function FST_buildSesionPayload(sesion, modo) {
     // FIX SOAP-MEDIA (A): adjuntos de la nota — SOLO referencias (url/fbPath), NUNCA base64 al doc.
     // Mismo criterio de strip que el chunking a Sheets (data:null). Condicional: sin adjuntos no se escribe.
     ...(Array.isArray(sesion.media) && sesion.media.length ? {
-      media: sesion.media.map(m => ({
+      // [LOOP-B #3] pasar el base64 FUENTE al guard (antes: data:null a ciegas). Con Storage OK (url)
+      // el guard lo anula igual; solo cambia el caso offline-sin-puntero, que ya no pierde el respaldo.
+      // Presupuesto acumulado por-sesión (permitirB64=true) → nunca rebasa 1MB de doc.
+      media: _guardMediaArray(sesion.media.map(m => ({
         mediaId: (m && (m.mediaId || m.id)) || '', name: (m && m.name) || '', label: (m && m.label) || '',
         type: (m && m.type) || '', fecha: (m && m.fecha) || '',
         url: (m && m.url) || '', fbPath: (m && m.fbPath) || '',
-        data: null
-      }))
+        data: (m && typeof m.data==='string') ? m.data : null
+      })), true)
     } : {}),
     // DIAG 1 (BUG 2): episodio — condicional para no escribir null en sesiones sin episodio
     ...(sesion.motivoIndex != null ? { motivoIndex: Number(sesion.motivoIndex) } : {}),
@@ -1102,16 +1180,37 @@ function registrarAcceso(accion){
 // se autorizan con el ID Token de Firebase del usuario autenticado.
 let _idTokenCache = null;
 let _idTokenTs = 0;
+let _idTokenUid = null;   // [AUTH-REFRESH c] uid dueño del token cacheado — invalida el cache si cambia la cuenta
 async function getFirebaseIdToken(forceRefresh=false, diag=null){
   const CACHE_MS = 50*60*1000; // 50 min (los tokens duran 1h)
   const ahora = Date.now();
-  if(!forceRefresh && _idTokenCache && (ahora - _idTokenTs) < CACHE_MS) return _idTokenCache;
+  // [AUTH-REFRESH c] Servir el cache SOLO si es del MISMO usuario que está logueado ahora. Antes
+  // (forceRefresh=true por defecto) cada llamada traía token fresco, así que un cambio de cuenta
+  // (supervisor↔personal, o logout por rutas que no pasan por doLogout: L3096/auto-logout) se
+  // resolvía solo. Con el cache como default hay que atarlo al uid o serviríamos el token del
+  // usuario anterior hasta 50 min. currentUser null (cold-start) → no sirve cache, entra al refresh.
+  var _curUid = (typeof fbAuth!=='undefined' && fbAuth && fbAuth.currentUser) ? fbAuth.currentUser.uid : null;
+  if(!forceRefresh && _idTokenCache && _curUid && _idTokenUid===_curUid && (ahora - _idTokenTs) < CACHE_MS) return _idTokenCache;
   try{
-    const user = (typeof fbAuth!=='undefined' && fbAuth) ? fbAuth.currentUser : null;
+    let user = (typeof fbAuth!=='undefined' && fbAuth) ? fbAuth.currentUser : null;
+    // [AUTH-REFRESH d] COLD-START: en el iPad, al abrir/reactivar la PWA, fbAuth.currentUser puede
+    // estar null unos instantes ANTES de que Firebase restaure la sesión persistida. Antes nos
+    // rendíamos de inmediato → callAppsScriptPrivado devolvía AUTH_REQUIRED → banner "Sesión expirada"
+    // FALSO. Ahora damos margen (máx 1.5s) a onAuthStateChanged; si de verdad no hay usuario, cae al
+    // mismo return null de siempre (semántica intacta). Solo se paga la espera en la ventana de arranque.
+    if(!user && typeof fbAuth!=='undefined' && fbAuth && typeof fbAuth.onAuthStateChanged==='function'){
+      user = await new Promise(function(res){
+        var listo=false, off=null;
+        try{ off = fbAuth.onAuthStateChanged(function(u){ if(!listo){ listo=true; if(off) off(); res(u||null); } }); }
+        catch(_e){ res(fbAuth.currentUser||null); return; }
+        setTimeout(function(){ if(!listo){ listo=true; if(off) off(); res((fbAuth&&fbAuth.currentUser)||null); } }, 1500);
+      });
+    }
     if(!user) return null;
     const tok = await user.getIdToken(forceRefresh);
     _idTokenCache = tok;
     _idTokenTs = ahora;
+    _idTokenUid = user.uid || null;   // [AUTH-REFRESH c] atar el cache al usuario que lo generó
     return tok;
   }catch(e){
     // [GRUPO-A #8] Distinguir fallo de RED de fallo de AUTH: un microcorte al renovar el token NO
@@ -1130,10 +1229,11 @@ async function getFirebaseIdToken(forceRefresh=false, diag=null){
 
 // Llamada autenticada a Apps Script: exclusivamente con Firebase ID Token
 async function callAppsScriptPrivado(action, payload={}, opts={}){
-  // feat/appsscript-auth: token FRESCO en cada llamada — getIdToken(true) fuerza renovación
-  // (evita mandar un token a punto de expirar). opts.forceRefresh:false permite optar por cache.
+  // [AUTH-REFRESH a] Antes forzaba token FRESCO (getIdToken(true)) en CADA llamada → round-trip extra
+  // a Firebase por operación e hipersensibilidad a microcortes. Ahora usa el cache <50min por defecto
+  // (los tokens duran 1h; margen holgado). El retry (abajo) fuerza refresh SOLO si el backend rechaza.
   const _diag = {red:false};   // [GRUPO-A #8] colector POR-LLAMADA: inmune a llamadas concurrentes
-  const idToken = await getFirebaseIdToken(opts.forceRefresh!==false, _diag);
+  const idToken = await getFirebaseIdToken(opts.forceRefresh===true, _diag);
   if(!idToken){
     // [GRUPO-A #8] Sin token por RED (diag.red) → RED_ERROR honesto: saveDB reintenta/encola con
     // mensaje de red. Sin usuario o AUTH real (diag.red=false) pinta "Sesión expirada", como antes.
@@ -1150,7 +1250,20 @@ async function callAppsScriptPrivado(action, payload={}, opts={}){
       headers:{'Content-Type':'text/plain;charset=utf-8'},
       body: JSON.stringify({action, ...payload, idToken})
     });
-    return await r.json();
+    const data = await r.json();
+    // [AUTH-REFRESH b/c] El backend rechaza un token vencido con {ok:false, error:'Token …', code:401}.
+    // Antes ese 401 caía en reintento ciego SIN banner (loadFromCloud solo mira AUTH_REQUIRED). Ahora:
+    // 1er 401 → reintentar UNA vez con token FRESCO (el cache pudo quedar viejo). 2º 401 con token
+    // recién emitido = sesión REALMENTE muerta → AUTH_REQUIRED (loadFromCloud ya lo mapea al banner).
+    // El flag opts._retry es POR-LLAMADA (sin global, como _diag): garantiza a lo sumo 1 refresh forzado.
+    if(data && data.code===401){
+      if(!opts._retry){
+        _idTokenCache = null;   // invalida el cache para que el retry pida token nuevo
+        return await callAppsScriptPrivado(action, payload, Object.assign({}, opts, {forceRefresh:true, _retry:true}));
+      }
+      return {ok:false, error:'AUTH_REQUIRED', detalle:(data&&data.error)||''};
+    }
+    return data;
   }catch(e){
     return {ok:false, error:'RED_ERROR', msg:e.message};
   }
@@ -1581,13 +1694,15 @@ async function _persistirHistoricoFirestore(p, camposHist){
     // fotos/docs: strip de base64 top-level (mismo criterio que ejercicios arriba) — el fallback
     // offline guarda 'data' base64; escribirlo podría pasar 1MB/doc y rechazar el Write 2 entero.
     // La referencia persistente (url/fbPath/mediaId) se conserva; el base64 vive en IndexedDB.
-    var _stripB64 = function(x){
-      if(x && typeof x.data==='string' && x.data.indexOf('data:')===0){ var c=Object.assign({},x); c.data=null; return c; }
-      return x;
-    };
-    if(Array.isArray(p.estudiosDocs))    outCl.estudiosDocs = p.estudiosDocs;
-    if(Array.isArray(p.fotos))           outCl.fotos = p.fotos.map(_stripB64);
-    if(Array.isArray(p.docs))            outCl.docs  = p.docs.map(_stripB64);
+    // [LOOP-B #3] antes anulaba data SIEMPRE que había base64, aun sin url/fbPath → si la subida a
+    // Storage falló, ese base64 (único respaldo) se perdía. Ahora delega en el guard: conserva el
+    // respaldo pequeño sin puntero, marca pendienteSubida el grande, y sigue anulando lo que ya está en Storage.
+    // [LOOP-B #3] destino Firestore (doc del paciente) → permitirB64=true con PRESUPUESTO COMPARTIDO
+    // entre estudiosDocs+fotos+docs para que la SUMA nunca rebase 1MB de doc (Rev A/B: cap acumulado).
+    var _budCl = {acc:0};
+    if(Array.isArray(p.estudiosDocs))    outCl.estudiosDocs = _guardMediaArray(p.estudiosDocs, true, _budCl);
+    if(Array.isArray(p.fotos))           outCl.fotos = _guardMediaArray(p.fotos, true, _budCl);
+    if(Array.isArray(p.docs))            outCl.docs  = _guardMediaArray(p.docs, true, _budCl);
     // ── LOOP B: filtro "solo lo que el usuario tocó" ──
     if(Array.isArray(camposHist)){
       Object.keys(outEj).forEach(function(k){ if(camposHist.indexOf(k)===-1) delete outEj[k]; });
@@ -1708,13 +1823,22 @@ function _encolarSoapHistorico(sid, pid, payload){
   }catch(e){ console.warn('[SOAP-hist] no se pudo encolar:', e && e.message); }
 }
 // Bug B fix — cola local para NOTAS NUEVAS de históricos cuyo write a Firestore falló.
-// (media no se guarda aquí: FST_buildSesionPayload no la usa; evita inflar localStorage.)
+// [LOOP-B #2] Antes: `delete sLimpia.media` → el snapshot iba sin fotos, el replay reconstruía la
+// sesión sin media y los archivos quedaban huérfanos en Storage/IDB. Ahora se conservan REFERENCIAS
+// (mediaId+metadatos, data:null) — el base64 ya vive en IndexedDB (handleSoapPhoto idbSet), así que
+// las refs pesan ~200 bytes y respetan la cuota de localStorage que motivó el delete. El replay
+// re-sube desde IDB y puebla url/fbPath.
 function _encolarSoapHistoricoNueva(pid, sesion){
   try{
     var q = JSON.parse(localStorage.getItem('COLA_SYNC_HIST')||'[]');
     if(!Array.isArray(q)) q = [];
     var sid = String((sesion && sesion.id) || '');
-    var sLimpia = Object.assign({}, sesion); delete sLimpia.media;
+    var sLimpia = Object.assign({}, sesion);
+    var _med = Array.isArray(sesion && sesion.media) ? sesion.media : [];
+    sLimpia.media = _med.map(function(m){ return {
+      mediaId:(m&&(m.mediaId||m.id))||'', name:(m&&m.name)||'', label:(m&&m.label)||'',
+      type:(m&&m.type)||'', fecha:(m&&m.fecha)||'', url:(m&&m.url)||'', fbPath:(m&&m.fbPath)||'', data:null
+    }; });
     q = q.filter(function(it){ return !(it && it.tipo==='nueva' && String(it.sesion && it.sesion.id)===sid); });
     q.push({tipo:'nueva', pid:pid, sesion:sLimpia, ts:Date.now()});
     localStorage.setItem('COLA_SYNC_HIST', JSON.stringify(q));
@@ -1761,6 +1885,7 @@ async function drenarColaSoapHistorico(){
           // FST_buildSesionPayload recrea los serverTimestamp (no serializables en la cola).
           if(!window._fstDb && typeof FST_init==='function') await FST_init();
           if(!window._fstDb) throw new Error('unavailable: firestore-no-disponible'); // temporal → reintenta
+          await _reSubirMediaDesdeIDB(it.pid, it.sesion && it.sesion.media);   // [LOOP-B #2] rescate de fotos offline
           var sesPayload = FST_buildSesionPayload(it.sesion, 'nueva');
           await window._fstDb.collection('pacientes').doc(it.pid).collection('sesiones').doc(String(it.sesion.id)).set(_sinUndefined(sesPayload), { merge:true });
           // CAPA 3 — sumar la fecha al set del doc padre (arrayUnion). Solo fechasSesiones (no toca
@@ -1771,6 +1896,10 @@ async function drenarColaSoapHistorico(){
             catch(_fs){ console.warn('[Capa3] fechasSesiones (replay nueva) no se pudo escribir:', _fs && _fs.message); }
           }
         } else {
+          // [LOOP-B #2] simetría con la rama nueva: re-subir fotos que quedaron en IDB en una EDICIÓN
+          // offline, ANTES de escribir el payload (muta it.payload.media → el write lleva url/fbPath).
+          if(!window._fstDb && typeof FST_init==='function') await FST_init();
+          await _reSubirMediaDesdeIDB(it.pid, it.payload && it.payload.media);
           await _guardarEdicionSoapHistorico(it.sid, it.pid, it.payload);
         }
         // éxito → no se re-encola
@@ -1898,6 +2027,11 @@ async function drenarColaSoapActivo(){
 function _stripB64Profundo(v){
   if(Array.isArray(v)) return v.map(_stripB64Profundo);
   if(v && typeof v==='object'){
+    // [LOOP-B #3] si el objeto ES un item de media (tiene data base64), decidir con el guard de
+    // puntero+umbral en vez de anular a ciegas (antes: cualquier data:>2048 → null borraba el respaldo).
+    // [LOOP-B #3] destino localStorage (cola HIST_DOC) → permitirB64=FALSE: NUNCA conserva base64 en
+    // localStorage (Rev B/C: cuota). Sin puntero → data:null + pendienteSubida; el binario sigue en IDB.
+    if(typeof v.data==='string' && v.data.indexOf('data:')===0){ return _guardMediaItem(v, false); }
     var o={};
     for(var k in v){
       if(!Object.prototype.hasOwnProperty.call(v,k)) continue;
@@ -3245,7 +3379,7 @@ async function doLogout(){
   document.getElementById('nav-supervision').style.display='none';
   document.getElementById('nav-qa').style.display='none';
   try{ if(typeof fbAuth!=='undefined' && fbAuth.currentUser){ await fbAuth.signOut(); } }catch(e){ console.warn('signOut:',e.message); }
-  _idTokenCache = null; _idTokenTs = 0; // PASO 1: limpiar caché de ID token
+  _idTokenCache = null; _idTokenTs = 0; _idTokenUid = null; // PASO 1: limpiar caché de ID token (+ uid, AUTH-REFRESH c)
   currentUser=null;screenStack=[];
   document.getElementById('login-user').value='';document.getElementById('login-pass').value='';
   showScreen('screen-login',false);
@@ -8508,11 +8642,12 @@ async function guardarSOAP(){
         ...(_dictadoH!=null ? { dictado:_dictadoH } : {}),
         ...(datosNota.dictadoUnico!=null ? { dictadoUnico:datosNota.dictadoUnico } : (notaH.dictadoUnico!=null ? { dictadoUnico:notaH.dictadoUnico } : {})),
         ...(datosNota.dictadoV2!=null ? { dictadoV2:datosNota.dictadoV2 } : (notaH.dictadoV2!=null ? { dictadoV2:notaH.dictadoV2 } : {})),
-        ...(_mediaH ? { media:_mediaH.map(function(m){ return {
+        ...(_mediaH ? { media:_guardMediaArray(_mediaH.map(function(m){ return {
           mediaId:(m&&(m.mediaId||m.id))||'', name:(m&&m.name)||'', label:(m&&m.label)||'',
           type:(m&&m.type)||'', fecha:(m&&m.fecha)||'',
-          url:(m&&m.url)||'', fbPath:(m&&m.fbPath)||'', data:null
-        }; }) } : {}),
+          url:(m&&m.url)||'', fbPath:(m&&m.fbPath)||'',
+          data:(m&&typeof m.data==='string')?m.data:null   // [LOOP-B #3] base64 fuente al guard (antes: null a ciegas)
+        }; }), false) } : {}),   // permitirB64=FALSE: payloadH va a la cola de EDICIÓN (localStorage) → nunca base64; el replay re-sube desde IDB
         updatedAt:new Date().toISOString()
       };
       const cacheList=_fstSesionesCache[pidH];
@@ -15331,7 +15466,7 @@ async function qaProbarConexion(){
   try{
     const r=await qaFetchPrivado('getPacientes');
     const d=await r.json();
-    if(d.error&&d.code===401){
+    if(d.error==='AUTH_REQUIRED' || (d.error&&d.code===401)){   // [AUTH-REFRESH] el nuevo mapeo devuelve AUTH_REQUIRED sin code tras el 2º 401
       QA_RESULTADOS.conexion=false;
       QA_RESULTADOS.error='Token rechazado por el servidor';
     } else {
