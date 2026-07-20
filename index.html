@@ -4562,10 +4562,10 @@ async function _fetchUltimaSesionHistoricos(resueltos, forzar){
               // Los homónimos extra NO pisan mapFechas → NO se vuelve unión (Opción A, nunca B).
               if(x.pid===principalPid[x.clave]){ cache.map[x.clave]=_ult; cache.mapFechas[x.clave]=_fs; }
             }catch(_e){
-              var _m=String((_e&&(_e.code||_e.message))||'');
-              if(/permission-denied|unavailable|unauthenticated|deadline|Missing or insufficient/i.test(_m)){
-                _fallaron.push(x);   // TRANSITORIO (frío) → reintentar, NO concluir "sin nota"
-              } else if(x.pid===principalPid[x.clave]){ cache.map[x.clave]=''; cache.mapFechas[x.clave]=[]; }  // error genuino: vacío como antes
+              // [COLD-GUARD] CUALQUIER fallo de lectura (throw) → reintentar; JAMÁS concluir "sin nota"
+              // a ciegas por un error (Rev: un string de error no-transitorio sembraba falta silenciosa).
+              // Un doc que de verdad no existe NO lanza (doc.exists=false → {} → vacío legítimo, no cae aquí).
+              _fallaron.push(x);
             }
           }));
           _porHacer = _fallaron;
@@ -5285,7 +5285,9 @@ async function mostrarRendimientoEquipo(ventana, forzar){
   // los históricos podrían pintar falsas faltas (caso Luis Vicente). Marcar NO confiable igual que activos.
   var _histNoConf = !!window._triHistLecturaIncompleta;
   var _datosNoConf = _activosNoConf || _histNoConf;
-  window._rendUltimo={ventana:ventana, datos:datos, tri:tri, etiqueta:etiqueta, ts:Date.now(), activosNoConfiables:_datosNoConf};
+  // [COLD-GUARD] activosNoConfiables lo lee el bloqueo del PDF; ahora lleva el flag COMBINADO
+  // (activos vacíos O históricos no leídos). datosNoConfiables es alias explícito para futuros lectores.
+  window._rendUltimo={ventana:ventana, datos:datos, tri:tri, etiqueta:etiqueta, ts:Date.now(), activosNoConfiables:_datosNoConf, datosNoConfiables:_datosNoConf};
   var _bannerAct = _activosNoConf
     ? '<div style="background:#FDECEA;border:2px solid #C0392B;color:#8a2114;border-radius:10px;padding:10px 12px;margin-bottom:10px;font-size:13px;font-weight:700">⚠️ No se pudieron cargar los pacientes activos — los números de ACTIVOS NO son confiables. Revisa tu conexión y toca 🔄 Actualizar. El PDF está deshabilitado en este estado.</div>'
     : (_histNoConf
