@@ -413,6 +413,14 @@ function _guardMediaItem(m, permitirB64, budget){
   if(permitirB64 && m.data.length <= _B64_MAX_ITEM && (budget.acc + m.data.length) <= _B64_MAX_DOC_TOTAL){
     budget.acc += m.data.length; return m;               // conservar respaldo pequeño dentro del presupuesto
   }
+  // A punto de SOLTAR el base64 (grande, presupuesto AGOTADO, o destino localStorage) sin puntero:
+  // GARANTIZAR el binario en IndexedDB bajo su mediaId ANTES de marcar pendienteSubida, para que el
+  // replay (_reSubirMediaDesdeIDB → idbGet(mediaId)) SIEMPRE lo encuentre. Cubre el caso que el idbSet
+  // de handleSoapPhoto/handleMedia NO cubre: base64 conservado en Firestore y recargado en OTRO
+  // dispositivo (ahí no pasó por ese idbSet) que se re-edita y cae por presupuesto. Best-effort e
+  // idempotente (idbSet es local y rápido; el replay corre segundos después, al reconectar). Sin
+  // mediaId no hay forma de rescatar → se marca igual (referencia honesta, no vacía muda).
+  if(m.mediaId){ try{ idbSet(m.mediaId, m.data); }catch(_e){} }
   var b=Object.assign({},m); b.data=null; b.pendienteSubida=true; return b;    // marcador localizable
 }
 function _guardMediaArray(arr, permitirB64, budget){
