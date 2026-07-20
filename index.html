@@ -343,7 +343,7 @@ async function FST_renderHistorialSoap(pid){
   } catch (e) {
     console.error('[FST] renderHistorialSoap ERROR:', e.message);
     const b2 = document.getElementById('fst-hist-block'); if (b2) b2.innerHTML = '<div style="padding:10px 14px;font-size:12px;color:var(--red)">Error al cargar historial Firestore: ' + escapeHTML(e.message) + '</div>';
-  } finally { window._fstRenderInFlight = null; }
+  } finally { if (window._fstRenderInFlight === pid) window._fstRenderInFlight = null; } // [COLD-START] solo limpiar si SEGUIMOS siendo el render dueño: un abort del reintento no debe borrar el marcador de un render más nuevo (otro paciente)
 }
 
 /* ===== FST_ DUAL-WRITE (Fase 3) — notas nuevas/editadas → Firestore staging ===== */
@@ -15458,7 +15458,7 @@ async function qaProbarConexion(){
   try{
     const r=await qaFetchPrivado('getPacientes');
     const d=await r.json();
-    if(d.error&&d.code===401){
+    if(d.error==='AUTH_REQUIRED' || (d.error&&d.code===401)){   // [AUTH-REFRESH] el nuevo mapeo devuelve AUTH_REQUIRED sin code tras el 2º 401
       QA_RESULTADOS.conexion=false;
       QA_RESULTADOS.error='Token rechazado por el servidor';
     } else {
