@@ -5447,6 +5447,7 @@ async function generarPDFRendimiento(terapeuta){
   var noIdent=t.noIdentificados||0, tardias=t.tardias||0;
   // VENTANA 24H + PISO: fuera del denominador ambas; se reportan con transparencia.
   var enTiempo=t.enTiempo||0, prePiso=t.prePiso||0;
+  var noAcudio=t.noAcudio||0;   // [NO-ACUDIÓ] fuera del denominador; transparencia en el PDF
   var atendidasOtro=Array.isArray(t.atendidasOtro)?t.atendidasOtro:[];
   var cod=(typeof TERAPEUTA_CAL2COD!=='undefined' && TERAPEUTA_CAL2COD[n]) ? TERAPEUTA_CAL2COD[n] : String(n).toUpperCase();
   var info=(typeof TERAPEUTAS_INFO!=='undefined' && TERAPEUTAS_INFO[cod]) ? TERAPEUTAS_INFO[cod] : {nombreCompleto:n};
@@ -5493,6 +5494,7 @@ async function generarPDFRendimiento(terapeuta){
   campo('Calidad promedio', score==null ? '—' : (score+' / 100'));
   campo('Notas fuera de 24 h', tardias);
   campo('En tiempo (últimas 24 h)', enTiempo);
+  campo('No acudió (excluidas)', noAcudio);
   campo('Atendidas por otro', atendidasOtro.length);
   y+=2;
 
@@ -5533,6 +5535,7 @@ async function generarPDFRendimiento(terapeuta){
   parrafo('Solo se contabilizan citas a partir del '+_ddmmFromISO(APP_INICIO_OPERACION)+', fecha en que el equipo comenzó a documentar en la app.');
   if(prePiso>0){ parrafo(prePiso+' cita'+(prePiso!==1?'s':'')+' del período anterior'+(prePiso!==1?'es':'')+' a esa fecha — excluida'+(prePiso!==1?'s':'')+' del cálculo.'); }
   if(noIdent>0){ parrafo(noIdent+' cita'+(noIdent!==1?'s':'')+' sin identificar en el calendario del período — no contada'+(noIdent!==1?'s':'')+' como falta; requiere'+(noIdent!==1?'n':'')+' vincular el nombre a un expediente.'); }
+  if(noAcudio>0){ parrafo(noAcudio+' cita'+(noAcudio!==1?'s':'')+' marcada'+(noAcudio!==1?'s':'')+' como "no acudió" (el paciente no se presentó) — excluida'+(noAcudio!==1?'s':'')+' del cálculo, no cuenta'+(noAcudio!==1?'n':'')+' como falta.'); }
   doc.setTextColor(40,40,40);
 
   // Nombre de archivo limpio para WhatsApp: terapeuta (nombre corto) + fecha de emisión.
