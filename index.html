@@ -4513,6 +4513,7 @@ async function _resolverPacientesCalendario(eventos){
 // forzar=true relee todo. Máx 1 doc por paciente, en paralelo.
 window._triUltimaHistCache={ts:0, map:{}, mapFechas:{}};
 async function _fetchUltimaSesionHistoricos(resueltos, forzar){
+  window._triHistLecturaIncompleta = false;   // [COLD-GUARD] resetear SIEMPRE (aunque no haya pendientes): no arrastrar el "no confiable" de una corrida fría previa
   var cache=window._triUltimaHistCache||{ts:0,map:{},mapFechas:{}};
   if(!cache.mapFechas) cache.mapFechas={};   // CAPA 3 — set de fechas por histórico (se lee del MISMO doc.get)
   if(!cache.mapFechasCand) cache.mapFechasCand={};   // BUG A — fechas por-candidato de homónimos: {clave:{pid:{fechas,ultima}}}
@@ -4541,7 +4542,6 @@ async function _fetchUltimaSesionHistoricos(resueltos, forzar){
     // TRANSITORIOS se reintentan (recupera solo, sin cerrar/reabrir); (2) si tras los reintentos
     // siguen fallando, se marca el reporte NO CONFIABLE (window._triHistLecturaIncompleta) para
     // bloquear el PDF y avisar — jamás inventar faltas con datos incompletos.
-    window._triHistLecturaIncompleta = false;
     try{
       var ok=await FST_init();
       if(ok && window._fstDb){
