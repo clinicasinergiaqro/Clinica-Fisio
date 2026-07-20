@@ -391,22 +391,58 @@ async function FST_resolverPidPaciente(paciente) {
   if (cacheKey) window._fstPidCache[cacheKey] = pid;
   return { ok: true, pid: pid, matchType: 'app_live_fallback' };
 }
-// [LOOP-B #3] Guard ÚNICO para el base64 de un item de media al persistir a Firestore. Reemplaza
-// los 4 strips que ponían data:null a ciegas (borraban el único respaldo cuando la subida a Storage
-// había fallado y no existía url/fbPath). Reglas:
+// [LOOP-B #3] Guard ÚNICO para el base64 de items de media al persistir. Reemplaza los 4 strips que
+// ponían data:null a ciegas (borraban el único respaldo cuando la subida a Storage falló y no había
+// url/fbPath). Reglas por item:
 //   - hay puntero durable (url/fbPath) → data:null (el binario ya vive en Storage).
-//   - SIN puntero y base64 pequeño (≤150KB) → conservar (cabe holgado bajo el tope de 1MB/doc).
-//   - SIN puntero y base64 grande → data:null + pendienteSubida:true (localizable por mediaId,
-//     JAMÁS una referencia vacía muda). El binario grande sigue en IndexedDB para re-subida futura.
-var _B64_MAX_DOC = 150*1024;   // 150 KB: margen holgado bajo el límite de 1 MB de un doc Firestore
-function _mediaConGuardB64(m){
+//   - SIN puntero, destino Firestore (permitirB64=true), base64 ≤150KB Y dentro del presupuesto
+//     acumulado del doc → conservar (respaldo cross-device que IndexedDB —por dispositivo— no da).
+//   - en cualquier otro caso (grande, sin cupo, o destino localStorage) → data:null + pendienteSubida:true:
+//     localizable por mediaId, JAMÁS referencia vacía muda; el binario sigue en IndexedDB.
+// El PRESUPUESTO acumulado (budget.acc compartido por doc) evita que N items pequeños sumen >1MB y
+// rechacen el write entero. En localStorage (colas) permitirB64=false SIEMPRE (no inflar la cuota).
+var _B64_MAX_ITEM = 150*1024;         // tope por item (KB) para conservar en un doc Firestore
+var _B64_MAX_DOC_TOTAL = 600*1024;    // presupuesto acumulado de base64 por doc (deja aire para texto bajo 1MB)
+function _guardMediaItem(m, permitirB64, budget){
   if(!m || typeof m!=='object') return m;
   var esB64 = (typeof m.data==='string' && m.data.indexOf('data:')===0);
   if(!esB64) return m;                                    // sin base64 (data null/ref): nada que decidir
   var tienePuntero = !!(m.url || m.fbPath);
   if(tienePuntero){ var a=Object.assign({},m); a.data=null; return a; }        // binario ya en Storage
-  if(m.data.length <= _B64_MAX_DOC) return m;             // pequeño y SIN puntero: conservar respaldo
-  var b=Object.assign({},m); b.data=null; b.pendienteSubida=true; return b;    // grande: marcador localizable
+  budget = budget || {acc:0};
+  if(permitirB64 && m.data.length <= _B64_MAX_ITEM && (budget.acc + m.data.length) <= _B64_MAX_DOC_TOTAL){
+    budget.acc += m.data.length; return m;               // conservar respaldo pequeño dentro del presupuesto
+  }
+  var b=Object.assign({},m); b.data=null; b.pendienteSubida=true; return b;    // marcador localizable
+}
+function _guardMediaArray(arr, permitirB64, budget){
+  if(!Array.isArray(arr)) return arr;
+  budget = budget || {acc:0};
+  return arr.map(function(m){ return _guardMediaItem(m, permitirB64, budget); });
+}
+// [LOOP-B #2] Re-sube a Storage la media que quedó SOLO en IndexedDB (creada offline: Storage falló y
+// el binario cayó a IDB por handleSoapPhoto/handleMedia). Ruta DETERMINISTA por mediaId → un reintento
+// SOBREESCRIBE, nunca duplica archivos huérfanos. MUTA cada item (url/fbPath) para que el write lleve el
+// puntero y el próximo reintento no re-suba. Se llama en las DOS ramas del replay (nueva y edición).
+// Por-item try/catch: un fallo de subida NO cuenta como intento del write ni manda a fallidos; el item
+// se conserva y se reintenta en el próximo drenado. Devuelve nada (mutación in-place).
+async function _reSubirMediaDesdeIDB(pid, mediaArr){
+  if(!Array.isArray(mediaArr) || !mediaArr.length) return;
+  if(typeof fbStorage==='undefined' || !fbStorage) return;
+  for(const _m of mediaArr){
+    if(!_m || _m.url || !_m.mediaId) continue;   // ya tiene puntero, o sin mediaId no es rescatable
+    try{
+      var _b64 = await idbGet(_m.mediaId);
+      if(!_b64) continue;                        // binario no está en ESTE dispositivo (otro equipo / IDB purgada)
+      var _safe = String(_m.name||'archivo').replace(/[^\w.\-]+/g,'_');
+      var _path = 'clinica/sinergia/'+pid+'/soap/'+_m.mediaId+'_'+_safe;   // DETERMINISTA
+      var _blob = await (await fetch(_b64)).blob();
+      await fbStorage.ref(_path).put(_blob, {contentType: _m.type || 'application/octet-stream'});
+      _m.url = await fbStorage.ref(_path).getDownloadURL();
+      _m.fbPath = _path;
+      if(_m.pendienteSubida) delete _m.pendienteSubida;   // ya subió: la referencia dejó de estar pendiente
+    }catch(_su){ console.warn('[LOOP-B replay] re-subida media falló (se reintenta):', _m.mediaId, _su && _su.message); }
+  }
 }
 function FST_buildSesionPayload(sesion, modo) {
   const sg = x => (typeof x === 'object' && x) ? x : {};
@@ -426,12 +462,13 @@ function FST_buildSesionPayload(sesion, modo) {
     ...(Array.isArray(sesion.media) && sesion.media.length ? {
       // [LOOP-B #3] pasar el base64 FUENTE al guard (antes: data:null a ciegas). Con Storage OK (url)
       // el guard lo anula igual; solo cambia el caso offline-sin-puntero, que ya no pierde el respaldo.
-      media: sesion.media.map(m => _mediaConGuardB64({
+      // Presupuesto acumulado por-sesión (permitirB64=true) → nunca rebasa 1MB de doc.
+      media: _guardMediaArray(sesion.media.map(m => ({
         mediaId: (m && (m.mediaId || m.id)) || '', name: (m && m.name) || '', label: (m && m.label) || '',
         type: (m && m.type) || '', fecha: (m && m.fecha) || '',
         url: (m && m.url) || '', fbPath: (m && m.fbPath) || '',
         data: (m && typeof m.data==='string') ? m.data : null
-      }))
+      })), true)
     } : {}),
     // DIAG 1 (BUG 2): episodio — condicional para no escribir null en sesiones sin episodio
     ...(sesion.motivoIndex != null ? { motivoIndex: Number(sesion.motivoIndex) } : {}),
@@ -1603,10 +1640,12 @@ async function _persistirHistoricoFirestore(p, camposHist){
     // [LOOP-B #3] antes anulaba data SIEMPRE que había base64, aun sin url/fbPath → si la subida a
     // Storage falló, ese base64 (único respaldo) se perdía. Ahora delega en el guard: conserva el
     // respaldo pequeño sin puntero, marca pendienteSubida el grande, y sigue anulando lo que ya está en Storage.
-    var _stripB64 = function(x){ return _mediaConGuardB64(x); };
-    if(Array.isArray(p.estudiosDocs))    outCl.estudiosDocs = p.estudiosDocs;
-    if(Array.isArray(p.fotos))           outCl.fotos = p.fotos.map(_stripB64);
-    if(Array.isArray(p.docs))            outCl.docs  = p.docs.map(_stripB64);
+    // [LOOP-B #3] destino Firestore (doc del paciente) → permitirB64=true con PRESUPUESTO COMPARTIDO
+    // entre estudiosDocs+fotos+docs para que la SUMA nunca rebase 1MB de doc (Rev A/B: cap acumulado).
+    var _budCl = {acc:0};
+    if(Array.isArray(p.estudiosDocs))    outCl.estudiosDocs = _guardMediaArray(p.estudiosDocs, true, _budCl);
+    if(Array.isArray(p.fotos))           outCl.fotos = _guardMediaArray(p.fotos, true, _budCl);
+    if(Array.isArray(p.docs))            outCl.docs  = _guardMediaArray(p.docs, true, _budCl);
     // ── LOOP B: filtro "solo lo que el usuario tocó" ──
     if(Array.isArray(camposHist)){
       Object.keys(outEj).forEach(function(k){ if(camposHist.indexOf(k)===-1) delete outEj[k]; });
@@ -1789,24 +1828,7 @@ async function drenarColaSoapHistorico(){
           // FST_buildSesionPayload recrea los serverTimestamp (no serializables en la cola).
           if(!window._fstDb && typeof FST_init==='function') await FST_init();
           if(!window._fstDb) throw new Error('unavailable: firestore-no-disponible'); // temporal → reintenta
-          // [LOOP-B #2] Re-subir a Storage la media que quedó SOLO en IndexedDB (creada offline). Ruta
-          // DETERMINISTA por mediaId → un reintento SOBREESCRIBE, nunca duplica archivos huérfanos. Muta
-          // it.sesion.media (url/fbPath) para que el payload lleve el puntero y el próximo reintento no re-suba.
-          if(Array.isArray(it.sesion && it.sesion.media) && it.sesion.media.length && typeof fbStorage!=='undefined' && fbStorage){
-            for(const _m of it.sesion.media){
-              if(!_m || _m.url || !_m.mediaId) continue;   // ya tiene puntero, o sin mediaId no es rescatable
-              try{
-                var _b64 = await idbGet(_m.mediaId);
-                if(!_b64) continue;                        // binario no está en ESTE dispositivo (otro equipo / IDB purgada)
-                var _safe = String(_m.name||'archivo').replace(/[^\w.\-]+/g,'_');
-                var _path = 'clinica/sinergia/'+it.pid+'/soap/'+_m.mediaId+'_'+_safe;   // DETERMINISTA
-                var _blob = await (await fetch(_b64)).blob();
-                await fbStorage.ref(_path).put(_blob, {contentType: _m.type || 'application/octet-stream'});
-                _m.url = await fbStorage.ref(_path).getDownloadURL();
-                _m.fbPath = _path;
-              }catch(_su){ console.warn('[LOOP-B replay] re-subida media falló (se reintenta):', _m.mediaId, _su && _su.message); }
-            }
-          }
+          await _reSubirMediaDesdeIDB(it.pid, it.sesion && it.sesion.media);   // [LOOP-B #2] rescate de fotos offline
           var sesPayload = FST_buildSesionPayload(it.sesion, 'nueva');
           await window._fstDb.collection('pacientes').doc(it.pid).collection('sesiones').doc(String(it.sesion.id)).set(_sinUndefined(sesPayload), { merge:true });
           // CAPA 3 — sumar la fecha al set del doc padre (arrayUnion). Solo fechasSesiones (no toca
@@ -1817,6 +1839,10 @@ async function drenarColaSoapHistorico(){
             catch(_fs){ console.warn('[Capa3] fechasSesiones (replay nueva) no se pudo escribir:', _fs && _fs.message); }
           }
         } else {
+          // [LOOP-B #2] simetría con la rama nueva: re-subir fotos que quedaron en IDB en una EDICIÓN
+          // offline, ANTES de escribir el payload (muta it.payload.media → el write lleva url/fbPath).
+          if(!window._fstDb && typeof FST_init==='function') await FST_init();
+          await _reSubirMediaDesdeIDB(it.pid, it.payload && it.payload.media);
           await _guardarEdicionSoapHistorico(it.sid, it.pid, it.payload);
         }
         // éxito → no se re-encola
@@ -1946,7 +1972,9 @@ function _stripB64Profundo(v){
   if(v && typeof v==='object'){
     // [LOOP-B #3] si el objeto ES un item de media (tiene data base64), decidir con el guard de
     // puntero+umbral en vez de anular a ciegas (antes: cualquier data:>2048 → null borraba el respaldo).
-    if(typeof v.data==='string' && v.data.indexOf('data:')===0){ return _mediaConGuardB64(v); }
+    // [LOOP-B #3] destino localStorage (cola HIST_DOC) → permitirB64=FALSE: NUNCA conserva base64 en
+    // localStorage (Rev B/C: cuota). Sin puntero → data:null + pendienteSubida; el binario sigue en IDB.
+    if(typeof v.data==='string' && v.data.indexOf('data:')===0){ return _guardMediaItem(v, false); }
     var o={};
     for(var k in v){
       if(!Object.prototype.hasOwnProperty.call(v,k)) continue;
@@ -8557,12 +8585,12 @@ async function guardarSOAP(){
         ...(_dictadoH!=null ? { dictado:_dictadoH } : {}),
         ...(datosNota.dictadoUnico!=null ? { dictadoUnico:datosNota.dictadoUnico } : (notaH.dictadoUnico!=null ? { dictadoUnico:notaH.dictadoUnico } : {})),
         ...(datosNota.dictadoV2!=null ? { dictadoV2:datosNota.dictadoV2 } : (notaH.dictadoV2!=null ? { dictadoV2:notaH.dictadoV2 } : {})),
-        ...(_mediaH ? { media:_mediaH.map(function(m){ return _mediaConGuardB64({
+        ...(_mediaH ? { media:_guardMediaArray(_mediaH.map(function(m){ return {
           mediaId:(m&&(m.mediaId||m.id))||'', name:(m&&m.name)||'', label:(m&&m.label)||'',
           type:(m&&m.type)||'', fecha:(m&&m.fecha)||'',
           url:(m&&m.url)||'', fbPath:(m&&m.fbPath)||'',
           data:(m&&typeof m.data==='string')?m.data:null   // [LOOP-B #3] base64 fuente al guard (antes: null a ciegas)
-        }); }) } : {}),
+        }; }), false) } : {}),   // permitirB64=FALSE: payloadH va a la cola de EDICIÓN (localStorage) → nunca base64; el replay re-sube desde IDB
         updatedAt:new Date().toISOString()
       };
       const cacheList=_fstSesionesCache[pidH];
