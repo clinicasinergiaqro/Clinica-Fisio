@@ -4662,6 +4662,64 @@ async function _marcarCitaResuelta(nombre, fecha){
     showToast('⚠️ No se pudo marcar'+((e&&e.message)?(': '+e.message):'')+' — ¿reglas v9 desplegadas?','error');
   }
 }
+// ── NO ACUDIÓ ── El paciente NO se presentó a la cita → no se hace nota, y esa cita NO debe contar
+// como falta ni penalizar a la terapeuta. Colección propia `citasNoAcudio` (NO reusa citasResueltas:
+// resuelta cuenta como ✅ en numerador+denominador; noAcudio sale del denominador entero, como
+// enTiempo/prePiso). Mismo espacio de clave (nombreNorm|DD/MM/YYYY). Solo supervisor. Reversible.
+async function FST_leerNoAcudio(forzar){
+  if(!forzar && window._citasNoAcudioCache && window._citasNoAcudioCache.map) return window._citasNoAcudioCache.map;
+  var map={};
+  try{
+    var ok=await FST_init();
+    if(!ok||!window._fstDb) return map;
+    var snap=await window._fstDb.collection('citasNoAcudio').get();
+    snap.forEach(function(d){
+      var x=d.data()||{};
+      if(x.claveNorm && x.fecha) map[_keyCitaResuelta(x.claveNorm, x.fecha)]=true;
+    });
+  }catch(e){ console.warn('[Rendimiento] leer citasNoAcudio:', e&&e.message); return map; }
+  window._citasNoAcudioCache={ts:Date.now(), map:map};
+  return map;
+}
+async function _marcarNoAcudio(nombre, fecha){
+  if(!esSupervisorUI()){ showToast('Solo supervisor','error'); return; }
+  var clave=_normPend(nombre);
+  var ddmm=String(fecha||'');
+  if(!clave||!ddmm){ showToast('Cita no válida','error'); return; }
+  try{
+    var ok=await FST_init();
+    if(!ok||!window._fstDb) throw new Error('Firestore no disponible');
+    var docId=clave+'__'+ddmm.replace(/\//g,'-');
+    await window._fstDb.collection('citasNoAcudio').doc(docId).set({
+      fecha:ddmm, claveNorm:clave, motivo:'no_acudio',
+      marcadoPor:(currentUser&&currentUser.name)||'',
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    window._citasNoAcudioCache=window._citasNoAcudioCache||{ts:Date.now(), map:{}};
+    window._citasNoAcudioCache.map[_keyCitaResuelta(clave, ddmm)]=true;
+    showToast('🚫 Cita marcada como "no acudió" — no cuenta como falta','success');
+    if(document.querySelector('[data-rendov]')) mostrarRendimientoEquipo(window._rendVentanaActualTri||'hoy');
+  }catch(e){
+    showToast('⚠️ No se pudo marcar'+((e&&e.message)?(': '+e.message):'')+' — ¿reglas citasNoAcudio desplegadas?','error');
+  }
+}
+async function _desmarcarNoAcudio(nombre, fecha){   // reversible: quita la marca "no acudió"
+  if(!esSupervisorUI()){ showToast('Solo supervisor','error'); return; }
+  var clave=_normPend(nombre);
+  var ddmm=String(fecha||'');
+  if(!clave||!ddmm){ showToast('Cita no válida','error'); return; }
+  try{
+    var ok=await FST_init();
+    if(!ok||!window._fstDb) throw new Error('Firestore no disponible');
+    var docId=clave+'__'+ddmm.replace(/\//g,'-');
+    await window._fstDb.collection('citasNoAcudio').doc(docId).delete();
+    if(window._citasNoAcudioCache && window._citasNoAcudioCache.map) delete window._citasNoAcudioCache.map[_keyCitaResuelta(clave, ddmm)];
+    showToast('↩︎ "No acudió" deshecho — la cita vuelve a evaluarse','success');
+    if(document.querySelector('[data-rendov]')) mostrarRendimientoEquipo(window._rendVentanaActualTri||'hoy');
+  }catch(e){
+    showToast('⚠️ No se pudo deshacer'+((e&&e.message)?(': '+e.message):''),'error');
+  }
+}
 // CAPA 3 — clave canónica de día (YYYY-MM-DD) desde CUALQUIER formato (ISO o DD/MM/YYYY), reusando
 // parseFechaClinicaSegura. Normaliza AMBOS lados de la comparación del dashboard → inmune al formato
 // mixto (migrados en ISO vs notas de la app en DD/MM). Devuelve '' si no parsea.
@@ -4670,9 +4728,9 @@ function _diaCanon(f){
   if(!d) return '';
   return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
 }
-function _triangularCitasNotas(eventos, resueltos, ultimaHist, asigMap, resueltas, fechasHist, candFechas){
+function _triangularCitasNotas(eventos, resueltos, ultimaHist, asigMap, resueltas, fechasHist, candFechas, noAcudioMap){
   var porTer={};
-  Object.keys(TERAPEUTA_CAL2COD).forEach(function(n){ porTer[n]={citas:0, conNota:0, sinNota:0, resueltas:0, sinNotaPacs:[], noIdentificados:0, noIdentPacs:[], atendidasOtro:[], tardias:0, tardiasPacs:[], enTiempo:0, enTiempoPacs:[], prePiso:0}; });
+  Object.keys(TERAPEUTA_CAL2COD).forEach(function(n){ porTer[n]={citas:0, conNota:0, sinNota:0, resueltas:0, sinNotaPacs:[], noIdentificados:0, noIdentPacs:[], atendidasOtro:[], tardias:0, tardiasPacs:[], enTiempo:0, enTiempoPacs:[], prePiso:0, noAcudio:0, noAcudioPacs:[]}; });   // [NO-ACUDIÓ] bucket propio: fuera del denominador
   var porDia={};   // VISTA-SEMANAL: desglose por día DD/MM/YYYY (mismo universo que la tabla: citas con terapeuta)
   var vistosSinNota={};
   (Array.isArray(eventos)?eventos:[]).forEach(function(ev){
@@ -4735,13 +4793,16 @@ function _triangularCitasNotas(eventos, resueltos, ultimaHist, asigMap, resuelta
     }
     // V2: resuelta a mano por el supervisor → cuenta como atendida, no aparece en 🔴
     var resuelta=!tiene && !!(resueltas && resueltas[_keyCitaResuelta(clave, ddmm)]);
+    // [NO-ACUDIÓ] el supervisor marcó que el paciente NO se presentó → fuera del denominador, nunca 🔴.
+    var noAcudio=!tiene && !resuelta && !!(noAcudioMap && noAcudioMap[_keyCitaResuelta(clave, ddmm)]);
     // VISTA-SEMANAL: acumular por día (misma semántica ✅/🔴 que la tabla)
     if(ddmm){
       var dd=porDia[ddmm]||(porDia[ddmm]={citas:0, conNota:0, sinNota:0});
       dd.citas++;
       // EXACTITUD: pid:null (no identificado) no entra al 🔴 del día — falso positivo hasta vincularlo.
       // VENTANA 24H: la cita aún en tiempo tampoco pinta 🔴. BUG A: homónimo ambiguo tampoco (va a 🔎).
-      if(tiene||resuelta) dd.conNota++; else if(r.pid && !enTiempo24 && !ambiguoSinResolver) dd.sinNota++;
+      // [NO-ACUDIÓ]: tampoco pinta 🔴 (no vino → no aplica).
+      if(tiene||resuelta) dd.conNota++; else if(r.pid && !enTiempo24 && !ambiguoSinResolver && !noAcudio) dd.sinNota++;
     }
     porTer[ter].citas++;
     if(tiene){
@@ -4775,6 +4836,13 @@ function _triangularCitasNotas(eventos, resueltos, ultimaHist, asigMap, resuelta
       }
     }
     else if(resuelta){ porTer[ter].conNota++; porTer[ter].resueltas++; }
+    else if(noAcudio){
+      // [NO-ACUDIÓ] el paciente no se presentó: NO conNota, NO sinNota → fuera del denominador de
+      // cobertura (identificadas = conNota + sinNota). No penaliza a la terapeuta. Reversible.
+      porTer[ter].noAcudio++;
+      var kna='NA|'+ter+'|'+clave+'|'+ddmm;
+      if(!vistosSinNota[kna]){ vistosSinNota[kna]=true; porTer[ter].noAcudioPacs.push({nombre:ev.paciente||'(sin nombre)', pid:r.pid, tipo:r.tipo, fecha:ddmm}); }
+    }
     else if(!r.pid || ambiguoSinResolver){
       // EXACTITUD: sin expediente (pid:null) O homónimo ambiguo sin nota que desambigue → "🔎 Revisar",
       // NO cuenta como falta (nunca 🔴 a ciegas). El chip ofrece vincular a mano al expediente correcto.
@@ -4836,6 +4904,10 @@ function _chipSinNota(x){
   var btnResolver='<button data-nombre="'+escapeAttr_(x.nombre)+'" data-fecha="'+escapeAttr_(x.fecha||'')+'" '
     +'onclick="_marcarCitaResuelta(this.dataset.nombre, this.dataset.fecha)" '
     +'style="'+base+'border:1px solid #A7F3D0;background:#ECFDF5;color:#065F46;cursor:pointer">✓ Resolver</button>';
+  // [NO-ACUDIÓ] chip gemelo: el paciente no se presentó → la cita sale del denominador (no penaliza).
+  var btnNoAcudio='<button data-nombre="'+escapeAttr_(x.nombre)+'" data-fecha="'+escapeAttr_(x.fecha||'')+'" '
+    +'onclick="_marcarNoAcudio(this.dataset.nombre, this.dataset.fecha)" '
+    +'style="'+base+'border:1px solid #FDE68A;background:#FFFBEB;color:#92400E;cursor:pointer">🚫 No acudió</button>';
   // v13: ¿este nombre ya está vinculado a mano? (para ofrecer "Cambiar" en vez de "Vincular")
   var claveV=_normPend(x.nombre||'');
   var esVinc=!!(window._citasVinculadasCache && window._citasVinculadasCache.map && window._citasVinculadasCache.map[claveV]);
@@ -4846,11 +4918,11 @@ function _chipSinNota(x){
     return '<span style="white-space:nowrap;display:inline-block">'
       +'<button data-pid="'+escapeAttr_(x.pid)+'" onclick="_abrirExpedienteDesdeRendimiento(this.dataset.pid)" '
       +'style="'+base+'border:1px solid #FCA5A5;background:#FEF2F2;color:#B91C1C;cursor:pointer">🔴 '
-      +escapeHTML(x.nombre)+' <span style="font-weight:400">→ abrir</span></button>'+btnResolver+(esVinc?btnVincular:'')+'</span>';
+      +escapeHTML(x.nombre)+' <span style="font-weight:400">→ abrir</span></button>'+btnResolver+btnNoAcudio+(esVinc?btnVincular:'')+'</span>';
   }
   // Sin pid: nombre no identificado → ofrecer vincular a mano.
   return '<span style="white-space:nowrap;display:inline-block"><span style="'+base+'border:1px dashed #FCA5A5;background:#FFF;color:#B91C1C;display:inline-block">🔴 '
-    +escapeHTML(x.nombre)+' <span style="font-weight:400">(sin expediente)</span></span>'+btnVincular+btnResolver+'</span>';
+    +escapeHTML(x.nombre)+' <span style="font-weight:400">(sin expediente)</span></span>'+btnVincular+btnResolver+btnNoAcudio+'</span>';
 }
 // ── LOOP COLA-REVISIÓN: sesiones con revisionPendiente:true (SOLO supervisor) ──
 // Query collectionGroup('sesiones') — REQUIERE: (1) reglas v10 (match /{path=**}/sesiones
@@ -5155,6 +5227,23 @@ function _rendimientoHTML(datos, noId, ventana, etiqueta, aviso, refresco, tri){
   var seccionEnTiempo=bloquesEnTiempo
     ? '<div style="margin-top:12px"><div style="font-size:12px;font-weight:800;color:#0369A1">⏳ En tiempo — últimas 24 h <span style="font-weight:400;color:var(--gray-500)">(aún no es falta; al pasar 24 h de la cita sin nota pasa a 🔴)</span></div>'+bloquesEnTiempo+'</div>'
     : '';
+  // [NO-ACUDIÓ] sección informativa + DESHACER: citas marcadas como "no se presentó" (fuera del cálculo).
+  var bloquesNoAcudio=Object.keys(TERAPEUTA_CAL2COD).map(function(n){
+    var t=tri[n];
+    if(!t || !t.noAcudioPacs || !t.noAcudioPacs.length) return '';
+    var c=(typeof AGENDA_COLORES!=='undefined'&&AGENDA_COLORES[n])?AGENDA_COLORES[n]:'#9BA3B5';
+    var chips=t.noAcudioPacs.map(function(x){
+      return '<span style="white-space:nowrap;display:inline-block;font-size:11px;font-weight:700;border-radius:10px;padding:4px 10px;margin:2px;border:1px solid #FDE68A;background:#FFFBEB;color:#92400E">🚫 '
+        +escapeHTML(x.nombre)+' <span style="font-weight:400">— '+escapeHTML(x.fecha||'')+'</span> '
+        +'<button data-nombre="'+escapeAttr_(x.nombre)+'" data-fecha="'+escapeAttr_(x.fecha||'')+'" onclick="_desmarcarNoAcudio(this.dataset.nombre, this.dataset.fecha)" style="border:none;background:none;color:#92400E;font-weight:800;cursor:pointer;padding:0 2px" title="Deshacer — la cita vuelve a evaluarse">↩︎</button></span>';
+    }).join('');
+    return '<div style="margin-top:8px;border-left:4px solid '+c+';padding-left:8px">'
+      +'<div style="font-size:12px;font-weight:800;color:'+c+'">'+escapeHTML(n)+' — '+t.noAcudioPacs.length+' no acudió</div>'
+      +'<div style="margin-top:2px">'+chips+'</div></div>';
+  }).join('');
+  var seccionNoAcudio=bloquesNoAcudio
+    ? '<div style="margin-top:12px"><div style="font-size:12px;font-weight:800;color:#92400E">🚫 No acudió <span style="font-weight:400;color:var(--gray-500)">(el paciente no se presentó — no cuenta como falta ni entra a cobertura; ↩︎ para deshacer)</span></div>'+bloquesNoAcudio+'</div>'
+    : '';
   // PISO DE FECHA: transparencia — cuántas citas del período quedaron ANTES del inicio de
   // operación de la app y por eso no se evalúan. Con las ventanas actuales siempre es 0
   // (la más amplia arranca el día 1 del mes); la línea solo aparece si algún día llega a >0.
@@ -5215,6 +5304,7 @@ function _rendimientoHTML(datos, noId, ventana, etiqueta, aviso, refresco, tri){
     +'<tbody>'+filas+'</tbody></table></div>'
     +seccionSinNota
     +seccionEnTiempo
+    +seccionNoAcudio
     +seccionRevisar
     +seccionAutoria
     +seccionTardias
@@ -5307,7 +5397,8 @@ async function mostrarRendimientoEquipo(ventana, forzar){
   var fechasHist=(window._triUltimaHistCache&&window._triUltimaHistCache.mapFechas)||{};   // CAPA 3
   var candFechas=(window._triUltimaHistCache&&window._triUltimaHistCache.mapFechasCand)||{};   // BUG A — fechas por-candidato de homónimos
   var resueltas=await FST_leerCitasResueltas(!!forzar);
-  var tri=_triangularCitasNotas(eventos, resueltos, ultimaHist, asigMap, resueltas, fechasHist, candFechas);
+  var noAcudioMap=await FST_leerNoAcudio(!!forzar);   // [NO-ACUDIÓ] citas marcadas "no se presentó"
+  var tri=_triangularCitasNotas(eventos, resueltos, ultimaHist, asigMap, resueltas, fechasHist, candFechas, noAcudioMap);
   tri._diasDDMM=dias.map(_ddmmFromISO);   // VISTA-SEMANAL: orden de columnas (lunes primero)
   _tm('triangulación históricos', tTri);
   var etiqueta=(dias.length>1)?(_ddmmFromISO(dias[0])+' — '+_ddmmFromISO(dias[dias.length-1])):'Hoy';
