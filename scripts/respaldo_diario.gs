@@ -17,6 +17,13 @@
  *
  * INSTALACIÓN (una sola vez): ejecutar manualmente `crearTriggerRespaldoDiario` desde el editor.
  * Es idempotente: borra cualquier trigger previo de esta función antes de crear el nuevo.
+ *
+ * SCOPES OAuth REQUERIDOS (agregar a appsscript.json → oauthScopes, SIN quitar los existentes):
+ *  - https://www.googleapis.com/auth/drive            (DriveApp: crear carpeta/archivos, buscar)
+ *  - https://www.googleapis.com/auth/script.send_mail (MailApp: alerta de corrupción; opcional)
+ *  - https://www.googleapis.com/auth/script.scriptapp (ScriptApp: crear/leer el trigger diario)
+ * Tras agregarlos y guardar, la 1ª ejecución pide reautorización (Revisar permisos → Permitir).
+ * Instalado y verificado en producción 2026-07-20 (96 filas, trigger 03:00 activo).
  */
 
 // Correo que recibe la alerta si el respaldo falla o si las filas caen >10% (posible corrupción).
