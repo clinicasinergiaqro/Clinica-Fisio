@@ -15194,15 +15194,37 @@ function initApp(){
   // coincide con el guardado — jamás repone el perfil de otra cuenta.
   try{
     if(typeof fbAuth!=='undefined' && fbAuth && typeof fbAuth.onAuthStateChanged==='function'){
-      var _un = fbAuth.onAuthStateChanged(function(u){
-        try{ if(_un) _un(); }catch(_e){}
-        if(!u || currentUser) return;   // sin sesión real → login normal; ya logueado → nada
+      // [FIX-B2] iOS PWA cold-resume: la 1ª emisión de onAuthStateChanged suele ser
+      // null (persistencia aún sin rehidratar) y un instante después llega el usuario
+      // real. Antes desuscribíamos en esa 1ª emisión: si era null, nos rendíamos y
+      // exigíamos re-login manual aunque la sesión Firebase estuviera VIVA (laptop
+      // entraba sola, celular pedía contraseña). Ahora NO nos rendimos en el primer
+      // null: seguimos escuchando hasta que llegue un USUARIO o venza el timeout, y
+      // solo entonces desuscribimos. Timeout = 3000ms, el MISMO margen de rehidratación
+      // iOS que [FIX-AUTH #2] (L1214). No toca el clasificador REHIDRATANDO/MUERTA ni
+      // el anti-banner (viven en getFirebaseIdToken/callAppsScriptPrivado).
+      var _un = null, _restaurado = false;
+      var _finRestore = function(){ try{ if(_un){ _un(); _un = null; } }catch(_e){} };
+      _un = fbAuth.onAuthStateChanged(function(u){
+        if(_restaurado) return;
+        if(!u) return;                  // null transitorio en cold-resume → seguir esperando
+        if(currentUser){ _restaurado = true; _finRestore(); return; } // ya logueado → nada
         var raw=null; try{ raw=JSON.parse(localStorage.getItem('sinergia_ultimoUsuarioOk')||'null'); }catch(_e){}
         var perfil = (raw && raw.email) ? ROLES_POR_CORREO[raw.email] : null;
         if(perfil && String(u.email||'').toLowerCase()===String(raw.email||'').toLowerCase()){
+          _restaurado = true; _finRestore();
           try{ entrarComo(perfil, raw.email, true); }catch(_e){}
+        } else {
+          // Hay usuario pero NO coincide con el guardado → jamás repone perfil ajeno.
+          _restaurado = true; _finRestore();
         }
       });
+      // Backstop: si en 3s no llegó ningún usuario, la sesión está genuinamente muerta
+      // → se desuscribe y se cae a login normal (no inventa sesión, sin Modo B).
+      setTimeout(function(){
+        if(_restaurado) return;
+        _restaurado = true; _finRestore();
+      }, 3000); // [FIX-B2] mismo margen iOS que [FIX-AUTH #2]
     }
   }catch(_e){}
 }
