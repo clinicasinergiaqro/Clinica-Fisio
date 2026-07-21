@@ -100,6 +100,13 @@ service cloud.firestore {
         'fecha','claveNorm','resueltoPor','updatedAt'
       ]);
     }
+    // ── NO ACUDIÓ: el paciente no se presentó → la cita sale del cálculo (no es falta). ──
+    // Doc id = claveNorm + '__' + DD-MM-YYYY. Solo el supervisor marca; todas leen (el dashboard la descuenta).
+    function citaNoAcudioOK() {
+      return request.resource.data.keys().hasOnly([
+        'fecha','claveNorm','motivo','marcadoPor','updatedAt'
+      ]);
+    }
     // ── v13: vinculación permanente nombre-calendario → paciente (dashboard) ──
     // Doc id = claveNorm (nombreNormalizado del nombre del calendario). Solo el
     // supervisor vincula; todas las terapeutas leen (el resolver del dashboard la
@@ -136,6 +143,11 @@ service cloud.firestore {
     match /citasResueltas/{citaId} {
       allow read: if isWriter();
       allow create, update: if isSupervisor() && citaResueltaOK();
+      allow delete: if isSupervisor();
+    }
+    match /citasNoAcudio/{citaId} {
+      allow read: if isWriter();
+      allow create, update: if isSupervisor() && citaNoAcudioOK();
       allow delete: if isSupervisor();
     }
     match /citasVinculadas/{claveNorm} {
