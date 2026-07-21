@@ -7805,6 +7805,7 @@ function actualizarTextareaDict(){
   const ta=document.getElementById('dictado-textarea'); if(!ta) return;
   ta.value=(_dictado.textoFinal + (_dictado.textoInterino?' ['+_dictado.textoInterino+']':'')).trim();
   ta.scrollTop=ta.scrollHeight;
+  try{ if(typeof programarBorradorSoap==='function') programarBorradorSoap(); }catch(_){} // [BORRADOR-SOAP] la voz escribe .value sin emitir 'input' → agendar autosave del borrador a mano
   const cnt=document.getElementById('dict-palabras'); if(cnt) cnt.textContent='Palabras: '+_dictado.palabras;
 }
 function setBtnDictadoEstado_(estado){
@@ -8494,6 +8495,108 @@ function renderSOAPForm(){
   <button class="btn-primary" onclick="guardarSOAP()">💾 Guardar nota SOAP</button>
   <button class="btn-secondary" onclick="confirmarSalidaSiDirty(goBack)">Cancelar</button>
   <div style="height:20px"></div>`;
+  // [BORRADOR-SOAP] write-ahead: attach autosave a los campos, y tras el poblado de edición (~150ms) ofrecer restaurar.
+  setTimeout(function(){ try{ activarAutosaveSoap(); }catch(_){} }, 60);
+  setTimeout(function(){ try{ cargarBorradorSoapSiExiste(); }catch(_){} }, 260);
+}
+
+// ── BORRADOR LOCAL DE NOTA SOAP (write-ahead) ────────────────────────────────
+// Mismo patrón probado que Nuevo-paciente (guardarBorradorNuevo) y Valoración
+// (guardarBorradorValoracion): autosave a localStorage MIENTRAS se escribe, para
+// que una recarga / cierre / logout a media nota NO pierda el texto. Solo toca
+// localStorage del dispositivo — nada de nube, rules ni backend.
+const CAMPOS_SOAP_TEXTO=['f-sdolor','f-scambios','f-sactfisica','f-orom','f-ofuerza','f-ohallazgos','f-aevolucion','f-arespuesta','f-aanalisis','f-ptratamiento','f-pindicaciones','f-pcontra','f-objetivo-sesion','f-respuesta-tto','f-tolerancia','f-eventos-sesion','f-cambios-plan','f-criterios-progreso','f-indicaciones-dom','dictado-textarea','f-fecha-consulta','f-soap-terapeuta','f-soap-textoriginal'];
+function _soapDraftKey(){
+  var pid=(currentPatient&&currentPatient.id)?String(currentPatient.id):'';
+  if(!pid) return '';
+  return 'sinergia_borrador_soap_'+pid+'__'+(editingSoapId||'nueva');   // req #4: único por paciente+sesión
+}
+function _soapFormTieneTexto(){
+  for(var i=0;i<CAMPOS_SOAP_TEXTO.length;i++){
+    var el=document.getElementById(CAMPOS_SOAP_TEXTO[i]);
+    if(el && String(el.value||'').trim()) return true;
+  }
+  return false;
+}
+function guardarBorradorSoap(){
+  try{
+    var key=_soapDraftKey(); if(!key) return;
+    if(!_soapFormTieneTexto()) return;   // no guardar borradores vacíos
+    var campos={};
+    CAMPOS_SOAP_TEXTO.forEach(function(id){ var el=document.getElementById(id); if(el) campos[id]=el.value; });
+    var data={ updatedAt:Date.now(), patientName:(currentPatient&&currentPatient.name)||'',
+      esEdicion:!!editingSoapId, modoNota:(typeof modoNotaActual!=='undefined'?modoNotaActual:''), campos:campos,
+      evaI:tempEvaI, evaF:tempEvaF,
+      mods:Array.isArray(tempMods)?tempMods.slice():[],
+      atendido:Array.isArray(tempAtendio)?tempAtendio.slice():[],
+      motivoIndex:(typeof tempMotivoIndex==='number')?tempMotivoIndex:null };
+    _purgarBorradoresSoapViejos();   // req #5: liberar espacio ANTES de escribir (purga >14 días)
+    var payload=JSON.stringify(data);
+    try{ localStorage.setItem(key, payload); }
+    catch(e1){
+      // Cuota llena: purgar agresivo (todo borrador SOAP salvo el actual) y reintentar UNA vez; si aún falla, avisar (no callar).
+      if(e1 && (e1.name==='QuotaExceededError' || e1.code===22)){
+        try{ for(var j=localStorage.length-1;j>=0;j--){ var kk=localStorage.key(j); if(kk && kk.indexOf('sinergia_borrador_soap_')===0 && kk!==key) localStorage.removeItem(kk); } }catch(_p){}
+        try{ localStorage.setItem(key, payload); }
+        catch(e2){ if(typeof showToast==='function') showToast('⚠️ Poco espacio: el borrador automático podría no guardarse. Guarda la nota pronto.','warning'); }
+      }
+    }
+  }catch(e){ console.warn('[borrador-soap] guardar:', e&&e.message); }
+}
+var _timerBorradorSoap=null;
+function programarBorradorSoap(){
+  clearTimeout(_timerBorradorSoap);
+  _timerBorradorSoap=setTimeout(guardarBorradorSoap, 1200);   // req #1: debounce (no en cada tecla)
+}
+function activarAutosaveSoap(){
+  try{
+    var cont=document.getElementById('content-soap'); if(!cont) return;
+    cont.querySelectorAll('input,textarea,select').forEach(function(el){
+      el.removeEventListener('input', programarBorradorSoap);
+      el.removeEventListener('change', programarBorradorSoap);
+      el.addEventListener('input', programarBorradorSoap);
+      el.addEventListener('change', programarBorradorSoap);
+    });
+  }catch(e){ console.warn('[borrador-soap] activar:', e&&e.message); }
+}
+function aplicarBorradorSoap(d){
+  try{
+    if(!d||!d.campos) return;
+    CAMPOS_SOAP_TEXTO.forEach(function(id){ if(d.campos[id]!==undefined){ var el=document.getElementById(id); if(el) el.value=d.campos[id]; } });
+    if(typeof d.evaI==='number'){ tempEvaI=d.evaI; var sI=document.getElementById('sl-i'),vI=document.getElementById('vi'); if(sI)sI.value=tempEvaI; if(vI){vI.textContent=tempEvaI;vI.className='eva-val '+getEvaClass(tempEvaI);} }
+    if(typeof d.evaF==='number'){ tempEvaF=d.evaF; var sF=document.getElementById('sl-f'),vF=document.getElementById('vf'); if(sF)sF.value=tempEvaF; if(vF){vF.textContent=tempEvaF;vF.className='eva-val '+getEvaClass(tempEvaF);} }
+    if(Array.isArray(d.mods)){ tempMods=d.mods.slice(); var g=document.getElementById('mod-grid'); if(g) g.innerHTML=MODALIDADES.map(function(mod){ var chk=tempMods.includes(mod); return '<div class="checkbox-item '+(chk?'checked':'')+'" onclick="toggleMod(\''+mod+'\')"><div class="cb-box">'+(chk?'✓':'')+'</div><div class="cb-label">'+mod+'</div></div>'; }).join(''); }
+    if(Array.isArray(d.atendido)){ tempAtendio=d.atendido.slice(); if(typeof _renderAtendioGrid==='function') _renderAtendioGrid(); }
+    if(typeof d.motivoIndex==='number') tempMotivoIndex=d.motivoIndex;
+    if(typeof d.modoNota==='string' && d.modoNota && typeof seleccionarModoNota==='function'){ try{ seleccionarModoNota(d.modoNota); }catch(_){} } // [BORRADOR-SOAP] restaurar modo clínico → re-muestra la sección opcional y su metadato
+    marcarDirty();
+  }catch(e){ console.warn('[borrador-soap] aplicar:', e&&e.message); }
+}
+function cargarBorradorSoapSiExiste(){
+  try{
+    var key=_soapDraftKey(); if(!key) return;
+    var raw=localStorage.getItem(key); if(!raw) return;
+    var draft=null; try{ draft=JSON.parse(raw); }catch(e){ return; }
+    if(!draft||!draft.campos) return;
+    var firma=key+'@'+(draft.updatedAt||0);              // no re-ofrecer el mismo borrador en la misma apertura
+    if(window._ultimoBorradorSoapOfrecido===firma) return;
+    window._ultimoBorradorSoapOfrecido=firma;
+    var fecha=new Date(draft.updatedAt||Date.now()).toLocaleString('es-MX');
+    var ok=confirm('Hay un borrador SIN GUARDAR de esta nota'+(draft.patientName?(' ('+draft.patientName+')'):'')+'.\n\nÚltima edición: '+fecha+'\n\n¿Recuperarlo?');   // req #2: ofrecer, no sobrescribir a ciegas
+    if(ok){ aplicarBorradorSoap(draft); showToast('⚠️ Borrador recuperado. Revísalo y toca Guardar nota SOAP.','success'); }
+    else if(confirm('¿Descartar este borrador?')){ localStorage.removeItem(key); showToast('Borrador descartado','warning'); }
+  }catch(e){ console.warn('[borrador-soap] cargar:', e&&e.message); }
+}
+function _borrarBorradorSoapPorKey(key){ try{ if(key) localStorage.removeItem(key); }catch(e){} }
+function _purgarBorradoresSoapViejos(){   // req #5: purga borradores SOAP de >14 días para respetar la cuota
+  try{
+    var LIMITE=14*24*60*60*1000, ahora=Date.now();
+    for(var i=localStorage.length-1;i>=0;i--){
+      var k=localStorage.key(i); if(!k || k.indexOf('sinergia_borrador_soap_')!==0) continue;
+      try{ var d=JSON.parse(localStorage.getItem(k)||'{}'); if(!d.updatedAt || (ahora-d.updatedAt)>LIMITE) localStorage.removeItem(k); }
+      catch(e){ localStorage.removeItem(k); }
+    }
+  }catch(e){}
 }
 
 function updateEvaVal(id,v){const el=document.getElementById(id);if(el)el.className=`eva-val ${getEvaClass(v)}`}
@@ -8570,6 +8673,8 @@ async function guardarSOAP(){
   if(!p){ showToast('No hay paciente activo — recarga la app e intenta de nuevo','error'); _liberarGuardSOAP(); return; } // guard: sin esto un currentPatient nulo lanzaba y dejaba _guardandoSOAP=true (botón bloqueado hasta recargar)
   const ter=currentUser.name;
 
+  var _draftKeySoap=_soapDraftKey(); // [BORRADOR-SOAP] capturar la key AHORA (editingSoapId aún válido); se limpia tras el commit
+  clearTimeout(_timerBorradorSoap); // [BORRADOR-SOAP] cancelar autosave pendiente → evita que el borrador resucite tras guardar (nota fantasma/duplicada)
   limpiarDirty(); // pasó validación: los cambios se persistirán
   const datosNota={
     s:{dolor:v('f-sdolor'), cambios:v('f-scambios'), actFisica:v('f-sactfisica')},
@@ -8722,6 +8827,7 @@ async function guardarSOAP(){
         const ci=cacheList.findIndex(s=>s.id===sidH);
         if(ci>=0) _fstSesionesCache[pidH][ci]={...notaH,...payloadH,id:sidH,historialEdiciones:histH};
       }
+      _borrarBorradorSoapPorKey(_draftKeySoap); // [BORRADOR-SOAP] edición-histórico commit → limpiar borrador (req #3)
       editingSoapId=null; editingSoapPid=null; editingSoapEsHistorico=false; _editingSoapHistoricoNota=null;
       tempEvolMedia=[];
       // FIX media-edición: espejar a Estudios y persistir estudiosDocs. Esta rama NO llama saveDB
@@ -8806,6 +8912,7 @@ async function guardarSOAP(){
     if(terapeutaFmt) datosNota.terapeuta = terapeutaFmt;
     p.soap[idx]={...notaAnterior, ...datosNota, historialEdiciones:notaAnterior.historialEdiciones};
     p.soap[idx].fecha = fechaConsultaFmt; // FECHA EDITABLE: usar la fecha del campo (puede corregirse al editar)
+    _borrarBorradorSoapPorKey(_draftKeySoap); // [BORRADOR-SOAP] edición-activo commit → limpiar borrador (req #3)
     // MIGRACIÓN: al estructurar una nota importada, queda revisada y completa
     if(p.soap[idx].importado){ p.soap[idx].revisionPendiente=false; p.soap[idx].completa=true; p.soap[idx].formatoOriginal='soap'; }
     editingSoapId=null;
@@ -8889,6 +8996,7 @@ async function guardarSOAP(){
       }
     }
     p.soap.push(nuevaSOAP);
+    _borrarBorradorSoapPorKey(_draftKeySoap); // [BORRADOR-SOAP] nota nueva commit → limpiar borrador (req #3)
     p.sesiones=sesNum;
     if(Array.isArray(p.motivosAnteriores)&&p.motivosAnteriores.length>0 && nuevaSOAP.motivoIndex===(p.motivoActualIndex||0)){
       p.numSesionEpisodioActual=(p.numSesionEpisodioActual||0)+1; // el contador del episodio ACTUAL no avanza al insertar en otro
