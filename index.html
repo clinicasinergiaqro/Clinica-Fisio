@@ -156,7 +156,10 @@ async function FST_init(){
 async function FST_fetchSesiones(pid){
   if (!pid || !window._fstDb) return [];
   try {
-    const snap = await window._fstDb.collection('pacientes').doc(pid).collection('sesiones').orderBy('num','asc').get();
+    const snap = await Promise.race([
+      window._fstDb.collection('pacientes').doc(pid).collection('sesiones').orderBy('num','asc').get(),
+      new Promise((_, rej) => setTimeout(() => rej(new Error('timeout-fetchSesiones')), 6000))
+    ]);
     return snap.docs.map(function(doc){
       const d = doc.data() || {};
       return {
@@ -267,7 +270,10 @@ function FST_renderCard(s, pid){
 async function FST_renderGaleriaHistorica(pid){
   try {
     if (!pid || !window._fstDb) return '';
-    const snap = await window._fstDb.collection('pacientes').doc(pid).get();
+    const snap = await Promise.race([
+      window._fstDb.collection('pacientes').doc(pid).get(),
+      new Promise((_, rej) => setTimeout(() => rej(new Error('timeout-galeriaHist')), 6000))
+    ]);
     const data = snap.data() || {};
     const fotos = (data.fotosHistoricas || []).filter(function(f){ return f && f.url; });
     if (!fotos.length) return '';
