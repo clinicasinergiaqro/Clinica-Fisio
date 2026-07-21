@@ -7091,9 +7091,85 @@ function FST_esperarDbLista(timeoutMs) {
   });
 }
 
+// 3.6-bis — [FIX-INDICE] Revalidación SWR del índice en 2º plano (NO bloquea la UI).
+// Relee Firestore; si el conjunto de pacientes cambió respecto a lo servido en cache,
+// actualiza memoria + sessionStorage y repinta la lista si Pacientes está en pantalla.
+// Reglas de seguridad (verificadas): (a) guard reentrante liberado en finally;
+// (b) LoadedAt SIEMPRE se actualiza (no martillea Firestore en bucle);
+// (c) NUNCA sobrescribe el índice bueno con una lectura vacía/fallida;
+// (d) solo toca el ÍNDICE Firestore — la fusión sigue poniendo locales como fuente de verdad.
+async function FST_refrescarIndiceEnSegundoPlano() {
+  if (window._FST_refrescandoIndice) return;   // ya hay un refresco en vuelo
+  window._FST_refrescandoIndice = true;
+  try {
+    let db = window._fstDb;
+    if (!db && typeof FST_init === 'function') {
+      try { await FST_init(); } catch(_e) {}
+      db = window._fstDb;
+    }
+    if (!db) return; // sin Firestore no se revalida ahora; se reintenta en el próximo acceso
+
+    const MAX_DOCS   = 5000;
+    const TIMEOUT_MS = 5000;
+    const snap = await Promise.race([
+      db.collection('pacientes').limit(MAX_DOCS).get(),
+      new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), TIMEOUT_MS))
+    ]);
+
+    const frescos = [];
+    snap.forEach(doc => {
+      const d = doc.data() || {};
+      frescos.push({
+        id              : doc.id,
+        fstPid          : doc.id,
+        name            : d.name            || '',
+        age             : d.age             || '',
+        terapeuta       : d.terapeuta       || d.terapeutaActual || '',
+        fechaNac        : d.fechaNac        || '',
+        creadoPor       : d.creadoPor       || '',
+        nombreNormalizado: d.nombreNormalizado || FST_normalizarBusqueda(d.name || ''),
+        dx              : d.dx              || d.diagnostico     || '',
+        sesionesCount   : d.sesionesCount   || d.soapCount       || 0,
+        ultimaSesion    : d.ultimaSesion    || '',
+        etiquetas       : Array.isArray(d.etiquetas) ? d.etiquetas : [],
+        _origenLista    : d.creadoPor === 'MIGRACION' ? 'firestore_migracion' : 'firestore_live'
+      });
+    });
+
+    // Guard anti-borrado: una lectura vacía NO reemplaza un índice bueno.
+    if (!frescos.length) {
+      window._FST_indicePacientesLoadedAt = Date.now(); // resetea timer para no martillar
+      return;
+    }
+
+    // ¿Cambió el conjunto? Firma por ids ordenados (detecta altas/bajas en otros dispositivos).
+    function firmaIds(arr){ return (arr||[]).map(x=>String((x&&x.id)||'')).sort().join('|'); }
+    const antes   = firmaIds(window._FST_indicePacientes);
+    const despues = firmaIds(frescos);
+
+    window._FST_indicePacientes         = frescos;
+    window._FST_indicePacientesLoadedAt = Date.now();
+    try { sessionStorage.setItem('FST_indice_v1', JSON.stringify({ ts: Date.now(), pacientes: frescos })); } catch(_e) {}
+
+    if (antes !== despues) {
+      console.log('[FST-LISTA][SWR] índice cambió (' + frescos.length + ' pacientes) — repintando lista');
+      if (typeof window._FST_invalidarVistaPacientes === 'function') window._FST_invalidarVistaPacientes();
+      const sp = document.getElementById('screen-pacientes');
+      if (sp && sp.classList.contains('active') && typeof renderPacientesLista === 'function') {
+        try { renderPacientesLista(); } catch(_e) {}
+      }
+    }
+  } catch(e) {
+    console.warn('[FST-LISTA][SWR] revalidación falló (no crítico):', e && e.message);
+  } finally {
+    window._FST_refrescandoIndice = false;
+  }
+}
+
 async function FST_cargarIndicePacientes() {
   const CACHE_KEY  = 'FST_indice_v1';
-  const TTL_MS     = 24 * 60 * 60 * 1000;
+  const TTL_MS     = 30 * 60 * 1000;   // [FIX-INDICE] 24h → 30min (backstop cross-reload; el SWR de abajo es lo que auto-cura)
+  const FRESH_MS   = 45 * 1000;        // [FIX-INDICE] SWR: índice servido con >45s → revalidar contra Firestore en 2º plano
   const MAX_DOCS   = 5000;
   const TIMEOUT_MS = 5000;
 
@@ -7117,6 +7193,11 @@ async function FST_cargarIndicePacientes() {
 
   // Nivel 1: memoria
   if (Array.isArray(window._FST_indicePacientes) && window._FST_indicePacientes.length) {
+    // [FIX-INDICE] SWR: si el índice en memoria ya "envejeció", revalida contra
+    // Firestore en 2º plano SIN bloquear (devuelve lo cacheado ya mismo).
+    if ((Date.now() - (window._FST_indicePacientesLoadedAt || 0)) > FRESH_MS) {
+      FST_refrescarIndiceEnSegundoPlano();
+    }
     return window._FST_indicePacientes;
   }
 
@@ -7125,6 +7206,9 @@ async function FST_cargarIndicePacientes() {
   if (cacheSesion) {
     window._FST_indicePacientes         = cacheSesion;
     window._FST_indicePacientesLoadedAt = Date.now();
+    // [FIX-INDICE] SWR: el sessionStorage pudo quedar desfasado respecto a
+    // Firestore (paciente creado en otro dispositivo). Revalida en 2º plano.
+    FST_refrescarIndiceEnSegundoPlano();
     return cacheSesion;
   }
 
