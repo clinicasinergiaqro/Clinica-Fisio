@@ -102,7 +102,7 @@ async function FST_init(){
         });
       }
       if (!user) {
-        console.warn('[FST] Sin usuario después de 10s. No se inicializa Firestore.');
+        console.warn('[FST] Sin usuario después de 4s. No se inicializa Firestore.');
         window._fstDb = null; window._fstInitDone = false; return false;
       }
       window._fstDb = app.firestore();
