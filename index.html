@@ -7805,6 +7805,7 @@ function actualizarTextareaDict(){
   const ta=document.getElementById('dictado-textarea'); if(!ta) return;
   ta.value=(_dictado.textoFinal + (_dictado.textoInterino?' ['+_dictado.textoInterino+']':'')).trim();
   ta.scrollTop=ta.scrollHeight;
+  try{ if(typeof programarBorradorSoap==='function') programarBorradorSoap(); }catch(_){} // [BORRADOR-SOAP] la voz escribe .value sin emitir 'input' → agendar autosave del borrador a mano
   const cnt=document.getElementById('dict-palabras'); if(cnt) cnt.textContent='Palabras: '+_dictado.palabras;
 }
 function setBtnDictadoEstado_(estado){
@@ -8524,13 +8525,22 @@ function guardarBorradorSoap(){
     var campos={};
     CAMPOS_SOAP_TEXTO.forEach(function(id){ var el=document.getElementById(id); if(el) campos[id]=el.value; });
     var data={ updatedAt:Date.now(), patientName:(currentPatient&&currentPatient.name)||'',
-      esEdicion:!!editingSoapId, campos:campos,
+      esEdicion:!!editingSoapId, modoNota:(typeof modoNotaActual!=='undefined'?modoNotaActual:''), campos:campos,
       evaI:tempEvaI, evaF:tempEvaF,
       mods:Array.isArray(tempMods)?tempMods.slice():[],
       atendido:Array.isArray(tempAtendio)?tempAtendio.slice():[],
       motivoIndex:(typeof tempMotivoIndex==='number')?tempMotivoIndex:null };
-    localStorage.setItem(key, JSON.stringify(data));
-    _purgarBorradoresSoapViejos();   // req #5: no acumular borradores viejos sin límite
+    _purgarBorradoresSoapViejos();   // req #5: liberar espacio ANTES de escribir (purga >14 días)
+    var payload=JSON.stringify(data);
+    try{ localStorage.setItem(key, payload); }
+    catch(e1){
+      // Cuota llena: purgar agresivo (todo borrador SOAP salvo el actual) y reintentar UNA vez; si aún falla, avisar (no callar).
+      if(e1 && (e1.name==='QuotaExceededError' || e1.code===22)){
+        try{ for(var j=localStorage.length-1;j>=0;j--){ var kk=localStorage.key(j); if(kk && kk.indexOf('sinergia_borrador_soap_')===0 && kk!==key) localStorage.removeItem(kk); } }catch(_p){}
+        try{ localStorage.setItem(key, payload); }
+        catch(e2){ if(typeof showToast==='function') showToast('⚠️ Poco espacio: el borrador automático podría no guardarse. Guarda la nota pronto.','warning'); }
+      }
+    }
   }catch(e){ console.warn('[borrador-soap] guardar:', e&&e.message); }
 }
 var _timerBorradorSoap=null;
@@ -8558,6 +8568,7 @@ function aplicarBorradorSoap(d){
     if(Array.isArray(d.mods)){ tempMods=d.mods.slice(); var g=document.getElementById('mod-grid'); if(g) g.innerHTML=MODALIDADES.map(function(mod){ var chk=tempMods.includes(mod); return '<div class="checkbox-item '+(chk?'checked':'')+'" onclick="toggleMod(\''+mod+'\')"><div class="cb-box">'+(chk?'✓':'')+'</div><div class="cb-label">'+mod+'</div></div>'; }).join(''); }
     if(Array.isArray(d.atendido)){ tempAtendio=d.atendido.slice(); if(typeof _renderAtendioGrid==='function') _renderAtendioGrid(); }
     if(typeof d.motivoIndex==='number') tempMotivoIndex=d.motivoIndex;
+    if(typeof d.modoNota==='string' && d.modoNota && typeof seleccionarModoNota==='function'){ try{ seleccionarModoNota(d.modoNota); }catch(_){} } // [BORRADOR-SOAP] restaurar modo clínico → re-muestra la sección opcional y su metadato
     marcarDirty();
   }catch(e){ console.warn('[borrador-soap] aplicar:', e&&e.message); }
 }
@@ -8663,6 +8674,7 @@ async function guardarSOAP(){
   const ter=currentUser.name;
 
   var _draftKeySoap=_soapDraftKey(); // [BORRADOR-SOAP] capturar la key AHORA (editingSoapId aún válido); se limpia tras el commit
+  clearTimeout(_timerBorradorSoap); // [BORRADOR-SOAP] cancelar autosave pendiente → evita que el borrador resucite tras guardar (nota fantasma/duplicada)
   limpiarDirty(); // pasó validación: los cambios se persistirán
   const datosNota={
     s:{dolor:v('f-sdolor'), cambios:v('f-scambios'), actFisica:v('f-sactfisica')},
