@@ -308,6 +308,11 @@ async function FST_renderHistorialSoap(pid){
   // de una operación previa), hay que renderizar aunque el flag coincida: el DOM fresco necesita pintarse.
   if (window._fstRenderInFlight === pid && document.getElementById('fst-hist-block')) return;
   window._fstRenderInFlight = pid;
+  // [FIX-HANG-4] Sello de recencia: openExpediente dispara varios renders en paralelo y el guard
+  // ya no los serializa. Sin esto, el que TERMINA último gana; si trae [] (token frío/carrera)
+  // pisa al render que ya pintó las notas. Con el sello, el último en ARRANCAR invalida a los viejos.
+  const _miRenderToken = (window._fstRenderToken = (window._fstRenderToken||0) + 1);
+  const _sigoVigente = () => window._fstRenderToken === _miRenderToken;
   // [FIX-HANG-3] Pinta re-adquiriendo el nodo vivo (un re-render pudo detachar el box capturado).
   const _pintarHist = (h) => {
     let b = document.getElementById('fst-hist-block');
@@ -350,8 +355,11 @@ async function FST_renderHistorialSoap(pid){
     // [FIX-HANG-3] No clobberar un cache bueno con [] (token frío que aún devuelve vacío).
     if (sesiones.length || !(Array.isArray(_fstSesionesCache[pid]) && _fstSesionesCache[pid].length)) _fstSesionesCache[pid] = sesiones;
     if (!sesiones.length) {
+      // [FIX-HANG-4] Si el cache del pid YA tiene sesiones (otro render las trajo), un fetch
+      // vacío NO debe borrarlas de pantalla con "Sin historial".
+      if (Array.isArray(_fstSesionesCache[pid]) && _fstSesionesCache[pid].length) return;
       const galeriaSola = await FST_renderGaleriaHistorica(pid);
-      _pintarHist(galeriaSola + '<div style="padding:10px 14px;font-size:12px;color:var(--gray-400)">Sin historial Firestore para este paciente.</div>');
+      if (_sigoVigente()) _pintarHist(galeriaSola + '<div style="padding:10px 14px;font-size:12px;color:var(--gray-400)">Sin historial Firestore para este paciente.</div>');
       return;
     }
     const ids = new Set(); const dups = sesiones.filter(function(s){ if (ids.has(s.id)) return true; ids.add(s.id); return false; });
@@ -370,7 +378,7 @@ async function FST_renderHistorialSoap(pid){
         _fstPrimeraSesEl.innerHTML='<div class="field-row"><div class="field-label">Primera sesión registrada</div><div class="field-value" style="color:var(--gray-400);font-size:13px">'+escapeHTML(_fstFmtF)+'</div></div>';
       }
     }
-    _pintarHist(galeria + '<div style="margin:14px 0 6px;padding:0 14px"><div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.7px;color:var(--gray-400)">\u{1F4C2} Historial clínico (Firestore staging · ' + sesiones.length + ' sesiones)</div></div>' + cards);
+    if (_sigoVigente()) _pintarHist(galeria + '<div style="margin:14px 0 6px;padding:0 14px"><div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.7px;color:var(--gray-400)">\u{1F4C2} Historial clínico (Firestore staging · ' + sesiones.length + ' sesiones)</div></div>' + cards);
     console.log('[FST] ' + sesiones.length + ' sesiones pintadas · pid=' + pid);
   } catch (e) {
     console.error('[FST] renderHistorialSoap ERROR:', e.message);
