@@ -1181,48 +1181,64 @@ function registrarAcceso(accion){
 let _idTokenCache = null;
 let _idTokenTs = 0;
 let _idTokenUid = null;   // [AUTH-REFRESH c] uid dueño del token cacheado — invalida el cache si cambia la cuenta
+// [FIX-AUTH #8 · SEGURIDAD DE CUENTA] borra TODO fragmento de token en memoria. Se llama en LOS TRES
+// caminos de salida de sesión (doLogout, login-sin-rol, auto-logout por inactividad) para que un token
+// de una cuenta JAMÁS sobreviva a la sesión de otra (lftaranda ↔ cfag1092). Barrera A; la Barrera B es
+// el guard uid-mismatch de getFirebaseIdToken (el cache solo se sirve si _idTokenUid === uid vivo).
+function _limpiarSesionToken(){ _idTokenCache = null; _idTokenTs = 0; _idTokenUid = null; }
 async function getFirebaseIdToken(forceRefresh=false, diag=null){
   const CACHE_MS = 50*60*1000; // 50 min (los tokens duran 1h)
   const ahora = Date.now();
-  // [AUTH-REFRESH c] Servir el cache SOLO si es del MISMO usuario que está logueado ahora. Antes
-  // (forceRefresh=true por defecto) cada llamada traía token fresco, así que un cambio de cuenta
-  // (supervisor↔personal, o logout por rutas que no pasan por doLogout: L3096/auto-logout) se
-  // resolvía solo. Con el cache como default hay que atarlo al uid o serviríamos el token del
-  // usuario anterior hasta 50 min. currentUser null (cold-start) → no sirve cache, entra al refresh.
+  // [FIX-AUTH #1] Clasificador de sesión por-llamada en diag.sesion: 'VIVA' | 'REHIDRATANDO' | 'MUERTA'.
+  // Por defecto REHIDRATANDO — NUNCA se declara muerta sin que Firebase lo confirme (anti-falso-banner).
+  if(diag && diag.sesion===undefined) diag.sesion = 'REHIDRATANDO';
+  // [AUTH-REFRESH c · CONDICIÓN-1] Servir el cache SOLO si es del MISMO usuario logueado AHORA
+  // (_idTokenUid === uid vivo). Un token de otra cuenta nunca se sirve: cambio de cuenta → uid no
+  // coincide → cache descartado → token fresco para fbAuth.currentUser actual.
   var _curUid = (typeof fbAuth!=='undefined' && fbAuth && fbAuth.currentUser) ? fbAuth.currentUser.uid : null;
-  if(!forceRefresh && _idTokenCache && _curUid && _idTokenUid===_curUid && (ahora - _idTokenTs) < CACHE_MS) return _idTokenCache;
+  if(!forceRefresh && _idTokenCache && _curUid && _idTokenUid===_curUid && (ahora - _idTokenTs) < CACHE_MS){
+    if(diag) diag.sesion = 'VIVA';   // [FIX-AUTH #1] cache servido con usuario presente = sesión viva
+    return _idTokenCache;
+  }
   try{
     let user = (typeof fbAuth!=='undefined' && fbAuth) ? fbAuth.currentUser : null;
-    // [AUTH-REFRESH d] COLD-START: en el iPad, al abrir/reactivar la PWA, fbAuth.currentUser puede
-    // estar null unos instantes ANTES de que Firebase restaure la sesión persistida. Antes nos
-    // rendíamos de inmediato → callAppsScriptPrivado devolvía AUTH_REQUIRED → banner "Sesión expirada"
-    // FALSO. Ahora damos margen (máx 1.5s) a onAuthStateChanged; si de verdad no hay usuario, cae al
-    // mismo return null de siempre (semántica intacta). Solo se paga la espera en la ventana de arranque.
+    // [FIX-AUTH #2] COLD-START iOS: esperar a que onAuthStateChanged RESUELVA (no un timeout ciego).
+    // authResuelto=true SOLO si el callback disparó → sabemos la verdad de Firebase. Si el timeout
+    // vence sin resolver, seguimos en REHIDRATANDO (transitorio) — jamás "muerta" por esperar.
+    var authResuelto = !!user;
     if(!user && typeof fbAuth!=='undefined' && fbAuth && typeof fbAuth.onAuthStateChanged==='function'){
       user = await new Promise(function(res){
         var listo=false, off=null;
-        try{ off = fbAuth.onAuthStateChanged(function(u){ if(!listo){ listo=true; if(off) off(); res(u||null); } }); }
+        try{ off = fbAuth.onAuthStateChanged(function(u){ if(!listo){ listo=true; authResuelto=true; if(off) off(); res(u||null); } }); }
         catch(_e){ res(fbAuth.currentUser||null); return; }
-        setTimeout(function(){ if(!listo){ listo=true; if(off) off(); res((fbAuth&&fbAuth.currentUser)||null); } }, 1500);
+        setTimeout(function(){ if(!listo){ listo=true; if(off) off(); res((fbAuth&&fbAuth.currentUser)||null); } }, 3000); // [FIX-AUTH #2] 1.5s→3s: margen real de rehidratación iOS
       });
+      if(user) authResuelto = true;
     }
-    if(!user) return null;
+    if(!user){
+      // [FIX-AUTH #3 · CONDICIÓN-2] Sin usuario: MUERTA solo si Firebase RESOLVIÓ sin sesión
+      // (confirmado). Timeout sin resolver = REHIDRATANDO (el caller reintenta en silencio).
+      if(diag) diag.sesion = authResuelto ? 'MUERTA' : 'REHIDRATANDO';
+      return null;
+    }
     const tok = await user.getIdToken(forceRefresh);
     _idTokenCache = tok;
     _idTokenTs = ahora;
     _idTokenUid = user.uid || null;   // [AUTH-REFRESH c] atar el cache al usuario que lo generó
+    if(diag) diag.sesion = 'VIVA';
     return tok;
   }catch(e){
-    // [GRUPO-A #8] Distinguir fallo de RED de fallo de AUTH: un microcorte al renovar el token NO
-    // es "sesión expirada". La clasificación viaja en `diag` POR-LLAMADA (objeto del caller) — sin
-    // flag global (llamadas concurrentes se pisarían la clasificación) y sin string-sentinel que un
-    // caller confunda con un token. En red: NO borrar el cache (si sigue fresco <50 min sirve tal cual).
+    // [GRUPO-A #8] red vs auth por-llamada en diag (sin flag global).
+    // [FIX-AUTH #4 · CONDICIÓN-2] SOLO los códigos de muerte REAL de Firebase declaran MUERTA.
+    // internal-error / quota-exceeded / too-many-requests / throws genéricos = TRANSITORIO
+    // (antes caían como "auth" → banner falso → ese era el bug).
     const _msg = String((e && (e.code || e.message)) || '');
     const _esRed = /network-request-failed|auth\/timeout|deadline|Failed to fetch|Load failed|NetworkError/i.test(_msg);
-    if(diag) diag.red = _esRed;
-    console.warn('[Auth] getIdToken error:', _msg);
-    if(_esRed && _idTokenCache && (ahora - _idTokenTs) < CACHE_MS) return _idTokenCache; // fallback: cacheado aún fresco
-    if(!_esRed) _idTokenCache = null;   // solo un error de AUTH real invalida el cache
+    const _muerta = /auth\/(user-token-expired|user-disabled|user-not-found|invalid-user-token|user-token-revoked|requires-recent-login|invalid-refresh-token)/i.test(_msg);
+    if(diag){ diag.red = _esRed; diag.sesion = _muerta ? 'MUERTA' : 'REHIDRATANDO'; }
+    console.warn('[Auth] getIdToken error:', _msg, '| sesion=', _muerta ? 'MUERTA' : 'transitoria');
+    if(!_muerta && _idTokenCache && (ahora - _idTokenTs) < CACHE_MS) return _idTokenCache; // transitorio: el cache fresco sigue sirviendo
+    if(_muerta) _idTokenCache = null;   // [FIX-AUTH #4] SOLO la muerte real invalida el cache
     return null;
   }
 }
@@ -1232,17 +1248,18 @@ async function callAppsScriptPrivado(action, payload={}, opts={}){
   // [AUTH-REFRESH a] Antes forzaba token FRESCO (getIdToken(true)) en CADA llamada → round-trip extra
   // a Firebase por operación e hipersensibilidad a microcortes. Ahora usa el cache <50min por defecto
   // (los tokens duran 1h; margen holgado). El retry (abajo) fuerza refresh SOLO si el backend rechaza.
-  const _diag = {red:false};   // [GRUPO-A #8] colector POR-LLAMADA: inmune a llamadas concurrentes
+  const _diag = {red:false, sesion:undefined};   // [GRUPO-A #8]+[FIX-AUTH #1] colector POR-LLAMADA: red + estado de sesión
   const idToken = await getFirebaseIdToken(opts.forceRefresh===true, _diag);
   if(!idToken){
-    // [GRUPO-A #8] Sin token por RED (diag.red) → RED_ERROR honesto: saveDB reintenta/encola con
-    // mensaje de red. Sin usuario o AUTH real (diag.red=false) pinta "Sesión expirada", como antes.
-    if(_diag.red){
-      return {ok:false, error:'RED_ERROR', msg:'Sin conexión al renovar sesión'};
+    // [FIX-AUTH #5 · CONDICIÓN-2] Sin token: "Sesión expirada" SOLO si Firebase CONFIRMÓ la muerte
+    // (diag.sesion==='MUERTA'). RED o REHIDRATANDO (cold-start iOS) = transitorio → RED_ERROR
+    // reintentable, SIN banner, SIN logout. Antes cualquier null no-red pintaba sesión expirada
+    // en falso — ese era el disparador del banner fantasma y de los toques en "Re-login".
+    if(_diag.sesion==='MUERTA'){
+      if(typeof showToast==='function') showToast('Sesión expirada, vuelve a iniciar sesión','error');
+      return {ok:false, error:'AUTH_REQUIRED'};
     }
-    // Sesión nula/expirada: avisar y NO llamar a Apps Script
-    if(typeof showToast==='function') showToast('Sesión expirada, recarga la app','error');
-    return {ok:false, error:'AUTH_REQUIRED'};
+    return {ok:false, error:'RED_ERROR', msg:'Reconectando sesión…', transitorio:true};
   }
   try{
     const r = await fetch(APPS_SCRIPT_URL, {
@@ -1256,12 +1273,21 @@ async function callAppsScriptPrivado(action, payload={}, opts={}){
     // 1er 401 → reintentar UNA vez con token FRESCO (el cache pudo quedar viejo). 2º 401 con token
     // recién emitido = sesión REALMENTE muerta → AUTH_REQUIRED (loadFromCloud ya lo mapea al banner).
     // El flag opts._retry es POR-LLAMADA (sin global, como _diag): garantiza a lo sumo 1 refresh forzado.
+    if(data && data.code===503){
+      // [FIX-AUTH #7] Backend transitorio (verificador identitytoolkit caído/429 — Fase 2 de Codigo.gs
+      // lo emite): reintentable, sin banner. Si el backend viejo aún no emite 503, este branch no corre.
+      return {ok:false, error:'RED_ERROR', msg:'Verificación temporalmente no disponible', transitorio:true};
+    }
     if(data && data.code===401){
       if(!opts._retry){
         _idTokenCache = null;   // invalida el cache para que el retry pida token nuevo
         return await callAppsScriptPrivado(action, payload, Object.assign({}, opts, {forceRefresh:true, _retry:true}));
       }
-      return {ok:false, error:'AUTH_REQUIRED', detalle:(data&&data.error)||''};
+      // [FIX-AUTH #6 · CONDICIÓN-2] 2º 401 con token RECIÉN emitido: si Firebase dice que la sesión
+      // está VIVA, el rechazo es del BACKEND (hipo del verificador / rol) — transitorio, SIN banner.
+      // AUTH_REQUIRED (banner) queda reservado para sesión MUERTA confirmada por Firebase.
+      if(_diag.sesion==='MUERTA'){ return {ok:false, error:'AUTH_REQUIRED', detalle:(data&&data.error)||''}; }
+      return {ok:false, error:'RED_ERROR', msg:'Verificación rechazada, reintentando', transitorio:true, detalle:(data&&data.error)||''};
     }
     return data;
   }catch(e){
@@ -3036,11 +3062,13 @@ const ROLES_POR_CORREO = Object.assign(
 // Email eliminado — acceso legacy retirado. Solo Firebase Auth.
 const RESPALDO_ADMIN = { user:'', pass:'', email:'' };
 
-function entrarComo(perfil, email){
+function entrarComo(perfil, email, silencioso){
+  // [FIX-AUTH #10b] silencioso=true: restauración de sesión tras una recarga (initApp) — repone la
+  // pantalla sin registrar un LOGIN nuevo (el acceso real ya quedó registrado al entrar).
   currentUser={...perfil, username:email, email};
   try{ localStorage.setItem('sinergia_ultimoUsuarioOk', JSON.stringify({
     email, name:perfil.name, role:perfil.role, initials:perfil.initials, ts:Date.now() })); }catch(e){}
-  registrarAcceso('LOGIN');
+  if(!silencioso) registrarAcceso('LOGIN');
   document.getElementById('login-error').style.display='none';
   document.getElementById('topbar-avatar').textContent=perfil.initials;
   document.getElementById('topbar-role').textContent=
@@ -3102,6 +3130,7 @@ async function doLogin(){
     const perfil = ROLES_POR_CORREO[email];
     if(!perfil){
       await fbAuth.signOut();
+      _limpiarSesionToken(); // [FIX-AUTH #8 · CONDICIÓN-1] correo sin rol: no dejar token viejo en memoria
       err.textContent='Tu correo no tiene un rol asignado. Contacta al administrador.';
       err.style.display='block';
       restaurarBtn();
@@ -3167,7 +3196,14 @@ window.addEventListener('DOMContentLoaded', initApp);
 window.addEventListener('DOMContentLoaded', function(){ try{ _initDblEnter(); }catch(_){} });
 // REFRESCO-PACIENTES: al volver la app a primer plano, refrescar la lista (throttle interno de 30s).
 document.addEventListener('visibilitychange', function(){
-  if(document.visibilityState === 'visible'){ try{ refrescarPacientesDesdeNube(); }catch(_){} }
+  if(document.visibilityState === 'visible'){
+    try{ refrescarPacientesDesdeNube(); }catch(_){}
+    // [FIX-AUTH #9] Una nota encolada por un hipo transitorio ya no espera al próximo 'online' o a un
+    // reinicio: al volver a foco (sesión ya rehidratada) las colas drenan. Idempotente: cada drenador
+    // tiene guard de en-curso y el borrado es por-confirmación (r.ok), nunca a ciegas.
+    try{ if(typeof sincronizarPendientes==='function') sincronizarPendientes(); }catch(_){}
+    try{ if(typeof drenarColaSoapActivo==='function') drenarColaSoapActivo(); }catch(_){}
+  }
 });
 
 // ── Service Worker — offline shell + AUTO-ACTUALIZACIÓN SEGURA ──────────────
@@ -3379,7 +3415,7 @@ async function doLogout(){
   document.getElementById('nav-supervision').style.display='none';
   document.getElementById('nav-qa').style.display='none';
   try{ if(typeof fbAuth!=='undefined' && fbAuth.currentUser){ await fbAuth.signOut(); } }catch(e){ console.warn('signOut:',e.message); }
-  _idTokenCache = null; _idTokenTs = 0; _idTokenUid = null; // PASO 1: limpiar caché de ID token (+ uid, AUTH-REFRESH c)
+  _limpiarSesionToken(); // [FIX-AUTH #8 · CONDICIÓN-1] borra cache+ts+uid del token en TODO logout manual
   currentUser=null;screenStack=[];
   document.getElementById('login-user').value='';document.getElementById('login-pass').value='';
   showScreen('screen-login',false);
@@ -14864,6 +14900,25 @@ function initApp(){
   try { if(checkPublicLink()) return; } catch(e){}
   // Modo oscuro persistente (no aplica en vista pública del paciente)
   if(localStorage.getItem('modoOscuro')==='1') document.body.classList.add('modo-oscuro');
+  // [FIX-AUTH #10] RESTAURAR SESIÓN TRAS RECARGA: si Firebase AÚN tiene sesión persistida, reponer
+  // currentUser y aterrizar en agenda — no en login. Antes, TODA recarga (p.ej. la del auto-update)
+  // caía en la pantalla de login aunque Firebase seguía autenticado: eso era el "me sacó de sesión".
+  // Fuente de verdad: onAuthStateChanged. Si resuelve SIN usuario → no hace nada → login normal
+  // (no inventa sesión: sin Modo B). [CONDICIÓN-1] solo restaura si el email vivo de Firebase
+  // coincide con el guardado — jamás repone el perfil de otra cuenta.
+  try{
+    if(typeof fbAuth!=='undefined' && fbAuth && typeof fbAuth.onAuthStateChanged==='function'){
+      var _un = fbAuth.onAuthStateChanged(function(u){
+        try{ if(_un) _un(); }catch(_e){}
+        if(!u || currentUser) return;   // sin sesión real → login normal; ya logueado → nada
+        var raw=null; try{ raw=JSON.parse(localStorage.getItem('sinergia_ultimoUsuarioOk')||'null'); }catch(_e){}
+        var perfil = (raw && raw.email) ? ROLES_POR_CORREO[raw.email] : null;
+        if(perfil && String(u.email||'').toLowerCase()===String(raw.email||'').toLowerCase()){
+          try{ entrarComo(perfil, raw.email, true); }catch(_e){}
+        }
+      });
+    }
+  }catch(_e){}
 }
 
 // ── AUTO-LOGOUT POR INACTIVIDAD (60 min) ─────────────────────────────────
@@ -14920,6 +14975,7 @@ function _evaluarAutoLogout(){
     }
     showToast('Sesión cerrada por inactividad','warning');
     try{ fbAuth.signOut(); }catch(e){}
+    try{ _limpiarSesionToken(); }catch(e){} // [FIX-AUTH #8 · CONDICIÓN-1] cierra el gap: el auto-logout tampoco deja token en memoria
     setTimeout(()=>showScreen('screen-login',false), 800);
   }
 }
