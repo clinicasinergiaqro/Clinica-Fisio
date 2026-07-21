@@ -323,7 +323,16 @@ async function FST_renderHistorialSoap(pid){
   };
   let box = document.getElementById('fst-hist-block');
   if (!box) { const c = document.getElementById('content-expediente'); if (!c) { window._fstRenderInFlight = null; return; } box = document.createElement('div'); box.id = 'fst-hist-block'; c.appendChild(box); }
-  box.innerHTML = '<div style="padding:10px 14px 4px;font-size:12px;color:var(--gray-400)">⏳ Cargando historial Firestore staging...</div>';
+  // [FIX-CACHE-FIRST] Si ya hay sesiones en cache (otro render/prefetch las trajo),
+  // pintarlas YA — sin spinner. Un re-render de la cascada de openExpediente ya no
+  // resetea a "Cargando"; el fetch de abajo refresca. Evita el spinner pegado.
+  const _cacheIni = _fstSesionesCache[pid];
+  if (Array.isArray(_cacheIni) && _cacheIni.length) {
+    const _cardsIni = [..._cacheIni].sort(_cmpSoapFechaDesc).map(s => FST_renderCard(s, pid)).join('');
+    if (_sigoVigente()) _pintarHist('<div style="margin:14px 0 6px;padding:0 14px"><div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.7px;color:var(--gray-400)">\u{1F4C2} Historial clínico (' + _cacheIni.length + ' sesiones)</div></div>' + _cardsIni);
+  } else {
+    box.innerHTML = '<div style="padding:10px 14px 4px;font-size:12px;color:var(--gray-400)">⏳ Cargando historial Firestore staging...</div>';
+  }
   try {
     const ok = await FST_init();
     if (!ok) { box.innerHTML = '<div style="padding:10px 14px;font-size:12px;color:var(--red)">⚠ No se pudo autenticar con Firestore staging.</div>'; return; }
@@ -355,12 +364,15 @@ async function FST_renderHistorialSoap(pid){
     // [FIX-HANG-3] No clobberar un cache bueno con [] (token frío que aún devuelve vacío).
     if (sesiones.length || !(Array.isArray(_fstSesionesCache[pid]) && _fstSesionesCache[pid].length)) _fstSesionesCache[pid] = sesiones;
     if (!sesiones.length) {
-      // [FIX-HANG-4] Si el cache del pid YA tiene sesiones (otro render las trajo), un fetch
-      // vacío NO debe borrarlas de pantalla con "Sin historial".
-      if (Array.isArray(_fstSesionesCache[pid]) && _fstSesionesCache[pid].length) return;
-      const galeriaSola = await FST_renderGaleriaHistorica(pid);
-      if (_sigoVigente()) _pintarHist(galeriaSola + '<div style="padding:10px 14px;font-size:12px;color:var(--gray-400)">Sin historial Firestore para este paciente.</div>');
-      return;
+      // [FIX-CACHE-FIRST] Si mi fetch vino vacío pero el cache tiene sesiones (otro render/prefetch),
+      // USARLAS y caer al render normal de abajo — NO retornar dejando el spinner pegado.
+      const _cFall = _fstSesionesCache[pid];
+      if (Array.isArray(_cFall) && _cFall.length) { sesiones = _cFall; }
+      else {
+        const galeriaSola = await FST_renderGaleriaHistorica(pid);
+        if (_sigoVigente()) _pintarHist(galeriaSola + '<div style="padding:10px 14px;font-size:12px;color:var(--gray-400)">Sin historial Firestore para este paciente.</div>');
+        return;
+      }
     }
     const ids = new Set(); const dups = sesiones.filter(function(s){ if (ids.has(s.id)) return true; ids.add(s.id); return false; });
     if (dups.length) console.error('[FST] IDs duplicados:', dups.map(function(s){ return s.id; }));
