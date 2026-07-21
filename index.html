@@ -303,14 +303,35 @@ async function FST_renderGaleriaHistorica(pid){
 
 async function FST_renderHistorialSoap(pid){
   if (!FST_isEnabled() || !pid) return;
-  if (window._fstRenderInFlight === pid) return; // evita doble fetch concurrente; re-render permitido al volver al tab
+  // [FIX-HANG-3] Guard consciente del DOM: solo suprimir si YA hay un bloque en el DOM vivo.
+  // Si el bloque no está (un re-render de openExpediente detachó el anterior, o el flag quedó
+  // de una operación previa), hay que renderizar aunque el flag coincida: el DOM fresco necesita pintarse.
+  if (window._fstRenderInFlight === pid && document.getElementById('fst-hist-block')) return;
   window._fstRenderInFlight = pid;
+  // [FIX-HANG-3] Pinta re-adquiriendo el nodo vivo (un re-render pudo detachar el box capturado).
+  const _pintarHist = (h) => {
+    let b = document.getElementById('fst-hist-block');
+    if (!b) { const cc = document.getElementById('content-expediente');
+              if (!cc || (currentPatient && currentPatient.id !== pid)) return;
+              b = document.createElement('div'); b.id = 'fst-hist-block'; cc.appendChild(b); }
+    b.innerHTML = h;
+  };
   let box = document.getElementById('fst-hist-block');
   if (!box) { const c = document.getElementById('content-expediente'); if (!c) { window._fstRenderInFlight = null; return; } box = document.createElement('div'); box.id = 'fst-hist-block'; c.appendChild(box); }
   box.innerHTML = '<div style="padding:10px 14px 4px;font-size:12px;color:var(--gray-400)">⏳ Cargando historial Firestore staging...</div>';
   try {
     const ok = await FST_init();
     if (!ok) { box.innerHTML = '<div style="padding:10px 14px;font-size:12px;color:var(--red)">⚠ No se pudo autenticar con Firestore staging.</div>'; return; }
+    // [FIX-HANG-3] Calentar el token ANTES del primer fetch: en cold-resume el token del SDK
+    // viejo devuelve [] (permission-denied silencioso). getIdToken() sin force es instant si
+    // es válido, y refresca si expiró. Race a 4s para no bloquear si la red no responde.
+    try {
+      const _u = firebase.auth().currentUser;
+      if (_u) await Promise.race([
+        _u.getIdToken(),
+        new Promise((_, rej) => setTimeout(() => rej(new Error('tok-timeout')), 4000))
+      ]);
+    } catch(_e){}
     let sesiones = await FST_fetchSesiones(pid);
     // [COLD-START FIX] En arranque frío del iPad la 1ª lectura de la subcolección puede volver []
     // porque el token/reglas de Firestore aún no propagaron (permission-denied que FST_fetchSesiones
@@ -326,10 +347,11 @@ async function FST_renderHistorialSoap(pid){
       }
     }
     if (sesiones.length) window._fstHistWarm = true;   // auth confirmada caliente → dejar de reintentar en vacíos
-    _fstSesionesCache[pid] = sesiones;
+    // [FIX-HANG-3] No clobberar un cache bueno con [] (token frío que aún devuelve vacío).
+    if (sesiones.length || !(Array.isArray(_fstSesionesCache[pid]) && _fstSesionesCache[pid].length)) _fstSesionesCache[pid] = sesiones;
     if (!sesiones.length) {
       const galeriaSola = await FST_renderGaleriaHistorica(pid);
-      box.innerHTML = galeriaSola + '<div style="padding:10px 14px;font-size:12px;color:var(--gray-400)">Sin historial Firestore para este paciente.</div>';
+      _pintarHist(galeriaSola + '<div style="padding:10px 14px;font-size:12px;color:var(--gray-400)">Sin historial Firestore para este paciente.</div>');
       return;
     }
     const ids = new Set(); const dups = sesiones.filter(function(s){ if (ids.has(s.id)) return true; ids.add(s.id); return false; });
@@ -348,7 +370,7 @@ async function FST_renderHistorialSoap(pid){
         _fstPrimeraSesEl.innerHTML='<div class="field-row"><div class="field-label">Primera sesión registrada</div><div class="field-value" style="color:var(--gray-400);font-size:13px">'+escapeHTML(_fstFmtF)+'</div></div>';
       }
     }
-    box.innerHTML = galeria + '<div style="margin:14px 0 6px;padding:0 14px"><div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.7px;color:var(--gray-400)">\u{1F4C2} Historial clínico (Firestore staging · ' + sesiones.length + ' sesiones)</div></div>' + cards;
+    _pintarHist(galeria + '<div style="margin:14px 0 6px;padding:0 14px"><div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.7px;color:var(--gray-400)">\u{1F4C2} Historial clínico (Firestore staging · ' + sesiones.length + ' sesiones)</div></div>' + cards);
     console.log('[FST] ' + sesiones.length + ' sesiones pintadas · pid=' + pid);
   } catch (e) {
     console.error('[FST] renderHistorialSoap ERROR:', e.message);
@@ -6144,7 +6166,9 @@ function openExpediente(pid){
   // re-renderiza. Solo LLAMA a FST_fetchSesiones (no la modifica).
   if(String(pid).startsWith('mig_pac_') && typeof FST_fetchSesiones==='function'){
     FST_fetchSesiones(pid).then(function(ses){
-      _fstSesionesCache[pid] = Array.isArray(ses)?ses:[];
+      // [FIX-HANG-3] No clobberar un cache bueno con [] (token frío en cold-resume).
+      const _n = Array.isArray(ses)?ses:[];
+      if (_n.length || !(Array.isArray(_fstSesionesCache[pid]) && _fstSesionesCache[pid].length)) _fstSesionesCache[pid] = _n;
       if(currentPatient && currentPatient.id===pid && document.getElementById('content-expediente')) renderExpediente(currentTab||'historia');
     }).catch(function(){});
   }
