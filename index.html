@@ -85,18 +85,22 @@ async function FST_init(){
     // con el login normal de la app. Sin app 'staging', sin auth adicional, sin prompt.
     if (typeof FST_PROD_MODE !== 'undefined' && FST_PROD_MODE) {
       const app = firebase.app();
-      // Esperar a que Auth tenga usuario antes de inicializar Firestore (evita permission-denied por carrera)
-      const user = await new Promise(resolve => {
-        let done = false;
-        const timer = setTimeout(() => {
-          if (done) return; done = true; resolve(null);
-        }, 10000);
-        const unsub = firebase.auth().onAuthStateChanged(u => {
-          if (!u) { console.log('[FST] Auth sin usuario, esperando...'); return; }
-          if (done) return; done = true;
-          clearTimeout(timer); unsub(); resolve(u);
+      // [FIX-HANG] currentUser-first: cold-resume iOS -> observer no re-emite + setTimeout
+      // congelado por throttling de timers -> FST_init cuelga infinito -> expediente nunca abre.
+      // Si currentUser ya existe (sesion viva, el caso de la foto), resolver al instante.
+      let user = (firebase.auth() && firebase.auth().currentUser) || null;
+      if (!user) {
+        user = await new Promise(resolve => {
+          let done = false, unsub = null;
+          const finish = (u) => {
+            if (done) return; done = true;
+            try { if (unsub) unsub(); } catch(_e){}
+            resolve(u || (firebase.auth() && firebase.auth().currentUser) || null);
+          };
+          const timer = setTimeout(() => finish(null), 4000);
+          unsub = firebase.auth().onAuthStateChanged(u => { if (!u) return; clearTimeout(timer); finish(u); });
         });
-      });
+      }
       if (!user) {
         console.warn('[FST] Sin usuario después de 10s. No se inicializa Firestore.');
         window._fstDb = null; window._fstInitDone = false; return false;
