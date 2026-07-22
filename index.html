@@ -7164,11 +7164,25 @@ async function FST_refrescarIndiceEnSegundoPlano() {
     if (!db) return; // sin Firestore no se revalida ahora; se reintenta en el próximo acceso
 
     const MAX_DOCS   = 5000;
-    const TIMEOUT_MS = 5000;
-    const snap = await Promise.race([
-      db.collection('pacientes').limit(MAX_DOCS).get(),
-      new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), TIMEOUT_MS))
-    ]);
+    const TIMEOUT_MS = 15000;   // [FIX-INDICE-FRIO] 5s → 15s: en cold-resume el read de ~2454 docs con token frío tarda >5s
+    // [FIX-INDICE-FRIO] Calentar el token ANTES del read (token frío del SDK viejo hace lento/[] el .get()).
+    try {
+      const _u = firebase.auth().currentUser;
+      if (_u) await Promise.race([
+        _u.getIdToken(),
+        new Promise((_, rej) => setTimeout(() => rej(new Error('tok-timeout')), 4000))
+      ]);
+    } catch(_e){}
+    // [FIX-INDICE-FRIO] Retry del read (hasta 2 intentos, 800ms) antes de caer a stale.
+    let snap = null;
+    for (let _i = 0; _i < 2 && !snap; _i++) {
+      try {
+        snap = await Promise.race([
+          db.collection('pacientes').limit(MAX_DOCS).get(),
+          new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), TIMEOUT_MS))
+        ]);
+      } catch(_r) { if (_i === 0) await new Promise(r => setTimeout(r, 800)); else throw _r; }
+    }
 
     const frescos = [];
     snap.forEach(doc => {
@@ -7225,7 +7239,7 @@ async function FST_cargarIndicePacientes() {
   const TTL_MS     = 30 * 60 * 1000;   // [FIX-INDICE] 24h → 30min (backstop cross-reload; el SWR de abajo es lo que auto-cura)
   const FRESH_MS   = 45 * 1000;        // [FIX-INDICE] SWR: índice servido con >45s → revalidar contra Firestore en 2º plano
   const MAX_DOCS   = 5000;
-  const TIMEOUT_MS = 5000;
+  const TIMEOUT_MS = 15000;   // [FIX-INDICE-FRIO] 5s → 15s: read de ~2454 docs con token frío tarda >5s en cold-resume
 
   function leerCacheSesion() {
     try {
@@ -7292,10 +7306,24 @@ async function FST_cargarIndicePacientes() {
   // Crear Promise compartida ANTES del await para que llamadas concurrentes la encuentren
   window._FST_indicePacientesPromise = (async () => {
     try {
-      const snap = await Promise.race([
-        db.collection('pacientes').limit(MAX_DOCS).get(),
-        new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), TIMEOUT_MS))
-      ]);
+      // [FIX-INDICE-FRIO] Calentar el token ANTES del read (token frío del SDK viejo hace lento/[] el .get()).
+      try {
+        const _u = firebase.auth().currentUser;
+        if (_u) await Promise.race([
+          _u.getIdToken(),
+          new Promise((_, rej) => setTimeout(() => rej(new Error('tok-timeout')), 4000))
+        ]);
+      } catch(_e){}
+      // [FIX-INDICE-FRIO] Retry del read (hasta 2 intentos, 800ms) antes de caer a stale/[].
+      let snap = null;
+      for (let _i = 0; _i < 2 && !snap; _i++) {
+        try {
+          snap = await Promise.race([
+            db.collection('pacientes').limit(MAX_DOCS).get(),
+            new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), TIMEOUT_MS))
+          ]);
+        } catch(_r) { if (_i === 0) await new Promise(r => setTimeout(r, 800)); else throw _r; }
+      }
 
       const pacientes = [];
       snap.forEach(doc => {
