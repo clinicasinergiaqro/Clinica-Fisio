@@ -154,7 +154,7 @@ async function FST_init(){
 }
 
 async function FST_fetchSesiones(pid){
-  if (!pid || !window._fstDb) return [];
+  if (!pid || !window._fstDb) return null;   // [SENTINEL] null = no pude cargar (sin db); array = cargó (aunque sea [])
   try {
     const snap = await Promise.race([
       window._fstDb.collection('pacientes').doc(pid).collection('sesiones').orderBy('num','asc').get(),
@@ -194,7 +194,7 @@ async function FST_fetchSesiones(pid){
         completa: false, importado: true, _origen: 'firestore_historico'
       };
     });
-  } catch (e) { console.error('[FST] fetchSesiones ERROR:', e.message); return []; }
+  } catch (e) { console.error('[FST] fetchSesiones ERROR:', e.message); return null; }   // [SENTINEL] error/timeout = no pude cargar
 }
 
 function FST_badgesSesion(s){
@@ -347,22 +347,30 @@ async function FST_renderHistorialSoap(pid){
       ]);
     } catch(_e){}
     let sesiones = await FST_fetchSesiones(pid);
-    // [COLD-START FIX] En arranque frío del iPad la 1ª lectura de la subcolección puede volver []
-    // porque el token/reglas de Firestore aún no propagaron (permission-denied que FST_fetchSesiones
-    // traga → []). Antes eso pintaba "Sin historial" y el usuario tenía que CERRAR Y REABRIR la app.
-    // Ahora reintentamos breve ANTES de concluir vacío, SOLO mientras la auth no se haya confirmado
-    // caliente en esta sesión (window._fstHistWarm). Un paciente realmente sin sesiones, con auth ya
-    // caliente, no reintenta (no lo penalizamos). Si el usuario cambia de paciente/tab, se aborta.
-    if (!sesiones.length && !window._fstHistWarm) {
-      for (let _i = 0; _i < 3 && !sesiones.length; _i++) {
+    // [SENTINEL] FST_fetchSesiones ahora devuelve null = "no pude cargar" (sin db / timeout / error);
+    // array = "cargó" (aunque sea []). Reintento breve mientras haya ERROR (null) O vacío, y la auth no
+    // esté confirmada caliente (window._fstHistWarm). Un paciente realmente sin sesiones, con auth ya
+    // caliente, no reintenta. Si el usuario cambia de paciente/tab, se aborta. (sesiones===null va SIEMPRE
+    // antes de !sesiones.length → short-circuit, nunca se evalúa null.length.)
+    if ((sesiones === null || !sesiones.length) && !window._fstHistWarm) {
+      for (let _i = 0; _i < 3 && (sesiones === null || !sesiones.length); _i++) {
         await new Promise(function(r){ setTimeout(r, 500); });
         if (window._fstRenderInFlight !== pid) return;   // el usuario cambió de tab/paciente: abortar
         sesiones = await FST_fetchSesiones(pid);
       }
     }
-    if (sesiones.length) window._fstHistWarm = true;   // auth confirmada caliente → dejar de reintentar en vacíos
-    // [FIX-HANG-3] No clobberar un cache bueno con [] (token frío que aún devuelve vacío).
-    if (sesiones.length || !(Array.isArray(_fstSesionesCache[pid]) && _fstSesionesCache[pid].length)) _fstSesionesCache[pid] = sesiones;
+    if (Array.isArray(sesiones) && sesiones.length) window._fstHistWarm = true;   // auth confirmada caliente
+    // [FIX-HANG-3] No clobberar cache bueno con []; [SENTINEL] y JAMÁS cachear el sentinel null.
+    if (Array.isArray(sesiones) && (sesiones.length || !(Array.isArray(_fstSesionesCache[pid]) && _fstSesionesCache[pid].length))) _fstSesionesCache[pid] = sesiones;
+    // [SENTINEL] Error de carga: cache-first; si no hay cache bueno, ERROR ACCIONABLE (no falso "Sin historial").
+    if (sesiones === null) {
+      const _cErr = _fstSesionesCache[pid];
+      if (Array.isArray(_cErr) && _cErr.length) { sesiones = _cErr; }   // usar cache bueno, seguir al render normal
+      else {
+        if (_sigoVigente()) _pintarHist('<div style="padding:12px 14px;font-size:12px;color:var(--red)">⚠ No se pudo cargar el historial (conexión). <button type="button" data-pid="'+escapeAttr_(pid)+'" onclick="FST_renderHistorialSoap(this.dataset.pid)" style="margin-left:8px;font-size:12px;font-weight:700;padding:5px 12px;border-radius:10px;border:1.5px solid var(--navy);background:white;color:var(--navy);cursor:pointer">Reintentar</button></div>');
+        return;
+      }
+    }
     if (!sesiones.length) {
       // [FIX-CACHE-FIRST] Si mi fetch vino vacío pero el cache tiene sesiones (otro render/prefetch),
       // USARLAS y caer al render normal de abajo — NO retornar dejando el spinner pegado.
@@ -10724,7 +10732,7 @@ async function _fechaSesionPorImagen(pid, url){
     var base = fname.replace(/\.[^.]+$/,'');
     if (base.length < 6) return null;
     var uuid = (fname.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i)||[])[0] || '';
-    var sesiones = (typeof FST_fetchSesiones==='function') ? await FST_fetchSesiones(pid) : [];
+    var sesiones = ((typeof FST_fetchSesiones==='function') ? await FST_fetchSesiones(pid) : []) || [];   // [SENTINEL] null→[] (no iterar sentinel)
     for (var i=0;i<sesiones.length;i++){
       var t = sesiones[i].textoOriginal || '';
       if (!t) continue;
@@ -16857,7 +16865,7 @@ async function nuevaSesionRapida(patientId){
       await FST_hidratarCamposClinicos(p, patientId);
       if(!Array.isArray(p.soap)) p.soap=[];
       if(typeof FST_fetchSesiones==='function' && window._fstDb){
-        try{ _fstSesionesCache[patientId] = await FST_fetchSesiones(patientId); }catch(e){}
+        try{ var _r = await FST_fetchSesiones(patientId); if(Array.isArray(_r)) _fstSesionesCache[patientId]=_r; }catch(e){}   // [SENTINEL] jamás cachear el sentinel null
       }
     }
   }
