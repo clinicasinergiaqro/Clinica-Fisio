@@ -347,19 +347,18 @@ async function FST_renderHistorialSoap(pid){
       ]);
     } catch(_e){}
     let sesiones = await FST_fetchSesiones(pid);
-    // [SENTINEL] FST_fetchSesiones ahora devuelve null = "no pude cargar" (sin db / timeout / error);
-    // array = "cargó" (aunque sea []). Reintento breve mientras haya ERROR (null) O vacío, y la auth no
-    // esté confirmada caliente (window._fstHistWarm). Un paciente realmente sin sesiones, con auth ya
-    // caliente, no reintenta. Si el usuario cambia de paciente/tab, se aborta. (sesiones===null va SIEMPRE
-    // antes de !sesiones.length → short-circuit, nunca se evalúa null.length.)
-    if ((sesiones === null || !sesiones.length) && !window._fstHistWarm) {
-      for (let _i = 0; _i < 3 && (sesiones === null || !sesiones.length); _i++) {
+    // [SENTINEL] null = "no pude cargar" (sin db / timeout / error); array = "cargó" (aunque sea []).
+    // Reintento breve SOLO en ERROR (null): con el sentinel un [] es AUTORITATIVO (query OK, 0 docs) y
+    // NO se reintenta → el histórico con 0 sesiones pinta "Sin historial" al instante, sin 1.5s de más.
+    // El cold-token-vacío que antes justificaba reintentar-en-vacío ahora llega como null. Si el usuario
+    // cambia de paciente/tab, se aborta. (_fstHistWarm quedó obsoleto: el sentinel lo reemplaza.)
+    if (sesiones === null) {
+      for (let _i = 0; _i < 3 && sesiones === null; _i++) {
         await new Promise(function(r){ setTimeout(r, 500); });
         if (window._fstRenderInFlight !== pid) return;   // el usuario cambió de tab/paciente: abortar
         sesiones = await FST_fetchSesiones(pid);
       }
     }
-    if (Array.isArray(sesiones) && sesiones.length) window._fstHistWarm = true;   // auth confirmada caliente
     // [FIX-HANG-3] No clobberar cache bueno con []; [SENTINEL] y JAMÁS cachear el sentinel null.
     if (Array.isArray(sesiones) && (sesiones.length || !(Array.isArray(_fstSesionesCache[pid]) && _fstSesionesCache[pid].length))) _fstSesionesCache[pid] = sesiones;
     // [SENTINEL] Error de carga: cache-first; si no hay cache bueno, ERROR ACCIONABLE (no falso "Sin historial").
