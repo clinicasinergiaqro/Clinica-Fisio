@@ -7163,7 +7163,7 @@ async function FST_refrescarIndiceEnSegundoPlano() {
     }
     if (!db) return; // sin Firestore no se revalida ahora; se reintenta en el próximo acceso
 
-    const MAX_DOCS   = 5000;
+    const MAX_DOCS   = 20000;   // [FIX-INDICE-FRIO] 5000 → 20000: evita truncar en silencio si la migración empujó el total cerca/arriba de 5000 (sin costo: devuelve solo lo que existe)
     const TIMEOUT_MS = 15000;   // [FIX-INDICE-FRIO] 5s → 15s: en cold-resume el read de ~2454 docs con token frío tarda >5s
     // [FIX-INDICE-FRIO] Calentar el token ANTES del read (token frío del SDK viejo hace lento/[] el .get()).
     try {
@@ -7238,7 +7238,7 @@ async function FST_cargarIndicePacientes() {
   const CACHE_KEY  = 'FST_indice_v1';
   const TTL_MS     = 30 * 60 * 1000;   // [FIX-INDICE] 24h → 30min (backstop cross-reload; el SWR de abajo es lo que auto-cura)
   const FRESH_MS   = 45 * 1000;        // [FIX-INDICE] SWR: índice servido con >45s → revalidar contra Firestore en 2º plano
-  const MAX_DOCS   = 5000;
+  const MAX_DOCS   = 20000;   // [FIX-INDICE-FRIO] 5000 → 20000: evita truncar en silencio si la migración empujó el total cerca/arriba de 5000 (sin costo: devuelve solo lo que existe)
   const TIMEOUT_MS = 15000;   // [FIX-INDICE-FRIO] 5s → 15s: read de ~2454 docs con token frío tarda >5s en cold-resume
 
   function leerCacheSesion() {
