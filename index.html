@@ -3258,6 +3258,74 @@ document.addEventListener('visibilitychange', function(){
   }
 });
 
+// [FIX-RECONNECT] Conexión Firestore zombie tras resume iOS: el socket heredado no responde y
+// todo .get() cuelga/vacía hasta remontar la app varias veces. Al volver a primer plano se
+// recicla la red del SDK (disable→enable) y se refresca la VISTA ACTIVA.
+// Seguridad verificada: (a) las escrituras van por colas COLA_* en localStorage (L1870+), no por
+// la cola offline del SDK; (b) sin enableIndexedDbPersistence (0 ocurrencias). => el toggle no
+// puede perder escrituras. Guard de escrituras en vuelo (_opEscrituraEnVuelo, wrapper L18381+)
+// CON timeout de escape: si tras 4.5s el contador sigue >0, la escritura probablemente cuelga
+// sobre la misma conexión zombie (deadlock) → forzar el reciclaje; la escritura cortada se
+// re-encola en COLA_* y reintenta idempotente (set merge por doc id).
+async function FST_reconectarFirestore(motivo){
+  try{
+    if (window._fstReconnecting) return;
+    if (!window._fstDb) return;                          // nada que reciclar aún
+    if ((window._opEscrituraEnVuelo|0) > 0) {
+      if (!window._fstReconnectPostergadoDesde) window._fstReconnectPostergadoDesde = Date.now();
+      if (Date.now() - window._fstReconnectPostergadoDesde < 4500) {
+        console.log('[FST-RECONNECT] pospuesto: escritura en vuelo, reintento en 1.5s');
+        setTimeout(function(){ FST_reconectarFirestore((motivo||'?')+'/retry'); }, 1500);
+        return;
+      }
+      console.log('[FST-RECONNECT] forzando pese a escritura en vuelo (>4.5s, probable cuelgue zombie)');
+    }
+    window._fstReconnectPostergadoDesde = 0;  // reset al proceder
+    window._fstReconnecting = true;
+    console.log('[FST-RECONNECT] reciclando red (' + (motivo||'?') + ')...');
+    try{ await Promise.race([window._fstDb.disableNetwork(), new Promise(r=>setTimeout(r,3000))]); }catch(_e){}
+    try{ await Promise.race([window._fstDb.enableNetwork(),  new Promise(r=>setTimeout(r,3000))]); }catch(_e){}
+    // [AJUSTE-1] Respiro: enableNetwork resuelve cuando el SDK acepta la orden, no cuando la
+    // conexión está lista para leer. Band-aid consciente; el respaldo real es el retry +
+    // cache-first interno de FST_renderHistorialSoap.
+    await new Promise(r=>setTimeout(r,400));
+    console.log('[FST-RECONNECT] red reciclada');
+    // R2: refrescar la VISTA ACTIVA genéricamente (no solo "paciente abierto").
+    // [BLOQUEANTE-1] En expediente NO se llama renderExpediente (c.innerHTML relanzaría la
+    // cascada 21f-21h). Se refresca el historial DIRECTO: idempotente por sello de recencia
+    // (21g) + cache-first (21h), y su contenedor (#fst-hist-block) es independiente de la
+    // gráfica (que vive en el HTML principal de la pestaña y no se toca).
+    var act = (document.querySelector('.screen.active')||{}).id || '';
+    if (act === 'screen-expediente' && window.currentPatient) {
+      var _pid = window.currentPatient.id;
+      if (String(_pid).startsWith('mig_pac_') && typeof FST_renderHistorialSoap==='function') {
+        try{ FST_renderHistorialSoap(_pid); }catch(_e){}
+      }
+    } else if (act === 'screen-pacientes') {
+      try{ if(typeof FST_refrescarIndiceEnSegundoPlano==='function') FST_refrescarIndiceEnSegundoPlano(); }catch(_e){}
+      try{ if(typeof renderPacientesLista==='function') renderPacientesLista(); }catch(_e){}
+    } else if (act === 'screen-agenda') {
+      try{ if(typeof renderAgenda==='function') renderAgenda(); }catch(_e){}
+      try{ refrescarPacientesDesdeNube(); }catch(_e){}
+    } // otras pantallas: sin refresco forzado; sus loaders releen al entrar
+  } finally {
+    window._fstReconnecting = false;
+  }
+}
+// R1: iOS no dispara visibilitychange confiablemente tras suspensión agresiva. Triple
+// enganche (visibilitychange + pageshow SOLO persisted + focus) a UN embudo con dedup de
+// 10s para que un mismo resume no dispare 3 reciclajes. pageshow sin persisted = carga
+// fresca = sin zombie = no reciclar.
+function _fstResumeHook(origen){
+  var t = Date.now();
+  if (t - (window._fstUltimoResume||0) < 10000) return;
+  window._fstUltimoResume = t;
+  try{ FST_reconectarFirestore(origen); }catch(_e){}
+}
+document.addEventListener('visibilitychange', function(){ if(document.visibilityState==='visible') _fstResumeHook('visibilitychange'); });
+window.addEventListener('pageshow', function(e){ if(e && e.persisted) _fstResumeHook('pageshow-bfcache'); });
+window.addEventListener('focus', function(){ _fstResumeHook('focus'); });
+
 // ── Service Worker — offline shell + AUTO-ACTUALIZACIÓN SEGURA ──────────────
 // El SW hace skipWaiting()+clients.claim(): la versión nueva toma control sola, pero el JS ya
 // cargado sigue siendo el viejo hasta recargar. Aquí recargamos AUTOMÁTICA y SEGURAMENTE — jamás
@@ -6185,7 +6253,11 @@ function openExpediente(pid){
   // las tenga en las vistas SÍNCRONAS (gráfica EVA, completitud). Una lectura por apertura; al llegar,
   // re-renderiza. Solo LLAMA a FST_fetchSesiones (no la modifica).
   if(String(pid).startsWith('mig_pac_') && typeof FST_fetchSesiones==='function'){
-    FST_fetchSesiones(pid).then(function(ses){
+    // [CAPA-1] Gate de init: en frío _fstDb no existe y FST_fetchSesiones devolvía [] en
+    // silencio (L157) → gráfica/vista huérfanas. Esperar FST_init (auth+db) antes del fetch.
+    (window._fstDb ? Promise.resolve(true) : FST_init().catch(function(){ return false; }))
+      .then(function(){ return FST_fetchSesiones(pid); })
+      .then(function(ses){
       // [FIX-HANG-3] No clobberar un cache bueno con [] (token frío en cold-resume).
       const _n = Array.isArray(ses)?ses:[];
       if (_n.length || !(Array.isArray(_fstSesionesCache[pid]) && _fstSesionesCache[pid].length)) _fstSesionesCache[pid] = _n;
