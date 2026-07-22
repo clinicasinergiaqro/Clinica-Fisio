@@ -153,6 +153,29 @@ async function FST_init(){
   }
 }
 
+// ── BORRADO LÓGICO — LADO LECTURA (cimiento; SIN botón de borrado aún) ──────────
+// Set de pids eliminados: poblado como BYPRODUCTO del read del índice (sin lectura extra),
+// reconstruido en cada carga/SWR. Solo se necesita para el caso cross-paciente (collectionGroup
+// de la cola de revisión), donde llega una sesión SIN su doc padre. Para docs que el lector YA
+// tiene, se filtra por el campo propio `eliminado` (el SDK web no tiene proyección → siempre viene).
+//
+// INVARIANTE A DEFENDER (no solo cierto hoy): todo write a pacientes/{pid} y a sesiones/{sid} DEBE
+// ser {merge:true}. Un write NO-merge (o uno que ponga eliminado:false fuera del des-borrar
+// supervisor) puede RESUCITAR un tombstone. El veredicto de los write-adjacentes depende de esto.
+//
+// [HOOK-2b — ANOTADO, NO IMPLEMENTADO] Cuando exista el botón de borrado: al marcar el tombstone,
+// la función de borrado DEBE hacer `window._FST_pidsEliminados.add(pid)` (y para des-borrar,
+// `.delete(pid)`) SÍNCRONAMENTE tras la escritura — NO esperar al próximo ciclo de índice. En
+// producción el supervisor borra y sigue trabajando sin recargar. Este es el punto donde se
+// engancha la invalidación en caliente del set.
+window._FST_pidsEliminados = window._FST_pidsEliminados || new Set();
+function _fstPidVivo(pid){ return !(window._FST_pidsEliminados && window._FST_pidsEliminados.has(String(pid||''))); }
+function _fstDocVivo(d){ return !!d && d.eliminado !== true; }                       // doc de paciente que YA tienes
+function _fstSesionViva(s, pid){ return !!s && s.eliminado !== true && _fstPidVivo(pid); }  // jerárquico (sid O padre)
+function _fstFiltrarVivos(items, getPid){
+  return (items||[]).filter(function(x){ return x && x.eliminado !== true && _fstPidVivo(getPid ? getPid(x) : String((x && (x.fstPid||x.id))||'')); });
+}
+
 async function FST_fetchSesiones(pid){
   if (!pid || !window._fstDb) return null;   // [SENTINEL] null = no pude cargar (sin db); array = cargó (aunque sea [])
   try {
@@ -160,9 +183,11 @@ async function FST_fetchSesiones(pid){
       window._fstDb.collection('pacientes').doc(pid).collection('sesiones').orderBy('num','asc').get(),
       new Promise((_, rej) => setTimeout(() => rej(new Error('timeout-fetchSesiones')), 6000))
     ]);
-    return snap.docs.map(function(doc){
+    return snap.docs.filter(function(doc){ return (doc.data()||{}).eliminado !== true; }).map(function(doc){   // [BORRADO] filtra sesiones tombstoneadas
       const d = doc.data() || {};
       return {
+        _docId: doc.id,        // [BORRADO] doc-id crudo (borrado de nota migrada usa ÉSTE, no el campo id que puede diferir)
+        _parentPid: pid,       // [BORRADO] pid del padre (para checks jerárquicos)
         id: d.id || doc.id, num: Number(d.num || 0), fecha: d.fecha || '', semana: Number(d.semana || 1),
         // FIX A — fallback de fecha para sesiones sin `fecha` (que caían al fondo del historial):
         fechaHoraISO: d.fechaHoraISO || (d.createdAt && typeof d.createdAt.toDate==='function' ? d.createdAt.toDate().toISOString() : ''),
@@ -275,6 +300,7 @@ async function FST_renderGaleriaHistorica(pid){
       new Promise((_, rej) => setTimeout(() => rej(new Error('timeout-galeriaHist')), 6000))
     ]);
     const data = snap.data() || {};
+    if (!_fstDocVivo(data)) return '';   // [BORRADO] sin galería de un paciente tombstoneado
     const fotos = (data.fotosHistoricas || []).filter(function(f){ return f && f.url; });
     if (!fotos.length) return '';
     const tipoPorUrl = {};
@@ -456,8 +482,12 @@ async function FST_resolverPidPaciente(paciente) {
   if (!ok || !window._fstDb) return { ok: false, reason: 'FST_INIT_FAILED' };
   if (nombre) {
     const snap = await window._fstDb.collection('pacientes').where('nombreNormalizado', '==', nombre).limit(3).get();
-    if (snap.size === 1) { const pid = snap.docs[0].id; if (cacheKey) window._fstPidCache[cacheKey] = pid; return { ok: true, pid: pid, matchType: 'nombreNormalizado_unico' }; }
-    if (snap.size > 1) { console.warn('[FST] PID ambiguo:', nombre, snap.size, 'matches → no escribe'); return { ok: false, reason: 'PID_AMBIGUO', matches: snap.size }; }
+    // [BORRADO] Excluir tombstones: un homónimo NUEVO no debe resolverse a un doc borrado (se
+    // escribiría DENTRO del tombstone —merge preserva eliminado:true— y quedaría invisible). El doc
+    // viene completo (SDK web sin proyección) → el campo eliminado siempre está presente.
+    const _vivos = snap.docs.filter(function(dd){ return (dd.data()||{}).eliminado !== true; });
+    if (_vivos.length === 1) { const pid = _vivos[0].id; if (cacheKey) window._fstPidCache[cacheKey] = pid; return { ok: true, pid: pid, matchType: 'nombreNormalizado_unico' }; }
+    if (_vivos.length > 1) { console.warn('[FST] PID ambiguo:', nombre, _vivos.length, 'matches → no escribe'); return { ok: false, reason: 'PID_AMBIGUO', matches: _vivos.length }; }
   }
   const base = appId || nombre || ('sin_nombre_' + Date.now());
   const pid = 'app_live_' + FST_hashSimpleLive(base);
@@ -4447,6 +4477,7 @@ async function mostrarPendientesSOAP(){
       var snapH=await window._fstDb.collection('pacientes').get();
       snapH.forEach(function(d){
         var data=d.data()||{};
+        if(!_fstDocVivo(data)) return;   // [BORRADO] excluir tombstones del full-read directo
         var nn=_normPend(data.nombreNormalizado || data.name || '');
         if(nn){ var tk=nn.split(' ').filter(Boolean); if(tk.length) idxHist.push(tk); }
       });
@@ -5080,6 +5111,7 @@ async function _fetchColaRevision(forzar){
   snap.forEach(function(d){
     var x=d.data()||{};
     var pid=d.ref.parent.parent?d.ref.parent.parent.id:'';
+    if(!_fstSesionViva(x, pid)) return;   // [BORRADO] jerárquico: oculta si sid eliminado O pid padre eliminado (set poblado por el FST_cargarIndicePacientes de arriba)
     items.push({ path:d.ref.path, pid:pid, sid:d.id, num:Number(x.num||0),
       fecha:String(x.fecha||''), nombre:nombres[pid]||pid, motivos:_motivosDe(x) });
   });
@@ -5453,6 +5485,7 @@ async function _rendIdxHist(forzar){
       var snapH=await window._fstDb.collection('pacientes').get();
       snapH.forEach(function(d){
         var data=d.data()||{};
+        if(!_fstDocVivo(data)) return;   // [BORRADO] excluir tombstones del full-read directo
         var nn=_normPend(data.nombreNormalizado || data.name || '');
         if(nn){ var tk=nn.split(' ').filter(Boolean); if(tk.length) idxHist.push(tk); }
       });
@@ -5746,8 +5779,9 @@ async function _detEjecutar(){
         var propias=p.soap.filter(function(s){ return s&&s.id&&!s.importado&&s._origen!=='firestore_historico'; });
         if(!propias.length) continue;
         var pid=null; try{ var r=await FST_resolverPidPaciente(p); if(r&&r.ok&&r.pid) pid=r.pid; }catch(_e){}
+        if(pid && !_fstPidVivo(pid)) continue;   // [BORRADO] paciente padre eliminado → no comparar espejo
         var ids=new Set();
-        if(pid){ try{ var sn=await window._fstDb.collection('pacientes').doc(pid).collection('sesiones').get(); sn.forEach(function(d){ ids.add(String(d.id)); }); }catch(_e){ continue; } }
+        if(pid){ try{ var sn=await window._fstDb.collection('pacientes').doc(pid).collection('sesiones').get(); sn.forEach(function(d){ if((d.data()||{}).eliminado===true) return; ids.add(String(d.id)); }); }catch(_e){ continue; } }
         var faltan=propias.filter(function(s){ return !ids.has(String(s.id)); });
         if(faltan.length){ hall.push({nombre:p.name, faltan:faltan.length, pid:pid?'':' · ⚠️ sin doc en la nube'}); window.__detEspejo.push({p:p, faltan:faltan}); }
       }
@@ -7250,8 +7284,10 @@ async function FST_refrescarIndiceEnSegundoPlano() {
     ]);
 
     const frescos = [];
+    const _elimSWR = new Set();   // [BORRADO] set de eliminados como byproduct del read (sin lectura extra)
     snap.forEach(doc => {
       const d = doc.data() || {};
+      if (d.eliminado === true) { _elimSWR.add(doc.id); return; }   // [BORRADO] fuera de la lista + al set
       frescos.push({
         id              : doc.id,
         fstPid          : doc.id,
@@ -7268,6 +7304,7 @@ async function FST_refrescarIndiceEnSegundoPlano() {
         _origenLista    : d.creadoPor === 'MIGRACION' ? 'firestore_migracion' : 'firestore_live'
       });
     });
+    window._FST_pidsEliminados = _elimSWR;   // [BORRADO] refresca el set en cada SWR
 
     // Guard anti-borrado: una lectura vacía NO reemplaza un índice bueno.
     if (!frescos.length) {
@@ -7377,8 +7414,10 @@ async function FST_cargarIndicePacientes() {
       ]);
 
       const pacientes = [];
+      const _elimIdx = new Set();   // [BORRADO] set de eliminados como byproduct del read (sin lectura extra)
       snap.forEach(doc => {
         const d = doc.data() || {};
+        if (d.eliminado === true) { _elimIdx.add(doc.id); return; }   // [BORRADO] fuera de la lista + al set
         pacientes.push({
           id              : doc.id,
           fstPid          : doc.id,
@@ -7395,6 +7434,7 @@ async function FST_cargarIndicePacientes() {
           _origenLista    : d.creadoPor === 'MIGRACION' ? 'firestore_migracion' : 'firestore_live'
         });
       });
+      window._FST_pidsEliminados = _elimIdx;   // [BORRADO] refresca el set en cada carga del índice
 
       window._FST_indicePacientes         = pacientes;
       window._FST_indicePacientesLoadedAt = Date.now();
@@ -7531,6 +7571,7 @@ async function FST_hidratarCamposClinicos(p, id) {
     const snap = await window._fstDb.collection('pacientes').doc(id).get();
     if (!snap.exists) return;
     const d = snap.data() || {};
+    if (!_fstDocVivo(d)) return;   // [BORRADO] no hidratar (ni abrir) un paciente tombstoneado
 
     if (d.age != null && p.age == null)   p.age = d.age;
     if (d.alergias)                       p.alergias = d.alergias;
