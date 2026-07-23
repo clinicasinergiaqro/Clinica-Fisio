@@ -238,6 +238,62 @@ async function _FST_cargarActivosEliminados(){
   }finally{ window._FST_activosElimEnVuelo = false; }
 }
 
+// ── [BORRADO-NOTAS-ACTIVAS] Entrega 4a — set de NOTAS de activo borradas (keyed por SID) ──────────
+// Estructura simétrica a activos (arriba), pero DELIBERADAMENTE SEPARADA: NO particionamos un solo
+// read de pacientesEliminados porque eso entrelazaría _FST_activosEliminadosListo (que habilita el
+// botón de borrado de activos, ya validado en 22f) con el read de notas. La colección es diminuta →
+// dos reads independientes es despreciable y deja el camino de activos byte-idéntico e intacto.
+// Mismas garantías anti-clobber: cache durable síncrono, RESUELVE→confía (incl. vacío), RECHAZA/sin-db→conserva.
+window._FST_notasActivasEliminadas = window._FST_notasActivasEliminadas || new Set();
+window._FST_notasActivasElimListo = window._FST_notasActivasElimListo || false;   // ¿verificado esta sesión? (lo usará el botón de 4b)
+var LS_NOTAS_ELIM = 'sinergia_notasActivasEliminadas';
+(function(){
+  try{ var raw=localStorage.getItem(LS_NOTAS_ELIM); if(raw){ var o=JSON.parse(raw); if(o&&Array.isArray(o.ids)) window._FST_notasActivasEliminadas=new Set(o.ids.map(String)); } }catch(_e){}
+})();
+function _notaActivaEliminada(sid){ return !!(window._FST_notasActivasEliminadas && window._FST_notasActivasEliminadas.has(String(sid||''))); }
+function _notaActivaViva(sid){ return !_notaActivaEliminada(sid); }
+// Helper greppeable para las VISTAS que leen p.soap CRUDO (convención _activoEliminado). Numeración/
+// lookup NO lo usan (leen p.soap directo). Set vacío → devuelve el array tal cual (fast path seguro).
+function _soapVivas(p){
+  var arr = (p && Array.isArray(p.soap)) ? p.soap : [];
+  if(!window._FST_notasActivasEliminadas || !window._FST_notasActivasEliminadas.size) return arr;
+  return arr.filter(function(s){ return s && !window._FST_notasActivasEliminadas.has(String(s.id||'')); });
+}
+// [BORRADO-NOTAS] Detector dev de FUGAS: si un sid marcado como borrado quedó VISIBLE en el DOM de una
+// lista de notas (una VISTA que olvidó filtrar), lo grita en consola. Dev-only, barato, no-op si el set
+// está vacío. Es la mitigación del modo de fallo "fuga visible" que justifica el default crudo del accessor.
+function _detectarFugaNotas(){
+  try{
+    if(!window._FST_notasActivasEliminadas || !window._FST_notasActivasEliminadas.size) return;
+    var els=document.querySelectorAll('.soap-card[data-sid]'); var n=0;
+    els.forEach(function(el){ var sid=el.getAttribute('data-sid'); if(sid && window._FST_notasActivasEliminadas.has(String(sid))){ n++; console.warn('[FUGA-NOTA] sid '+sid+' marcado borrado pero VISIBLE en el DOM — una VISTA no filtró'); } });
+    if(n) console.warn('[FUGA-NOTA] total fugas en pantalla: '+n);
+  }catch(_e){}
+}
+async function _FST_cargarNotasActivasEliminadas(){
+  if(window._FST_notasActivasElimEnVuelo) return;
+  window._FST_notasActivasElimEnVuelo = true;
+  try{
+    if(!window._fstDb && typeof FST_init==='function'){ try{ await FST_init(); }catch(_){} }
+    if(!window._fstDb){ console.log('[BORRADO-NOTAS] read USÓ CACHE (sin _fstDb aún): '+(window._FST_notasActivasEliminadas?window._FST_notasActivasEliminadas.size:0)+' · Listo='+window._FST_notasActivasElimListo); return; }
+    try{ var _u=firebase.auth().currentUser; if(_u) await Promise.race([_u.getIdToken(), new Promise(function(_,r){ setTimeout(function(){ r(new Error('tok')); },4000); })]); }catch(_e){}
+    var snap = await Promise.race([
+      window._fstDb.collection('pacientesEliminados').where('tipo','==','notaActiva').get(),
+      new Promise(function(_,r){ setTimeout(function(){ r(new Error('timeout')); }, 8000); })
+    ]);
+    var ids=[]; snap.forEach(function(d){ var x=d.data()||{}; if(x.sid) ids.push(String(x.sid)); });
+    var antes = window._FST_notasActivasEliminadas ? window._FST_notasActivasEliminadas.size : 0;
+    window._FST_notasActivasEliminadas = new Set(ids);   // RESUELTO con token caliente → confiar, incluso vacío
+    window._FST_notasActivasElimListo = true;
+    try{ localStorage.setItem(LS_NOTAS_ELIM, JSON.stringify({ ts: Date.now(), ids: ids })); }catch(_e){}
+    if(antes>0 && ids.length===0) console.warn('[BORRADO-NOTAS] set pasó de '+antes+' a 0 — ¿restauración legítima o colección mal escrita? (revisar en gate 4b)');
+    console.log('[BORRADO-NOTAS] read RESOLVIÓ: '+ids.length+' notas · Listo=true');
+    try{ if(currentPatient && typeof renderExpediente==='function'){ var _sp=document.getElementById('screen-expediente'); if(_sp&&_sp.classList.contains('active')) renderExpediente('soap'); } }catch(_e){}
+  }catch(e){
+    console.warn('[BORRADO-NOTAS] read RECHAZÓ (regla/red): '+((e&&e.message)||'?')+' · conservo cache ('+(window._FST_notasActivasEliminadas?window._FST_notasActivasEliminadas.size:0)+') · Listo='+window._FST_notasActivasElimListo);
+  }finally{ window._FST_notasActivasElimEnVuelo = false; }
+}
+
 async function FST_fetchSesiones(pid){
   if (!pid || !window._fstDb) return null;   // [SENTINEL] null = no pude cargar (sin db); array = cargó (aunque sea [])
   try {
@@ -1254,6 +1310,17 @@ function obtenerSesiones(p){
     return Array.isArray(c) ? c : null; // null = histórico aún cargando
   }
   return Array.isArray(p.soap) ? p.soap : [];
+}
+// [BORRADO-NOTAS-ACTIVAS] Accessor de VISTA: sesiones VISIBLES (crudo menos notas de activo borradas).
+// obtenerSesiones() se deja CRUDO a propósito (numeración/lookup dependen de él, L8xxx/L9xxx): filtrar
+// ahí reciclaría `num` en silencio. Aquí el default es filtrado y su fallo es una fuga VISIBLE (la
+// atrapa el detector dev), no una corrupción silenciosa. Histórico: sin cambio (notaActiva es activo-only).
+function obtenerSesionesVisibles(p){
+  var s = obtenerSesiones(p);
+  if(!Array.isArray(s)) return s;   // null = histórico cargando: propaga la señal, no la aplanes a []
+  if(String((p&&p.id)||'').startsWith('mig_pac_')) return s;   // histórico: su borrado de nota es otro camino
+  if(!window._FST_notasActivasEliminadas || !window._FST_notasActivasEliminadas.size) return s;
+  return s.filter(function(x){ return x && !window._FST_notasActivasEliminadas.has(String(x.id||'')); });
 }
 let _guardandoSOAP = false; // H-02: anti-doble-toque en guardarSOAP
 let modoRapidoIA=true; // true = modo rápido (default); false = modo completo
@@ -2999,7 +3066,7 @@ function _cmpSoapFechaDesc(a,b){
 }
 function obtenerUltimaFechaSoap(p){
   // Sesiones vía helper: activo → p.soap; histórico → Firestore. Histórico cargando (null) → [] → sin fecha.
-  const _ses = (typeof obtenerSesiones==='function' ? obtenerSesiones(p) : (p&&p.soap)) || [];
+  const _ses = (typeof obtenerSesionesVisibles==='function' ? obtenerSesionesVisibles(p) : (p&&p.soap)) || [];   // [BORRADO-NOTAS] VISTA: última fecha ignora notas borradas → cascada a +7d/inactivos/supervisión
   const fechas=_ses.map(obtenerFechaSoapISO).filter(Boolean).sort();
   return fechas.length ? fechas[fechas.length-1] : null;
 }
@@ -3249,6 +3316,7 @@ function entrarComo(perfil, email, silencioso){
     try{ renderPacientes(); }catch(e){ console.error('renderPacientes error:',e); }
   }).catch(e=>{ console.error('loadFromCloud error:',e); });
   try{ if(typeof _FST_cargarActivosEliminados==='function') _FST_cargarActivosEliminados(); }catch(_e){}   // [BORRADO-ACTIVOS] A1: carga el set tras login (SWR; re-render al llegar)
+  try{ if(typeof _FST_cargarNotasActivasEliminadas==='function') _FST_cargarNotasActivasEliminadas(); }catch(_e){}   // [BORRADO-NOTAS] carga el set de notas borradas tras login
   // Auto-sync: mostrar estado y sincronizar lo pendiente al abrir
   actualizarIndicadorSync();
   if(navigator.onLine) setTimeout(sincronizarPendientes, 1500);
@@ -3359,6 +3427,7 @@ document.addEventListener('visibilitychange', function(){
   if(document.visibilityState === 'visible'){
     try{ refrescarPacientesDesdeNube(); }catch(_){}
     try{ if(typeof _FST_cargarActivosEliminados==='function') _FST_cargarActivosEliminados(); }catch(_){}   // [BORRADO-ACTIVOS] A1: refresca el set al volver a foco (cross-device)
+    try{ if(typeof _FST_cargarNotasActivasEliminadas==='function') _FST_cargarNotasActivasEliminadas(); }catch(_){}   // [BORRADO-NOTAS] refresca el set de notas al volver a foco
     // [FIX-AUTH #9] Una nota encolada por un hipo transitorio ya no espera al próximo 'online' o a un
     // reinicio: al volver a foco (sesión ya rehidratada) las colas drenan. Idempotente: cada drenador
     // tiene guard de en-curso y el borrado es por-confirmación (r.ok), nunca a ciegas.
@@ -3669,7 +3738,7 @@ function renderAgenda(){
   });
   // ALL terapeutas see ALL patients of the day — no filter by terapeuta
   let pts = patientsDB.filter(p=>p.date===todayISO && !_activoEliminado(p.id));   // [BORRADO-ACTIVOS] D1-1: agenda del día
-  const incomplete=pts.filter(p=>Array.isArray(p.soap)&&p.soap.some(s=>!s.completa)).length;
+  const incomplete=pts.filter(p=>_soapVivas(p).some(s=>!s.completa)).length;   // [BORRADO-NOTAS] VISTA
   const c=document.getElementById('content-agenda');
   let html=`<div class="date-header">
     <div><div class="date-text">${today.toLocaleDateString('es-MX',{weekday:'long',day:'numeric',month:'long'})}</div>
@@ -3680,7 +3749,7 @@ function renderAgenda(){
   const sinConsent=pts.filter(p=>!Array.isArray(p.consentimientos)||!p.consentimientos.some(c=>c.firmado)).length;
   // [GRUPO-A #12] comparación por día CANÓNICO (_diaCanon), no string crudo: una fecha en ISO ya no rompe el conteo
   const _hoyC=_diaCanon(todayFmt());
-  const sinSoapHoy=pts.filter(p=>{const soaps=Array.isArray(p.soap)?p.soap:[];return !soaps.some(s=>{const c=s&&_diaCanon(s.fecha);return c&&c===_hoyC;});}).length;
+  const sinSoapHoy=pts.filter(p=>{const soaps=_soapVivas(p);return !soaps.some(s=>{const c=s&&_diaCanon(s.fecha);return c&&c===_hoyC;});}).length;   // [BORRADO-NOTAS] VISTA
   if(pts.length>0){
     html+=`<div class="section-card" style="margin-bottom:12px;background:linear-gradient(135deg,#F0F4FF,#E8EEF7)">
       <div style="padding:12px 14px">
@@ -3700,7 +3769,7 @@ function renderAgenda(){
   // G-6(1): empty-state "Sin pacientes hoy / Toca + para agregar" omitido — las citas vienen de
   // Google Calendar (bloque de abajo), no de patientsDB. Evita el hueco grande del centro.
   if(pts.length) pts.forEach(p=>{
-    const inc=Array.isArray(p.soap)&&p.soap.some(s=>!s.completa);
+    const inc=_soapVivas(p).some(s=>!s.completa);   // [BORRADO-NOTAS] VISTA
     const hasConsent=Array.isArray(p.consentimientos)&&p.consentimientos.some(c=>c.firmado);
     const soapAtrasado=necesitaAlertaSoapSemanal(p);
     const badge=inc?`<span class="badge badge-alert">⚠ SOAP</span>`
@@ -3720,7 +3789,7 @@ function renderAgenda(){
   // G-2: bloque adicional "Agenda del calendario" (async, no bloquea el dashboard de hoy)
   try{ FST_montarAgendaCalendar('dia'); }catch(e){ console.warn('[Agenda cal] montar:', e&&e.message); }
   // M2-E: toast una vez por sesión si hay SOAP atrasado
-  const atrasados=patientsDB.filter(p=>!_activoEliminado(p.id)&&!String(p.name||'').startsWith('TEST_QA_')&&necesitaAlertaSoapSemanal(p)&&Array.isArray(p.soap)&&p.soap.length>0).length;   // [BORRADO-ACTIVOS] D1-2
+  const atrasados=patientsDB.filter(p=>!_activoEliminado(p.id)&&!String(p.name||'').startsWith('TEST_QA_')&&necesitaAlertaSoapSemanal(p)&&_soapVivas(p).length>0).length;   // [BORRADO-ACTIVOS] D1-2
   if(atrasados>0 && !sessionStorage.getItem('toastSoapMostrado')){
     showToast(`${atrasados} paciente${atrasados>1?'s':''} con SOAP atrasado (+7 días)`,'warning');
     sessionStorage.setItem('toastSoapMostrado','1');
@@ -3893,7 +3962,7 @@ function _modalElegirPaciente(nombreCal, lista, accion){
     // CASO AMBIGUO: última visita por candidato para que la terapeuta distinga homónimos
     var ult='';
     try{
-      if(Array.isArray(p.soap)&&p.soap.length){ ult=p.soap[p.soap.length-1].fecha||''; }
+      var _svUlt=_soapVivas(p); if(_svUlt.length){ ult=_svUlt[_svUlt.length-1].fecha||''; }   // [BORRADO-NOTAS] VISTA: última visible
       else { ult=p.ultimaSesionLive||p.ultimaSesion||''; }
     }catch(_u){}
     var extras=[p.terapeuta?escapeHTML(p.terapeuta):'', p.age?escapeHTML(p.age)+' años':'', ult?('últ. sesión: '+escapeHTML(ult)):'últ. sesión: —'].filter(Boolean).join(' · ');
@@ -4125,7 +4194,7 @@ function _evaRep(s){
   return null;
 }
 function _evaSinMejoria(p){
-  var conEva=(Array.isArray(p.soap)?p.soap:[]).slice()
+  var conEva=_soapVivas(p).slice()   // [BORRADO-NOTAS] VISTA (alerta EVA sin mejoría)
     .sort(function(a,b){return (a.num||0)-(b.num||0);})
     .map(_evaRep).filter(function(v){return v!=null;});
   if(conEva.length<3) return null;
@@ -4429,7 +4498,7 @@ function _computarPendientesSOAP(eventos, diasISO, idxHist, asigMap, histNotas){
       if(e._ultimaHist){ var cu=_diaCanon(e._ultimaHist); if(cu) cs[cu]=1; }
       notas=Object.keys(diasCanon).filter(function(dc){ return cs[dc]; }).length;
     } else {
-      notas=(Array.isArray(e.p.soap)?e.p.soap:[]).filter(function(s){ return s && diasCanon[_diaCanon(s.fecha)]; }).length;
+      notas=_soapVivas(e.p).filter(function(s){ return s && diasCanon[_diaCanon(s.fecha)]; }).length;   // [BORRADO-NOTAS] VISTA (déficit por terapeuta)
     }
     var deficit=Math.max(0, e.visitas-notas);
     if(deficit<=0) return;
@@ -4949,7 +5018,7 @@ function _triangularCitasNotas(eventos, resueltos, ultimaHist, asigMap, resuelta
     if(r.tipo==='activo' && r.p){
       // AUTORÍA: .find (no .some) para tener a la mano la sesión que casó la fecha (terapeuta/atendidoPor).
       // Normaliza AMBOS lados (activos ya son DD/MM, pero robusto ante cualquier formato).
-      sMatch=(Array.isArray(r.p.soap)?r.p.soap:[]).find(function(s){ return s && citaCanon && _diaCanon(s.fecha)===citaCanon; })||null;
+      sMatch=_soapVivas(r.p).find(function(s){ return s && citaCanon && _diaCanon(s.fecha)===citaCanon; })||null;   // [BORRADO-NOTAS] VISTA (triangulación cita-nota)
       tiene=!!sMatch;
     } else if(r.ambiguo && Array.isArray(r.candidatos)){
       // BUG A — homónimos: NO adjudicar a ciegas. Contar cuántos candidatos tienen nota ESE día.
@@ -4957,14 +5026,14 @@ function _triangularCitasNotas(eventos, resueltos, ultimaHist, asigMap, resuelta
       var _cf=(candFechas&&candFechas[clave])||{};
       var _conNotaCand=r.candidatos.filter(function(c){
         if(!c) return false;
-        if(c.tipo==='activo' && c.p){ return !!(Array.isArray(c.p.soap)?c.p.soap:[]).find(function(s){ return s && citaCanon && _diaCanon(s.fecha)===citaCanon; }); }
+        if(c.tipo==='activo' && c.p){ return !!_soapVivas(c.p).find(function(s){ return s && citaCanon && _diaCanon(s.fecha)===citaCanon; }); }   // [BORRADO-NOTAS] VISTA
         if(c.tipo==='historico' && c.pid){ var d=_cf[c.pid]||{fechas:[],ultima:''}; var setC=(Array.isArray(d.fechas)?d.fechas.slice():[]); if(d.ultima) setC.push(d.ultima); return !!(citaCanon && setC.some(function(f){ return _diaCanon(f)===citaCanon; })); }
         return false;
       });
       if(_conNotaCand.length===1){
         tiene=true;
         // Si el que casó es activo, recuperar sMatch para autoría/tardías (igual que la rama activo normal).
-        if(_conNotaCand[0].tipo==='activo' && _conNotaCand[0].p){ sMatch=(Array.isArray(_conNotaCand[0].p.soap)?_conNotaCand[0].p.soap:[]).find(function(s){ return s && citaCanon && _diaCanon(s.fecha)===citaCanon; })||null; }
+        if(_conNotaCand[0].tipo==='activo' && _conNotaCand[0].p){ sMatch=_soapVivas(_conNotaCand[0].p).find(function(s){ return s && citaCanon && _diaCanon(s.fecha)===citaCanon; })||null; }   // [BORRADO-NOTAS] VISTA
       } else { tiene=false; ambiguoSinResolver=true; }
     } else if(r.tipo==='historico'){
       // CAPA 3 — set COMPLETO de fechas del histórico (normalizado), no solo la última. DEGRADACIÓN:
@@ -5310,7 +5379,7 @@ function _computarRendimiento(eventos, diasISO, asigMap){
     else { var nm=ev.paciente||'(sin nombre)'; sinAsignar[nm]=(sinAsignar[nm]||0)+1; }
   });
   (Array.isArray(patientsDB)?patientsDB:[]).forEach(function(p){
-    (Array.isArray(p&&p.soap)?p.soap:[]).forEach(function(s){
+    _soapVivas(p).forEach(function(s){   // [BORRADO-NOTAS] VISTA (rendimiento por terapeuta)
       if(!s || !diasDDMM[s.fecha]) return;
       var cod=String(s.terapeuta||'').toUpperCase();
       for(var cal in TERAPEUTA_CAL2COD){
@@ -5800,12 +5869,12 @@ async function _detEjecutar(){
     if(!window._fstDb && typeof FST_init==='function') await FST_init();
     if(!window._fstDb){ secciones.push(_detBloque('☁️ Espejo roto (activos)','Necesita conexión a internet — este chequeo no corrió. Los de abajo (locales) sí.','warning')); }
     else {
-      var activos=(Array.isArray(patientsDB)?patientsDB:[]).filter(function(p){ return p&&p.id&&String(p.id).indexOf('mig_pac_')!==0&&!String(p.name||'').startsWith('TEST_QA_')&&Array.isArray(p.soap)&&p.soap.length>0&&!_activoEliminado(p.id); });   // [BORRADO-ACTIVOS]
+      var activos=(Array.isArray(patientsDB)?patientsDB:[]).filter(function(p){ return p&&p.id&&String(p.id).indexOf('mig_pac_')!==0&&!String(p.name||'').startsWith('TEST_QA_')&&_soapVivas(p).length>0&&!_activoEliminado(p.id); });   // [BORRADO-ACTIVOS]+[BORRADO-NOTAS] VISTA
       if(modo==='reciente') activos=activos.filter(_reciente);
       var hall=[], i=0;
       for(const p of activos){
         i++; if(prog && (i%4===0||i===activos.length)){ prog.textContent='Revisando espejo… '+i+'/'+activos.length; await new Promise(function(r){ setTimeout(r,0); }); }
-        var propias=p.soap.filter(function(s){ return s&&s.id&&!s.importado&&s._origen!=='firestore_historico'; });
+        var propias=_soapVivas(p).filter(function(s){ return s&&s.id&&!s.importado&&s._origen!=='firestore_historico'; });   // [BORRADO-NOTAS] VISTA (rendimiento)
         if(!propias.length) continue;
         var pid=null; try{ var r=await FST_resolverPidPaciente(p); if(r&&r.ok&&r.pid) pid=r.pid; }catch(_e){}
         if(pid && !_fstPidVivo(pid)) continue;   // [BORRADO] paciente padre eliminado → no comparar espejo
@@ -5827,7 +5896,7 @@ async function _detEjecutar(){
       if(!p||String(p.name||'').startsWith('TEST_QA_')) return false;
       var f=_pf(p.fechaCreacion||p.date||''); if(!f||f<DESDE) return false;
       var th=!!((p.motivoConsulta&&String(p.motivoConsulta).trim())||(p.valoracion&&Object.keys(p.valoracion||{}).length)||(p.antecedentes&&Object.keys(p.antecedentes||{}).length));
-      return th&&(!Array.isArray(p.soap)||p.soap.length===0);
+      return th&&(_soapVivas(p).length===0);   // [BORRADO-NOTAS] VISTA (rendimiento: sin notas vivas)
     }).map(function(p){ return {nombre:p.name, creado:p.fechaCreacion||p.date||'', por:p.creadoPor||''}; });
     if(sinSoap.length){ secciones.push(_detBloque('📝 Creados desde 3-jul con historia y 0 sesiones ('+sinSoap.length+')',
       '<div style="max-height:140px;overflow:auto">'+sinSoap.map(function(x){ return '<div style="padding:2px 0">'+escapeHTML(x.nombre)+' <span style="color:var(--gray-400)">· '+escapeHTML(x.creado)+(x.por?(' · '+escapeHTML(x.por)):'')+'</span></div>'; }).join('')+'</div><div style="margin-top:4px;color:var(--gray-500)">Normal si es un alta muy reciente; sospechoso si ya tuvo citas.</div>','warning')); }
@@ -6103,7 +6172,7 @@ function verMasPacientes_(btn){
   let list = FST_filtrarLista(fuenteVerMas, q);
   if(filtro==='hoy') list=list.filter(p=>p.date===todayISO);
   if(filtro==='precaucion') list=list.filter(p=>p.seguridadClinica?.tienePrecaucion);
-  if(filtro==='sin-soap'){ const _hoyC=_diaCanon(todayFmt()); list=list.filter(p=>{const s=Array.isArray(p.soap)?p.soap:[];return !s.some(x=>{const c=x&&_diaCanon(x.fecha);return c&&c===_hoyC;});}); } // [GRUPO-A #12] día canónico (c truthy: '' jamás casa con '')
+  if(filtro==='sin-soap'){ const _hoyC=_diaCanon(todayFmt()); list=list.filter(p=>{const s=_soapVivas(p);return !s.some(x=>{const c=x&&_diaCanon(x.fecha);return c&&c===_hoyC;});}); } // [GRUPO-A #12] día canónico + [BORRADO-NOTAS] VISTA
 
   const siguiente = list.slice(offset, offset + LOTE);
   const abrirFn = FST_LISTA_ACTIVA ? 'FST_abrirPacienteDesdeLista' : 'openExpediente';
@@ -6137,8 +6206,8 @@ function _resaltarNombre(nombre, qRaw){
 // Tarjeta de paciente — fuente ÚNICA (usada por la lista y por "Ver más").
 function _pacCardHTML(p, q, abrirFn){
   const hasConsent=Array.isArray(p.consentimientos)&&p.consentimientos.some(c=>c.firmado);
-  const inc=Array.isArray(p.soap)&&p.soap.some(s=>!s.completa);
-  const soapAtrasado=!String(p.name||'').startsWith('TEST_QA_')&&necesitaAlertaSoapSemanal(p)&&Array.isArray(p.soap)&&p.soap.length>0;
+  const inc=_soapVivas(p).some(s=>!s.completa);   // [BORRADO-NOTAS] VISTA
+  const soapAtrasado=!String(p.name||'').startsWith('TEST_QA_')&&necesitaAlertaSoapSemanal(p)&&_soapVivas(p).length>0;
   const esMio=p.terapeuta===currentUser.name;
   const badge=inc?`<span class="badge badge-alert" style="font-size:10px">⚠</span>`:!hasConsent?`<span class="badge badge-pending" style="font-size:10px">📋</span>`:soapAtrasado?`<span class="badge badge-alert" style="font-size:9px;background:#FEF3C7;color:#92400E">⚠️ +7d</span>`:'';
   return `<div class="patient-card" data-pid="${escapeAttr_(p.id)}" onclick="${abrirFn}(this.dataset.pid)">
@@ -6149,7 +6218,7 @@ function _pacCardHTML(p, q, abrirFn){
             <span>👤 ${escapeHTML(p.age)}a</span>
             <span style="${!esMio?'color:var(--gold);font-weight:700':''}">🩺 ${escapeHTML(p.terapeuta)}</span>
             ${(typeof p.terapeutaSeguimiento==='string'&&p.terapeutaSeguimiento&&!p.terapeutaSeguimiento.includes('T00:'))?`<span style="color:var(--green);font-size:10px">→ ${escapeHTML(p.terapeutaSeguimiento)}</span>`:''}
-            <span>${Array.isArray(p.soap)?p.soap.length:(typeof p.sesiones==='number'?p.sesiones:0)} ses.</span>
+            <span>${Array.isArray(p.soap)?_soapVivas(p).length:(typeof p.sesiones==='number'?p.sesiones:0)} ses.</span>
           </div>
           <div class="patient-meta" style="margin-top:3px;font-size:11px;color:#5A6478;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:200px">${escapeHTML(typeof p.dx==='string'?p.dx.split(',')[0]:(p.dx?.dxClinico||p.dx?.dxMedico||'Sin diagnóstico'))}</div>
           ${Array.isArray(p.etiquetas)&&p.etiquetas.length?`<div style="display:flex;flex-wrap:wrap;gap:3px;margin-top:4px">${p.etiquetas.slice(0,3).map(e=>`<span style="font-size:9px;font-weight:700;background:#E8EEF7;color:var(--navy);padding:2px 7px;border-radius:8px">${escapeHTML(e)}</span>`).join('')}</div>`:''}
@@ -6214,7 +6283,7 @@ function renderPacientesLista(fuenteLista){
   let list=FST_filtrarLista(baseLista, q);   // ya viene RANKEADA (empieza-por > contiene > dx/terapeuta)
   if(filtro==='hoy') list=list.filter(p=>p.date===todayISO);
   if(filtro==='precaucion') list=list.filter(p=>p.seguridadClinica?.tienePrecaucion);
-  if(filtro==='sin-soap'){ const _hoyC=_diaCanon(todayFmt()); list=list.filter(p=>{ const s=Array.isArray(p.soap)?p.soap:[]; return !s.some(x=>{const c=x&&_diaCanon(x.fecha);return c&&c===_hoyC;}); }); } // [GRUPO-A #12] día canónico (c truthy: '' jamás casa con '')
+  if(filtro==='sin-soap'){ const _hoyC=_diaCanon(todayFmt()); list=list.filter(p=>{ const s=_soapVivas(p); return !s.some(x=>{const c=x&&_diaCanon(x.fecha);return c&&c===_hoyC;}); }); } // [GRUPO-A #12] día canónico + [BORRADO-NOTAS] VISTA
 
   let html;
   if(!list.length){
@@ -6352,7 +6421,7 @@ function renderIndicadorCompletitud(p){
   const cons = tieneConsentimientoFirmado(p);
   // Sesiones vía helper unificado: activo → p.soap; histórico → Firestore (obtenerSesiones).
   // Histórico aún cargando → [] (breve; se corrige al re-render que dispara el pre-fetch de openExpediente).
-  const _ses = obtenerSesiones(p) || [];
+  const _ses = obtenerSesionesVisibles(p) || [];   // [BORRADO-NOTAS] VISTA: completitud/chips ignoran notas borradas
   // Loop2 P1: consentimiento previo — en primera cita (sin SOAP) pendiente es normal
   const esPrimeraCita = _ses.length === 0;
   const datos = !!(p.consentimientoDatos && p.consentimientoDatos.aceptado);
@@ -6436,7 +6505,7 @@ function extraerFechasDeTextoClinico(texto){
 async function obtenerResumenFechasClinicas(paciente, sesionesFirestore){
   var p=paciente||{};
   sesionesFirestore=Array.isArray(sesionesFirestore)?sesionesFirestore:[];
-  var todas=(Array.isArray(p.soap)?p.soap:[]).concat(sesionesFirestore);
+  var todas=_soapVivas(p).concat(sesionesFirestore);   // [BORRADO-NOTAS] VISTA (hitos fechas clínicas)
   var seen={}, unicas=[];
   todas.forEach(function(s){
     if(!s) return;
@@ -6567,7 +6636,7 @@ function _renderSoapCard(s,p,readOnly){
         `<div style="width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:22px">📎<div style="font-size:8px;color:#5A6478">${(m.name||'').split('.').pop().toUpperCase()}</div></div>`}
       <div class="media-label">${m.label||m.name}</div></div>`).join('')}
     </div></div>`:'';
-  return `<div class="soap-card">
+  return `<div class="soap-card" data-sid="${escapeAttr_(s.id||'')}">
     <div class="soap-header">
       <div>
         <div class="soap-sesion">${sesionLine} ${inc?'<span class="badge badge-alert" style="font-size:10px;">⚠ Incompleta</span>':'<span style="font-size:10px;color:var(--green);font-weight:600">✅ Completa</span>'}</div>
@@ -6680,7 +6749,7 @@ function renderExpediente(tab='historia'){
       </div>
     </div>`;
     if(Array.isArray(p.motivosAnteriores)&&p.motivosAnteriores.length>0){
-      const _epSoaps=Array.isArray(p.soap)?p.soap:[];
+      const _epSoaps=_soapVivas(p);   // [BORRADO-NOTAS] VISTA (conteo de sesiones por episodio)
       html+=`
       <div class="section-card" style="margin-bottom:12px">
         <div class="section-title" style="cursor:pointer" onclick="toggleMotivosAnteriores()">
@@ -6854,7 +6923,7 @@ function renderExpediente(tab='historia'){
     // (#fst-hist-block, se inyecta tras este render) y se editan por la rama histórica
     // (editarSoapHistorico → _guardarEdicionSoapHistorico, que SÍ persiste historialEdiciones).
     const _esMigSoap = String(p.id||'').startsWith('mig_pac_');
-    const soaps = _esMigSoap ? [] : [...p.soap].sort(_cmpSoapFechaDesc);
+    const soaps = _esMigSoap ? [] : _soapVivas(p).slice().sort(_cmpSoapFechaDesc);   // [BORRADO-NOTAS] VISTA: historial sin notas borradas (.slice: _soapVivas puede devolver p.soap crudo → no mutar)
     if(_esMigSoap){
       html+=`<div style="padding:12px 14px;font-size:12px;color:var(--gray-400)">📂 Historial clínico desde la nube (abajo).</div>`;
     } else if(!soaps.length){
@@ -7001,6 +7070,7 @@ function renderExpediente(tab='historia'){
   // FST (STAGING): historial Firestore SOLO en el tab SOAP, tras el render principal.
   // No-op con el flag apagado. No muta p.soap[]. setTimeout deja que termine c.innerHTML.
   if (tab==='soap' && typeof FST_renderHistorialSoap === 'function') setTimeout(function(){ FST_renderHistorialSoap(p.id); }, 0);
+  if (tab==='soap') setTimeout(function(){ if(typeof _detectarFugaNotas==='function') _detectarFugaNotas(); }, 0);   // [BORRADO-NOTAS] detector dev de fugas tras render del historial
   // Prompt B v2: fechas clínicas en tab Historia (render local inmediato + enriquecido Firestore).
   if (tab==='historia') setTimeout(function(){ actualizarFechasClinicas(p); }, 0);
   if (tab==='estudios' && typeof FST_renderEstudiosApartado === 'function') setTimeout(function(){ FST_renderEstudiosApartado(p.id); }, 0);
@@ -9767,12 +9837,16 @@ async function generarSoapConIA(){
         ? p.soap.filter(s=>typeof s.motivoIndex==='number' && s.motivoIndex===_midxP1)
         : p.soap.slice();
       const _ordEpP1 = _soapsEpP1.slice().sort((a,b)=>(Number(a.num)||0)-(Number(b.num)||0));
+      // [BORRADO-NOTAS] Split del caso mixto: numSesionEpisodio (numeración de contexto) usa el CRUDO
+      // _ordEpP1; sesionAnterior y tendenciaEVA (insumo que lee la IA) usan la vista VIVA — una nota
+      // borrada no debe contaminar el contexto clínico enviado al modelo.
+      const _ordEpP1Vis = _ordEpP1.filter(s=>_notaActivaViva(s&&s.id));
 
-      // numSesionEpisodio: solo si hay episodios (si no, duplicaría numSesion)
+      // numSesionEpisodio: solo si hay episodios (si no, duplicaría numSesion). CRUDO (numeración).
       if(_tieneEpP1) payloadDatos.numSesionEpisodio = String(_ordEpP1.length + 1);
 
-      // sesionAnterior: última sesión del episodio actual (EVA suprimida si es sentinela 5/3)
-      const _antP1 = _ordEpP1[_ordEpP1.length-1];
+      // sesionAnterior: última sesión VIVA del episodio actual (EVA suprimida si es sentinela 5/3)
+      const _antP1 = _ordEpP1Vis[_ordEpP1Vis.length-1];
       if(_antP1){
         const _evaAnt = (_antP1.evaI!=null && !(Number(_antP1.evaI)===5 && Number(_antP1.evaF)===3))
           ? 'EVA '+_antP1.evaI+(_antP1.evaF!=null?'→'+_antP1.evaF:'') : '';
@@ -9786,7 +9860,7 @@ async function generarSoapConIA(){
       }
 
       // tendenciaEVA: serie sobre evaI, excluyendo null Y el sentinela default 5/3 (A4)
-      const _serieP1 = _ordEpP1
+      const _serieP1 = _ordEpP1Vis
         .filter(s=> s.evaI!=null && !(Number(s.evaI)===5 && Number(s.evaF)===3))
         .map(s=>Number(s.evaI)).filter(n=>!isNaN(n));
       if(_serieP1.length>=2){
@@ -9947,13 +10021,16 @@ function usarSoapIA(){
 function copiarSesionAnterior(){
   // 1. Verificar que existe currentPatient con notas previas
   const p = currentPatient;
-  if(!p || !Array.isArray(p.soap) || p.soap.length === 0){
+  // [BORRADO-NOTAS] FILTRAR (no es display): copiar contenido de una nota BORRADA a una nota nueva
+  // resucitaría contenido clínico eliminado dentro de un registro vivo. Copia la última NO-borrada.
+  const _svCopia = _soapVivas(p);
+  if(!p || _svCopia.length === 0){
     showToast('No hay sesión anterior para copiar.','error');
     return;
   }
 
-  // 2. Tomar la última nota — sin modificarla
-  const lastSoap = p.soap[p.soap.length - 1];
+  // 2. Tomar la última nota VIVA — sin modificarla
+  const lastSoap = _svCopia[_svCopia.length - 1];
 
   // 3. Helper para setear campos (nunca muestra null/undefined)
   const set = (id, val) => {
@@ -10254,7 +10331,7 @@ async function _FST_extraerEstudiosDeNotas(p){
   if (!window._estudiosCache) window._estudiosCache = {};
   if (window._estudiosCache[p.id]) return window._estudiosCache[p.id];   // FIX 3 (I-D): cache por pid
   var items = [];
-  (Array.isArray(p && p.soap) ? p.soap : []).forEach(function(s){
+  _soapVivas(p).forEach(function(s){   // [BORRADO-NOTAS] VISTA (estudios extraídos de notas)
     var fecha = s.fecha || s.date || '';
     var blob = [s.textoOriginal, s.s&&s.s.dolor, s.s&&s.s.cambios, s.s&&s.s.actFisica,
                 s.o&&s.o.rom, s.o&&s.o.fuerza, s.o&&s.o.hallazgos,
@@ -10788,7 +10865,8 @@ function _modalConfirmarBorrado(titulo, resumenHTML, textoBoton){
     ov.innerHTML='<div style="background:#fff;border-radius:16px 16px 0 0;width:100%;max-width:480px;padding:16px">'
       +'<div style="font-weight:800;color:#B91C1C;margin-bottom:10px">'+escapeHTML(titulo||'Borrar')+'</div>'
       +'<div style="margin-bottom:12px">'+resumenHTML+'</div>'
-      +'<div style="font-size:11px;color:var(--gray-400);margin-bottom:10px">Se moverá a la Papelera. Puedes restaurarla desde la app.</div>'
+      // [BORRADO-NOTAS] Fix texto duplicado: la línea fija de restauración se retiró de aquí; cada caller
+      // pone su propio subtexto en resumenHTML (género correcto: nota→"restaurarla", paciente→"restaurable").
       +'<button id="_del-ok" style="width:100%;padding:12px;border:none;border-radius:10px;background:#B91C1C;color:#fff;font-size:14px;font-weight:800;cursor:pointer">'+escapeHTML(textoBoton||'Mover a papelera')+'</button>'
       +'<button id="_del-cancel" style="width:100%;padding:10px;margin-top:4px;border:none;background:none;color:var(--gray-400);font-size:13px;cursor:pointer">Cancelar</button></div>';
     document.body.appendChild(ov);
@@ -10812,7 +10890,8 @@ async function _borrarNotaHistorica(docId, pid){
   var resumen = _resumenNotaBorrado(s);
   var resumenHTML = '<div style="font-size:13px;color:var(--navy);font-weight:700">'+escapeHTML(nombre)+'</div>'
     + '<div style="font-size:12px;color:var(--gray-500);margin:2px 0 6px">Nota del '+escapeHTML(fecha||'(sin fecha)')+'</div>'
-    + '<div style="font-size:12px;color:var(--gray-600);background:#F6F8FB;border-radius:8px;padding:8px">'+escapeHTML(resumen||'(sin texto)')+'</div>';
+    + '<div style="font-size:12px;color:var(--gray-600);background:#F6F8FB;border-radius:8px;padding:8px">'+escapeHTML(resumen||'(sin texto)')+'</div>'
+    + '<div style="font-size:11px;color:var(--gray-400);margin-top:8px">Se moverá a la Papelera. Puedes restaurarla desde la app.</div>';   // [BORRADO-NOTAS] subtexto propio del caller (antes fijo en el modal)
   var ok = await _modalConfirmarBorrado('🗑️ Mover nota a papelera', resumenHTML, 'Mover a papelera');
   if(!ok) return;
   var ts = Date.now();
@@ -14040,7 +14119,7 @@ function abrirNuevoMotivoConsulta(){
   (Array.isArray(p.soap)?p.soap:[]).forEach(function(s){
     if(s && typeof s.motivoIndex!=='number'){ s.motivoIndex=0; s.numEpisodio=++_bkSeq; }
   });
-  var _nSesEp=(Array.isArray(p.soap)?p.soap:[]).filter(function(s){ return s && s.motivoIndex===(p.motivoActualIndex||0); }).length;
+  var _nSesEp=_soapVivas(p).filter(function(s){ return s && s.motivoIndex===(p.motivoActualIndex||0); }).length;   // [BORRADO-NOTAS] VISTA: conteo mostrado en el confirm (el backfill de arriba es CRUDO/numeración)
   if(!confirm('¿El paciente viene por un motivo diferente al registrado actualmente?\n\nEl motivo actual ('+((p.motivoConsulta||'sin descripción').slice(0,60))+', '+_nSesEp+' sesión'+(_nSesEp===1?'':'es')+') quedará en el historial.')){ return; }
 
   // a. Snapshot del motivo actual
@@ -14055,7 +14134,7 @@ function abrirNuevoMotivoConsulta(){
     fechaCierre: todayFmt(),
     creadoPor: p.creadoPor||'',
     motivoIndex: p.motivoActualIndex||0,
-    numSesionesEpisodio: Array.isArray(p.soap)?p.soap.filter(function(s){return s.motivoIndex===(p.motivoActualIndex||0);}).length:0
+    numSesionesEpisodio: Array.isArray(p.soap)?_soapVivas(p).filter(function(s){return s.motivoIndex===(p.motivoActualIndex||0);}).length:0   // [BORRADO-NOTAS] VISTA: snapshot que se muestra en "Motivos anteriores"
   };
   // b. Archivar
   if(!Array.isArray(p.motivosAnteriores)) p.motivosAnteriores=[];
@@ -14160,6 +14239,14 @@ async function _RPT_obtenerSesionesDedup(pid){
       var da=parseFechaClinicaSegura(a.fecha||a.date||a.fechaHoraISO), db=parseFechaClinicaSegura(b.fecha||b.date||b.fechaHoraISO);
       return (da?da.getTime():0) - (db?db.getTime():0); // cronológico ascendente
     });
+}
+// [BORRADO-NOTAS] Wrapper de VISTA para reportes: NO toca el merge/dedup (clave num|fecha, precedencia
+// fs-sobre-local) — filtra su OUTPUT una sola vez. Cubre id y _docId (activo: s.id; espejo Firestore:
+// doc-id = sid). Sus dos únicos consumidores (síntesis IA + pestaña de reporte) llaman aquí.
+async function _RPT_obtenerSesionesDedupVisibles(pid){
+  var arr = await _RPT_obtenerSesionesDedup(pid);
+  if(!Array.isArray(arr) || !window._FST_notasActivasEliminadas || !window._FST_notasActivasEliminadas.size) return arr;
+  return arr.filter(function(s){ return s && !_notaActivaEliminada(s.id) && !_notaActivaEliminada(s._docId); });
 }
 
 function _RPT_hashEntradas(p, sesiones){
@@ -14611,7 +14698,7 @@ async function RPT_generarSintesisIA(pid){
   try{
     var p=_resolverPaciente(pid);
     if(!p) throw new Error('Paciente no encontrado');
-    var sesiones=await _RPT_obtenerSesionesDedup(pid);
+    var sesiones=await _RPT_obtenerSesionesDedupVisibles(pid);   // [BORRADO-NOTAS] VISTA (reporte + síntesis IA)
     // FASE C: la síntesis respeta el episodio seleccionado en la pestaña (mismo helper y
     // mismo hash filtrado que el orquestador → cache independiente por episodio).
     // pCtx conserva SIEMPRE los permanentes del paciente (antecedentes/alergias/seguridad)
@@ -14769,7 +14856,7 @@ async function RPT_pintarPestanaReporte(pid, filtroEpisodio){
         }
       }catch(e){ console.warn('[RPT] hidratar · pid='+pid+':', e&&e.message); }
     }
-    var sesiones=await _RPT_obtenerSesionesDedup(pid);
+    var sesiones=await _RPT_obtenerSesionesDedupVisibles(pid);   // [BORRADO-NOTAS] VISTA (reporte + síntesis IA)
     // SOAP-E2 + FASE C: filtro por episodio con helper compartido y fallback ep-0.
     var tieneEpisodios=Array.isArray(p.motivosAnteriores)&&p.motivosAnteriores.length>0;
     // FASE C (Opción 2): default = episodio ACTUAL cuando hay episodios; 'todos' = expediente completo.
@@ -17270,7 +17357,7 @@ function showSupervision(){
 }
 // ── B1: Gráfica EVA en SVG puro (sin librerías) ──
 function generarGraficaEVA(p){
-  const _ses=obtenerSesiones(p);
+  const _ses=obtenerSesionesVisibles(p);   // [BORRADO-NOTAS] VISTA: la serie EVA no dibuja notas borradas
   if(_ses===null) return '<div style="padding:14px;font-size:12px;color:var(--gray-400);text-align:center">⏳ Cargando gráfica de dolor…</div>';
   const toNum=v=>{ const n=Number(v); return isNaN(n)?null:n; };
   // FIX EVA (A2): guard _esMig ELIMINADO — su comentario ("FST_fetchSesiones no devuelve
@@ -17369,8 +17456,8 @@ function renderSupervision(){
   setTimeout(renderEstadoOffline_, 300);
   ters.forEach(ter=>{
     const pts=patientsDB.filter(p=>p.terapeuta===ter && !_activoEliminado(p.id));   // [BORRADO-ACTIVOS] D2: rendimiento por terapeuta (un borrado no cuenta)
-    const totalSOAP=pts.reduce((a,p)=>a+(Array.isArray(p.soap)?p.soap.length:0),0);
-    const inc=pts.reduce((a,p)=>a+(Array.isArray(p.soap)?p.soap.filter(s=>!s.completa).length:0),0);
+    const totalSOAP=pts.reduce((a,p)=>a+(Array.isArray(p.soap)?_soapVivas(p).length:0),0);   // [BORRADO-NOTAS] VISTA (total notas supervisión)
+    const inc=pts.reduce((a,p)=>a+(Array.isArray(p.soap)?_soapVivas(p).filter(s=>!s.completa).length:0),0);   // [BORRADO-NOTAS] VISTA (incompletas supervisión)
     const sinConsent=pts.filter(p=>!tieneConsentimientoFirmado(p)).length;
     const sinDatos=pts.filter(p=>!(p.consentimientoDatos&&p.consentimientoDatos.aceptado)).length;
     const sinSexo=pts.filter(p=>!p.sexo||p.sexo==='No especificado'||p.sexo==='').length;
@@ -17392,7 +17479,7 @@ function renderSupervision(){
       <div class="sup-row"><div style="font-size:13px;color:var(--gray-600)">Con alta clínica</div><div style="font-weight:700;color:var(--navy)">🏁 ${conAlta}</div></div>
       <div class="sup-row"><div style="font-size:13px;color:var(--gray-600)">Con eventos adversos</div><div style="font-weight:700;color:${conEventos>0?'var(--red)':'var(--green)'}">${conEventos>0?`⚠️ ${conEventos}`:'✅ 0'}</div></div>
       <div class="sup-row"><div style="font-size:13px;color:var(--gray-600)">Inactivos sin alta</div><div style="font-weight:700;color:${inactivosSinAlta>0?'var(--amber)':'var(--green)'}">${inactivosSinAlta>0?`💤 ${inactivosSinAlta}`:'✅ 0'}</div></div>
-      ${pts.filter(p=>Array.isArray(p.soap)&&p.soap.some(s=>!s.completa)).map(p=>`<div data-pid="${escapeAttr_(p.id)}" onclick="openExpediente(this.dataset.pid)" style="padding:8px 14px;font-size:12px;color:var(--red);font-weight:600;cursor:pointer;background:var(--red-light)">⚠ ${escapeHTML(p.name)} →</div>`).join('')}
+      ${pts.filter(p=>_soapVivas(p).some(s=>!s.completa)).map(p=>`<div data-pid="${escapeAttr_(p.id)}" onclick="openExpediente(this.dataset.pid)" style="padding:8px 14px;font-size:12px;color:var(--red);font-weight:600;cursor:pointer;background:var(--red-light)">⚠ ${escapeHTML(p.name)} →</div>`).join('')}
     </div>`;
   });
 
@@ -17407,7 +17494,7 @@ function renderSupervision(){
   </div>`;
 
   // ── SOAP pendiente semanal (M2-D) ────────────────────────────────────────
-  const conSoapAtrasado=patientsDB.filter(p=>!_activoEliminado(p.id)&&!String(p.name||'').startsWith('TEST_QA_')&&necesitaAlertaSoapSemanal(p)&&Array.isArray(p.soap)&&p.soap.length>0)   // [BORRADO-ACTIVOS] D2
+  const conSoapAtrasado=patientsDB.filter(p=>!_activoEliminado(p.id)&&!String(p.name||'').startsWith('TEST_QA_')&&necesitaAlertaSoapSemanal(p)&&_soapVivas(p).length>0)   // [BORRADO-ACTIVOS] D2
     .sort((a,b)=>diasDesdeUltimoSoap(b)-diasDesdeUltimoSoap(a));
   html+=`<div class="section-card" style="margin-bottom:12px">
     <div class="section-title">📅 SOAP pendiente semanal</div>
@@ -17441,7 +17528,7 @@ function filtrarInactividad(dias){
   const limite=new Date(Date.now()-dias*24*60*60*1000);
   const inactivos=patientsDB.filter(p=>{
     if(_activoEliminado(p.id)) return false;   // [BORRADO-ACTIVOS] D2: inactivos
-    const soaps=Array.isArray(p.soap)?p.soap:[];
+    const soaps=_soapVivas(p);   // [BORRADO-NOTAS] VISTA (inactividad)
     if(!soaps.length) return true;
     const ultima=soaps[soaps.length-1];
     const fechaUlt=ultima.fecha?new Date(ultima.fecha.split('/').reverse().join('-')):null;
@@ -17455,7 +17542,7 @@ function filtrarInactividad(dias){
   if(!el) return;
   if(!inactivos.length){ el.innerHTML=`<div style="padding:12px;font-size:13px;color:var(--green);font-weight:600">✅ Todos los pacientes tienen actividad reciente</div>`; return; }
   el.innerHTML=inactivos.map(p=>{
-    const soaps=Array.isArray(p.soap)?p.soap:[];
+    const soaps=_soapVivas(p);   // [BORRADO-NOTAS] VISTA (inactividad)
     const ultSoap=soaps.length?soaps[soaps.length-1].fecha:'Sin sesiones';
     const diasSin=soaps.length?(()=>{const f=new Date(soaps[soaps.length-1].fecha.split('/').reverse().join('-'));return Math.floor((Date.now()-f.getTime())/86400000)})():999;
     return `<div style="padding:10px 0;border-bottom:1px solid var(--gray-100)">
