@@ -10886,6 +10886,17 @@ function _modalBloqueoSync(nombre, n, detalleHTML){
     ov.querySelector('#_bs-cancel').onclick=function(){ cerrar('cancelar'); };
   });
 }
+// [F1] Backup SIN base64: la media vive en Storage (url/fbPath); guardar refs, no el binario.
+// Mantiene el doc de backup pequeño (nunca falla por el límite de 1 MiB) sin perder nada real.
+function _pacienteSinBase64(p){
+  try{
+    var c=Object.assign({}, p);
+    function stripArr(arr){ return (arr||[]).map(function(m){ if(m && (m.url||m.fbPath)){ var m2=Object.assign({},m); if('data' in m2) delete m2.data; return m2; } return m; }); }
+    if(Array.isArray(p.soap)) c.soap=p.soap.map(function(s){ if(!s||!Array.isArray(s.media)) return s; var s2=Object.assign({},s); s2.media=stripArr(s.media); return s2; });
+    ['fotos','docs','estudiosDocs'].forEach(function(k){ if(Array.isArray(p[k])) c[k]=stripArr(p[k]); });
+    return c;
+  }catch(_e){ return p; }
+}
 // BORRAR PACIENTE (unificado activo + histórico). Resolución: currentPatient.id, SOLO desde el
 // expediente abierto. Marca SOLO el "padre" (histórico: doc; activo: entrada pacientesEliminados +
 // espejo) — el jerárquico/filtro ocultan lo demás. Un write para borrar, un write para restaurar.
@@ -10946,7 +10957,7 @@ async function _borrarPaciente(){
     } else {
       // Obligatorio 2: backup del REGISTRO LOCAL COMPLETO (p.soap local-only + media base64) — 1 doc.
       // (Bajo (ii) el registro local NO se pierde con el borrado; este backup es respaldo, no la vía de restore.)
-      await revRef.set({ tipo:'pacienteActivo', pid:pid, ts:ts, borradoPor:borradoPor, nombre:(p.name||pid), numSesiones:nSes, fecha:fechaUlt, registroLocal:_sinUndefined(p) });
+      await revRef.set({ tipo:'pacienteActivo', pid:pid, ts:ts, borradoPor:borradoPor, nombre:(p.name||pid), numSesiones:nSes, fecha:fechaUlt, registroLocal:_sinUndefined(_pacienteSinBase64(p)) });
       // D3: marcar el espejo app_live_ por igualdad de campo único (sin nombres, auto-indexado).
       try{
         var esp=await window._fstDb.collection('pacientes').where('appSourceId','==',pid).get();
