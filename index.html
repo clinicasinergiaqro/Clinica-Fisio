@@ -2729,6 +2729,13 @@ function _esPacienteTest(p){
 // Limpieza única al boot: sacar históricos (mig_pac_) fantasma que se hayan filtrado a localStorage
 // en versiones anteriores (su p.soap quedaba congelado). Se purgan del disco una vez; de ahí en
 // adelante saveLocal ya nunca los persiste. Los históricos se abren frescos desde Firestore (FST_*).
+// ⚠️ CRUDO: `patientsDB` incluye pacientes BORRADOS (borrado lógico, filtro lado-lectura ii).
+// Para cualquier VISTA (algo que el usuario ve: lista, agenda, dashboard, conteos, rendimiento)
+// FILTRA con `!_activoEliminado(p.id)` (o el futuro accessor `pacientesVivos()`). Iterar
+// `patientsDB` directo en una vista = BUG DE BORRADO (un paciente eliminado reaparece).
+// Solo persistencia (saveLocal) y LOOKUPS internos (resolver/dedupe/write/restore/sync) usan el crudo.
+// CONVENCIÓN GREPPEABLE (revisión de código — repetir este grep y clasificar cada hit VISTA/LOOKUP):
+//   grep -nE "patientsDB\.(filter|find|forEach|map|some)" index.html   → todo hit de VISTA debe llevar _activoEliminado/pacientesVivos
 let patientsDB = (function(){
   var _raw = loadDB('pts') || [];
   var _hadMig = Array.isArray(_raw) && _raw.some(function(p){ return String(p&&p.id||'').startsWith('mig_pac_'); });
