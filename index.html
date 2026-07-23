@@ -200,7 +200,7 @@ async function _FST_cargarActivosEliminados(){
   window._FST_activosElimEnVuelo = true;
   try{
     if(!window._fstDb && typeof FST_init==='function'){ try{ await FST_init(); }catch(_){} }
-    if(!window._fstDb) return;   // sin db: conserva cache (fail-safe), no vacía
+    if(!window._fstDb){ console.log('[BORRADO-ACTIVOS] read USÓ CACHE (sin _fstDb aún): '+(window._FST_activosEliminados?window._FST_activosEliminados.size:0)+' · Listo='+window._FST_activosEliminadosListo); return; }   // sin db: conserva cache (fail-safe), no vacía
     try{ var _u=firebase.auth().currentUser; if(_u) await Promise.race([_u.getIdToken(), new Promise(function(_,r){ setTimeout(function(){ r(new Error('tok')); },4000); })]); }catch(_e){}
     var snap = await Promise.race([
       window._fstDb.collection('pacientesEliminados').where('tipo','==','pacienteActivo').get(),
@@ -212,11 +212,11 @@ async function _FST_cargarActivosEliminados(){
     window._FST_activosEliminadosListo = true;
     try{ localStorage.setItem(LS_ACTIVOS_ELIM, JSON.stringify({ ts: Date.now(), ids: ids })); }catch(_e){}
     if(antes>0 && ids.length===0) console.warn('[BORRADO-ACTIVOS] set pasó de '+antes+' a 0 — ¿restauración legítima o nombre de colección mal escrito? (A5: revisar en el gate)');
-    console.log('[BORRADO-ACTIVOS] set cargado:', ids.length);
+    console.log('[BORRADO-ACTIVOS] read RESOLVIÓ: '+ids.length+' entradas · regla OK · Listo=true');   // D4: RESOLVIÓ (no "0 entradas" ambiguo)
     try{ if(typeof _FST_invalidarVistaPacientes==='function') _FST_invalidarVistaPacientes(); }catch(_e){}
     try{ var sp=document.getElementById('screen-pacientes'); if(sp&&sp.classList.contains('active')&&typeof renderPacientesLista==='function') renderPacientesLista(); }catch(_e){}
   }catch(e){
-    console.warn('[BORRADO-ACTIVOS] read falló, conservo cache ('+(window._FST_activosEliminados?window._FST_activosEliminados.size:0)+'):', e&&e.message);
+    console.warn('[BORRADO-ACTIVOS] read RECHAZÓ (regla/red): '+((e&&e.message)||'?')+' · conservo cache ('+(window._FST_activosEliminados?window._FST_activosEliminados.size:0)+') · Listo='+window._FST_activosEliminadosListo);   // D4: RECHAZÓ != resolvió-vacío
     // Fail-open VISIBLE: solo si NO hay set NI cache (nunca verificado) y hay pacientes.
     if((!window._FST_activosEliminados || !window._FST_activosEliminados.size) && !window._FST_activosEliminadosListo && Array.isArray(patientsDB) && patientsDB.length){
       try{ if(typeof showToast==='function') showToast('⚠️ No se pudo verificar la lista de borrados (sin conexión); pueden aparecer temporalmente.','warning'); }catch(_e){}
@@ -3647,7 +3647,7 @@ function renderAgenda(){
     return p;
   });
   // ALL terapeutas see ALL patients of the day — no filter by terapeuta
-  let pts = patientsDB.filter(p=>p.date===todayISO);
+  let pts = patientsDB.filter(p=>p.date===todayISO && !_activoEliminado(p.id));   // [BORRADO-ACTIVOS] D1-1: agenda del día
   const incomplete=pts.filter(p=>Array.isArray(p.soap)&&p.soap.some(s=>!s.completa)).length;
   const c=document.getElementById('content-agenda');
   let html=`<div class="date-header">
@@ -3699,7 +3699,7 @@ function renderAgenda(){
   // G-2: bloque adicional "Agenda del calendario" (async, no bloquea el dashboard de hoy)
   try{ FST_montarAgendaCalendar('dia'); }catch(e){ console.warn('[Agenda cal] montar:', e&&e.message); }
   // M2-E: toast una vez por sesión si hay SOAP atrasado
-  const atrasados=patientsDB.filter(p=>!String(p.name||'').startsWith('TEST_QA_')&&necesitaAlertaSoapSemanal(p)&&Array.isArray(p.soap)&&p.soap.length>0).length;
+  const atrasados=patientsDB.filter(p=>!_activoEliminado(p.id)&&!String(p.name||'').startsWith('TEST_QA_')&&necesitaAlertaSoapSemanal(p)&&Array.isArray(p.soap)&&p.soap.length>0).length;   // [BORRADO-ACTIVOS] D1-2
   if(atrasados>0 && !sessionStorage.getItem('toastSoapMostrado')){
     showToast(`${atrasados} paciente${atrasados>1?'s':''} con SOAP atrasado (+7 días)`,'warning');
     sessionStorage.setItem('toastSoapMostrado','1');
@@ -12515,6 +12515,7 @@ function buscarPacientesSimilares(nombre){
   const n=String(nombre||'').trim().toLowerCase();
   if(!n) return [];
   return patientsDB.filter(p=>{
+    if(_activoEliminado(p.id)) return false;   // [BORRADO-ACTIVOS] D1-3: no ofrecer un borrado como duplicado al dar de alta
     if(String(p.name||'').startsWith('TEST_QA_')) return false;
     if(String(p.name||'').startsWith('TEST QA')) return false;
     const pn=String(p.name||'').trim().toLowerCase();
@@ -17154,7 +17155,7 @@ function renderSupervision(){
     +'<div id="offline-status-box"></div>';
   setTimeout(renderEstadoOffline_, 300);
   ters.forEach(ter=>{
-    const pts=patientsDB.filter(p=>p.terapeuta===ter);
+    const pts=patientsDB.filter(p=>p.terapeuta===ter && !_activoEliminado(p.id));   // [BORRADO-ACTIVOS] D2: rendimiento por terapeuta (un borrado no cuenta)
     const totalSOAP=pts.reduce((a,p)=>a+(Array.isArray(p.soap)?p.soap.length:0),0);
     const inc=pts.reduce((a,p)=>a+(Array.isArray(p.soap)?p.soap.filter(s=>!s.completa).length:0),0);
     const sinConsent=pts.filter(p=>!tieneConsentimientoFirmado(p)).length;
@@ -17193,7 +17194,7 @@ function renderSupervision(){
   </div>`;
 
   // ── SOAP pendiente semanal (M2-D) ────────────────────────────────────────
-  const conSoapAtrasado=patientsDB.filter(p=>!String(p.name||'').startsWith('TEST_QA_')&&necesitaAlertaSoapSemanal(p)&&Array.isArray(p.soap)&&p.soap.length>0)
+  const conSoapAtrasado=patientsDB.filter(p=>!_activoEliminado(p.id)&&!String(p.name||'').startsWith('TEST_QA_')&&necesitaAlertaSoapSemanal(p)&&Array.isArray(p.soap)&&p.soap.length>0)   // [BORRADO-ACTIVOS] D2
     .sort((a,b)=>diasDesdeUltimoSoap(b)-diasDesdeUltimoSoap(a));
   html+=`<div class="section-card" style="margin-bottom:12px">
     <div class="section-title">📅 SOAP pendiente semanal</div>
@@ -17226,6 +17227,7 @@ function filtrarInactividad(dias){
   });
   const limite=new Date(Date.now()-dias*24*60*60*1000);
   const inactivos=patientsDB.filter(p=>{
+    if(_activoEliminado(p.id)) return false;   // [BORRADO-ACTIVOS] D2: inactivos
     const soaps=Array.isArray(p.soap)?p.soap:[];
     if(!soaps.length) return true;
     const ultima=soaps[soaps.length-1];
