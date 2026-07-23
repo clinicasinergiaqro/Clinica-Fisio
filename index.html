@@ -6338,6 +6338,12 @@ function _motivoVigenteDe(p){
 }
 // ── EXPEDIENTE ─────────────────────────────────────────────────────────────
 function openExpediente(pid){
+  // [BORRADO] Bloqueo único de apertura (cubre TODA entrada, incl. L5096): un paciente en Papelera
+  // no se abre — simetría con históricos (que el índice ya excluye). Restaurar es la única vía.
+  if((typeof _activoEliminado==='function' && _activoEliminado(pid)) || (window._FST_pidsEliminados && window._FST_pidsEliminados.has(String(pid)))){
+    try{ showToast('Este paciente está en la Papelera. Restáuralo para verlo.','warning'); }catch(_){}
+    return;
+  }
   currentPatient=patientsDB.find(p=>p.id===pid);
   if(!currentPatient) return;
   document.getElementById('exp-topbar-name').textContent=currentPatient.name.split(' ').slice(0,2).join(' ');
@@ -6661,7 +6667,7 @@ function renderExpediente(tab='historia'){
     <button class="tab ${tab==='consent'?'active':''}" onclick="renderExpediente('consent')">Consentimiento</button>
   </div>
   ${(currentUser&&(currentUser.role==='supervisor'||currentUser.name==='CARLOS'||p.terapeuta===currentUser.name||p.terapeutaSeguimiento===currentUser.name))?`<div style="padding:4px 14px 0;text-align:right"><button data-pid="${escapeAttr_(p.id)}" onclick="exportarExpedienteJSON(this.dataset.pid)" style="background:transparent;border:1px solid rgba(255,255,255,.4);color:white;border-radius:16px;padding:4px 12px;font-size:11px;cursor:pointer;font-weight:600">📥 Exportar JSON</button></div>`:''}
-  ${(esSupervisorUI())?`<div style="padding:4px 14px 0;text-align:right"><button data-pid="${escapeAttr_(p.id)}" onclick="_abrirEditarPaciente(this.dataset.pid)" style="background:var(--gold);border:none;color:var(--navy-dark);border-radius:16px;padding:5px 14px;font-size:12px;cursor:pointer;font-weight:700">✏️ Editar datos</button></div>`:''}
+  ${(esSupervisorUI())?`<div style="padding:4px 14px 0;text-align:right;display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap">${_puedeBorrar()?`<button onclick="_borrarPaciente()" style="background:#FEF2F2;border:1.5px solid #FCA5A5;color:#B91C1C;border-radius:16px;padding:5px 14px;font-size:12px;cursor:pointer;font-weight:700">🗑️ Mover a papelera</button>`:''}<button data-pid="${escapeAttr_(p.id)}" onclick="_abrirEditarPaciente(this.dataset.pid)" style="background:var(--gold);border:none;color:var(--navy-dark);border-radius:16px;padding:5px 14px;font-size:12px;cursor:pointer;font-weight:700">✏️ Editar datos</button></div>`:''}
   <div style="padding:6px 14px 0;text-align:right"><button data-pid="${escapeAttr_(p.id)}" onclick="pedirRevaloracion(this.dataset.pid)" style="background:#C0392B;border:none;color:#fff;border-radius:14px;padding:10px 20px;font-size:14px;cursor:pointer;font-weight:800;box-shadow:0 2px 6px rgba(192,57,43,.35)">🆘 Pedir valoración o apoyo de Carlos</button></div>
   ${renderIndicadorCompletitud(p)}`;
 
@@ -10845,6 +10851,134 @@ async function _borrarNotaHistorica(docId, pid){
   }catch(_e){}
   showToast('🗑️ Nota movida a papelera','success');
 }
+// Detección de cambios SIN SINCRONIZAR de un ACTIVO. Fuentes: COLA_SYNC (getColaSync L1956, ids de
+// paciente pendientes a Sheets) + COLA_SOAP_ACT (L2107, dual-writes de sesión pendientes a Firestore)
+// + su cola de FALLIDOS (errores permanentes con diagnóstico). Ground-truth adicional: CLOBBER-FIX
+// (s.id ∉ idsNube, L2498) — pero eso exige leer Sheets; para el bloqueo bastan las colas locales.
+function _pacientePendientesSync(pid){
+  var out={n:0, cambios:false, notas:[], errores:[]};
+  try{ if(typeof getColaSync==='function' && getColaSync().indexOf(pid)!==-1){ out.cambios=true; out.n++; } }catch(_){}
+  function _q(k){ try{ return JSON.parse(localStorage.getItem(k)||'[]')||[]; }catch(_){ return []; } }
+  _q('COLA_SOAP_ACT').forEach(function(it){ if(it && String(it.pid||'')===String(pid)){ out.n++; out.notas.push({fecha:(it.sesion&&it.sesion.fecha)||'', num:(it.sesion&&it.sesion.num)||''}); } });
+  _q('COLA_SOAP_ACT_FALLIDOS').forEach(function(it){ if(it && String(it.pid||'')===String(pid)){ out.n++; out.errores.push({fecha:(it.sesion&&it.sesion.fecha)||'', err:it.error||'error de subida'}); } });
+  return out;
+}
+async function _forzarSyncPaciente(){
+  try{ if(typeof sincronizarPendientes==='function') await sincronizarPendientes(); }catch(_){}
+  try{ if(typeof drenarColaSoapActivo==='function') await drenarColaSoapActivo(); }catch(_){}
+}
+// Modal de bloqueo por notas sin sincronizar: dice CUÁLES + ofrece "Forzar sincronización" (evita
+// que una nota atorada permanentemente deje al paciente imposible de borrar sin diagnóstico).
+function _modalBloqueoSync(nombre, n, detalleHTML){
+  return new Promise(function(resolve){
+    var ov=document.createElement('div');
+    ov.style.cssText='position:fixed;inset:0;background:rgba(13,27,62,.5);z-index:9999;display:flex;align-items:flex-end;justify-content:center';
+    function cerrar(v){ try{ov.remove();}catch(_){} resolve(v); }
+    ov.onclick=function(e){ if(e.target===ov) cerrar('cancelar'); };
+    ov.innerHTML='<div style="background:#fff;border-radius:16px 16px 0 0;width:100%;max-width:480px;padding:16px">'
+      +'<div style="font-weight:800;color:#B45309;margin-bottom:8px">⚠️ '+escapeHTML(nombre||'')+' tiene '+n+' cambio'+(n!==1?'s':'')+' sin sincronizar</div>'
+      +'<div style="font-size:12px;color:var(--gray-600);margin-bottom:8px">No se puede borrar hasta subirlos (esas notas solo viven en este dispositivo).</div>'
+      +'<div style="font-size:12px;color:var(--gray-600);background:#FFFBEB;border-radius:8px;padding:8px;margin-bottom:10px">'+detalleHTML+'</div>'
+      +'<button id="_bs-forzar" style="width:100%;padding:12px;border:none;border-radius:10px;background:var(--navy);color:#fff;font-size:14px;font-weight:800;cursor:pointer">🔄 Forzar sincronización</button>'
+      +'<button id="_bs-cancel" style="width:100%;padding:10px;margin-top:4px;border:none;background:none;color:var(--gray-400);font-size:13px;cursor:pointer">Cancelar</button></div>';
+    document.body.appendChild(ov);
+    ov.querySelector('#_bs-forzar').onclick=function(){ cerrar('forzar'); };
+    ov.querySelector('#_bs-cancel').onclick=function(){ cerrar('cancelar'); };
+  });
+}
+// BORRAR PACIENTE (unificado activo + histórico). Resolución: currentPatient.id, SOLO desde el
+// expediente abierto. Marca SOLO el "padre" (histórico: doc; activo: entrada pacientesEliminados +
+// espejo) — el jerárquico/filtro ocultan lo demás. Un write para borrar, un write para restaurar.
+async function _borrarPaciente(){
+  if(!_puedeBorrar()){ showToast('Solo Carlos puede borrar','error'); return; }
+  var p=currentPatient;
+  if(!p || !p.id){ showToast('Abre el expediente del paciente primero','error'); return; }
+  var pid=String(p.id);
+  var esHist=pid.indexOf('mig_pac_')===0;
+  if(!esHist && !window._FST_activosEliminadosListo){ showToast('Aún no se verificó la lista de borrados; reintenta en un momento','warning'); return; }   // A4
+  if(!window._fstDb){ try{ await FST_init(); }catch(_){} }
+  if(!window._fstDb){ showToast('Firestore no disponible','error'); return; }
+  // BLOQUEO por notas sin sincronizar (solo activos; los históricos viven en Firestore, no en colas locales).
+  if(!esHist){
+    var pend=_pacientePendientesSync(pid);
+    if(pend.n>0){
+      var det='';
+      pend.notas.forEach(function(x){ det+='<div>• Nota '+(x.num?('#'+escapeHTML(String(x.num))+' '):'')+escapeHTML(x.fecha||'')+' — pendiente de subir</div>'; });
+      pend.errores.forEach(function(x){ det+='<div style="color:var(--red)">• '+escapeHTML(x.fecha||'')+' — FALLO: '+escapeHTML(String(x.err).slice(0,90))+'</div>'; });
+      if(pend.cambios) det+='<div>• Cambios de expediente pendientes de subir</div>';
+      var accion=await _modalBloqueoSync(p.name, pend.n, det);
+      if(accion!=='forzar') return;
+      showToast('Sincronizando…','');
+      await _forzarSyncPaciente();
+      var p2=_pacientePendientesSync(pid);
+      if(p2.n>0){ showToast('Aún quedan '+p2.n+' sin sincronizar — revisa el detalle antes de borrar','error'); return; }
+    }
+  }
+  // Resumen para confirmar (nombre + nº notas + fecha última).
+  var sesiones=[];
+  if(esHist){ try{ var r=await FST_fetchSesiones(pid); if(Array.isArray(r)) sesiones=r; }catch(_){} }
+  else { sesiones=Array.isArray(p.soap)?p.soap:[]; }
+  var nSes=sesiones.length;
+  var fechas=sesiones.map(function(s){ return s.fecha; }).filter(Boolean).sort();
+  var fechaUlt=fechas.length?fechas[fechas.length-1]:'';
+  var resumenHTML='<div style="font-size:13px;color:var(--navy);font-weight:700">'+escapeHTML(p.name||pid)+'</div>'
+    +'<div style="font-size:12px;color:var(--gray-500);margin:2px 0 6px">'+nSes+' nota'+(nSes!==1?'s':'')+(fechaUlt?(' · última: '+escapeHTML(fechaUlt)):'')+' · '+(esHist?'histórico':'activo')+'</div>'
+    +'<div style="font-size:12px;color:var(--gray-600);background:#F6F8FB;border-radius:8px;padding:8px">Se moverá el expediente COMPLETO a la Papelera. Restaurable desde la app.</div>';
+  var ok=await _modalConfirmarBorrado('🗑️ Mover paciente a papelera', resumenHTML, 'Mover a papelera');
+  if(!ok) return;
+  var ts=Date.now();
+  var borradoPor=(currentUser&&(currentUser.email||currentUser.username))||EMAIL_ADMIN_BORRADO;
+  var papRef=null;
+  try{
+    var revId=(esHist?'pacHist':'pacAct')+'__'+pid+'__'+ts;
+    var revRef=window._fstDb.collection('revision').doc(revId);
+    var espejoDocId=null;
+    if(esHist){
+      // Backup ATÓMICO-VERIFICADO: doc padre + TODAS las sesiones (lotes <=450 por el límite 500/batch),
+      // confirmado completo ANTES del tombstone. Un lote que falle → throw → NO marca.
+      var pref=window._fstDb.collection('pacientes').doc(pid);
+      var psnap=await pref.get(); if(!psnap.exists){ showToast('El paciente ya no existe en la nube','error'); return; }
+      var ssnap=await pref.collection('sesiones').get();
+      await revRef.set({ tipo:'pacienteHistorico', pid:pid, ts:ts, borradoPor:borradoPor, nombre:(p.name||pid), numSesiones:ssnap.size, fecha:fechaUlt, paciente:(psnap.data()||{}) });
+      var docs=ssnap.docs, LOTE=450;
+      for(var i=0;i<docs.length;i+=LOTE){ var b=window._fstDb.batch(); docs.slice(i,i+LOTE).forEach(function(d){ b.set(revRef.collection('sesiones').doc(d.id), d.data()||{}); }); await b.commit(); }
+      var back=await revRef.collection('sesiones').get(); if(back.size!==ssnap.size) throw new Error('backup incompleto ('+back.size+'/'+ssnap.size+')');
+    } else {
+      // Obligatorio 2: backup del REGISTRO LOCAL COMPLETO (p.soap local-only + media base64) — 1 doc.
+      // (Bajo (ii) el registro local NO se pierde con el borrado; este backup es respaldo, no la vía de restore.)
+      await revRef.set({ tipo:'pacienteActivo', pid:pid, ts:ts, borradoPor:borradoPor, nombre:(p.name||pid), numSesiones:nSes, fecha:fechaUlt, registroLocal:_sinUndefined(p) });
+      // D3: marcar el espejo app_live_ por igualdad de campo único (sin nombres, auto-indexado).
+      try{
+        var esp=await window._fstDb.collection('pacientes').where('appSourceId','==',pid).get();
+        if(esp.size===1){ espejoDocId=esp.docs[0].id; await window._fstDb.collection('pacientes').doc(espejoDocId).set({ eliminado:true, eliminadoPor:borradoPor, eliminadoFecha:new Date(ts).toISOString() },{merge:true}); }
+        else if(esp.size>1){ console.error('[BORRADO-ACTIVOS] >1 espejo con appSourceId='+pid+' — NO marco espejo a ciegas; sigo con el marcado local'); showToast('⚠️ Anomalía: >1 espejo; el espejo NO se marcó (revisar)','warning'); }
+        // esp.size===0 → activo nunca sincronizado, sin espejo → normal, nada que marcar.
+      }catch(_e){ console.warn('[BORRADO-ACTIVOS] no se pudo consultar/marcar espejo:', _e&&_e.message); }
+    }
+    // Papelera (guarda espejoDocId para restaurar el espejo sin re-buscar → sin restauración parcial).
+    papRef=await window._fstDb.collection('papelera').add(_sinUndefined({ tipo:(esHist?'pacienteHistorico':'pacienteActivo'), pid:pid, nombre:(p.name||pid), numSesiones:nSes, fecha:fechaUlt, resumen:(nSes+' nota'+(nSes!==1?'s':'')), ts:ts, borradoPor:borradoPor, revId:revId, espejoDocId:espejoDocId }));
+    // RECIÉN AHORA el marcado del "padre".
+    if(esHist){ await window._fstDb.collection('pacientes').doc(pid).set({ eliminado:true, eliminadoPor:borradoPor, eliminadoFecha:new Date(ts).toISOString() },{merge:true}); }
+    else { await window._fstDb.collection('pacientesEliminados').doc('pacienteActivo__'+pid).set({ tipo:'pacienteActivo', id:pid, eliminadoPor:borradoPor, eliminadoFecha:new Date(ts).toISOString() }); }
+    console.log('[BORRADO-PACIENTE] marcado OK ·', (esHist?'historico':'activo'), pid);
+  }catch(e){
+    console.error('[BORRADO-PACIENTE]', e);
+    if(papRef){ try{ await papRef.delete(); }catch(_){} }   // rollback: sin fantasma; el paciente NO se marcó → sigue vivo
+    showToast('❌ No se pudo borrar (backup/reglas): '+((e&&e.message)||'error')+'. El paciente NO se tocó.','error');
+    return;
+  }
+  // Invalidación EN CALIENTE.
+  if(esHist){ try{ if(window._FST_pidsEliminados) window._FST_pidsEliminados.add(pid); }catch(_){} try{ delete _fstSesionesCache[pid]; }catch(_){} }
+  else {
+    try{ if(window._FST_activosEliminados) window._FST_activosEliminados.add(pid); }catch(_){}
+    try{ var _c=JSON.parse(localStorage.getItem(LS_ACTIVOS_ELIM)||'{}'); var _ids=Array.isArray(_c.ids)?_c.ids:[]; if(_ids.indexOf(pid)===-1) _ids.push(pid); localStorage.setItem(LS_ACTIVOS_ELIM, JSON.stringify({ ts:Date.now(), ids:_ids })); }catch(_){}
+  }
+  try{ if(typeof _FST_invalidarVistaPacientes==='function') _FST_invalidarVistaPacientes(); }catch(_){}
+  try{ window._colaRevisionCache=null; }catch(_){}
+  try{ window._citasVinculadasCache=null; }catch(_){}
+  showToast('🗑️ Paciente movido a papelera','success');
+  try{ if(typeof goBack==='function') goBack(); }catch(_){}
+}
 // PAPELERA — lee la colección 'papelera' con query SIMPLE (sin índice compuesto). Notas y pacientes.
 async function abrirPapelera(){
   if(!_puedeBorrar()){ showToast('Solo Carlos','error'); return; }
@@ -10893,11 +11027,21 @@ async function _restaurarDesdePapelera(entryId, btn){
       try{ delete _fstSesionesCache[e.pid]; }catch(_){}
       try{ if(currentPatient && currentPatient.id===e.pid && typeof FST_renderHistorialSoap==='function') FST_renderHistorialSoap(e.pid); }catch(_){}
       try{ window._colaRevisionCache=null; }catch(_){}
-    } else if(e.tipo==='paciente'){
+    } else if(e.tipo==='pacienteHistorico' || e.tipo==='paciente'){   // 'paciente' legacy = histórico
       await window._fstDb.collection('pacientes').doc(e.pid)
         .set({ eliminado:false, restauradoPor:restauradoPor, restauradoFecha:restauradoFecha }, { merge:true });
       try{ if(window._FST_pidsEliminados) window._FST_pidsEliminados.delete(String(e.pid)); }catch(_){}
+      try{ delete _fstSesionesCache[e.pid]; }catch(_){}
       try{ if(typeof _FST_invalidarVistaPacientes==='function') _FST_invalidarVistaPacientes(); }catch(_){}
+    } else if(e.tipo==='pacienteActivo'){
+      // Restore de ACTIVO = DES-OCULTAR (el registro local nunca se removió bajo ii): quitar de
+      // pacientesEliminados + desmarcar el espejo por su doc-id GUARDADO (sin re-buscar → sin parcial).
+      await window._fstDb.collection('pacientesEliminados').doc('pacienteActivo__'+e.pid).delete();
+      if(e.espejoDocId){ try{ await window._fstDb.collection('pacientes').doc(e.espejoDocId).set({ eliminado:false, restauradoPor:restauradoPor, restauradoFecha:restauradoFecha },{merge:true}); }catch(_x){ console.warn('[restaurar] espejo (reintentable):', _x&&_x.message); } }
+      try{ if(window._FST_activosEliminados) window._FST_activosEliminados.delete(String(e.pid)); }catch(_){}
+      try{ var _c=JSON.parse(localStorage.getItem(LS_ACTIVOS_ELIM)||'{}'); var _ids=(Array.isArray(_c.ids)?_c.ids:[]).filter(function(x){ return String(x)!==String(e.pid); }); localStorage.setItem(LS_ACTIVOS_ELIM, JSON.stringify({ ts:Date.now(), ids:_ids })); }catch(_){}
+      try{ if(typeof _FST_invalidarVistaPacientes==='function') _FST_invalidarVistaPacientes(); }catch(_){}
+      try{ window._citasVinculadasCache=null; }catch(_){}
     }
     // (a) ya quitó el flag arriba; (b) borrar la entrada de papelera en SU propio try:
     // si (b) falla, la nota YA quedó restaurada (visible) — el mensaje lo refleja, sin asustar.
