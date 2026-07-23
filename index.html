@@ -1100,10 +1100,8 @@ body.modo-oscuro .topbar{background:#141824}
       <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
       Supervisión
     </button>
-    <button class="nav-item" id="nav-qa" onclick="showQA()" style="display:none">
-      <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>
-      QA
-    </button>
+    <!-- [LOOP-B] QA fuera del nav (riesgo operativo: escribía en prod a un toque). La pantalla sigue
+         existiendo, alcanzable SOLO por ?qa=1 con guard de rol en showQA(). -->
   </nav>
 </div>
 
@@ -3028,8 +3026,11 @@ function entrarModoOffline_(){
   const le=document.getElementById('login-error'); if(le) le.style.display='none';
   document.getElementById('topbar-avatar').textContent=u.initials||'OFF';
   document.getElementById('topbar-role').textContent='📴 Modo offline · '+(u.name||'Usuario');
-  if(u.role==='supervisor'){ document.getElementById('nav-supervision').style.display='flex'; document.getElementById('nav-qa').style.display='flex'; }
-  else{ document.getElementById('nav-supervision').style.display='none'; document.getElementById('nav-qa').style.display='none'; }
+  if(u.role==='supervisor'){ document.getElementById('nav-supervision').style.display='flex';
+    // [LOOP-B] QA ya no vive en el nav. Deep-link deliberado ?qa=1 (showQA valida el rol al entrar).
+    try{ if(new URLSearchParams(location.search).get('qa')==='1' && typeof showQA==='function') setTimeout(showQA,0); }catch(_e){}
+  }
+  else{ document.getElementById('nav-supervision').style.display='none'; }
   screenStack=['screen-agenda']; showScreen('screen-agenda',false);
   try{ renderAgenda(); }catch(e){} try{ renderPacientes(); }catch(e){}
   actualizarIndicadorSync();
@@ -3306,10 +3307,8 @@ function entrarComo(perfil, email, silencioso){
     perfil.role==='supervisor'?'⭐ Supervisor':`Terapeuta · ${perfil.name}`;
   if(perfil.role==='supervisor'){
     document.getElementById('nav-supervision').style.display='flex';
-    document.getElementById('nav-qa').style.display='flex';
   } else {
     document.getElementById('nav-supervision').style.display='none';
-    document.getElementById('nav-qa').style.display='none';
   }
   screenStack=['screen-agenda'];
   showScreen('screen-agenda',false);
@@ -3716,7 +3715,6 @@ async function doLogout(){
   registrarAcceso('LOGOUT');
   try{ _detenerAutoLogout(); }catch(e){} // detener timer de inactividad
   document.getElementById('nav-supervision').style.display='none';
-  document.getElementById('nav-qa').style.display='none';
   try{ if(typeof fbAuth!=='undefined' && fbAuth.currentUser){ await fbAuth.signOut(); } }catch(e){ console.warn('signOut:',e.message); }
   _limpiarSesionToken(); // [FIX-AUTH #8 · CONDICIÓN-1] borra cache+ts+uid del token en TODO logout manual
   currentUser=null;screenStack=[];
@@ -16213,7 +16211,10 @@ let QA_C10 = null; // Resultados del Ciclo 10 Archivos Cloud
 let QA_AUTH = null; // Resultados de prueba Firebase Auth
 
 function showQA(){
-  if(!currentUser||currentUser.role!=='supervisor') return;
+  // [LOOP-B] 🔴 GUARD DE ROL AL ENTRAR. Antes la protección era que nav-qa solo se mostraba al
+  // supervisor; ahora que la entrada es ?qa=1 (una URL es adivinable), el rol se valida AQUÍ y aborta
+  // visible si no es supervisor — mismo patrón que showMigracionHistorica. Sin esto, ?qa=1 debilitaría.
+  if(!currentUser || currentUser.role!=='supervisor'){ try{ showToast('Panel QA: solo supervisor','error'); }catch(_e){} return; }
   screenStack.push('screen-qa');
   showScreen('screen-qa',false);
   renderQA();
@@ -16239,14 +16240,7 @@ function renderQA(){
       ⚠️ Solo crea pacientes ficticios con nombre "TEST QA". No afecta pacientes reales.
     </div>
 
-    <!-- MIGRACIÓN HISTÓRICA (solo supervisor) -->
-    <div class="section-card" style="margin-bottom:12px;border:1px solid var(--navy)">
-      <div class="section-title">📥 Migración histórica de notas</div>
-      <div style="padding:12px 14px">
-        <div style="font-size:12px;color:var(--gray-400);margin-bottom:10px;line-height:1.5">Importa pacientes desde <b>.jsonl</b> + media. Idempotente, por lotes, con checkpoint. La IA corre después.</div>
-        <button class="btn-primary" onclick="showMigracionHistorica()">Abrir importador</button>
-      </div>
-    </div>
+    <!-- [LOOP-B] MIGRACIÓN HISTÓRICA movida a Supervisión (es la única pieza operativa real del panel QA). -->
 
     <!-- BOTÓN 1: CONEXIÓN -->
     <div class="section-card" style="margin-bottom:12px">
@@ -16644,6 +16638,7 @@ function crearPacienteQAFicticio(terapeuta, num, region){
 }
 
 async function generarPacientesQATerapeutas(incluirCarlos){
+  if(!confirm('Esto BORRA los pacientes de prueba TEST_QA_ existentes y crea '+(incluirCarlos?30:25)+' nuevos en el Sheets REAL de producción. ¿Continuar?')) return;   // [LOOP-B] confirm de escritura en prod
   const regiones=['Rodilla','Tobillo','Hombro','Cervical','Lumbar'];
   const terapeutas=['DAF','ZARA','CAMI','GORE','JESS'];
   if(incluirCarlos) terapeutas.push('CARLOS');
@@ -16698,7 +16693,7 @@ function borrarPacientesQATerapeutas(){
 async function borrarPacientesQATerapeutasConfirm(){
   const cuantos=patientsDB.filter(p=>String(p.name).startsWith('TEST_QA_')).length;
   if(cuantos===0){ showToast('No hay pacientes TEST_QA_ para borrar','');return; }
-  if(!confirm('¿Borrar todos los pacientes TEST_QA_? Esta acción no afecta pacientes reales.')) return;
+  if(!confirm('Esto BORRA todos los pacientes de prueba TEST_QA_ del Sheets REAL de producción (no afecta pacientes reales). ¿Continuar?')) return;   // [LOOP-B] texto explícito
   showToast('Borrando TEST_QA_ de Sheets...','');
   // 1. Borrar de Sheets vía acción independiente
   try{
@@ -16772,6 +16767,7 @@ async function qaProbarConexion(){
 
 // ── QA: Crear 10 pacientes ficticios ──────────────────────────────
 async function qaCrearPacientes(){
+  if(!confirm('Esto BORRA los pacientes TEST QA existentes y crea 10 nuevos en el Sheets REAL de producción. ¿Continuar?')) return;   // [LOOP-B] confirm de escritura en prod
   showToast('Limpiando TEST QA anteriores en Sheets...','');
 
   // 1. Borrar TEST QA anteriores del Sheets primero
@@ -16913,6 +16909,7 @@ function qaVerificarGlobales(){
 
 // ── QA: Eliminar TEST QA ──────────────────────────────────────────
 async function qaEliminarTestQA(){
+  if(!confirm('Esto BORRA todos los pacientes TEST QA del Sheets REAL de producción. ¿Continuar?')) return;   // [LOOP-B] confirm de escritura en prod
   showToast('Eliminando TEST QA de memoria y Sheets...','');
   const antes=patientsDB.length;
   patientsDB=patientsDB.filter(p=>!p.name.startsWith('TEST QA'));
@@ -16950,6 +16947,7 @@ async function qaReporteCompleto(){
 
 // ── QA CICLO 8 — SOAP ─────────────────────────────────────────────────────
 async function qaProbarCiclo8(){
+  if(!confirm('Ciclo de prueba 8: ESCRIBE pacientes/notas de prueba en el Sheets REAL de producción. ¿Continuar?')) return;   // [LOOP-B] confirm de escritura en prod
   QA_C8 = {
     paciente:null, soap1:null, soap2:null, soap3:null,
     guardado:null, lectura:null, count3:null,
@@ -17065,6 +17063,7 @@ async function qaProbarCiclo8(){
 
 // ── QA CICLO 9 — Consentimientos ───────────────────────────────────────────
 async function qaProbarCiclo9(){
+  if(!confirm('Ciclo de prueba 9: ESCRIBE pacientes/notas de prueba en el Sheets REAL de producción. ¿Continuar?')) return;   // [LOOP-B] confirm de escritura en prod
   QA_C9 = {paciente:null, crear:null, guardado:null, firmadoLeido:null, datosOK:null, auditoria:null, aprobado:false, error:''};
   renderQA();
   showToast('Iniciando prueba Ciclo 9 — Consentimientos...','');
@@ -17137,6 +17136,7 @@ async function qaProbarCiclo9(){
 
 // ── CICLO 10 — Archivo Cloud (Firebase Storage) ────────────────────────────
 async function qaProbarCiclo10(){
+  if(!confirm('Ciclo de prueba 10: ESCRIBE pacientes/notas de prueba en el Sheets REAL de producción. ¿Continuar?')) return;   // [LOOP-B] confirm de escritura en prod
   QA_C10 = {
     firebaseInit:null, storageOK:null, pacienteOK:null, archivoSel:null,
     subida:null, urlRecibida:null, metadataGuardada:null, lecturaSheets:null,
@@ -17384,6 +17384,7 @@ async function qaProbarPOST(){
 
 // ── QA CICLO 7 — Historia Clínica ─────────────────────────────────────────
 async function qaProbarCiclo7(){
+  if(!confirm('Ciclo de prueba 7: ESCRIBE pacientes/notas de prueba en el Sheets REAL de producción. ¿Continuar?')) return;   // [LOOP-B] confirm de escritura en prod
   QA_C7 = {
     crearPaciente:null, guardarInicial:null, leerSheets:null,
     editarDAF:null, historial:null, antesDepues:null,
@@ -17657,6 +17658,7 @@ function renderSupervision(){
     +'<button onclick="exportarPacientesCSV()" style="background:var(--navy);color:white;border:none;border-radius:20px;padding:8px 16px;font-size:13px;font-weight:700;cursor:pointer">📥 Exportar lista CSV</button>'
     +'<button onclick="prepararModoOffline_()" class="chip-quick">📴 Preparar modo sin internet</button>'
     +'<button onclick="verAvisoPrivacidad_()" class="chip-quick">📄 Aviso de privacidad</button>'
+    +'<button onclick="showMigracionHistorica()" class="chip-quick">📥 Abrir importador</button>'   // [LOOP-B] migración histórica movida aquí (era la única pieza operativa real de QA)
     +'</div>'
     +'<div id="offline-status-box"></div>';
   setTimeout(renderEstadoOffline_, 300);
