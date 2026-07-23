@@ -10902,6 +10902,29 @@ function _pacienteSinBase64(p){
 // (incluye nombres de campo + overhead de codificación, no solo el JSON) → dejamos ~48 KiB de colchón.
 var _LIMITE_DOC_FST = 1000000;   // bytes; umbral conservador bajo el límite duro de 1 MiB de Firestore
 function _tamBytes(str){ try{ return new TextEncoder().encode(str).length; }catch(_e){ return String(str||'').length; } }
+// [BORRADO][3-bis] Modal del guard de tamaño. Default SEGURO = esperar (que LOOP-B suba la media y el
+// backup encoja). Escape DELIBERADO = "Borrar sin respaldo" (botón aparte, aviso explícito) para el
+// caso en que la media NUNCA suba (error permanente de Storage / archivo corrupto): sin él, ese paciente
+// quedaría indeleteable para siempre. Bajo (ii) el registro local se conserva y el restore (des-ocultar)
+// sigue funcionando; lo único que se omite es la copia redundante en revision/.
+function _modalBackupExcedido(nombre, mib){
+  return new Promise(function(resolve){
+    var ov=document.createElement('div');
+    ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:100050;display:flex;align-items:center;justify-content:center;padding:20px';
+    ov.onclick=function(e){ if(e.target===ov){ ov.remove(); resolve('cancelar'); } };
+    ov.innerHTML='<div style="background:#fff;border-radius:16px;padding:22px;max-width:360px;width:100%">'
+      +'<div style="font-size:16px;font-weight:800;color:#B45309;margin-bottom:8px">⚠️ Respaldo demasiado grande</div>'
+      +'<div style="font-size:13px;color:#374151;margin-bottom:10px">El respaldo de <b>'+escapeHTML(nombre||'')+'</b> pesa '+escapeHTML(String(mib))+' MiB por media que aún no se sube a la nube. Lo normal: <b>sube/sincroniza las fotos</b> y reintenta — el respaldo encoge y el borrado funciona.</div>'
+      +'<div style="font-size:12px;color:#6B7280;background:#FEF3C7;border-radius:8px;padding:8px;margin-bottom:14px">Si la media nunca sube (error de la nube o archivo dañado), puedes borrar SIN respaldo: no se guardará copia en la nube, pero el registro local se conserva y la restauración sigue funcionando.</div>'
+      +'<div style="display:flex;flex-direction:column;gap:8px">'
+      +'<button id="_be_wait" style="padding:11px;border-radius:10px;border:none;background:var(--navy);color:#fff;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">Esperar y sincronizar (recomendado)</button>'
+      +'<button id="_be_force" style="padding:10px;border-radius:10px;border:1px solid #FCA5A5;background:#fff;color:#B91C1C;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">Borrar sin respaldo</button>'
+      +'</div></div>';
+    document.body.appendChild(ov);
+    ov.querySelector('#_be_wait').onclick=function(){ ov.remove(); resolve('cancelar'); };
+    ov.querySelector('#_be_force').onclick=function(){ ov.remove(); resolve('sinRespaldo'); };
+  });
+}
 // BORRAR PACIENTE (unificado activo + histórico). Resolución: currentPatient.id, SOLO desde el
 // expediente abierto. Marca SOLO el "padre" (histórico: doc; activo: entrada pacientesEliminados +
 // espejo) — el jerárquico/filtro ocultan lo demás. Un write para borrar, un write para restaurar.
@@ -10944,7 +10967,7 @@ async function _borrarPaciente(){
   if(!ok) return;
   var ts=Date.now();
   var borradoPor=(currentUser&&(currentUser.email||currentUser.username))||EMAIL_ADMIN_BORRADO;
-  var papRef=null;
+  var papRef=null, _omitirRespaldo=false;   // [3-bis] _omitirRespaldo: activo borrado sin backup (media > límite, escape deliberado)
   try{
     var revId=(esHist?'pacHist':'pacAct')+'__'+pid+'__'+ts;
     var revRef=window._fstDb.collection('revision').doc(revId);
@@ -10969,11 +10992,19 @@ async function _borrarPaciente(){
       // no se toca nada (papRef sigue null → sin rollback, el paciente NO se marcó → sigue vivo).
       var _bytesBackup=_tamBytes(JSON.stringify(_payloadBackup));
       if(_bytesBackup > _LIMITE_DOC_FST){
-        showToast('❌ El respaldo excede el tamaño máximo ('+(_bytesBackup/1048576).toFixed(2)+' MiB) por media sin sincronizar. Sube/sincroniza las fotos del paciente y reintenta el borrado.','error');
-        console.warn('[BORRADO-ACTIVOS] backup '+_bytesBackup+'B > límite '+_LIMITE_DOC_FST+'B — abortado, paciente intacto');
-        return;
+        // Default SEGURO = esperar (LOOP-B sube la media → el backup encoge → reintenta). Escape
+        // deliberado para media que NUNCA sube: "Borrar sin respaldo" (un clic aparte). Bajo (ii) el
+        // registro local se conserva y el restore (des-ocultar) sigue funcionando; se omite solo revision/.
+        var _acc=await _modalBackupExcedido((p.name||pid), (_bytesBackup/1048576).toFixed(2));
+        if(_acc!=='sinRespaldo'){
+          showToast('Borrado en espera: sube/sincroniza las fotos y reintenta. El paciente NO se tocó.','');
+          console.warn('[BORRADO-ACTIVOS] backup '+_bytesBackup+'B > límite '+_LIMITE_DOC_FST+'B — usuario NO forzó; abortado, paciente intacto');
+          return;
+        }
+        _omitirRespaldo=true;
+        console.warn('[BORRADO-ACTIVOS] backup '+_bytesBackup+'B > límite — usuario eligió BORRAR SIN RESPALDO; se omite revision/, registro local intacto (ii)');
       }
-      await revRef.set(_payloadBackup);
+      if(!_omitirRespaldo){ await revRef.set(_payloadBackup); }
       // D3: marcar el espejo app_live_ por igualdad de campo único (sin nombres, auto-indexado).
       try{
         var esp=await window._fstDb.collection('pacientes').where('appSourceId','==',pid).get();
@@ -10983,7 +11014,7 @@ async function _borrarPaciente(){
       }catch(_e){ console.warn('[BORRADO-ACTIVOS] no se pudo consultar/marcar espejo:', _e&&_e.message); }
     }
     // Papelera (guarda espejoDocId para restaurar el espejo sin re-buscar → sin restauración parcial).
-    papRef=await window._fstDb.collection('papelera').add(_sinUndefined({ tipo:(esHist?'pacienteHistorico':'pacienteActivo'), pid:pid, nombre:(p.name||pid), numSesiones:nSes, fecha:fechaUlt, resumen:(nSes+' nota'+(nSes!==1?'s':'')), ts:ts, borradoPor:borradoPor, revId:revId, espejoDocId:espejoDocId }));
+    papRef=await window._fstDb.collection('papelera').add(_sinUndefined({ tipo:(esHist?'pacienteHistorico':'pacienteActivo'), pid:pid, nombre:(p.name||pid), numSesiones:nSes, fecha:fechaUlt, resumen:(nSes+' nota'+(nSes!==1?'s':'')), ts:ts, borradoPor:borradoPor, revId:(_omitirRespaldo?null:revId), espejoDocId:espejoDocId, sinRespaldo:(_omitirRespaldo||null) }));
     // RECIÉN AHORA el marcado del "padre".
     if(esHist){ await window._fstDb.collection('pacientes').doc(pid).set({ eliminado:true, eliminadoPor:borradoPor, eliminadoFecha:new Date(ts).toISOString() },{merge:true}); }
     else { await window._fstDb.collection('pacientesEliminados').doc('pacienteActivo__'+pid).set({ tipo:'pacienteActivo', id:pid, eliminadoPor:borradoPor, eliminadoFecha:new Date(ts).toISOString() }); }
