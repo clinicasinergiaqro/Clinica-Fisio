@@ -4222,63 +4222,19 @@ async function _aplicarPosponer(pid, dias){
   try{ await saveDB('pts',[p],{camposHist:['revalSolicitada']}); var ovMenu=document.querySelector('[data-posponer]'); if(ovMenu) ovMenu.remove(); showToast('⏰ Pospuesta '+dias+' días','success'); mostrarRevaloraciones(); }
   catch(e){ showToast('❌ '+((e&&e.message)||'error'),'error'); }
 }
-async function _eliminarPacienteRevalorar(pid, tarjetaEl) {
-  var confirmado = await new Promise(function(resolve) {
-    var m = document.createElement('div');
-    m.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px';
-    m.innerHTML = '<div style="background:#fff;border-radius:16px;padding:24px;max-width:320px;width:100%;text-align:center">'
-      + '<div style="font-size:18px;font-weight:800;color:#1e293b;margin-bottom:8px">¿Eliminar paciente?</div>'
-      + '<div style="font-size:13px;color:#64748b;margin-bottom:20px">Se eliminará permanentemente de la lista y base de datos.</div>'
-      + '<div style="display:flex;gap:10px;justify-content:center">'
-      + '<button id="_elim_cancel" style="padding:10px 20px;border-radius:10px;border:1px solid #e2e8f0;background:#f8fafc;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">Cancelar</button>'
-      + '<button id="_elim_ok" style="padding:10px 20px;border-radius:10px;border:none;background:#ef4444;color:#fff;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">Eliminar</button>'
-      + '</div></div>';
-    document.body.appendChild(m);
-    m.querySelector('#_elim_cancel').onclick = function() { m.remove(); resolve(false); };
-    m.querySelector('#_elim_ok').onclick = function() { m.remove(); resolve(true); };
-  });
-  if (!confirmado) return;
-
-  // Agujero #2: mover los archivos del paciente a borrados/ ANTES de eliminarlo (no dejar huérfanos).
-  // Cubre los archivos con referencia estructurada (estudios/fotos/docs/media SOAP). Los históricos
-  // migrados / ejercicios (sin fbPath en estos arrays) los recoge el barrido de fantasmas server-side.
-  try {
-    var _pDel = _resolverPaciente(pid);
-    if (_pDel){
-      var _archivos = [];
-      (Array.isArray(_pDel.estudiosDocs)?_pDel.estudiosDocs:[]).forEach(function(e){ if(e&&e.fbPath) _archivos.push({fbPath:e.fbPath, tipoDoc:e.tipo||'estudio'}); });
-      (Array.isArray(_pDel.fotos)?_pDel.fotos:[]).forEach(function(e){ if(e&&e.fbPath) _archivos.push({fbPath:e.fbPath, tipoDoc:'foto'}); });
-      (Array.isArray(_pDel.docs)?_pDel.docs:[]).forEach(function(e){ if(e&&e.fbPath) _archivos.push({fbPath:e.fbPath, tipoDoc:'doc'}); });
-      (Array.isArray(_pDel.soap)?_pDel.soap:[]).forEach(function(s){ (s&&Array.isArray(s.media)?s.media:[]).forEach(function(m){ if(m&&m.fbPath) _archivos.push({fbPath:m.fbPath, tipoDoc:'soap-media'}); }); });
-      for (var _k=0; _k<_archivos.length; _k++){
-        await _moverArchivoABorrados(_archivos[_k].fbPath, {tipo:'paciente-eliminado', pid:pid, tipoDoc:_archivos[_k].tipoDoc, nombre:(_pDel.name||'')});
-      }
-    }
-  } catch(e){ console.warn('[eliminar] mover archivos a borrados:', e.message); }
-
-  // 1. Borrar de patientsDB
-  patientsDB = patientsDB.filter(function(p) { return p.id !== pid; });
-
-  // 2. Borrar de localStorage sinergia_pts
-  try {
-    var pts = JSON.parse(localStorage.getItem('sinergia_pts') || '[]');
-    localStorage.setItem('sinergia_pts', JSON.stringify(pts.filter(function(p){ return p.id !== pid; })));
-  } catch(e) {}
-
-  // 3. Si NO es histórico: borrar de Firestore y del Sheet
-  if (String(pid).indexOf('mig_pac_') !== 0) {
-    try {
-      if (window._fstDb) await window._fstDb.collection('pacientes').doc(pid).delete();
-    } catch(e) { console.warn('[eliminar] Firestore:', e); }
-    try {
-      await qaFetchPrivado('deletePaciente', { id: pid });
-    } catch(e) { console.warn('[eliminar] Sheet:', e); }
+// [BORRADO][3-bis] RETIRADO el borrado FÍSICO de Revalorar (antes _eliminarPacienteRevalorar, que hacía
+// .delete() irreversible sobre pacientes ACTIVOS sin backup ni papelera). Sustituido por el borrado
+// LÓGICO unificado. Opción (a): NO abre un segundo camino de resolución — abre el expediente
+// (openExpediente fija currentPatient de forma síncrona, con su propio bloqueo de papelera) y dispara
+// el MISMO _borrarPaciente() del botón del expediente. Cero .delete() físico, cero pid threading:
+// un único invariante de resolución (currentPatient), con confirmación + backup + papelera + restore.
+function _borrarPacienteDesdeReval(pid){
+  try{ var ov=document.querySelector('[data-revalov]'); if(ov) ov.remove(); }catch(_){}
+  try{ openExpediente(pid); }catch(_e){}
+  if(!currentPatient || String(currentPatient.id)!==String(pid)){
+    showToast('No se pudo abrir el expediente para borrar','error'); return;
   }
-
-  // 4. Quitar del DOM
-  if (tarjetaEl) tarjetaEl.remove();
-
-  showToast('🗑️ Paciente eliminado', 'success');
+  _borrarPaciente();
 }
 async function _limpiarTodosLosTest(){
   if(!(currentUser && currentUser.role==='supervisor')){ showToast('Solo supervisor','error'); return; }
@@ -4348,7 +4304,7 @@ async function mostrarRevaloraciones(){
         +'<div style="display:flex;gap:8px;margin-top:8px">'
         +'<button data-pid="'+escapeAttr_(p.id)+'" onclick="this.closest(\'[data-revalov]\').remove();openExpediente(this.dataset.pid)" style="font-size:12px;font-weight:700;border:none;border-radius:10px;padding:6px 12px;cursor:pointer;background:var(--navy);color:#fff">Ver expediente</button>'
         +'<button data-pid="'+escapeAttr_(p.id)+'" onclick="_posponerRevaloracion(this.dataset.pid)" style="font-size:12px;font-weight:700;border:1px solid var(--gray-200);border-radius:10px;padding:6px 12px;cursor:pointer;background:#fff;color:var(--navy)">⏰ Posponer</button>'
-        +(currentUser && currentUser.role==='supervisor' ? '<button data-pid="'+escapeAttr_(p.id)+'" onclick="(function(btn){_eliminarPacienteRevalorar(btn.dataset.pid, btn.closest(\'[data-reval-card]\'))})(this)" style="font-size:12px;font-weight:700;border:none;border-radius:10px;padding:6px 12px;cursor:pointer;font-family:inherit;background:#FEE2E2;color:#B91C1C">🗑️ Eliminar</button>' : '')
+        +(currentUser && currentUser.role==='supervisor' ? '<button data-pid="'+escapeAttr_(p.id)+'" onclick="_borrarPacienteDesdeReval(this.dataset.pid)" style="font-size:12px;font-weight:700;border:none;border-radius:10px;padding:6px 12px;cursor:pointer;font-family:inherit;background:#FEE2E2;color:#B91C1C">🗑️ Mover a papelera</button>' : '')
         +'</div></div>';
     }).join('');
   }
@@ -10942,6 +10898,10 @@ function _pacienteSinBase64(p){
     return c;
   }catch(_e){ return p; }
 }
+// [BORRADO][3-bis] Guard de tamaño del backup (residual F1). Firestore rechaza cualquier doc >1 MiB
+// (incluye nombres de campo + overhead de codificación, no solo el JSON) → dejamos ~48 KiB de colchón.
+var _LIMITE_DOC_FST = 1000000;   // bytes; umbral conservador bajo el límite duro de 1 MiB de Firestore
+function _tamBytes(str){ try{ return new TextEncoder().encode(str).length; }catch(_e){ return String(str||'').length; } }
 // BORRAR PACIENTE (unificado activo + histórico). Resolución: currentPatient.id, SOLO desde el
 // expediente abierto. Marca SOLO el "padre" (histórico: doc; activo: entrada pacientesEliminados +
 // espejo) — el jerárquico/filtro ocultan lo demás. Un write para borrar, un write para restaurar.
@@ -11002,7 +10962,18 @@ async function _borrarPaciente(){
     } else {
       // Obligatorio 2: backup del REGISTRO LOCAL COMPLETO (p.soap local-only + media base64) — 1 doc.
       // (Bajo (ii) el registro local NO se pierde con el borrado; este backup es respaldo, no la vía de restore.)
-      await revRef.set({ tipo:'pacienteActivo', pid:pid, ts:ts, borradoPor:borradoPor, nombre:(p.name||pid), numSesiones:nSes, fecha:fechaUlt, registroLocal:_sinUndefined(_pacienteSinBase64(p)) });
+      var _payloadBackup={ tipo:'pacienteActivo', pid:pid, ts:ts, borradoPor:borradoPor, nombre:(p.name||pid), numSesiones:nSes, fecha:fechaUlt, registroLocal:_sinUndefined(_pacienteSinBase64(p)) };
+      // [BORRADO][3-bis] Guard de tamaño (residual F1): la media que SOLO existe como base64 (sin puntero
+      // a Storage) sigue viajando en el doc. Sin este chequeo, un doc >1 MiB haría fallar el .set con un
+      // error opaco y el paciente quedaría INDELETEABLE. Mensaje EXPLÍCITO y accionable antes de escribir;
+      // no se toca nada (papRef sigue null → sin rollback, el paciente NO se marcó → sigue vivo).
+      var _bytesBackup=_tamBytes(JSON.stringify(_payloadBackup));
+      if(_bytesBackup > _LIMITE_DOC_FST){
+        showToast('❌ El respaldo excede el tamaño máximo ('+(_bytesBackup/1048576).toFixed(2)+' MiB) por media sin sincronizar. Sube/sincroniza las fotos del paciente y reintenta el borrado.','error');
+        console.warn('[BORRADO-ACTIVOS] backup '+_bytesBackup+'B > límite '+_LIMITE_DOC_FST+'B — abortado, paciente intacto');
+        return;
+      }
+      await revRef.set(_payloadBackup);
       // D3: marcar el espejo app_live_ por igualdad de campo único (sin nombres, auto-indexado).
       try{
         var esp=await window._fstDb.collection('pacientes').where('appSourceId','==',pid).get();
