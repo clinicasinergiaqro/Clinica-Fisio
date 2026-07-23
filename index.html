@@ -4352,13 +4352,39 @@ async function _limpiarTodosLosTest(){
 // dejar `if false` para todo lo clínico. Idempotente y tolerante por-doc. Guard de existencia: NO crea
 // stubs (docs de activos sin espejo se saltan). REQUIERE que las reglas ya permitan escribir `esTest`
 // (supervisor); si no, el write da permission-denied y se cuenta como "bloqueado". Se corre desde
-// consola una sola vez: _backfillEsTest(). Secuencia de ops: (1) publicar regla que permita escribir
-// esTest → (2) correr _backfillEsTest() → (3) publicar `allow delete: if isSupervisor() && esTest==true`.
-async function _backfillEsTest(){
+// consola. DRY-RUN por defecto: _backfillEsTest() solo LISTA (id/nombre/motivo), NO escribe; solo
+// _backfillEsTest({ejecutar:true}) escribe. Secuencia de ops: (1) publicar regla que permita escribir
+// esTest → (2) _backfillEsTest() dry-run y REVISAR que no haya un paciente real → (3) _backfillEsTest({ejecutar:true})
+// → (4) verificar "0 bloqueados" → (5) publicar `allow delete: if isSupervisor() && esTest==true`.
+// Motivo EXACTO por el que la heurística considera test a un paciente (para el dry-run del backfill).
+// Refleja rama por rama _esPacienteTest — si cambia una, cambia la otra.
+function _motivoEsTest(p){
+  if(!p) return null;
+  if(p.id && _IDS_TEST.indexOf(p.id)!==-1) return 'id en _IDS_TEST';
+  var n=String(p.name||'').trim();
+  if(/^test/i.test(n)) return "nombre empieza con 'test'";
+  if(n.replace(/\s/g,'').length<=2) return 'nombre ≤2 caracteres ("'+n+'")';
+  var exactos=['prueba','zorras','menor de edad','j','df'];
+  if(exactos.indexOf(n.toLowerCase())!==-1) return 'en lista exacta ("'+n.toLowerCase()+'")';
+  return null;
+}
+async function _backfillEsTest(opts){
+  var ejecutar=!!(opts && opts.ejecutar===true);
   if(!(currentUser && currentUser.role==='supervisor')){ console.warn('[esTest] solo supervisor'); return; }
+  var tests=(Array.isArray(patientsDB)?patientsDB:[]).filter(function(p){ return _esPacienteTest(p); });
+  // 🔴 DRY-RUN POR DEFECTO: listar SIN escribir. La heurística (nombre ≤2 chars, empieza con 'test',
+  // lista exacta con 'j'/'df') PUEDE atrapar un paciente REAL; si se le persiste esTest:true y luego se
+  // cierra la regla, ese expediente clínico quedaría FÍSICAMENTE borrable. Revisar la lista completa
+  // ANTES de ejecutar. Solo _backfillEsTest({ejecutar:true}) escribe.
+  console.log('[esTest] '+(ejecutar?'EJECUTAR':'DRY-RUN')+' · '+tests.length+' pacientes que la heurística marca como test:');
+  tests.forEach(function(p){ console.log('  · '+String((p&&p.id)||'?')+' — "'+String((p&&p.name)||'')+'" — motivo: '+(_motivoEsTest(p)||'?')); });
+  if(!ejecutar){
+    console.log('[esTest] DRY-RUN: NO se escribió nada. Si algún paciente REAL aparece arriba, sácalo de _IDS_TEST o ajusta la heurística ANTES de ejecutar. Para ejecutar: _backfillEsTest({ejecutar:true})');
+    try{ if(typeof showToast==='function') showToast('esTest DRY-RUN: '+tests.length+' candidatos en consola — nada escrito','warning'); }catch(_){}
+    return { dryRun:true, candidatos:tests.length };
+  }
   if(!window._fstDb){ try{ await FST_init(); }catch(_){} }
   if(!window._fstDb){ console.warn('[esTest] Firestore no disponible'); return; }
-  var tests=(Array.isArray(patientsDB)?patientsDB:[]).filter(function(p){ return _esPacienteTest(p); });
   var ok=0, saltados=0, bloqueados=0;
   for(var i=0;i<tests.length;i++){
     var p=tests[i], pid=String((p&&p.id)||'');
@@ -8706,11 +8732,11 @@ function renderSOAPForm(){
     <div class="form-section-title">📋 Identificación</div>
     <div class="form-group">
       <div class="form-field"><div class="form-label">Paciente</div><div style="font-size:15px;font-weight:700;color:var(--navy)">${escapeHTML(p.name)}</div></div>
-      <div class="form-field"><div class="form-label">Sesión</div><div style="font-size:15px;font-weight:700;color:var(--navy)">${
+      <div class="form-field"><div class="form-label">Sesión Nº</div><div style="font-size:15px;font-weight:700;color:var(--navy)">${
         (_tieneEps&&!editingSoapId&&!editingSoapEsHistorico)
           ? `${(p.numSesionEpisodioActual||0)+1} <span style="font-size:11px;color:var(--gray-400);font-weight:400">· Episodio ${(p.motivoActualIndex||0)+1}</span>`
           : `${sesNum}${(()=>{const t=parseInt(p.planTto?.sesiones);return(t&&t>0)?' de '+t:''})()}`
-      }</div>${(_tieneEps&&!editingSoapId&&!editingSoapEsHistorico)?`<div style="font-size:10px;color:var(--gray-400);margin-top:1px">${totalPrevias+1}ª visita del paciente</div>`:''}</div>
+      }</div>${(_tieneEps&&!editingSoapId&&!editingSoapEsHistorico)?`<div style="font-size:10px;color:var(--gray-400);margin-top:1px">${totalPrevias+1}ª visita real · el Nº de sesión es un identificador fijo (no baja al borrar)</div>`:''}</div>
       <div class="form-field"><div class="form-label">Semana</div><div style="font-size:15px;font-weight:700;color:var(--navy)">${semana}</div></div>
       <div class="form-field"><div class="form-label">Terapeuta</div><div style="font-size:15px;font-weight:700;color:var(--navy)">${ter}</div></div>
     </div>
