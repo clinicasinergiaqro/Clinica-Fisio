@@ -3026,10 +3026,7 @@ function entrarModoOffline_(){
   const le=document.getElementById('login-error'); if(le) le.style.display='none';
   document.getElementById('topbar-avatar').textContent=u.initials||'OFF';
   document.getElementById('topbar-role').textContent='📴 Modo offline · '+(u.name||'Usuario');
-  if(u.role==='supervisor'){ document.getElementById('nav-supervision').style.display='flex';
-    // [LOOP-B] QA ya no vive en el nav. Deep-link deliberado ?qa=1 (showQA valida el rol al entrar).
-    try{ if(new URLSearchParams(location.search).get('qa')==='1' && typeof showQA==='function') setTimeout(showQA,0); }catch(_e){}
-  }
+  if(u.role==='supervisor'){ document.getElementById('nav-supervision').style.display='flex'; }
   else{ document.getElementById('nav-supervision').style.display='none'; }
   screenStack=['screen-agenda']; showScreen('screen-agenda',false);
   try{ renderAgenda(); }catch(e){} try{ renderPacientes(); }catch(e){}
@@ -3307,6 +3304,11 @@ function entrarComo(perfil, email, silencioso){
     perfil.role==='supervisor'?'⭐ Supervisor':`Terapeuta · ${perfil.name}`;
   if(perfil.role==='supervisor'){
     document.getElementById('nav-supervision').style.display='flex';
+    // [LOOP-B] Deep-link ?qa=1 AQUÍ, en entrarComo: es el camino COMPARTIDO por el login fresco (L3372)
+    // y la RESTAURACIÓN de sesión (L16107, silencioso=true) → funciona también en recarga caliente, no
+    // solo tras login. Doble candado intacto: el chequeo del parámetro vive solo en la rama supervisor,
+    // y showQA re-valida el rol al entrar. setTimeout deja terminar showScreen('screen-agenda') primero.
+    try{ if(new URLSearchParams(location.search).get('qa')==='1' && typeof showQA==='function') setTimeout(showQA,0); }catch(_e){}
   } else {
     document.getElementById('nav-supervision').style.display='none';
   }
