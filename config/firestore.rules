@@ -152,6 +152,13 @@ service cloud.firestore {
     match /papelera/{document=**} {
       allow read, create, delete: if isSupervisor();
     }
+    // Set de borrados de ACTIVOS/notas (filtro lado-local). SHAPE distinta a papelera:
+    // TODAS las apps (terapeutas) deben LEER para filtrar; SOLO lftaranda escribe. Campo `tipo`
+    // ('pacienteActivo' | 'notaActiva') para que Entrega 4 reuse sin republicar reglas.
+    match /pacientesEliminados/{docId} {
+      allow read: if isWriter();
+      allow write: if isSupervisor();
+    }
     match /agendaAsignaciones/{nombreNorm} {
       allow read: if isWriter();
       allow create, update: if isSupervisor() && asignacionAgendaOK();

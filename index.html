@@ -176,6 +176,54 @@ function _fstFiltrarVivos(items, getPid){
   return (items||[]).filter(function(x){ return x && x.eliminado !== true && _fstPidVivo(getPid ? getPid(x) : String((x && (x.fstPid||x.id))||'')); });
 }
 
+// ── BORRADO LÓGICO ACTIVOS — LADO LECTURA (Entrega 2: filtro NO-destructivo) ─────
+// Recomendación (ii): patientsDB SIEMPRE completo (ningún saveLocal pierde local-only en NINGÚN
+// dispositivo); el filtro es una VISTA DERIVADA que aplican los consumidores. Set keyed por id
+// LOCAL (p-uuid), que sobrevive el resync (vive en Firestore, no en Sheets/local). Colección con
+// campo `tipo` para que Entrega 4 (notas de activo) reuse sin republicar reglas.
+window._FST_activosEliminados = window._FST_activosEliminados || new Set();
+window._FST_activosEliminadosListo = window._FST_activosEliminadosListo || false;   // ¿verificado contra Firestore esta sesión? (A4: botón deshabilitado si false)
+var LS_ACTIVOS_ELIM = 'sinergia_activosEliminados';
+// Cache localStorage → set en memoria, SÍNCRONO al arranque (el 1er loadFromCloud ya lo tiene → sin race).
+(function(){
+  try{ var raw=localStorage.getItem(LS_ACTIVOS_ELIM); if(raw){ var o=JSON.parse(raw); if(o&&Array.isArray(o.ids)) window._FST_activosEliminados=new Set(o.ids.map(String)); } }catch(_e){}
+})();
+function _activoEliminado(id){ return !!(window._FST_activosEliminados && window._FST_activosEliminados.has(String(id||''))); }
+function _FST_filtrarActivosVivos(arr){
+  if(!window._FST_activosEliminados || !window._FST_activosEliminados.size) return arr||[];   // set vacío → no-op (fast path, seguro)
+  return (arr||[]).filter(function(p){ return p && !window._FST_activosEliminados.has(String(p.id||'')); });
+}
+// SWR: lee la colección (diminuta) con token caliente + timeout-race. RESUELVE → set fresco + cache +
+// re-render. RECHAZA/timeout → conserva el último set conocido (fail-safe: borrados siguen ocultos).
+async function _FST_cargarActivosEliminados(){
+  if(window._FST_activosElimEnVuelo) return;
+  window._FST_activosElimEnVuelo = true;
+  try{
+    if(!window._fstDb && typeof FST_init==='function'){ try{ await FST_init(); }catch(_){} }
+    if(!window._fstDb){ console.log('[BORRADO-ACTIVOS] read USÓ CACHE (sin _fstDb aún): '+(window._FST_activosEliminados?window._FST_activosEliminados.size:0)+' · Listo='+window._FST_activosEliminadosListo); return; }   // sin db: conserva cache (fail-safe), no vacía
+    try{ var _u=firebase.auth().currentUser; if(_u) await Promise.race([_u.getIdToken(), new Promise(function(_,r){ setTimeout(function(){ r(new Error('tok')); },4000); })]); }catch(_e){}
+    var snap = await Promise.race([
+      window._fstDb.collection('pacientesEliminados').where('tipo','==','pacienteActivo').get(),
+      new Promise(function(_,r){ setTimeout(function(){ r(new Error('timeout')); }, 8000); })
+    ]);
+    var ids=[]; snap.forEach(function(d){ var x=d.data()||{}; if(x.id) ids.push(String(x.id)); });
+    var antes = window._FST_activosEliminados ? window._FST_activosEliminados.size : 0;
+    window._FST_activosEliminados = new Set(ids);   // RESUELTO con token caliente → confiar, incluso vacío (legítimo tras restauraciones)
+    window._FST_activosEliminadosListo = true;
+    try{ localStorage.setItem(LS_ACTIVOS_ELIM, JSON.stringify({ ts: Date.now(), ids: ids })); }catch(_e){}
+    if(antes>0 && ids.length===0) console.warn('[BORRADO-ACTIVOS] set pasó de '+antes+' a 0 — ¿restauración legítima o nombre de colección mal escrito? (A5: revisar en el gate)');
+    console.log('[BORRADO-ACTIVOS] read RESOLVIÓ: '+ids.length+' entradas · regla OK · Listo=true');   // D4: RESOLVIÓ (no "0 entradas" ambiguo)
+    try{ if(typeof _FST_invalidarVistaPacientes==='function') _FST_invalidarVistaPacientes(); }catch(_e){}
+    try{ var sp=document.getElementById('screen-pacientes'); if(sp&&sp.classList.contains('active')&&typeof renderPacientesLista==='function') renderPacientesLista(); }catch(_e){}
+  }catch(e){
+    console.warn('[BORRADO-ACTIVOS] read RECHAZÓ (regla/red): '+((e&&e.message)||'?')+' · conservo cache ('+(window._FST_activosEliminados?window._FST_activosEliminados.size:0)+') · Listo='+window._FST_activosEliminadosListo);   // D4: RECHAZÓ != resolvió-vacío
+    // Fail-open VISIBLE: solo si NO hay set NI cache (nunca verificado) y hay pacientes.
+    if((!window._FST_activosEliminados || !window._FST_activosEliminados.size) && !window._FST_activosEliminadosListo && Array.isArray(patientsDB) && patientsDB.length){
+      try{ if(typeof showToast==='function') showToast('⚠️ No se pudo verificar la lista de borrados (sin conexión); pueden aparecer temporalmente.','warning'); }catch(_e){}
+    }
+  }finally{ window._FST_activosElimEnVuelo = false; }
+}
+
 async function FST_fetchSesiones(pid){
   if (!pid || !window._fstDb) return null;   // [SENTINEL] null = no pude cargar (sin db); array = cargó (aunque sea [])
   try {
@@ -2681,6 +2729,13 @@ function _esPacienteTest(p){
 // Limpieza única al boot: sacar históricos (mig_pac_) fantasma que se hayan filtrado a localStorage
 // en versiones anteriores (su p.soap quedaba congelado). Se purgan del disco una vez; de ahí en
 // adelante saveLocal ya nunca los persiste. Los históricos se abren frescos desde Firestore (FST_*).
+// ⚠️ CRUDO: `patientsDB` incluye pacientes BORRADOS (borrado lógico, filtro lado-lectura ii).
+// Para cualquier VISTA (algo que el usuario ve: lista, agenda, dashboard, conteos, rendimiento)
+// FILTRA con `!_activoEliminado(p.id)` (o el futuro accessor `pacientesVivos()`). Iterar
+// `patientsDB` directo en una vista = BUG DE BORRADO (un paciente eliminado reaparece).
+// Solo persistencia (saveLocal) y LOOKUPS internos (resolver/dedupe/write/restore/sync) usan el crudo.
+// CONVENCIÓN GREPPEABLE (revisión de código — repetir este grep y clasificar cada hit VISTA/LOOKUP):
+//   grep -nE "patientsDB\.(filter|find|forEach|map|some)" index.html   → todo hit de VISTA debe llevar _activoEliminado/pacientesVivos
 let patientsDB = (function(){
   var _raw = loadDB('pts') || [];
   var _hadMig = Array.isArray(_raw) && _raw.some(function(p){ return String(p&&p.id||'').startsWith('mig_pac_'); });
@@ -3179,6 +3234,7 @@ function entrarComo(perfil, email, silencioso){
     try{ renderAgenda(); }catch(e){ console.error('renderAgenda error:',e); }
     try{ renderPacientes(); }catch(e){ console.error('renderPacientes error:',e); }
   }).catch(e=>{ console.error('loadFromCloud error:',e); });
+  try{ if(typeof _FST_cargarActivosEliminados==='function') _FST_cargarActivosEliminados(); }catch(_e){}   // [BORRADO-ACTIVOS] A1: carga el set tras login (SWR; re-render al llegar)
   // Auto-sync: mostrar estado y sincronizar lo pendiente al abrir
   actualizarIndicadorSync();
   if(navigator.onLine) setTimeout(sincronizarPendientes, 1500);
@@ -3288,6 +3344,7 @@ window.addEventListener('DOMContentLoaded', function(){ try{ _initDblEnter(); }c
 document.addEventListener('visibilitychange', function(){
   if(document.visibilityState === 'visible'){
     try{ refrescarPacientesDesdeNube(); }catch(_){}
+    try{ if(typeof _FST_cargarActivosEliminados==='function') _FST_cargarActivosEliminados(); }catch(_){}   // [BORRADO-ACTIVOS] A1: refresca el set al volver a foco (cross-device)
     // [FIX-AUTH #9] Una nota encolada por un hipo transitorio ya no espera al próximo 'online' o a un
     // reinicio: al volver a foco (sesión ya rehidratada) las colas drenan. Idempotente: cada drenador
     // tiene guard de en-curso y el borrado es por-confirmación (r.ok), nunca a ciegas.
@@ -3597,7 +3654,7 @@ function renderAgenda(){
     return p;
   });
   // ALL terapeutas see ALL patients of the day — no filter by terapeuta
-  let pts = patientsDB.filter(p=>p.date===todayISO);
+  let pts = patientsDB.filter(p=>p.date===todayISO && !_activoEliminado(p.id));   // [BORRADO-ACTIVOS] D1-1: agenda del día
   const incomplete=pts.filter(p=>Array.isArray(p.soap)&&p.soap.some(s=>!s.completa)).length;
   const c=document.getElementById('content-agenda');
   let html=`<div class="date-header">
@@ -3649,7 +3706,7 @@ function renderAgenda(){
   // G-2: bloque adicional "Agenda del calendario" (async, no bloquea el dashboard de hoy)
   try{ FST_montarAgendaCalendar('dia'); }catch(e){ console.warn('[Agenda cal] montar:', e&&e.message); }
   // M2-E: toast una vez por sesión si hay SOAP atrasado
-  const atrasados=patientsDB.filter(p=>!String(p.name||'').startsWith('TEST_QA_')&&necesitaAlertaSoapSemanal(p)&&Array.isArray(p.soap)&&p.soap.length>0).length;
+  const atrasados=patientsDB.filter(p=>!_activoEliminado(p.id)&&!String(p.name||'').startsWith('TEST_QA_')&&necesitaAlertaSoapSemanal(p)&&Array.isArray(p.soap)&&p.soap.length>0).length;   // [BORRADO-ACTIVOS] D1-2
   if(atrasados>0 && !sessionStorage.getItem('toastSoapMostrado')){
     showToast(`${atrasados} paciente${atrasados>1?'s':''} con SOAP atrasado (+7 días)`,'warning');
     sessionStorage.setItem('toastSoapMostrado','1');
@@ -4258,7 +4315,7 @@ async function mostrarRevaloraciones(){
   document.body.appendChild(ov);
   var card=ov.firstChild;
   var lista=[];
-  (Array.isArray(patientsDB)?patientsDB:[]).forEach(function(p){ var m=_motivosRevaloracion(p); if(m.length) lista.push({p:p, motivos:m}); });
+  (Array.isArray(patientsDB)?patientsDB:[]).forEach(function(p){ if(_activoEliminado(p.id)) return; var m=_motivosRevaloracion(p); if(m.length) lista.push({p:p, motivos:m}); });   // [BORRADO-ACTIVOS]
   var peso=function(it){ return it.motivos.some(function(x){return x.tipo==='manual';})?0:(it.motivos.some(function(x){return x.tipo==='eva';})?1:2); };
   lista.sort(function(a,b){return peso(a)-peso(b);});
   var cuerpo;
@@ -4614,6 +4671,7 @@ async function _resolverPacientesCalendario(eventos){
   var idxAct={};
   (Array.isArray(patientsDB)?patientsDB:[]).forEach(function(p){
     if(!p) return;
+    if(typeof _activoEliminado==='function' && _activoEliminado(p.id)) return;   // [BORRADO-ACTIVOS] activo eliminado no resuelve citas
     if(p.name) idxAct[_normPend(p.name)]=p;
     if(p.nombreNormalizado) idxAct[_normPend(p.nombreNormalizado)]=p;
   });
@@ -5772,7 +5830,7 @@ async function _detEjecutar(){
     if(!window._fstDb && typeof FST_init==='function') await FST_init();
     if(!window._fstDb){ secciones.push(_detBloque('☁️ Espejo roto (activos)','Necesita conexión a internet — este chequeo no corrió. Los de abajo (locales) sí.','warning')); }
     else {
-      var activos=(Array.isArray(patientsDB)?patientsDB:[]).filter(function(p){ return p&&p.id&&String(p.id).indexOf('mig_pac_')!==0&&!String(p.name||'').startsWith('TEST_QA_')&&Array.isArray(p.soap)&&p.soap.length>0; });
+      var activos=(Array.isArray(patientsDB)?patientsDB:[]).filter(function(p){ return p&&p.id&&String(p.id).indexOf('mig_pac_')!==0&&!String(p.name||'').startsWith('TEST_QA_')&&Array.isArray(p.soap)&&p.soap.length>0&&!_activoEliminado(p.id); });   // [BORRADO-ACTIVOS]
       if(modo==='reciente') activos=activos.filter(_reciente);
       var hall=[], i=0;
       for(const p of activos){
@@ -7475,6 +7533,9 @@ function FST_fusionarPacientes(locales, firestore) {
     const nk = nombreKey(p);
     if (id) vistosPorId.add(id);
     if (nk) vistosNombre.add(nk);
+    // [BORRADO-ACTIVOS] Oculta el activo eliminado — pero YA lo agregó a vistos → su espejo
+    // app_live_ (Firestore) queda deduplicado por id/nombre y tampoco aparece. patientsDB intacto.
+    if (typeof _activoEliminado==='function' && _activoEliminado(p.id)) return;
     out.push({ ...p, _origenLista: p._origenLista || 'local' });
   });
 
@@ -12461,6 +12522,7 @@ function buscarPacientesSimilares(nombre){
   const n=String(nombre||'').trim().toLowerCase();
   if(!n) return [];
   return patientsDB.filter(p=>{
+    if(_activoEliminado(p.id)) return false;   // [BORRADO-ACTIVOS] D1-3: no ofrecer un borrado como duplicado al dar de alta
     if(String(p.name||'').startsWith('TEST_QA_')) return false;
     if(String(p.name||'').startsWith('TEST QA')) return false;
     const pn=String(p.name||'').trim().toLowerCase();
@@ -17100,7 +17162,7 @@ function renderSupervision(){
     +'<div id="offline-status-box"></div>';
   setTimeout(renderEstadoOffline_, 300);
   ters.forEach(ter=>{
-    const pts=patientsDB.filter(p=>p.terapeuta===ter);
+    const pts=patientsDB.filter(p=>p.terapeuta===ter && !_activoEliminado(p.id));   // [BORRADO-ACTIVOS] D2: rendimiento por terapeuta (un borrado no cuenta)
     const totalSOAP=pts.reduce((a,p)=>a+(Array.isArray(p.soap)?p.soap.length:0),0);
     const inc=pts.reduce((a,p)=>a+(Array.isArray(p.soap)?p.soap.filter(s=>!s.completa).length:0),0);
     const sinConsent=pts.filter(p=>!tieneConsentimientoFirmado(p)).length;
@@ -17139,7 +17201,7 @@ function renderSupervision(){
   </div>`;
 
   // ── SOAP pendiente semanal (M2-D) ────────────────────────────────────────
-  const conSoapAtrasado=patientsDB.filter(p=>!String(p.name||'').startsWith('TEST_QA_')&&necesitaAlertaSoapSemanal(p)&&Array.isArray(p.soap)&&p.soap.length>0)
+  const conSoapAtrasado=patientsDB.filter(p=>!_activoEliminado(p.id)&&!String(p.name||'').startsWith('TEST_QA_')&&necesitaAlertaSoapSemanal(p)&&Array.isArray(p.soap)&&p.soap.length>0)   // [BORRADO-ACTIVOS] D2
     .sort((a,b)=>diasDesdeUltimoSoap(b)-diasDesdeUltimoSoap(a));
   html+=`<div class="section-card" style="margin-bottom:12px">
     <div class="section-title">📅 SOAP pendiente semanal</div>
@@ -17172,6 +17234,7 @@ function filtrarInactividad(dias){
   });
   const limite=new Date(Date.now()-dias*24*60*60*1000);
   const inactivos=patientsDB.filter(p=>{
+    if(_activoEliminado(p.id)) return false;   // [BORRADO-ACTIVOS] D2: inactivos
     const soaps=Array.isArray(p.soap)?p.soap:[];
     if(!soaps.length) return true;
     const ultima=soaps[soaps.length-1];
