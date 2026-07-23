@@ -113,10 +113,15 @@ service cloud.firestore {
     // Poner/quitar el tombstone eliminado:true — SOLO isSupervisor() (= lftaranda@gmail.com,
     // punto ÚNICO de verdad del email en estas reglas). Whitelist estricta: SOLO los campos del
     // borrado/restauración; ningún otro campo puede cambiar en el mismo write (no abre un update amplio).
-    // Cubre borrar (eliminado:true) y des-borrar (eliminado:false + restauradoPor/Fecha).
-    function borradoKeysOK() {
+    // Cubre borrar (eliminado:true + eliminadoMotivo) y des-borrar (eliminado:false + restauradoPor/Fecha).
+    // Sincronizado con las reglas PUBLICADAS por Carlos: funciones separadas paciente/sesión + eliminadoMotivo.
+    function pacienteBorradoOK() {
       return request.resource.data.diff(resource.data).affectedKeys()
-        .hasOnly(['eliminado','eliminadoPor','eliminadoFecha','restauradoPor','restauradoFecha']);
+        .hasOnly(['eliminado','eliminadoPor','eliminadoFecha','eliminadoMotivo','restauradoPor','restauradoFecha']);
+    }
+    function sesionBorradoOK() {
+      return request.resource.data.diff(resource.data).affectedKeys()
+        .hasOnly(['eliminado','eliminadoPor','eliminadoFecha','eliminadoMotivo','restauradoPor','restauradoFecha']);
     }
     match /pacientes/{pacienteId} {
       allow read: if isWriter();
@@ -126,14 +131,14 @@ service cloud.firestore {
                         pacienteEjerciciosUpdateOK() ||
                         pacienteClinicoUpdateOK()
                       ))
-                    || (isSupervisor() && borradoKeysOK());   // borrado/restauración: solo lftaranda
+                    || (isSupervisor() && pacienteBorradoOK());   // borrado/restauración: solo lftaranda
       allow delete: if isSupervisor();
     }
     match /pacientes/{pacienteId}/sesiones/{sesionId} {
       allow read: if isWriter();
       allow create: if isWriter() && sesionCreateOK();
       allow update: if (isWriter() && sesionUpdateOK())
-                    || (isSupervisor() && borradoKeysOK());   // borrado/restauración de nota: solo lftaranda
+                    || (isSupervisor() && sesionBorradoOK());   // borrado/restauración de nota: solo lftaranda
       allow delete: if isSupervisor();
     }
     // Backup clínico completo del contenido borrado (doc + sesiones) — SOLO lftaranda.
