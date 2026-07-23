@@ -170,6 +170,20 @@ async function FST_init(){
 // engancha la invalidación en caliente del set.
 window._FST_pidsEliminados = window._FST_pidsEliminados || new Set();
 function _fstPidVivo(pid){ return !(window._FST_pidsEliminados && window._FST_pidsEliminados.has(String(pid||''))); }
+// [BORRADO] RMW del set de eliminados PERSISTIDO junto al índice (FST_indice_v1). Lo llaman las rutas
+// EN CALIENTE (borrar/restaurar histórico) para que una recarga ANTES del próximo read vivo —incluso
+// OFFLINE, donde el read nunca llega— refleje el borrado/restauración. Simétrico a como los activos
+// escriben sinergia_activosEliminados en caliente. No crea el cache si no existe (no inventa índice).
+function _persistirPidEliminadoIndice(pid, borrado){
+  try{
+    var raw=sessionStorage.getItem('FST_indice_v1'); if(!raw) return;
+    var o=JSON.parse(raw); if(!o||!Array.isArray(o.pacientes)) return;
+    var set=new Set(Array.isArray(o.eliminados)?o.eliminados.map(String):[]);
+    if(borrado) set.add(String(pid)); else set.delete(String(pid));
+    o.eliminados=Array.from(set);
+    sessionStorage.setItem('FST_indice_v1', JSON.stringify(o));
+  }catch(_e){}
+}
 function _fstDocVivo(d){ return !!d && d.eliminado !== true; }                       // doc de paciente que YA tienes
 function _fstSesionViva(s, pid){ return !!s && s.eliminado !== true && _fstPidVivo(pid); }  // jerárquico (sid O padre)
 function _fstFiltrarVivos(items, getPid){
@@ -7369,9 +7383,12 @@ async function FST_refrescarIndiceEnSegundoPlano() {
         _origenLista    : d.creadoPor === 'MIGRACION' ? 'firestore_migracion' : 'firestore_live'
       });
     });
-    window._FST_pidsEliminados = _elimSWR;   // [BORRADO] refresca el set en cada SWR
+    // Anti-clobber del SET: un read vacío (0 docs, zombie) NO lo vacía. Solo reemplaza si trajo algo.
+    if (frescos.length || _elimSWR.size) {
+      window._FST_pidsEliminados = _elimSWR;   // [BORRADO] SWR con datos → refresca el set
+    }
 
-    // Guard anti-borrado: una lectura vacía NO reemplaza un índice bueno.
+    // Guard anti-borrado del ÍNDICE: una lectura sin pacientes NO reemplaza un índice bueno.
     if (!frescos.length) {
       window._FST_indicePacientesLoadedAt = Date.now(); // resetea timer para no martillar
       return;
@@ -7384,7 +7401,7 @@ async function FST_refrescarIndiceEnSegundoPlano() {
 
     window._FST_indicePacientes         = frescos;
     window._FST_indicePacientesLoadedAt = Date.now();
-    try { sessionStorage.setItem('FST_indice_v1', JSON.stringify({ ts: Date.now(), pacientes: frescos })); } catch(_e) {}
+    try { sessionStorage.setItem('FST_indice_v1', JSON.stringify({ ts: Date.now(), pacientes: frescos, eliminados: Array.from(window._FST_pidsEliminados||[]) })); } catch(_e) {}   // [BORRADO] persiste el set junto al índice
 
     if (antes !== despues) {
       console.log('[FST-LISTA][SWR] índice cambió (' + frescos.length + ' pacientes) — repintando lista');
@@ -7408,6 +7425,20 @@ async function FST_cargarIndicePacientes() {
   const MAX_DOCS   = 5000;
   const TIMEOUT_MS = 5000;
 
+  // [BORRADO] Durabilidad del Set de eliminados cruzando recargas. Sin esto, tras recargar el Set
+  // arranca vacío (L171) y este cache-hit retornaba el array SIN repoblarlo → _fstPidVivo daba true
+  // para todo → las sesiones de un histórico borrado REAPARECÍAN en la Cola hasta el próximo read vivo
+  // (y si ese read fallaba —sin red—, nunca). Los activos ya tienen esto (sinergia_activosEliminados);
+  // esta es su simétrica para históricos. Anti-clobber: UNE al Set, nunca lo vacía; un cache viejo sin
+  // el campo (o un read fallido) deja el Set como está.
+  function restaurarPidsEliminados(eliminados) {
+    try {
+      if (!Array.isArray(eliminados) || !eliminados.length) return;
+      if (!window._FST_pidsEliminados) window._FST_pidsEliminados = new Set();
+      eliminados.forEach(function(id){ if (id) window._FST_pidsEliminados.add(String(id)); });
+    } catch(_e) {}
+  }
+
   function leerCacheSesion() {
     try {
       const raw = sessionStorage.getItem(CACHE_KEY);
@@ -7415,14 +7446,16 @@ async function FST_cargarIndicePacientes() {
       const p = JSON.parse(raw);
       if (!p || !Array.isArray(p.pacientes) || !p.ts) return null;
       if ((Date.now() - p.ts) > TTL_MS) { console.log('[FST-LISTA] cache vencido'); return null; }
-      console.log('[FST-LISTA] cache sessionStorage:', p.pacientes.length, 'pacientes');
+      restaurarPidsEliminados(p.eliminados);   // [BORRADO] repuebla el Set junto al array (durabilidad histórica)
+      console.log('[FST-LISTA] cache sessionStorage:', p.pacientes.length, 'pacientes', '| elim:', (Array.isArray(p.eliminados)?p.eliminados.length:0));
       return p.pacientes;
     } catch(e) { console.warn('[FST-LISTA] cache inválido:', e.message); return null; }
   }
 
   function guardarCacheSesion(pacientes) {
     try {
-      sessionStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), pacientes }));
+      const elim = window._FST_pidsEliminados ? Array.from(window._FST_pidsEliminados) : [];
+      sessionStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), pacientes, eliminados: elim }));
     } catch(e) { console.warn('[FST-LISTA] no se guardó cache:', e.message); }
   }
 
@@ -7499,12 +7532,19 @@ async function FST_cargarIndicePacientes() {
           _origenLista    : d.creadoPor === 'MIGRACION' ? 'firestore_migracion' : 'firestore_live'
         });
       });
-      window._FST_pidsEliminados = _elimIdx;   // [BORRADO] refresca el set en cada carga del índice
+      // Anti-clobber (simétrico al SWR y a los activos): una lectura TOTALMENTE vacía (0 docs) es
+      // sospechosa (zombie/permiso) — NO pisa el Set, el índice ni el cache buenos. Solo un read con
+      // algún doc es autoritativo y reemplaza el Set (un restore en otro dispositivo se propaga así).
+      if (!pacientes.length && !_elimIdx.size) {
+        console.warn('[FST-LISTA] read vivo vacío (0 docs) — NO piso Set/índice/cache');
+        return Array.isArray(window._FST_indicePacientes) ? window._FST_indicePacientes : [];
+      }
+      window._FST_pidsEliminados = _elimIdx;   // [BORRADO] read vivo autoritativo → reemplaza el set
 
       window._FST_indicePacientes         = pacientes;
       window._FST_indicePacientesLoadedAt = Date.now();
       guardarCacheSesion(pacientes);
-      console.log('[FST-LISTA] índice Firestore cargado:', pacientes.length, 'pacientes');
+      console.log('[FST-LISTA] índice Firestore cargado:', pacientes.length, 'pacientes', '| elim:', _elimIdx.size);
       return pacientes;
 
     } catch(e) {
@@ -10984,7 +11024,7 @@ async function _borrarPaciente(){
     return;
   }
   // Invalidación EN CALIENTE.
-  if(esHist){ try{ if(window._FST_pidsEliminados) window._FST_pidsEliminados.add(pid); }catch(_){} try{ delete _fstSesionesCache[pid]; }catch(_){} }
+  if(esHist){ try{ if(window._FST_pidsEliminados) window._FST_pidsEliminados.add(pid); }catch(_){} try{ _persistirPidEliminadoIndice(pid, true); }catch(_){} try{ delete _fstSesionesCache[pid]; }catch(_){} }
   else {
     try{ if(window._FST_activosEliminados) window._FST_activosEliminados.add(pid); }catch(_){}
     try{ var _c=JSON.parse(localStorage.getItem(LS_ACTIVOS_ELIM)||'{}'); var _ids=Array.isArray(_c.ids)?_c.ids:[]; if(_ids.indexOf(pid)===-1) _ids.push(pid); localStorage.setItem(LS_ACTIVOS_ELIM, JSON.stringify({ ts:Date.now(), ids:_ids })); }catch(_){}
@@ -11047,6 +11087,7 @@ async function _restaurarDesdePapelera(entryId, btn){
       await window._fstDb.collection('pacientes').doc(e.pid)
         .set({ eliminado:false, restauradoPor:restauradoPor, restauradoFecha:restauradoFecha }, { merge:true });
       try{ if(window._FST_pidsEliminados) window._FST_pidsEliminados.delete(String(e.pid)); }catch(_){}
+      try{ _persistirPidEliminadoIndice(e.pid, false); }catch(_){}
       try{ delete _fstSesionesCache[e.pid]; }catch(_){}
       try{ if(typeof _FST_invalidarVistaPacientes==='function') _FST_invalidarVistaPacientes(); }catch(_){}
     } else if(e.tipo==='pacienteActivo'){
