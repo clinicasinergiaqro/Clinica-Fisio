@@ -245,6 +245,7 @@ function FST_renderCard(s, pid){
   var botonesEdicion = '<div style="display:flex;gap:6px;padding:4px 14px 8px;flex-wrap:wrap">'
     + '<button type="button" data-sid="'+escapeAttr_(s.id||'')+'" data-pid="'+escapeAttr_(pid||'')+'" onclick="editarSoapHistorico(this.dataset.sid,this.dataset.pid)" style="font-size:12px;font-weight:700;padding:6px 12px;border-radius:12px;border:1.5px solid var(--navy);background:white;color:var(--navy);cursor:pointer">✏️ Editar</button>'
     + '<button type="button" data-sid="'+escapeAttr_(s.id||'')+'" onclick="verHistorialEdicionesSOAP(this.dataset.sid,true)" style="font-size:12px;font-weight:600;padding:6px 12px;border-radius:12px;border:1.5px solid var(--gray-200);background:white;color:var(--gray-600);cursor:pointer">🕘 Historial</button>'
+    + (_puedeBorrar() ? '<button type="button" data-docid="'+escapeAttr_(s._docId||'')+'" data-pid="'+escapeAttr_(pid||'')+'" onclick="_borrarNotaHistorica(this.dataset.docid,this.dataset.pid)" style="font-size:12px;font-weight:700;padding:6px 12px;border-radius:12px;border:1.5px solid #FCA5A5;background:#FEF2F2;color:#B91C1C;cursor:pointer">🗑️ Borrar</button>' : '')
     + '</div>';
   // LOOP J-2: en notas estructuradas el link vive en textoOriginal y no se pintaba. Bloque aditivo solo si hay URLs.
   var linksNota = (typeof _FST_extraerLinksDeTexto==='function' && s.textoOriginal) ? _FST_extraerLinksDeTexto(s.textoOriginal, s.fecha) : [];
@@ -3929,7 +3930,7 @@ async function FST_montarAgendaCalendar(rango){
     + '<div style="font-size:13px;font-weight:700;color:var(--navy);margin-bottom:8px">📅 Agenda del calendario</div>'
     + '<div style="font-size:10px;color:var(--gray-400);margin:-4px 0 8px">Sincronizado desde Google Calendar · Solo lectura</div>'
     + '<div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap">'+btn('dia','Hoy')+btn('manana','Mañana')+btn('pasado','Pasado')+btn('semana','Semana')+btn('semanaSiguiente','Próxima')+'</div>'
-    + (esSupervisorUI()?'<div style="margin-bottom:10px;display:flex;gap:6px;flex-wrap:wrap"><button onclick="mostrarPendientesSOAP()" style="font-size:12px;font-weight:700;border:none;border-radius:10px;padding:6px 12px;cursor:pointer;font-family:inherit;background:#FEF3C7;color:#92400E">📋 Notas pendientes</button><button onclick="mostrarRendimientoEquipo(\'hoy\')" style="font-size:12px;font-weight:700;border:none;border-radius:10px;padding:6px 12px;cursor:pointer;font-family:inherit;background:#E8F5EE;color:#2E7D52">📊 Rendimiento</button><button onclick="mostrarColaRevision()" style="font-size:12px;font-weight:700;border:none;border-radius:10px;padding:6px 12px;cursor:pointer;font-family:inherit;background:#FDE8E8;color:#B91C1C">🔍 Cola de revisión</button><button onclick="mostrarRevaloraciones()" style="font-size:12px;font-weight:700;border:none;border-radius:10px;padding:6px 12px;cursor:pointer;font-family:inherit;background:#E0E7FF;color:#3730A3">🔄 Revalorar'+((typeof _countRevaloraciones==="function"&&_countRevaloraciones()>0)?(" ("+_countRevaloraciones()+")"):"")+'</button><button onclick="toggleVistaTerapeuta()" style="font-size:12px;font-weight:700;border:none;border-radius:10px;padding:6px 12px;cursor:pointer;font-family:inherit;background:#EEF1F6;color:var(--navy)">👁️ Ver como terapeuta</button><button onclick="mostrarDeteccionDatos()" style="font-size:12px;font-weight:700;border:none;border-radius:10px;padding:6px 12px;cursor:pointer;font-family:inherit;background:#FEE2E2;color:#B91C1C">🔎 Detección de datos</button></div>':'')
+    + (esSupervisorUI()?'<div style="margin-bottom:10px;display:flex;gap:6px;flex-wrap:wrap"><button onclick="mostrarPendientesSOAP()" style="font-size:12px;font-weight:700;border:none;border-radius:10px;padding:6px 12px;cursor:pointer;font-family:inherit;background:#FEF3C7;color:#92400E">📋 Notas pendientes</button><button onclick="mostrarRendimientoEquipo(\'hoy\')" style="font-size:12px;font-weight:700;border:none;border-radius:10px;padding:6px 12px;cursor:pointer;font-family:inherit;background:#E8F5EE;color:#2E7D52">📊 Rendimiento</button><button onclick="mostrarColaRevision()" style="font-size:12px;font-weight:700;border:none;border-radius:10px;padding:6px 12px;cursor:pointer;font-family:inherit;background:#FDE8E8;color:#B91C1C">🔍 Cola de revisión</button><button onclick="mostrarRevaloraciones()" style="font-size:12px;font-weight:700;border:none;border-radius:10px;padding:6px 12px;cursor:pointer;font-family:inherit;background:#E0E7FF;color:#3730A3">🔄 Revalorar'+((typeof _countRevaloraciones==="function"&&_countRevaloraciones()>0)?(" ("+_countRevaloraciones()+")"):"")+'</button><button onclick="toggleVistaTerapeuta()" style="font-size:12px;font-weight:700;border:none;border-radius:10px;padding:6px 12px;cursor:pointer;font-family:inherit;background:#EEF1F6;color:var(--navy)">👁️ Ver como terapeuta</button><button onclick="mostrarDeteccionDatos()" style="font-size:12px;font-weight:700;border:none;border-radius:10px;padding:6px 12px;cursor:pointer;font-family:inherit;background:#FEE2E2;color:#B91C1C">🔎 Detección de datos</button>'+(_puedeBorrar()?'<button onclick="abrirPapelera()" style="font-size:12px;font-weight:700;border:none;border-radius:10px;padding:6px 12px;cursor:pointer;font-family:inherit;background:#F1F5F9;color:#334155">🗑️ Papelera</button>':'')+'</div>':'')
     + '<div id="agenda-cal-list"><div style="font-size:12px;color:var(--gray-400);padding:6px 0">⏳ Cargando agenda…</div></div>'
     + '</div></div>';
   const reqId = (window._agendaCalReq = (window._agendaCalReq||0) + 1);
@@ -10692,6 +10693,158 @@ function _pedirTextoLibre(titulo, placeholder){
     ov.querySelector('#_ptl-ok').onclick = function(){ var v=(ov.querySelector('#_ptl-txt').value||'').trim(); cerrar(v||null); };
     ov.querySelector('#_ptl-cancel').onclick = function(){ cerrar(null); };
   });
+}
+
+// ── BORRADO LÓGICO — BOTONES + PAPELERA (Entrega 1: NOTA de histórico) ──────────
+// Doble candado: (1) firestore.rules (borradoKeysOK + isSupervisor); (2) este gate de front.
+// Punto ÚNICO de verdad del email en el FRONT (en reglas es isSupervisor()). NUNCA cfag1092.
+var EMAIL_ADMIN_BORRADO = 'lftaranda@gmail.com';
+function _puedeBorrar(){
+  return !!(currentUser && String((currentUser.email||currentUser.username)||'').toLowerCase() === EMAIL_ADMIN_BORRADO && !window._previewTerapeuta);
+}
+// Resumen para la confirmación: primeras ~10 palabras del contenido de la nota.
+function _resumenNotaBorrado(s){
+  if(!s) return '';
+  var t = s.textoOriginal || [s.s&&s.s.dolor, s.o&&s.o.rom, s.a&&s.a.evolucion, s.p&&s.p.tratamiento].filter(Boolean).join(' ');
+  t = String(t||'').replace(/\s+/g,' ').trim();
+  var pal = t.split(' ').filter(Boolean);
+  return pal.length ? (pal.slice(0,10).join(' ') + (pal.length>10?'…':'')) : '';
+}
+// Modal de confirmación con contenido VISIBLE (nombre + fecha + resumen) antes de borrar.
+function _modalConfirmarBorrado(titulo, resumenHTML, textoBoton){
+  return new Promise(function(resolve){
+    var ov=document.createElement('div');
+    ov.style.cssText='position:fixed;inset:0;background:rgba(13,27,62,.5);z-index:9999;display:flex;align-items:flex-end;justify-content:center';
+    function cerrar(v){ try{ov.remove();}catch(_){} resolve(v); }
+    ov.onclick=function(e){ if(e.target===ov) cerrar(false); };
+    ov.innerHTML='<div style="background:#fff;border-radius:16px 16px 0 0;width:100%;max-width:480px;padding:16px">'
+      +'<div style="font-weight:800;color:#B91C1C;margin-bottom:10px">'+escapeHTML(titulo||'Borrar')+'</div>'
+      +'<div style="margin-bottom:12px">'+resumenHTML+'</div>'
+      +'<div style="font-size:11px;color:var(--gray-400);margin-bottom:10px">Se moverá a la Papelera. Puedes restaurarla desde la app.</div>'
+      +'<button id="_del-ok" style="width:100%;padding:12px;border:none;border-radius:10px;background:#B91C1C;color:#fff;font-size:14px;font-weight:800;cursor:pointer">'+escapeHTML(textoBoton||'Mover a papelera')+'</button>'
+      +'<button id="_del-cancel" style="width:100%;padding:10px;margin-top:4px;border:none;background:none;color:var(--gray-400);font-size:13px;cursor:pointer">Cancelar</button></div>';
+    document.body.appendChild(ov);
+    ov.querySelector('#_del-ok').onclick=function(){ cerrar(true); };
+    ov.querySelector('#_del-cancel').onclick=function(){ cerrar(false); };
+  });
+}
+// Borrar NOTA de histórico. Resolución por _docId CRUDO (doc-id real del snapshot), NUNCA el campo id.
+// Orden estricto: confirmar → backup revision/ + entrada papelera → RECIÉN el tombstone. Si el backup
+// falla, NO marca y el error se muestra VISIBLE. Si el tombstone falla tras la papelera, se hace
+// rollback de la entrada de papelera (la nota sigue viva → sin fantasma).
+async function _borrarNotaHistorica(docId, pid){
+  if(!_puedeBorrar()){ showToast('Solo Carlos puede borrar','error'); return; }
+  if(!docId || !pid){ showToast('Datos incompletos','error'); return; }
+  if(!window._fstDb){ try{ await FST_init(); }catch(_){} }
+  if(!window._fstDb){ showToast('Firestore no disponible','error'); return; }
+  var cache = Array.isArray(_fstSesionesCache[pid]) ? _fstSesionesCache[pid] : [];
+  var s = cache.find(function(x){ return x && x._docId===docId; }) || null;
+  var nombre = (currentPatient&&currentPatient.name) || (s&&s.nombre) || pid;
+  var fecha = (s&&s.fecha) || '';
+  var resumen = _resumenNotaBorrado(s);
+  var resumenHTML = '<div style="font-size:13px;color:var(--navy);font-weight:700">'+escapeHTML(nombre)+'</div>'
+    + '<div style="font-size:12px;color:var(--gray-500);margin:2px 0 6px">Nota del '+escapeHTML(fecha||'(sin fecha)')+'</div>'
+    + '<div style="font-size:12px;color:var(--gray-600);background:#F6F8FB;border-radius:8px;padding:8px">'+escapeHTML(resumen||'(sin texto)')+'</div>';
+  var ok = await _modalConfirmarBorrado('🗑️ Mover nota a papelera', resumenHTML, 'Mover a papelera');
+  if(!ok) return;
+  var ts = Date.now();
+  var borradoPor = (currentUser&&(currentUser.email||currentUser.username))||EMAIL_ADMIN_BORRADO;
+  var papRef = null;
+  try{
+    var ref = window._fstDb.collection('pacientes').doc(pid).collection('sesiones').doc(docId);
+    var snap = await ref.get();
+    if(!snap.exists){ showToast('La nota ya no existe en la nube','error'); return; }
+    var contenido = snap.data()||{};
+    // 1) backup a revision/ (DEBE suceder antes del tombstone)
+    var revId = 'nota__'+pid+'__'+docId+'__'+ts;
+    await window._fstDb.collection('revision').doc(revId).set({
+      tipo:'nota', pid:pid, sid:docId, ts:ts, borradoPor:borradoPor, nombre:nombre, fecha:fecha, contenido:contenido
+    });
+    // 2) entrada en papelera (query simple, SIN índice)
+    papRef = await window._fstDb.collection('papelera').add({
+      tipo:'nota', pid:pid, sid:docId, nombre:nombre, fecha:fecha, resumen:resumen, ts:ts, borradoPor:borradoPor, revId:revId
+    });
+    // 3) RECIÉN AHORA el tombstone
+    await ref.set({ eliminado:true, eliminadoPor:borradoPor, eliminadoFecha:new Date(ts).toISOString() }, { merge:true });
+  }catch(e){
+    console.error('[borrado-nota]', e);
+    if(papRef){ try{ await papRef.delete(); }catch(_r){} }   // rollback: sin fantasma en papelera
+    showToast('❌ No se pudo borrar (backup/reglas): '+((e&&e.message)||'error')+'. La nota NO se tocó.','error');
+    return;
+  }
+  // 4) invalidación EN CALIENTE — mecanismo de NOTA (no de paciente): purga cache, re-pinta, refresca cola.
+  try{ _fstSesionesCache[pid] = (Array.isArray(_fstSesionesCache[pid])?_fstSesionesCache[pid]:[]).filter(function(x){ return x && x._docId!==docId; }); }catch(_e){}
+  try{ if(typeof FST_renderHistorialSoap==='function') FST_renderHistorialSoap(pid); }catch(_e){}
+  try{
+    if(window._colaRevisionCache && Array.isArray(window._colaRevisionCache.items)){
+      window._colaRevisionCache.items = window._colaRevisionCache.items.filter(function(it){ return !(it && it.pid===pid && String(it.sid)===String(docId)); });
+    }
+    if(document.getElementById('cont-cola-revision') && typeof mostrarColaRevision==='function') mostrarColaRevision(false);
+  }catch(_e){}
+  showToast('🗑️ Nota movida a papelera','success');
+}
+// PAPELERA — lee la colección 'papelera' con query SIMPLE (sin índice compuesto). Notas y pacientes.
+async function abrirPapelera(){
+  if(!_puedeBorrar()){ showToast('Solo Carlos','error'); return; }
+  if(!window._fstDb){ try{ await FST_init(); }catch(_){} }
+  if(!window._fstDb){ showToast('Firestore no disponible','error'); return; }
+  var ov=document.createElement('div');
+  ov.style.cssText='position:fixed;inset:0;background:rgba(13,27,62,.5);z-index:9999;display:flex;align-items:flex-end;justify-content:center';
+  ov.onclick=function(e){ if(e.target===ov){ try{ov.remove();}catch(_){} } };
+  var box=document.createElement('div');
+  box.style.cssText='background:#fff;border-radius:16px 16px 0 0;width:100%;max-width:520px;max-height:80vh;overflow:auto;padding:16px';
+  box.innerHTML='<div style="font-weight:800;color:var(--navy);margin-bottom:10px">🗑️ Papelera</div><div id="_pap-body" style="font-size:13px;color:var(--gray-500)">Cargando…</div><button id="_pap-close" style="width:100%;padding:10px;margin-top:10px;border:none;background:none;color:var(--gray-400);font-size:13px;cursor:pointer">Cerrar</button>';
+  ov.appendChild(box); document.body.appendChild(ov);
+  box.querySelector('#_pap-close').onclick=function(){ try{ov.remove();}catch(_){} };
+  try{
+    var snap=await window._fstDb.collection('papelera').get();
+    var items=[]; snap.forEach(function(d){ items.push(Object.assign({_id:d.id}, d.data()||{})); });
+    items.sort(function(a,b){ return (b.ts||0)-(a.ts||0); });
+    _renderPapeleraBody(box.querySelector('#_pap-body'), items);
+  }catch(e){ var bb=box.querySelector('#_pap-body'); if(bb) bb.innerHTML='<span style="color:var(--red)">Error: '+escapeHTML((e&&e.message)||'')+'</span>'; }
+}
+function _renderPapeleraBody(cont, items){
+  if(!cont) return;
+  if(!items.length){ cont.innerHTML='<div style="color:var(--gray-400)">Papelera vacía.</div>'; return; }
+  cont.innerHTML=items.map(function(it){
+    var t = it.tipo==='paciente'?'👤 Paciente':'📝 Nota';
+    return '<div style="border:1px solid var(--gray-200);border-radius:10px;padding:10px;margin-bottom:8px">'
+      +'<div style="font-weight:700;color:var(--navy)">'+t+' · '+escapeHTML(it.nombre||it.pid||'')+'</div>'
+      +'<div style="font-size:11px;color:var(--gray-400)">'+escapeHTML(it.fecha||'')+(it.resumen?(' · '+escapeHTML(String(it.resumen).slice(0,80))):'')+'</div>'
+      +'<button type="button" data-eid="'+escapeAttr_(it._id)+'" onclick="_restaurarDesdePapelera(this.dataset.eid, this)" style="margin-top:6px;font-size:12px;font-weight:700;border:none;border-radius:8px;padding:6px 12px;cursor:pointer;background:#E8F5EE;color:#2E7D52">↩︎ Restaurar</button>'
+      +'</div>';
+  }).join('');
+}
+async function _restaurarDesdePapelera(entryId, btn){
+  if(!_puedeBorrar()){ showToast('Solo Carlos','error'); return; }
+  if(!window._fstDb){ showToast('Firestore no disponible','error'); return; }
+  if(btn) btn.disabled=true;
+  try{
+    var eref=window._fstDb.collection('papelera').doc(entryId);
+    var esnap=await eref.get();
+    if(!esnap.exists){ showToast('Entrada no encontrada','error'); if(btn) btn.disabled=false; return; }
+    var e=esnap.data()||{};
+    var restauradoPor=(currentUser&&(currentUser.email||currentUser.username))||EMAIL_ADMIN_BORRADO, restauradoFecha=new Date().toISOString();
+    if(e.tipo==='nota'){
+      await window._fstDb.collection('pacientes').doc(e.pid).collection('sesiones').doc(e.sid)
+        .set({ eliminado:false, restauradoPor:restauradoPor, restauradoFecha:restauradoFecha }, { merge:true });
+      try{ delete _fstSesionesCache[e.pid]; }catch(_){}
+      try{ if(currentPatient && currentPatient.id===e.pid && typeof FST_renderHistorialSoap==='function') FST_renderHistorialSoap(e.pid); }catch(_){}
+      try{ window._colaRevisionCache=null; }catch(_){}
+    } else if(e.tipo==='paciente'){
+      await window._fstDb.collection('pacientes').doc(e.pid)
+        .set({ eliminado:false, restauradoPor:restauradoPor, restauradoFecha:restauradoFecha }, { merge:true });
+      try{ if(window._FST_pidsEliminados) window._FST_pidsEliminados.delete(String(e.pid)); }catch(_){}
+      try{ if(typeof _FST_invalidarVistaPacientes==='function') _FST_invalidarVistaPacientes(); }catch(_){}
+    }
+    await eref.delete();
+    showToast('↩︎ Restaurado','success');
+    if(btn && btn.parentNode) btn.parentNode.style.display='none';
+  }catch(err){
+    console.error('[restaurar]', err);
+    showToast('❌ No se pudo restaurar: '+((err&&err.message)||''),'error');
+    if(btn) btn.disabled=false;
+  }
 }
 
 // ── BORRADO LÓGICO (tombstone) ────────────────────────────────────────────

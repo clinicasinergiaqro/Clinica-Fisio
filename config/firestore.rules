@@ -116,24 +116,43 @@ service cloud.firestore {
         'pid','tipo','nombreOriginal','vinculadoPor','fecha','updatedAt'
       ]);
     }
+    // ── BORRADO LÓGICO (papelera) ──
+    // Poner/quitar el tombstone eliminado:true — SOLO isSupervisor() (= lftaranda@gmail.com,
+    // punto ÚNICO de verdad del email en estas reglas). Whitelist estricta: SOLO los campos del
+    // borrado/restauración; ningún otro campo puede cambiar en el mismo write (no abre un update amplio).
+    // Cubre borrar (eliminado:true) y des-borrar (eliminado:false + restauradoPor/Fecha).
+    function borradoKeysOK() {
+      return request.resource.data.diff(resource.data).affectedKeys()
+        .hasOnly(['eliminado','eliminadoPor','eliminadoFecha','restauradoPor','restauradoFecha']);
+    }
     match /pacientes/{pacienteId} {
       allow read: if isWriter();
       allow create: if isWriter();
-      allow update: if isWriter() && (
-        pacienteLiveUpdateOK() ||
-        pacienteEjerciciosUpdateOK() ||
-        pacienteClinicoUpdateOK()
-      );
+      allow update: if (isWriter() && (
+                        pacienteLiveUpdateOK() ||
+                        pacienteEjerciciosUpdateOK() ||
+                        pacienteClinicoUpdateOK()
+                      ))
+                    || (isSupervisor() && borradoKeysOK());   // borrado/restauración: solo lftaranda
       allow delete: if isSupervisor();
     }
     match /pacientes/{pacienteId}/sesiones/{sesionId} {
       allow read: if isWriter();
       allow create: if isWriter() && sesionCreateOK();
-      allow update: if isWriter() && sesionUpdateOK();
+      allow update: if (isWriter() && sesionUpdateOK())
+                    || (isSupervisor() && borradoKeysOK());   // borrado/restauración de nota: solo lftaranda
       allow delete: if isSupervisor();
     }
-    match /revision/{docId} {
+    // Backup clínico completo del contenido borrado (doc + sesiones) — SOLO lftaranda.
+    // Recursivo: cubre revision/{tipo}/{id}/{ts} y cualquier profundidad. Si falta, el backup
+    // falla y el flujo de borrado NO marca el tombstone (orden estricto).
+    match /revision/{document=**} {
       allow read, write: if isSupervisor();
+    }
+    // Papelera: índice de lo borrado para la vista de Papelera y la restauración. SOLO lftaranda.
+    // Allowlist explícita por email vía isSupervisor() (NO "writer excepto cfag1092").
+    match /papelera/{document=**} {
+      allow read, create, delete: if isSupervisor();
     }
     match /agendaAsignaciones/{nombreNorm} {
       allow read: if isWriter();
