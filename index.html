@@ -4347,6 +4347,67 @@ async function _limpiarTodosLosTest(){
   try{ mostrarRevaloraciones(); }catch(e){}
   try{ renderPacientes(); }catch(e){}
 }
+// [esTest] Backfill ÚNICO (supervisor): marca esTest:true en los docs Firestore de los pacientes de
+// prueba (heurística _esPacienteTest) para que las REGLAS puedan cerrar `allow delete` SOLO a test y
+// dejar `if false` para todo lo clínico. Idempotente y tolerante por-doc. Guard de existencia: NO crea
+// stubs (docs de activos sin espejo se saltan). REQUIERE que las reglas ya permitan escribir `esTest`
+// (supervisor); si no, el write da permission-denied y se cuenta como "bloqueado". Se corre desde
+// consola. DRY-RUN por defecto: _backfillEsTest() solo LISTA (id/nombre/motivo), NO escribe; solo
+// _backfillEsTest({ejecutar:true}) escribe. Secuencia de ops: (1) publicar regla que permita escribir
+// esTest → (2) _backfillEsTest() dry-run y REVISAR que no haya un paciente real → (3) _backfillEsTest({ejecutar:true})
+// → (4) verificar "0 bloqueados" → (5) publicar `allow delete: if isSupervisor() && esTest==true`.
+// Motivo EXACTO por el que la heurística considera test a un paciente (para el dry-run del backfill).
+// Refleja rama por rama _esPacienteTest — si cambia una, cambia la otra.
+function _motivoEsTest(p){
+  if(!p) return null;
+  if(p.id && _IDS_TEST.indexOf(p.id)!==-1) return 'id en _IDS_TEST';
+  var n=String(p.name||'').trim();
+  if(/^test/i.test(n)) return "nombre empieza con 'test'";
+  if(n.replace(/\s/g,'').length<=2) return 'nombre ≤2 caracteres ("'+n+'")';
+  var exactos=['prueba','zorras','menor de edad','j','df'];
+  if(exactos.indexOf(n.toLowerCase())!==-1) return 'en lista exacta ("'+n.toLowerCase()+'")';
+  return null;
+}
+async function _backfillEsTest(opts){
+  var ejecutar=!!(opts && opts.ejecutar===true);
+  if(!(currentUser && currentUser.role==='supervisor')){ console.warn('[esTest] solo supervisor'); return; }
+  var tests=(Array.isArray(patientsDB)?patientsDB:[]).filter(function(p){ return _esPacienteTest(p); });
+  // 🔴 DRY-RUN POR DEFECTO: listar SIN escribir. La heurística (nombre ≤2 chars, empieza con 'test',
+  // lista exacta con 'j'/'df') PUEDE atrapar un paciente REAL; si se le persiste esTest:true y luego se
+  // cierra la regla, ese expediente clínico quedaría FÍSICAMENTE borrable. Revisar la lista completa
+  // ANTES de ejecutar. Solo _backfillEsTest({ejecutar:true}) escribe.
+  console.log('[esTest] '+(ejecutar?'EJECUTAR':'DRY-RUN')+' · '+tests.length+' pacientes que la heurística marca como test:');
+  tests.forEach(function(p){ console.log('  · '+String((p&&p.id)||'?')+' — "'+String((p&&p.name)||'')+'" — motivo: '+(_motivoEsTest(p)||'?')); });
+  if(!ejecutar){
+    console.log('[esTest] DRY-RUN: NO se escribió nada. Si algún paciente REAL aparece arriba, sácalo de _IDS_TEST o ajusta la heurística ANTES de ejecutar. Para ejecutar: _backfillEsTest({ejecutar:true})');
+    try{ if(typeof showToast==='function') showToast('esTest DRY-RUN: '+tests.length+' candidatos en consola — nada escrito','warning'); }catch(_){}
+    return { dryRun:true, candidatos:tests.length };
+  }
+  if(!window._fstDb){ try{ await FST_init(); }catch(_){} }
+  if(!window._fstDb){ console.warn('[esTest] Firestore no disponible'); return; }
+  var ok=0, saltados=0, bloqueados=0;
+  for(var i=0;i<tests.length;i++){
+    var p=tests[i], pid=String((p&&p.id)||'');
+    if(!pid){ saltados++; continue; }
+    // (a) doc directo pacientes/{pid} — el que borra _limpiarTodosLosTest. Solo si EXISTE (no crear stub).
+    try{
+      var ref=window._fstDb.collection('pacientes').doc(pid);
+      var snap=await ref.get();
+      if(snap.exists){ await ref.set({ esTest:true },{merge:true}); ok++; } else { saltados++; }
+    }catch(e){ bloqueados++; console.warn('[esTest] bloqueado (¿regla aún sin esTest?) '+pid+':', e&&e.message); }
+    // (b) activo: también el espejo por appSourceId (por si un borrado futuro apunta al espejo).
+    if(pid.indexOf('mig_pac_')!==0){
+      try{
+        var esp=await window._fstDb.collection('pacientes').where('appSourceId','==',pid).get();
+        if(esp.size===1){ await window._fstDb.collection('pacientes').doc(esp.docs[0].id).set({ esTest:true },{merge:true}); ok++; }
+      }catch(e2){ bloqueados++; console.warn('[esTest] espejo bloqueado '+pid+':', e2&&e2.message); }
+    }
+  }
+  console.log('[esTest] backfill: '+tests.length+' de prueba · escritos:'+ok+' · saltados(sin doc):'+saltados+' · bloqueados(regla):'+bloqueados);
+  try{ if(typeof showToast==='function') showToast('esTest: '+ok+' escritos, '+bloqueados+' bloqueados (ver consola)', bloqueados?'warning':'success'); }catch(_){}
+  return { total:tests.length, ok:ok, saltados:saltados, bloqueados:bloqueados };
+}
+try{ if(typeof window!=='undefined') window._backfillEsTest=_backfillEsTest; }catch(_){}
 // Supervisor: lista de pacientes para revalorar.
 async function mostrarRevaloraciones(){
   if(!(currentUser&&currentUser.role==='supervisor')){ showToast('Solo supervisor','error'); return; }
@@ -7536,8 +7597,8 @@ async function FST_cargarIndicePacientes() {
     db = await FST_esperarDbLista(8000);
   }
   if (!db) {
-    console.warn('[FST-LISTA] _fstDb no disponible después de 8s. Fallback local.');
-    return []; // NO cachear — falla temporal, no resultado real
+    console.warn('[FST-LISTA] _fstDb no disponible después de 8s → null (no pude cargar, NO "0 pacientes").');
+    return null; // [SENTINEL] falla temporal ≠ resultado real. null lo distingue del [] genuino (clase L157).
   }
 
   // Crear Promise compartida ANTES del await para que llamadas concurrentes la encuentren
@@ -7574,7 +7635,7 @@ async function FST_cargarIndicePacientes() {
       // algún doc es autoritativo y reemplaza el Set (un restore en otro dispositivo se propaga así).
       if (!pacientes.length && !_elimIdx.size) {
         console.warn('[FST-LISTA] read vivo vacío (0 docs) — NO piso Set/índice/cache');
-        return Array.isArray(window._FST_indicePacientes) ? window._FST_indicePacientes : [];
+        return (Array.isArray(window._FST_indicePacientes) && window._FST_indicePacientes.length) ? window._FST_indicePacientes : null;   // [SENTINEL] read zombie ≠ 0 real
       }
       window._FST_pidsEliminados = _elimIdx;   // [BORRADO] read vivo autoritativo → reemplaza el set
 
@@ -7588,7 +7649,7 @@ async function FST_cargarIndicePacientes() {
       console.warn('[FST-LISTA] error Firestore:', e.message);
       const fallback = leerCacheSesion();
       if (fallback) { console.warn('[FST-LISTA] usando cache como fallback'); return fallback; }
-      return [];
+      return null;   // [SENTINEL] error de red sin cache ≠ "0 pacientes". null → el consumidor conserva su vista.
     } finally {
       // Limpiar Promise SOLO al terminar, para que quien esperaba la encuentre resuelta
       window._FST_indicePacientesPromise = null;
@@ -7808,7 +7869,16 @@ async function FST_obtenerListaParaRender() {
   }
   try {
     const fst       = await FST_cargarIndicePacientes();
-    const fusionada = FST_fusionarPacientes(patientsDB || [], fst || []);
+    if (fst === null) {
+      // [SENTINEL] índice NO disponible (≠ "0 pacientes"): NO refundir con [] — los históricos
+      // desaparecerían de la lista por una falla temporal. Conservar la vista previa; si no hay, degradar a local.
+      const prev = window._FST_listaPacientesActual;
+      if (Array.isArray(prev) && prev.length) { console.warn('[FST-LISTA] índice null → conservo vista previa ('+prev.length+')'); return prev; }
+      console.warn('[FST-LISTA] índice null y sin vista previa → degrado a local');
+      FST_setListaPacientesVista(patientsDB || []);
+      return patientsDB || [];
+    }
+    const fusionada = FST_fusionarPacientes(patientsDB || [], fst);
     FST_setListaPacientesVista(fusionada);
     return fusionada;
   } catch(e) {
@@ -8591,8 +8661,10 @@ function renderSOAPForm(){
   const p=currentPatient;
   // FIX HEADER: total real PRIMERO (cache hidratado vía obtenerSesiones) — inmune al campo
   // sesionesCount desactualizado del doc índice que hacía divergir header (12) vs cuerpo (15ª).
-  const _sesTodas=obtenerSesiones(p);
-  const totalPrevias=Array.isArray(_sesTodas)?_sesTodas.length:(typeof p.sesiones==='number'?p.sesiones:0);
+  const _sesTodas=obtenerSesiones(p);   // CRUDO: alimenta la NUMERACIÓN (sesNum/_mxRealNum). No filtrar aquí:
+  // el num no se recicla (una nota restaurada vuelve con su número → filtrar colisionaría).
+  const _sesVis=obtenerSesionesVisibles(p);   // [1-bis] VISIBLES: el CONTEO "Nª visita" del encabezado SÍ baja al borrar.
+  const totalPrevias=Array.isArray(_sesVis)?_sesVis.length:(Array.isArray(_sesTodas)?_sesTodas.length:(typeof p.sesiones==='number'?p.sesiones:0));
   const _mxRealNum=(Array.isArray(_sesTodas)?_sesTodas:[]).reduce(function(mx,s){var n=Number(s&&s.num)||0;return n>mx?n:mx;},0);
   const sesNum=(editingSoapEsHistorico&&_editingSoapHistoricoNota)?_editingSoapHistoricoNota.num:(Math.max((typeof p.sesiones==='number'?p.sesiones:0),_mxRealNum)+1); // FIX SESIÓN-NaN + stale
   // Terapeuta de la nota = quien está llenando la nota, no el terapeuta asignado
@@ -8660,11 +8732,11 @@ function renderSOAPForm(){
     <div class="form-section-title">📋 Identificación</div>
     <div class="form-group">
       <div class="form-field"><div class="form-label">Paciente</div><div style="font-size:15px;font-weight:700;color:var(--navy)">${escapeHTML(p.name)}</div></div>
-      <div class="form-field"><div class="form-label">Sesión</div><div style="font-size:15px;font-weight:700;color:var(--navy)">${
+      <div class="form-field"><div class="form-label">Sesión Nº</div><div style="font-size:15px;font-weight:700;color:var(--navy)">${
         (_tieneEps&&!editingSoapId&&!editingSoapEsHistorico)
           ? `${(p.numSesionEpisodioActual||0)+1} <span style="font-size:11px;color:var(--gray-400);font-weight:400">· Episodio ${(p.motivoActualIndex||0)+1}</span>`
           : `${sesNum}${(()=>{const t=parseInt(p.planTto?.sesiones);return(t&&t>0)?' de '+t:''})()}`
-      }</div>${(_tieneEps&&!editingSoapId&&!editingSoapEsHistorico)?`<div style="font-size:10px;color:var(--gray-400);margin-top:1px">${totalPrevias+1}ª visita del paciente</div>`:''}</div>
+      }</div>${(_tieneEps&&!editingSoapId&&!editingSoapEsHistorico)?`<div style="font-size:10px;color:var(--gray-400);margin-top:1px">${totalPrevias+1}ª visita real · el Nº de sesión es un identificador fijo (no baja al borrar)</div>`:''}</div>
       <div class="form-field"><div class="form-label">Semana</div><div style="font-size:15px;font-weight:700;color:var(--navy)">${semana}</div></div>
       <div class="form-field"><div class="form-label">Terapeuta</div><div style="font-size:15px;font-weight:700;color:var(--navy)">${ter}</div></div>
     </div>
