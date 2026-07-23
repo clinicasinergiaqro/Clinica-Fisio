@@ -11061,9 +11061,12 @@ function _renderPapeleraBody(cont, items){
   if(!cont) return;
   if(!items.length){ cont.innerHTML='<div style="color:var(--gray-400)">Papelera vacía.</div>'; return; }
   cont.innerHTML=items.map(function(it){
-    var t = it.tipo==='paciente'?'👤 Paciente':'📝 Nota';
+    var t = (it.tipo==='pacienteHistorico'||it.tipo==='pacienteActivo'||it.tipo==='paciente')?'👤 Paciente':'📝 Nota';
+    // [BORRADO][3-bis][V3] Marca visible de "sin respaldo" (borrado forzado por media > 1 MiB sin subir):
+    // deja saber, meses después, que este registro NO tiene copia en revision/ (restaura des-ocultando igual).
+    var _badgeSR = it.sinRespaldo ? '<span style="font-size:10px;font-weight:700;background:#FEF3C7;color:#B45309;border-radius:6px;padding:2px 6px;margin-left:6px">⚠️ sin respaldo</span>' : '';
     return '<div style="border:1px solid var(--gray-200);border-radius:10px;padding:10px;margin-bottom:8px">'
-      +'<div style="font-weight:700;color:var(--navy)">'+t+' · '+escapeHTML(it.nombre||it.pid||'')+'</div>'
+      +'<div style="font-weight:700;color:var(--navy)">'+t+' · '+escapeHTML(it.nombre||it.pid||'')+_badgeSR+'</div>'
       +'<div style="font-size:11px;color:var(--gray-400)">'+escapeHTML(it.fecha||'')+(it.resumen?(' · '+escapeHTML(String(it.resumen).slice(0,80))):'')+'</div>'
       +'<button type="button" data-eid="'+escapeAttr_(it._id)+'" onclick="_restaurarDesdePapelera(this.dataset.eid, this)" style="margin-top:6px;font-size:12px;font-weight:700;border:none;border-radius:8px;padding:6px 12px;cursor:pointer;background:#E8F5EE;color:#2E7D52">↩︎ Restaurar</button>'
       +'</div>';
