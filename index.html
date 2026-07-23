@@ -6652,7 +6652,7 @@ function _renderSoapCard(s,p,readOnly){
         <div class="eva-num ${getEvaClass(s.s?.dolor?.split('/')[0]||5)}" style="width:28px;height:28px;font-size:12px;">${s.s?.dolor?.split('/')[0]||'?'}</div>
         ${!readOnly?`<button data-sid="${escapeAttr_(s.id)}" onclick="editarSOAP(this.dataset.sid)" style="background:var(--navy);color:white;border:none;border-radius:20px;padding:3px 10px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">✏️ Editar</button>`:''}
         ${s.historialEdiciones&&s.historialEdiciones.length?`<button data-sid="${escapeAttr_(s.id)}" onclick="verHistorialEdicionesSOAP(this.dataset.sid)" style="background:var(--gray-100);color:var(--gray-600);border:none;border-radius:20px;padding:3px 10px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">🕘 Ver historial</button>`:''}
-        ${(typeof _puedeBorrar==='function'&&_puedeBorrar())?`<button data-sid="${escapeAttr_(s.id)}" onclick="_borrarNotaActiva(this.dataset.sid)" style="background:#FEE2E2;color:#B91C1C;border:none;border-radius:20px;padding:3px 10px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit" title="Mover nota a papelera">🗑️</button>`:''}
+        ${(typeof _puedeBorrar==='function'&&_puedeBorrar()&&s.id)?`<button data-sid="${escapeAttr_(s.id)}" onclick="_borrarNotaActiva(this.dataset.sid)" style="background:#FEE2E2;color:#B91C1C;border:none;border-radius:20px;padding:3px 10px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit" title="Mover nota a papelera">🗑️</button>`:''}
       </div>
     </div>
     ${s.historialEdiciones&&s.historialEdiciones.length?`<div style="font-size:11px;color:var(--gray-400);padding:4px 14px 0;border-top:1px solid var(--gray-100)">✏️ Última edición: ${s.historialEdiciones[s.historialEdiciones.length-1].fecha} ${s.historialEdiciones[s.historialEdiciones.length-1].hora||''} por <b>${s.historialEdiciones[s.historialEdiciones.length-1].usuario}</b></div>`:''}
@@ -11056,22 +11056,29 @@ async function _borrarNotaActiva(sid){
     }catch(_e){ console.warn('[BORRADO-NOTA-ACT] no se pudo consultar espejo:', _e&&_e.message); }
     // 3) entrada en papelera con el espejoDocId GUARDADO (restaurar sin re-buscar → sin parcial).
     papRef=await window._fstDb.collection('papelera').add(_sinUndefined({ tipo:'notaActiva', pid:pid, sid:String(sid), nombre:(p.name||pid), fecha:(s.fecha||''), resumen:resumen, num:(s.num||null), ts:ts, borradoPor:borradoPor, revId:revId, espejoDocId:espejoDocId }));
-    // 4) RECIÉN AHORA los marcados. (a) set local por sid.
+    // 4) PRIMARY: set local por sid. Tras esto la nota queda oculta en el expediente y con papelera →
+    // punto SIN rollback. El espejo va DESPUÉS y aparte (no dentro de este try) para que su fallo no
+    // revierta un borrado ya efectivo dejando un doc huérfano + toast mentiroso.
     await window._fstDb.collection('pacientesEliminados').doc('notaActiva__'+sid).set({ tipo:'notaActiva', sid:String(sid), pid:pid, eliminadoPor:borradoPor, eliminadoFecha:new Date(ts).toISOString() });
-    // (b) 2-bis: el espejo sesiones/{sid} puede NO existir (nota nunca sincronizada). Un .set(merge) sobre
-    // doc inexistente = CREATE → reglas lo rechazan (sesionCreateOK no incluye eliminado). Verificar existencia.
-    if(espejoDocId){
+    console.log('[BORRADO-NOTA-ACT] marcado PRIMARY OK ·', pid, sid);
+  }catch(e){
+    console.error('[BORRADO-NOTA-ACT]', e);
+    if(papRef){ try{ await papRef.delete(); }catch(_r){} }   // rollback: nada quedó marcado → la nota sigue viva, sin fantasma
+    showToast('❌ No se pudo borrar (backup/reglas): '+((e&&e.message)||'error')+'. La nota NO se tocó.','error');
+    return;
+  }
+  // 4b) SECUNDARIO, NO-FATAL: marcar el espejo para ocultar de la Cola de Revisión. Un fallo aquí NO
+  // revierte el borrado (la nota YA está oculta en el expediente y en papelera). 2-bis: si el doc de
+  // sesión no existe (nota nunca sincronizada), un .set(merge) sería CREATE → reglas lo rechazan →
+  // verificar existencia y SALTAR sin error. Fallo real (red/permiso/>1) → aviso VISIBLE + reintentable.
+  var _espejoOK=true;
+  if(espejoDocId){
+    try{
       var sesRef=window._fstDb.collection('pacientes').doc(espejoDocId).collection('sesiones').doc(String(sid));
       var sesSnap=await sesRef.get();
       if(sesSnap.exists){ await sesRef.set({ eliminado:true, eliminadoPor:borradoPor, eliminadoFecha:new Date(ts).toISOString() },{merge:true}); }
-      else { console.log('[BORRADO-NOTA-ACT] espejo sesiones/'+sid+' NO existe (nota nunca sincronizada) → nada que ocultar en la Cola; salto sin error'); }
-    }
-    console.log('[BORRADO-NOTA-ACT] marcado OK ·', pid, sid, '· espejo:', (espejoDocId?'sí':'no'));
-  }catch(e){
-    console.error('[BORRADO-NOTA-ACT]', e);
-    if(papRef){ try{ await papRef.delete(); }catch(_r){} }   // rollback: la nota sigue viva → sin fantasma
-    showToast('❌ No se pudo borrar (backup/reglas): '+((e&&e.message)||'error')+'. La nota NO se tocó.','error');
-    return;
+      else { console.log('[BORRADO-NOTA-ACT] espejo sesiones/'+sid+' NO existe (nota nunca sincronizada) → nada que ocultar en la Cola'); }
+    }catch(_ee){ _espejoOK=false; console.warn('[BORRADO-NOTA-ACT] espejo NO marcado (reintentable):', _ee&&_ee.message); }
   }
   // 5) invalidación EN CALIENTE: set + cache durable + re-render historial + refrescar Cola.
   try{ if(window._FST_notasActivasEliminadas) window._FST_notasActivasEliminadas.add(String(sid)); }catch(_){}
@@ -11083,7 +11090,8 @@ async function _borrarNotaActiva(sid){
     }
     if(document.getElementById('cont-cola-revision') && typeof mostrarColaRevision==='function') mostrarColaRevision(false);
   }catch(_){}
-  showToast('🗑️ Nota movida a papelera','success');
+  // Aviso VISIBLE del fallo parcial: nota borrada + en papelera, pero el espejo no se marcó → sigue en la Cola.
+  showToast(_espejoOK ? '🗑️ Nota movida a papelera' : '🗑️ Nota en papelera — ⚠️ sigue visible en la Cola de Revisión (restáurala y reintenta el borrado)', _espejoOK?'success':'warning');
 }
 // [BORRADO][3-bis] Modal del guard de tamaño. Default SEGURO = esperar (que LOOP-B suba la media y el
 // backup encoja). Escape DELIBERADO = "Borrar sin respaldo" (botón aparte, aviso explícito) para el
