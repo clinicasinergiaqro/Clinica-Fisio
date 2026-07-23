@@ -245,7 +245,7 @@ function FST_renderCard(s, pid){
   var botonesEdicion = '<div style="display:flex;gap:6px;padding:4px 14px 8px;flex-wrap:wrap">'
     + '<button type="button" data-sid="'+escapeAttr_(s.id||'')+'" data-pid="'+escapeAttr_(pid||'')+'" onclick="editarSoapHistorico(this.dataset.sid,this.dataset.pid)" style="font-size:12px;font-weight:700;padding:6px 12px;border-radius:12px;border:1.5px solid var(--navy);background:white;color:var(--navy);cursor:pointer">✏️ Editar</button>'
     + '<button type="button" data-sid="'+escapeAttr_(s.id||'')+'" onclick="verHistorialEdicionesSOAP(this.dataset.sid,true)" style="font-size:12px;font-weight:600;padding:6px 12px;border-radius:12px;border:1.5px solid var(--gray-200);background:white;color:var(--gray-600);cursor:pointer">🕘 Historial</button>'
-    + (_puedeBorrar() ? '<button type="button" data-docid="'+escapeAttr_(s._docId||'')+'" data-pid="'+escapeAttr_(pid||'')+'" onclick="_borrarNotaHistorica(this.dataset.docid,this.dataset.pid)" style="font-size:12px;font-weight:700;padding:6px 12px;border-radius:12px;border:1.5px solid #FCA5A5;background:#FEF2F2;color:#B91C1C;cursor:pointer">🗑️ Borrar</button>' : '')
+    + ((_puedeBorrar() && s._docId) ? '<button type="button" data-docid="'+escapeAttr_(s._docId)+'" data-pid="'+escapeAttr_(pid||'')+'" onclick="_borrarNotaHistorica(this.dataset.docid,this.dataset.pid)" style="font-size:12px;font-weight:700;padding:6px 12px;border-radius:12px;border:1.5px solid #FCA5A5;background:#FEF2F2;color:#B91C1C;cursor:pointer">🗑️ Borrar</button>' : '')
     + '</div>';
   // LOOP J-2: en notas estructuradas el link vive en textoOriginal y no se pintaba. Bloque aditivo solo si hay URLs.
   var linksNota = (typeof _FST_extraerLinksDeTexto==='function' && s.textoOriginal) ? _FST_extraerLinksDeTexto(s.textoOriginal, s.fecha) : [];
@@ -10766,6 +10766,7 @@ async function _borrarNotaHistorica(docId, pid){
     });
     // 3) RECIÉN AHORA el tombstone
     await ref.set({ eliminado:true, eliminadoPor:borradoPor, eliminadoFecha:new Date(ts).toISOString() }, { merge:true });
+    console.log('[borrado-nota] tombstone OK', pid, docId);   // discrimina "no se escribió" vs "se escribió pero el filtro no ocultó"
   }catch(e){
     console.error('[borrado-nota]', e);
     if(papRef){ try{ await papRef.delete(); }catch(_r){} }   // rollback: sin fantasma en papelera
@@ -10837,9 +10838,13 @@ async function _restaurarDesdePapelera(entryId, btn){
       try{ if(window._FST_pidsEliminados) window._FST_pidsEliminados.delete(String(e.pid)); }catch(_){}
       try{ if(typeof _FST_invalidarVistaPacientes==='function') _FST_invalidarVistaPacientes(); }catch(_){}
     }
-    await eref.delete();
-    showToast('↩︎ Restaurado','success');
-    if(btn && btn.parentNode) btn.parentNode.style.display='none';
+    // (a) ya quitó el flag arriba; (b) borrar la entrada de papelera en SU propio try:
+    // si (b) falla, la nota YA quedó restaurada (visible) — el mensaje lo refleja, sin asustar.
+    var _limpio = true;
+    try{ await eref.delete(); }catch(_d){ _limpio = false; console.warn('[restaurar] no se pudo borrar entrada papelera (reintentable):', _d && _d.message); }
+    showToast(_limpio ? '↩︎ Restaurado' : '↩︎ Restaurado (la entrada quedó en papelera; puedes reintentar)','success');
+    if(btn && btn.parentNode && _limpio) btn.parentNode.style.display='none';
+    else if(btn) btn.disabled=false;
   }catch(err){
     console.error('[restaurar]', err);
     showToast('❌ No se pudo restaurar: '+((err&&err.message)||''),'error');
