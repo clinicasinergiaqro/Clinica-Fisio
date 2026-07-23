@@ -6652,6 +6652,7 @@ function _renderSoapCard(s,p,readOnly){
         <div class="eva-num ${getEvaClass(s.s?.dolor?.split('/')[0]||5)}" style="width:28px;height:28px;font-size:12px;">${s.s?.dolor?.split('/')[0]||'?'}</div>
         ${!readOnly?`<button data-sid="${escapeAttr_(s.id)}" onclick="editarSOAP(this.dataset.sid)" style="background:var(--navy);color:white;border:none;border-radius:20px;padding:3px 10px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">✏️ Editar</button>`:''}
         ${s.historialEdiciones&&s.historialEdiciones.length?`<button data-sid="${escapeAttr_(s.id)}" onclick="verHistorialEdicionesSOAP(this.dataset.sid)" style="background:var(--gray-100);color:var(--gray-600);border:none;border-radius:20px;padding:3px 10px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">🕘 Ver historial</button>`:''}
+        ${(typeof _puedeBorrar==='function'&&_puedeBorrar()&&s.id)?`<button data-sid="${escapeAttr_(s.id)}" onclick="_borrarNotaActiva(this.dataset.sid)" style="background:#FEE2E2;color:#B91C1C;border:none;border-radius:20px;padding:3px 10px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit" title="Mover nota a papelera">🗑️</button>`:''}
       </div>
     </div>
     ${s.historialEdiciones&&s.historialEdiciones.length?`<div style="font-size:11px;color:var(--gray-400);padding:4px 14px 0;border-top:1px solid var(--gray-100)">✏️ Última edición: ${s.historialEdiciones[s.historialEdiciones.length-1].fecha} ${s.historialEdiciones[s.historialEdiciones.length-1].hora||''} por <b>${s.historialEdiciones[s.historialEdiciones.length-1].usuario}</b></div>`:''}
@@ -10986,6 +10987,112 @@ function _pacienteSinBase64(p){
 // (incluye nombres de campo + overhead de codificación, no solo el JSON) → dejamos ~48 KiB de colchón.
 var _LIMITE_DOC_FST = 1000000;   // bytes; umbral conservador bajo el límite duro de 1 MiB de Firestore
 function _tamBytes(str){ try{ return new TextEncoder().encode(str).length; }catch(_e){ return String(str||'').length; } }
+// [BORRADO-NOTAS][4b] Backup de UNA nota sin base64 (media en Storage: url/fbPath). El bloqueo P4
+// garantiza que solo se borran notas ya sincronizadas → su media vive en Storage → backup pequeño.
+function _notaSinBase64(s){
+  try{ if(!s||!Array.isArray(s.media)) return s; var s2=Object.assign({},s); s2.media=s.media.map(function(m){ if(m&&(m.url||m.fbPath)){ var m2=Object.assign({},m); if('data' in m2) delete m2.data; return m2; } return m; }); return s2; }catch(_e){ return s; }
+}
+// [BORRADO-NOTAS][4b] P4: ¿el sid de ESTA nota está atorado en la cola de subida? (COLA_SOAP_ACT o
+// _FALLIDOS). Si sí, borrar resucitaría la nota (el drenado crearía el espejo SIN eliminado). Devuelve
+// el error de _FALLIDOS para que el modal diga POR QUÉ no subió y ofrezca "Forzar sincronización".
+function _notaActivaPendienteSync(pid, sid){
+  var out={pendiente:false, error:''};
+  function _q(k){ try{ return JSON.parse(localStorage.getItem(k)||'[]')||[]; }catch(_){ return []; } }
+  _q('COLA_SOAP_ACT').forEach(function(it){ if(it && String(it.pid||'')===String(pid) && it.sesion && String(it.sesion.id)===String(sid)){ out.pendiente=true; } });
+  _q('COLA_SOAP_ACT_FALLIDOS').forEach(function(it){ if(it && String(it.pid||'')===String(pid) && it.sesion && String(it.sesion.id)===String(sid)){ out.pendiente=true; out.error=it.error||'error de subida'; } });
+  return out;
+}
+// BORRAR NOTA de ACTIVO (Entrega 4b). Simetría con _borrarNotaHistorica. Doble ocultamiento:
+// pacientesEliminados(tipo notaActiva, por sid) oculta las VISTAS de p.soap (filtro 4a); espejo
+// sesiones/{sid}.eliminado oculta la Cola de Revisión (collectionGroup). Orden estricto: confirmar →
+// backup → papelera(con espejoDocId) → RECIÉN los marcados. sid determinista por dual-write (L696/L707).
+async function _borrarNotaActiva(sid){
+  if(!_puedeBorrar()){ showToast('Solo Carlos puede borrar','error'); return; }   // re-check en la ACCIÓN, no solo en el render
+  var p=currentPatient;
+  if(!p || !p.id || String(p.id).indexOf('mig_pac_')===0){ showToast('Abre el expediente del activo primero','error'); return; }
+  if(!sid){ showToast('Nota sin id','error'); return; }
+  if(!window._fstDb){ try{ await FST_init(); }catch(_){} }
+  if(!window._fstDb){ showToast('Firestore no disponible','error'); return; }
+  var pid=String(p.id);
+  var s=(Array.isArray(p.soap)?p.soap:[]).find(function(x){ return x && String(x.id)===String(sid); });
+  if(!s){ showToast('Nota no encontrada','error'); return; }
+  // P4 — bloqueo con escape: si el sid está en la cola, NO borrar (el drenado crearía el espejo sin
+  // eliminado → resucita). El modal dice cuál/por qué y ofrece forzar. Sin esto, una nota atorada en
+  // _FALLIDOS por error permanente sería imposible de borrar para siempre.
+  var pend=_notaActivaPendienteSync(pid, sid);
+  if(pend.pendiente){
+    var det='<div>• Nota '+(s.num?('#'+escapeHTML(String(s.num))+' '):'')+escapeHTML(s.fecha||'')+' — '+(pend.error?('FALLO: '+escapeHTML(String(pend.error).slice(0,90))):'pendiente de subir')+'</div>';
+    var accion=await _modalBloqueoSync('Esta nota', 1, det);
+    if(accion!=='forzar') return;
+    showToast('Sincronizando…','');
+    await _forzarSyncPaciente();
+    var pend2=_notaActivaPendienteSync(pid, sid);
+    if(pend2.pendiente){ showToast('La nota aún no se sincroniza — revisa el detalle antes de borrar','error'); return; }
+  }
+  // Confirmar (fecha + primeras ~palabras del contenido).
+  var resumen=_resumenNotaBorrado(s);
+  var resumenHTML='<div style="font-size:13px;color:var(--navy);font-weight:700">'+escapeHTML(p.name||pid)+'</div>'
+    +'<div style="font-size:12px;color:var(--gray-500);margin:2px 0 6px">Nota '+(s.num?('#'+escapeHTML(String(s.num))+' '):'')+'del '+escapeHTML(s.fecha||'(sin fecha)')+'</div>'
+    +'<div style="font-size:12px;color:var(--gray-600);background:#F6F8FB;border-radius:8px;padding:8px">'+escapeHTML(resumen||'(sin texto)')+'</div>'
+    +'<div style="font-size:11px;color:var(--gray-400);margin-top:8px">Se moverá a la Papelera. Puedes restaurarla desde la app.</div>';
+  var ok=await _modalConfirmarBorrado('🗑️ Mover nota a papelera', resumenHTML, 'Mover a papelera');
+  if(!ok) return;
+  var ts=Date.now();
+  var borradoPor=(currentUser&&(currentUser.email||currentUser.username))||EMAIL_ADMIN_BORRADO;
+  var papRef=null;
+  try{
+    // 1) backup a revision/ (contenido de la nota, base64 despojado — media en Storage).
+    var revId='notaAct__'+pid+'__'+sid+'__'+ts;
+    await window._fstDb.collection('revision').doc(revId).set(_sinUndefined({
+      tipo:'notaActiva', pid:pid, sid:String(sid), ts:ts, borradoPor:borradoPor, nombre:(p.name||pid), fecha:(s.fecha||''), num:(s.num||null), contenido:_notaSinBase64(s)
+    }));
+    // 2) resolver el espejo por appSourceId (guard >1 como Entrega 3).
+    var espejoDocId=null;
+    try{
+      var esp=await window._fstDb.collection('pacientes').where('appSourceId','==',pid).get();
+      if(esp.size===1){ espejoDocId=esp.docs[0].id; }
+      else if(esp.size>1){ console.error('[BORRADO-NOTA-ACT] >1 espejo con appSourceId='+pid+' — NO marco espejo a ciegas; sigo solo con el marcado local'); showToast('⚠️ Anomalía: >1 espejo; el espejo NO se marcó (revisar)','warning'); }
+      // esp.size===0 → activo nunca sincronizado, sin espejo → normal, nada que marcar.
+    }catch(_e){ console.warn('[BORRADO-NOTA-ACT] no se pudo consultar espejo:', _e&&_e.message); }
+    // 3) entrada en papelera con el espejoDocId GUARDADO (restaurar sin re-buscar → sin parcial).
+    papRef=await window._fstDb.collection('papelera').add(_sinUndefined({ tipo:'notaActiva', pid:pid, sid:String(sid), nombre:(p.name||pid), fecha:(s.fecha||''), resumen:resumen, num:(s.num||null), ts:ts, borradoPor:borradoPor, revId:revId, espejoDocId:espejoDocId }));
+    // 4) PRIMARY: set local por sid. Tras esto la nota queda oculta en el expediente y con papelera →
+    // punto SIN rollback. El espejo va DESPUÉS y aparte (no dentro de este try) para que su fallo no
+    // revierta un borrado ya efectivo dejando un doc huérfano + toast mentiroso.
+    await window._fstDb.collection('pacientesEliminados').doc('notaActiva__'+sid).set({ tipo:'notaActiva', sid:String(sid), pid:pid, eliminadoPor:borradoPor, eliminadoFecha:new Date(ts).toISOString() });
+    console.log('[BORRADO-NOTA-ACT] marcado PRIMARY OK ·', pid, sid);
+  }catch(e){
+    console.error('[BORRADO-NOTA-ACT]', e);
+    if(papRef){ try{ await papRef.delete(); }catch(_r){} }   // rollback: nada quedó marcado → la nota sigue viva, sin fantasma
+    showToast('❌ No se pudo borrar (backup/reglas): '+((e&&e.message)||'error')+'. La nota NO se tocó.','error');
+    return;
+  }
+  // 4b) SECUNDARIO, NO-FATAL: marcar el espejo para ocultar de la Cola de Revisión. Un fallo aquí NO
+  // revierte el borrado (la nota YA está oculta en el expediente y en papelera). 2-bis: si el doc de
+  // sesión no existe (nota nunca sincronizada), un .set(merge) sería CREATE → reglas lo rechazan →
+  // verificar existencia y SALTAR sin error. Fallo real (red/permiso/>1) → aviso VISIBLE + reintentable.
+  var _espejoOK=true;
+  if(espejoDocId){
+    try{
+      var sesRef=window._fstDb.collection('pacientes').doc(espejoDocId).collection('sesiones').doc(String(sid));
+      var sesSnap=await sesRef.get();
+      if(sesSnap.exists){ await sesRef.set({ eliminado:true, eliminadoPor:borradoPor, eliminadoFecha:new Date(ts).toISOString() },{merge:true}); }
+      else { console.log('[BORRADO-NOTA-ACT] espejo sesiones/'+sid+' NO existe (nota nunca sincronizada) → nada que ocultar en la Cola'); }
+    }catch(_ee){ _espejoOK=false; console.warn('[BORRADO-NOTA-ACT] espejo NO marcado (reintentable):', _ee&&_ee.message); }
+  }
+  // 5) invalidación EN CALIENTE: set + cache durable + re-render historial + refrescar Cola.
+  try{ if(window._FST_notasActivasEliminadas) window._FST_notasActivasEliminadas.add(String(sid)); }catch(_){}
+  try{ var _c=JSON.parse(localStorage.getItem(LS_NOTAS_ELIM)||'{}'); var _ids=Array.isArray(_c.ids)?_c.ids:[]; if(_ids.indexOf(String(sid))===-1) _ids.push(String(sid)); localStorage.setItem(LS_NOTAS_ELIM, JSON.stringify({ ts:Date.now(), ids:_ids })); }catch(_){}
+  try{ if(currentPatient && String(currentPatient.id)===pid && typeof renderExpediente==='function') renderExpediente('soap'); }catch(_){}
+  try{
+    if(window._colaRevisionCache && Array.isArray(window._colaRevisionCache.items)){
+      window._colaRevisionCache.items = window._colaRevisionCache.items.filter(function(it){ return !(it && String(it.sid)===String(sid)); });
+    }
+    if(document.getElementById('cont-cola-revision') && typeof mostrarColaRevision==='function') mostrarColaRevision(false);
+  }catch(_){}
+  // Aviso VISIBLE del fallo parcial: nota borrada + en papelera, pero el espejo no se marcó → sigue en la Cola.
+  showToast(_espejoOK ? '🗑️ Nota movida a papelera' : '🗑️ Nota en papelera — ⚠️ sigue visible en la Cola de Revisión (restáurala y reintenta el borrado)', _espejoOK?'success':'warning');
+}
 // [BORRADO][3-bis] Modal del guard de tamaño. Default SEGURO = esperar (que LOOP-B suba la media y el
 // backup encoja). Escape DELIBERADO = "Borrar sin respaldo" (botón aparte, aviso explícito) para el
 // caso en que la media NUNCA suba (error permanente de Storage / archivo corrupto): sin él, ese paciente
@@ -11188,6 +11295,23 @@ async function _restaurarDesdePapelera(entryId, btn){
       try{ var _c=JSON.parse(localStorage.getItem(LS_ACTIVOS_ELIM)||'{}'); var _ids=(Array.isArray(_c.ids)?_c.ids:[]).filter(function(x){ return String(x)!==String(e.pid); }); localStorage.setItem(LS_ACTIVOS_ELIM, JSON.stringify({ ts:Date.now(), ids:_ids })); }catch(_){}
       try{ if(typeof _FST_invalidarVistaPacientes==='function') _FST_invalidarVistaPacientes(); }catch(_){}
       try{ window._citasVinculadasCache=null; }catch(_){}
+    } else if(e.tipo==='notaActiva'){
+      // Restore de NOTA de activo = des-ocultar. Orden seguro: DATO primero, papelera al final (abajo).
+      // (a) quitar el set local; (b) desmarcar el espejo por el espejoDocId GUARDADO (no re-buscar);
+      // (c) refrescar el historial. El registro local nunca se removió → la nota vuelve con su num original.
+      await window._fstDb.collection('pacientesEliminados').doc('notaActiva__'+e.sid).delete();
+      if(e.espejoDocId){ try{ var _sr=window._fstDb.collection('pacientes').doc(e.espejoDocId).collection('sesiones').doc(String(e.sid)); var _ss=await _sr.get(); if(_ss.exists) await _sr.set({ eliminado:false, restauradoPor:restauradoPor, restauradoFecha:restauradoFecha },{merge:true}); }catch(_x){ console.warn('[restaurar] espejo nota (reintentable):', _x&&_x.message); } }
+      try{ if(window._FST_notasActivasEliminadas) window._FST_notasActivasEliminadas.delete(String(e.sid)); }catch(_){}
+      try{ var _cn=JSON.parse(localStorage.getItem(LS_NOTAS_ELIM)||'{}'); var _idsn=(Array.isArray(_cn.ids)?_cn.ids:[]).filter(function(x){ return String(x)!==String(e.sid); }); localStorage.setItem(LS_NOTAS_ELIM, JSON.stringify({ ts:Date.now(), ids:_idsn })); }catch(_){}
+      try{ if(currentPatient && String(currentPatient.id)===String(e.pid) && typeof renderExpediente==='function'){ var _spn=document.getElementById('screen-expediente'); if(_spn&&_spn.classList.contains('active')) renderExpediente('soap'); } }catch(_){}
+      try{ window._colaRevisionCache=null; }catch(_){}
+    } else {
+      // else RUIDOSO: un tipo desconocido NO debe caer en silencio (habría atrapado esta clase de bug
+      // desde el principio, y protege contra el próximo tipo que se añada sin cablear su branch).
+      console.error('[restaurar] tipo de entrada no reconocido:', e && e.tipo, '· entryId:', entryId);
+      showToast('⚠️ Tipo de entrada no reconocido ('+escapeHTML(String((e&&e.tipo)||'?'))+') — no se restauró','error');
+      if(btn) btn.disabled=false;
+      return;
     }
     // (a) ya quitó el flag arriba; (b) borrar la entrada de papelera en SU propio try:
     // si (b) falla, la nota YA quedó restaurada (visible) — el mensaje lo refleja, sin asustar.
