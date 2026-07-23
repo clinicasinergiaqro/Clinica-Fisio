@@ -6641,6 +6641,14 @@ function _renderSoapCard(s,p,readOnly){
         `<div style="width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:22px">📎<div style="font-size:8px;color:#5A6478">${(m.name||'').split('.').pop().toUpperCase()}</div></div>`}
       <div class="media-label">${m.label||m.name}</div></div>`).join('')}
     </div></div>`:'';
+  // [BORRADO-NOTAS][UI] Fila de acciones al PIE (paridad con el histórico FST_renderCard L366-370): Editar
+  // + Historial + Borrar, con etiqueta y borde, misma posición y estilo. El eva-num se queda en la cabecera
+  // (indicador, no acción). Condicional: no se renderiza el <div> si no hay ningún botón (readOnly sin nada).
+  var _bA = '';
+  if(!readOnly) _bA += '<button type="button" data-sid="'+escapeAttr_(s.id||'')+'" onclick="editarSOAP(this.dataset.sid)" style="font-size:12px;font-weight:700;padding:6px 12px;border-radius:12px;border:1.5px solid var(--navy);background:white;color:var(--navy);cursor:pointer">✏️ Editar</button>';
+  if(s.historialEdiciones&&s.historialEdiciones.length) _bA += '<button type="button" data-sid="'+escapeAttr_(s.id||'')+'" onclick="verHistorialEdicionesSOAP(this.dataset.sid)" style="font-size:12px;font-weight:600;padding:6px 12px;border-radius:12px;border:1.5px solid var(--gray-200);background:white;color:var(--gray-600);cursor:pointer">🕘 Historial</button>';
+  if(typeof _puedeBorrar==='function'&&_puedeBorrar()&&s.id) _bA += '<button type="button" data-sid="'+escapeAttr_(s.id||'')+'" onclick="_borrarNotaActiva(this.dataset.sid)" style="font-size:12px;font-weight:700;padding:6px 12px;border-radius:12px;border:1.5px solid #FCA5A5;background:#FEF2F2;color:#B91C1C;cursor:pointer">🗑️ Borrar</button>';
+  var botonesActivo = _bA ? '<div style="display:flex;gap:6px;padding:4px 14px 8px;flex-wrap:wrap">'+_bA+'</div>' : '';
   return `<div class="soap-card" data-sid="${escapeAttr_(s.id||'')}">
     <div class="soap-header">
       <div>
@@ -6650,16 +6658,13 @@ function _renderSoapCard(s,p,readOnly){
       </div>
       <div style="display:flex;gap:6px;align-items:center;">
         <div class="eva-num ${getEvaClass(s.s?.dolor?.split('/')[0]||5)}" style="width:28px;height:28px;font-size:12px;">${s.s?.dolor?.split('/')[0]||'?'}</div>
-        ${!readOnly?`<button data-sid="${escapeAttr_(s.id)}" onclick="editarSOAP(this.dataset.sid)" style="background:var(--navy);color:white;border:none;border-radius:20px;padding:3px 10px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">✏️ Editar</button>`:''}
-        ${s.historialEdiciones&&s.historialEdiciones.length?`<button data-sid="${escapeAttr_(s.id)}" onclick="verHistorialEdicionesSOAP(this.dataset.sid)" style="background:var(--gray-100);color:var(--gray-600);border:none;border-radius:20px;padding:3px 10px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">🕘 Ver historial</button>`:''}
-        ${(typeof _puedeBorrar==='function'&&_puedeBorrar()&&s.id)?`<button data-sid="${escapeAttr_(s.id)}" onclick="_borrarNotaActiva(this.dataset.sid)" style="background:#FEE2E2;color:#B91C1C;border:none;border-radius:20px;padding:3px 10px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit" title="Mover nota a papelera">🗑️</button>`:''}
       </div>
     </div>
     ${s.historialEdiciones&&s.historialEdiciones.length?`<div style="font-size:11px;color:var(--gray-400);padding:4px 14px 0;border-top:1px solid var(--gray-100)">✏️ Última edición: ${s.historialEdiciones[s.historialEdiciones.length-1].fecha} ${s.historialEdiciones[s.historialEdiciones.length-1].hora||''} por <b>${s.historialEdiciones[s.historialEdiciones.length-1].usuario}</b></div>`:''}
     <div class="soap-body">
       ${bodyHTML}
       ${mediaHTML}
-    </div></div>`;
+    </div>${botonesActivo}</div>`;
 }
 
 function renderExpediente(tab='historia'){
