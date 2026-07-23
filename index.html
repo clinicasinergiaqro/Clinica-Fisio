@@ -256,7 +256,10 @@ function _notaActivaViva(sid){ return !_notaActivaEliminada(sid); }
 // lookup NO lo usan (leen p.soap directo). Set vacío → devuelve el array tal cual (fast path seguro).
 function _soapVivas(p){
   var arr = (p && Array.isArray(p.soap)) ? p.soap : [];
-  if(!window._FST_notasActivasEliminadas || !window._FST_notasActivasEliminadas.size) return arr;
+  // SIEMPRE copia nueva: en el fast-path (set vacío) NO devolver p.soap por referencia — cualquier
+  // mutación del consumidor (.sort/.reverse/.splice/.push/.shift) corrompería p.soap → saveLocal. La
+  // .slice() es despreciable y elimina la clase entera. filter() ya devuelve array nuevo.
+  if(!window._FST_notasActivasEliminadas || !window._FST_notasActivasEliminadas.size) return arr.slice();
   return arr.filter(function(s){ return s && !window._FST_notasActivasEliminadas.has(String(s.id||'')); });
 }
 // [BORRADO-NOTAS] Detector dev de FUGAS: si un sid marcado como borrado quedó VISIBLE en el DOM de una
@@ -1318,8 +1321,10 @@ function obtenerSesiones(p){
 function obtenerSesionesVisibles(p){
   var s = obtenerSesiones(p);
   if(!Array.isArray(s)) return s;   // null = histórico cargando: propaga la señal, no la aplanes a []
-  if(String((p&&p.id)||'').startsWith('mig_pac_')) return s;   // histórico: su borrado de nota es otro camino
-  if(!window._FST_notasActivasEliminadas || !window._FST_notasActivasEliminadas.size) return s;
+  // SIEMPRE copia nueva en las ramas que devuelven array (obtenerSesiones da p.soap / _fstSesionesCache
+  // POR REFERENCIA): un consumidor que mute el retorno corrompería p.soap o el cache. filter() ya copia.
+  if(String((p&&p.id)||'').startsWith('mig_pac_')) return s.slice();   // histórico: crudo (copia defensiva)
+  if(!window._FST_notasActivasEliminadas || !window._FST_notasActivasEliminadas.size) return s.slice();   // activo fast-path: COPIA
   return s.filter(function(x){ return x && !window._FST_notasActivasEliminadas.has(String(x.id||'')); });
 }
 let _guardandoSOAP = false; // H-02: anti-doble-toque en guardarSOAP
