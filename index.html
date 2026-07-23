@@ -7557,6 +7557,11 @@ function FST_fusionarPacientes(locales, firestore) {
     if (nk && vistosNombre.has(nk)) return; // match exacto de nombre → saltar; en duda, incluir
 
     if (!id) return; // sin id no hay forma de abrirlo
+    // [BORRADO] Simétrico al activo (L7544): oculta el histórico con tombstone leyendo el SET
+    // (_FST_pidsEliminados, poblado en caliente por _borrarPaciente), NO el flag del array del índice
+    // —que puede venir de cache stale sin invalidar—. Sin esto la lista dependía del refresco SWR
+    // del índice (~1s) para soltar el histórico; con esto desaparece al instante como la Cola.
+    if (typeof _fstPidVivo==='function' && !_fstPidVivo(id)) return;
 
     vistosPorId.add(id);
     if (nk) vistosNombre.add(nk);
