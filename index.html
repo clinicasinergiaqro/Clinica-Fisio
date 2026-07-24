@@ -359,8 +359,8 @@ function FST_badgesSesion(s){
 function FST_renderCard(s, pid){
   // [NUM-SESIÓN] Número por posición-fecha sobre las vivas del histórico (cache ya filtra borradas),
   // fuente única, nunca s.num/numEpisodio guardados. Episodios (opción b) del paciente abierto.
-  var _lista = (window._fstSesionesCache && Array.isArray(window._fstSesionesCache[pid])) ? window._fstSesionesCache[pid] : [];
-  var _tEp = Array.isArray(window.currentPatient && window.currentPatient.motivosAnteriores) && window.currentPatient.motivosAnteriores.length>0;
+  var _lista = (typeof _fstSesionesCache!=='undefined' && Array.isArray(_fstSesionesCache[pid])) ? _fstSesionesCache[pid] : [];
+  var _tEp = Array.isArray(currentPatient && currentPatient.motivosAnteriores) && currentPatient.motivosAnteriores.length>0;
   var _ns = _numeroSesionMap(_lista, _tEp)[String(s.id)];
   const fecha = escapeHTML(s.fecha || '(sin fecha)');
   const terapeuta = escapeHTML(s.terapeuta || 'REVISAR');
@@ -6871,7 +6871,7 @@ function renderExpediente(tab='historia'){
   // openExpediente re-renderiza al llegar y lo puebla). p.sesiones se mantiene numérico para la
   // lógica de preview "Sesión N+1", poblado solo con dato real (0 si aún no hay).
   const _sesVisibles=Array.isArray(p.soap)&&p.soap.length?_soapVivas(p).length
-    :(window._fstSesionesCache&&Array.isArray(window._fstSesionesCache[p.id]))?window._fstSesionesCache[p.id].length
+    :(typeof _fstSesionesCache!=='undefined'&&Array.isArray(_fstSesionesCache[p.id]))?_fstSesionesCache[p.id].length   // [FIX] var de módulo, no window (era window._fstSesionesCache = undefined → históricos caían a 0/—)
     :Array.isArray(p.soap)?_soapVivas(p).length   // activo con 0 notas: 0 es dato real, no desconocido
     :null;                                        // sin soap[] ni cache (histórico frío): desconocido → '—'
   if(typeof p.sesiones!=='number') p.sesiones=(_sesVisibles==null?0:_sesVisibles);
