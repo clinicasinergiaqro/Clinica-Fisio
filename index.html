@@ -4644,20 +4644,12 @@ async function mostrarPendientesSOAP(){
     return;
   }
   try{ var dPac=await loadFromCloud(); if(Array.isArray(dPac)&&dPac.length) patientsDB=dPac; }catch(_){}
-  // Índice ligero de históricos (una sola lectura) para no marcar como "no identificado" a pacientes de Firestore
+  // Índice ligero de históricos para no marcar como "no identificado" a pacientes de Firestore.
+  // [TASK1 B4] Antes: full-read DIRECTO de 'pacientes' (~2400 docs cobrados) en CADA click del
+  // botón. Mismo universo y misma construcción de tokens que _rendIdxHist → reusar (índice
+  // cacheado + cache propio de 5 min). Cero lecturas nuevas en el caso típico.
   var idxHist=[];
-  try{
-    var okF=await FST_init();
-    if(okF && window._fstDb){
-      var snapH=await window._fstDb.collection('pacientes').get();
-      snapH.forEach(function(d){
-        var data=d.data()||{};
-        if(!_fstDocVivo(data)) return;   // [BORRADO] excluir tombstones del full-read directo
-        var nn=_normPend(data.nombreNormalizado || data.name || '');
-        if(nn){ var tk=nn.split(' ').filter(Boolean); if(tk.length) idxHist.push(tk); }
-      });
-    }
-  }catch(_h){ idxHist=[]; }
+  try{ idxHist=(await _rendIdxHist(false))||[]; }catch(_h){ idxHist=[]; }
   var asigMapPend={}; try{ asigMapPend=await FST_leerAsignacionesAgenda(); }catch(_a){}
   // DASHBOARD-NOTAS: triangulación de históricos — 1 doc por paciente del calendario (ultimaSesionLive)
   var histNotasPend=null;
@@ -5654,17 +5646,22 @@ window._idxHistRendCache=null;     // {ts, arr} — tokens de nombres de histór
 async function _rendIdxHist(forzar){
   var c=window._idxHistRendCache;
   if(!forzar && c && (Date.now()-c.ts)<REND_CACHE_TTL_MS) return c.arr;
+  // [TASK1 B4] Antes: full-read DIRECTO de 'pacientes' (~2400 docs cobrados) cada 5 min de uso del
+  // dashboard. Los tokens salen del MISMO universo que el índice cacheado (vivos — el índice ya
+  // excluye eliminado:true al leer, equivalente a _fstDocVivo — con nombreNormalizado||name) →
+  // servirse del índice: cero lecturas nuevas en el caso típico; si el índice necesita refrescar,
+  // su propio SWR gobierna (gate 30 min).
   var idxHist=[];
   try{
-    var okF=await FST_init();
-    if(okF && window._fstDb){
-      var snapH=await window._fstDb.collection('pacientes').get();
-      snapH.forEach(function(d){
-        var data=d.data()||{};
-        if(!_fstDocVivo(data)) return;   // [BORRADO] excluir tombstones del full-read directo
-        var nn=_normPend(data.nombreNormalizado || data.name || '');
+    var lista=(typeof FST_cargarIndicePacientes==='function') ? await FST_cargarIndicePacientes() : null;
+    if(Array.isArray(lista)){
+      lista.forEach(function(e){
+        if(!e) return;
+        var nn=_normPend(e.nombreNormalizado || e.name || '');
         if(nn){ var tk=nn.split(' ').filter(Boolean); if(tk.length) idxHist.push(tk); }
       });
+    } else if(c && Array.isArray(c.arr) && c.arr.length){
+      return c.arr;   // [SENTINEL] índice null (no pude cargar) → conservar tokens previos, no pisar con []
     }
   }catch(_h){ idxHist=[]; }
   window._idxHistRendCache={ts:Date.now(), arr:idxHist};
@@ -7461,7 +7458,21 @@ function FST_esperarDbLista(timeoutMs) {
 // (b) LoadedAt SIEMPRE se actualiza (no martillea Firestore en bucle);
 // (c) NUNCA sobrescribe el índice bueno con una lectura vacía/fallida;
 // (d) solo toca el ÍNDICE Firestore — la fusión sigue poniendo locales como fuente de verdad.
-async function FST_refrescarIndiceEnSegundoPlano() {
+// [TASK1 B1] Frescura del índice: cada revalidación = ~2400 docs COBRADOS por Firestore.
+// El índice sirve HISTÓRICOS (mig_pac_, casi inmutables) + espejos; lo único que un re-read
+// propaga cross-device son altas/bajas/renombres de históricos — eventos raros y de supervisor.
+// Los borrados del MISMO dispositivo actualizan el Set en memoria al instante (no dependen de
+// esto), y los sets de ACTIVOS tienen su loader propio y barato (pacientesEliminados filtrada).
+// 30 min = tope de desfase cross-device aceptado a cambio de ~40× menos lecturas que el umbral
+// anterior (45 s). [AUDITAR: X=30min elegido por criterio; súbelo/bájalo si el gate lo pide.]
+var FST_INDICE_FRESH_MS = 30 * 60 * 1000;
+async function FST_refrescarIndiceEnSegundoPlano(forzar) {
+  // [TASK1 B1/B3] Gate de frecuencia ÚNICO para TODOS los disparadores (acceso con memoria
+  // envejecida, restore de sessionStorage, resume/reconnect): si los DATOS del índice tienen
+  // <30 min (edad real _FST_indiceDatosTs, no la hora de servido), este disparo NO relee.
+  var _edadDatos = Date.now() - (window._FST_indiceDatosTs || 0);
+  if (!forzar && Array.isArray(window._FST_indicePacientes) && window._FST_indicePacientes.length
+      && _edadDatos < FST_INDICE_FRESH_MS) return;
   if (window._FST_refrescandoIndice) return;   // ya hay un refresco en vuelo
   window._FST_refrescandoIndice = true;
   try {
@@ -7509,6 +7520,7 @@ async function FST_refrescarIndiceEnSegundoPlano() {
     // Guard anti-borrado del ÍNDICE: una lectura sin pacientes NO reemplaza un índice bueno.
     if (!frescos.length) {
       window._FST_indicePacientesLoadedAt = Date.now(); // resetea timer para no martillar
+      window._FST_indiceDatosTs           = Date.now(); // [TASK1 B1] también el gate: no re-leer en bucle un vacío
       return;
     }
 
@@ -7519,6 +7531,7 @@ async function FST_refrescarIndiceEnSegundoPlano() {
 
     window._FST_indicePacientes         = frescos;
     window._FST_indicePacientesLoadedAt = Date.now();
+    window._FST_indiceDatosTs           = Date.now();   // [TASK1 B1] edad real de los DATOS (gate de frecuencia)
     try { sessionStorage.setItem('FST_indice_v1', JSON.stringify({ ts: Date.now(), pacientes: frescos, eliminados: Array.from(window._FST_pidsEliminados||[]) })); } catch(_e) {}   // [BORRADO] persiste el set junto al índice
 
     if (antes !== despues) {
@@ -7538,8 +7551,15 @@ async function FST_refrescarIndiceEnSegundoPlano() {
 
 async function FST_cargarIndicePacientes() {
   const CACHE_KEY  = 'FST_indice_v1';
-  const TTL_MS     = 30 * 60 * 1000;   // [FIX-INDICE] 24h → 30min (backstop cross-reload; el SWR de abajo es lo que auto-cura)
-  const FRESH_MS   = 45 * 1000;        // [FIX-INDICE] SWR: índice servido con >45s → revalidar contra Firestore en 2º plano
+  // [TASK1 B2] TTL 30min → 12h. El TTL solo decide si el sessionStorage es SERVIBLE tras recarga;
+  // la frescura la gobierna el SWR (FST_INDICE_FRESH_MS=30min, gate interno): datos >30min se
+  // sirven YA y se revalidan en 2º plano en segundos. Servir un índice de horas es seguro
+  // (históricos casi inmutables + sentinel/anti-clobber intactos) y evita el full-read en frío
+  // de cada recarga del día. 12h cubre la jornada completa. [AUDITAR]
+  const TTL_MS     = 12 * 60 * 60 * 1000;
+  // [TASK1 B1/B3] FRESH 45s → gate compartido de 30 min (FST_INDICE_FRESH_MS). Con 45s,
+  // prácticamente CADA visita a la lista disparaba un read de ~2400 docs.
+  const FRESH_MS   = FST_INDICE_FRESH_MS;
   const MAX_DOCS   = 5000;
   const TIMEOUT_MS = 5000;
 
@@ -7564,6 +7584,7 @@ async function FST_cargarIndicePacientes() {
       const p = JSON.parse(raw);
       if (!p || !Array.isArray(p.pacientes) || !p.ts) return null;
       if ((Date.now() - p.ts) > TTL_MS) { console.log('[FST-LISTA] cache vencido'); return null; }
+      window._FST_indiceDatosTs = p.ts;   // [TASK1 B3] edad REAL de los datos (antes se fingía Date.now() y el SWR disparaba SIEMPRE tras restore)
       restaurarPidsEliminados(p.eliminados);   // [BORRADO] repuebla el Set junto al array (durabilidad histórica)
       console.log('[FST-LISTA] cache sessionStorage:', p.pacientes.length, 'pacientes', '| elim:', (Array.isArray(p.eliminados)?p.eliminados.length:0));
       return p.pacientes;
@@ -7579,9 +7600,10 @@ async function FST_cargarIndicePacientes() {
 
   // Nivel 1: memoria
   if (Array.isArray(window._FST_indicePacientes) && window._FST_indicePacientes.length) {
-    // [FIX-INDICE] SWR: si el índice en memoria ya "envejeció", revalida contra
+    // [FIX-INDICE] SWR: si los DATOS del índice ya "envejecieron", revalida contra
     // Firestore en 2º plano SIN bloquear (devuelve lo cacheado ya mismo).
-    if ((Date.now() - (window._FST_indicePacientesLoadedAt || 0)) > FRESH_MS) {
+    // [TASK1 B1] edad por _FST_indiceDatosTs (datos reales); el gate interno del SWR re-verifica.
+    if ((Date.now() - (window._FST_indiceDatosTs || 0)) > FRESH_MS) {
       FST_refrescarIndiceEnSegundoPlano();
     }
     return window._FST_indicePacientes;
@@ -7662,6 +7684,7 @@ async function FST_cargarIndicePacientes() {
 
       window._FST_indicePacientes         = pacientes;
       window._FST_indicePacientesLoadedAt = Date.now();
+      window._FST_indiceDatosTs           = Date.now();   // [TASK1 B1] edad real de los DATOS
       guardarCacheSesion(pacientes);
       console.log('[FST-LISTA] índice Firestore cargado:', pacientes.length, 'pacientes', '| elim:', _elimIdx.size);
       return pacientes;
