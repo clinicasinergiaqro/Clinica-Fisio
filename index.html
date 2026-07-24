@@ -357,6 +357,11 @@ function FST_badgesSesion(s){
 }
 
 function FST_renderCard(s, pid){
+  // [NUM-SESIÓN] Número por posición-fecha sobre las vivas del histórico (cache ya filtra borradas),
+  // fuente única, nunca s.num/numEpisodio guardados. Episodios (opción b) del paciente abierto.
+  var _lista = (window._fstSesionesCache && Array.isArray(window._fstSesionesCache[pid])) ? window._fstSesionesCache[pid] : [];
+  var _tEp = Array.isArray(window.currentPatient && window.currentPatient.motivosAnteriores) && window.currentPatient.motivosAnteriores.length>0;
+  var _ns = _numeroSesionMap(_lista, _tEp)[String(s.id)];
   const fecha = escapeHTML(s.fecha || '(sin fecha)');
   const terapeuta = escapeHTML(s.terapeuta || 'REVISAR');
   const semana = Number.isFinite(s.semana) ? s.semana : 1;
@@ -397,9 +402,9 @@ function FST_renderCard(s, pid){
     : '';
   return '<div class="soap-card" style="opacity:.92;border-left:3px solid var(--navy)">'
     + '<div class="soap-header" style="cursor:default"><div>'
-    + '<div class="soap-sesion">Sesión ' + escapeHTML(s.numEpisodio != null ? s.numEpisodio : s.num) + (s.numEpisodio != null ? ' <span style="font-size:10px;color:var(--gray-400);font-weight:400">· Episodio ' + escapeHTML((s.motivoIndex||0)+1) + '</span>' : '') + '</div>'
-    // FIX CONTADOR: línea secundaria con el num global (paridad con _renderSoapCard de activos)
-    + (s.numEpisodio != null && s.num ? '<div style="font-size:10px;color:var(--gray-400);margin-top:1px">Sesión ' + escapeHTML(s.num) + ' del expediente</div>' : '')
+    + '<div class="soap-sesion">Sesión ' + escapeHTML(_ns ? _ns.n : '—') + (_tEp ? ' <span style="font-size:10px;color:var(--gray-400);font-weight:400">· Episodio ' + escapeHTML((s.motivoIndex||0)+1) + '</span>' : '') + '</div>'
+    // [NUM-SESIÓN] línea secundaria con la posición GLOBAL del expediente (solo pacientes con episodios)
+    + (_tEp && _ns ? '<div style="font-size:10px;color:var(--gray-400);margin-top:1px">Sesión ' + escapeHTML(_ns.nGlobal) + ' del expediente</div>' : '')
     + '<div class="soap-meta">' + fecha + ' · <span style="font-weight:700;color:var(--navy)">' + terapeuta + '</span> · Semana ' + escapeHTML(semana) + '</div>'
     + '</div><div style="display:flex;flex-wrap:wrap;gap:4px;align-items:center">' + FST_badgesSesion(s) + '</div></div>'
     + '<div class="soap-body">'
@@ -3073,6 +3078,47 @@ function _cmpSoapFechaDesc(a,b){
   const fa=obtenerFechaSoapISO(a)||'', fb=obtenerFechaSoapISO(b)||'';
   if(fa!==fb) return fa<fb?1:-1;                    // fecha descendente (más reciente arriba)
   return (Number(b&&b.num)||0)-(Number(a&&a.num)||0); // empate/sin fecha → num descendente
+}
+// ── [NUM-SESIÓN] Numeración de sesión ÚNICA por FECHA ascendente sobre notas VIVAS ──────────────
+// Fuente única para los 4 consumidores (encabezado, gráfica EVA, reporte, tarjeta histórica). El
+// número = POSICIÓN al ordenar por fecha (la 1 = la más antigua); se recalcula en cada render, NUNCA
+// se lee s.num para display (queda como dato muerto). Desempate DETERMINISTA (nunca baila al recargar):
+// día clínico → fechaHoraISO → createdAt → orden de creación (s.num, uso interno) → id.
+function _msTimestamp_(v){
+  if(v==null) return null;
+  if(typeof v==='number') return v;
+  if(typeof v==='object'){ if(typeof v.toMillis==='function'){ try{return v.toMillis();}catch(_){return null;} } if(typeof v.toDate==='function'){ try{return v.toDate().getTime();}catch(_){return null;} } }
+  var t=Date.parse(String(v)); return isNaN(t)?null:t;
+}
+function _cmpSesionFecha(a,b){
+  var da=(typeof parseFechaClinicaSegura==='function')?parseFechaClinicaSegura(a&&(a.fecha||a.date||a.fechaHoraISO)):null;
+  var db=(typeof parseFechaClinicaSegura==='function')?parseFechaClinicaSegura(b&&(b.fecha||b.date||b.fechaHoraISO)):null;
+  var ta=da?da.getTime():null, tb=db?db.getTime():null;
+  if(ta!=null&&tb!=null&&ta!==tb) return ta-tb;      // fecha clínica ascendente (1 = más antigua)
+  if(ta!=null&&tb==null) return -1;                  // con fecha antes que sin fecha
+  if(ta==null&&tb!=null) return 1;
+  var ha=_msTimestamp_(a&&a.fechaHoraISO), hb=_msTimestamp_(b&&b.fechaHoraISO);
+  if(ha!=null&&hb!=null&&ha!==hb) return ha-hb;      // desempate 1: timestamp ISO
+  var ca=_msTimestamp_(a&&a.createdAt), cb=_msTimestamp_(b&&b.createdAt);
+  if(ca!=null&&cb!=null&&ca!==cb) return ca-cb;      // desempate 2: createdAt
+  var na=Number(a&&a.num)||0, nb=Number(b&&b.num)||0;
+  if(na!==nb) return na-nb;                          // desempate 3: orden de creación (interno, no display)
+  return String(a&&a.id||'').localeCompare(String(b&&b.id||''));   // desempate 4: id (estable)
+}
+// Devuelve mapa sid → {n, total, nGlobal, totalGlobal, ep}. Sin episodios: n/total = posición y total
+// GLOBALES. Con episodios (opción b): n/total = posición y total DENTRO del episodio (motivoIndex);
+// nGlobal/totalGlobal quedan para la línea "N del expediente".
+function _numeroSesionMap(sesiones, tieneEp){
+  var arr=Array.isArray(sesiones)?sesiones.filter(function(s){return s&&s.id!=null;}):[];
+  var orden=arr.slice().sort(_cmpSesionFecha);
+  var tot=orden.length, map={};
+  orden.forEach(function(s,i){ map[String(s.id)]={ n:i+1, total:tot, nGlobal:i+1, totalGlobal:tot, ep:null }; });
+  if(tieneEp){
+    var grupos={};
+    orden.forEach(function(s){ var mi=(typeof s.motivoIndex==='number')?s.motivoIndex:0; (grupos[mi]||(grupos[mi]=[])).push(s); });
+    Object.keys(grupos).forEach(function(k){ var g=grupos[k]; g.forEach(function(s,i){ var e=map[String(s.id)]; e.n=i+1; e.total=g.length; e.ep=Number(k); }); });
+  }
+  return map;
 }
 function obtenerUltimaFechaSoap(p){
   // Sesiones vía helper: activo → p.soap; histórico → Firestore. Histórico cargando (null) → [] → sin fecha.
@@ -6708,11 +6754,25 @@ function actualizarFechasClinicas(paciente){
 
 function _renderSoapCard(s,p,readOnly){
   var inc=!s.completa;
-  var _hasEp=(typeof s.motivoIndex==='number'&&s.motivoIndex>=0&&Array.isArray(p.motivosAnteriores)&&p.motivosAnteriores.length>0);
-  var sesionLine=_hasEp
-    ?`Sesión ${s.numEpisodio} · Episodio ${s.motivoIndex+1}`
-    :`Sesión ${s.num}${(s.totalSesiones&&!isNaN(s.totalSesiones))?' de '+s.totalSesiones:''}`;
-  var expedienteLine=_hasEp?`<div style="font-size:10px;color:var(--gray-400);margin-top:1px">Sesión ${s.num} del expediente</div>`:'';
+  // [NUM-SESIÓN] Número = posición por fecha en vivas (fuente única _numeroSesionMap), NUNCA s.num.
+  // M = total de vivas (con episodios: dentro del episodio activo). El objetivo del plan
+  // (planTto.sesiones) va como etiqueta APARTE, jamás conflado con la numeración (adiós "Sesión 7 de 5").
+  var _tEp=Array.isArray(p&&p.motivosAnteriores)&&p.motivosAnteriores.length>0;
+  var _ns=_numeroSesionMap(obtenerSesionesVisibles(p)||[], _tEp)[String(s.id)];
+  var _objPlan=parseInt(p.planTto&&p.planTto.sesiones);
+  var _objTxt=(_objPlan&&_objPlan>0)?` <span style="font-size:10px;color:var(--gray-400);font-weight:400">· objetivo ${_objPlan}</span>`:'';
+  var _epNum=(typeof s.motivoIndex==='number'?s.motivoIndex:0)+1;
+  var sesionLine, expedienteLine='';
+  if(_ns){
+    if(_tEp){
+      sesionLine=`Sesión ${_ns.n} · Episodio ${_epNum}`;
+      expedienteLine=`<div style="font-size:10px;color:var(--gray-400);margin-top:1px">Sesión ${_ns.nGlobal} del expediente</div>`;
+    } else {
+      sesionLine=`Sesión ${_ns.n} de ${_ns.total}${_objTxt}`;
+    }
+  } else {
+    sesionLine=`Sesión —`;   // vivas aún no disponibles (raro en activos): se recompone al re-render
+  }
   var bodyHTML=(s.importado&&s.formatoOriginal==='texto_libre')
     ? `<div class="soap-section">
         <div class="soap-label"><span class="soap-s">📝 Nota importada — texto original</span>
@@ -14953,6 +15013,7 @@ function _RPT_htmlEstudios(p){
 function _RPT_htmlSoap(sesiones){
   if(!sesiones.length) return _RPT_secHead(5,'Síntesis de notas SOAP')+'<div style="color:#9095A5;font-size:11px">Sin sesiones registradas</div>';
   var orden=sesiones.slice().sort(function(a,b){ var fa=obtenerFechaSoapISO(a)||'',fb=obtenerFechaSoapISO(b)||''; if(fa!==fb)return fa<fb?1:-1; return (Number(b&&b.num)||0)-(Number(a&&a.num)||0); });
+  var _posMap=_numeroSesionMap(sesiones, false);   // [NUM-SESIÓN] número por posición-fecha (este set ya viene filtrado por episodio); orden de arriba es solo para MOSTRAR (reciente primero)
   function pill(eva){
     if(eva==null) return '<span style="color:#9497A2;font-size:9px">—</span>';
     var c=eva>=5?{bg:'#FCEBEB',fg:'#A32D2D'}:(eva>=3?{bg:'#FBF3E4',fg:'#8A5A0B'}:{bg:'#E1F5EE',fg:'#0F6E56'});
@@ -14969,7 +15030,7 @@ function _RPT_htmlSoap(sesiones){
     // texto_libre: sin tratamiento estructurado y con texto original → Hallazgos ancho completo, sin col Tratamiento.
     var textoLibre = !String(trat).trim() && !!String(s.textoOriginal||'').trim();
     var zebra=(idx%2===0)?'background:#FAFAF8;-webkit-print-color-adjust:exact;print-color-adjust:exact;':'';
-    var celS='<td style="'+tdB+'"><span style="font-weight:700">S'+escapeHTML(String(s.num||''))+' · '+escapeHTML(_RPT_fechaCorta(s.fecha||s.date))+'</span><br><span style="font-size:8.5px;color:#9497A2">'+escapeHTML(s.terapeuta||'—')+'</span></td>';
+    var celS='<td style="'+tdB+'"><span style="font-weight:700">S'+escapeHTML(String((_posMap[String(s.id)]&&_posMap[String(s.id)].n)||''))+' · '+escapeHTML(_RPT_fechaCorta(s.fecha||s.date))+'</span><br><span style="font-size:8.5px;color:#9497A2">'+escapeHTML(s.terapeuta||'—')+'</span></td>';
     var celD='<td style="'+tdB+'">'+pill(eva)+'</td>';
     if(textoLibre){
       var txt=String(s.textoOriginal||'').replace(/\s+/g,' ').slice(0,190);
@@ -15179,7 +15240,9 @@ function _RPT_htmlLegal(){
 function _RPT_pintarGrafica(pid, sesiones){
   var box=document.getElementById('rpt-grafica-'+pid);
   if(!box) return;
-  var pts=sesiones.map(function(s,i){ return { i:i, eva:_RPT_evaDeSesion(s), fecha:s.fecha||s.date||'', num:(s.numEpisodio!=null?s.numEpisodio:(s.num||(i+1))) }; }).filter(function(x){ return x.eva!=null; });
+  // [NUM-SESIÓN] misma fuente única: ordenar por fecha y numerar por posición (no s.num/numEpisodio)
+  var _pos=_numeroSesionMap(sesiones, false);
+  var pts=sesiones.slice().sort(_cmpSesionFecha).map(function(s,i){ return { i:i, eva:_RPT_evaDeSesion(s), fecha:s.fecha||s.date||'', num:(_pos[String(s.id)]&&_pos[String(s.id)].n)||(i+1) }; }).filter(function(x){ return x.eva!=null; });
   if(!pts.length){ box.innerHTML='<div style="color:var(--gray-400);font-size:12px;padding:8px">Sin datos de EVA para graficar</div>'; return; }
   var W=Math.max(320,40+pts.length*46), H=200, padL=28, padR=12, padT=12, padB=42;
   var plotW=W-padL-padR, plotH=H-padT-padB;
@@ -17779,14 +17842,9 @@ function generarGraficaEVA(p){
   // FIX EVA (A4): ordenar por FECHA CLÍNICA (mismo criterio que el reporte, 11237) — el orden
   // por num/array se distorsiona cuando las fechas se corrigieron después (cola de revisión).
   // Empate o fecha no parseable → conserva el orden original (índice como desempate estable).
-  const _ordenadas=_soapFilt.map((s,ix)=>({s:s,ix:ix})).sort((a,b)=>{
-    const da=(typeof parseFechaClinicaSegura==='function')?parseFechaClinicaSegura(a.s.fecha||a.s.date||a.s.fechaHoraISO):null;
-    const db=(typeof parseFechaClinicaSegura==='function')?parseFechaClinicaSegura(b.s.fecha||b.s.date||b.s.fechaHoraISO):null;
-    if(da&&db&&da.getTime()!==db.getTime()) return da-db;
-    return a.ix-b.ix;
-  }).map(x=>x.s);
+  const _ordenadas=_soapFilt.slice().sort(_cmpSesionFecha);   // [NUM-SESIÓN] mismo orden/desempate determinista que el encabezado (fecha asc); una nota atrasada entra en su lugar cronológico, no al final
   const sesiones=_ordenadas.map((s,i)=>({
-    num:_tieneEp?(s.numEpisodio||i+1):(i+1),
+    num:i+1,   // [NUM-SESIÓN] posición por fecha; para episodios _soapFilt ya está filtrado al episodio activo → i+1 = posición dentro del episodio (igual que el encabezado)
     // FIX EVA (A3 + decisión Carlos): UNA sola serie = EVA INICIAL (evaI, dolor con el que llega
     // el paciente a cada sesión) → muestra la evolución ENTRE sesiones. Excluye el par sentinel
     // evaI=5 & evaF=3 (sliders no tocados), mismo criterio que la tendencia IA.
