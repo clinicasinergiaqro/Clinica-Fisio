@@ -7478,7 +7478,8 @@ async function FST_refrescarIndiceEnSegundoPlano() {
         sesionesCount   : d.sesionesCount   || d.soapCount       || 0,
         ultimaSesion    : d.ultimaSesion    || '',
         etiquetas       : Array.isArray(d.etiquetas) ? d.etiquetas : [],
-        _origenLista    : d.creadoPor === 'MIGRACION' ? 'firestore_migracion' : 'firestore_live'
+        _origenLista    : d.creadoPor === 'MIGRACION' ? 'firestore_migracion' : 'firestore_live',
+        appSourceId     : d.appSourceId || undefined   // [DEDUP] p-uuid del activo (espejo app_live_). only-when-present: undefined en históricos → JSON.stringify lo omite.
       });
     });
     // Anti-clobber del SET: un read vacío (0 docs, zombie) NO lo vacía. Solo reemplaza si trajo algo.
@@ -7627,7 +7628,8 @@ async function FST_cargarIndicePacientes() {
           sesionesCount   : d.sesionesCount   || d.soapCount       || 0,
           ultimaSesion    : d.ultimaSesion    || '',
           etiquetas       : Array.isArray(d.etiquetas) ? d.etiquetas : [],
-          _origenLista    : d.creadoPor === 'MIGRACION' ? 'firestore_migracion' : 'firestore_live'
+          _origenLista    : d.creadoPor === 'MIGRACION' ? 'firestore_migracion' : 'firestore_live',
+          appSourceId     : d.appSourceId || undefined   // [DEDUP] p-uuid del activo (espejo app_live_). only-when-present: undefined en históricos → JSON.stringify lo omite.
         });
       });
       // Anti-clobber (simétrico al SWR y a los activos): una lectura TOTALMENTE vacía (0 docs) es
@@ -7692,6 +7694,11 @@ function FST_fusionarPacientes(locales, firestore) {
     // Deduplicar: id primero (más confiable), nombre como último recurso
     if (id && vistosPorId.has(id)) return;
     if (p.fstPid && vistosPorId.has(String(p.fstPid))) return;
+    // [DEDUP] Espejo app_live_ de un activo local: su doc-id NO es el p-uuid, pero appSourceId SÍ.
+    // Colapsa por p-uuid (determinista, inmune a acentos/typos del nombre). Solo aplica a activos que
+    // SÍ están en patientsDB (su p-uuid entró a vistosPorId); un activo excluido por _esPacienteTest en
+    // loadFromCloud NO está en vistosPorId → su espejo NO se colapsa (huérfano) — eso es de L2610, no de aquí.
+    if (p.appSourceId && vistosPorId.has(String(p.appSourceId))) return;
     if (nk && vistosNombre.has(nk)) return; // match exacto de nombre → saltar; en duda, incluir
 
     if (!id) return; // sin id no hay forma de abrirlo
