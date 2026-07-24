@@ -6336,6 +6336,18 @@ function _pacSyncChips(){
 }
 // CUERPO: lo ÚNICO que se re-pinta. Lee q del INPUT VIVO (no de un argumento) → los refrescos
 // async nunca borran lo escrito ni tocan el input.
+// [TASK1-LAZY] Pista de históricos: número SOLO desde el caché (sessionStorage) y CON su edad.
+// Sin caché → cadena vacía (la acción dice "Incluir históricos" a secas, sin cifra inventada).
+function _pacHistoricosHint(){
+  try{
+    const raw=sessionStorage.getItem('FST_indice_v1'); if(!raw) return '';
+    const p=JSON.parse(raw); if(!p||!Array.isArray(p.pacientes)||!p.ts) return '';
+    const mins=Math.round((Date.now()-p.ts)/60000);
+    return `(~${p.pacientes.length} en caché · hace ${mins<1?'<1':mins} min)`;
+  }catch(_e){ return ''; }
+}
+// [TASK1-LAZY] La terapeuta pide traer históricos: fija el flag de sesión y repinta (dispara la carga).
+function _pacIncluirHistoricos(){ window._pacQuiereHistoricos=true; try{ renderPacientesLista(); }catch(_e){} }
 function renderPacientesLista(fuenteLista){
   const cont=document.getElementById('pac-lista'); if(!cont) return;
   if(!currentUser){ cont.innerHTML=''; return; }
@@ -6346,30 +6358,62 @@ function renderPacientesLista(fuenteLista){
   else if(FST_LISTA_ACTIVA){
     const sig=FST_firmaPatientsDBLocal();
     const ok=Array.isArray(window._FST_listaPacientesActual)&&window._FST_listaPacientesActual.length&&window._FST_listaPatientsDBSig===sig;
-    if(ok){ baseLista=window._FST_listaPacientesActual; }
-    else{
+    // [TASK1-LAZY] El índice (~2.4k históricos = 1 read cobrado) se carga BAJO DEMANDA, no al pintar:
+    // solo si hay BÚSQUEDA activa (q) o la terapeuta pidió "Incluir históricos". Sin eso, base = activos
+    // (patientsDB, 0 lecturas). Un día guiado por Agenda sin buscar nunca toca el índice. El flag
+    // _pacQuiereHistoricos vive la sesión (una vez incluidos, no se re-oculta al limpiar la búsqueda).
+    const _quiereHistoricos = (String(q||'').trim().length>0) || !!window._pacQuiereHistoricos;
+    if(ok && _quiereHistoricos){ baseLista=window._FST_listaPacientesActual; }
+    else if(_quiereHistoricos){
       baseLista=patientsDB||[];
       if(!window._FST_listaCargando){
         window._FST_listaCargando=true;
         FST_obtenerListaParaRender().then(()=>{ window._FST_listaCargando=false; renderPacientesLista(); }).catch(e=>{ window._FST_listaCargando=false; console.warn('[FST-LISTA] no se pudo cargar lista fusionada:', e.message); });
       }
-    }
+    } else { baseLista=patientsDB||[]; }   // [TASK1-LAZY] activos only, sin cargar índice
   } else { baseLista=patientsDB||[]; }
   let list=FST_filtrarLista(baseLista, q);   // ya viene RANKEADA (empieza-por > contiene > dx/terapeuta)
   if(filtro==='hoy') list=list.filter(p=>p.date===todayISO);
   if(filtro==='precaucion') list=list.filter(p=>p.seguridadClinica?.tienePrecaucion);
   if(filtro==='sin-soap'){ const _hoyC=_diaCanon(todayFmt()); list=list.filter(p=>{ const s=_soapVivas(p); return !s.some(x=>{const c=x&&_diaCanon(x.fecha);return c&&c===_hoyC;}); }); } // [GRUPO-A #12] día canónico + [BORRADO-NOTAS] VISTA
 
+  // [TASK1-LAZY] Estado de la carga del índice y si la base mostrada YA es la vista fusionada (con históricos).
+  const _cargandoHist = !!window._FST_listaCargando;
+  const _qActivo = String(q||'').trim().length>0;
+  const _baseEsFusion = FST_LISTA_ACTIVA && baseLista===window._FST_listaPacientesActual;
   let html;
   if(!list.length){
-    html=`<div class="empty-state"><div class="emoji">🔍</div><p>${q?`Sin resultados para "${escapeHTML(q)}"`:'Sin pacientes aún.'}</p></div>`;
+    // [TASK1-LAZY] NUNCA "sin resultados" mientras el índice carga con búsqueda activa: sería un
+    // vacío-mentiroso (la terapeuta concluiría que el paciente no existe). Estado explícito.
+    if(_cargandoHist && _qActivo){
+      html=`<div class="empty-state"><div class="emoji">⏳</div><p>Buscando también en históricos…</p></div>`;
+    } else {
+      html=`<div class="empty-state"><div class="emoji">🔍</div><p>${q?`Sin resultados para "${escapeHTML(q)}"`:'Sin pacientes aún.'}</p></div>`;
+    }
   } else {
     const LOTE=40;
     const abrirFn=FST_LISTA_ACTIVA?'FST_abrirPacienteDesdeLista':'openExpediente';
-    html=`<div style="font-size:11px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:.7px;margin-bottom:8px">Pacientes de la clínica (${list.length})</div>`;
+    // [TASK1-LAZY] Encabezado HONESTO: con históricos ya cargados → total real; con solo activos →
+    // "N activos" (NO inventamos un total de históricos que la app no cargó — igual que Loop D).
+    const _encabezado = _baseEsFusion
+      ? `Pacientes de la clínica (${list.length})`
+      : `${list.length} paciente${list.length!==1?'s':''} activo${list.length!==1?'s':''}`;
+    html=`<div style="font-size:11px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:.7px;margin-bottom:8px">${_encabezado}</div>`;
+    // [TASK1-LAZY] Acción para traer históricos bajo demanda. El número SOLO si viene del caché
+    // (sessionStorage) y CON su edad; si no hay caché, sin cifra — no fabricar un número indefendible.
+    if(FST_LISTA_ACTIVA && !_baseEsFusion && !_cargandoHist){
+      const _hint=_pacHistoricosHint();
+      html+=`<button onclick="_pacIncluirHistoricos()" class="chip-quick" style="width:100%;margin-bottom:10px;padding:10px;font-weight:700">👥 Incluir históricos${_hint?` <span style="font-weight:400;opacity:.65">${_hint}</span>`:''}</button>`;
+    } else if(FST_LISTA_ACTIVA && !_baseEsFusion && _cargandoHist){
+      html+=`<div style="padding:8px 12px;margin-bottom:8px;font-size:12px;color:var(--gray-500)">⏳ Cargando históricos…</div>`;
+    }
     html+=list.slice(0,LOTE).filter(Boolean).map(p=>_pacCardHTML(p, q, abrirFn)).join('');
     if(list.length>LOTE){
       html+=`<button id="ver-mas-pacientes" class="chip-quick" style="width:100%;margin-top:10px;padding:12px;font-weight:700" data-offset="${LOTE}" data-q="${escapeAttr_(q)}" data-filtro="${escapeAttr_(filtro)}" onclick="verMasPacientes_(this)">Ver más (${list.length-LOTE} restantes)</button>`;
+    }
+    // [TASK1-LAZY] Hay resultados en activos PERO el índice sigue llegando: avisa que faltan históricos.
+    if(_cargandoHist && _qActivo){
+      html+=`<div style="padding:8px 12px;font-size:12px;color:var(--gray-500)">⏳ Buscando también en históricos…</div>`;
     }
   }
   cont.innerHTML=html;
@@ -7783,7 +7827,7 @@ function FST_setListaPacientesVista(arr) {
 }
 
 // 3.9 — Apertura: local = flujo original; histórico = inyección temporal + openExpediente real
-function FST_abrirPacienteDesdeLista(pid) {
+async function FST_abrirPacienteDesdeLista(pid) {
   const id = String(pid || '').trim();
   if (!id) return;
 
@@ -7801,8 +7845,25 @@ function FST_abrirPacienteDesdeLista(pid) {
     if (existeLocal) return openExpediente(id);
 
     // Caso 2: paciente histórico — inyección temporal (se retira en finally)
-    const p = (window._FST_listaPacientesPorId || {})[id];
-    if (!p) { console.warn('[FST-LISTA] paciente no encontrado en vista:', id); return; }
+    let p = (window._FST_listaPacientesPorId || {})[id];
+    // [TASK1-LAZY] Fallback: con carga perezosa el mapa puede estar VACÍO (nunca se pintó la lista
+    // fusionada) o quedar invalidado entre resolver la cita y abrir. Cargar el índice bajo demanda
+    // y reintentar — mismo patrón que _abrirExpedienteDesdeRendimiento (L5213). Evita el return mudo
+    // que antes abortaba en silencio la apertura de un histórico desde Agenda.
+    if (!p) {
+      try {
+        const _lista = (typeof FST_cargarIndicePacientes==='function' ? (await FST_cargarIndicePacientes()) : null) || [];
+        for (let _i=0;_i<_lista.length;_i++){
+          if (String((_lista[_i]&&_lista[_i].id)||'')===id){
+            window._FST_listaPacientesPorId = window._FST_listaPacientesPorId || {};
+            window._FST_listaPacientesPorId[id] = _lista[_i];
+            p = _lista[_i];
+            break;
+          }
+        }
+      } catch(_e){}
+      if (!p) { console.warn('[FST-LISTA] paciente no encontrado en vista tras cargar índice:', id); return; }
+    }
 
     // M-2: hidratar campos clínicos completos desde Firestore antes de abrir.
     // El índice solo trae 10 campos de lista; antecedentes/motivo/valoracion/
