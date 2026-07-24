@@ -10738,18 +10738,55 @@ async function _guardarEdicionPaciente(pid){
   }
 }
 
-// [ESTUDIOS-THUMB] ¿Este estudio es una IMAGEN pintable como thumbnail? Señal ÚNICA fiable:
-// la EXTENSIÓN del nombre en fbPath (o url) — el `tipo` es clínico (receta/imagen/…), no formato
-// (un escaneo PDF puede llevar tipo:'imagen'). Regla conservadora: sin url o tipo 'link' → NO;
-// extensión de imagen explícita → SÍ; cualquier otra cosa (pdf/doc/sin extensión clara) → NO.
-// Así un PDF u archivo ambiguo JAMÁS intenta pintarse como <img> (cae a icono). El onerror del
-// <img> es la segunda red: si la URL no carga, también cae a icono.
-function _estudioEsImagen(e){
-  if(!e || !e.url) return false;
-  if(e.tipo==='link') return false;
+// [ESTUDIOS-THUMB] Clasifica un estudio para su recuadro de preview. Señal por EXTENSIÓN del
+// nombre en fbPath (o url) — el `tipo` es clínico (receta/imagen/…), no formato.
+//   'pdf'  → PDF: se rinde la 1ª página con pdf.js (ya en el shell) como thumbnail.
+//   'img'  → imagen: <img> directo. También el caso AMBIGUO (url sin extensión clara y no-link):
+//            se intenta como imagen porque el onerror lo devuelve al icono si no lo es → una
+//            interpretación fotografiada sin extensión en el nombre igual se ve. Un formato
+//            no-imagen conocido (doc/xls/zip/…) NO cae aquí → icono.
+//   'icono'→ sin url, link externo, o formato no-visualizable.
+function _estudioVisual(e){
+  if(!e || !e.url || e.tipo==='link') return 'icono';
   var s = String(e.fbPath || e.url || '').toLowerCase();
-  if(/\.(jpe?g|png|gif|webp|heic|heif|bmp)(\?|#|$)/.test(s)) return true;   // imagen explícita
-  return false;   // pdf/doc/sin extensión clara → icono, nunca <img>
+  if(/\.pdf(\?|#|$)/.test(s)) return 'pdf';
+  if(/\.(jpe?g|png|gif|webp|heic|heif|bmp)(\?|#|$)/.test(s)) return 'img';
+  if(/\.(docx?|xlsx?|pptx?|txt|csv|zip|rar)(\?|#|$)/.test(s)) return 'icono';   // no-imagen conocido
+  return 'img';   // sin extensión clara → intentar imagen (onerror→icono); cubre imágenes sin extensión
+}
+// [ESTUDIOS-PDF-THUMB] Rinde la 1ª página de un PDF en un <canvas> como miniatura. Lazy (al entrar
+// en viewport) y una sola vez (data-rendered). Si pdf.js no está o falla, se queda el icono de
+// fallback (.thumb-fallback), nunca un recuadro roto.
+async function _renderEstudioPdfThumb(canvas){
+  if(!canvas || canvas.getAttribute('data-rendered')) return;
+  canvas.setAttribute('data-rendered','1');
+  var url = canvas.getAttribute('data-pdfurl'); if(!url || !window.pdfjsLib) return;
+  try{
+    var pdf = await pdfjsLib.getDocument({url:url}).promise;
+    var page = await pdf.getPage(1);
+    var base = page.getViewport({scale:1});
+    var targetW = (canvas.parentNode && canvas.parentNode.clientWidth) || 300;
+    var vp = page.getViewport({scale: Math.max(0.2, targetW/base.width)});
+    canvas.width = vp.width; canvas.height = vp.height;
+    await page.render({canvasContext:canvas.getContext('2d'), viewport:vp}).promise;
+    var fb = canvas.parentNode && canvas.parentNode.querySelector('.thumb-fallback');
+    if(fb) fb.style.display='none';   // éxito → revelar el canvas
+  }catch(err){ console.warn('[ESTUDIOS-PDF-THUMB] 1ª pág no rendida:', err&&err.message); }   // deja el icono
+}
+function _FST_montarPdfThumbs(box){
+  try{
+    if(!box || !window.pdfjsLib) return;
+    var cs = box.querySelectorAll('canvas[data-pdfurl]:not([data-rendered])');
+    if(!cs.length) return;
+    if('IntersectionObserver' in window){
+      var obs = new IntersectionObserver(function(ents){
+        ents.forEach(function(en){ if(en.isIntersecting){ obs.unobserve(en.target); _renderEstudioPdfThumb(en.target); } });
+      }, {rootMargin:'250px'});
+      cs.forEach(function(c){ obs.observe(c); });
+    } else {
+      cs.forEach(function(c){ _renderEstudioPdfThumb(c); });
+    }
+  }catch(_e){}
 }
 async function FST_renderEstudiosApartado(pid){
   var box = document.getElementById('estudios-apartado');
@@ -10843,21 +10880,27 @@ async function FST_renderEstudiosApartado(pid){
             + '<b>✏️ Interpretación manual</b>'+(e.resumenManual.autor?(' · '+escapeHTML(e.resumenManual.autor)):'')+'<br>'+escapeHTML(e.resumenManual.texto||'')+'</div>';
         }
       }
-      // [ESTUDIOS-THUMB] Imagen → TARJETA de documento: banner ancho (~fila) de 180px con
-      // object-position:top, para que se vea el encabezado de la receta (médico/fecha) y se
-      // reconozca de un vistazo sin abrir. NO página completa (no empuja la lista fuera de vista).
-      // PDF/otros/ambiguo → icono en fila. Conserva nombre/badges/acciones; el banner y el nombre
-      // abren a tamaño completo al tocar (link). lazy + onerror→icono intactos.
+      // [ESTUDIOS-THUMB] Recuadro de preview según formato: imagen → <img>; PDF → 1ª página con
+      // pdf.js (thumbnail lazy); resto → icono en fila. Card ancha de 320px, contain, anclada
+      // arriba; tap abre a tamaño completo. Conserva nombre/badges/acciones (van debajo).
       var _infoHtml = '<div class="doc-info"><div class="doc-name">'+link+badgeNota+badgeSesion+badgeHist+'</div>'
         + '<div class="doc-meta">'+escapeHTML(fechaTxt)
         + ' · <span style="font-size:9px;font-weight:700;background:#E8EEF7;color:var(--navy);padding:1px 6px;border-radius:8px">'+t.label+'</span>'
         + (e.agregadoPor?(' · agregado por '+escapeHTML(e.agregadoPor)):'')+'</div>'
         + iaBlock + '</div>';
-      if(_estudioEsImagen(e)){
+      var _vis = _estudioVisual(e);
+      if(_vis==='img' || _vis==='pdf'){
+        var _media;
+        if(_vis==='pdf'){
+          _media = '<canvas data-pdfurl="'+u+'" style="display:block;max-width:100%;max-height:100%;margin:0 auto"></canvas>'
+            + '<div class="thumb-fallback" style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;background:var(--gray-50);color:var(--gray-400)"><div style="font-size:36px">'+t.icono+'</div><div style="font-size:11px;font-weight:700">PDF · toca para abrir</div></div>';
+        } else {
+          _media = '<img src="'+u+'" loading="lazy" decoding="async" alt="" style="width:100%;height:100%;object-fit:contain;object-position:top;display:block" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\'">'
+            + '<div class="thumb-fallback" style="display:none;position:absolute;inset:0;align-items:center;justify-content:center;font-size:34px">'+t.icono+'</div>';
+        }
         return '<div class="doc-item" style="flex-direction:column;align-items:stretch;gap:8px">'
           + '<a href="'+u+'" target="_blank" rel="noopener noreferrer" style="display:block;position:relative;width:100%;height:320px;border-radius:8px;overflow:hidden;background:var(--gray-50);border:1px solid var(--gray-200)">'
-          +   '<img src="'+u+'" loading="lazy" decoding="async" alt="" style="width:100%;height:100%;object-fit:contain;object-position:top;display:block" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\'">'
-          +   '<div style="display:none;position:absolute;inset:0;align-items:center;justify-content:center;font-size:34px">'+t.icono+'</div>'
+          +   _media
           + '</a>'
           + '<div style="display:flex;align-items:flex-start;width:100%">' + _infoHtml + acciones + '</div>'
           + '</div>';
@@ -10866,6 +10909,7 @@ async function FST_renderEstudiosApartado(pid){
         + '<div class="doc-icon" style="font-size:18px">'+t.icono+'</div>'
         + _infoHtml + acciones + '</div>';
     }).join('');
+    try{ _FST_montarPdfThumbs(box); }catch(_e){}   // [ESTUDIOS-PDF-THUMB] rinde 1ª página de los PDFs (lazy)
   } catch(e){ box.innerHTML = '<div style="padding:12px;color:var(--red);font-size:12px">Error al cargar estudios: '+escapeHTML(e.message)+'</div>'; }
 }
 
