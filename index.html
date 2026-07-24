@@ -2797,8 +2797,8 @@ function sanearYRecalcularEdad(p){
 function tryParse(s,fallback){try{return JSON.parse(s);}catch(e){return fallback;}}
 
 // ── Detección de pacientes de prueba (LIMPIEZA-TEST) ──
-var _IDS_TEST = ['p1781643783300','p1781427175480','p002',
-  'p1781813126150','p0b58a214-e48e-46bb-9954-4a41d2092ccd','p1781814958552','p3978d981-a3f0-4cb2-aced-59b898ca23bd']; // 2 Juan de prueba + p002 (ZARA) + 4 expedientes de prueba borrados 2026-07-03 (Zaray/Camila/Dafne/Carlos Aranda) — blocklist anti-resurrección
+var _IDS_TEST = ['p1781643783300','p1781427175480',
+  'p1781813126150','p0b58a214-e48e-46bb-9954-4a41d2092ccd','p1781814958552','p3978d981-a3f0-4cb2-aced-59b898ca23bd']; // 2 Juan de prueba + 4 fichas de QA borradas 2026-07-03 (Zaray/Camila/Dafne/Carlos Aranda) — blocklist anti-resurrección. RETIRADO 2026-07-24: p002 = Andrea Mendez Díaz, paciente REAL con 2 notas SOAP en Sheet (sin espejo ni gemelo mig) — estaba mal etiquetado como "(ZARA)" y ocultaba un expediente clínico real. Dafne (p1781814958552, 1 nota) SIGUE bloqueada pendiente de revisión de esa nota.
 function _esPacienteTest(p){
   if(!p) return false;
   if(p.id && _IDS_TEST.indexOf(p.id)!==-1) return true;
@@ -7478,7 +7478,8 @@ async function FST_refrescarIndiceEnSegundoPlano() {
         sesionesCount   : d.sesionesCount   || d.soapCount       || 0,
         ultimaSesion    : d.ultimaSesion    || '',
         etiquetas       : Array.isArray(d.etiquetas) ? d.etiquetas : [],
-        _origenLista    : d.creadoPor === 'MIGRACION' ? 'firestore_migracion' : 'firestore_live'
+        _origenLista    : d.creadoPor === 'MIGRACION' ? 'firestore_migracion' : 'firestore_live',
+        appSourceId     : d.appSourceId || undefined   // [DEDUP] p-uuid del activo (espejo app_live_). only-when-present: undefined en históricos → JSON.stringify lo omite.
       });
     });
     // Anti-clobber del SET: un read vacío (0 docs, zombie) NO lo vacía. Solo reemplaza si trajo algo.
@@ -7627,7 +7628,8 @@ async function FST_cargarIndicePacientes() {
           sesionesCount   : d.sesionesCount   || d.soapCount       || 0,
           ultimaSesion    : d.ultimaSesion    || '',
           etiquetas       : Array.isArray(d.etiquetas) ? d.etiquetas : [],
-          _origenLista    : d.creadoPor === 'MIGRACION' ? 'firestore_migracion' : 'firestore_live'
+          _origenLista    : d.creadoPor === 'MIGRACION' ? 'firestore_migracion' : 'firestore_live',
+          appSourceId     : d.appSourceId || undefined   // [DEDUP] p-uuid del activo (espejo app_live_). only-when-present: undefined en históricos → JSON.stringify lo omite.
         });
       });
       // Anti-clobber (simétrico al SWR y a los activos): una lectura TOTALMENTE vacía (0 docs) es
@@ -7692,6 +7694,11 @@ function FST_fusionarPacientes(locales, firestore) {
     // Deduplicar: id primero (más confiable), nombre como último recurso
     if (id && vistosPorId.has(id)) return;
     if (p.fstPid && vistosPorId.has(String(p.fstPid))) return;
+    // [DEDUP] Espejo app_live_ de un activo local: su doc-id NO es el p-uuid, pero appSourceId SÍ.
+    // Colapsa por p-uuid (determinista, inmune a acentos/typos del nombre). Solo aplica a activos que
+    // SÍ están en patientsDB (su p-uuid entró a vistosPorId); un activo excluido por _esPacienteTest en
+    // loadFromCloud NO está en vistosPorId → su espejo NO se colapsa (huérfano) — eso es de L2610, no de aquí.
+    if (p.appSourceId && vistosPorId.has(String(p.appSourceId))) return;
     if (nk && vistosNombre.has(nk)) return; // match exacto de nombre → saltar; en duda, incluir
 
     if (!id) return; // sin id no hay forma de abrirlo
@@ -16285,7 +16292,7 @@ function renderQA(){
           </tr>
           <tr style="border-bottom:1px solid var(--gray-100)">
             <td style="padding:6px 4px;color:var(--gray-400)">Pacientes duplicados</td>
-            <td style="text-align:right">${chip(r.duplicados===false,'No hay','Detectados')}</td>
+            <td style="text-align:right">${chip(r.duplicados===null?null:(r.duplicados===false),'No hay','Detectados')}</td>
           </tr>
         </table>
         <button class="btn-primary" onclick="qaLeerSheets()">📖 Leer y verificar</button>
@@ -16364,7 +16371,7 @@ function renderQA(){
           </tr>
           <tr style="border-bottom:1px solid var(--gray-100)">
             <td style="padding:7px 4px;color:var(--gray-400)">Duplicados</td>
-            <td style="text-align:right">${chip(r.duplicados===false,'No hay','Detectados')}</td>
+            <td style="text-align:right">${chip(r.duplicados===null?null:(r.duplicados===false),'No hay','Detectados')}</td>
           </tr>
           <tr style="border-bottom:1px solid var(--gray-100)">
             <td style="padding:7px 4px;color:var(--gray-400)">Pacientes globales (sin filtro)</td>
