@@ -10734,6 +10734,19 @@ async function _guardarEdicionPaciente(pid){
   }
 }
 
+// [ESTUDIOS-THUMB] ¿Este estudio es una IMAGEN pintable como thumbnail? Señal ÚNICA fiable:
+// la EXTENSIÓN del nombre en fbPath (o url) — el `tipo` es clínico (receta/imagen/…), no formato
+// (un escaneo PDF puede llevar tipo:'imagen'). Regla conservadora: sin url o tipo 'link' → NO;
+// extensión de imagen explícita → SÍ; cualquier otra cosa (pdf/doc/sin extensión clara) → NO.
+// Así un PDF u archivo ambiguo JAMÁS intenta pintarse como <img> (cae a icono). El onerror del
+// <img> es la segunda red: si la URL no carga, también cae a icono.
+function _estudioEsImagen(e){
+  if(!e || !e.url) return false;
+  if(e.tipo==='link') return false;
+  var s = String(e.fbPath || e.url || '').toLowerCase();
+  if(/\.(jpe?g|png|gif|webp|heic|heif|bmp)(\?|#|$)/.test(s)) return true;   // imagen explícita
+  return false;   // pdf/doc/sin extensión clara → icono, nunca <img>
+}
 async function FST_renderEstudiosApartado(pid){
   var box = document.getElementById('estudios-apartado');
   if (!box) return;
@@ -10826,8 +10839,19 @@ async function FST_renderEstudiosApartado(pid){
             + '<b>✏️ Interpretación manual</b>'+(e.resumenManual.autor?(' · '+escapeHTML(e.resumenManual.autor)):'')+'<br>'+escapeHTML(e.resumenManual.texto||'')+'</div>';
         }
       }
+      // [ESTUDIOS-THUMB] Imagen → miniatura directa (ver sin picar); PDF/otros/ambiguo → icono.
+      // Conserva nombre/badges/link/acciones intactos (solo cambia el recuadro izquierdo).
+      var _celda;
+      if(_estudioEsImagen(e)){
+        _celda = '<div style="flex-shrink:0;position:relative;width:64px;height:64px;border-radius:8px;overflow:hidden;background:var(--gray-100);border:1px solid var(--gray-200)">'
+          + '<img src="'+u+'" loading="lazy" decoding="async" alt="" style="width:100%;height:100%;object-fit:cover;display:block" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\'">'
+          + '<div style="display:none;position:absolute;inset:0;align-items:center;justify-content:center;font-size:22px">'+t.icono+'</div>'
+          + '</div>';
+      } else {
+        _celda = '<div class="doc-icon" style="font-size:18px">'+t.icono+'</div>';
+      }
       return '<div class="doc-item" style="align-items:flex-start">'
-        + '<div class="doc-icon" style="font-size:18px">'+t.icono+'</div>'
+        + _celda
         + '<div class="doc-info"><div class="doc-name">'+link+badgeNota+badgeSesion+badgeHist+'</div>'
         + '<div class="doc-meta">'+escapeHTML(fechaTxt)
         + ' · <span style="font-size:9px;font-weight:700;background:#E8EEF7;color:var(--navy);padding:1px 6px;border-radius:8px">'+t.label+'</span>'
