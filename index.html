@@ -291,7 +291,11 @@ async function _FST_cargarNotasActivasEliminadas(){
     try{ localStorage.setItem(LS_NOTAS_ELIM, JSON.stringify({ ts: Date.now(), ids: ids })); }catch(_e){}
     if(antes>0 && ids.length===0) console.warn('[BORRADO-NOTAS] set pasó de '+antes+' a 0 — ¿restauración legítima o colección mal escrita? (revisar en gate 4b)');
     console.log('[BORRADO-NOTAS] read RESOLVIÓ: '+ids.length+' notas · Listo=true');
-    try{ if(currentPatient && typeof renderExpediente==='function'){ var _sp=document.getElementById('screen-expediente'); if(_sp&&_sp.classList.contains('active')) renderExpediente('soap'); } }catch(_e){}
+    // [FIX-TAB] Este loader corre en cada visibilitychange (volver a la app). Antes forzaba
+    // renderExpediente('soap') en duro → si estabas en Estudios (p.ej. tras abrir una receta en
+    // pestaña nueva) el regreso te tiraba a SOAP sin tocar nada. Conservar la pestaña ACTUAL:
+    // el objetivo del re-render es reflejar notas borradas, no cambiarte de tab.
+    try{ if(currentPatient && typeof renderExpediente==='function'){ var _sp=document.getElementById('screen-expediente'); if(_sp&&_sp.classList.contains('active')) renderExpediente(currentTab||'historia'); } }catch(_e){}
   }catch(e){
     console.warn('[BORRADO-NOTAS] read RECHAZÓ (regla/red): '+((e&&e.message)||'?')+' · conservo cache ('+(window._FST_notasActivasEliminadas?window._FST_notasActivasEliminadas.size:0)+') · Listo='+window._FST_notasActivasElimListo);
   }finally{ window._FST_notasActivasElimEnVuelo = false; }
