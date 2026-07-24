@@ -2798,7 +2798,7 @@ function tryParse(s,fallback){try{return JSON.parse(s);}catch(e){return fallback
 
 // ── Detección de pacientes de prueba (LIMPIEZA-TEST) ──
 var _IDS_TEST = ['p1781643783300','p1781427175480','p002',
-  'p1781813126150','p0b58a214-e48e-46bb-9954-4a41d2092ccd','p1781814958552','p3978d981-a3f0-4cb2-aced-59b898ca23bd']; // 2 Juan de prueba + p002 + 4 fichas de QA borradas 2026-07-03 (Zaray/Camila/Dafne/Carlos Aranda) — blocklist anti-resurrección. p002 "Andrea Mendez Díaz" = fragmento DUPLICADO de 2 sesiones (16/06 y 17/06/2026) que ya viven en el registro real pmr45mhae (17 sesiones, siempre visible, mismo app_live_3310b55). Se retiró del blocklist el 2026-07-24 creyéndolo expediente oculto; al verificar resultó redundante 100% con pmr45mhae y solo generaba una 2ª fila "Andrea" en la lista → RE-BLOQUEADO 2026-07-24. Dafne (p1781814958552, 1 nota) sigue bloqueada pendiente de revisión de esa nota.
+  'p1781813126150','p0b58a214-e48e-46bb-9954-4a41d2092ccd','p3978d981-a3f0-4cb2-aced-59b898ca23bd']; // 2 Juan de prueba + p002 + 3 fichas de QA borradas 2026-07-03 (Zaray/Camila/Carlos Aranda) — blocklist anti-resurrección. p002 "Andrea Mendez Díaz" = fragmento DUPLICADO de 2 sesiones (16/06 y 17/06/2026) que ya viven en el registro real pmr45mhae (17 sesiones, siempre visible, mismo app_live_3310b55); re-bloqueado 2026-07-24 tras verificar redundancia 100%. RETIRADO 2026-07-24: p1781814958552 "Dafne Estefanía Duñez Dosal" = paciente REAL con 1 nota clínica (18/06/2026, dolor mano izq 8/10 ENA, escrita por GORE), única en los tres universos (patientsDB/Sheet/índice Firestore), sin gemelos — era un expediente real invisible, no QA.
 function _esPacienteTest(p){
   if(!p) return false;
   if(p.id && _IDS_TEST.indexOf(p.id)!==-1) return true;
@@ -6289,7 +6289,7 @@ function _pacCardHTML(p, q, abrirFn){
             <span>👤 ${escapeHTML(p.age)}a</span>
             <span style="${!esMio?'color:var(--gold);font-weight:700':''}">🩺 ${escapeHTML(p.terapeuta)}</span>
             ${(typeof p.terapeutaSeguimiento==='string'&&p.terapeutaSeguimiento&&!p.terapeutaSeguimiento.includes('T00:'))?`<span style="color:var(--green);font-size:10px">→ ${escapeHTML(p.terapeutaSeguimiento)}</span>`:''}
-            <span>${Array.isArray(p.soap)?_soapVivas(p).length:(typeof p.sesiones==='number'?p.sesiones:0)} ses.</span>
+            <span>${Array.isArray(p.soap)?_soapVivas(p).length+' ses.':'— ses.'}</span>
           </div>
           <div class="patient-meta" style="margin-top:3px;font-size:11px;color:#5A6478;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:200px">${escapeHTML(typeof p.dx==='string'?p.dx.split(',')[0]:(p.dx?.dxClinico||p.dx?.dxMedico||'Sin diagnóstico'))}</div>
           ${Array.isArray(p.etiquetas)&&p.etiquetas.length?`<div style="display:flex;flex-wrap:wrap;gap:3px;margin-top:4px">${p.etiquetas.slice(0,3).map(e=>`<span style="font-size:9px;font-weight:700;background:#E8EEF7;color:var(--navy);padding:2px 7px;border-radius:8px">${escapeHTML(e)}</span>`).join('')}</div>`:''}
@@ -17784,29 +17784,26 @@ function filtrarInactividad(dias){
     const b=document.getElementById('btn-inact-'+d);
     if(b){ b.style.background=d===dias?'var(--navy)':''; b.style.color=d===dias?'white':''; }
   });
-  const limite=new Date(Date.now()-dias*24*60*60*1000);
+  // [LOOP-D D1-b] Misma noción de "última nota" que las tarjetas y "Inactivos sin alta":
+  // fecha-MÁXIMA real vía diasDesdeUltimoSoap/obtenerUltimaFechaSoap, NO la última por posición
+  // del array ni el orden por string 'dd/mm/yyyy' (que ordenaba por día antes que por año). Sin
+  // notas vivas → Infinity → inactivo. Así la lista cuadra con lo que muestran las tarjetas.
   const inactivos=patientsDB.filter(p=>{
     if(_activoEliminado(p.id)) return false;   // [BORRADO-ACTIVOS] D2: inactivos
-    const soaps=_soapVivas(p);   // [BORRADO-NOTAS] VISTA (inactividad)
-    if(!soaps.length) return true;
-    const ultima=soaps[soaps.length-1];
-    const fechaUlt=ultima.fecha?new Date(ultima.fecha.split('/').reverse().join('-')):null;
-    return !fechaUlt||fechaUlt<limite;
-  }).sort((a,b)=>{
-    const fa=Array.isArray(a.soap)&&a.soap.length?a.soap[a.soap.length-1].fecha:'';
-    const fb=Array.isArray(b.soap)&&b.soap.length?b.soap[b.soap.length-1].fecha:'';
-    return fa<fb?-1:fa>fb?1:0;
-  });
+    return diasDesdeUltimoSoap(p) > dias;
+  }).sort((a,b)=> diasDesdeUltimoSoap(b) - diasDesdeUltimoSoap(a));   // más inactivo primero
   const el=document.getElementById('lista-inactividad');
   if(!el) return;
   if(!inactivos.length){ el.innerHTML=`<div style="padding:12px;font-size:13px;color:var(--green);font-weight:600">✅ Todos los pacientes tienen actividad reciente</div>`; return; }
   el.innerHTML=inactivos.map(p=>{
-    const soaps=_soapVivas(p);   // [BORRADO-NOTAS] VISTA (inactividad)
-    const ultSoap=soaps.length?soaps[soaps.length-1].fecha:'Sin sesiones';
-    const diasSin=soaps.length?(()=>{const f=new Date(soaps[soaps.length-1].fecha.split('/').reverse().join('-'));return Math.floor((Date.now()-f.getTime())/86400000)})():999;
+    // [LOOP-D D1-b] Misma fuente fecha-máx real (obtenerUltimaFechaSoap → ISO) que el filtro/orden.
+    const _fUlt=obtenerUltimaFechaSoap(p);
+    const ultSoap=_fUlt?_ddmmFromISO(_fUlt):'Sin sesiones';
+    const _d=diasDesdeUltimoSoap(p);
+    const diasSin=isFinite(_d)?_d:999;
     return `<div style="padding:10px 0;border-bottom:1px solid var(--gray-100)">
       <div style="font-size:14px;font-weight:600;color:var(--navy)">${escapeHTML(p.name)}</div>
-      <div style="font-size:12px;color:var(--gray-400)">🩺 ${p.terapeuta} · Última sesión: ${ultSoap} · ${soaps.length===0?'Sin sesiones':`${diasSin} días sin actividad`}</div>
+      <div style="font-size:12px;color:var(--gray-400)">🩺 ${p.terapeuta} · Última sesión: ${ultSoap} · ${_fUlt?`${diasSin} días sin actividad`:'Sin sesiones'}</div>
       <div style="display:flex;gap:6px;margin-top:6px">
         <button data-pid="${escapeAttr_(p.id)}" onclick="openExpediente(this.dataset.pid)" class="chip-quick">Ver expediente</button>
       </div>
