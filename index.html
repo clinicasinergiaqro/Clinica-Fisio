@@ -7464,7 +7464,12 @@ function FST_esperarDbLista(timeoutMs) {
 // Los borrados del MISMO dispositivo actualizan el Set en memoria al instante (no dependen de
 // esto), y los sets de ACTIVOS tienen su loader propio y barato (pacientesEliminados filtrada).
 // 30 min = tope de desfase cross-device aceptado a cambio de ~40× menos lecturas que el umbral
-// anterior (45 s). [AUDITAR: X=30min elegido por criterio; súbelo/bájalo si el gate lo pide.]
+// anterior (45 s).
+// [TASK1 V3 — EFECTO ACEPTADO EXPLÍCITAMENTE (decisión de supervisión 2026-07-24)]: un BORRADO o
+// RESTAURACIÓN de HISTÓRICO hecho en OTRO dispositivo tarda hasta 30 min en reflejarse aquí
+// (antes 45 s). En el MISMO dispositivo sigue instantáneo (el Set se actualiza en memoria).
+// Aceptado porque el borrado es supervisor-only y raro. Si esto duele algún día, bajar
+// FST_INDICE_FRESH_MS o forzar FST_refrescarIndiceEnSegundoPlano(true) tras borrar/restaurar.
 var FST_INDICE_FRESH_MS = 30 * 60 * 1000;
 async function FST_refrescarIndiceEnSegundoPlano(forzar) {
   // [TASK1 B1/B3] Gate de frecuencia ÚNICO para TODOS los disparadores (acceso con memoria
