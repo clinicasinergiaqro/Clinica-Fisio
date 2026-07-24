@@ -9847,7 +9847,9 @@ function verHistorialEdicionesSOAP(soapId, esHistorico){
     const campos=(h.cambios||[]).map(c=>`  • ${c.campo}: "${c.anterior}" → "${c.nuevo}"`).join('\n');
     return `${i+1}. ${h.fecha} ${h.hora||''} — ${h.usuario||'usuario no especificado'}\n${campos||'  Sin detalle de campos'}`;
   }).join('\n\n');
-  alert('Historial de ediciones — Sesión '+nota.num+'\n\n'+texto);
+  // [NUM-SESIÓN] posición por fecha (s.num muerto para display)
+  var _phEd=_numeroSesionMap(obtenerSesionesVisibles(currentPatient)||[], Array.isArray(currentPatient&&currentPatient.motivosAnteriores)&&currentPatient.motivosAnteriores.length>0)[String(nota.id)];
+  alert('Historial de ediciones — Sesión '+(_phEd?_phEd.n:'—')+'\n\n'+texto);
 }
 
 function editarSOAP(soapId){
@@ -9865,10 +9867,11 @@ function editarSOAP(soapId){
   _soapMediaTocada=false; // FIX media-edición: reset tras preload — el usuario aún no tocó el preview
 
   // Actualizar topbar
-  const totalSes=parseInt(p.planTto?.sesiones);
-  const totalTxt=(totalSes&&totalSes>0)?' de '+totalSes:'';
+  // [NUM-SESIÓN] posición por fecha + total de VIVAS (s.num muerto para display; objetivo del plan no se confla)
+  const _tEpEd=Array.isArray(p&&p.motivosAnteriores)&&p.motivosAnteriores.length>0;
+  const _peEd=_numeroSesionMap(obtenerSesionesVisibles(p)||[], _tEpEd)[String(nota.id)];
   document.getElementById('soap-topbar-meta').textContent=
-    `✏️ Editando — Sesión ${nota.num}${totalTxt}`;
+    `✏️ Editando — Sesión ${_peEd?(_peEd.n+' de '+_peEd.total):'—'}`;
 
   screenStack.push('screen-soap');showScreen('screen-soap',false);
   renderSOAPForm();
@@ -9949,7 +9952,9 @@ async function editarSoapHistorico(sid, pid){
   tempEvaF=nota.evaF!=null?Number(nota.evaF):3;
   tempEvolMedia=Array.isArray(nota.media)?nota.media.map(function(m){return Object.assign({},m);}):[]; // FIX media-edición: precargar media existente de la nota histórica
   _soapMediaTocada=false; // FIX media-edición: reset tras preload — el usuario aún no tocó el preview
-  document.getElementById('soap-topbar-meta').textContent='✏️ Editando (histórico) — Sesión '+nota.num;
+  // [NUM-SESIÓN] posición por fecha (s.num muerto para display)
+  var _phH=_numeroSesionMap(_fstSesionesCache[pid]||[], Array.isArray(currentPatient&&currentPatient.motivosAnteriores)&&currentPatient.motivosAnteriores.length>0)[String(nota.id)];
+  document.getElementById('soap-topbar-meta').textContent='✏️ Editando (histórico) — Sesión '+(_phH?_phH.n:'—');
   screenStack.push('screen-soap'); showScreen('screen-soap',false);
   renderSOAPForm();
   setTimeout(function(){
