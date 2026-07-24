@@ -16285,7 +16285,7 @@ function renderQA(){
           </tr>
           <tr style="border-bottom:1px solid var(--gray-100)">
             <td style="padding:6px 4px;color:var(--gray-400)">Pacientes duplicados</td>
-            <td style="text-align:right">${chip(r.duplicados===false,'No hay','Detectados')}</td>
+            <td style="text-align:right">${chip(r.duplicados===null?null:(r.duplicados===false),'No hay','Detectados')}</td>
           </tr>
         </table>
         <button class="btn-primary" onclick="qaLeerSheets()">📖 Leer y verificar</button>
@@ -16364,7 +16364,7 @@ function renderQA(){
           </tr>
           <tr style="border-bottom:1px solid var(--gray-100)">
             <td style="padding:7px 4px;color:var(--gray-400)">Duplicados</td>
-            <td style="text-align:right">${chip(r.duplicados===false,'No hay','Detectados')}</td>
+            <td style="text-align:right">${chip(r.duplicados===null?null:(r.duplicados===false),'No hay','Detectados')}</td>
           </tr>
           <tr style="border-bottom:1px solid var(--gray-100)">
             <td style="padding:7px 4px;color:var(--gray-400)">Pacientes globales (sin filtro)</td>
