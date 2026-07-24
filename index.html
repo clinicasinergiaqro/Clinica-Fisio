@@ -3085,11 +3085,18 @@ function necesitaAlertaSoapSemanal(p){
   return diasDesdeUltimoSoap(p) > 7;
 }
 
-// Consentimiento firmado: considera nuevo array consentimientos[] y legacy
+// Consentimiento firmado: considera nuevo array consentimientos[] y legacy.
+// [LOOP-D D1-a] Endurecido: exige FIRMA presente, no solo el flag `firmado`. Un registro
+// `firmado:true` SIN dato de firma (c.firma legacy / c.firmaUrl nuevo) NO cuenta como otorgado
+// — el error conservador en consentimiento es señalar de más, no dar por firmado lo que no lo está.
+// Fuente única: los 5 sitios de display (Supervisión, agenda-resumen, agenda-card, lista, expediente)
+// llaman aquí; antes 4 replicaban `consentimientos.some(c=>c.firmado)` inline (array-only, flag suelto).
 function tieneConsentimientoFirmado(p){
+  if(!p) return false;
+  var _firmadoConFirma=function(c){ return !!(c && c.firmado && (c.firma || c.firmaUrl)); };
   return Array.isArray(p.consentimientos)
-    ? p.consentimientos.some(c => c && c.firmado)
-    : !!(p.consentimiento && p.consentimiento.firmado);
+    ? p.consentimientos.some(_firmadoConFirma)
+    : _firmadoConFirma(p.consentimiento);
 }
 
 // ── B2: Etiquetas por paciente ──
@@ -3754,7 +3761,7 @@ function renderAgenda(){
     <div class="session-count">Google Calendar</div></div>`;
   // ── Dashboard de hoy ──────────────────────────────────────────────────────
   const conPrecaucion=pts.filter(p=>p.seguridadClinica?.tienePrecaucion).length;
-  const sinConsent=pts.filter(p=>!Array.isArray(p.consentimientos)||!p.consentimientos.some(c=>c.firmado)).length;
+  const sinConsent=pts.filter(p=>!tieneConsentimientoFirmado(p)).length;   // [LOOP-D D1-a] helper único (array+legacy, exige firma real)
   // [GRUPO-A #12] comparación por día CANÓNICO (_diaCanon), no string crudo: una fecha en ISO ya no rompe el conteo
   const _hoyC=_diaCanon(todayFmt());
   const sinSoapHoy=pts.filter(p=>{const soaps=_soapVivas(p);return !soaps.some(s=>{const c=s&&_diaCanon(s.fecha);return c&&c===_hoyC;});}).length;   // [BORRADO-NOTAS] VISTA
@@ -3780,7 +3787,7 @@ function renderAgenda(){
   // Google Calendar (bloque de abajo), no de patientsDB. Evita el hueco grande del centro.
   if(pts.length) pts.forEach(p=>{
     const inc=_soapVivas(p).some(s=>!s.completa);   // [BORRADO-NOTAS] VISTA
-    const hasConsent=Array.isArray(p.consentimientos)&&p.consentimientos.some(c=>c.firmado);
+    const hasConsent=tieneConsentimientoFirmado(p);   // [LOOP-D D1-a] helper único (array+legacy, exige firma real)
     const soapAtrasado=necesitaAlertaSoapSemanal(p);
     const badge=inc?`<span class="badge badge-alert">⚠ Importada</span>`
       :!hasConsent?`<span class="badge badge-pending">Sin consentimiento</span>`
@@ -6276,7 +6283,7 @@ function _resaltarNombre(nombre, qRaw){
 }
 // Tarjeta de paciente — fuente ÚNICA (usada por la lista y por "Ver más").
 function _pacCardHTML(p, q, abrirFn){
-  const hasConsent=Array.isArray(p.consentimientos)&&p.consentimientos.some(c=>c.firmado);
+  const hasConsent=tieneConsentimientoFirmado(p);   // [LOOP-D D1-a] helper único (array+legacy, exige firma real)
   const inc=_soapVivas(p).some(s=>!s.completa);   // [BORRADO-NOTAS] VISTA
   const soapAtrasado=!String(p.name||'').startsWith('TEST_QA_')&&necesitaAlertaSoapSemanal(p)&&_soapVivas(p).length>0;
   const esMio=p.terapeuta===currentUser.name;
@@ -6769,7 +6776,7 @@ function renderExpediente(tab='historia'){
   const c=document.getElementById('content-expediente');
   const hasContra=p.contraindicaciones&&p.contraindicaciones!=='Ninguna';
   const hasAllergy=p.alergias&&p.alergias!=='Ninguna';
-  const hasConsent=Array.isArray(p.consentimientos)&&p.consentimientos.some(c=>c.firmado);
+  const hasConsent=tieneConsentimientoFirmado(p);   // [LOOP-D D1-a] helper único (array+legacy, exige firma real)
 
   let html=`<div class="exp-header">
     <div class="exp-name">${escapeHTML(p.name)}</div>
