@@ -2797,8 +2797,8 @@ function sanearYRecalcularEdad(p){
 function tryParse(s,fallback){try{return JSON.parse(s);}catch(e){return fallback;}}
 
 // ── Detección de pacientes de prueba (LIMPIEZA-TEST) ──
-var _IDS_TEST = ['p1781643783300','p1781427175480',
-  'p1781813126150','p0b58a214-e48e-46bb-9954-4a41d2092ccd','p1781814958552','p3978d981-a3f0-4cb2-aced-59b898ca23bd']; // 2 Juan de prueba + 4 fichas de QA borradas 2026-07-03 (Zaray/Camila/Dafne/Carlos Aranda) — blocklist anti-resurrección. RETIRADO 2026-07-24: p002 = Andrea Mendez Díaz, paciente REAL con 2 notas SOAP en Sheet (sin espejo ni gemelo mig) — estaba mal etiquetado como "(ZARA)" y ocultaba un expediente clínico real. Dafne (p1781814958552, 1 nota) SIGUE bloqueada pendiente de revisión de esa nota.
+var _IDS_TEST = ['p1781643783300','p1781427175480','p002',
+  'p1781813126150','p0b58a214-e48e-46bb-9954-4a41d2092ccd','p1781814958552','p3978d981-a3f0-4cb2-aced-59b898ca23bd']; // 2 Juan de prueba + p002 + 4 fichas de QA borradas 2026-07-03 (Zaray/Camila/Dafne/Carlos Aranda) — blocklist anti-resurrección. p002 "Andrea Mendez Díaz" = fragmento DUPLICADO de 2 sesiones (16/06 y 17/06/2026) que ya viven en el registro real pmr45mhae (17 sesiones, siempre visible, mismo app_live_3310b55). Se retiró del blocklist el 2026-07-24 creyéndolo expediente oculto; al verificar resultó redundante 100% con pmr45mhae y solo generaba una 2ª fila "Andrea" en la lista → RE-BLOQUEADO 2026-07-24. Dafne (p1781814958552, 1 nota) sigue bloqueada pendiente de revisión de esa nota.
 function _esPacienteTest(p){
   if(!p) return false;
   if(p.id && _IDS_TEST.indexOf(p.id)!==-1) return true;
