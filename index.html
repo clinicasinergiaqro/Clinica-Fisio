@@ -2977,7 +2977,10 @@ async function verificarOfflineReady_(){
     online: navigator.onLine };
   try{ estado.serviceWorker = !!(navigator.serviceWorker && navigator.serviceWorker.controller); }catch(e){}
   try{ if('caches' in window){ const keys=await caches.keys(); estado.cacheShell = keys.some(k=>String(k).includes('sinergia-shell')); } }catch(e){}
-  try{ const pts=loadLocal('pts')||[]; estado.pacientesLocales=Array.isArray(pts)?pts.length:0; }catch(e){}
+  // [LOOP-D B1] Memoria, no disco: loadLocal('pts') es un snapshot que puede ir por detrás del
+  // patientsDB vivo (el panel mostró 56 con la app en 57). El número visible = el que la app USA.
+  // patientsDB sin poblar → null → la UI pinta '—' (nunca un número viejo).
+  try{ estado.pacientesLocales=Array.isArray(patientsDB)?patientsDB.length:null; }catch(e){ estado.pacientesLocales=null; }
   try{ estado.colaPendiente=getColaSync().length; }catch(e){}
   try{ const db=await initIDB(); estado.indexedDB=!!db; }catch(e){}
   return estado;
@@ -2993,7 +2996,7 @@ async function renderEstadoOffline_(){
     +'<div style="font-size:12px;line-height:1.6;color:#334155">'
     +'Service Worker: <b>'+(e.serviceWorker?'OK':'No activo')+'</b><br>'
     +'Cache app: <b>'+(e.cacheShell?'OK':'Pendiente')+'</b><br>'
-    +'Pacientes locales: <b>'+e.pacientesLocales+'</b><br>'
+    +'Pacientes cargados: <b>'+(e.pacientesLocales==null?'—':e.pacientesLocales)+'</b> <span style="font-size:10px;color:#94A3B8">(los que la app usa ahora, en memoria)</span><br>'
     +'IndexedDB media: <b>'+(e.indexedDB?'OK':'No disponible')+'</b><br>'
     +'Cambios pendientes: <b>'+e.colaPendiente+'</b><br>'
     +'Última sync: <b>'+(e.ultimaSync||'Sin registro')+'</b><br>'
@@ -3769,8 +3772,10 @@ function renderAgenda(){
       </div>
     </div>`;
   }
+  // [LOOP-D B3] Unidad honesta (el conteo es de PACIENTES, no de notas) + nombre del concepto real:
+  // completa:false solo nace en notas IMPORTADAS del histórico (L340) — no existen "borradores" en p.soap.
   if(incomplete>0) html+=`<div class="alert-banner"><div class="alert-banner-icon">⚠️</div>
-    <div class="alert-banner-text">${incomplete} nota${incomplete>1?'s':''} SOAP incompleta${incomplete>1?'s':''}</div></div>`;
+    <div class="alert-banner-text">${incomplete} paciente${incomplete>1?'s':''} de hoy con notas importadas sin revisar</div></div>`;
   // G-6(1): empty-state "Sin pacientes hoy / Toca + para agregar" omitido — las citas vienen de
   // Google Calendar (bloque de abajo), no de patientsDB. Evita el hueco grande del centro.
   if(pts.length) pts.forEach(p=>{
@@ -4075,7 +4080,7 @@ async function FST_montarAgendaCalendar(rango){
     + '<div style="font-size:13px;font-weight:700;color:var(--navy);margin-bottom:8px">📅 Agenda del calendario</div>'
     + '<div style="font-size:10px;color:var(--gray-400);margin:-4px 0 8px">Sincronizado desde Google Calendar · Solo lectura</div>'
     + '<div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap">'+btn('dia','Hoy')+btn('manana','Mañana')+btn('pasado','Pasado')+btn('semana','Semana')+btn('semanaSiguiente','Próxima')+'</div>'
-    + (esSupervisorUI()?'<div style="margin-bottom:10px;display:flex;gap:6px;flex-wrap:wrap"><button onclick="mostrarPendientesSOAP()" style="font-size:12px;font-weight:700;border:none;border-radius:10px;padding:6px 12px;cursor:pointer;font-family:inherit;background:#FEF3C7;color:#92400E">📋 Notas pendientes</button><button onclick="mostrarRendimientoEquipo(\'hoy\')" style="font-size:12px;font-weight:700;border:none;border-radius:10px;padding:6px 12px;cursor:pointer;font-family:inherit;background:#E8F5EE;color:#2E7D52">📊 Rendimiento</button><button onclick="mostrarColaRevision()" style="font-size:12px;font-weight:700;border:none;border-radius:10px;padding:6px 12px;cursor:pointer;font-family:inherit;background:#FDE8E8;color:#B91C1C">🔍 Cola de revisión</button><button onclick="mostrarRevaloraciones()" style="font-size:12px;font-weight:700;border:none;border-radius:10px;padding:6px 12px;cursor:pointer;font-family:inherit;background:#E0E7FF;color:#3730A3">🔄 Revalorar'+((typeof _countRevaloraciones==="function"&&_countRevaloraciones()>0)?(" ("+_countRevaloraciones()+")"):"")+'</button><button onclick="toggleVistaTerapeuta()" style="font-size:12px;font-weight:700;border:none;border-radius:10px;padding:6px 12px;cursor:pointer;font-family:inherit;background:#EEF1F6;color:var(--navy)">👁️ Ver como terapeuta</button><button onclick="mostrarDeteccionDatos()" style="font-size:12px;font-weight:700;border:none;border-radius:10px;padding:6px 12px;cursor:pointer;font-family:inherit;background:#FEE2E2;color:#B91C1C">🔎 Detección de datos</button>'+(_puedeBorrar()?'<button onclick="abrirPapelera()" style="font-size:12px;font-weight:700;border:none;border-radius:10px;padding:6px 12px;cursor:pointer;font-family:inherit;background:#F1F5F9;color:#334155">🗑️ Papelera</button>':'')+'</div>':'')
+    + (esSupervisorUI()?'<div style="margin-bottom:10px;display:flex;gap:6px;flex-wrap:wrap"><button onclick="mostrarPendientesSOAP()" style="font-size:12px;font-weight:700;border:none;border-radius:10px;padding:6px 12px;cursor:pointer;font-family:inherit;background:#FEF3C7;color:#92400E">📋 Sin documentar</button><button onclick="mostrarRendimientoEquipo(\'hoy\')" style="font-size:12px;font-weight:700;border:none;border-radius:10px;padding:6px 12px;cursor:pointer;font-family:inherit;background:#E8F5EE;color:#2E7D52">📊 Rendimiento</button><button onclick="mostrarColaRevision()" style="font-size:12px;font-weight:700;border:none;border-radius:10px;padding:6px 12px;cursor:pointer;font-family:inherit;background:#FDE8E8;color:#B91C1C">🔍 Cola de revisión</button><button onclick="mostrarRevaloraciones()" style="font-size:12px;font-weight:700;border:none;border-radius:10px;padding:6px 12px;cursor:pointer;font-family:inherit;background:#E0E7FF;color:#3730A3">🔄 Revalorar'+((typeof _countRevaloraciones==="function"&&_countRevaloraciones()>0)?(" ("+_countRevaloraciones()+")"):"")+'</button><button onclick="toggleVistaTerapeuta()" style="font-size:12px;font-weight:700;border:none;border-radius:10px;padding:6px 12px;cursor:pointer;font-family:inherit;background:#EEF1F6;color:var(--navy)">👁️ Ver como terapeuta</button><button onclick="mostrarDeteccionDatos()" style="font-size:12px;font-weight:700;border:none;border-radius:10px;padding:6px 12px;cursor:pointer;font-family:inherit;background:#FEE2E2;color:#B91C1C">🔎 Detección de datos</button>'+(_puedeBorrar()?'<button onclick="abrirPapelera()" style="font-size:12px;font-weight:700;border:none;border-radius:10px;padding:6px 12px;cursor:pointer;font-family:inherit;background:#F1F5F9;color:#334155">🗑️ Papelera</button>':'')+'</div>':'')
     + '<div id="agenda-cal-list"><div style="font-size:12px;color:var(--gray-400);padding:6px 0">⏳ Cargando agenda…</div></div>'
     + '</div></div>';
   const reqId = (window._agendaCalReq = (window._agendaCalReq||0) + 1);
@@ -4579,7 +4584,7 @@ function _pendientesHTML(rep, etiquetaVentana){
   var ters=Object.keys(rep.porTer).sort(function(a,b){return rep.porTer[b].total-rep.porTer[a].total;});
   var cuerpo;
   if(!rep.totalPend){
-    cuerpo='<div style="text-align:center;padding:20px;color:#2E7D52;font-weight:700">✅ Todo al día — sin notas pendientes</div>';
+    cuerpo='<div style="text-align:center;padding:20px;color:#2E7D52;font-weight:700">✅ Todo al día — ninguna sesión sin documentar</div>';
   } else {
     cuerpo=ters.map(function(t){
       var c=(typeof AGENDA_COLORES!=='undefined'&&AGENDA_COLORES[t])?AGENDA_COLORES[t]:(typeof AGENDA_COLOR_SIN!=='undefined'?AGENDA_COLOR_SIN:'#9BA3B5');
@@ -4593,7 +4598,7 @@ function _pendientesHTML(rep, etiquetaVentana){
         return '<div style="font-size:12px;color:#374151;padding:2px 0 2px 10px">• '+etiq+'</div>';
       }).join('');
       return '<div style="margin-bottom:12px;border-left:4px solid '+c+';padding-left:10px">'
-        +'<div style="font-size:14px;font-weight:800;color:'+c+'">'+escapeHTML(t)+' — '+rep.porTer[t].total+' pendiente'+(rep.porTer[t].total!==1?'s':'')+'</div>'
+        +'<div style="font-size:14px;font-weight:800;color:'+c+'">'+escapeHTML(t)+' — '+rep.porTer[t].total+' sin documentar</div>'
         +pacs+'</div>';
     }).join('');
   }
@@ -4605,9 +4610,9 @@ function _pendientesHTML(rep, etiquetaVentana){
       +rep.noId.map(function(x){return escapeHTML(x.nombre);}).join(', ')+'</div></div>';
   }
   return '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">'
-    +'<div style="font-size:16px;font-weight:800;color:var(--navy)">📋 Notas SOAP pendientes</div>'
+    +'<div style="font-size:16px;font-weight:800;color:var(--navy)">📋 Sesiones sin documentar</div>'
     +'<button onclick="this.closest(\'[data-pendov]\').remove()" style="background:none;border:none;font-size:22px;color:var(--gray-400);cursor:pointer">×</button></div>'
-    +'<div style="font-size:12px;color:var(--gray-500);margin-bottom:12px">'+escapeHTML(etiquetaVentana)+' · Total: <b style="color:var(--navy)">'+rep.totalPend+'</b></div>'
+    +'<div style="font-size:12px;color:var(--gray-500);margin-bottom:12px">'+escapeHTML(etiquetaVentana)+' · Total: <b style="color:var(--navy)">'+rep.totalPend+'</b> — citas identificadas del calendario sin nota SOAP del día correspondiente (cobertura, no calidad)</div>'
     +cuerpo+noId;
 }
 async function mostrarPendientesSOAP(){
@@ -4616,7 +4621,7 @@ async function mostrarPendientesSOAP(){
   ov.setAttribute('data-pendov','1');
   ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:10001;display:flex;align-items:flex-start;justify-content:center;overflow:auto;padding:40px 12px';
   ov.onclick=function(e){ if(e.target===ov) ov.remove(); };
-  ov.innerHTML='<div style="background:#fff;border-radius:16px;width:100%;max-width:520px;padding:18px"><div style="font-size:12px;color:var(--gray-400)">⏳ Calculando notas pendientes…</div></div>';
+  ov.innerHTML='<div style="background:#fff;border-radius:16px;width:100%;max-width:520px;padding:18px"><div style="font-size:12px;color:var(--gray-400)">⏳ Calculando sesiones sin documentar…</div></div>';
   document.body.appendChild(ov);
   var card=ov.firstChild;
   var dias=_diasVentanaPendientes();
@@ -5483,7 +5488,7 @@ function _rendimientoHTML(datos, noId, ventana, etiqueta, aviso, refresco, tri){
       +'<div style="margin-top:2px">'+t.sinNotaPacs.map(function(x){ return _chipSinNota(x); }).join('')+'</div></div>';
   }).join('');
   var seccionSinNota=bloquesSinNota
-    ? '<div style="margin-top:12px"><div style="font-size:12px;font-weight:800;color:var(--navy)">📝 Citas sin nota — toca para abrir el expediente</div>'+bloquesSinNota+'</div>'
+    ? '<div style="margin-top:12px"><div style="font-size:12px;font-weight:800;color:var(--navy)">📝 Sesiones sin documentar (citas sin nota) — toca para abrir el expediente</div>'+bloquesSinNota+'</div>'
     : '<div style="margin-top:12px;font-size:12px;font-weight:700;color:#2E7D52">✅ Todas las citas identificadas de la ventana tienen nota</div>';
   // EXACTITUD: nombres de calendario sin expediente (pid:null) → sección aparte "🔎 Revisar".
   // NO cuentan como falta (🔴); reutilizan _chipSinNota, que ya trae el botón 🔗 Vincular por ser pid:null.
@@ -6748,9 +6753,16 @@ function renderExpediente(tab='historia'){
   if(!p.consentimiento||typeof p.consentimiento!=='object'||Array.isArray(p.consentimiento)) p.consentimiento={};
   if(typeof p.alergias!=='string') p.alergias='Ninguna';
   if(typeof p.dx!=='string') p.dx=(p.dx?.dxClinico||p.dx?.dxMedico||'Sin diagnóstico');
-  // FIX SESIÓN-NaN: preferir el conteo real del índice (sesionesCount) sobre soap.length,
-  // que para históricos siempre es 0 y pintaba un falso "Sesión 1" (el num guardado era 15).
-  if(typeof p.sesiones!=='number') p.sesiones=(Number(p.sesionesCount)||0)||p.soap.length;
+  // [LOOP-D B2] "Ses. N" = sesiones REALES visibles, nunca sesionesCount: ese campo quedó congelado
+  // en la migración (0 escrituras en todo el código; Abril: contador 10 vs 16 reales). Activo →
+  // notas vivas; histórico → cache Firestore si ya cargó; sin dato → '—' (el prefetch de
+  // openExpediente re-renderiza al llegar y lo puebla). p.sesiones se mantiene numérico para la
+  // lógica de preview "Sesión N+1", poblado solo con dato real (0 si aún no hay).
+  const _sesVisibles=Array.isArray(p.soap)&&p.soap.length?_soapVivas(p).length
+    :(window._fstSesionesCache&&Array.isArray(window._fstSesionesCache[p.id]))?window._fstSesionesCache[p.id].length
+    :Array.isArray(p.soap)?_soapVivas(p).length   // activo con 0 notas: 0 es dato real, no desconocido
+    :null;                                        // sin soap[] ni cache (histórico frío): desconocido → '—'
+  if(typeof p.sesiones!=='number') p.sesiones=(_sesVisibles==null?0:_sesVisibles);
   // FIX HISTORIA (Opción A): fuente única del episodio vigente para todos los tabs
   const mv=_motivoVigenteDe(p);
   const _epSufijo=mv.tieneEps?(' · Episodio '+mv.epNum+' (actual)'):'';
@@ -6761,7 +6773,7 @@ function renderExpediente(tab='historia'){
 
   let html=`<div class="exp-header">
     <div class="exp-name">${escapeHTML(p.name)}</div>
-    <div class="exp-meta"><span>👤 ${escapeHTML(p.age)} años</span><span>🩺 ${escapeHTML(p.terapeuta)}</span><span>Ses. ${escapeHTML(p.sesiones)}</span></div>
+    <div class="exp-meta"><span>👤 ${escapeHTML(p.age)} años</span><span>🩺 ${escapeHTML(p.terapeuta)}</span><span>Ses. ${_sesVisibles==null?'—':_sesVisibles}</span></div>
     <div class="exp-pills">
       <span class="exp-pill">${escapeHTML(typeof p.dx==='string'?p.dx.split(',')[0]:(p.dx?.dxClinico||p.dx?.dxMedico||'—'))}</span>
       ${hasContra?'<span class="exp-pill red">⚠ Contraindicación</span>':''}
@@ -9545,7 +9557,15 @@ async function guardarSOAP(){
     _maxNum = Math.max(_maxNum, Number(p.sesiones)||0, Number(p.sesionesCount)||0);
     // Histórico Firestore no cargado en memoria (migrados): leer el num real.
     // Degrada limpio: si falla o tarda >4s, usa el max de memoria y guarda igual.
-    const _faltaHistorial = (Number(p.sesionesCount)||0) > (Array.isArray(p.soap)?p.soap.length:0);
+    // [LOOP-D B2] Recalculada desde la NATURALEZA del paciente, no desde sesionesCount (congelado
+    // en la migración; con el contador por DEBAJO del real la bandera vieja no disparaba cuando
+    // debía). Ahora: hay historial remoto que consultar si el paciente es de Firestore
+    // (mig_pac_/fstPid/índice) Y sus sesiones no están ya en memoria (si lo están, _maxNum ya las
+    // contó arriba). Dispara más que antes en frío — costo: 1 query con timeout 4s solo al GUARDAR
+    // nota; a cambio la numeración nunca depende de un contador muerto.
+    const _esDeFirestore = String(p.id||'').indexOf('mig_pac_')===0 || !!p.fstPid
+      || p._origenLista==='firestore_migracion' || p._origenLista==='firestore_live';
+    const _faltaHistorial = _esDeFirestore && !(Array.isArray(_ses) && _ses.length>0);
     if (_faltaHistorial && typeof FST_fetchSesiones==='function' && window._fstDb && p.id) {
       try {
         const _hist = await Promise.race([
@@ -17641,13 +17661,16 @@ async function nuevaSesionRapida(patientId){
   if(!p){ showToast('Paciente no encontrado','error'); return; }
   // FIX SESIÓN-NaN (autorizado): el objeto del índice trae `sesionesCount`, no `sesiones` —
   // renderSOAPForm hacía p.sesiones+1 = NaN. Normalizar DESPUÉS de la hidratación (ya esperada
-  // arriba) con el mismo criterio que usa guardarSOAP para el num real: máximo num de las
-  // sesiones hidratadas → sesionesCount → soap.length. Así el encabezado coincide con lo que
-  // se va a guardar (ej. Inesa: 14 previas → "Sesión 15", no NaN ni un falso "Sesión 1").
+  // arriba) con datos REALES: máximo num de las sesiones hidratadas → máximo num en p.soap →
+  // soap.length. [LOOP-D B2] sesionesCount fuera de la cadena: congelado en la migración (0
+  // escrituras en el código), un valor viejo aquí pintaba un "Sesión N" falso en el encabezado.
+  // La numeración REAL al guardar la protege _maxNum (guardarSOAP), que SÍ conserva sesionesCount
+  // como candidato de Math.max — ahí un valor alto es inofensivo (nunca recicla num).
   if(typeof p.sesiones!=='number'){
     var _mxNSR=0;
     (_fstSesionesCache[patientId]||[]).forEach(function(s){ var n=Number(s&&s.num)||0; if(n>_mxNSR)_mxNSR=n; });
-    p.sesiones=_mxNSR || Number(p.sesionesCount)||0 || (Array.isArray(p.soap)?p.soap.length:0);
+    if(!_mxNSR && Array.isArray(p.soap)) p.soap.forEach(function(s){ var n=Number(s&&s.num)||0; if(n>_mxNSR)_mxNSR=n; });
+    p.sesiones=_mxNSR || (Array.isArray(p.soap)?p.soap.length:0);
   }
   currentPatient=p;
   showNuevoSOAP();
@@ -17682,13 +17705,15 @@ function renderSupervision(){
     const conAlta=pts.filter(p=>p.altaClinica?.activa).length;
     const conEventos=pts.filter(p=>(p.eventosAdversos||[]).length>0).length;
     const inactivosSinAlta=pts.filter(p=>!p.altaClinica?.activa && diasDesdeUltimoSoap(p)>30).length;
-    const pct=totalSOAP>0?Math.round(((totalSOAP-inc)/totalSOAP)*100):100;
-    const col=pct>=80?'var(--green)':'var(--red)';
+    // [LOOP-D B5] % retirado: era (notas completas ÷ notas vivas) de los pacientes ASIGNADOS al
+    // terapeuta (agrupa por p.terapeuta, no por autor de cada nota) → bajaba por notas ajenas
+    // (p.ej. una importada sin revisar de otro autor sobre su paciente). Sus dos componentes ya
+    // se muestran como filas (Notas SOAP · Importadas sin revisar). Leyenda al pie del panel.
     html+=`<div class="section-card" style="margin-bottom:12px">
-      <div class="section-title">🩺 ${ter} <span style="margin-left:auto;font-size:13px;font-weight:700;color:${col}">${pct}%</span></div>
+      <div class="section-title">🩺 ${ter}</div>
       <div class="sup-row"><div style="font-size:13px;color:var(--gray-600)">Pacientes activos</div><div style="font-weight:700">${pts.length}</div></div>
       <div class="sup-row"><div style="font-size:13px;color:var(--gray-600)">Notas SOAP</div><div style="font-weight:700">${totalSOAP}</div></div>
-      <div class="sup-row"><div style="font-size:13px;color:var(--gray-600)">SOAP incompletos</div><div style="font-weight:700;color:${inc>0?'var(--red)':'var(--green)'}">${inc>0?`⚠ ${inc}`:'✅ 0'}</div></div>
+      <div class="sup-row"><div style="font-size:13px;color:var(--gray-600)">Importadas sin revisar</div><div style="font-weight:700;color:${inc>0?'var(--red)':'var(--green)'}">${inc>0?`⚠ ${inc}`:'✅ 0'}</div></div>
       <div class="sup-row"><div style="font-size:13px;color:var(--gray-600)">Sin consentimiento</div><div style="font-weight:700;color:${sinConsent>0?'var(--amber)':'var(--green)'}">${sinConsent>0?`📋 ${sinConsent}`:'✅ 0'}</div></div>
       <div class="sup-row"><div style="font-size:13px;color:var(--gray-600)">Sin consent. de datos</div><div style="font-weight:700;color:${sinDatos>0?'var(--amber)':'var(--green)'}">${sinDatos>0?`🔒 ${sinDatos}`:'✅ 0'}</div></div>
       <div class="sup-row"><div style="font-size:13px;color:var(--gray-600)">Sin sexo</div><div style="font-weight:700;color:${sinSexo>0?'var(--amber)':'var(--green)'}">${sinSexo>0?`⚧ ${sinSexo}`:'✅ 0'}</div></div>
@@ -17699,6 +17724,23 @@ function renderSupervision(){
       ${pts.filter(p=>_soapVivas(p).some(s=>!s.completa)).map(p=>`<div data-pid="${escapeAttr_(p.id)}" onclick="openExpediente(this.dataset.pid)" style="padding:8px 14px;font-size:12px;color:var(--red);font-weight:600;cursor:pointer;background:var(--red-light)">⚠ ${escapeHTML(p.name)} →</div>`).join('')}
     </div>`;
   });
+
+  // [LOOP-D B6] Una frase por cifra — leyenda VISIBLE (iPad no tiene hover: leyenda, no tooltip).
+  // Criterio de aceptación del loop: si un número no admite su frase, se elimina (así cayó el %).
+  html+=`<div class="section-card" style="margin-bottom:12px">
+    <div class="section-title">ℹ️ Qué mide cada cifra</div>
+    <div style="padding:8px 14px 12px;font-size:11.5px;line-height:1.7;color:var(--gray-600)">
+      <b>Pacientes activos</b>: pacientes asignados al terapeuta (campo terapeuta), sin contar borrados.<br>
+      <b>Notas SOAP</b>: notas vivas (no borradas) de esos pacientes, las haya escrito quien sea.<br>
+      <b>Importadas sin revisar</b>: notas traídas del histórico que nadie ha estructurado aún; se marcan revisadas al editarlas. No son borradores del terapeuta.<br>
+      <b>Sin consentimiento / Sin consent. de datos</b>: pacientes del terapeuta sin firma de tratamiento / de datos personales.<br>
+      <b>Sin sexo · Sin revaloración · Con alta clínica · Con eventos adversos</b>: pacientes del terapeuta con esa condición en su ficha.<br>
+      <b>Inactivos sin alta</b>: +30 días sin nota viva y sin alta clínica.<br>
+      <b>Sesiones sin documentar</b> (Agenda → Sin documentar): citas identificadas del calendario sin nota SOAP del día correspondiente — mide cobertura, no calidad.<br>
+      <b>Cobertura</b> (Rendimiento): notas hechas ÷ citas identificadas de la ventana; sin identificar, en tiempo (24 h), no acudió y pre-inicio quedan fuera del denominador.<br>
+      <span style="color:var(--gray-400)">El % por terapeuta se retiró: mezclaba notas de varios autores bajo un solo nombre y podía bajar por notas ajenas. Sus componentes se muestran por separado.</span>
+    </div>
+  </div>`;
 
   // ── Pacientes sin actividad reciente ─────────────────────────────────────
   let diasInactividad=30;
