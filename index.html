@@ -7558,7 +7558,6 @@ async function FST_refrescarIndiceEnSegundoPlano(forzar) {
         creadoPor       : d.creadoPor       || '',
         nombreNormalizado: d.nombreNormalizado || FST_normalizarBusqueda(d.name || ''),
         dx              : d.dx              || d.diagnostico     || '',
-        sesionesCount   : d.sesionesCount   || d.soapCount       || 0,
         ultimaSesion    : d.ultimaSesion    || '',
         etiquetas       : Array.isArray(d.etiquetas) ? d.etiquetas : [],
         _origenLista    : d.creadoPor === 'MIGRACION' ? 'firestore_migracion' : 'firestore_live',
@@ -7719,7 +7718,6 @@ async function FST_cargarIndicePacientes() {
           creadoPor       : d.creadoPor       || '',
           nombreNormalizado: d.nombreNormalizado || FST_normalizarBusqueda(d.name || ''),
           dx              : d.dx              || d.diagnostico     || '',
-          sesionesCount   : d.sesionesCount   || d.soapCount       || 0,
           ultimaSesion    : d.ultimaSesion    || '',
           etiquetas       : Array.isArray(d.etiquetas) ? d.etiquetas : [],
           _origenLista    : d.creadoPor === 'MIGRACION' ? 'firestore_migracion' : 'firestore_live',
@@ -9654,7 +9652,11 @@ async function guardarSOAP(){
       _ses.forEach(s => { _maxNum = Math.max(_maxNum, Number(s.num)||0); });
     }
     if (Array.isArray(p.soap)) p.soap.forEach(s => { const n = Number(s.num)||0; if (n>_maxNum) _maxNum=n; });
-    _maxNum = Math.max(_maxNum, Number(p.sesiones)||0, Number(p.sesionesCount)||0);
+    // [RETIRO sesionesCount] Campo congelado de la migración RETIRADO del índice (ya no se lee ni se
+    // muestra en ningún lado; Loop D lo había sacado de los conteos visibles). La numeración se apoya
+    // en dato REAL: max num de sesiones hidratadas (_ses) + p.soap + p.sesiones, y el fetch de
+    // _faltaHistorial (abajo) trae el num real de un histórico no cargado. p.sesionesCount ya no existe.
+    _maxNum = Math.max(_maxNum, Number(p.sesiones)||0);
     // Histórico Firestore no cargado en memoria (migrados): leer el num real.
     // Degrada limpio: si falla o tarda >4s, usa el max de memoria y guarda igual.
     // [LOOP-D B2] Recalculada desde la NATURALEZA del paciente, no desde sesionesCount (congelado
@@ -17830,13 +17832,11 @@ async function nuevaSesionRapida(patientId){
     }
   }
   if(!p){ showToast('Paciente no encontrado','error'); return; }
-  // FIX SESIÓN-NaN (autorizado): el objeto del índice trae `sesionesCount`, no `sesiones` —
-  // renderSOAPForm hacía p.sesiones+1 = NaN. Normalizar DESPUÉS de la hidratación (ya esperada
-  // arriba) con datos REALES: máximo num de las sesiones hidratadas → máximo num en p.soap →
-  // soap.length. [LOOP-D B2] sesionesCount fuera de la cadena: congelado en la migración (0
-  // escrituras en el código), un valor viejo aquí pintaba un "Sesión N" falso en el encabezado.
-  // La numeración REAL al guardar la protege _maxNum (guardarSOAP), que SÍ conserva sesionesCount
-  // como candidato de Math.max — ahí un valor alto es inofensivo (nunca recicla num).
+  // FIX SESIÓN-NaN (autorizado): renderSOAPForm hacía p.sesiones+1 = NaN cuando p.sesiones no era
+  // número. Normalizar DESPUÉS de la hidratación (ya esperada arriba) con datos REALES: máximo num
+  // de las sesiones hidratadas → máximo num en p.soap → soap.length. [RETIRO sesionesCount] el campo
+  // congelado de la migración ya NO participa (retirado del índice); la numeración se apoya solo en
+  // dato real. La numeración final al GUARDAR la protege _maxNum (guardarSOAP) por la misma vía.
   if(typeof p.sesiones!=='number'){
     var _mxNSR=0;
     (_fstSesionesCache[patientId]||[]).forEach(function(s){ var n=Number(s&&s.num)||0; if(n>_mxNSR)_mxNSR=n; });
