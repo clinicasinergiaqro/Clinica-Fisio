@@ -5329,7 +5329,11 @@ function _triangularCitasNotas(eventos, resueltos, ultimaHist, asigMap, resuelta
         var calCod=String(TERAPEUTA_CAL2COD[ter]||'').toUpperCase();
         var escrito=(Array.isArray(sMatch.atendidoPor)&&sMatch.atendidoPor.length)?sMatch.atendidoPor:(sMatch.terapeuta?[sMatch.terapeuta]:[]);
         var validCods=Object.keys(TERAPEUTA_CAL2COD).map(function(k){ return TERAPEUTA_CAL2COD[k]; });
-        var codsCon=escrito.map(function(x){ return String(x||'').toUpperCase(); }).filter(function(c){ return validCods.indexOf(c)!==-1; });
+        // [F4] atendidoPor mezcla vocabularios: códigos ('DAF') y nombres de pila ('Dafne', de la
+        // grilla "¿Quién atendió?"). Normalizar vía TERAPEUTA_CAL2COD (nombre→código) ANTES del
+        // fallback a mayúsculas. Antes: 'Dafne'→'DAFNE' no estaba en validCods y se filtraba en
+        // silencio → "atendida por otro" jamás disparaba para Camila/Dafne/Goretti.
+        var codsCon=escrito.map(function(x){ var _s=String(x||'').trim(); return TERAPEUTA_CAL2COD[_s] || _s.toUpperCase(); }).filter(function(c){ return validCods.indexOf(c)!==-1; });
         // Solo si hay autor(es) conocido(s) y NINGUNO es el terapeuta del calendario.
         if(calCod && codsCon.length && codsCon.indexOf(calCod)===-1){
           porTer[ter].atendidasOtro.push({nombre:ev.paciente||'(sin nombre)', fecha:ddmm, atendioPor:escrito.join(', ')});
