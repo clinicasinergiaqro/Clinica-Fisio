@@ -4372,6 +4372,14 @@ function toggleVistaTerapeuta(forzar){
   try{ if(currentPatient && typeof renderExpediente==='function' && document.getElementById('content-expediente')) renderExpediente(currentTab||'historia'); }catch(_){}
   try{ if(document.getElementById('agenda-cal-block') && typeof FST_montarAgendaCalendar==='function') FST_montarAgendaCalendar('dia'); }catch(_){}
 }
+// [SOAP-PENDIENTES v(A)] Predicado ÚNICO de cobertura por nota: una cita se considera DOCUMENTADA
+// solo si la nota que la cubre fue creada EN LA APP (no migrada/importada). Marcador por flags
+// (más robusto que parsear el id): !s.importado && s._origen!=='firestore_historico' (mismo criterio
+// que las "propias" en Detección de datos). Las tres vistas (banner/tabla/header) lo usan para que
+// una nota migrada NUNCA cuente como documentación. Solo aplica a p.soap (activos); los históricos
+// cubren por fechasHist/ultimaSesionLive, cuyas fechas migradas son viejas y ya las excluye el
+// piso APP_INICIO_OPERACION.
+function _notaCreadaEnApp(s){ return !!s && !s.importado && s._origen!=='firestore_historico'; }
 function _computarPendientesSOAP(eventos, diasISO, idxHist, asigMap, histNotas){
   // DASHBOARD-NOTAS: histNotas (opcional) = {claveNorm:{pid, ultima:'DD/MM/YYYY'}} — permite contar
   // pendientes de HISTÓRICOS por ultimaSesionLive. Sin él, comportamiento idéntico al previo (se omiten).
@@ -4429,7 +4437,7 @@ function _computarPendientesSOAP(eventos, diasISO, idxHist, asigMap, histNotas){
       if(e._ultimaHist){ var cu=_diaCanon(e._ultimaHist); if(cu) cs[cu]=1; }
       notas=Object.keys(diasCanon).filter(function(dc){ return cs[dc]; }).length;
     } else {
-      notas=(Array.isArray(e.p.soap)?e.p.soap:[]).filter(function(s){ return s && diasCanon[_diaCanon(s.fecha)]; }).length;
+      notas=(Array.isArray(e.p.soap)?e.p.soap:[]).filter(function(s){ return s && _notaCreadaEnApp(s) && diasCanon[_diaCanon(s.fecha)]; }).length;   // [SOAP-PENDIENTES v(A)] nota migrada NO cubre
     }
     var deficit=Math.max(0, e.visitas-notas);
     if(deficit<=0) return;
@@ -4949,7 +4957,7 @@ function _triangularCitasNotas(eventos, resueltos, ultimaHist, asigMap, resuelta
     if(r.tipo==='activo' && r.p){
       // AUTORÍA: .find (no .some) para tener a la mano la sesión que casó la fecha (terapeuta/atendidoPor).
       // Normaliza AMBOS lados (activos ya son DD/MM, pero robusto ante cualquier formato).
-      sMatch=(Array.isArray(r.p.soap)?r.p.soap:[]).find(function(s){ return s && citaCanon && _diaCanon(s.fecha)===citaCanon; })||null;
+      sMatch=(Array.isArray(r.p.soap)?r.p.soap:[]).find(function(s){ return s && _notaCreadaEnApp(s) && citaCanon && _diaCanon(s.fecha)===citaCanon; })||null;
       tiene=!!sMatch;
     } else if(r.ambiguo && Array.isArray(r.candidatos)){
       // BUG A — homónimos: NO adjudicar a ciegas. Contar cuántos candidatos tienen nota ESE día.
@@ -4957,14 +4965,14 @@ function _triangularCitasNotas(eventos, resueltos, ultimaHist, asigMap, resuelta
       var _cf=(candFechas&&candFechas[clave])||{};
       var _conNotaCand=r.candidatos.filter(function(c){
         if(!c) return false;
-        if(c.tipo==='activo' && c.p){ return !!(Array.isArray(c.p.soap)?c.p.soap:[]).find(function(s){ return s && citaCanon && _diaCanon(s.fecha)===citaCanon; }); }
+        if(c.tipo==='activo' && c.p){ return !!(Array.isArray(c.p.soap)?c.p.soap:[]).find(function(s){ return s && _notaCreadaEnApp(s) && citaCanon && _diaCanon(s.fecha)===citaCanon; }); }
         if(c.tipo==='historico' && c.pid){ var d=_cf[c.pid]||{fechas:[],ultima:''}; var setC=(Array.isArray(d.fechas)?d.fechas.slice():[]); if(d.ultima) setC.push(d.ultima); return !!(citaCanon && setC.some(function(f){ return _diaCanon(f)===citaCanon; })); }
         return false;
       });
       if(_conNotaCand.length===1){
         tiene=true;
         // Si el que casó es activo, recuperar sMatch para autoría/tardías (igual que la rama activo normal).
-        if(_conNotaCand[0].tipo==='activo' && _conNotaCand[0].p){ sMatch=(Array.isArray(_conNotaCand[0].p.soap)?_conNotaCand[0].p.soap:[]).find(function(s){ return s && citaCanon && _diaCanon(s.fecha)===citaCanon; })||null; }
+        if(_conNotaCand[0].tipo==='activo' && _conNotaCand[0].p){ sMatch=(Array.isArray(_conNotaCand[0].p.soap)?_conNotaCand[0].p.soap:[]).find(function(s){ return s && _notaCreadaEnApp(s) && citaCanon && _diaCanon(s.fecha)===citaCanon; })||null; }
       } else { tiene=false; ambiguoSinResolver=true; }
     } else if(r.tipo==='historico'){
       // CAPA 3 — set COMPLETO de fechas del histórico (normalizado), no solo la última. DEGRADACIÓN:
@@ -5311,7 +5319,7 @@ function _computarRendimiento(eventos, diasISO, asigMap){
   });
   (Array.isArray(patientsDB)?patientsDB:[]).forEach(function(p){
     (Array.isArray(p&&p.soap)?p.soap:[]).forEach(function(s){
-      if(!s || !diasDDMM[s.fecha]) return;
+      if(!s || !_notaCreadaEnApp(s) || !diasDDMM[s.fecha]) return;   // [SOAP-PENDIENTES v(A)] nota migrada NO cuenta como documentación
       var cod=String(s.terapeuta||'').toUpperCase();
       for(var cal in TERAPEUTA_CAL2COD){
         if(TERAPEUTA_CAL2COD[cal]===cod){ stats[cal].notas++; stats[cal].scoreSum+=_scoreSoapCalidad(s); stats[cal].scoreN++; break; }
