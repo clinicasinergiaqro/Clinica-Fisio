@@ -4955,11 +4955,9 @@ async function _computarBannerPendientes(){
   window._bannerPendCache=out;
   return out;
 }
-async function _montarBannerPendientes(){
-  if(!document.getElementById('banner-pend-personal')) return;
-  var r=null;
-  try{ r=await _computarBannerPendientes(); }catch(_){ r=null; }
-  var el=document.getElementById('banner-pend-personal');   // el bloque pudo re-renderizarse durante el await
+window._bannerPendExpandido=false;   // toggle "ver todos" del banner (persiste durante la sesión)
+function _renderBannerPendientes(r){
+  var el=document.getElementById('banner-pend-personal');
   if(!el) return;
   if(!r){ el.innerHTML=''; return; }
   if(!r.total){
@@ -4967,13 +4965,31 @@ async function _montarBannerPendientes(){
     return;
   }
   // GUARDRAIL: solo la lista PROPIA (r.items ya viene filtrada a la terapeuta logueada).
-  var lista=r.items.slice(0,8).map(function(x){
+  var exp=!!window._bannerPendExpandido;
+  var visibles=exp?r.items:r.items.slice(0,8);
+  var lista=visibles.map(function(x){
     return '<div style="font-size:11px;color:#92400E;padding:1px 0">• '+escapeHTML(x.nombre)+' — '+escapeHTML(x.fecha)+'</div>';
-  }).join('') + (r.items.length>8?('<div style="font-size:11px;color:#92400E;padding:1px 0">…y '+(r.items.length-8)+' más</div>'):'');
+  }).join('');
+  var toggle='';
+  if(r.items.length>8){
+    toggle='<button onclick="_toggleBannerPendientes()" style="margin-top:5px;font-size:11px;font-weight:700;border:none;border-radius:8px;padding:5px 12px;cursor:pointer;font-family:inherit;background:#FDE68A;color:#92400E">'
+      +(exp?'▴ Ver menos':'▾ Ver los '+(r.items.length-8)+' restantes')+'</button>';
+  }
   el.innerHTML='<div style="margin-bottom:10px;padding:10px 12px;background:#FEF3C7;border-radius:10px">'
-    +'<div style="font-size:13px;font-weight:800;color:#92400E">📋 Tienes '+r.total+' sesión'+(r.total!==1?'es':'')+' sin documentar</div>'
+    +'<div style="font-size:13px;font-weight:800;color:#92400E">📋 Tienes '+r.total+' '+(r.total===1?'sesión':'sesiones')+' sin documentar</div>'
     +'<div style="font-size:10px;color:#92400E;margin:2px 0 4px">Citas del calendario sin nota SOAP del día (desde el '+_ddmmFromISO(APP_INICIO_OPERACION)+'). Se salda escribiendo la nota.</div>'
-    +lista+'</div>';
+    +lista+toggle+'</div>';
+}
+function _toggleBannerPendientes(){
+  window._bannerPendExpandido=!window._bannerPendExpandido;
+  if(window._bannerPendCache) _renderBannerPendientes(window._bannerPendCache);
+}
+async function _montarBannerPendientes(){
+  if(!document.getElementById('banner-pend-personal')) return;
+  var r=null;
+  try{ r=await _computarBannerPendientes(); }catch(_){ r=null; }
+  if(!document.getElementById('banner-pend-personal')) return;   // el bloque pudo re-renderizarse durante el await
+  _renderBannerPendientes(r);
 }
 // ── LOOP S1+S2+S3: Dashboard de rendimiento de equipo (solo supervisor) ─────────────
 // S1: citas (Google Calendar vía leerAgenda) vs notas SOAP escritas, ventanas hoy/7días/mes.
