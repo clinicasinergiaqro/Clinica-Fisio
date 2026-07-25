@@ -2563,13 +2563,22 @@ async function loadFromCloud(){
           if(Array.isArray(pLocal.fotos)&&pLocal.fotos.some(f=>f.data)) pSano.fotos = pLocal.fotos;
           if(Array.isArray(pLocal.docs)&&pLocal.docs.some(d=>d.data)) pSano.docs = pLocal.docs;
           if(Array.isArray(pLocal.estudiosDocs)&&pLocal.estudiosDocs.length&&!Array.isArray(pSano.estudiosDocs)) pSano.estudiosDocs = pLocal.estudiosDocs;
-          // Preservar consentimientos locales (el array incluye las firmas base64 que no van a Sheets)
-          if(Array.isArray(pLocal.consentimientos)&&pLocal.consentimientos.length){
-            pSano.consentimientos = pLocal.consentimientos;
-          } else if(pLocal.consentimiento?.firma){
-            // compatibilidad con objeto viejo
-            pSano.consentimiento = {...(pSano.consentimiento||{}), firma:pLocal.consentimiento.firma, fotoIdentidad:pLocal.consentimiento.fotoIdentidad};
+          // Preservar consentimientos locales (el array incluye las firmas base64 que no van a Sheets).
+          // SELF-HEALING ACOTADO (limpieza cross-device): esta rama ya es "Sheets gana" (la nube ganó
+          // por recencia, PIEZA 4 arriba). Si la nube AFIRMA que hay consentimiento(s) → conservar lo
+          // local para no perder el base64 (comportamiento normal). Si la nube los trae VACÍOS es una
+          // limpieza deliberada del supervisor → NO restaurar nada local: el clear se adopta en este
+          // iPad y llega a los otros. Excepción ACOTADA a consentimiento; no cambia la política global
+          // de merge (una firma creada offline MÁS NUEVA ya gana entera vía PIEZA 4 y no llega aquí).
+          if(Array.isArray(pSano.consentimientos) && pSano.consentimientos.length){
+            if(Array.isArray(pLocal.consentimientos)&&pLocal.consentimientos.length){
+              pSano.consentimientos = pLocal.consentimientos;
+            } else if(pLocal.consentimiento?.firma){
+              // compatibilidad con objeto viejo
+              pSano.consentimiento = {...(pSano.consentimiento||{}), firma:pLocal.consentimiento.firma, fotoIdentidad:pLocal.consentimiento.fotoIdentidad};
+            }
           }
+          // else: nube con consentimientos vacíos + autoritativa → limpieza; se conserva el vacío.
           // Conservar media base64 dentro de SOAP
           if(Array.isArray(pLocal.soap)&&Array.isArray(pSano.soap)){
             pSano.soap = pSano.soap.map(s=>{
@@ -4408,6 +4417,136 @@ async function _limpiarTodosLosTest(){
   showToast('✅ '+okCount+' pacientes de prueba eliminados','success');
   try{ mostrarRevaloraciones(); }catch(e){}
   try{ renderPacientes(); }catch(e){}
+}
+// ── LIMPIEZA MASIVA DE CONSENTIMIENTOS DE PRUEBA (solo supervisor / lftaranda) ──────────────
+// Vacía los 4 campos de consentimiento de los ACTIVOS: consentimientos[], consentimientoDatos,
+// consentimientoImagen, consentimientoWhatsApp (+ legacy consentimiento:{}). Ninguno es legal —
+// el flujo está congelado hasta revisión del abogado LFPDPPP; se empieza limpio cuando se apruebe.
+// Es el INVERSO simétrico de guardarConsentimiento: persiste vía saveDB, que para activos escribe
+// Sheets + local (para activos el consentimiento NO vive en Firestore: el índice es lean). saveDB
+// también reescribe patientsDB local (anti-resurrección: el iPad que firmó no lo vuelve a subir).
+// NO toca históricos (mig_pac_ no tienen consentimiento). historialCambios se PRESERVA (rastro de
+// auditoría: consta que existió un consentimiento de prueba y se limpió). Storage (PNG/PDF de firma)
+// NO se toca aquí — es un paso separado y POSTERIOR a verificar que estos writes salieron bien.
+function _consentDefaults_(){
+  return {
+    datos:   {aceptado:false,fecha:null,hora:null,responsable:'',versionAviso:'v3.0',fechaVersionAviso:null,avisoLegalRevisado:false,medio:'app'},
+    imagen:  {aceptado:false,fecha:null,hora:null,alcance:'',observaciones:''},
+    whatsapp:{aceptado:false,fecha:null,hora:null,telefono:'',aceptaRecordatorios:false,aceptaEjercicios:false,observaciones:''}
+  };
+}
+// "Tiene algo de consentimiento" = cualquiera de los 4 campos con dato real (o legacy firmado).
+function _tieneAlgunConsentimiento_(p){
+  if(!p) return false;
+  var arr=Array.isArray(p.consentimientos)?p.consentimientos:[];
+  var cd=p.consentimientoDatos||{}, ci=p.consentimientoImagen||{}, cw=p.consentimientoWhatsApp||{};
+  var leg=!!(p.consentimiento && p.consentimiento.firmado);
+  return arr.length>0 || !!cd.aceptado || !!ci.aceptado || !!cw.aceptado || leg;
+}
+async function _limpiarConsentimientosPrueba(){
+  if(!esSupervisorUI()){ showToast('Solo supervisor','error'); return; }
+  // Universo = ACTIVOS vivos. patientsDB ya excluye test/mig_pac_ al construirse; se excluyen borrados.
+  var activos=(Array.isArray(patientsDB)?patientsDB:[]).filter(function(p){ return p && p.id && !_activoEliminado(p.id); });
+  var objetivo=activos.filter(_tieneAlgunConsentimiento_);
+  if(!objetivo.length){ showToast('No hay consentimientos que limpiar','success'); return; }
+  var nArr=0,nD=0,nI=0,nW=0,nLeg=0,nFirma=0;
+  var registro=objetivo.map(function(p){
+    var arr=Array.isArray(p.consentimientos)?p.consentimientos:[];
+    var cd=p.consentimientoDatos||{}, ci=p.consentimientoImagen||{}, cw=p.consentimientoWhatsApp||{};
+    var leg=!!(p.consentimiento && p.consentimiento.firmado);
+    if(arr.length) nArr++;
+    if(cd.aceptado) nD++;
+    if(ci.aceptado) nI++;
+    if(cw.aceptado) nW++;
+    if(leg) nLeg++;
+    var firmasStorage=arr.filter(function(c){ return c && (c.firmaUrl||c.firmaFbPath||c.pdfUrl||c.pdfFbPath||c.firma); }).length;
+    nFirma+=firmasStorage;
+    return { pid:p.id, nombre:p.name||'', consentimientosCount:arr.length,
+      datosAceptado:!!cd.aceptado, imagenAceptado:!!ci.aceptado, whatsappAceptado:!!cw.aceptado,
+      legacyFirmado:leg, firmasConStorage:firmasStorage,
+      snapshot:{ consentimientos:arr, consentimientoDatos:cd, consentimientoImagen:ci, consentimientoWhatsApp:cw, consentimiento:p.consentimiento||{} } };
+  });
+  var listaHTML=registro.map(function(r){
+    var tags=[];
+    if(r.consentimientosCount) tags.push(r.consentimientosCount+' firma(s)');
+    if(r.datosAceptado) tags.push('datos');
+    if(r.imagenAceptado) tags.push('imagen');
+    if(r.whatsappAceptado) tags.push('whatsapp');
+    if(r.legacyFirmado) tags.push('legacy');
+    if(r.firmasConStorage) tags.push('📎'+r.firmasConStorage+' Storage');
+    return '<div style="padding:6px 0;border-bottom:1px solid #f1f5f9;font-size:12px"><b>'+escapeHTML(r.nombre)+'</b> <span style="color:#94a3b8">'+escapeHTML(r.pid)+'</span><br><span style="color:#64748b">'+tags.join(' · ')+'</span></div>';
+  }).join('');
+  // Modal: conteo en vivo + lista expandible + EXPORT (habilita el limpiar) + confirmación fuerte.
+  var accion=await new Promise(function(resolve){
+    var m=document.createElement('div');
+    m.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:99999;display:flex;align-items:center;justify-content:center;padding:16px';
+    m.innerHTML='<div style="background:#fff;border-radius:16px;padding:22px;max-width:430px;width:100%;max-height:86vh;display:flex;flex-direction:column">'
+      +'<div style="font-size:18px;font-weight:800;color:#1e293b;margin-bottom:6px">🧹 Limpiar consentimientos de prueba</div>'
+      +'<div style="font-size:13px;color:#64748b;margin-bottom:10px">Se vaciarán <b>'+objetivo.length+'</b> expedientes activos: '
+        +nArr+' con firma · '+nD+' datos · '+nI+' imagen · '+nW+' WhatsApp'+(nLeg?(' · '+nLeg+' legacy'):'')+'.<br>'
+        +'Se preserva el historial de cambios. Las firmas en Storage ('+nFirma+') NO se tocan aquí — paso posterior.</div>'
+      +'<details style="margin-bottom:10px"><summary style="cursor:pointer;font-size:13px;font-weight:700;color:#334155">Ver los '+objetivo.length+' expedientes</summary>'
+        +'<div style="max-height:34vh;overflow:auto;margin-top:8px">'+listaHTML+'</div></details>'
+      +'<div style="font-size:12px;color:#b91c1c;background:#fef2f2;border-radius:8px;padding:8px 10px;margin-bottom:14px">Operación masiva irreversible. Exporta el log ANTES de limpiar.</div>'
+      +'<div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end">'
+      +'<button id="_lc_cancel" style="padding:10px 16px;border-radius:10px;border:1px solid #e2e8f0;background:#f8fafc;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">Cancelar</button>'
+      +'<button id="_lc_export" style="padding:10px 16px;border-radius:10px;border:1px solid #0ea5e9;background:#e0f2fe;color:#075985;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">📥 Exportar log</button>'
+      +'<button id="_lc_ok" disabled style="padding:10px 16px;border-radius:10px;border:none;background:#94a3b8;color:#fff;font-size:13px;font-weight:700;cursor:not-allowed;font-family:inherit">Limpiar '+objetivo.length+'</button>'
+      +'</div>'
+      +'<div id="_lc_hint" style="font-size:11px;color:#94a3b8;text-align:right;margin-top:6px">Exporta el log para habilitar el botón</div>'
+      +'</div>';
+    document.body.appendChild(m);
+    m.querySelector('#_lc_cancel').onclick=function(){ m.remove(); resolve(null); };
+    m.querySelector('#_lc_export').onclick=function(){
+      try{
+        var payload={ generadoEn:new Date().toISOString(), operacion:'limpieza-consentimientos-prueba',
+          supervisor:(currentUser&&currentUser.name)||'', totalExpedientes:objetivo.length,
+          resumen:{conFirma:nArr,datos:nD,imagen:nI,whatsapp:nW,legacy:nLeg,firmasEnStorage:nFirma}, expedientes:registro };
+        var blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});
+        var url=URL.createObjectURL(blob);
+        var a=document.createElement('a');
+        a.href=url; a.download='consentimientos-prueba-'+(new Date().toISOString().slice(0,19).replace(/[:T]/g,'-'))+'.json';
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(function(){ URL.revokeObjectURL(url); },2000);
+        var okb=m.querySelector('#_lc_ok');
+        okb.disabled=false; okb.style.background='#ef4444'; okb.style.cursor='pointer';
+        var hint=m.querySelector('#_lc_hint'); if(hint) hint.textContent='✅ Log exportado · ya puedes limpiar';
+        showToast('Log exportado','success');
+      }catch(e){ console.warn('[limpiarCons] export',e); showToast('No se pudo exportar el log','error'); }
+    };
+    m.querySelector('#_lc_ok').onclick=function(){ if(m.querySelector('#_lc_ok').disabled) return; m.remove(); resolve(true); };
+  });
+  if(accion!==true) return;
+  // Escritura secuencial con throttle (200 ms) — saveDB ya reintenta/encola ante LOCK_TIMEOUT.
+  showToast('🧹 Limpiando '+objetivo.length+' expedientes…','');
+  var ok=0, fail=0, def=_consentDefaults_();
+  for(var i=0;i<objetivo.length;i++){
+    var p=objetivo[i];
+    try{
+      p.consentimientos=[];
+      p.consentimiento={};
+      p.consentimientoDatos={...def.datos};
+      p.consentimientoImagen={...def.imagen};
+      p.consentimientoWhatsApp={...def.whatsapp};
+      if(!Array.isArray(p.historialCambios)) p.historialCambios=[];
+      var ahora=new Date();
+      p.historialCambios.push({ usuario:(currentUser&&currentUser.name)||'SUPERVISOR', seccion:'consentimiento',
+        fecha:ahora.toLocaleString('es-MX'), accion:'Limpieza de consentimiento de prueba (flujo congelado, no legal)',
+        antes:'consentimiento de prueba', despues:'sin consentimiento' });
+      p.ultimoUsuario=(currentUser&&currentUser.name)||'SUPERVISOR';
+      p.fechaActualizacion=ahora.toLocaleString('es-MX');
+      // Activos: saveDB escribe Sheets + local, NO Firestore (el índice lean no lleva consentimiento).
+      // camposHist es INERTE para activos (solo lo usa la rama mig_pac_) → se omite para no sugerir un
+      // write a Firestore que no ocurre. El índice lean no se contamina con campos de consentimiento.
+      var r=await saveDB('pts',[p]);
+      if(r&&r.ok) ok++; else fail++;
+    }catch(e){ console.warn('[limpiarCons]',p&&p.id,e); fail++; }
+    if((i%5)===0) showToast('🧹 '+(i+1)+'/'+objetivo.length+'…','');
+    await new Promise(function(res){ setTimeout(res,200); });
+  }
+  try{ if(typeof renderSupervision==='function') renderSupervision(); }catch(_){}
+  console.log('[limpiarCons] resultado: ok='+ok+' fail='+fail+' de '+objetivo.length);
+  showToast(fail? ('Limpieza: '+ok+' ok, '+fail+' con error (revisa consola)') : ('✅ '+ok+' expedientes limpiados'), fail?'error':'success');
 }
 // [esTest] Backfill ÚNICO (supervisor): marca esTest:true en los docs Firestore de los pacientes de
 // prueba (heurística _esPacienteTest) para que las REGLAS puedan cerrar `allow delete` SOLO a test y
@@ -13315,15 +13454,12 @@ function guardarNuevoPaciente(){
   /* RIESGO RESIDUAL — Token de Apps Script expuesto en frontend.
      Migración a Firebase ID Token pendiente para sub-loop dedicado.
      No abordar en este parche. */
+  // ALTA — bloqueo de consentimiento DESACTIVADO mientras el flujo legal está congelado (pendiente de
+  // revisión del abogado LFPDPPP). Un alta nueva NO debe volver a generar un consentimiento no-legal,
+  // así que ya no se exige aceptar datos para crear el expediente. El checkbox se sigue leyendo para el
+  // valor del campo (queda aceptado:false si no se marca). REACTIVAR cuando el aviso esté aprobado:
+  // restaurar el bloque `if(!aceptaDatos){ showToast(...); return; }` que vivía aquí.
   const aceptaDatos = !!document.getElementById('n-consent-datos')?.checked;
-  if(!aceptaDatos){
-    showToast(
-      'Para crear el expediente clínico se requiere aceptar el '+
-      'tratamiento de datos personales y datos sensibles de salud.',
-      'error'
-    );
-    return; // BLOQUEO REAL — no se crea expediente, no se llama saveDB
-  }
   limpiarDirty(); // pasó todas las validaciones: el expediente se creará
   // M3: Detección de duplicados por nombre (no aplica al editar)
   const similares=buscarPacientesSimilares(nombre);
@@ -17925,6 +18061,7 @@ function renderSupervision(){
     +'<button onclick="prepararModoOffline_()" class="chip-quick">📴 Preparar modo sin internet</button>'
     +'<button onclick="verAvisoPrivacidad_()" class="chip-quick">📄 Aviso de privacidad</button>'
     +'<button onclick="showMigracionHistorica()" class="chip-quick">📥 Abrir importador</button>'   // [LOOP-B] migración histórica movida aquí (era la única pieza operativa real de QA)
+    +'<button onclick="_limpiarConsentimientosPrueba()" class="chip-quick" style="background:#fef2f2;color:#b91c1c;border:1px solid #fecaca">🧹 Limpiar consentimientos de prueba</button>'
     +'</div>'
     +'<div id="offline-status-box"></div>';
   setTimeout(renderEstadoOffline_, 300);
