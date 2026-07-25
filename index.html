@@ -4147,8 +4147,11 @@ async function FST_montarAgendaCalendar(rango){
     + '<div style="font-size:10px;color:var(--gray-400);margin:-4px 0 8px">Sincronizado desde Google Calendar · Solo lectura</div>'
     + '<div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap">'+btn('dia','Hoy')+btn('manana','Mañana')+btn('pasado','Pasado')+btn('semana','Semana')+btn('semanaSiguiente','Próxima')+'</div>'
     + (esSupervisorUI()?'<div style="margin-bottom:10px;display:flex;gap:6px;flex-wrap:wrap"><button onclick="mostrarPendientesSOAP()" style="font-size:12px;font-weight:700;border:none;border-radius:10px;padding:6px 12px;cursor:pointer;font-family:inherit;background:#FEF3C7;color:#92400E">📋 Sin documentar</button><button onclick="mostrarRendimientoEquipo(\'hoy\')" style="font-size:12px;font-weight:700;border:none;border-radius:10px;padding:6px 12px;cursor:pointer;font-family:inherit;background:#E8F5EE;color:#2E7D52">📊 Rendimiento</button><button onclick="mostrarColaRevision()" style="font-size:12px;font-weight:700;border:none;border-radius:10px;padding:6px 12px;cursor:pointer;font-family:inherit;background:#FDE8E8;color:#B91C1C">🔍 Cola de revisión</button><button onclick="mostrarRevaloraciones()" style="font-size:12px;font-weight:700;border:none;border-radius:10px;padding:6px 12px;cursor:pointer;font-family:inherit;background:#E0E7FF;color:#3730A3">🔄 Revalorar'+((typeof _countRevaloraciones==="function"&&_countRevaloraciones()>0)?(" ("+_countRevaloraciones()+")"):"")+'</button><button onclick="toggleVistaTerapeuta()" style="font-size:12px;font-weight:700;border:none;border-radius:10px;padding:6px 12px;cursor:pointer;font-family:inherit;background:#EEF1F6;color:var(--navy)">👁️ Ver como terapeuta</button><button onclick="mostrarDeteccionDatos()" style="font-size:12px;font-weight:700;border:none;border-radius:10px;padding:6px 12px;cursor:pointer;font-family:inherit;background:#FEE2E2;color:#B91C1C">🔎 Detección de datos</button>'+(_puedeBorrar()?'<button onclick="abrirPapelera()" style="font-size:12px;font-weight:700;border:none;border-radius:10px;padding:6px 12px;cursor:pointer;font-family:inherit;background:#F1F5F9;color:#334155">🗑️ Papelera</button>':'')+'</div>':'')
+    + '<div id="banner-pend-personal"></div>'
     + '<div id="agenda-cal-list"><div style="font-size:12px;color:var(--gray-400);padding:6px 0">⏳ Cargando agenda…</div></div>'
     + '</div></div>';
+  // [BANNER] pendientes personales del terapeuta logueado — no bloqueante, cache 5 min
+  setTimeout(function(){ try{ _montarBannerPendientes(); }catch(_){} }, 0);
   const reqId = (window._agendaCalReq = (window._agendaCalReq||0) + 1);
   let res;
   try{ res = await FST_fetchAgendaCalendar(rango); }
@@ -4708,10 +4711,14 @@ function toggleVistaTerapeuta(forzar){
   try{ if(currentPatient && typeof renderExpediente==='function' && document.getElementById('content-expediente')) renderExpediente(currentTab||'historia'); }catch(_){}
   try{ if(document.getElementById('agenda-cal-block') && typeof FST_montarAgendaCalendar==='function') FST_montarAgendaCalendar('dia'); }catch(_){}
 }
-function _computarPendientesSOAP(eventos, diasISO, idxHist, asigMap, histNotas){
+function _computarPendientesSOAP(eventos, diasISO, idxHist, asigMap, histNotas, clavesAmbiguas){
   // DASHBOARD-NOTAS: histNotas (opcional) = {claveNorm:{pid, ultima:'DD/MM/YYYY'}} — permite contar
   // pendientes de HISTÓRICOS por ultimaSesionLive. Sin él, comportamiento idéntico al previo (se omiten).
   histNotas=(histNotas && typeof histNotas==='object')?histNotas:null;
+  // [P0-2] clavesAmbiguas (opcional) = {claveNorm:true} — homónimos SIN desambiguar según
+  // _resolverPacientesCalendario. Misma protección que el dashboard (_triangularCitasNotas):
+  // un homónimo ambiguo NUNCA se adjudica a ciegas → va a "🔎 revisar", no cuenta como pendiente.
+  clavesAmbiguas=(clavesAmbiguas && typeof clavesAmbiguas==='object')?clavesAmbiguas:null;
   var diasDDMM={}; diasISO.forEach(function(i){ var k=_ddmmFromISO(i); if(k) diasDDMM[k]=true; });
   var diasCanon={}; diasISO.forEach(function(i){ var c=_diaCanon(i); if(c) diasCanon[c]=true; });   // CAPA 3 — días de la ventana en clave canónica
   var idx={};
@@ -4719,7 +4726,7 @@ function _computarPendientesSOAP(eventos, diasISO, idxHist, asigMap, histNotas){
     if(p&&p.name) idx[_normPend(p.name)]=p;
     if(p&&p.nombreNormalizado) idx[_normPend(p.nombreNormalizado)]=p;
   });
-  var porPac={}, noId=[];
+  var porPac={}, noId=[], revisar=[], _revVistos={};
   idxHist = Array.isArray(idxHist) ? idxHist : [];
   (Array.isArray(eventos)?eventos:[]).forEach(function(ev){
     var nombre=ev.paciente||'';
@@ -4727,6 +4734,12 @@ function _computarPendientesSOAP(eventos, diasISO, idxHist, asigMap, histNotas){
     var clave=_normPend(nombre);
     // S3: asignación persistente — resuelve "Sin asignar" con el mapa agendaAsignaciones
     if(asigMap && ter==='Sin asignar' && asigMap[clave]) ter=asigMap[clave];
+    // [P0-2] Homónimo ambiguo: el veredicto del resolvedor tiene prioridad sobre el índice local
+    // (paridad con el dashboard). Ni pendiente, ni no-identificado: lista aparte "🔎 revisar".
+    if(clavesAmbiguas && clave && clavesAmbiguas[clave]){
+      if(!_revVistos[clave]){ _revVistos[clave]=true; revisar.push({nombre:nombre||'(sin nombre)', ter:ter}); }
+      return;
+    }
     var p=idx[clave];
     if(p){
       var e=porPac[p.id]||(porPac[p.id]={p:p, ter:ter, visitas:0});
@@ -4774,7 +4787,7 @@ function _computarPendientesSOAP(eventos, diasISO, idxHist, asigMap, histNotas){
     t.pacientes.push({name:e.p.name, deficit:deficit, visitas:e.visitas, notas:notas, pid:String(e.p.id||''), esHist:!!e._esHist});
   });
   var totalPend=Object.keys(porTer).reduce(function(a,k){return a+porTer[k].total;},0);
-  return {porTer:porTer, noId:noId, totalPend:totalPend};
+  return {porTer:porTer, noId:noId, totalPend:totalPend, revisar:revisar};
 }
 function _pendientesHTML(rep, etiquetaVentana){
   var ters=Object.keys(rep.porTer).sort(function(a,b){return rep.porTer[b].total-rep.porTer[a].total;});
@@ -4805,11 +4818,20 @@ function _pendientesHTML(rep, etiquetaVentana){
       +'<div style="font-size:11px;color:#92400E;line-height:1.4">Nombres del calendario sin expediente activo ni histórico — probablemente pacientes nuevos por dar de alta: '
       +rep.noId.map(function(x){return escapeHTML(x.nombre);}).join(', ')+'</div></div>';
   }
+  // [P0-2] Homónimos ambiguos: nunca adjudicados a ciegas — el supervisor los resuelve
+  // vinculando en 📊 Rendimiento (misma semántica 🔎 que el dashboard).
+  var rev='';
+  if(rep.revisar&&rep.revisar.length){
+    rev='<div style="margin-top:10px;padding:10px;background:#EEF2FF;border-radius:10px">'
+      +'<div style="font-size:12px;font-weight:800;color:#3730A3;margin-bottom:4px">🔎 '+rep.revisar.length+' cita(s) con homónimos — no cuentan como pendiente</div>'
+      +'<div style="font-size:11px;color:#3730A3;line-height:1.4">Más de un expediente casa con el nombre; vincula en 📊 Rendimiento para resolver: '
+      +rep.revisar.map(function(x){return escapeHTML(x.nombre);}).join(', ')+'</div></div>';
+  }
   return '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">'
     +'<div style="font-size:16px;font-weight:800;color:var(--navy)">📋 Sesiones sin documentar</div>'
     +'<button onclick="this.closest(\'[data-pendov]\').remove()" style="background:none;border:none;font-size:22px;color:var(--gray-400);cursor:pointer">×</button></div>'
     +'<div style="font-size:12px;color:var(--gray-500);margin-bottom:12px">'+escapeHTML(etiquetaVentana)+' · Total: <b style="color:var(--navy)">'+rep.totalPend+'</b> — citas identificadas del calendario sin nota SOAP del día correspondiente (cobertura, no calidad)</div>'
-    +cuerpo+noId;
+    +cuerpo+rev+noId;
 }
 async function mostrarPendientesSOAP(){
   if(!(currentUser && currentUser.role==='supervisor')){ showToast('Solo supervisor','error'); return; }
@@ -4841,7 +4863,9 @@ async function mostrarPendientesSOAP(){
   try{ idxHist=(await _rendIdxHist(false))||[]; }catch(_h){ idxHist=[]; }
   var asigMapPend={}; try{ asigMapPend=await FST_leerAsignacionesAgenda(); }catch(_a){}
   // DASHBOARD-NOTAS: triangulación de históricos — 1 doc por paciente del calendario (ultimaSesionLive)
-  var histNotasPend=null;
+  // [P0-2] clavesAmbiguasPend: un objeto ambiguo trae tipo/pid de candidatos[0] y ANTES pasaba el
+  // filtro de abajo → se adjudicaba el déficit al homónimo arbitrario. Ahora se separa a 🔎.
+  var histNotasPend=null, clavesAmbiguasPend={};
   try{
     var resPend=await _resolverPacientesCalendario(res.eventos||[]);
     var ultPend=await _fetchUltimaSesionHistoricos(resPend, false);
@@ -4849,18 +4873,116 @@ async function mostrarPendientesSOAP(){
     histNotasPend={};
     Object.keys(resPend).forEach(function(k){
       var r=resPend[k];
-      if(r && r.tipo==='historico' && r.pid) histNotasPend[k]={pid:r.pid, ultima:(ultPend&&ultPend[k])||'', fechas:(_fPend[k]||[])};
+      if(!r) return;
+      if(r.ambiguo){ clavesAmbiguasPend[k]=true; return; }   // [P0-2] homónimo: jamás candidatos[0] a ciegas
+      if(r.tipo==='historico' && r.pid) histNotasPend[k]={pid:r.pid, ultima:(ultPend&&ultPend[k])||'', fechas:(_fPend[k]||[])};
     });
-  }catch(_t){ histNotasPend=null; }
-  var rep=_computarPendientesSOAP(res.eventos||[], dias, idxHist, asigMapPend, histNotasPend);
+  }catch(_t){ histNotasPend=null; clavesAmbiguasPend={}; }
+  var rep=_computarPendientesSOAP(res.eventos||[], dias, idxHist, asigMapPend, histNotasPend, clavesAmbiguasPend);
   var etiqueta=(dias.length>1)?('Desde '+_ddmmFromISO(dias[0])):'Hoy';
   card.innerHTML=_pendientesHTML(rep, etiqueta);
+}
+// ── [BANNER] Pendientes personales del terapeuta logueado ───────────────────────────
+// Cada terapeuta ve SU número de "sesiones sin documentar" (cobertura: cita sin nota del
+// día), calculado por CITA desde APP_INICIO_OPERACION. Reglas de Carlos:
+//  · Cita compartida = pendiente de TODAS las terapeutas asignadas; se salda con UNA nota
+//    (cualquiera de ellas la documenta → desaparece para todas).
+//  · Si Carlos aparece junto a otra, la cita es de la otra; solo de Carlos si sale solo.
+//  · Homónimo ambiguo → 🔎 del supervisor, NO cuenta como pendiente (paridad dashboard).
+//  · GUARDRAIL de no-fuga: solo se computa y rinde la rebanada del terapeuta logueado;
+//    jamás se construye ni vuelca el porTer completo ni el noId (nombres ajenos).
+function _terapeutasDeCita(ev, asigMap){
+  var ts=Array.isArray(ev&&ev.terapeutas)?ev.terapeutas.filter(function(t){ return !!TERAPEUTA_CAL2COD[t]; }):[];
+  if(!ts.length){
+    var clave=_normPend((ev&&ev.paciente)||'');
+    var a=asigMap&&asigMap[clave];
+    if(a&&TERAPEUTA_CAL2COD[a]) ts=[a];
+  }
+  // Regla de Carlos: acompañando a otra(s), la cita es de la(s) otra(s); solo suya si va solo.
+  if(ts.length>1) ts=ts.filter(function(t){ return t!=='Carlos'; });
+  return ts;
+}
+window._bannerPendCache=null;   // {ts, cod, total, items} — TTL = REND_CACHE_TTL_MS (5 min)
+async function _computarBannerPendientes(){
+  var cod=String((currentUser&&currentUser.name)||'').toUpperCase();
+  var miNombre=TERAPEUTA_COD2CAL[cod];
+  if(!miNombre) return null;   // usuario sin código de terapeuta conocido → sin banner
+  var c=window._bannerPendCache;
+  if(c && c.cod===cod && (Date.now()-c.ts)<REND_CACHE_TTL_MS) return c;
+  var res=null;
+  try{ res=await FST_fetchAgendaRango(APP_INICIO_OPERACION, _hoyISOlocal()); }catch(_){ res=null; }
+  if(!res||!res.ok) return null;   // sin agenda no se inventa nada (banner ausente)
+  var eventos=Array.isArray(res.eventos)?res.eventos:[];
+  var asigMap={};    try{ asigMap=await FST_leerAsignacionesAgenda(false); }catch(_){}
+  var resueltos={};  try{ resueltos=await _resolverPacientesCalendario(eventos); }catch(_){ resueltos={}; }
+  var ultimaHist={}; try{ ultimaHist=await _fetchUltimaSesionHistoricos(resueltos, false); }catch(_){ ultimaHist={}; }
+  var fechasHist=(window._triUltimaHistCache&&window._triUltimaHistCache.mapFechas)||{};
+  var resueltas={};  try{ resueltas=await FST_leerCitasResueltas(false); }catch(_){}
+  var noAcudioMap={};try{ noAcudioMap=await FST_leerNoAcudio(false); }catch(_){}
+  var ahora=Date.now(), items=[], vistos={};
+  eventos.forEach(function(ev){
+    var clave=_normPend(ev.paciente||'');
+    if(!clave) return;
+    // GUARDRAIL primero: solo citas donde la terapeuta logueada está asignada.
+    var asignadas=_terapeutasDeCita(ev, asigMap);
+    if(asignadas.indexOf(miNombre)===-1) return;
+    var ddmm=_ddmmDeISOEvento(ev.inicio);
+    var citaCanon=_diaCanon(ddmm);
+    if(!citaCanon || citaCanon<APP_INICIO_OPERACION) return;   // piso: lo migrado/previo no cuenta
+    var _t=ev.inicio?new Date(ev.inicio).getTime():NaN;
+    if(isFinite(_t) && _t>ahora) return;                       // cita futura: aún no es pendiente
+    var r=(resueltos||{})[clave]||{pid:null,tipo:null};
+    if(r.ambiguo) return;                                      // [P0-2] homónimo → 🔎 del supervisor
+    if(!r.pid) return;                                         // sin expediente → 🔎 del supervisor
+    // ¿Se saldó con UNA nota? (cualquier autora, mismo criterio por día que el dashboard)
+    var tiene=false;
+    if(r.tipo==='activo' && r.p){
+      tiene=!!_soapVivas(r.p).find(function(s){ return s && _diaCanon(s.fecha)===citaCanon; });
+    } else if(r.tipo==='historico'){
+      var setF=(Array.isArray(fechasHist[clave])?fechasHist[clave].slice():[]);
+      if(ultimaHist&&ultimaHist[clave]) setF.push(ultimaHist[clave]);
+      tiene=setF.some(function(f){ return _diaCanon(f)===citaCanon; });
+    }
+    if(tiene) return;
+    var kMarca=_keyCitaResuelta(clave, ddmm);
+    if((resueltas&&resueltas[kMarca])||(noAcudioMap&&noAcudioMap[kMarca])) return;   // el supervisor ya la sacó
+    var kv=clave+'|'+ddmm;
+    if(vistos[kv]) return;
+    vistos[kv]=true;
+    items.push({nombre:ev.paciente||'(sin nombre)', fecha:ddmm});
+  });
+  var out={ts:Date.now(), cod:cod, total:items.length, items:items};
+  window._bannerPendCache=out;
+  return out;
+}
+async function _montarBannerPendientes(){
+  if(!document.getElementById('banner-pend-personal')) return;
+  var r=null;
+  try{ r=await _computarBannerPendientes(); }catch(_){ r=null; }
+  var el=document.getElementById('banner-pend-personal');   // el bloque pudo re-renderizarse durante el await
+  if(!el) return;
+  if(!r){ el.innerHTML=''; return; }
+  if(!r.total){
+    el.innerHTML='<div style="margin-bottom:10px;padding:8px 12px;background:#ECFDF5;border-radius:10px;font-size:12px;font-weight:700;color:#065F46">✅ Estás al día — sin sesiones por documentar</div>';
+    return;
+  }
+  // GUARDRAIL: solo la lista PROPIA (r.items ya viene filtrada a la terapeuta logueada).
+  var lista=r.items.slice(0,8).map(function(x){
+    return '<div style="font-size:11px;color:#92400E;padding:1px 0">• '+escapeHTML(x.nombre)+' — '+escapeHTML(x.fecha)+'</div>';
+  }).join('') + (r.items.length>8?('<div style="font-size:11px;color:#92400E;padding:1px 0">…y '+(r.items.length-8)+' más</div>'):'');
+  el.innerHTML='<div style="margin-bottom:10px;padding:10px 12px;background:#FEF3C7;border-radius:10px">'
+    +'<div style="font-size:13px;font-weight:800;color:#92400E">📋 Tienes '+r.total+' sesión'+(r.total!==1?'es':'')+' sin documentar</div>'
+    +'<div style="font-size:10px;color:#92400E;margin:2px 0 4px">Citas del calendario sin nota SOAP del día (desde el '+_ddmmFromISO(APP_INICIO_OPERACION)+'). Se salda escribiendo la nota.</div>'
+    +lista+'</div>';
 }
 // ── LOOP S1+S2+S3: Dashboard de rendimiento de equipo (solo supervisor) ─────────────
 // S1: citas (Google Calendar vía leerAgenda) vs notas SOAP escritas, ventanas hoy/7días/mes.
 // S2: score de calidad de nota (JS puro, 0-100).
 // S3: asignación persistente para "Sin asignar"/"Por identificar" (colección agendaAsignaciones, reglas v8).
 var TERAPEUTA_CAL2COD={Carlos:'CARLOS', Zara:'ZARA', Camila:'CAMI', Dafne:'DAF', Goretti:'GORE', Jess:'JESS'};
+// [BANNER] Dirección inversa código→nombre de calendario, construida invirtiendo el mapa
+// existente (fuente única: NO duplicar un mapa nuevo).
+var TERAPEUTA_COD2CAL=(function(){ var m={}; Object.keys(TERAPEUTA_CAL2COD).forEach(function(n){ m[TERAPEUTA_CAL2COD[n]]=n; }); return m; })();
 function _diasVentanaRendimiento(ventana){
   function iso(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
   var hoy=new Date(); hoy.setHours(12,0,0,0);
