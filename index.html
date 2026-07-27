@@ -4902,6 +4902,12 @@ function _terapeutasDeCita(ev, asigMap){
   if(ts.length>1) ts=ts.filter(function(t){ return t!=='Carlos'; });
   return ts;
 }
+// [NOTA-CERCA] Distancia en días entre dos claves canónicas 'YYYY-MM-DD' (99 si alguna no parsea).
+function _difDiasCanon(a,b){
+  var da=new Date(String(a)+'T12:00:00'), db=new Date(String(b)+'T12:00:00');
+  if(isNaN(da.getTime())||isNaN(db.getTime())) return 99;
+  return Math.round(Math.abs(da-db)/86400000);
+}
 window._bannerPendCache=null;   // {ts, cod, total, items} — TTL = REND_CACHE_TTL_MS (5 min)
 async function _computarBannerPendientes(){
   var cod=String((currentUser&&currentUser.name)||'').toUpperCase();
@@ -4935,21 +4941,26 @@ async function _computarBannerPendientes(){
     if(r.ambiguo) return;                                      // [P0-2] homónimo → 🔎 del supervisor
     if(!r.pid) return;                                         // sin expediente → 🔎 del supervisor
     // ¿Se saldó con UNA nota? (cualquier autora, mismo criterio por día que el dashboard)
-    var tiene=false;
+    var fechasNotas=[];
     if(r.tipo==='activo' && r.p){
-      tiene=!!_soapVivas(r.p).find(function(s){ return s && _diaCanon(s.fecha)===citaCanon; });
+      _soapVivas(r.p).forEach(function(s){ var c=s&&_diaCanon(s.fecha); if(c) fechasNotas.push(c); });
     } else if(r.tipo==='historico'){
       var setF=(Array.isArray(fechasHist[clave])?fechasHist[clave].slice():[]);
       if(ultimaHist&&ultimaHist[clave]) setF.push(ultimaHist[clave]);
-      tiene=setF.some(function(f){ return _diaCanon(f)===citaCanon; });
+      setF.forEach(function(f){ var c=_diaCanon(f); if(c) fechasNotas.push(c); });
     }
-    if(tiene) return;
+    if(fechasNotas.indexOf(citaCanon)!==-1) return;   // tiene nota del día exacto
     var kMarca=_keyCitaResuelta(clave, ddmm);
     if((resueltas&&resueltas[kMarca])||(noAcudioMap&&noAcudioMap[kMarca])) return;   // el supervisor ya la sacó
     var kv=clave+'|'+ddmm;
     if(vistos[kv]) return;
     vistos[kv]=true;
-    items.push({nombre:ev.paciente||'(sin nombre)', fecha:ddmm});
+    // [NOTA-CERCA] Opción A: si hay una nota a ±2 días de la cita, el problema probable es la
+    // FECHA de la nota, no la falta de nota. El pendiente NO se perdona (sigue contando hasta
+    // que corrijan la fecha en la nota); solo se diagnostica para no perseguir a ciegas.
+    var notaCerca='', _mejor=99;
+    fechasNotas.forEach(function(c){ var d=_difDiasCanon(c, citaCanon); if(d>0 && d<=2 && d<_mejor){ _mejor=d; notaCerca=c; } });
+    items.push({nombre:ev.paciente||'(sin nombre)', fecha:ddmm, notaCerca:(notaCerca?_ddmmFromISO(notaCerca):'')});
   });
   var out={ts:Date.now(), cod:cod, total:items.length, items:items};
   window._bannerPendCache=out;
@@ -4968,7 +4979,8 @@ function _renderBannerPendientes(r){
   var exp=!!window._bannerPendExpandido;
   var visibles=exp?r.items:r.items.slice(0,8);
   var lista=visibles.map(function(x){
-    return '<div style="font-size:11px;color:#92400E;padding:1px 0">• '+escapeHTML(x.nombre)+' — '+escapeHTML(x.fecha)+'</div>';
+    var pista=x.notaCerca?(' <span style="font-weight:700">⚠️ hay nota del '+escapeHTML(x.notaCerca)+' — ¿fecha equivocada?</span>'):'';
+    return '<div style="font-size:11px;color:#92400E;padding:1px 0">• '+escapeHTML(x.nombre)+' — '+escapeHTML(x.fecha)+pista+'</div>';
   }).join('');
   var toggle='';
   if(r.items.length>8){
