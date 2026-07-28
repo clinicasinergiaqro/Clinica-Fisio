@@ -9897,6 +9897,7 @@ async function guardarSOAP(){
           console.warn('[SOAP-hist] guardado falló, encolado:', err && err.message);
         }
       }
+      try{ window._bannerPendCache=null; if(window._triUltimaHistCache) window._triUltimaHistCache.ts=0; _montarBannerPendientes(); }catch(_){}   // [BANNER-REFRESH] rama estáticamente HISTÓRICO (no usar editingSoapEsHistorico: ya se reseteó arriba)
       goBack();
       setTimeout(()=>renderExpediente('soap'),300);
       _liberarGuardSOAP();
@@ -9985,7 +9986,7 @@ async function guardarSOAP(){
         }catch(_err){ _encolarSoapActivo(p.id, p.soap[idx], 'edicion'); console.warn('[SOAP-act] dual-write edición excepción, encolado:', _err && _err.message); }
       }
     }).catch(()=>{ _encolarSoapActivo(p.id, p.soap[idx], 'edicion'); showToast('⚠️ Sin conexión — actualizada local, se sincronizará','warning'); })
-    .finally(()=>_liberarGuardSOAP());
+    .finally(()=>{ try{ window._bannerPendCache=null; _montarBannerPendientes(); }catch(_){} _liberarGuardSOAP(); });   // [BANNER-REFRESH] rama activo (aditivo, jamás afecta el guardado)
     goBack();
     setTimeout(()=>renderExpediente('soap'),300);
 
@@ -10067,6 +10068,7 @@ async function guardarSOAP(){
     if(_esHistNueva && !navigator.onLine){
       _encolarSoapHistoricoNueva(p.id, nuevaSOAP);
       showToast('📴 Sin conexión — nota respaldada en este equipo. Se sincronizará al reconectar.','warning');
+      try{ window._bannerPendCache=null; if(window._triUltimaHistCache) window._triUltimaHistCache.ts=0; _montarBannerPendientes(); }catch(_){}   // [BANNER-REFRESH] rama estáticamente HISTÓRICO offline
       _liberarGuardSOAP();
       goBack();
       setTimeout(()=>renderExpediente('soap'),300);
@@ -10113,7 +10115,7 @@ async function guardarSOAP(){
         }
       }
     }).catch(()=>showToast('⚠️ Sin conexión — SOAP guardada solo en este equipo','warning'))
-    .finally(()=>_liberarGuardSOAP());
+    .finally(()=>{ try{ window._bannerPendCache=null; if(_esHistNueva && window._triUltimaHistCache) window._triUltimaHistCache.ts=0; _montarBannerPendientes(); }catch(_){} _liberarGuardSOAP(); });   // [BANNER-REFRESH] nueva (activo/hist-online; _esHistNueva SÍ existe en este scope, L10063)
     goBack();
     setTimeout(()=>renderExpediente('soap'),300);
   }
