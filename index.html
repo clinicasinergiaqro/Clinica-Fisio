@@ -15770,8 +15770,9 @@ async function enviarEjerciciosWhatsApp(){
   var link=base+'?ejercicios='+p.ejerciciosToken;
   var nombre=(p.name||'').split(' ').slice(0,2).join(' ');
   var msg='Hola '+nombre+', te compartimos el programa de ejercicios diseñado para ti por tu equipo de Clínica Sinergia. '
-    +'Realízalo respetando la dosificación indicada en cada ejercicio para obtener el mejor resultado. '
-    +'Si al realizarlo presentas alguna molestia, suspéndelo y avísanos. Cualquier duda la revisamos juntos en tu próxima sesión. '
+    +'Te pedimos realizarlo respetando la dosificación indicada en cada ejercicio para obtener el mejor resultado. '
+    +'Recuerda que una molestia leve puede ser parte normal del proceso, como te explicamos en tu sesión; si sientes un dolor fuerte o que va en aumento, suspende el ejercicio y avísanos. '
+    +'Si te queda alguna duda, con gusto la aclaramos en tu próxima sesión. '
     +'Tu rutina: '+link;
   var copiado=await _intentarCopiar(msg);
   var tel=_normalizarTelWA(p.telefono);
@@ -15793,8 +15794,9 @@ function enviarEjerciciosWhatsAppClinica(url){
   var p = currentPatient;
   var nombre = (p && p.name) ? p.name : '';
   var msg = 'Hola '+nombre+', te compartimos el programa de ejercicios diseñado para ti por tu equipo de Clínica Sinergia. '
-    +'Realízalo respetando la dosificación indicada en cada ejercicio para obtener el mejor resultado. '
-    +'Si al realizarlo presentas alguna molestia, suspéndelo y avísanos. Cualquier duda la revisamos juntos en tu próxima sesión. '
+    +'Te pedimos realizarlo respetando la dosificación indicada en cada ejercicio para obtener el mejor resultado. '
+    +'Recuerda que una molestia leve puede ser parte normal del proceso, como te explicamos en tu sesión; si sientes un dolor fuerte o que va en aumento, suspende el ejercicio y avísanos. '
+    +'Si te queda alguna duda, con gusto la aclaramos en tu próxima sesión. '
     +'Tu rutina: '+url;
   var wa = 'https://wa.me/524424795588?text='+encodeURIComponent(msg);
   window.open(wa, '_blank'); // URL externa de WhatsApp — window.open es correcto aquí
@@ -15902,8 +15904,9 @@ function copyLink(url){
   var p = currentPatient;
   var nombre = (p && p.name) ? p.name : '';
   var msg = 'Hola '+nombre+', te compartimos el programa de ejercicios diseñado para ti por tu equipo de Clínica Sinergia. '
-    +'Realízalo respetando la dosificación indicada en cada ejercicio para obtener el mejor resultado. '
-    +'Si al realizarlo presentas alguna molestia, suspéndelo y avísanos. Cualquier duda la revisamos juntos en tu próxima sesión. '
+    +'Te pedimos realizarlo respetando la dosificación indicada en cada ejercicio para obtener el mejor resultado. '
+    +'Recuerda que una molestia leve puede ser parte normal del proceso, como te explicamos en tu sesión; si sientes un dolor fuerte o que va en aumento, suspende el ejercicio y avísanos. '
+    +'Si te queda alguna duda, con gusto la aclaramos en tu próxima sesión. '
     +'Tu rutina: '+url;
   // 1) Copiar DENTRO del gesto (sin await antes — crítico en iPad PWA standalone).
   if(navigator.clipboard && navigator.clipboard.writeText){
@@ -15995,7 +15998,7 @@ function cambiarEstadoEjercicio(idx, estado){
 
 // ── M1-C6: WhatsApp profesional ───────────────────────────────────────────
 function sendWhatsApp(url, nombre){
-  const msg = encodeURIComponent(`Hola ${nombre||''}, te compartimos el programa de ejercicios diseñado para ti por tu equipo de Clínica Sinergia. Realízalo respetando la dosificación indicada en cada ejercicio para obtener el mejor resultado. Si al realizarlo presentas alguna molestia, suspéndelo y avísanos. Cualquier duda la revisamos juntos en tu próxima sesión. Tu rutina: ${url}`);
+  const msg = encodeURIComponent(`Hola ${nombre||''}, te compartimos el programa de ejercicios diseñado para ti por tu equipo de Clínica Sinergia. Te pedimos realizarlo respetando la dosificación indicada en cada ejercicio para obtener el mejor resultado. Recuerda que una molestia leve puede ser parte normal del proceso, como te explicamos en tu sesión; si sientes un dolor fuerte o que va en aumento, suspende el ejercicio y avísanos. Si te queda alguna duda, con gusto la aclaramos en tu próxima sesión. Tu rutina: ${url}`);
   window.open(`https://wa.me/?text=${msg}`, '_blank');
 }
 
