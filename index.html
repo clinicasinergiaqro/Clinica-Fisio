@@ -3864,12 +3864,6 @@ function renderAgenda(){
   c.innerHTML=html;
   // G-2: bloque adicional "Agenda del calendario" (async, no bloquea el dashboard de hoy)
   try{ FST_montarAgendaCalendar('dia'); }catch(e){ console.warn('[Agenda cal] montar:', e&&e.message); }
-  // M2-E: toast una vez por sesión si hay SOAP atrasado
-  const atrasados=patientsDB.filter(p=>!_activoEliminado(p.id)&&!String(p.name||'').startsWith('TEST_QA_')&&necesitaAlertaSoapSemanal(p)&&_soapVivas(p).length>0).length;   // [BORRADO-ACTIVOS] D1-2
-  if(atrasados>0 && !sessionStorage.getItem('toastSoapMostrado')){
-    showToast(`${atrasados} paciente${atrasados>1?'s':''} con SOAP atrasado (+7 días)`,'warning');
-    sessionStorage.setItem('toastSoapMostrado','1');
-  }
 }
 // ── G-2: Agenda del Google Calendar (backend leerAgenda) — la app SOLO LEE ──
 const AGENDA_COLORES = {Carlos:'#1B3A6B', Zara:'#0E7C66', Camila:'#B8860B', Dafne:'#7B4FA3', Goretti:'#C0392B', Jess:'#2C7BB6'};
