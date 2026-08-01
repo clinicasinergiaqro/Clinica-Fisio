@@ -6357,7 +6357,7 @@ async function _detEjecutar(){
     var fSoap=_n('COLA_SOAP_ACT_FALLIDOS'), fHist=_n('COLA_SYNC_HIST_FALLIDOS')+_n('COLA_SYNC_HIST_DOC_FALLIDOS');
     var cuerpo='Pendientes de sincronizar (se reintentan solas): <b>'+pend+'</b>.';
     if(fSoap) cuerpo+='<br>SOAP de activos que se rindieron: <b>'+fSoap+'</b> — recuperables con «Rescatar».';
-    if(fHist){ cuerpo+='<br>Cambios de histórico que se rindieron: <b>'+fHist+'</b> — <i>NO se tocan aquí</i> (pueden ser conflicto con otro equipo; requieren revisión manual).'; }
+    if(fHist){ cuerpo+='<br>Cambios de histórico que se rindieron: <b>'+fHist+'</b> — verifica las notas NUEVAS con «Verificar histórico» (las ediciones de histórico se revisan manual).'; }
     var tipoC=(fSoap||fHist)?'warning':(pend?'info':'ok');
     if(fSoap) hayHallazgos=true;
     secciones.push(_detBloque('📥 Colas de sincronización', (pend||fSoap||fHist)?cuerpo:'✅ Todo sincronizado, sin colas pendientes.', tipoC));
@@ -6388,6 +6388,7 @@ async function _detEjecutar(){
   // ── Acciones ──
   var acciones='<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px">'
     +'<button id="det-rescatar" onclick="_detRescatar()" style="font-size:13px;font-weight:800;border:none;border-radius:10px;padding:9px 16px;cursor:pointer;font-family:inherit;background:'+(hayHallazgos?'#B91C1C':'#EEF1F6')+';color:'+(hayHallazgos?'#fff':'var(--gray-500)')+'">☁️ Rescatar (subir lo pendiente)</button>'
+    +((function(){ try{ var _a=JSON.parse(localStorage.getItem('COLA_SYNC_HIST_FALLIDOS')||'[]'); return Array.isArray(_a)&&_a.some(function(it){ return it && it.tipo==='nueva'; }); }catch(e){ return false; } })()?('<button id="det-limpia-hist" onclick="_detLimpiarHistFallidos()" style="font-size:13px;font-weight:800;border:none;border-radius:10px;padding:9px 16px;cursor:pointer;font-family:inherit;background:#EEF1F6;color:var(--gray-500)">🔁 Verificar histórico en nube</button>'):'')
     +'<button onclick="_detExportar()" style="font-size:13px;font-weight:800;border:none;border-radius:10px;padding:9px 16px;cursor:pointer;font-family:inherit;background:var(--gold);color:var(--navy-dark)">📤 Exportar este dispositivo</button>'
     +'</div>';
   cont.innerHTML=cabecera+secciones.join('')+acciones;
@@ -6417,6 +6418,36 @@ async function _detRescatar(){
   try{ if(typeof sincronizarPendientes==='function') await sincronizarPendientes(); }catch(e){}
   if(btn){ btn.disabled=false; btn.textContent='Rescatar de nuevo'; }
   showToast('☁️ Rescate disparado — '+n+' sesión(es) encoladas. Revisa de nuevo para confirmar 0 pendientes.','success');
+  setTimeout(_detEjecutar, 800);
+}
+// [LIMPIEZA-FANTASMAS-HIST] Puerta de salida para los fallidos de histórico NUEVOS (create-vs-update):
+// mueve SOLO los tipo==='nueva' de COLA_SYNC_HIST_FALLIDOS a la cola viva COLA_SYNC_HIST y drena.
+// Toda la lógica de nube vive en drenarColaSoapHistorico (guard fantasma del fix 08-01a: get() bajo
+// el pid mig_pac_ REAL → si existe, confirma sin reescribir y repara fechasSesiones; si no, create;
+// ante cualquier fallo del get(), ruta normal). Las ediciones (tipo!=='nueva') se DEJAN intactas en
+// fallidos (terreno de conflicto cross-device, revisión manual). Fail-safe de una vía: un ítem solo
+// sale por éxito confirmado; temporal→reintento; permanente→vuelve a fallidos con su error real.
+async function _detLimpiarHistFallidos(){
+  if(!navigator.onLine){ showToast('Sin conexión — conéctate y reintenta','warning'); return; }
+  var f; try{ f=JSON.parse(localStorage.getItem('COLA_SYNC_HIST_FALLIDOS')||'[]'); }catch(e){ f=[]; }
+  if(!Array.isArray(f)) f=[];
+  var nuevas=f.filter(function(it){ return it && it.tipo==='nueva'; });
+  var resto =f.filter(function(it){ return !(it && it.tipo==='nueva'); });   // ediciones: se quedan
+  if(!nuevas.length){ showToast('No hay notas nuevas de histórico por verificar','success'); return; }
+  if(!window.confirm('Se verificarán '+nuevas.length+' nota(s) NUEVA(s) de histórico rendidas contra la nube. Las ya subidas se confirman; el resto se reintenta.\n\nSolo toca datos de ESTE dispositivo. ¿Continuar?')) return;
+  var btn=document.getElementById('det-limpia-hist'); if(btn){ btn.disabled=true; btn.textContent='Verificando…'; }
+  try{
+    var viva; try{ viva=JSON.parse(localStorage.getItem('COLA_SYNC_HIST')||'[]'); }catch(e){ viva=[]; }
+    if(!Array.isArray(viva)) viva=[];
+    nuevas.forEach(function(it){ var c=Object.assign({},it); delete c.error; delete c.falladoEn; delete c.intentos; delete c.proximoIntento; viva.push(c); });
+    // ORDEN crash-safe: persistir el vivo ANTES de recortar fallidos (drenar no vacía el vivo hasta
+    // el final con `restantes`; si truena a media, los ítems siguen en el vivo, no se pierden).
+    localStorage.setItem('COLA_SYNC_HIST', JSON.stringify(viva));
+    localStorage.setItem('COLA_SYNC_HIST_FALLIDOS', JSON.stringify(resto));
+  }catch(e){ console.warn('[limpieza-hist] no se pudo reencolar:', e && e.message); if(btn){ btn.disabled=false; btn.textContent='Verificar histórico en nube'; } showToast('No se pudo iniciar la verificación','warning'); return; }
+  try{ if(typeof drenarColaSoapHistorico==='function') await drenarColaSoapHistorico(); }catch(e){ console.warn('[limpieza-hist] drenar:', e && e.message); }
+  if(btn){ btn.disabled=false; btn.textContent='Verificar de nuevo'; }
+  showToast('🔁 Verificación disparada — '+nuevas.length+' nota(s) de histórico. Revisa de nuevo para confirmar.','success');
   setTimeout(_detEjecutar, 800);
 }
 async function _detExportar(){
