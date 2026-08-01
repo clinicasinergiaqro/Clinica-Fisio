@@ -2142,6 +2142,22 @@ async function drenarColaSoapHistorico(){
           // FST_buildSesionPayload recrea los serverTimestamp (no serializables en la cola).
           if(!window._fstDb && typeof FST_init==='function') await FST_init();
           if(!window._fstDb) throw new Error('unavailable: firestore-no-disponible'); // temporal → reintenta
+          // [REPLAY-SEGURO] Fantasma create-vs-update: si la sesión YA existe bajo el pid del item
+          // (mig_pac_ real por construcción, mismo destino del write de abajo), confirmarla sin
+          // reescribir. Solo se repara el índice fechasSesiones del padre (arrayUnion idempotente,
+          // no crítico) por si el write original murió entre sesión e índice. Ante cualquier fallo
+          // del get() → ruta normal de hoy (la nota nunca sale de la cola sin confirmación).
+          try{
+            var _snapH=await _conTimeout(window._fstDb.collection('pacientes').doc(it.pid).collection('sesiones').doc(String(it.sesion.id)).get(), 10000);
+            if(_snapH && _snapH.exists){
+              if(it.sesion && it.sesion.fecha){
+                try{ await window._fstDb.collection('pacientes').doc(it.pid).set({ fechasSesiones: firebase.firestore.FieldValue.arrayUnion((typeof _aISO==='function' && _aISO(it.sesion.fecha)) || it.sesion.fecha) }, { merge:true }); }
+                catch(_fs2){ console.warn('[Capa3] fechasSesiones (fantasma) no se pudo escribir:', _fs2 && _fs2.message); }
+              }
+              console.log('[SOAP-hist] fantasma confirmado en nube · pid='+it.pid+' · sid='+it.sesion.id+' — se da por subida');
+              continue;
+            }
+          }catch(_g){ /* fail-safe: sin confirmación → ruta normal de hoy */ }
           await _reSubirMediaDesdeIDB(it.pid, it.sesion && it.sesion.media);   // [LOOP-B #2] rescate de fotos offline
           var sesPayload = FST_buildSesionPayload(it.sesion, 'nueva');
           await window._fstDb.collection('pacientes').doc(it.pid).collection('sesiones').doc(String(it.sesion.id)).set(_sinUndefined(sesPayload), { merge:true });
@@ -2244,10 +2260,29 @@ async function drenarColaSoapActivo(){
         // Replay con el MODO guardado. Items encolados antes de este fix no tienen it.modo → 'nueva'
         // (correcto: la cola solo encolaba notas nuevas hasta ahora).
         var _modoReplay=(it.modo==='edicion') ? 'edicion' : 'nueva';
+        // [REPLAY-SEGURO] Fantasma create-vs-update: si la nota 'nueva' YA existe en la nube bajo
+        // el pid REAL, se confirma como subida SIN reescribir (el replay con payload de create sobre
+        // un doc existente lo rechaza sesionUpdateOK → permission-denied perpetuo). Guard estricto:
+        // JAMÁS confirma contra un espejo app_live_ (huérfano) y ante CUALQUIER fallo del get()
+        // (red/timeout/permiso) cae a la ruta normal — la nota nunca sale de la cola sin confirmación.
+        if(_modoReplay==='nueva'){
+          try{
+            var _pi=await FST_resolverPidPaciente(pac);
+            if(_pi && _pi.ok && _pi.pid && String(_pi.pid).indexOf('app_live_')!==0){
+              if(!window._fstDb && typeof FST_init==='function') await FST_init();
+              if(window._fstDb){
+                var _snap=await _conTimeout(window._fstDb.collection('pacientes').doc(_pi.pid).collection('sesiones').doc(String(it.sesion.id)).get(), 10000);
+                if(_snap && _snap.exists){ console.log('[SOAP-act] fantasma confirmado en nube · pid='+_pi.pid+' · sid='+it.sesion.id+' — se da por subida'); continue; }
+              }
+            }
+          }catch(_g){ /* fail-safe: sin confirmación → ruta normal de hoy */ }
+        }
         var r=await _conTimeout(FST_guardarSesionFirestore(pac, it.sesion, _modoReplay), 10000);
         if(r && r.ok){ /* éxito → no se re-encola */ }
         else {
-          var _reason=(r && r.reason)||'desconocido';
+          // [REPLAY-SEGURO Fix 2] conservar el mensaje real (antes solo 'FIRESTORE_ERROR' a secas
+          // → imposible distinguir permiso vs red en los FALLIDOS). No altera la lógica de reintentos.
+          var _reason=((r && r.reason)||'desconocido')+(r && r.message ? (' · '+String(r.message).slice(0,180)) : '');
           if(/FLAG_OFF|NO_STAGING|SKIP_IMPORTADA|INPUT_FALTANTE|SID_VACIO/.test(_reason)){
             // No recuperables reintentando (espejo apagado o input inválido) → a FALLIDOS, no reintentar.
             fallidos.push(Object.assign({}, it, {error:_reason, falladoEn:ahora}));
@@ -3864,12 +3899,6 @@ function renderAgenda(){
   c.innerHTML=html;
   // G-2: bloque adicional "Agenda del calendario" (async, no bloquea el dashboard de hoy)
   try{ FST_montarAgendaCalendar('dia'); }catch(e){ console.warn('[Agenda cal] montar:', e&&e.message); }
-  // M2-E: toast una vez por sesión si hay SOAP atrasado
-  const atrasados=patientsDB.filter(p=>!_activoEliminado(p.id)&&!String(p.name||'').startsWith('TEST_QA_')&&necesitaAlertaSoapSemanal(p)&&_soapVivas(p).length>0).length;   // [BORRADO-ACTIVOS] D1-2
-  if(atrasados>0 && !sessionStorage.getItem('toastSoapMostrado')){
-    showToast(`${atrasados} paciente${atrasados>1?'s':''} con SOAP atrasado (+7 días)`,'warning');
-    sessionStorage.setItem('toastSoapMostrado','1');
-  }
 }
 // ── G-2: Agenda del Google Calendar (backend leerAgenda) — la app SOLO LEE ──
 const AGENDA_COLORES = {Carlos:'#1B3A6B', Zara:'#0E7C66', Camila:'#B8860B', Dafne:'#7B4FA3', Goretti:'#C0392B', Jess:'#2C7BB6'};
