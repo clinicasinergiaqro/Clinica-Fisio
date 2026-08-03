@@ -3917,7 +3917,7 @@ function renderAgenda(){
   try{ FST_montarAgendaCalendar('dia'); }catch(e){ console.warn('[Agenda cal] montar:', e&&e.message); }
 }
 // ── G-2: Agenda del Google Calendar (backend leerAgenda) — la app SOLO LEE ──
-const AGENDA_COLORES = {Carlos:'#1B3A6B', Zara:'#0E7C66', Camila:'#B8860B', Dafne:'#7B4FA3', Goretti:'#C0392B', Jess:'#2C7BB6'};
+const AGENDA_COLORES = {Carlos:'#1B3A6B', Zara:'#0E7C66', Camila:'#B8860B', Dafne:'#7B4FA3', Goretti:'#C0392B', Jess:'#2C7BB6', Dulce:'#C2185B'};
 const AGENDA_COLOR_SIN = '#9BA3B5';
 function _horaLocal(iso){
   try{ return new Date(iso).toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'}); }
@@ -9927,7 +9927,7 @@ function updateEvaVal(id,v){const el=document.getElementById(id);if(el)el.classN
 
 // F3: ¿quién atendió la sesión? (multi-selección; default = terapeuta de la nota)
 function _listaTerapeutasAtienden(){
-  var base=['Carlos','Zara','Camila','Dafne','Goretti','Jess'];
+  var base=['Carlos','Zara','Camila','Dafne','Goretti','Jess','Dulce'];
   var yo=(currentUser&&currentUser.name)||'';
   if(yo && base.indexOf(yo)===-1) base.push(yo);
   return base;
@@ -11298,7 +11298,7 @@ function _abrirEditarPaciente(pid){
   if(!(currentUser && currentUser.role==='supervisor')){ showToast('Sin permiso — solo supervisor','error'); return; }
   var p = _resolverPaciente(pid);
   if(!p){ showToast('Paciente no encontrado','error'); return; }
-  var ters = ['CARLOS','DAF','ZARA','CAMI','GORE','JESS'];
+  var ters = ['CARLOS','DAF','ZARA','CAMI','GORE','JESS','DUL'];
   var opts = ters.map(function(t){ return '<option value="'+t+'"'+(p.terapeuta===t?' selected':'')+'>'+t+'</option>'; }).join('');
   if(p.terapeuta && ters.indexOf(p.terapeuta)===-1){ opts = '<option value="'+escapeAttr_(p.terapeuta)+'" selected>'+escapeHTML(p.terapeuta)+'</option>'+opts; }
   // Sexo: mismas opciones que el alta inicial (n-sexo, NOM-004). Preserva valor no estándar existente.
@@ -13130,6 +13130,7 @@ const TERAPEUTAS_INFO = {
   'CAMI':   {nombreCompleto:'Camila Saldana Lerma',cedula:null},
   'JESS':   {nombreCompleto:'Jessica Abril Rivera Arenas',cedula:null},
   'GORE':   {nombreCompleto:'Araney Goretti Meza Reyes',cedula:null},
+  'DUL':    {nombreCompleto:'Dulce Padron Salazar',cedula:null},
 };
 
 async function guardarConsentimiento(){
@@ -13607,7 +13608,7 @@ function showNuevoPaciente(){
   screenStack.push('screen-nuevo');showScreen('screen-nuevo',false);renderNuevoPaciente();
 }
 function renderNuevoPaciente(){
-  const ters=['CARLOS','DAF','ZARA','CAMI','GORE','JESS'];
+  const ters=['CARLOS','DAF','ZARA','CAMI','GORE','JESS','DUL'];
   // Opciones para terapeuta de seguimiento — todos menos el actual
   const optsSegimiento=['— Sin asignar —',...ters]
     .map(t=>`<option value="${t==='— Sin asignar —'?'':t}">${t}</option>`).join('');
@@ -18489,7 +18490,7 @@ async function nuevaSesionRapida(patientId){
 }
 
 function renderSupervision(){
-  const ters=['CARLOS','DAF','ZARA','CAMI','GORE','JESS'];
+  const ters=['CARLOS','DAF','ZARA','CAMI','GORE','JESS','DUL'];
   const c=document.getElementById('content-supervision');
   // EXPORTACIÓN — botón solo supervisor (no interfiere con el resto del render)
   // BLOQUEANTE LEGAL: aviso de privacidad pendiente de revisión por abogado LFPDPPP.

@@ -1038,6 +1038,7 @@ function testScript() {
 var AGENDA_INICIALES = [
   { ini: 'CM', terapeuta: 'Camila'  },
   { ini: 'Z',  terapeuta: 'Zara'    },
+  { ini: 'DU', terapeuta: 'Dulce'   },  // DU antes de D (D sola es Dafne)
   { ini: 'D',  terapeuta: 'Dafne'   },
   { ini: 'G',  terapeuta: 'Goretti' },
   { ini: 'C',  terapeuta: 'Carlos'  },
