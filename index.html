@@ -3389,7 +3389,8 @@ const ROLES_POR_CORREO = Object.assign(
   _R('gutierrezgarciazaray96','gmail.com','ZARA','terapeuta','ZA'),
   _R('camislerma26','gmail.com','CAMI','terapeuta','CA'),
   _R('agoretti.mr','gmail.com','GORE','terapeuta','GO'),
-  _R('jriveare2000','hotmail.com','JESS','terapeuta','JE')
+  _R('jriveare2000','hotmail.com','JESS','terapeuta','JE'),
+  _R('dulcesalazar_1799','hotmail.com','DUL','terapeuta','DU')
 );
 
 // Email eliminado — acceso legacy retirado. Solo Firebase Auth.
@@ -5051,7 +5052,7 @@ async function _montarBannerPendientes(){
 // S1: citas (Google Calendar vía leerAgenda) vs notas SOAP escritas, ventanas hoy/7días/mes.
 // S2: score de calidad de nota (JS puro, 0-100).
 // S3: asignación persistente para "Sin asignar"/"Por identificar" (colección agendaAsignaciones, reglas v8).
-var TERAPEUTA_CAL2COD={Carlos:'CARLOS', Zara:'ZARA', Camila:'CAMI', Dafne:'DAF', Goretti:'GORE', Jess:'JESS'};
+var TERAPEUTA_CAL2COD={Carlos:'CARLOS', Zara:'ZARA', Camila:'CAMI', Dafne:'DAF', Goretti:'GORE', Jess:'JESS', Dulce:'DUL'};
 // [BANNER] Dirección inversa código→nombre de calendario, construida invirtiendo el mapa
 // existente (fuente única: NO duplicar un mapa nuevo).
 var TERAPEUTA_COD2CAL=(function(){ var m={}; Object.keys(TERAPEUTA_CAL2COD).forEach(function(n){ m[TERAPEUTA_CAL2COD[n]]=n; }); return m; })();
@@ -18808,7 +18809,8 @@ const TERAPEUTAS_MIGRACION = {
   'daf':'DAF','dafne':'DAF','dafne d':'DAF',
   'cami':'CAMI','camila':'CAMI',
   'gore':'GORE','goretti':'GORE','agoretti':'GORE',
-  'jess':'JESS','jes':'JESS','jessica':'JESS'
+  'jess':'JESS','jes':'JESS','jessica':'JESS',
+  'dulce':'DUL','dulce padron':'DUL','dulce salazar':'DUL','dulce padron salazar':'DUL'
 };
 function normalizaTerapeutaImport_(nombre){
   const k=String(nombre||'').trim().toLowerCase().replace(/\s+/g,' ');
