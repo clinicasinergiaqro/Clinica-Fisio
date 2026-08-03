@@ -8,7 +8,8 @@ service cloud.firestore {
         'camislerma26@gmail.com',
         'agoretti.mr@gmail.com',
         'dafnend26@gmail.com',
-        'jriveare2000@hotmail.com'
+        'jriveare2000@hotmail.com',
+        'dulcesalazar_1799@hotmail.com'
       ];
     }
     function isSupervisor() {
