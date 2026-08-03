@@ -5701,30 +5701,53 @@ function _colaRevisionHTML(items, filtro, desdeCache){
   var cuerpo='';
   Object.keys(porMotivo).sort(function(a,b){return porMotivo[b].length-porMotivo[a].length;}).forEach(function(m){
     var grupo=porMotivo[m];
-    // M2: validación masiva del grupo (con confirm dentro de la función)
-    cuerpo+='<div style="margin-top:12px"><div style="display:flex;align-items:center;gap:8px;border-bottom:2px solid var(--gray-200);padding-bottom:3px">'
-      +'<div style="flex:1;font-size:13px;font-weight:800;color:var(--navy)">'+escapeHTML(MOTIVO_LABELS[m]||m)+' — '+grupo.length+'</div>'
-      +'<button data-m="'+escapeAttr_(m)+'" onclick="_validarGrupoRevision(this.dataset.m)" style="font-size:10px;font-weight:700;border:1px solid #A7F3D0;border-radius:8px;padding:2px 8px;cursor:pointer;background:#ECFDF5;color:#065F46;font-family:inherit">✓ Validar todas ('+grupo.length+')</button>'
-      +'</div>';
-    // M3: sub-agrupación visual por paciente (items ya vienen ordenados nombre+num)
+    // M3: sub-agrupación visual por paciente (items ya vienen ordenados nombre+num).
+    // fila(): renderer ÚNICO del ítem (mismo HTML de siempre), compartido por el camino
+    // genérico y por los sub-grupos de FECHA_FUTURA — cero duplicación.
     var pidPrev=null;
-    grupo.forEach(function(it,ix){
+    function fila(it,ix,sub){
       var mismo=(it.pid===pidPrev); pidPrev=it.pid;
-      var idInp='colarev-f-'+m.replace(/[^A-Za-z0-9]/g,'')+'-'+ix;
+      var idInp='colarev-f-'+(m+(sub||'')).replace(/[^A-Za-z0-9]/g,'')+'-'+ix;
       var esFecha=_esMotivoFecha(it.motivos);
       // M1: editor de fecha inline solo en motivos de fecha
       var editor=esFecha
         ? '<input type="date" id="'+idInp+'" value="'+escapeAttr_(_fechaAInputISO(it.fecha))+'" style="font-size:11px;border:1px solid var(--gray-200);border-radius:8px;padding:2px 4px;font-family:inherit">'
           +'<button data-path="'+escapeAttr_(it.path)+'" data-inp="'+idInp+'" onclick="_guardarFechaRevision(this.dataset.path, this.dataset.inp)" style="font-size:10px;font-weight:700;border:1px solid #C7D2FE;border-radius:8px;padding:2px 8px;cursor:pointer;background:#EEF2FF;color:#3730A3;font-family:inherit">💾 Fecha</button>'
         : '';
-      cuerpo+='<div style="display:flex;align-items:center;gap:6px;padding:5px 0 5px '+(mismo?'18px':'0')+';border-bottom:1px solid #F0F2F7;flex-wrap:wrap">'
+      return '<div style="display:flex;align-items:center;gap:6px;padding:5px 0 5px '+(mismo?'18px':'0')+';border-bottom:1px solid #F0F2F7;flex-wrap:wrap">'
         +'<div style="flex:1;min-width:140px;font-size:12px;color:#374151">'+(mismo?'<span style="color:var(--gray-400)">↳</span> ':'<b>'+escapeHTML(it.nombre)+'</b> · ')+'ses '+(it.num||'—')+' · '+(it.fecha?escapeHTML(it.fecha):'<span style="color:#B91C1C;font-weight:700">(sin fecha)</span>')
         +(it.motivos.length>1?' <span style="font-size:10px;color:var(--gray-400)">['+escapeHTML(it.motivos.join(', '))+']</span>':'')+'</div>'
         +editor
         +'<button data-pid="'+escapeAttr_(it.pid)+'" onclick="_abrirExpedienteDesdeRendimiento(this.dataset.pid)" style="font-size:10px;font-weight:700;border:1px solid #C7D2FE;border-radius:8px;padding:2px 8px;cursor:pointer;background:#EEF2FF;color:#3730A3;font-family:inherit">abrir →</button>'
         +'<button data-path="'+escapeAttr_(it.path)+'" onclick="_validarSesionRevision(this.dataset.path)" style="font-size:10px;font-weight:700;border:1px solid #A7F3D0;border-radius:8px;padding:2px 8px;cursor:pointer;background:#ECFDF5;color:#065F46;font-family:inherit">✓ Validada</button>'
         +'</div>';
-    });
+    }
+    if(m==='FECHA_FUTURA'){
+      // [FECHA-FUTURA] Corte DINÁMICO ≤ hoy: la migración marcó "futura" todo lo posterior a su
+      // corrida; con el tiempo esas fechas caducan (ya son pasado válido) y solo hay que validar.
+      // Las AÚN futuras son errores reales (2036/2027/meses por venir) → editor 💾, nunca lote.
+      // Fecha sin parsear ('') cae al lado SEGURO (Aún futuras) — jamás al lote.
+      var _hoyC=_hoyISOlocal();
+      var cad=[], fut=[];
+      grupo.forEach(function(it){ var iso=_fechaAInputISO(it.fecha); if(iso && iso<=_hoyC){ cad.push(it); } else { fut.push(it); } });
+      cuerpo+='<div style="margin-top:12px"><div style="border-bottom:2px solid var(--gray-200);padding-bottom:3px;font-size:13px;font-weight:800;color:var(--navy)">'+escapeHTML(MOTIVO_LABELS[m]||m)+' — '+grupo.length+'</div>';
+      cuerpo+='<div style="display:flex;align-items:center;gap:8px;margin-top:6px">'
+        +'<div style="flex:1;font-size:12px;font-weight:800;color:#065F46">⏰ Caducadas (la fecha ya pasó) — '+cad.length+'</div>'
+        +(cad.length?('<button onclick="_validarCaducadasRevision()" style="font-size:10px;font-weight:700;border:1px solid #A7F3D0;border-radius:8px;padding:2px 8px;cursor:pointer;background:#ECFDF5;color:#065F46;font-family:inherit">✓ Validar caducadas ('+cad.length+')</button>'):'')
+        +'</div>';
+      pidPrev=null; cad.forEach(function(it,ix){ cuerpo+=fila(it,ix,'CAD'); });
+      cuerpo+='<div style="margin-top:8px;font-size:12px;font-weight:800;color:#B91C1C">🔴 Aún futuras (error real, corregir con 💾) — '+fut.length+'</div>';
+      pidPrev=null; fut.forEach(function(it,ix){ cuerpo+=fila(it,ix,'FUT'); });
+      cuerpo+='</div>';
+      return;   // sin botón genérico "Validar todas" en este grupo: el lote seguro es SOLO caducadas
+    }
+    // M2: validación masiva del grupo (con confirm dentro de la función)
+    cuerpo+='<div style="margin-top:12px"><div style="display:flex;align-items:center;gap:8px;border-bottom:2px solid var(--gray-200);padding-bottom:3px">'
+      +'<div style="flex:1;font-size:13px;font-weight:800;color:var(--navy)">'+escapeHTML(MOTIVO_LABELS[m]||m)+' — '+grupo.length+'</div>'
+      +'<button data-m="'+escapeAttr_(m)+'" onclick="_validarGrupoRevision(this.dataset.m)" style="font-size:10px;font-weight:700;border:1px solid #A7F3D0;border-radius:8px;padding:2px 8px;cursor:pointer;background:#ECFDF5;color:#065F46;font-family:inherit">✓ Validar todas ('+grupo.length+')</button>'
+      +'</div>';
+    pidPrev=null;
+    grupo.forEach(function(it,ix){ cuerpo+=fila(it,ix,''); });
     cuerpo+='</div>';
   });
   if(!visibles.length) cuerpo='<div style="text-align:center;padding:24px;color:#2E7D52;font-weight:700">✅ Cola vacía — nada pendiente de revisión'+(filtro?' con este filtro':'')+'</div>';
@@ -5740,7 +5763,7 @@ function _colaRevisionHTML(items, filtro, desdeCache){
     +cuerpo;
 }
 // M1: helpers de fecha del editor inline
-var MOTIVOS_FECHA=['FECHA_INTERPOLADA','FECHA_DESDE_TEXTO','FECHA_CORREGIDA_AUTO','SIN_FECHA','IMPORTADA_SIN_FECHA','FECHA_RARA'];
+var MOTIVOS_FECHA=['FECHA_INTERPOLADA','FECHA_DESDE_TEXTO','FECHA_CORREGIDA_AUTO','SIN_FECHA','IMPORTADA_SIN_FECHA','FECHA_RARA','FECHA_FUTURA'];   // [FECHA-FUTURA] destapa el editor 💾 (antes el hueco lo escondía justo aquí)
 function _esMotivoFecha(motivos){ return (motivos||[]).some(function(m){ return MOTIVOS_FECHA.indexOf(m)!==-1; }); }
 function _fechaAInputISO(f){   // 'DD/MM/YYYY' o 'YYYY-MM-DD…' → 'YYYY-MM-DD' (value del <input type=date>)
   var s2=String(f||'');
@@ -5795,6 +5818,37 @@ async function _validarGrupoRevision(motivo){
     showToast('✓ '+grupo.length+' sesiones validadas','success');
     if(document.querySelector('[data-colarev]')) mostrarColaRevision(false, filtro);
   }catch(e){ showToast('⚠️ Validación masiva falló: '+((e&&e.message)||''),'error'); }
+}
+// [FECHA-FUTURA] Lote SEGURO: valida SOLO las FECHA_FUTURA cuya fecha ya es ≤ hoy (flag caducado).
+// El subconjunto se RECALCULA aquí al momento del clic con el filtro ESTRICTO (no confía en lo
+// pintado): motivo FECHA_FUTURA + fecha parseable + iso<=hoy. Una nota aún-futura (2036/2027/meses
+// por venir) o sin fecha parseable NUNCA pasa el filtro → imposible enterrar un error real.
+async function _validarCaducadasRevision(){
+  if(!esSupervisorUI()){ showToast('Solo supervisor','error'); return; }
+  var cache=window._colaRevisionCache;
+  if(!cache||!Array.isArray(cache.items)) return;
+  var hoyISO=_hoyISOlocal();
+  var cad=cache.items.filter(function(it){
+    if(it.motivos.indexOf('FECHA_FUTURA')===-1) return false;
+    var iso=_fechaAInputISO(it.fecha);
+    return !!iso && iso<=hoyISO;   // ESTRICTO: sin fecha parseable o > hoy → fuera del lote
+  });
+  if(!cad.length){ showToast('No hay caducadas por validar','success'); return; }
+  if(!confirm('¿Validar las '+cad.length+' sesiones FECHA_FUTURA cuya fecha YA PASÓ (≤ '+hoyISO+')? Solo se quita el flag caducado; las fechas no cambian. Las aún-futuras NO se tocan.')) return;
+  try{
+    var ok=await FST_init();
+    if(!ok||!window._fstDb) throw new Error('Firestore no disponible');
+    for(var i=0;i<cad.length;i+=450){
+      var lote=cad.slice(i,i+450);
+      var batch=window._fstDb.batch();
+      lote.forEach(function(it){ batch.set(window._fstDb.doc(it.path), {revisionPendiente:false}, {merge:true}); });
+      await batch.commit();
+    }
+    var paths={}; cad.forEach(function(it){ paths[it.path]=true; });
+    cache.items=cache.items.filter(function(it){ return !paths[it.path]; });
+    showToast('⏰ '+cad.length+' caducadas validadas — quedan las aún-futuras por corregir','success');
+    if(document.querySelector('[data-colarev]')) mostrarColaRevision(false, window._colaRevFiltro||null);
+  }catch(e){ showToast('⚠️ Validación de caducadas falló: '+((e&&e.message)||''),'error'); }
 }
 async function mostrarColaRevision(forzar, filtro){
   if(!esSupervisorUI()){ showToast('Solo supervisor','error'); return; }
