@@ -5059,7 +5059,15 @@ function _diasVentanaRendimiento(ventana){
   function iso(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
   var hoy=new Date(); hoy.setHours(12,0,0,0);
   var out=[], d, fin=new Date(hoy);
-  if(ventana==='mes'){ d=new Date(hoy.getFullYear(), hoy.getMonth(), 1, 12); }
+  if(ventana==='mesAnterior'){
+    // [MES-ANTERIOR] Lista de trabajo del mes calendario PREVIO completo (hoy: 1-31 julio; en
+    // septiembre: agosto, etc.). MISMO patrón local/hora-12 del resto de ventanas — nada de UTC:
+    // "día 0" del mes actual = último día del anterior; enero resuelve a diciembre del año previo.
+    // El piso APP_INICIO_OPERACION de la triangulación sigue cortando defensivamente todo lo <1-jul.
+    d=new Date(hoy.getFullYear(), hoy.getMonth()-1, 1, 12);
+    fin=new Date(hoy.getFullYear(), hoy.getMonth(), 0, 12);
+  }
+  else if(ventana==='mes'){ d=new Date(hoy.getFullYear(), hoy.getMonth(), 1, 12); }
   else if(ventana==='7dias'){ d=new Date(hoy); d.setDate(d.getDate()-6); }
   else if(ventana==='semana'){
     // VISTA-SEMANAL: lunes a domingo de la SEMANA ACTUAL (incluye días futuros)
@@ -6010,7 +6018,7 @@ function _rendimientoHTML(datos, noId, ventana, etiqueta, aviso, refresco, tri){
   return '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">'
     +'<div style="font-size:16px;font-weight:800;color:var(--navy)">📊 Rendimiento del equipo</div>'
     +'<button onclick="this.closest(\'[data-rendov]\').remove()" style="background:none;border:none;font-size:22px;color:var(--gray-400);cursor:pointer">×</button></div>'
-    +'<div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap;align-items:center">'+btnV('hoy','Hoy')+btnV('semana','Esta semana')+btnV('7dias','7 días')+btnV('mes','Mes')
+    +'<div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap;align-items:center">'+btnV('hoy','Hoy')+btnV('semana','Esta semana')+btnV('7dias','7 días')+btnV('mes','Mes')+btnV('mesAnterior','Mes anterior')
     +'<button onclick="mostrarRendimientoEquipo(\''+ventana+'\', true)" style="font-size:11px;font-weight:700;border:none;border-radius:10px;padding:5px 10px;cursor:pointer;font-family:inherit;background:#EEF1F6;color:var(--navy)">🔄 Actualizar</button>'
     +((refresco&&refresco.desdeCache)?('<span style="font-size:10px;color:var(--gray-400)">cache · hace '+Math.max(1,Math.round((Date.now()-(refresco.ts||Date.now()))/1000))+' s</span>'):'')
     +'</div>'
@@ -6061,7 +6069,7 @@ async function _rendIdxHist(forzar){
 }
 async function mostrarRendimientoEquipo(ventana, forzar){
   if(!esSupervisorUI()){ showToast('Solo supervisor','error'); return; }
-  ventana=(ventana==='7dias'||ventana==='mes'||ventana==='semana')?ventana:'hoy';
+  ventana=(ventana==='7dias'||ventana==='mes'||ventana==='semana'||ventana==='mesAnterior')?ventana:'hoy';
   var prev=document.querySelector('[data-rendov]'); if(prev) prev.remove();
   var ov=document.createElement('div');
   ov.setAttribute('data-rendov','1');
@@ -6127,6 +6135,7 @@ async function mostrarRendimientoEquipo(ventana, forzar){
   tri._diasDDMM=dias.map(_ddmmFromISO);   // VISTA-SEMANAL: orden de columnas (lunes primero)
   _tm('triangulación históricos', tTri);
   var etiqueta=(dias.length>1)?(_ddmmFromISO(dias[0])+' — '+_ddmmFromISO(dias[dias.length-1])):'Hoy';
+  if(ventana==='mesAnterior') etiqueta='Mes anterior · '+etiqueta;   // [MES-ANTERIOR] sin duda de qué mes se mira
   // PDF-RENDIMIENTO: snapshot de lo que se está pintando, para que el botón 📄 por fila genere el
   // PDF con EXACTAMENTE los mismos números del dashboard (misma ventana, mismo tri/datos/etiqueta).
   // D1 — degradación NO silenciosa: si patientsDB no cargó (offline/Sheets/timeout), TODO activo caería a
