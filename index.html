@@ -3780,6 +3780,20 @@ if ('serviceWorker' in navigator) {
       revisarCambioDeCaches();
       aplicarActualizacionSiSegura();
     });
+    // [LOOP-B] Triple gancho de resume para el CHEQUEO del SW (mismo patrón R1 de L3603-3615 que
+    // ya usa Firestore): iOS standalone no dispara visibilitychange confiablemente tras suspensión
+    // agresiva — pageshow(persisted) y focus cubren esos huecos y PROVOCAN reg.update() (el paso
+    // que en standalone nunca corría). Throttle 60s: alternar apps no genera ráfagas de update().
+    // Offline: reg.update() falla silencioso y el gancho 'online' (arriba) reintenta al volver la red.
+    var _swUpdPingTs = 0;
+    function _swPingUpdate(){
+      var t = Date.now(); if(t - _swUpdPingTs < 60000) return; _swUpdPingTs = t;
+      try{ navigator.serviceWorker.getRegistration().then(r => { if(r) r.update(); }).catch(()=>{}); }catch(e){}
+      try{ revisarCambioDeCaches(); }catch(e){}
+      try{ aplicarActualizacionSiSegura(); }catch(e){}
+    }
+    window.addEventListener('pageshow', function(ev){ if(ev && ev.persisted) _swPingUpdate(); });
+    window.addEventListener('focus', function(){ _swPingUpdate(); });
     // Tic lento: [FIX-AUTOUPDATE p4] revisa estado y aplica si es seguro. Si quedó una
     // actualización pendiente y el usuario ya terminó (guardó / dejó de escribir), se aplica
     // sola sin que tenga que hacer nada.
@@ -3801,9 +3815,10 @@ if ('serviceWorker' in navigator) {
           }
         });
       });
-      // [FIX-AUTOUPDATE p4] reg.update() periódico SE CONSERVA tal cual: es quien PROVOCA la
-      // instalación del SW nuevo en una PWA que lleva días abierta. El revisor solo detecta.
-      setInterval(() => { try{ reg.update(); }catch(e){} }, 20*60*1000);
+      // [FIX-AUTOUPDATE p4] reg.update() periódico SE CONSERVA: es quien PROVOCA la instalación
+      // del SW nuevo en una PWA que lleva días abierta. [LOOP-B] 20→5 min: las sesiones clínicas
+      // son ráfagas cortas y con 20 min el timer jamás alcanzaba a disparar en foreground.
+      setInterval(() => { try{ reg.update(); }catch(e){} }, 5*60*1000);
     }).catch(()=>{});
 
     // El SW nuevo tomó control (skipWaiting+claim) → aplicar. [FIX-AUTOUPDATE p5] discriminador
@@ -6309,6 +6324,14 @@ async function _detEjecutar(){
   function _reciente(p){ var f=_pf(p.fechaActualizacion||p.fechaCreacion||p.date||''); if(f&&f>=DESDE) return true; return (Array.isArray(p.soap)?p.soap:[]).some(function(s){ var d=_pf(s&&(s.fechaHoraISO||s.fecha)); return d&&d>=DESDE; }); }
   window.__detEspejo=[];
   var secciones=[], hayHallazgos=false;
+
+  // [LOOP-B] Versión visible: cache del SW ACTIVO en este dispositivo (activate borra los viejos,
+  // así que lo que queda es la versión que de verdad controla). Verificable en campo para gates.
+  try{
+    var _vks=(typeof _cachesShell==='function')?await _cachesShell():null;
+    var _vtxt=(_vks&&_vks.length)?_vks.join(' · '):'(sin cache de shell aún)';
+    secciones.push(_detBloque('📦 Versión de la app en este dispositivo','Cache del service worker activo: <b>'+escapeHTML(_vtxt)+'</b>','info'));
+  }catch(_ev){}
 
   // ── 1) ESPEJO ROTO (activos con sesiones en este equipo que no están en Firestore) ──
   try{
