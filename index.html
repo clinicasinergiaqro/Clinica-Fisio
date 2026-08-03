@@ -5119,7 +5119,10 @@ async function FST_guardarAsignacionAgenda(nombreNorm, nombreOriginal, terapeuta
 // citaVinculadaOK v13). Reversible con delete. Campos EXACTOS de la whitelist de la regla:
 // pid, tipo, nombreOriginal, vinculadoPor, fecha, updatedAt (no agregar/quitar → permission-denied).
 async function FST_leerCitasVinculadas(forzar){
-  if(!forzar && window._citasVinculadasCache && window._citasVinculadasCache.map) return window._citasVinculadasCache.map;
+  // [FOOT-GUN P0-1] TTL: antes el cache duraba TODA la sesión → otros dispositivos veían una
+  // vinculación vieja hasta reiniciar la app. Con TTL, cualquier cambio se refleja en ≤5 min.
+  if(!forzar && window._citasVinculadasCache && window._citasVinculadasCache.map
+     && (Date.now()-(window._citasVinculadasCache.ts||0)) < (typeof REND_CACHE_TTL_MS!=='undefined'?REND_CACHE_TTL_MS:300000)) return window._citasVinculadasCache.map;
   var map={};
   try{
     var ok=await FST_init();
@@ -5140,12 +5143,14 @@ async function FST_guardarCitaVinculada(claveNorm, nombreOriginal, pid, tipo){
   });
   window._citasVinculadasCache=window._citasVinculadasCache||{ts:Date.now(), map:{}};
   window._citasVinculadasCache.map[claveNorm]={pid:String(pid||''), tipo:String(tipo||''), nombreOriginal:String(nombreOriginal||'')};
+  try{ window._bannerPendCache=null; }catch(_){}   // [FOOT-GUN P0-1] el banner del que vincula se corrige al instante, no 5 min después
 }
 async function FST_borrarCitaVinculada(claveNorm){
   var ok=await FST_init();
   if(!ok||!window._fstDb) throw new Error('Firestore no disponible');
   await window._fstDb.collection('citasVinculadas').doc(claveNorm).delete();
   if(window._citasVinculadasCache && window._citasVinculadasCache.map) delete window._citasVinculadasCache.map[claveNorm];
+  try{ window._bannerPendCache=null; }catch(_){}   // [FOOT-GUN P0-1] ídem al deshacer
 }
 // ── LOOP DASHBOARD-NOTAS: triangulación calendario vs notas (activos + históricos) ──
 // Históricos: 1 lectura del DOC pacientes/{pid} por paciente que aparezca en el calendario
@@ -6661,6 +6666,12 @@ async function _abrirModalVincular(nombre){
     // un paciente creado hoy no está en el índice de 24h. Dedup por id/nombre (locales primero).
     if(typeof FST_fusionarPacientes==='function') indice=FST_fusionarPacientes(Array.isArray(patientsDB)?patientsDB:[], indice);
   }catch(_e){ indice=[]; }
+  // [FOOT-GUN P0-1] Un espejo app_live_ JAMÁS es destino válido de vinculación: es dato DERIVADO
+  // de un activo cuyo expediente real está en esta misma lista (fusión pone locales primero), y
+  // vincular al espejo rompe la resolución (patientsDB no resuelve ese id → banner ciego, caso
+  // Mateo). Filtro por prefijo exacto: solo bloquea CREAR nuevas; una vinculación existente a
+  // espejo sigue visible y removible («Deshacer» usa yaVinc, no esta lista).
+  indice=(Array.isArray(indice)?indice:[]).filter(function(p){ return String((p&&p.id)||'').indexOf('app_live_')!==0; });
   var yaVinc=(window._citasVinculadasCache && window._citasVinculadasCache.map && window._citasVinculadasCache.map[claveNorm])||null;
   var m=document.createElement('div');
   m.setAttribute('data-vincov','1');
