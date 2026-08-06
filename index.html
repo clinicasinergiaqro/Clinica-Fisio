@@ -13613,13 +13613,14 @@ function renderNuevoPaciente(){
   const optsSegimiento=['— Sin asignar —',...ters]
     .map(t=>`<option value="${t==='— Sin asignar —'?'':t}">${t}</option>`).join('');
 
-  // IDs de campos en orden para navegación con Enter
+  // IDs de campos en orden para navegación con Enter — sigue el ORDEN NUEVO de secciones
+  // (REACOMODO fase 1, 2026-08: ficha → motivo → antecedentes → seguridad → valoración → dx → plan)
   const camposOrden=[
-    'n-nombre','n-fechanac','n-telefono','n-motivoconsulta','n-medico','n-alergias',
-    'n-patologicos','n-deportivos','n-deporte-freq','n-cirugias','n-medicamentos',
-    'n-dxmedico','n-mecanismo','n-evolucion','n-estudios',
+    'n-nombre','n-fechanac','n-telefono','n-medico',
+    'n-motivoconsulta','n-dxmedico','n-mecanismo','n-evolucion',
+    'n-patologicos','n-cirugias','n-medicamentos','n-alergias','n-deportivos','n-deporte-freq',
     'n-inflamacion','n-marcha','n-rom','n-fuerza','n-flex',
-    'n-pruebas','n-palpacion','n-banderas',
+    'n-pruebas','n-palpacion','n-banderas','n-estudios',
     'n-dxclinico','n-limitaciones','n-objcp','n-objlp','n-pronostico',
     'n-frecuencia','n-sesiones','n-tmanual','n-agentes','n-plancontra'
   ];
@@ -13635,7 +13636,7 @@ function renderNuevoPaciente(){
     </div>
   </div>
   <div class="form-section">
-    <div class="form-section-title">👤 Datos generales</div>
+    <div class="form-section-title">👤 Ficha de identificación</div>
     <div class="form-group">
       <div class="form-field"><div class="form-label">Nombre completo <span class="req">*</span></div><input class="form-input" id="n-nombre" type="text" autocapitalize="words" placeholder="Nombre completo"></div>
       <div class="form-field">
@@ -13672,32 +13673,57 @@ function renderNuevoPaciente(){
         <div style="font-size:11px;color:var(--gray-400);padding:4px 14px">Si otro terapeuta dará continuidad, selecciónalo aquí</div>
       </div>
       <div class="form-field"><div class="form-label">Médico referente</div><input class="form-input" id="n-medico" type="text" placeholder="Ej: Dr. Martín Romo"></div>
-      <div class="form-field">
-        <div class="form-label">Motivo de consulta <span style="color:var(--gray-400);font-weight:400">(breve, opcional)</span></div>
-        <input class="form-input" id="n-motivoconsulta" type="text" autocapitalize="sentences" placeholder="Ej: Dolor lumbar de 2 semanas, postquirúrgico de LCA">
-        <div style="font-size:11px;color:var(--gray-400);padding:3px 14px">Resumen en una línea para el expediente y consentimiento</div>
-      </div>
     </div>
   </div>
+  <!-- REACOMODO fase 1 (2026-08): orden de entrevista NOM-004 (ficha → motivo → antecedentes →
+       seguridad → valoración → dx → plan). Solo se movieron bloques de UI: TODOS los IDs de campo
+       y el modelo de datos quedan idénticos (guardarNuevoPaciente lee por ID, no por posición).
+       La antigua sección "⚠️ Alertas clínicas" se disolvió: n-contra vive ahora en Seguridad
+       y n-alergias en Antecedentes. Los checkboxes de condiciones médicas (sc-condicion) se
+       muestran en Antecedentes pero SIGUEN guardando en seguridadClinica.condiciones. -->
   <div class="form-section">
-    <div class="form-section-title">⚠️ Alertas clínicas</div>
+    <div class="form-section-title">💬 Motivo de consulta y padecimiento actual</div>
     <div class="form-group">
-      <div class="form-field"><div class="form-label">Contraindicaciones</div><textarea class="form-input" id="n-contra" placeholder="Marcapasos, bypass, anticoagulantes..."></textarea><div class="chip-row"><button type="button" class="chip-oneshot" onclick="setCampoRapido('n-contra','Ninguna')">Sin contraindicaciones referidas</button></div></div>
-      <div class="form-field"><div class="form-label">🚫 Alergias <span class="req">*</span></div><input class="form-input" id="n-alergias" type="text" placeholder="Ej: Penicilina, AINES, látex. O escribir 'Ninguna'"><div class="chip-row"><button type="button" class="chip-oneshot" onclick="setCampoRapido('n-alergias','Ninguna')">Sin alergias conocidas</button></div></div>
+      <div class="form-field">
+        <div class="form-label">Motivo de consulta <span style="color:var(--gray-400);font-weight:400">(resumen en una línea)</span></div>
+        <input class="form-input" id="n-motivoconsulta" type="text" autocapitalize="sentences" placeholder="Ej: Dolor lumbar de 2 semanas, postquirúrgico de LCA">
+        <div style="font-size:11px;color:var(--gray-400);padding:3px 14px">Título del episodio — aparece en el expediente y el consentimiento</div>
+      </div>
+      <div class="form-field"><div class="form-label">Diagnóstico médico</div><input class="form-input" id="n-dxmedico" type="text" placeholder="Ej: Tendinopatía rotuliana"><div class="chip-row"><button type="button" class="chip-quick" onclick="setCampoRapido('n-dxmedico','No cuenta con diagnóstico médico referido')">Sin diagnóstico médico referido</button></div></div>
+      <div class="form-field"><div class="form-label">Padecimiento actual <span class="req">*</span></div><textarea class="form-input" id="n-padecimiento" placeholder="Descripción del paciente..."></textarea></div>
+      <div class="form-field"><div class="form-label">Mecanismo de lesión</div><input class="form-input" id="n-mecanismo" type="text" placeholder="Ej: Sobreuso, trauma directo"></div>
+      <div class="form-field"><div class="form-label">Tiempo de evolución</div><input class="form-input" id="n-evolucion" type="text" placeholder="Ej: 3 meses"></div>
     </div>
   </div>
   <div class="form-section">
     <div class="form-section-title">🏥 Antecedentes</div>
-    <div class="form-group">
+    <div class="form-group" style="margin-bottom:10px">
       <div class="form-field"><div class="form-label">Antecedentes heredofamiliares</div><input class="form-input" id="n-patologicos" type="text" placeholder="Ej. diabetes, hipertensión, cáncer, cardiopatías u otros antecedentes familiares relevantes"><div class="chip-row"><button type="button" class="chip-quick" onclick="setCampoRapido('n-patologicos','Sin antecedentes heredofamiliares relevantes')">Sin antecedentes heredofamiliares relevantes</button></div></div>
-      <div class="form-field"><div class="form-label">Antecedentes deportivos</div><input class="form-input" id="n-deportivos" type="text" placeholder="Ej: Crossfit, natación..."><div class="chip-row"><button type="button" class="chip-quick" onclick="setCampoRapido('n-deportivos','No practica actividad deportiva')">No practica</button></div></div>
-      <div class="form-field"><div class="form-label">Deporte y frecuencia</div><input class="form-input" id="n-deporte-freq" type="text" placeholder="Ej: Crossfit 4x semana"><div class="chip-row"><button type="button" class="chip-quick" onclick="setCampoRapido('n-deporte-freq','No aplica')">No aplica</button></div></div>
+    </div>
+    <!-- Personales patológicos: checkboxes mudados desde "Seguridad clínica" (REACOMODO fase 1).
+         Mismas clases sc-condicion / sc-condiciones-obs → siguen guardando en seguridadClinica. -->
+    <div class="form-group" style="margin-bottom:10px">
+      <div class="form-field">
+        <div class="form-label">Condiciones médicas <span style="color:var(--gray-400);font-weight:400">(personales patológicos)</span></div>
+        <div class="checkbox-grid" id="sc-condiciones-grid">${['Cáncer activo','Antecedente de cáncer','Hemofilia / trastorno de coagulación','Anticoagulantes','Diabetes','Hipertensión','Osteoporosis','Embarazo','Epilepsia','Alteración de sensibilidad','Alteración vascular','Infección activa','Herida abierta','Otro','Ninguna referida'].map(o=>`<label class="checkbox-item"><input type="checkbox" class="sc-condicion" value="${o}" ${o==='Ninguna referida'?'checked':''} style="width:16px;height:16px"> <span class="cb-label">${o}</span></label>`).join('')}</div>
+        <input class="form-input" id="sc-condiciones-obs" type="text" placeholder="Especificar otra enfermedad o condición médica relevante" style="margin-top:8px">
+        <div class="chip-row">
+          <button type="button" class="chip-quick" onclick="setCampoRapido('sc-condiciones-obs','Sin antecedentes oncológicos')">Sin antecedentes oncológicos</button>
+          <button type="button" class="chip-quick" onclick="setCampoRapido('sc-condiciones-obs','Sin trastornos de coagulación')">Sin trastornos de coagulación</button>
+          <button type="button" class="chip-quick" onclick="setCampoRapido('sc-condiciones-obs','Sin contraindicaciones para agentes físicos')">Sin contraindicaciones para agentes físicos</button>
+        </div>
+      </div>
+    </div>
+    <div class="form-group">
       <div class="form-field"><div class="form-label">Cirugías previas</div><input class="form-input" id="n-cirugias" type="text" placeholder="Ej: Apendicectomía 2018"><div class="chip-row"><button type="button" class="chip-oneshot" onclick="setCampoRapido('n-cirugias','Ninguna')">Sin cirugías previas relevantes</button></div></div>
       <div class="form-field"><div class="form-label">Medicamentos actuales</div><input class="form-input" id="n-medicamentos" type="text" placeholder="Ej: Enalapril 10mg"><div class="chip-row"><button type="button" class="chip-oneshot" onclick="setCampoRapido('n-medicamentos','Ninguno')">No toma medicamentos</button></div></div>
+      <div class="form-field"><div class="form-label">🚫 Alergias <span class="req">*</span></div><input class="form-input" id="n-alergias" type="text" placeholder="Ej: Penicilina, AINES, látex. O escribir 'Ninguna'"><div class="chip-row"><button type="button" class="chip-oneshot" onclick="setCampoRapido('n-alergias','Ninguna')">Sin alergias conocidas</button></div></div>
+      <div class="form-field"><div class="form-label">Antecedentes deportivos</div><input class="form-input" id="n-deportivos" type="text" placeholder="Ej: Crossfit, natación..."><div class="chip-row"><button type="button" class="chip-quick" onclick="setCampoRapido('n-deportivos','No practica actividad deportiva')">No practica</button></div></div>
+      <div class="form-field"><div class="form-label">Deporte y frecuencia</div><input class="form-input" id="n-deporte-freq" type="text" placeholder="Ej: Crossfit 4x semana"><div class="chip-row"><button type="button" class="chip-quick" onclick="setCampoRapido('n-deporte-freq','No aplica')">No aplica</button></div></div>
     </div>
   </div>
   <div class="form-section">
-    <div class="form-section-title">🛡️ Seguridad clínica y contraindicaciones</div>
+    <div class="form-section-title">🛡️ Seguridad y banderas rojas</div>
 
     <!-- BLOQUE 1 — Implantes -->
     <div class="form-group" style="margin-bottom:10px">
@@ -13709,22 +13735,9 @@ function renderNuevoPaciente(){
       </div>
     </div>
 
-    <!-- BLOQUE 2 — Condiciones médicas -->
+    <!-- BLOQUE 2 — Banderas rojas (checkboxes). NOTA fase 1: el campo texto n-banderas de
+         Valoración sigue existiendo; se unifica en fase 2 del reacomodo. -->
     <div class="form-group" style="margin-bottom:10px">
-      <div class="form-field">
-        <div class="form-label">Condiciones médicas</div>
-        <div class="checkbox-grid" id="sc-condiciones-grid">${['Cáncer activo','Antecedente de cáncer','Hemofilia / trastorno de coagulación','Anticoagulantes','Diabetes','Hipertensión','Osteoporosis','Embarazo','Epilepsia','Alteración de sensibilidad','Alteración vascular','Infección activa','Herida abierta','Otro','Ninguna referida'].map(o=>`<label class="checkbox-item"><input type="checkbox" class="sc-condicion" value="${o}" ${o==='Ninguna referida'?'checked':''} style="width:16px;height:16px"> <span class="cb-label">${o}</span></label>`).join('')}</div>
-        <input class="form-input" id="sc-condiciones-obs" type="text" placeholder="Especificar otra enfermedad o condición médica relevante" style="margin-top:8px">
-        <div class="chip-row">
-          <button type="button" class="chip-quick" onclick="setCampoRapido('sc-condiciones-obs','Sin antecedentes oncológicos')">Sin antecedentes oncológicos</button>
-          <button type="button" class="chip-quick" onclick="setCampoRapido('sc-condiciones-obs','Sin trastornos de coagulación')">Sin trastornos de coagulación</button>
-          <button type="button" class="chip-quick" onclick="setCampoRapido('sc-condiciones-obs','Sin contraindicaciones para agentes físicos')">Sin contraindicaciones para agentes físicos</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- BLOQUE 3 — Banderas rojas -->
-    <div class="form-group">
       <div class="form-field">
         <div class="form-label">🚩 Banderas rojas</div>
         <div class="checkbox-grid" id="sc-banderas-grid">${['Fiebre','Pérdida de peso inexplicable','Dolor nocturno severo no mecánico','Trauma importante reciente','Alteración neurológica progresiva','Pérdida de control de esfínteres','Sospecha de TVP','Dolor torácico','Disnea','Sangrado anormal','Ninguna referida'].map(o=>`<label class="checkbox-item"><input type="checkbox" class="sc-bandera" value="${o}" ${o==='Ninguna referida'?'checked':''} style="width:16px;height:16px"> <span class="cb-label">${o}</span></label>`).join('')}</div>
@@ -13732,17 +13745,12 @@ function renderNuevoPaciente(){
         <div class="chip-row"><button type="button" class="chip-oneshot" onclick="document.querySelectorAll('.sc-bandera').forEach(c=>c.checked=(c.value==='Ninguna referida'));setCampoRapido('sc-banderas-detalle','Sin banderas rojas')">Sin banderas rojas</button></div>
       </div>
     </div>
-  </div>
 
-  <div class="form-section">
-    <div class="form-section-title">💬 Motivo de consulta</div>
+    <!-- BLOQUE 3 — Contraindicaciones médicas (texto libre, antes en "Alertas clínicas").
+         Guarda en p.contraindicaciones (campo raíz) — distinto del tamizaje (seguridadClinica)
+         y de las precauciones del plan (planTto.contraindicaciones). -->
     <div class="form-group">
-      <div class="form-field"><div class="form-label">Diagnóstico médico</div><input class="form-input" id="n-dxmedico" type="text" placeholder="Ej: Tendinopatía rotuliana"><div class="chip-row"><button type="button" class="chip-quick" onclick="setCampoRapido('n-dxmedico','No cuenta con diagnóstico médico referido')">Sin diagnóstico médico referido</button></div></div>
-      <div class="form-field"><div class="form-label">Padecimiento actual <span class="req">*</span></div><textarea class="form-input" id="n-padecimiento" placeholder="Descripción del paciente..."></textarea></div>
-      <div class="form-field"><div class="form-label">Mecanismo de lesión</div><input class="form-input" id="n-mecanismo" type="text" placeholder="Ej: Sobreuso, trauma directo"></div>
-      <div class="form-field"><div class="form-label">Tiempo de evolución</div><input class="form-input" id="n-evolucion" type="text" placeholder="Ej: 3 meses"></div>
-      <div class="form-field"><div class="form-label">Estudios de imagen</div><input class="form-input" id="n-estudios" type="text" placeholder="Ej: US tendón rotuliano"></div>
-      <div class="form-field"><div class="form-label">Hallazgos / conclusión</div><textarea class="form-input" id="n-hallazgos" placeholder="Resumen del reporte de imagen..."></textarea></div>
+      <div class="form-field"><div class="form-label">Contraindicaciones médicas</div><textarea class="form-input" id="n-contra" placeholder="Marcapasos, bypass, anticoagulantes..."></textarea><div class="chip-row"><button type="button" class="chip-oneshot" onclick="setCampoRapido('n-contra','Ninguna')">Sin contraindicaciones referidas</button></div></div>
     </div>
   </div>
   <div class="form-section">
@@ -13763,6 +13771,8 @@ function renderNuevoPaciente(){
       <div class="form-field"><div class="form-label">Pruebas especiales</div><input class="form-input" id="n-pruebas" type="text" placeholder="Ej: Thomas(+), Ober(+)"></div>
       <div class="form-field"><div class="form-label">Palpación</div><input class="form-input" id="n-palpacion" type="text" placeholder="Ej: Dolor inserción tibial 7/10"></div>
       <div class="form-field"><div class="form-label">🚩 Banderas rojas</div><input class="form-input" id="n-banderas" type="text" placeholder="Ej: Ninguna. O describe si existen."></div>
+      <div class="form-field"><div class="form-label">Estudios de imagen</div><input class="form-input" id="n-estudios" type="text" placeholder="Ej: US tendón rotuliano"></div>
+      <div class="form-field"><div class="form-label">Hallazgos / conclusión</div><textarea class="form-input" id="n-hallazgos" placeholder="Resumen del reporte de imagen..."></textarea></div>
     </div>
   </div>
   <div class="form-section">
@@ -13784,7 +13794,7 @@ function renderNuevoPaciente(){
       <div class="form-field"><div class="form-label">Ejercicio terapéutico</div><textarea class="form-input" id="n-ejercicio" placeholder="Ej: Excéntricos, estabilización lumbar..."></textarea></div>
       <div class="form-field"><div class="form-label">Terapia manual</div><input class="form-input" id="n-tmanual" type="text" placeholder="Ej: Movilización STJ, liberación miofascial"></div>
       <div class="form-field"><div class="form-label">Agentes físicos</div><input class="form-input" id="n-agentes" type="text" placeholder="Ej: US, MEP, TENS, ESWT"></div>
-      <div class="form-field"><div class="form-label">Contraindicaciones</div><input class="form-input" id="n-plancontra" type="text" placeholder="Ej: Sin impacto, sin AINES"></div>
+      <div class="form-field"><div class="form-label">Precauciones del plan</div><input class="form-input" id="n-plancontra" type="text" placeholder="Ej: Sin impacto, sin AINES"></div>
     </div>
   </div>
   <div class="form-section">
@@ -14887,12 +14897,15 @@ function activarAutosaveValoracion(){
 
 // ── BORRADOR NUEVO PACIENTE ───────────────────────────────────────────────
 const DRAFT_NUEVO='sinergia_borrador_nuevo_paciente';
+// Orden espejo del layout del REACOMODO fase 1 (misma MEMBRESÍA que antes — solo cambia el orden;
+// el borrador guarda/restaura por ID, así que borradores previos al reacomodo siguen funcionando).
 const CAMPOS_NUEVO=['n-nombre','n-fechanac','n-edad','n-telefono','n-terapeuta','n-terapeuta-seguimiento','n-medico',
-  'n-alergias','n-contra','n-patologicos','n-deportivos','n-deporte-freq','n-cirugias','n-medicamentos',
-  'n-dxmedico','n-padecimiento','n-mecanismo','n-evolucion','n-estudios','n-hallazgos','n-motivoconsulta',
-  'n-inflamacion','n-marcha','n-rom','n-fuerza','n-flex','n-pruebas','n-palpacion','n-banderas',
+  'n-motivoconsulta','n-dxmedico','n-padecimiento','n-mecanismo','n-evolucion',
+  'n-patologicos','sc-condiciones-obs','n-cirugias','n-medicamentos','n-alergias','n-deportivos','n-deporte-freq',
+  'sc-implantes-detalle','sc-banderas-detalle','n-contra',
+  'n-inflamacion','n-marcha','n-rom','n-fuerza','n-flex','n-pruebas','n-palpacion','n-banderas','n-estudios','n-hallazgos',
   'n-dxclinico','n-dxfuncional','n-limitaciones','n-objcp','n-objlp','n-pronostico',
-  'n-frecuencia','n-sesiones','n-ejercicio','n-tmanual','n-agentes','n-plancontra','sc-condiciones-obs','sc-implantes-detalle','sc-banderas-detalle'];
+  'n-frecuencia','n-sesiones','n-ejercicio','n-tmanual','n-agentes','n-plancontra'];
 
 function guardarBorradorNuevo(){
   try{
