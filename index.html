@@ -922,6 +922,12 @@ select.form-input{font-size:14px}
 .eva-slider{flex:1;-webkit-appearance:none;height:6px;border-radius:3px;background:linear-gradient(to right,#2E7D52,#F59E0B,#C0392B);outline:none}
 .eva-slider::-webkit-slider-thumb{-webkit-appearance:none;width:24px;height:24px;border-radius:50%;background:var(--navy);border:3px solid var(--white);box-shadow:0 2px 6px rgba(0,0,0,.2);cursor:pointer}
 .eva-val{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:16px;background:var(--gray-100);color:var(--navy);flex-shrink:0}
+/* ── 1A: EVA por botones (sustituye sliders en la nota SOAP; el alta conserva su slider) ── */
+.evabtn-row{display:flex;flex-wrap:wrap;gap:6px}
+.evabtn{min-width:34px;height:38px;border-radius:10px;border:1.5px solid var(--gray-200);background:var(--gray-50);color:var(--gray-600);font-size:15px;font-weight:700;font-family:inherit;cursor:pointer;padding:0 8px}
+.evabtn.on{background:var(--navy);color:#fff;border-color:var(--navy);box-shadow:0 2px 6px rgba(27,58,107,.35)}
+.evabtn.ne{font-size:12px}
+.evabtn.ne.on{background:var(--gray-600);border-color:var(--gray-600)}
 
 /* CHECKBOXES */
 .checkbox-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px}
@@ -1294,7 +1300,8 @@ function confirmarSalidaSiDirty(callback){
     limpiarDirty(); callback();
   }
 }
-let tempMods=[], tempEvaI=5, tempEvaF=3, tempEvolMedia=[];
+// 1A: EVA sin defaults — null/undefined = sin tocar (bloquea guardar); ya no se inventa el 5→3.
+let tempMods=[], tempEvaI=null, tempEvaF, tempEvolMedia=[];
 // FIX media-edición (flag sentinel): distingue "el usuario tocó el preview de media" (agregó/quitó)
 // de "el form nunca cargó la media". Se pone true en handleSoapPhoto/removeSoapMedia y se resetea a
 // false al abrir cualquier form (después del preload). Permite VACIAR media a propósito sin que la
@@ -8947,8 +8954,8 @@ function aplicarEstructuraSOAPv2(r){
   const llenados=[];
   Object.entries(r.campos).forEach(([id,val])=>{ if(insertarTextoEnCampoSeguro(id, val)) llenados.push(id); });
   // EVA
-  if(r.eva.inicio!=null && !r.eva.ambiguo){ tempEvaI=Math.max(0,Math.min(10,r.eva.inicio)); const s=document.getElementById('sl-i'),vi=document.getElementById('vi'); if(s)s.value=tempEvaI; if(vi){vi.textContent=tempEvaI;vi.className=`eva-val ${getEvaClass(tempEvaI)}`;} }
-  if(r.eva.final!=null){ tempEvaF=Math.max(0,Math.min(10,r.eva.final)); const s=document.getElementById('sl-f'),vf=document.getElementById('vf'); if(s)s.value=tempEvaF; if(vf){vf.textContent=tempEvaF;vf.className=`eva-val ${getEvaClass(tempEvaF)}`;} }
+  if(r.eva.inicio!=null && !r.eva.ambiguo){ _setEvaProg('i', Math.max(0,Math.min(10,r.eva.inicio))); }
+  if(r.eva.final!=null){ _setEvaProg('f', Math.max(0,Math.min(10,r.eva.final))); }
   if(r.eva.ambiguo) showToast(`EVA detectada: ${r.eva.inicio}. Márcala manualmente.`,'warning');
   // Modalidades
   if(r.modalidades.length){
@@ -8993,8 +9000,8 @@ function acomodarTranscripcionSOAP_v1_legacy(){
   if(buckets.P.length && insertarTextoEnCampo('f-ptratamiento', buckets.P.join(' '))) llenados.push('Plan');
   const eva=detectarEVAenTexto(texto);
   if(eva && eva.seguro){
-    if(eva.i!=null){ tempEvaI=Math.max(0,Math.min(10,eva.i)); const s=document.getElementById('sl-i'),vi=document.getElementById('vi'); if(s)s.value=tempEvaI; if(vi){vi.textContent=tempEvaI;vi.className=`eva-val ${getEvaClass(tempEvaI)}`;} }
-    if(eva.f!=null){ tempEvaF=Math.max(0,Math.min(10,eva.f)); const s=document.getElementById('sl-f'),vf=document.getElementById('vf'); if(s)s.value=tempEvaF; if(vf){vf.textContent=tempEvaF;vf.className=`eva-val ${getEvaClass(tempEvaF)}`;} }
+    if(eva.i!=null){ _setEvaProg('i', Math.max(0,Math.min(10,eva.i))); }
+    if(eva.f!=null){ _setEvaProg('f', Math.max(0,Math.min(10,eva.f))); }
     showToast('EVA detectada y actualizada','success');
   } else if(eva && !eva.seguro){
     showToast(`EVA detectada: ${eva.valor}. Márcala manualmente.`,'warning');
@@ -9360,8 +9367,8 @@ function aplicarDictadoSOAP(modo){
   });
   // EVA (sliders existentes sl-i/sl-f + tempEvaI/F)
   const eva=soap.eva||{};
-  if(eva.inicio!=null && (modo==='todo')){ tempEvaI=Math.max(0,Math.min(10,eva.inicio)); const s=document.getElementById('sl-i'),vi=document.getElementById('vi'); if(s)s.value=tempEvaI; if(vi){vi.textContent=tempEvaI;vi.className=`eva-val ${getEvaClass(tempEvaI)}`;} }
-  if(eva.final!=null && (modo==='todo')){ tempEvaF=Math.max(0,Math.min(10,eva.final)); const s=document.getElementById('sl-f'),vf=document.getElementById('vf'); if(s)s.value=tempEvaF; if(vf){vf.textContent=tempEvaF;vf.className=`eva-val ${getEvaClass(tempEvaF)}`;} }
+  if(eva.inicio!=null && (modo==='todo')){ _setEvaProg('i', Math.max(0,Math.min(10,eva.inicio))); }
+  if(eva.final!=null && (modo==='todo')){ _setEvaProg('f', Math.max(0,Math.min(10,eva.final))); }
   // Modalidades: MERGE (agregar nuevas, no reemplazar) — B4 regla 4 · Loop A Snippet D: normaliza antes de togglear
   if(Array.isArray(soap.modalidades)&&soap.modalidades.length){
     if(!Array.isArray(tempMods)) tempMods=[];
@@ -9387,7 +9394,7 @@ function showNuevoSOAP(){
   if(!currentPatient) return;
   // reset dictado 2.2
   _dictado.activo=false; _dictado.textoFinal=''; _dictado.textoInterino=''; _dictado.palabras=0; _dictadoSoapPreview=null; _dictadoMetadata=null; _dictadoManual=false;
-  tempMods=[]; tempEvaI=5; tempEvaF=3; tempEvolMedia=[]; _soapMediaTocada=false; editingSoapId=null; editingSoapPid=null; editingSoapEsHistorico=false; _editingSoapHistoricoNota=null; modoNotaActual=''; _dictadoBanderas=[]; _dictadoActivo=false; _dictadoTransPrecargada=false; _soapV2Resultado=null; limpiarDirty();
+  tempMods=[]; tempEvaI=null; tempEvaF=undefined; tempEvolMedia=[]; _soapMediaTocada=false; editingSoapId=null; editingSoapPid=null; editingSoapEsHistorico=false; _editingSoapHistoricoNota=null; modoNotaActual=''; _dictadoBanderas=[]; _dictadoActivo=false; _dictadoTransPrecargada=false; _soapV2Resultado=null; limpiarDirty();
   tempEvolucionChips=[];
   const sesNum=(typeof currentPatient.sesiones==='number'?currentPatient.sesiones:0)+1; // FIX SESIÓN-NaN: guard defensivo
   const totalSes=parseInt(currentPatient.planTto?.sesiones);
@@ -9502,18 +9509,23 @@ function renderSOAPForm(){
     </div>
   </div>`+selectorMotivoHtml+`
 
-  <!-- MODO CLÍNICO DE NOTA (LOOP4) -->
+  <!-- MODO CLÍNICO DE NOTA (LOOP4) — 1A: colapsado por default (casi siempre queda el default;
+       ocupaba un bloque entero de pantalla). El estado y seleccionarModoNota NO cambian. -->
   <div class="form-section">
-    <div class="form-section-title">🎯 Modo de nota clínica</div>
+    <div class="form-section-title" onclick="_tgSoapSec('soap-modo-wrap',document.getElementById('soap-modo-flecha'))" style="cursor:pointer">🎯 Modo de nota clínica <span style="margin-left:auto;font-weight:400;color:var(--gray-400);font-size:12px" id="soap-modo-flecha">›</span></div>
+    <div id="soap-modo-wrap" style="display:none">
     <div style="padding:0 14px 6px"><div id="soap-modo-chips" style="display:flex;flex-wrap:wrap;gap:6px">
       ${['rapido|⚡ Rápido','completo|📝 Completo','seguro|🏥 Seguro/aseg.','postquirurgico|🔧 Postquirúrgico','deportivo|🏃 Deportivo','revaloracion|🔄 Revaloración','alta|🏁 Alta'].map(m=>{const[val,lbl]=m.split('|');return `<button type="button" class="modo-nota-chip" data-modo="${val}" onclick="seleccionarModoNota('${val}')" style="font-size:12px;font-weight:600;padding:6px 12px;border-radius:16px;border:1.5px solid var(--gray-200);background:white;color:var(--gray-600);cursor:pointer">${lbl}</button>`}).join('')}
     </div>
     <div id="soap-modo-hint" style="font-size:11px;color:var(--gray-400);margin-top:6px"></div></div>
+    </div>
   </div>
 
-  <!-- SPRINT3 L4A: dictado clínico SOAP -->
+  <!-- SPRINT3 L4A: dictado clínico SOAP — 1A: colapsado por default (ocupaba media pantalla
+       aunque no se usara). La maquinaria de dictado NO cambia; solo se muestra al tocar. -->
   <div class="form-section">
-    <div class="form-section-title">🎤 Dictado clínico <span style="font-size:11px;font-weight:400;color:var(--gray-400)">(IA estructura el SOAP)</span></div>
+    <div class="form-section-title" onclick="_tgSoapSec('soap-dictado-wrap',document.getElementById('soap-dictado-flecha'))" style="cursor:pointer">🎤 Dictado clínico <span style="font-size:11px;font-weight:400;color:var(--gray-400)">(IA estructura el SOAP)</span> <span style="margin-left:auto;font-weight:400;color:var(--gray-400);font-size:12px" id="soap-dictado-flecha">›</span></div>
+    <div id="soap-dictado-wrap" style="display:none">
     <div style="padding:0 14px 8px">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
         <div id="dict-estado" style="font-size:12px;font-weight:700;color:var(--gray-400)">Toca "Iniciar" y habla de corrido, o escribe/pega el texto.</div>
@@ -9528,6 +9540,7 @@ function renderSOAPForm(){
       </div>
       <textarea class="form-input" id="dictado-textarea" placeholder="Aquí aparece el texto dictado en vivo… (ej: paciente acude con cinco de diez, arcos de movimiento limitados, se aplicó ultrasonido y estiramientos)" style="min-height:90px" oninput="_dictadoTextareaManual()"></textarea>
       <div id="dictado-preview"></div>
+    </div>
     </div>
   </div>
 
@@ -9566,12 +9579,8 @@ function renderSOAPForm(){
     <div class="form-section-title" style="color:#1565C0">S — Subjetivo</div>
     <div class="form-group">
       <div class="form-field">
-        <div class="form-label">EVA inicio <span class="req">*</span></div>
-        <div class="eva-slider-wrap">
-          <input type="range" class="eva-slider" min="0" max="10" value="${tempEvaI}" id="sl-i"
-            oninput="tempEvaI=+this.value;document.getElementById('vi').textContent=this.value;updateEvaVal('vi',+this.value)">
-          <div class="eva-val ${getEvaClass(tempEvaI)}" id="vi">${tempEvaI}</div>
-        </div>
+        <div class="form-label">EVA inicio <span class="req">*</span> <span style="font-size:11px;color:var(--gray-400);font-weight:400">(toca el número)</span></div>
+        <div class="evabtn-row" id="eva-row-i">${_evaBtnsHTML('i')}</div>
       </div>
       <div class="form-field">
         <div class="form-label">Dolor (contexto, provocación) <span class="req">*</span></div>
@@ -9634,12 +9643,8 @@ function renderSOAPForm(){
     <div class="form-section-title" style="color:#4A148C">P — Plan</div>
     <div class="form-group">
       <div class="form-field">
-        <div class="form-label">EVA final <span class="req">*</span></div>
-        <div class="eva-slider-wrap">
-          <input type="range" class="eva-slider" min="0" max="10" value="${tempEvaF}" id="sl-f"
-            oninput="tempEvaF=+this.value;document.getElementById('vf').textContent=this.value;updateEvaVal('vf',+this.value)">
-          <div class="eva-val ${getEvaClass(tempEvaF)}" id="vf">${tempEvaF}</div>
-        </div>
+        <div class="form-label">EVA final <span class="req">*</span> <span style="font-size:11px;color:var(--gray-400);font-weight:400">(número, o "No evaluado" si no aplica)</span></div>
+        <div class="evabtn-row" id="eva-row-f">${_evaBtnsHTML('f')}</div>
       </div>
     </div>
     <div class="form-section-title" style="margin-top:8px;">⚡ Modalidades aplicadas <span style="color:var(--red)">*</span></div>
@@ -9678,12 +9683,15 @@ function renderSOAPForm(){
     <div class="form-section-title">📋 Detalle clínico de la sesión <span style="font-size:11px;font-weight:400;color:var(--gray-400)">(opcional)</span></div>
     <div class="form-group">
       <div class="form-field"><div class="form-label">Objetivo de la sesión</div><textarea class="form-input" id="f-objetivo-sesion" placeholder="Ej: Mejorar ROM de flexión, reducir dolor en marcha..."></textarea></div>
-      <div class="form-field"><div class="form-label">Respuesta al tratamiento</div><textarea class="form-input" id="f-respuesta-tto" placeholder="Ej: Buena respuesta, disminución de dolor post-sesión..."></textarea></div>
+<!-- 1A: campo "Respuesta al tratamiento" ELIMINADO de este bloque opcional — duplicaba
+     f-arespuesta (A del SOAP principal). El campo del MODELO (respuestaTratamiento) se conserva
+     para notas viejas; guardarSOAP lo sigue leyendo y queda '' en notas nuevas. -->
       <div class="form-field"><div class="form-label">Tolerancia</div><input class="form-input" type="text" id="f-tolerancia" placeholder="Ej: Buena tolerancia, sin molestias"></div>
       <div class="form-field"><div class="form-label">Eventos adversos en la sesión</div><input class="form-input" type="text" id="f-eventos-sesion" placeholder="Ej: Ninguno"></div>
       <div class="form-field"><div class="form-label">Cambios al plan</div><textarea class="form-input" id="f-cambios-plan" placeholder="Ej: Se progresa carga, se añade ejercicio excéntrico..."></textarea></div>
       <div class="form-field"><div class="form-label">Criterios de progreso</div><textarea class="form-input" id="f-criterios-progreso" placeholder="Ej: Aumento de fuerza a 4/5, EVA en descenso..."></textarea></div>
-      <div class="form-field"><div class="form-label">Indicaciones domiciliarias</div><textarea class="form-input" id="f-indicaciones-dom" placeholder="Ej: Ejercicios 2x día, aplicar hielo post actividad..."></textarea></div>
+<!-- 1A: campo "Indicaciones domiciliarias" ELIMINADO — duplicaba f-pindicaciones (P del SOAP
+     principal). El campo del MODELO (indicacionesDomiciliarias) se conserva para notas viejas. -->
     </div>
   </div>
 
@@ -9839,7 +9847,9 @@ function renderSOAPForm(){
 // (guardarBorradorValoracion): autosave a localStorage MIENTRAS se escribe, para
 // que una recarga / cierre / logout a media nota NO pierda el texto. Solo toca
 // localStorage del dispositivo — nada de nube, rules ni backend.
-const CAMPOS_SOAP_TEXTO=['f-sdolor','f-scambios','f-sactfisica','f-orom','f-ofuerza','f-ohallazgos','f-aevolucion','f-arespuesta','f-aanalisis','f-ptratamiento','f-pindicaciones','f-pcontra','f-objetivo-sesion','f-respuesta-tto','f-tolerancia','f-eventos-sesion','f-cambios-plan','f-criterios-progreso','f-indicaciones-dom','dictado-textarea','f-fecha-consulta','f-soap-terapeuta','f-soap-textoriginal'];
+// 1A: f-respuesta-tto y f-indicaciones-dom fuera de la lista (campos duplicados eliminados del
+// form; los borradores viejos que los traigan simplemente ignoran esos IDs al restaurar).
+const CAMPOS_SOAP_TEXTO=['f-sdolor','f-scambios','f-sactfisica','f-orom','f-ofuerza','f-ohallazgos','f-aevolucion','f-arespuesta','f-aanalisis','f-ptratamiento','f-pindicaciones','f-pcontra','f-objetivo-sesion','f-tolerancia','f-eventos-sesion','f-cambios-plan','f-criterios-progreso','dictado-textarea','f-fecha-consulta','f-soap-terapeuta','f-soap-textoriginal'];
 function _soapDraftKey(){
   var pid=(currentPatient&&currentPatient.id)?String(currentPatient.id):'';
   if(!pid) return '';
@@ -9897,8 +9907,8 @@ function aplicarBorradorSoap(d){
   try{
     if(!d||!d.campos) return;
     CAMPOS_SOAP_TEXTO.forEach(function(id){ if(d.campos[id]!==undefined){ var el=document.getElementById(id); if(el) el.value=d.campos[id]; } });
-    if(typeof d.evaI==='number'){ tempEvaI=d.evaI; var sI=document.getElementById('sl-i'),vI=document.getElementById('vi'); if(sI)sI.value=tempEvaI; if(vI){vI.textContent=tempEvaI;vI.className='eva-val '+getEvaClass(tempEvaI);} }
-    if(typeof d.evaF==='number'){ tempEvaF=d.evaF; var sF=document.getElementById('sl-f'),vF=document.getElementById('vf'); if(sF)sF.value=tempEvaF; if(vF){vF.textContent=tempEvaF;vF.className='eva-val '+getEvaClass(tempEvaF);} }
+    if(typeof d.evaI==='number'){ _setEvaProg('i', d.evaI); }
+    if(typeof d.evaF==='number' || d.evaF===null){ _setEvaProg('f', d.evaF); }
     if(Array.isArray(d.mods)){ tempMods=d.mods.slice(); var g=document.getElementById('mod-grid'); if(g) g.innerHTML=MODALIDADES.map(function(mod){ var chk=tempMods.includes(mod); return '<div class="checkbox-item '+(chk?'checked':'')+'" onclick="toggleMod(\''+mod+'\')"><div class="cb-box">'+(chk?'✓':'')+'</div><div class="cb-label">'+mod+'</div></div>'; }).join(''); }
     if(Array.isArray(d.atendido)){ tempAtendio=d.atendido.slice(); if(typeof _renderAtendioGrid==='function') _renderAtendioGrid(); }
     if(typeof d.motivoIndex==='number') tempMotivoIndex=d.motivoIndex;
@@ -9935,11 +9945,56 @@ function _purgarBorradoresSoapViejos(){   // req #5: purga borradores SOAP de >1
 
 function updateEvaVal(id,v){const el=document.getElementById(id);if(el)el.className=`eva-val ${getEvaClass(v)}`}
 
+// ── 1A: EVA por botones ──────────────────────────────────────────────────────
+// Estados: tempEvaI null = sin tocar (BLOQUEA guardar; EVA inicial es obligatorio).
+// tempEvaF undefined = sin tocar (BLOQUEA) · null = "No evaluado" EXPLÍCITO (constancia
+// honesta: se guarda evaF:null y queda fuera de todo promedio de dolor — los consumidores
+// ya ignoran null: L4316, L5095, L10714, L15327) · número = valor real.
+// Las notas viejas no cambian: todas traen evaI/evaF numéricos (los defaults 5/3 de antes).
+function _evaBtnsHTML(cual){
+  var val=(cual==='i')?tempEvaI:tempEvaF;
+  var h='';
+  for(var n=0;n<=10;n++){
+    h+='<button type="button" class="evabtn'+(val===n?' on':'')+'" onclick="_setEvaTap(\''+cual+'\','+n+')">'+n+'</button>';
+  }
+  if(cual==='f'){
+    var neOn=(val===null && typeof tempEvaF!=='undefined');
+    h+='<button type="button" class="evabtn ne'+(neOn?' on':'')+'" onclick="_setEvaTap(\'f\',null)">No evaluado</button>';
+  }
+  return h;
+}
+function _pintarEvaBtns(cual){
+  var row=document.getElementById('eva-row-'+cual);
+  if(row) row.innerHTML=_evaBtnsHTML(cual);
+}
+function _setEvaTap(cual,v){
+  if(cual==='i') tempEvaI=v; else tempEvaF=v;
+  marcarDirty(); _pintarEvaBtns(cual);
+}
+// Setter programático (IA, dictado, borrador): asigna el temp y repinta la grilla si existe.
+// Sustituye a los antiguos updates directos del slider (sl-i/sl-f ya no existen en el form).
+function _setEvaProg(cual,v){
+  if(cual==='i') tempEvaI=v; else tempEvaF=v;
+  _pintarEvaBtns(cual);
+}
+// ── 1A: colapso de secciones del form SOAP (modo de nota y dictado) ──
+function _tgSoapSec(id,flechaEl){
+  var el=document.getElementById(id); if(!el) return;
+  var abierto=el.style.display!=='none';
+  el.style.display=abierto?'none':'block';
+  if(flechaEl) flechaEl.textContent=abierto?'›':'⌄';
+}
 // F3: ¿quién atendió la sesión? (multi-selección; default = terapeuta de la nota)
 function _listaTerapeutasAtienden(){
   var base=['Carlos','Zara','Camila','Dafne','Goretti','Jess','Dulce'];
+  // 1A fix Jess/JESS: currentUser.name es el CÓDIGO ('JESS'); antes se pusheaba junto al
+  // nombre de calendario ('Jess') y salían dos botones para la misma persona. Normalizar
+  // vía TERAPEUTA_COD2CAL (misma fuente que banner/dashboard). Los atendidoPor ya guardados
+  // con código siguen siendo válidos: el normalizador F4 (TERAPEUTA_CAL2COD[x]||upper) mapea
+  // 'Jess' y 'JESS' al MISMO código — la atribución no cambia para nadie.
   var yo=(currentUser&&currentUser.name)||'';
-  if(yo && base.indexOf(yo)===-1) base.push(yo);
+  var yoCal=(typeof TERAPEUTA_COD2CAL!=='undefined'&&TERAPEUTA_COD2CAL[yo])||yo;
+  if(yoCal && base.indexOf(yoCal)===-1) base.push(yoCal);
   return base;
 }
 function _renderAtendioGrid(){
@@ -9994,14 +10049,16 @@ async function guardarSOAP(){
   if(!v('f-pindicaciones')) missing.push('Indicaciones (P)');
   if(tempMods.length===0) missing.push('Modalidades');
   }
-  if(missing.length){showToast(`Faltan: ${missing.slice(0,2).join(', ')}${missing.length>2?'...':''}`, 'error');_liberarGuardSOAP();return;}
-
-  // Aviso suave si EVA final sigue en default
-  const evaFActual=Number(document.getElementById('sl-f')?.value??tempEvaF);
-  if(evaFActual===3&&!editingSoapId){
-    showToast('Confirma EVA final antes de guardar.','');
-    // No bloquea — el terapeuta puede ignorar el aviso
+  // 1A: EVA obligatorio por TOQUE (única modificación a la validación de guardarSOAP — 2 checks
+  // aditivos en la misma lista `missing`; la persistencia no se toca). Antes los sliders traían
+  // defaults 5/3 y el aviso era suave → notas con "mejoría" jamás medida. Ahora: EVA inicio
+  // requiere número; EVA final requiere número O "No evaluado" explícito (tempEvaF null, se
+  // guarda evaF:null — constancia honesta, fuera de los promedios).
+  if(!_esTextoLibreHist){
+    if(tempEvaI==null) missing.push('EVA inicio (toca el número)');
+    if(typeof tempEvaF==='undefined') missing.push('EVA final (número o "No evaluado")');
   }
+  if(missing.length){showToast(`Faltan: ${missing.slice(0,2).join(', ')}${missing.length>2?'...':''}`, 'error');_liberarGuardSOAP();return;}
 
   const p=currentPatient;
   if(!p){ showToast('No hay paciente activo — recarga la app e intenta de nuevo','error'); _liberarGuardSOAP(); return; } // guard: sin esto un currentPatient nulo lanzaba y dejaba _guardandoSOAP=true (botón bloqueado hasta recargar)
@@ -10446,8 +10503,9 @@ function editarSOAP(soapId){
   editingSoapPid=p.id||''; editingSoapEsHistorico=false; _editingSoapHistoricoNota=null;
   // Cargar datos en variables globales
   tempMods=Array.isArray(nota.modalidades)?[...nota.modalidades]:[];
-  tempEvaI=nota.evaI??5;
-  tempEvaF=nota.evaF??3;
+  // 1A: al editar, precargar lo guardado tal cual (evaF null = "No evaluado" queda marcado).
+  tempEvaI=(nota.evaI!=null)?nota.evaI:null;
+  tempEvaF=(nota.evaF!==undefined)?nota.evaF:null;
   tempEvolMedia=Array.isArray(nota.media)?nota.media.map(m=>({...m})):[]; // FIX media-edición: precargar media existente (evita WIPE al guardar)
   _soapMediaTocada=false; // FIX media-edición: reset tras preload — el usuario aún no tocó el preview
 
@@ -10497,13 +10555,8 @@ function editarSOAP(soapId){
       const band=document.getElementById('dictado-bandera');
       if(band) band.style.display=_dictadoBanderas.length?'block':'none';
     }
-    // EVA sliders
-    const slI=document.getElementById('sl-i');const valI=document.getElementById('vi');
-    if(slI){slI.value=tempEvaI;}
-    if(valI){valI.textContent=tempEvaI;valI.className=`eva-val ${getEvaClass(tempEvaI)}`;}
-    const slF=document.getElementById('sl-f');const valF=document.getElementById('vf');
-    if(slF){slF.value=tempEvaF;}
-    if(valF){valF.textContent=tempEvaF;valF.className=`eva-val ${getEvaClass(tempEvaF)}`;}
+    // EVA (1A: botones — repintar grillas desde los temps ya seteados)
+    _pintarEvaBtns('i'); _pintarEvaBtns('f');
     // Grid de modalidades
     const g=document.getElementById('mod-grid');
     if(g) g.innerHTML=MODALIDADES.map(mod=>{
@@ -10533,8 +10586,9 @@ async function editarSoapHistorico(sid, pid){
   editingSoapEsHistorico=true;
   _editingSoapHistoricoNota=nota;
   tempMods=Array.isArray(nota.modalidades)?[...nota.modalidades]:[];
-  tempEvaI=nota.evaI!=null?Number(nota.evaI):5;
-  tempEvaF=nota.evaF!=null?Number(nota.evaF):3;
+  // 1A: precargar lo guardado tal cual (evaF null = "No evaluado" marcado; sin defaults 5/3).
+  tempEvaI=nota.evaI!=null?Number(nota.evaI):null;
+  tempEvaF=(nota.evaF!==undefined)?(nota.evaF!=null?Number(nota.evaF):null):null;
   tempEvolMedia=Array.isArray(nota.media)?nota.media.map(function(m){return Object.assign({},m);}):[]; // FIX media-edición: precargar media existente de la nota histórica
   _soapMediaTocada=false; // FIX media-edición: reset tras preload — el usuario aún no tocó el preview
   // [NUM-SESIÓN] posición por fecha (s.num muerto para display)
@@ -10564,13 +10618,8 @@ async function editarSoapHistorico(sid, pid){
     if(stEl && nota.terapeuta) stEl.value=nota.terapeuta;
     // Modo de nota
     if(nota.modoNota) seleccionarModoNota(nota.modoNota);
-    // EVA sliders
-    var slI=document.getElementById('sl-i'),valI=document.getElementById('vi');
-    if(slI) slI.value=tempEvaI;
-    if(valI){valI.textContent=tempEvaI;valI.className='eva-val '+getEvaClass(tempEvaI);}
-    var slF=document.getElementById('sl-f'),valF=document.getElementById('vf');
-    if(slF) slF.value=tempEvaF;
-    if(valF){valF.textContent=tempEvaF;valF.className='eva-val '+getEvaClass(tempEvaF);}
+    // EVA (1A: botones — repintar grillas desde los temps ya seteados)
+    _pintarEvaBtns('i'); _pintarEvaBtns('f');
     // Grid modalidades
     var g=document.getElementById('mod-grid');
     if(g) g.innerHTML=MODALIDADES.map(function(mod){var chk=tempMods.includes(mod);return '<div class="checkbox-item '+(chk?'checked':'')+'" onclick="toggleMod(\''+mod+'\')"><div class="cb-box">'+(chk?'✓':'')+'</div><div class="cb-label">'+mod+'</div></div>';}).join('');
@@ -10658,12 +10707,14 @@ async function generarSoapConIA(){
   if(!modoRapidoIA){
     payloadDatos.edadReal = (p.age && !isNaN(p.age) && Number(p.age)>0) ? String(Number(p.age))+' años' : '';
     payloadDatos.diagnostico = typeof p.dx==='string' ? p.dx : (p.dx?.dxClinico||p.dx?.dxMedico||'');
-    const evaIVal=Number(document.getElementById('sl-i')?.value??tempEvaI);
-    const evaFVal=Number(document.getElementById('sl-f')?.value??tempEvaF);
+    // 1A: los sliders sl-i/sl-f ya no existen — leer los temps directo (null/undefined = sin dato).
+    const evaIVal=(tempEvaI!=null)?Number(tempEvaI):NaN;
+    const evaFVal=(tempEvaF!=null)?Number(tempEvaF):NaN;
     const notaMencionaEva=/\b(eva|dolor|escala|\/10|pain)\b/i.test(notaLibre);
     let eva='';
-    if(evaIVal!==5 || notaMencionaEva) eva+=`EVA inicio sesión: ${evaIVal}/10`;
-    if(evaFVal!==3) eva+=(eva?' — ':'')+`EVA final sesión: ${evaFVal}/10`;
+    // 1A: sin sliders ya no hay sentinel 5/3 — se reporta lo que exista de verdad.
+    if(isFinite(evaIVal)) eva+=`EVA inicio sesión: ${evaIVal}/10`;
+    if(isFinite(evaFVal)) eva+=(eva?' — ':'')+`EVA final sesión: ${evaFVal}/10`;
     payloadDatos.eva = eva || 'No capturada. No inventar EVA final.';
 
     // ── Loop P1 — contexto clínico longitudinal (A1-A6) ──────────────────────
@@ -10923,22 +10974,15 @@ function copiarSesionAnterior(){
   // 8. Copiar modalidades
   tempMods = Array.isArray(lastSoap.modalidades) ? [...lastSoap.modalidades] : [];
 
-  // 9. Copiar EVA inicial
-  if(typeof lastSoap.evaI !== 'undefined'){
-    tempEvaI = Number(lastSoap.evaI) || tempEvaI;
-    const slI = document.getElementById('sl-i');
-    const valI = document.getElementById('vi');
-    if(slI) slI.value = tempEvaI;
-    if(valI){ valI.textContent = tempEvaI; valI.className = `eva-val ${getEvaClass(tempEvaI)}`; }
+  // 9. Copiar EVA inicial (1A: botones; solo si trae número real)
+  if(lastSoap.evaI != null && isFinite(Number(lastSoap.evaI))){
+    _setEvaProg('i', Number(lastSoap.evaI));
   }
 
-  // 10. Copiar EVA final
-  if(typeof lastSoap.evaF !== 'undefined'){
-    tempEvaF = Number(lastSoap.evaF) || tempEvaF;
-    const slF = document.getElementById('sl-f');
-    const valF = document.getElementById('vf');
-    if(slF) slF.value = tempEvaF;
-    if(valF){ valF.textContent = tempEvaF; valF.className = `eva-val ${getEvaClass(tempEvaF)}`; }
+  // 10. Copiar EVA final (1A: botones; evaF null de la nota anterior = "No evaluado" NO se copia
+  // — el EVA final de HOY se captura hoy)
+  if(lastSoap.evaF != null && isFinite(Number(lastSoap.evaF))){
+    _setEvaProg('f', Number(lastSoap.evaF));
   }
 
   // 11. Actualizar grid de modalidades visualmente
