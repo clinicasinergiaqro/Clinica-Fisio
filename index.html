@@ -10054,7 +10054,10 @@ async function guardarSOAP(){
   // defaults 5/3 y el aviso era suave → notas con "mejoría" jamás medida. Ahora: EVA inicio
   // requiere número; EVA final requiere número O "No evaluado" explícito (tempEvaF null, se
   // guarda evaF:null — constancia honesta, fuera de los promedios).
-  if(!_esTextoLibreHist){
+  // SOLO NOTAS NUEVAS (!editingSoapId): al EDITAR una nota vieja sin evaI/evaF los temps se
+  // precargan null (jamás undefined — L10508/L10591) y NO se exige inventar un EVA retroactivo:
+  // ninguna nota existente se vuelve ineditable por esta validación.
+  if(!_esTextoLibreHist && !editingSoapId){
     if(tempEvaI==null) missing.push('EVA inicio (toca el número)');
     if(typeof tempEvaF==='undefined') missing.push('EVA final (número o "No evaluado")');
   }
