@@ -5908,7 +5908,15 @@ function _computarRendimiento(eventos, diasISO, asigMap){
       if(!s || !diasDDMM[s.fecha]) return;
       var cod=String(s.terapeuta||'').toUpperCase();
       for(var cal in TERAPEUTA_CAL2COD){
-        if(TERAPEUTA_CAL2COD[cal]===cod){ stats[cal].notas++; stats[cal].scoreSum+=_scoreSoapCalidad(s); stats[cal].scoreN++; break; }
+        if(TERAPEUTA_CAL2COD[cal]===cod){
+          stats[cal].notas++;
+          // Nota de valoración auto-generada: cuenta como cita-con-nota pero NO entra al promedio
+          // de calidad (decisión supervisor 2026-08). Si la terapeuta la editó (historialEdiciones
+          // con entradas), entonces SÍ entra al score como cualquier nota.
+          var _esValSinEditar = s.modoNota==='valoracion' && !(Array.isArray(s.historialEdiciones)&&s.historialEdiciones.length);
+          if(!_esValSinEditar){ stats[cal].scoreSum+=_scoreSoapCalidad(s); stats[cal].scoreN++; }
+          break;
+        }
       }
     });
   });
@@ -7346,6 +7354,8 @@ function _renderSoapCard(s,p,readOnly){
   } else {
     sesionLine=`Sesión —`;   // vivas aún no disponibles (raro en activos): se recompone al re-render
   }
+  // Nota de valoración auto-generada en el alta: badge para distinguirla de las notas normales.
+  if(s.modoNota==='valoracion') sesionLine+=` <span style="background:#EEF4FF;color:var(--navy);font-size:10px;font-weight:800;padding:2px 8px;border-radius:9px">📋 Valoración</span>`;
   var bodyHTML=(s.importado&&s.formatoOriginal==='texto_libre')
     ? `<div class="soap-section">
         <div class="soap-label"><span class="soap-s">📝 Nota importada — texto original</span>
@@ -13622,7 +13632,7 @@ function renderNuevoPaciente(){
     'n-inflamacion','n-marcha','n-rom','n-fuerza','n-flex',
     'n-pruebas','n-palpacion','n-estudios',
     'n-dxclinico','n-limitaciones','n-objcp','n-objlp','n-pronostico',
-    'n-frecuencia','n-sesiones','n-tmanual','n-agentes','n-plancontra'
+    'n-frecuencia','n-sesiones','n-tmanual','n-agentes','n-plancontra','n-ttohoy'
   ];
 
   const c=document.getElementById('content-nuevo');
@@ -13797,6 +13807,14 @@ function renderNuevoPaciente(){
       <div class="form-field"><div class="form-label">Terapia manual</div><input class="form-input" id="n-tmanual" type="text" placeholder="Ej: Movilización STJ, liberación miofascial"></div>
       <div class="form-field"><div class="form-label">Agentes físicos</div><input class="form-input" id="n-agentes" type="text" placeholder="Ej: US, MEP, TENS, ESWT"></div>
       <div class="form-field"><div class="form-label">Precauciones del plan</div><input class="form-input" id="n-plancontra" type="text" placeholder="Ej: Sin impacto, sin AINES"></div>
+      <!-- NOTA DE VALORACIÓN: estos 2 campos alimentan la nota SOAP #1 auto-generada al guardar.
+           max=hoy — jamás se generan notas con fecha futura (limpieza FECHA_FUTURA). -->
+      <div class="form-field">
+        <div class="form-label">Fecha de la valoración</div>
+        <input type="date" class="form-input" id="n-fecha-valoracion" style="max-width:200px" max="${_isoMasDias(0)}" value="${_isoMasDias(0)}">
+        <div style="font-size:11px;color:var(--gray-400);padding:3px 14px">Día de la primera consulta — con esto se genera la nota de valoración (sesión 1)</div>
+      </div>
+      <div class="form-field"><div class="form-label">Tratamiento aplicado hoy <span style="color:var(--gray-400);font-weight:400">(opcional)</span></div><input class="form-input" id="n-ttohoy" type="text" placeholder="Ej: Liberación miofascial + calor 15 min"><div style="font-size:11px;color:var(--gray-400);padding:3px 14px">Se registra en la P de la nota de valoración</div></div>
     </div>
   </div>
   <div class="form-section">
@@ -13994,6 +14012,52 @@ function guardarNuevoPaciente(){
     }],
   };
   patientsDB.push(nuevo);
+  // ── NOTA DE VALORACIÓN AUTO-GENERADA (sesión 1) ────────────────────────────
+  // La primera consulta ES un SOAP: S←padecimiento, O←exploración, A←dx+EVA, P←plan+tratamiento
+  // aplicado hoy. modoNota:'valoracion' la distingue (excluida del promedio de calidad salvo que
+  // la terapeuta la edite) y revisionPendiente:false la mantiene fuera de la cola de revisión.
+  // Es SNAPSHOT del alta: ediciones posteriores a la valoración del expediente NO la reescriben
+  // (NOM-004 — las notas no se regeneran; el PDF muestra la valoración viva + la nota original).
+  // FAIL-SAFE TOTAL: cualquier error aquí NO rompe el alta — el paciente se crea igual.
+  try{
+    var _fvIso=v('n-fecha-valoracion') || _isoMasDias(0);
+    if(_fvIso > _isoMasDias(0)) _fvIso=_isoMasDias(0);   // defensa extra al max= del input: jamás nota futura
+    var _fvParts=_fvIso.split('-');
+    var _fvFmt=(_fvParts.length===3) ? (_fvParts[2]+'/'+_fvParts[1]+'/'+_fvParts[0]) : todayFmt();
+    var _ttoHoy=v('n-ttohoy');
+    var _oExtra=['Inflamación: '+nuevo.valoracion.inflamacion,'Marcha/postura: '+nuevo.valoracion.marcha,
+      'Flexibilidad: '+nuevo.valoracion.flexibilidad,'Pruebas: '+nuevo.valoracion.pruebasEspeciales,
+      'Palpación: '+nuevo.valoracion.palpacion].join(' · ');
+    var notaVal={
+      id:generarIdSeguro_('s'), num:1, fecha:_fvFmt,
+      horaCreacion:new Date().toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'}),
+      fechaHoraISO:new Date().toISOString(),
+      terapeuta:nuevo.terapeuta, semana:1,
+      totalSesiones:parseInt(sesionesFinal)||10,
+      s:{ dolor:'EVA '+evaVal+'/10 en valoración inicial', cambios:padecimiento,
+          actFisica:nuevo.antecedentes.deportivos+((nuevo.antecedentes.deporteFrecuencia&&nuevo.antecedentes.deporteFrecuencia!=='No aplica')?(' ('+nuevo.antecedentes.deporteFrecuencia+')'):'') },
+      o:{ rom:nuevo.valoracion.rom, fuerza:nuevo.valoracion.fuerza, hallazgos:_oExtra },
+      a:{ evolucion:'Valoración inicial — primera consulta del episodio.', respuesta:'',
+          analisis:(nuevo.dxFuncional.dxClinico||'')+'. '+(nuevo.dxFuncional.dxFuncional||'') },
+      p:{ tratamiento:_ttoHoy||'Sesión de valoración (sin tratamiento adicional registrado)',
+          indicaciones:'Plan: '+frecuenciaFinal+', '+sesionesFinal+' sesiones. Ejercicio: '+nuevo.planTto.ejercicioTerapeutico+'. T. manual: '+nuevo.planTto.terapiaManual+'. Agentes: '+nuevo.planTto.agentesFisicos,
+          contraindicaciones:nuevo.planTto.contraindicaciones },
+      evaI:evaVal, evaF:null, modalidades:[],
+      completa:true, modoNota:'valoracion', revisionPendiente:false,
+      atendidoPor:[nuevo.terapeuta], creadoPor:currentUser.name
+    };
+    nuevo.soap.push(notaVal);
+    nuevo.sesiones=1;   // la siguiente nota real sale num:2 (guardarSOAP: max+1 — L10314, intacto)
+    // Dual-write con la maquinaria EXISTENTE (guardarSOAP NO se toca): si falla o no hay red,
+    // la nota queda en COLA_SOAP_ACT y el drenador la sube después. El alta jamás espera ni falla.
+    try{
+      if(typeof FST_guardarSesionFirestore==='function'){
+        FST_guardarSesionFirestore(nuevo, notaVal, 'nueva').then(function(r){
+          if(!(r&&r.ok)) _encolarSoapActivo(nuevo.id, notaVal, 'nueva');
+        }).catch(function(){ _encolarSoapActivo(nuevo.id, notaVal, 'nueva'); });
+      } else { _encolarSoapActivo(nuevo.id, notaVal, 'nueva'); }
+    }catch(_e){ try{ _encolarSoapActivo(nuevo.id, notaVal, 'nueva'); }catch(_e2){} }
+  }catch(_eNotaVal){ console.warn('[ALTA] nota de valoración no generada (alta continúa):', _eNotaVal&&_eNotaVal.message); }
   // Fase 5: alta local → invalidar SOLO la vista fusionada (no relee Firestore)
   if (typeof window._FST_invalidarVistaPacientes === 'function') { window._FST_invalidarVistaPacientes(); }
   // Buscador de vincular / resolver del dashboard: el índice cacheado (24h) no veía activos recién
@@ -14915,7 +14979,7 @@ const CAMPOS_NUEVO=['n-nombre','n-fechanac','n-edad','n-telefono','n-terapeuta',
   'sc-implantes-detalle','sc-banderas-detalle','n-contra',
   'n-inflamacion','n-marcha','n-rom','n-fuerza','n-flex','n-pruebas','n-palpacion','n-estudios','n-hallazgos',
   'n-dxclinico','n-dxfuncional','n-limitaciones','n-objcp','n-objlp','n-pronostico',
-  'n-frecuencia','n-sesiones','n-ejercicio','n-tmanual','n-agentes','n-plancontra'];
+  'n-frecuencia','n-sesiones','n-ejercicio','n-tmanual','n-agentes','n-plancontra','n-fecha-valoracion','n-ttohoy'];
 
 function guardarBorradorNuevo(){
   try{
@@ -15631,7 +15695,7 @@ function _RPT_htmlSoap(sesiones){
     // texto_libre: sin tratamiento estructurado y con texto original → Hallazgos ancho completo, sin col Tratamiento.
     var textoLibre = !String(trat).trim() && !!String(s.textoOriginal||'').trim();
     var zebra=(idx%2===0)?'background:#FAFAF8;-webkit-print-color-adjust:exact;print-color-adjust:exact;':'';
-    var celS='<td style="'+tdB+'"><span style="font-weight:700">S'+escapeHTML(String((_posMap[String(s.id)]&&_posMap[String(s.id)].n)||''))+' · '+escapeHTML(_RPT_fechaCorta(s.fecha||s.date))+'</span><br><span style="font-size:8.5px;color:#9497A2">'+escapeHTML(s.terapeuta||'—')+'</span></td>';
+    var celS='<td style="'+tdB+'"><span style="font-weight:700">S'+escapeHTML(String((_posMap[String(s.id)]&&_posMap[String(s.id)].n)||''))+' · '+escapeHTML(_RPT_fechaCorta(s.fecha||s.date))+'</span><br><span style="font-size:8.5px;color:#9497A2">'+escapeHTML(s.terapeuta||'—')+'</span>'+((s.modoNota==='valoracion')?'<br><span style="font-size:8px;color:#1F5C4D;font-weight:800">📋 Valoración</span>':'')+'</td>';
     var celD='<td style="'+tdB+'">'+pill(eva)+'</td>';
     if(textoLibre){
       var txt=String(s.textoOriginal||'').replace(/\s+/g,' ').slice(0,190);
