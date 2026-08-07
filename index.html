@@ -928,6 +928,15 @@ select.form-input{font-size:14px}
 .evabtn.on{background:var(--navy);color:#fff;border-color:var(--navy);box-shadow:0 2px 6px rgba(27,58,107,.35)}
 .evabtn.ne{font-size:12px}
 .evabtn.ne.on{background:var(--gray-600);border-color:var(--gray-600)}
+/* 1B: botón ⧉ "traer de la sesión anterior" por campo (SOAP) */
+.traer-btn{margin-left:6px;padding:2px 9px;border-radius:8px;border:1px solid var(--gray-200);background:var(--gray-50);color:var(--navy);font-size:11px;font-weight:700;font-family:inherit;cursor:pointer;vertical-align:middle;white-space:nowrap}
+.traer-btn:active{background:var(--navy);color:#fff;border-color:var(--navy)}
+/* 1B: filas de protocolo por modalidad seleccionada (SOAP) */
+.proto-row{margin:6px 14px 0;padding:8px 10px;background:var(--gray-50);border:1.5px dashed var(--gray-200);border-radius:10px}
+.proto-row-nombre{font-size:11px;font-weight:800;color:var(--navy);text-transform:uppercase;letter-spacing:.3px}
+/* 1C: atajo sesión de descarga muscular */
+.btn-descarga{width:100%;background:#FFF8E6;color:var(--navy);border:2px solid var(--gold);border-radius:var(--radius);padding:12px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit}
+.btn-descarga.on{background:var(--gold);color:var(--navy-dark)}
 
 /* CHECKBOXES */
 .checkbox-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px}
@@ -1283,6 +1292,25 @@ const MODALIDADES=[
   'Presoterapia','Termoterapia','Crioterapia',
   'Drenaje linfático',
   'Tracciones','Otra'];
+
+// 1B: protocolo por modalidad — tabla REAL de la clínica (CERRADA por Carlos 2026-08-07).
+// SIN tiempos: los aparatos ya traen sus protocolos fijos; solo se captura lo que VARÍA. Tipos:
+//   'simple'   → un solo chip "+ Agregar al tratamiento" (la modalidad se anota tal cual)
+//   'opciones' → chips de sub-opción; tocar una compone "Modalidad sub-opción"
+//   'texto'    → campo libre + Agregar; compone "Modalidad: <texto>" (Terapia manual y Láser)
+// Tecarterapia NO necesita sub-opción extra: resistiva/capacitiva ya son modalidades separadas
+// en el grid. MEP e ILIB fuera de la tabla (no se usan). Modalidades sin entrada aquí:
+// solo se marcan en el grid, sin fila (comportamiento de siempre).
+const PROTOCOLOS_MODALIDAD={
+  'Tecarterapia resistiva':{tipo:'simple'},
+  'Tecarterapia capacitiva':{tipo:'simple'},
+  'Ultrasonido':{tipo:'opciones', ops:['0%','10%','20%','30%','40%','50%','60%','70%','80%','90%','100%']},
+  'Láser':{tipo:'texto', ph:'Ej: cicatriz, dolor crónico, neuropático...'},
+  'Ondas de choque':{tipo:'simple'},
+  'Presoterapia':{tipo:'simple'},
+  'Corriente Aura':{tipo:'simple'},
+  'Terapia manual':{tipo:'texto', ph:'Ej: liberación miofascial, movilización grado III...'}
+};
 
 const today=new Date();
 const todayISO=today.toISOString().split('T')[0];
@@ -5917,11 +5945,11 @@ function _computarRendimiento(eventos, diasISO, asigMap){
       for(var cal in TERAPEUTA_CAL2COD){
         if(TERAPEUTA_CAL2COD[cal]===cod){
           stats[cal].notas++;
-          // Nota de valoración auto-generada: cuenta como cita-con-nota pero NO entra al promedio
-          // de calidad (decisión supervisor 2026-08). Si la terapeuta la editó (historialEdiciones
-          // con entradas), entonces SÍ entra al score como cualquier nota.
-          var _esValSinEditar = s.modoNota==='valoracion' && !(Array.isArray(s.historialEdiciones)&&s.historialEdiciones.length);
-          if(!_esValSinEditar){ stats[cal].scoreSum+=_scoreSoapCalidad(s); stats[cal].scoreN++; }
+          // Notas auto-generadas (valoración del alta y descarga 1C): cuentan como cita-con-nota
+          // pero NO entran al promedio de calidad (decisión supervisor 2026-08). Si la terapeuta
+          // la editó (historialEdiciones con entradas), entonces SÍ entra como cualquier nota.
+          var _esAutoSinEditar = (s.modoNota==='valoracion'||s.modoNota==='descarga') && !(Array.isArray(s.historialEdiciones)&&s.historialEdiciones.length);
+          if(!_esAutoSinEditar){ stats[cal].scoreSum+=_scoreSoapCalidad(s); stats[cal].scoreN++; }
           break;
         }
       }
@@ -7361,8 +7389,9 @@ function _renderSoapCard(s,p,readOnly){
   } else {
     sesionLine=`Sesión —`;   // vivas aún no disponibles (raro en activos): se recompone al re-render
   }
-  // Nota de valoración auto-generada en el alta: badge para distinguirla de las notas normales.
+  // Notas auto-generadas: badge para distinguirlas de las notas normales.
   if(s.modoNota==='valoracion') sesionLine+=` <span style="background:#EEF4FF;color:var(--navy);font-size:10px;font-weight:800;padding:2px 8px;border-radius:9px">📋 Valoración</span>`;
+  if(s.modoNota==='descarga') sesionLine+=` <span style="background:#FFF8E6;color:#8A6D1A;font-size:10px;font-weight:800;padding:2px 8px;border-radius:9px">🙌 Descarga</span>`;
   var bodyHTML=(s.importado&&s.formatoOriginal==='texto_libre')
     ? `<div class="soap-section">
         <div class="soap-label"><span class="soap-s">📝 Nota importada — texto original</span>
@@ -8963,6 +8992,7 @@ function aplicarEstructuraSOAPv2(r){
     r.modalidades.forEach(m=>{ if(!tempMods.includes(m)) tempMods.push(m); });
     const g=document.getElementById('mod-grid');
     if(g && typeof MODALIDADES!=='undefined') g.innerHTML=MODALIDADES.map(mod=>{const chk=tempMods.includes(mod);return `<div class="checkbox-item ${chk?'checked':''}" onclick="toggleMod('${mod}')"><div class="cb-box">${chk?'✓':''}</div><div class="cb-label">${mod}</div></div>`;}).join('');
+    try{ _renderProtoRows(); }catch(_){}
   }
   // Banderas
   _dictadoBanderas = Array.isArray(r.banderas)?[...r.banderas]:[];
@@ -9013,6 +9043,7 @@ function acomodarTranscripcionSOAP_v1_legacy(){
     mods.forEach(m=>{ if(!tempMods.includes(m)){ tempMods.push(m); nuevas++; } });
     const g=document.getElementById('mod-grid');
     if(g && typeof MODALIDADES!=='undefined') g.innerHTML=MODALIDADES.map(mod=>{const chk=tempMods.includes(mod);return `<div class="checkbox-item ${chk?'checked':''}" onclick="toggleMod('${mod}')"><div class="cb-box">${chk?'✓':''}</div><div class="cb-label">${mod}</div></div>`;}).join('');
+    try{ _renderProtoRows(); }catch(_){}
     if(nuevas) showToast(`${nuevas} modalidad(es) detectada(s)`,'success');
   }
   chequearBanderasDictado(texto);
@@ -9394,7 +9425,7 @@ function showNuevoSOAP(){
   if(!currentPatient) return;
   // reset dictado 2.2
   _dictado.activo=false; _dictado.textoFinal=''; _dictado.textoInterino=''; _dictado.palabras=0; _dictadoSoapPreview=null; _dictadoMetadata=null; _dictadoManual=false;
-  tempMods=[]; tempEvaI=null; tempEvaF=undefined; tempEvolMedia=[]; _soapMediaTocada=false; editingSoapId=null; editingSoapPid=null; editingSoapEsHistorico=false; _editingSoapHistoricoNota=null; modoNotaActual=''; _dictadoBanderas=[]; _dictadoActivo=false; _dictadoTransPrecargada=false; _soapV2Resultado=null; limpiarDirty();
+  tempMods=[]; tempEvaI=null; tempEvaF=undefined; tempEvolMedia=[]; _soapMediaTocada=false; editingSoapId=null; editingSoapPid=null; editingSoapEsHistorico=false; _editingSoapHistoricoNota=null; modoNotaActual=''; _dictadoBanderas=[]; _dictadoActivo=false; _dictadoTransPrecargada=false; _soapV2Resultado=null; _modoDescarga=false; limpiarDirty();
   tempEvolucionChips=[];
   const sesNum=(typeof currentPatient.sesiones==='number'?currentPatient.sesiones:0)+1; // FIX SESIÓN-NaN: guard defensivo
   const totalSes=parseInt(currentPatient.planTto?.sesiones);
@@ -9457,6 +9488,11 @@ function renderSOAPForm(){
   // get last soap for reference
   const lastSoap=Array.isArray(p.soap)&&p.soap.length?p.soap[p.soap.length-1]:null;
 
+  // 1B: ⧉ traer de la sesión anterior POR CAMPO. El botón solo se pinta si existe una
+  // nota VIVA distinta de la que se está editando (si no hay anterior, ni aparece).
+  const _tieneAnterior=_soapVivas(p).filter(function(s){return !editingSoapId||s.id!==editingSoapId;}).length>0;
+  const _traerBtn=function(id){ return _tieneAnterior?'<button type="button" class="traer-btn" onclick="traerCampoAnterior(\''+id+'\')">⧉ anterior</button>':''; };
+
   let modHtml=MODALIDADES.map(m=>{
     const chk=tempMods.includes(m);
     return `<div class="checkbox-item ${chk?'checked':''}" onclick="toggleMod('${m}')">
@@ -9493,7 +9529,27 @@ function renderSOAPForm(){
       ? `${_nom} · Sesión ${(p.numSesionEpisodioActual||0)+1} · Ep ${(p.motivoActualIndex||0)+1} · ${totalPrevias+1}ª visita`
       : `${_nom} · Sesión ${sesNum}${(()=>{const t=parseInt(p.planTto?.sesiones);return(t&&t>0)?' de '+t:''})()}`;
   }
-  c.innerHTML=alertaPrecaucion+`
+  // 1C: atajo "sesión de descarga muscular" — SOLO nota nueva (al editar se ve el SOAP normal).
+  // Activarlo oculta #soap-full y muestra un cuadro mínimo (dónde + complemento + EVA reales).
+  const _descargaHtml=(!editingSoapId&&!editingSoapEsHistorico)?`
+  <div class="form-section" style="padding:10px 14px">
+    <button type="button" id="btn-descarga" class="btn-descarga" onclick="toggleDescarga()">🙌 Sesión de descarga muscular (atajo)</button>
+    <div id="descarga-box" style="display:none;margin-top:10px">
+      <div class="form-field">
+        <div class="form-label">¿Dónde fue la descarga? <span class="req">*</span></div>
+        <textarea class="form-input" id="d-donde" placeholder="Ej: Espalda alta y trapecios. Cuádriceps e isquios post-partido..."></textarea>
+      </div>
+      <div class="form-field">
+        <div class="form-label">Complemento <span style="font-size:11px;color:var(--gray-400);font-weight:400">(opcional: electro, preso, punción...)</span></div>
+        <input class="form-input" type="text" id="d-comp" placeholder="Ej: Electroterapia en trapecios 15 min">
+      </div>
+      <div id="eva-slot-di"></div>
+      <div id="eva-slot-df"></div>
+      <button class="btn-primary" onclick="guardarDescarga()" style="margin-top:10px">💾 Guardar descarga</button>
+      <div style="font-size:11px;color:var(--gray-400);margin-top:6px;line-height:1.5">Se genera la nota S/O/A/P completa automáticamente, etiquetada 🙌 Descarga (fuera del promedio de calidad). Después es editable como cualquier nota.</div>
+    </div>
+  </div>`:'';
+  c.innerHTML=alertaPrecaucion+_descargaHtml+`<div id="soap-full">
   <!-- ENCABEZADO -->
   <div class="form-section">
     <div class="form-section-title">📋 Identificación</div>
@@ -9578,12 +9634,12 @@ function renderSOAPForm(){
   <div class="form-section">
     <div class="form-section-title" style="color:#1565C0">S — Subjetivo</div>
     <div class="form-group">
-      <div class="form-field">
+      <div id="eva-slot-i"><div class="form-field" id="eva-field-i">
         <div class="form-label">EVA inicio <span class="req">*</span> <span style="font-size:11px;color:var(--gray-400);font-weight:400">(toca el número)</span></div>
         <div class="evabtn-row" id="eva-row-i">${_evaBtnsHTML('i')}</div>
-      </div>
+      </div></div>
       <div class="form-field">
-        <div class="form-label">Dolor (contexto, provocación) <span class="req">*</span></div>
+        <div class="form-label">Dolor (contexto, provocación) <span class="req">*</span>${_traerBtn('f-sdolor')}</div>
         <textarea class="form-input" id="f-sdolor" placeholder="Ej: 6/10 al bajar escaleras, 3/10 en reposo..."></textarea>
       </div>
       <div class="form-field">
@@ -9591,7 +9647,7 @@ function renderSOAPForm(){
         <textarea class="form-input" id="f-scambios" placeholder="Ej: Hizo los isométricos 3 días, refiere leve mejoría..."></textarea>
       </div>
       <div class="form-field">
-        <div class="form-label">Actividad física</div>
+        <div class="form-label">Actividad física ${_traerBtn('f-sactfisica')}</div>
         <input class="form-input" type="text" id="f-sactfisica" placeholder="Ej: Caminata 15 min diarios sin dolor">
       </div>
     </div>
@@ -9601,15 +9657,15 @@ function renderSOAPForm(){
     <div class="form-section-title" style="color:#1B5E20">O — Objetivo</div>
     <div class="form-group">
       <div class="form-field">
-        <div class="form-label">ROM (valores específicos)</div>
+        <div class="form-label">ROM (valores específicos) ${_traerBtn('f-orom')}</div>
         <textarea class="form-input" id="f-orom" placeholder="Ej: Flexión 130°, dolor 3/10 a partir de 60°..."></textarea>
       </div>
       <div class="form-field">
-        <div class="form-label">Fuerza muscular (escala Daniels)</div>
+        <div class="form-label">Fuerza muscular (escala Daniels) ${_traerBtn('f-ofuerza')}</div>
         <textarea class="form-input" id="f-ofuerza" placeholder="Ej: Cuádriceps 4/5 con dolor en arco 30-60°. Glúteo medio 3+/5..."></textarea>
       </div>
       <div class="form-field">
-        <div class="form-label">Hallazgos / pruebas clínicas <span class="req">*</span></div>
+        <div class="form-label">Hallazgos / pruebas clínicas <span class="req">*</span>${_traerBtn('f-ohallazgos')}</div>
         <textarea class="form-input" id="f-ohallazgos" placeholder="Ej: Clarke (+) con crepitación. Polo inferior rótula 7/10 a palpación..."></textarea>
       </div>
     </div>
@@ -9642,15 +9698,16 @@ function renderSOAPForm(){
   <div class="form-section">
     <div class="form-section-title" style="color:#4A148C">P — Plan</div>
     <div class="form-group">
-      <div class="form-field">
+      <div id="eva-slot-f"><div class="form-field" id="eva-field-f">
         <div class="form-label">EVA final <span class="req">*</span> <span style="font-size:11px;color:var(--gray-400);font-weight:400">(número, o "No evaluado" si no aplica)</span></div>
         <div class="evabtn-row" id="eva-row-f">${_evaBtnsHTML('f')}</div>
-      </div>
+      </div></div>
     </div>
     <div class="form-section-title" style="margin-top:8px;">⚡ Modalidades aplicadas <span style="color:var(--red)">*</span></div>
     <div class="form-group">
       <div class="form-field">
         <div class="checkbox-grid" id="mod-grid">${modHtml}</div>
+        <div id="proto-rows">${_protoRowsHTML()}</div>
       </div>
     </div>
     <div class="form-section-title" style="margin-top:8px;">👥 ¿Quién atendió esta sesión?</div>
@@ -9664,9 +9721,10 @@ function renderSOAPForm(){
         <div class="form-label">Tratamiento aplicado y dosis <span class="req">*</span></div>
         <textarea class="form-input" id="f-ptratamiento" placeholder="Ej: Tecarterapia 448kHz resistivo 10min. Láser polo inferior rótula. Isométricos cuádriceps 4×45seg..."></textarea>
         ${chipsHTML('f-ptratamiento',['Continuar protocolo','Progresar carga','Reducir intensidad'])}
+        ${_ejChipsHTML(p)}
       </div>
       <div class="form-field">
-        <div class="form-label">Indicaciones para casa <span class="req">*</span></div>
+        <div class="form-label">Indicaciones para casa <span class="req">*</span>${_traerBtn('f-pindicaciones')}</div>
         <textarea class="form-input" id="f-pindicaciones" placeholder="Ej: Isométricos 4 series 45seg, 3 veces al día. Hielo 10min post ejercicio..."></textarea>
         ${chipsHTML('f-pindicaciones',['Mantener ejercicios domiciliarios','Reposo relativo','Frío/calor en casa','Hidratación y descanso'])}
       </div>
@@ -9836,6 +9894,7 @@ function renderSOAPForm(){
 
   <button class="btn-primary" onclick="guardarSOAP()">💾 Guardar nota SOAP</button>
   <button class="btn-secondary" onclick="confirmarSalidaSiDirty(goBack)">Cancelar</button>
+  </div><!-- /soap-full (1C: se oculta completo en modo descarga) -->
   <div style="height:20px"></div>`;
   // [BORRADOR-SOAP] write-ahead: attach autosave a los campos, y tras el poblado de edición (~150ms) ofrecer restaurar.
   setTimeout(function(){ try{ activarAutosaveSoap(); }catch(_){} }, 60);
@@ -9909,7 +9968,7 @@ function aplicarBorradorSoap(d){
     CAMPOS_SOAP_TEXTO.forEach(function(id){ if(d.campos[id]!==undefined){ var el=document.getElementById(id); if(el) el.value=d.campos[id]; } });
     if(typeof d.evaI==='number'){ _setEvaProg('i', d.evaI); }
     if(typeof d.evaF==='number' || d.evaF===null){ _setEvaProg('f', d.evaF); }
-    if(Array.isArray(d.mods)){ tempMods=d.mods.slice(); var g=document.getElementById('mod-grid'); if(g) g.innerHTML=MODALIDADES.map(function(mod){ var chk=tempMods.includes(mod); return '<div class="checkbox-item '+(chk?'checked':'')+'" onclick="toggleMod(\''+mod+'\')"><div class="cb-box">'+(chk?'✓':'')+'</div><div class="cb-label">'+mod+'</div></div>'; }).join(''); }
+    if(Array.isArray(d.mods)){ tempMods=d.mods.slice(); var g=document.getElementById('mod-grid'); if(g) g.innerHTML=MODALIDADES.map(function(mod){ var chk=tempMods.includes(mod); return '<div class="checkbox-item '+(chk?'checked':'')+'" onclick="toggleMod(\''+mod+'\')"><div class="cb-box">'+(chk?'✓':'')+'</div><div class="cb-label">'+mod+'</div></div>'; }).join(''); try{ _renderProtoRows(); }catch(_){} }
     if(Array.isArray(d.atendido)){ tempAtendio=d.atendido.slice(); if(typeof _renderAtendioGrid==='function') _renderAtendioGrid(); }
     if(typeof d.motivoIndex==='number') tempMotivoIndex=d.motivoIndex;
     if(typeof d.modoNota==='string' && d.modoNota && typeof seleccionarModoNota==='function'){ try{ seleccionarModoNota(d.modoNota); }catch(_){} } // [BORRADOR-SOAP] restaurar modo clínico → re-muestra la sección opcional y su metadato
@@ -9984,6 +10043,145 @@ function _tgSoapSec(id,flechaEl){
   el.style.display=abierto?'none':'block';
   if(flechaEl) flechaEl.textContent=abierto?'›':'⌄';
 }
+// ── 1B: ⧉ traer de la sesión anterior POR CAMPO ─────────────────────────────
+// Solo campos que suelen repetirse entre sesiones (dolor-contexto, actividad física,
+// ROM, fuerza, hallazgos, indicaciones para casa). A PROPÓSITO no hay ⧉ en "Cambios
+// desde última sesión" ni en "Análisis clínico": esos se razonan HOY, no se copian.
+var _TRAER_CAMPO_ANT={
+  'f-sdolor':        function(s){return s.s&&s.s.dolor;},
+  'f-sactfisica':    function(s){return s.s&&s.s.actFisica;},
+  'f-orom':          function(s){return s.o&&s.o.rom;},
+  'f-ofuerza':       function(s){return s.o&&s.o.fuerza;},
+  'f-ohallazgos':    function(s){return s.o&&s.o.hallazgos;},
+  'f-pindicaciones': function(s){return s.p&&s.p.indicaciones;}
+};
+function _notaAnteriorParaTraer(){
+  var p=currentPatient; if(!p) return null;
+  // [BORRADO-NOTAS] FILTRAR: jamás traer contenido de una nota borrada. Al EDITAR,
+  // "anterior" = la última viva DISTINTA de la nota que se está editando.
+  var vivas=_soapVivas(p).filter(function(s){return !editingSoapId||s.id!==editingSoapId;});
+  return vivas.length?vivas[vivas.length-1]:null;
+}
+function traerCampoAnterior(id){
+  var el=document.getElementById(id), fn=_TRAER_CAMPO_ANT[id];
+  if(!el||!fn) return;
+  var nota=_notaAnteriorParaTraer();
+  if(!nota){ showToast('No hay sesión anterior para traer.','error'); return; }
+  var val=fn(nota);
+  val=(val!=null&&val!=='undefined'&&val!=='null')?String(val).trim():'';
+  if(!val||val==='[pendiente]'){ showToast('La sesión anterior no tiene ese campo.','warning'); return; }
+  if(el.value.trim()&&el.value.trim()!==val&&!confirm('Este campo ya tiene texto. ¿Reemplazarlo por el de la sesión anterior?')) return;
+  el.value=val; marcarDirty();
+  showToast('⧉ Traído de la sesión anterior. Ajusta lo que cambió hoy.','');
+}
+// ── 1B: tratamiento unificado — la modalidad marcada muestra su fila de protocolo ────────────
+// Tocar compone la línea en el campo Tratamiento vía _agregarLineaTratamiento: SIEMPRE
+// append (nunca borra ni reemplaza texto escrito) y con dedupe de línea exacta.
+function _protoRowsHTML(){
+  if(typeof PROTOCOLOS_MODALIDAD==='undefined') return '';
+  var sel=(Array.isArray(tempMods)?tempMods:[]).filter(function(m){return PROTOCOLOS_MODALIDAD[m];});
+  if(!sel.length) return '';
+  return sel.map(function(m){
+    var cfg=PROTOCOLOS_MODALIDAD[m], mAttr=JSON.stringify(m).replace(/"/g,'&quot;'), inner='';
+    if(cfg.tipo==='opciones'){
+      inner='<div class="chip-row">'+cfg.ops.map(function(op){
+        return '<button type="button" class="chip-quick" onclick="_protoAplicar('+mAttr+','+JSON.stringify(op).replace(/"/g,'&quot;')+')">'+escapeHTML(op)+'</button>';
+      }).join('')+'</div>';
+    } else if(cfg.tipo==='texto'){
+      var idIn='proto-txt-'+m.replace(/[^a-zA-Z0-9]/g,'');
+      inner='<div style="display:flex;gap:6px;margin-top:4px"><input class="form-input" type="text" id="'+idIn+'" placeholder="'+escapeHTML(cfg.ph||'')+'" style="flex:1;font-size:13px"><button type="button" class="chip-quick" onclick="_protoAplicarTexto('+mAttr+',\''+idIn+'\')">+ Agregar</button></div>';
+    } else {
+      inner='<div class="chip-row"><button type="button" class="chip-quick" onclick="_protoAplicar('+mAttr+',null)">+ Agregar al tratamiento</button></div>';
+    }
+    return '<div class="proto-row"><div class="proto-row-nombre">'+escapeHTML(m)+'</div>'+inner+'</div>';
+  }).join('');
+}
+function _renderProtoRows(){
+  var el=document.getElementById('proto-rows'); if(!el) return;
+  // Preservar lo tecleado en campos de texto (Terapia manual) al re-render por toggle de otra modalidad
+  var prev={};
+  el.querySelectorAll('input[id^="proto-txt-"]').forEach(function(i){ prev[i.id]=i.value; });
+  el.innerHTML=_protoRowsHTML();
+  Object.keys(prev).forEach(function(id){ var i=document.getElementById(id); if(i&&prev[id]) i.value=prev[id]; });
+}
+function _agregarLineaTratamiento(linea){
+  var el=document.getElementById('f-ptratamiento'); if(!el) return false;
+  var txt=el.value.trim();
+  if(txt.split('\n').some(function(l){return l.trim()===linea;})){ showToast('Esa línea ya está en el tratamiento.','warning'); return false; }
+  el.value=txt?(txt+'\n'+linea):linea;
+  marcarDirty(); return true;
+}
+function _protoAplicar(mod,op){
+  var linea=op?(mod+' '+op):mod;   // "Ultrasonido 80%", "Láser antiinflamatorio"; simple → solo la modalidad
+  if(_agregarLineaTratamiento(linea)) showToast('Agregado al tratamiento: '+linea,'success');
+}
+function _protoAplicarTexto(mod,inputId){
+  var el=document.getElementById(inputId);
+  var t=((el&&el.value)||'').trim();
+  if(!t){ showToast('Escribe la(s) técnica(s) primero.','warning'); return; }
+  if(_agregarLineaTratamiento(mod+': '+t)){ showToast('Agregado al tratamiento: '+mod+': '+t,'success'); if(el) el.value=''; }
+}
+// 1B: ejercicios del paciente (pestaña Ejercicios) como chips → línea en el tratamiento.
+// La dosis (series×reps) se escribe/ajusta en el propio campo: no se inventa un default.
+function _ejChipsHTML(p){
+  var ejs=((p&&Array.isArray(p.ejercicios))?p.ejercicios:[]).map(function(e){return e?String(e.label||e.name||'').trim():'';}).filter(Boolean);
+  if(!ejs.length) return '';
+  return '<div style="font-size:11px;font-weight:800;color:var(--navy);margin-top:8px">🏋️ Ejercicios del paciente <span style="font-weight:400;color:var(--gray-400)">(toca para agregar; anota series×reps)</span></div><div class="chip-row">'+
+    ejs.map(function(n){ return '<button type="button" class="chip-quick" onclick="_ejAplicar('+JSON.stringify(n).replace(/"/g,'&quot;')+')">'+escapeHTML(n)+'</button>'; }).join('')+'</div>';
+}
+function _ejAplicar(n){
+  if(_agregarLineaTratamiento('Ejercicio: '+n)) showToast('Agregado: '+n+'. Anota series×reps en el tratamiento.','success');
+}
+// ── 1C: atajo "sesión de descarga muscular" ──────────────────────────────────
+// Apaga TODO el SOAP (#soap-full) y deja solo el cuadro de descarga. Los EVA son los MISMOS
+// nodos del form (se mueven de lugar): tempEvaI/tempEvaF y la validación 1A quedan intactos.
+let _modoDescarga=false;
+function toggleDescarga(){
+  var full=document.getElementById('soap-full'), box=document.getElementById('descarga-box'), btn=document.getElementById('btn-descarga');
+  if(!full||!box) return;
+  _modoDescarga=!_modoDescarga;
+  full.style.display=_modoDescarga?'none':'block';
+  box.style.display=_modoDescarga?'block':'none';
+  if(btn){
+    btn.textContent=_modoDescarga?'← Volver a la nota SOAP completa':'🙌 Sesión de descarga muscular (atajo)';
+    btn.classList.toggle('on',_modoDescarga);
+  }
+  var fi=document.getElementById('eva-field-i'), ff=document.getElementById('eva-field-f');
+  var si=document.getElementById(_modoDescarga?'eva-slot-di':'eva-slot-i');
+  var sf=document.getElementById(_modoDescarga?'eva-slot-df':'eva-slot-f');
+  if(fi&&si) si.appendChild(fi);
+  if(ff&&sf) sf.appendChild(ff);
+}
+async function guardarDescarga(){
+  var donde=(document.getElementById('d-donde')?.value||'').trim();
+  var comp=(document.getElementById('d-comp')?.value||'').trim();
+  var faltan=[];
+  if(!donde) faltan.push('¿Dónde fue la descarga?');
+  if(tempEvaI==null) faltan.push('EVA inicio (toca el número)');
+  if(typeof tempEvaF==='undefined') faltan.push('EVA final (número o "No evaluado")');
+  if(faltan.length){ showToast('Faltan: '+faltan.slice(0,2).join(', ')+(faltan.length>2?'...':''),'error'); return; }
+  // Componer el SOAP base en los campos REALES (ocultos) y guardar por la vía estándar:
+  // guardarSOAP queda INTACTA — misma validación, misma persistencia, misma cola offline.
+  var set=function(id,v){ var el=document.getElementById(id); if(el) el.value=v; };
+  var compTxt=comp?(' Complemento: '+comp+'.'):'';
+  set('f-sdolor','Acude a sesión de descarga muscular. EVA inicio '+tempEvaI+'/10.');
+  set('f-scambios','Sesión de descarga/mantenimiento; sin cambios reportados respecto al plan activo.');
+  set('f-ohallazgos','Descarga muscular en: '+donde+'.'+compTxt);
+  set('f-aevolucion','Sesión de descarga muscular');
+  set('f-arespuesta',(tempEvaF===null)
+    ? 'Tolera la sesión sin complicaciones. EVA final no evaluado.'
+    : ((Number(tempEvaF)<=Number(tempEvaI))?'Favorable: EVA '+tempEvaI+'→'+tempEvaF+'.':'EVA '+tempEvaI+'→'+tempEvaF+'; vigilar respuesta en la siguiente sesión.'));
+  set('f-aanalisis','Sesión de mantenimiento/descarga; no modifica el plan terapéutico vigente.');
+  set('f-ptratamiento','Descarga muscular: '+donde+'.'+compTxt);
+  set('f-pindicaciones','Hidratación y descanso. Continuar indicaciones vigentes.');
+  var mods=['Masoterapia'];
+  if(/electro|tens|corriente/i.test(comp)) mods.push('Electroterapia');
+  if(/preso/i.test(comp)) mods.push('Presoterapia');
+  if(/punci|aguja/i.test(comp)) mods.push('Punción seca');
+  tempMods=mods;
+  modoNotaActual='descarga';   // guardarSOAP ya persiste modoNota (L10120): etiqueta sin tocarla
+  await guardarSOAP();
+}
 // F3: ¿quién atendió la sesión? (multi-selección; default = terapeuta de la nota)
 function _listaTerapeutasAtienden(){
   var base=['Carlos','Zara','Camila','Dafne','Goretti','Jess','Dulce'];
@@ -10019,6 +10217,7 @@ function toggleMod(m){
     return `<div class="checkbox-item ${chk?'checked':''}" onclick="toggleMod('${mod}')">
       <div class="cb-box">${chk?'✓':''}</div><div class="cb-label">${mod}</div></div>`;
   }).join('');
+  _renderProtoRows();   // 1B: la fila de protocolo sigue a la selección de modalidades
 }
 
 // H-02: liberar guard anti-doble-toque de guardarSOAP
@@ -10566,6 +10765,7 @@ function editarSOAP(soapId){
       const chk=tempMods.includes(mod);
       return `<div class="checkbox-item ${chk?'checked':''}" onclick="toggleMod('${mod}')"><div class="cb-box">${chk?'✓':''}</div><div class="cb-label">${mod}</div></div>`;
     }).join('');
+    _renderProtoRows();   // 1B: filas de protocolo de las modalidades de la nota
     // Pre-seleccionar terapeuta en el selector de edición
     const stEl=document.getElementById('f-soap-terapeuta');
     if(stEl && nota.terapeuta) stEl.value=nota.terapeuta;
@@ -10626,6 +10826,7 @@ async function editarSoapHistorico(sid, pid){
     // Grid modalidades
     var g=document.getElementById('mod-grid');
     if(g) g.innerHTML=MODALIDADES.map(function(mod){var chk=tempMods.includes(mod);return '<div class="checkbox-item '+(chk?'checked':'')+'" onclick="toggleMod(\''+mod+'\')"><div class="cb-box">'+(chk?'✓':'')+'</div><div class="cb-label">'+mod+'</div></div>';}).join('');
+    try{ _renderProtoRows(); }catch(_){}   // 1B: filas de protocolo de las modalidades de la nota
     // Cambiar título del botón guardar
     var btnGuardar=document.querySelector('[onclick="guardarSOAP()"]');
     if(btnGuardar) btnGuardar.textContent='💾 Guardar cambios (histórico)';
@@ -10999,6 +11200,7 @@ function copiarSesionAnterior(){
       </div>`;
     }).join('');
   }
+  _renderProtoRows();   // 1B: refleja las modalidades copiadas
 
   // 12. Aviso — nunca guarda automáticamente
   showToast('Sesión anterior copiada como base editable. Revisa cambios antes de guardar.','');
@@ -15742,7 +15944,7 @@ function _RPT_htmlSoap(sesiones){
     // texto_libre: sin tratamiento estructurado y con texto original → Hallazgos ancho completo, sin col Tratamiento.
     var textoLibre = !String(trat).trim() && !!String(s.textoOriginal||'').trim();
     var zebra=(idx%2===0)?'background:#FAFAF8;-webkit-print-color-adjust:exact;print-color-adjust:exact;':'';
-    var celS='<td style="'+tdB+'"><span style="font-weight:700">S'+escapeHTML(String((_posMap[String(s.id)]&&_posMap[String(s.id)].n)||''))+' · '+escapeHTML(_RPT_fechaCorta(s.fecha||s.date))+'</span><br><span style="font-size:8.5px;color:#9497A2">'+escapeHTML(s.terapeuta||'—')+'</span>'+((s.modoNota==='valoracion')?'<br><span style="font-size:8px;color:#1F5C4D;font-weight:800">📋 Valoración</span>':'')+'</td>';
+    var celS='<td style="'+tdB+'"><span style="font-weight:700">S'+escapeHTML(String((_posMap[String(s.id)]&&_posMap[String(s.id)].n)||''))+' · '+escapeHTML(_RPT_fechaCorta(s.fecha||s.date))+'</span><br><span style="font-size:8.5px;color:#9497A2">'+escapeHTML(s.terapeuta||'—')+'</span>'+((s.modoNota==='valoracion')?'<br><span style="font-size:8px;color:#1F5C4D;font-weight:800">📋 Valoración</span>':'')+((s.modoNota==='descarga')?'<br><span style="font-size:8px;color:#8A6D1A;font-weight:800">🙌 Descarga</span>':'')+'</td>';
     var celD='<td style="'+tdB+'">'+pill(eva)+'</td>';
     if(textoLibre){
       var txt=String(s.textoOriginal||'').replace(/\s+/g,' ').slice(0,190);
