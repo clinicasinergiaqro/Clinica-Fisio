@@ -1293,24 +1293,23 @@ const MODALIDADES=[
   'Drenaje linfático',
   'Tracciones','Otra'];
 
-// 1B: protocolo por modalidad — tabla REAL de la clínica (corrección 2026-08-07). SIN tiempos:
-// los aparatos ya traen sus protocolos fijos; solo se captura lo que VARÍA. Tipos:
+// 1B: protocolo por modalidad — tabla REAL de la clínica (CERRADA por Carlos 2026-08-07).
+// SIN tiempos: los aparatos ya traen sus protocolos fijos; solo se captura lo que VARÍA. Tipos:
 //   'simple'   → un solo chip "+ Agregar al tratamiento" (la modalidad se anota tal cual)
 //   'opciones' → chips de sub-opción; tocar una compone "Modalidad sub-opción"
-//   'texto'    → campo libre + Agregar; compone "Modalidad: <texto>" (Terapia manual)
+//   'texto'    → campo libre + Agregar; compone "Modalidad: <texto>" (Terapia manual y Láser)
 // Tecarterapia NO necesita sub-opción extra: resistiva/capacitiva ya son modalidades separadas
 // en el grid. MEP e ILIB fuera de la tabla (no se usan). Modalidades sin entrada aquí:
 // solo se marcan en el grid, sin fila (comportamiento de siempre).
-// [PENDIENTE Carlos] Láser: ¿lista de modos completa? · Corriente Aura: ¿lleva sub-opción?
 const PROTOCOLOS_MODALIDAD={
   'Tecarterapia resistiva':{tipo:'simple'},
   'Tecarterapia capacitiva':{tipo:'simple'},
   'Ultrasonido':{tipo:'opciones', ops:['0%','10%','20%','30%','40%','50%','60%','70%','80%','90%','100%']},
-  'Láser':{tipo:'opciones', ops:['antiinflamatorio','inhibitorio','regenerativo','dolor crónico','cicatriz','neuropático']},
+  'Láser':{tipo:'texto', ph:'Ej: cicatriz, dolor crónico, neuropático...'},
   'Ondas de choque':{tipo:'simple'},
   'Presoterapia':{tipo:'simple'},
   'Corriente Aura':{tipo:'simple'},
-  'Terapia manual':{tipo:'texto'}
+  'Terapia manual':{tipo:'texto', ph:'Ej: liberación miofascial, movilización grado III...'}
 };
 
 const today=new Date();
@@ -10090,7 +10089,7 @@ function _protoRowsHTML(){
       }).join('')+'</div>';
     } else if(cfg.tipo==='texto'){
       var idIn='proto-txt-'+m.replace(/[^a-zA-Z0-9]/g,'');
-      inner='<div style="display:flex;gap:6px;margin-top:4px"><input class="form-input" type="text" id="'+idIn+'" placeholder="Ej: liberación miofascial, movilización grado III..." style="flex:1;font-size:13px"><button type="button" class="chip-quick" onclick="_protoAplicarTexto('+mAttr+',\''+idIn+'\')">+ Agregar</button></div>';
+      inner='<div style="display:flex;gap:6px;margin-top:4px"><input class="form-input" type="text" id="'+idIn+'" placeholder="'+escapeHTML(cfg.ph||'')+'" style="flex:1;font-size:13px"><button type="button" class="chip-quick" onclick="_protoAplicarTexto('+mAttr+',\''+idIn+'\')">+ Agregar</button></div>';
     } else {
       inner='<div class="chip-row"><button type="button" class="chip-quick" onclick="_protoAplicar('+mAttr+',null)">+ Agregar al tratamiento</button></div>';
     }
