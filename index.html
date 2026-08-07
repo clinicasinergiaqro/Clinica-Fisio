@@ -13620,7 +13620,7 @@ function renderNuevoPaciente(){
     'n-motivoconsulta','n-dxmedico','n-mecanismo','n-evolucion',
     'n-patologicos','n-cirugias','n-medicamentos','n-alergias','n-deportivos','n-deporte-freq',
     'n-inflamacion','n-marcha','n-rom','n-fuerza','n-flex',
-    'n-pruebas','n-palpacion','n-banderas','n-estudios',
+    'n-pruebas','n-palpacion','n-estudios',
     'n-dxclinico','n-limitaciones','n-objcp','n-objlp','n-pronostico',
     'n-frecuencia','n-sesiones','n-tmanual','n-agentes','n-plancontra'
   ];
@@ -13735,8 +13735,8 @@ function renderNuevoPaciente(){
       </div>
     </div>
 
-    <!-- BLOQUE 2 — Banderas rojas (checkboxes). NOTA fase 1: el campo texto n-banderas de
-         Valoración sigue existiendo; se unifica en fase 2 del reacomodo. -->
+    <!-- BLOQUE 2 — Banderas rojas (checkboxes): FUENTE ÚNICA desde fase 2 del reacomodo
+         (el campo texto duplicado del alta se eliminó; valoracion.banderasRojas se deriva de aquí). -->
     <div class="form-group" style="margin-bottom:10px">
       <div class="form-field">
         <div class="form-label">🚩 Banderas rojas</div>
@@ -13770,7 +13770,9 @@ function renderNuevoPaciente(){
       <div class="form-field"><div class="form-label">Flexibilidad</div><input class="form-input" id="n-flex" type="text" placeholder="Ej: Reducida isquiotibiales"></div>
       <div class="form-field"><div class="form-label">Pruebas especiales</div><input class="form-input" id="n-pruebas" type="text" placeholder="Ej: Thomas(+), Ober(+)"></div>
       <div class="form-field"><div class="form-label">Palpación</div><input class="form-input" id="n-palpacion" type="text" placeholder="Ej: Dolor inserción tibial 7/10"></div>
-      <div class="form-field"><div class="form-label">🚩 Banderas rojas</div><input class="form-input" id="n-banderas" type="text" placeholder="Ej: Ninguna. O describe si existen."></div>
+      <!-- REACOMODO fase 2 (2026-08): el campo texto "🚩 Banderas rojas" (n-banderas) se eliminó del
+           alta — duplicaba los checkboxes sc-bandera de Seguridad. valoracion.banderasRojas se sigue
+           escribiendo SIEMPRE (derivado de los checkboxes en guardarNuevoPaciente). -->
       <div class="form-field"><div class="form-label">Estudios de imagen</div><input class="form-input" id="n-estudios" type="text" placeholder="Ej: US tendón rotuliano"></div>
       <div class="form-field"><div class="form-label">Hallazgos / conclusión</div><textarea class="form-input" id="n-hallazgos" placeholder="Resumen del reporte de imagen..."></textarea></div>
     </div>
@@ -13935,9 +13937,16 @@ function guardarNuevoPaciente(){
       deporteFrecuencia:v('n-deporte-freq','No aplica'),cirugias:v('n-cirugias','Ninguna'),medicamentos:v('n-medicamentos','Ninguno')},
     motivo:{dxMedico:dxmedicoFinal, padecimiento, mecanismo:v('n-mecanismo','No especificado'),
       evolucion:v('n-evolucion','No especificado'),estudios:v('n-estudios','Pendiente'),hallazgos:v('n-hallazgos','Pendiente')},
+    // valoracion.banderasRojas: DERIVADO de los checkboxes sc-bandera (los mismos que guardan en
+    // seguridadClinica.banderasRojas) desde el REACOMODO fase 2 (2026-08). El campo texto n-banderas
+    // del alta se eliminó por duplicado, pero el campo del MODELO se conserva porque lo leen:
+    // la vista del expediente (🚩 en historia), el PDF de valoración (v.neurologico||v.banderasRojas)
+    // y el editor ed-banderas de valoración. NO eliminar del modelo; expedientes viejos con texto
+    // libre se siguen mostrando y editando igual.
     valoracion:{eva:evaVal,inflamacion:v('n-inflamacion','No evaluada'),marcha:v('n-marcha','No evaluada'),
       rom:v('n-rom','No evaluado'),fuerza:v('n-fuerza','No evaluada'),flexibilidad:v('n-flex','No evaluada'),
-      pruebasEspeciales:v('n-pruebas','No realizadas'),palpacion:v('n-palpacion','No evaluada'),banderasRojas:v('n-banderas','Ninguna')},
+      pruebasEspeciales:v('n-pruebas','No realizadas'),palpacion:v('n-palpacion','No evaluada'),
+      banderasRojas:(()=>{const b=Array.from(document.querySelectorAll('.sc-bandera:checked')).map(c=>c.value).filter(x=>x!=='Ninguna referida');return b.length?b.join(', '):'Ninguna';})()},
     dxFuncional:{dxClinico:v('n-dxclinico',dxmedicoFinal),dxFuncional:v('n-dxfuncional','Pendiente'),
       limitaciones:v('n-limitaciones','Pendiente'),objetivosCP:v('n-objcp','Pendiente'),
       objetivosLP:v('n-objlp','Pendiente'),pronostico:v('n-pronostico','Pendiente')},
@@ -14897,13 +14906,14 @@ function activarAutosaveValoracion(){
 
 // ── BORRADOR NUEVO PACIENTE ───────────────────────────────────────────────
 const DRAFT_NUEVO='sinergia_borrador_nuevo_paciente';
-// Orden espejo del layout del REACOMODO fase 1 (misma MEMBRESÍA que antes — solo cambia el orden;
-// el borrador guarda/restaura por ID, así que borradores previos al reacomodo siguen funcionando).
+// Orden espejo del layout del REACOMODO (el borrador guarda/restaura por ID, así que borradores
+// previos siguen funcionando; un ID guardado que ya no existe en el form simplemente se ignora).
+// Fase 2: 'n-banderas' salió de la lista — el campo se eliminó del alta (duplicaba sc-bandera).
 const CAMPOS_NUEVO=['n-nombre','n-fechanac','n-edad','n-telefono','n-terapeuta','n-terapeuta-seguimiento','n-medico',
   'n-motivoconsulta','n-dxmedico','n-padecimiento','n-mecanismo','n-evolucion',
   'n-patologicos','sc-condiciones-obs','n-cirugias','n-medicamentos','n-alergias','n-deportivos','n-deporte-freq',
   'sc-implantes-detalle','sc-banderas-detalle','n-contra',
-  'n-inflamacion','n-marcha','n-rom','n-fuerza','n-flex','n-pruebas','n-palpacion','n-banderas','n-estudios','n-hallazgos',
+  'n-inflamacion','n-marcha','n-rom','n-fuerza','n-flex','n-pruebas','n-palpacion','n-estudios','n-hallazgos',
   'n-dxclinico','n-dxfuncional','n-limitaciones','n-objcp','n-objlp','n-pronostico',
   'n-frecuencia','n-sesiones','n-ejercicio','n-tmanual','n-agentes','n-plancontra'];
 
