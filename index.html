@@ -974,6 +974,16 @@ select.form-input{font-size:14px}
 .seg-pill{font-size:11px;font-weight:700;padding:3px 10px;border-radius:12px;background:var(--gray-50);color:var(--gray-600);border:1px solid var(--gray-200)}
 .seg-pill.alert{background:#FEF2F2;color:#DC2626;border-color:#FECACA}
 
+/* SOAP: botones expandibles (modo de nota, dictado) */
+.soap-expand-btn{display:flex;align-items:center;gap:10px;background:var(--white);border:1.5px solid var(--gray-200);border-radius:var(--radius);margin:0 14px 8px;padding:14px 16px;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:all .15s}
+.soap-expand-btn:active{transform:scale(.98);background:var(--gray-50)}
+.soap-expand-btn .seb-icon{font-size:20px;flex-shrink:0}
+.soap-expand-btn .seb-text{flex:1}
+.soap-expand-btn .seb-label{font-size:13px;font-weight:700;color:var(--navy)}
+.soap-expand-btn .seb-sub{font-size:11px;color:var(--gray-400);margin-top:1px}
+.soap-expand-btn .seb-arrow{width:26px;height:26px;background:var(--navy);color:white;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;transition:transform .2s;flex-shrink:0}
+.soap-expand-btn.open .seb-arrow{transform:rotate(90deg)}
+
 /* BUTTONS */
 .btn-primary{width:100%;background:var(--navy);color:var(--white);border:none;border-radius:var(--radius);padding:15px;font-size:15px;font-weight:700;cursor:pointer;margin-top:8px;font-family:inherit}
 .btn-primary:active{transform:scale(.98)}
@@ -9628,7 +9638,11 @@ function renderSOAPForm(){
   <!-- MODO CLÍNICO DE NOTA (LOOP4) — 1A: colapsado por default (casi siempre queda el default;
        ocupaba un bloque entero de pantalla). El estado y seleccionarModoNota NO cambian. -->
   <div class="form-section">
-    <div class="form-section-title" onclick="_tgSoapSec('soap-modo-wrap',document.getElementById('soap-modo-flecha'))" style="cursor:pointer">🎯 Modo de nota clínica <span style="margin-left:auto;font-weight:400;color:var(--gray-400);font-size:12px" id="soap-modo-flecha">›</span></div>
+    <div class="soap-expand-btn" id="soap-modo-btn" onclick="_tgSoapSec2('soap-modo-wrap','soap-modo-btn')">
+      <span class="seb-icon">🎯</span>
+      <div class="seb-text"><div class="seb-label">Modo de nota clínica</div><div class="seb-sub">Rápido, completo, deportivo…</div></div>
+      <span class="seb-arrow">›</span>
+    </div>
     <div id="soap-modo-wrap" style="display:none">
     <div style="padding:0 14px 6px"><div id="soap-modo-chips" style="display:flex;flex-wrap:wrap;gap:6px">
       ${['rapido|⚡ Rápido','completo|📝 Completo','seguro|🏥 Seguro/aseg.','postquirurgico|🔧 Postquirúrgico','deportivo|🏃 Deportivo','revaloracion|🔄 Revaloración','alta|🏁 Alta'].map(m=>{const[val,lbl]=m.split('|');return `<button type="button" class="modo-nota-chip" data-modo="${val}" onclick="seleccionarModoNota('${val}')" style="font-size:12px;font-weight:600;padding:6px 12px;border-radius:16px;border:1.5px solid var(--gray-200);background:white;color:var(--gray-600);cursor:pointer">${lbl}</button>`}).join('')}
@@ -9640,7 +9654,11 @@ function renderSOAPForm(){
   <!-- SPRINT3 L4A: dictado clínico SOAP — 1A: colapsado por default (ocupaba media pantalla
        aunque no se usara). La maquinaria de dictado NO cambia; solo se muestra al tocar. -->
   <div class="form-section">
-    <div class="form-section-title" onclick="_tgSoapSec('soap-dictado-wrap',document.getElementById('soap-dictado-flecha'))" style="cursor:pointer">🎤 Dictado clínico <span style="font-size:11px;font-weight:400;color:var(--gray-400)">(IA estructura el SOAP)</span> <span style="margin-left:auto;font-weight:400;color:var(--gray-400);font-size:12px" id="soap-dictado-flecha">›</span></div>
+    <div class="soap-expand-btn" id="soap-dictado-btn" onclick="_tgSoapSec2('soap-dictado-wrap','soap-dictado-btn')">
+      <span class="seb-icon">🎤</span>
+      <div class="seb-text"><div class="seb-label">Dictado clínico</div><div class="seb-sub">IA estructura el SOAP desde tu voz</div></div>
+      <span class="seb-arrow">›</span>
+    </div>
     <div id="soap-dictado-wrap" style="display:none">
     <div style="padding:0 14px 8px">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
@@ -10102,6 +10120,13 @@ function _tgSoapSec(id,flechaEl){
   var abierto=el.style.display!=='none';
   el.style.display=abierto?'none':'block';
   if(flechaEl) flechaEl.textContent=abierto?'›':'⌄';
+}
+function _tgSoapSec2(wrapId,btnId){
+  var el=document.getElementById(wrapId),btn=document.getElementById(btnId);
+  if(!el) return;
+  var abierto=el.style.display!=='none';
+  el.style.display=abierto?'none':'block';
+  if(btn) btn.classList.toggle('open',!abierto);
 }
 // ── 1B: ⧉ traer de la sesión anterior POR CAMPO ─────────────────────────────
 // Solo campos que suelen repetirse entre sesiones (dolor-contexto, actividad física,
