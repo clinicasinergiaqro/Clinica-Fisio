@@ -13873,11 +13873,11 @@ function renderNuevoPaciente(){
     .map(t=>`<option value="${t==='— Sin asignar —'?'':t}">${t}</option>`).join('');
 
   // IDs de campos en orden para navegación con Enter — sigue el ORDEN NUEVO de secciones
-  // (REACOMODO fase 1, 2026-08: ficha → motivo → antecedentes → seguridad → valoración → dx → plan)
+  // (REACOMODO fase 2, 2026-08: ficha → antecedentes → seguridad → motivo → valoración → dx → plan)
   const camposOrden=[
     'n-nombre','n-fechanac','n-telefono','n-medico',
-    'n-motivoconsulta','n-dxmedico','n-mecanismo','n-evolucion',
     'n-patologicos','n-cirugias','n-medicamentos','n-alergias','n-deportivos','n-deporte-freq',
+    'n-motivoconsulta','n-dxmedico','n-mecanismo','n-evolucion',
     'n-inflamacion','n-marcha','n-rom','n-fuerza','n-flex',
     'n-pruebas','n-palpacion','n-estudios',
     'n-dxclinico','n-limitaciones','n-objcp','n-objlp','n-pronostico',
@@ -13934,26 +13934,11 @@ function renderNuevoPaciente(){
       <div class="form-field"><div class="form-label">Médico referente</div><input class="form-input" id="n-medico" type="text" placeholder="Ej: Dr. Martín Romo"></div>
     </div>
   </div>
-  <!-- REACOMODO fase 1 (2026-08): orden de entrevista NOM-004 (ficha → motivo → antecedentes →
-       seguridad → valoración → dx → plan). Solo se movieron bloques de UI: TODOS los IDs de campo
-       y el modelo de datos quedan idénticos (guardarNuevoPaciente lee por ID, no por posición).
-       La antigua sección "⚠️ Alertas clínicas" se disolvió: n-contra vive ahora en Seguridad
-       y n-alergias en Antecedentes. Los checkboxes de condiciones médicas (sc-condicion) se
-       muestran en Antecedentes pero SIGUEN guardando en seguridadClinica.condiciones. -->
-  <div class="form-section">
-    <div class="form-section-title">💬 Motivo de consulta y padecimiento actual</div>
-    <div class="form-group">
-      <div class="form-field">
-        <div class="form-label">Motivo de consulta <span style="color:var(--gray-400);font-weight:400">(resumen en una línea)</span></div>
-        <input class="form-input" id="n-motivoconsulta" type="text" autocapitalize="sentences" placeholder="Ej: Dolor lumbar de 2 semanas, postquirúrgico de LCA">
-        <div style="font-size:11px;color:var(--gray-400);padding:3px 14px">Título del episodio — aparece en el expediente y el consentimiento</div>
-      </div>
-      <div class="form-field"><div class="form-label">Diagnóstico médico</div><input class="form-input" id="n-dxmedico" type="text" placeholder="Ej: Tendinopatía rotuliana"><div class="chip-row"><button type="button" class="chip-quick" onclick="setCampoRapido('n-dxmedico','No cuenta con diagnóstico médico referido')">Sin diagnóstico médico referido</button></div></div>
-      <div class="form-field"><div class="form-label">Padecimiento actual <span class="req">*</span></div><textarea class="form-input" id="n-padecimiento" placeholder="Descripción del paciente..."></textarea></div>
-      <div class="form-field"><div class="form-label">Mecanismo de lesión</div><input class="form-input" id="n-mecanismo" type="text" placeholder="Ej: Sobreuso, trauma directo"></div>
-      <div class="form-field"><div class="form-label">Tiempo de evolución</div><input class="form-input" id="n-evolucion" type="text" placeholder="Ej: 3 meses"></div>
-    </div>
-  </div>
+  <!-- REACOMODO fase 2 (2026-08): orden de entrevista clínico (ficha → antecedentes → seguridad →
+       motivo → valoración → dx → plan). Primero contexto del paciente, luego la queja actual.
+       TODOS los IDs de campo y el modelo de datos quedan idénticos (guardarNuevoPaciente lee por
+       ID, no por posición). Los checkboxes de condiciones médicas (sc-condicion) se muestran en
+       Antecedentes pero SIGUEN guardando en seguridadClinica.condiciones. -->
   <div class="form-section">
     <div class="form-section-title">🏥 Antecedentes</div>
     <div class="form-group" style="margin-bottom:10px">
@@ -14010,6 +13995,20 @@ function renderNuevoPaciente(){
          y de las precauciones del plan (planTto.contraindicaciones). -->
     <div class="form-group">
       <div class="form-field"><div class="form-label">Contraindicaciones médicas</div><textarea class="form-input" id="n-contra" placeholder="Marcapasos, bypass, anticoagulantes..."></textarea><div class="chip-row"><button type="button" class="chip-oneshot" onclick="setCampoRapido('n-contra','Ninguna')">Sin contraindicaciones referidas</button></div></div>
+    </div>
+  </div>
+  <div class="form-section">
+    <div class="form-section-title">💬 Motivo de consulta y padecimiento actual</div>
+    <div class="form-group">
+      <div class="form-field">
+        <div class="form-label">Motivo de consulta <span style="color:var(--gray-400);font-weight:400">(resumen en una línea)</span></div>
+        <input class="form-input" id="n-motivoconsulta" type="text" autocapitalize="sentences" placeholder="Ej: Dolor lumbar de 2 semanas, postquirúrgico de LCA">
+        <div style="font-size:11px;color:var(--gray-400);padding:3px 14px">Título del episodio — aparece en el expediente y el consentimiento</div>
+      </div>
+      <div class="form-field"><div class="form-label">Diagnóstico médico</div><input class="form-input" id="n-dxmedico" type="text" placeholder="Ej: Tendinopatía rotuliana"><div class="chip-row"><button type="button" class="chip-quick" onclick="setCampoRapido('n-dxmedico','No cuenta con diagnóstico médico referido')">Sin diagnóstico médico referido</button></div></div>
+      <div class="form-field"><div class="form-label">Padecimiento actual <span class="req">*</span></div><textarea class="form-input" id="n-padecimiento" placeholder="Descripción del paciente..."></textarea></div>
+      <div class="form-field"><div class="form-label">Mecanismo de lesión</div><input class="form-input" id="n-mecanismo" type="text" placeholder="Ej: Sobreuso, trauma directo"></div>
+      <div class="form-field"><div class="form-label">Tiempo de evolución</div><input class="form-input" id="n-evolucion" type="text" placeholder="Ej: 3 meses"></div>
     </div>
   </div>
   <div class="form-section">
