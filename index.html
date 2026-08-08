@@ -1887,6 +1887,7 @@ async function saveDB(k, v, opts){
       revaloraciones: Array.isArray(p.revaloraciones)?p.revaloraciones:[],
       revalSolicitada: p.revalSolicitada || null,
       eventosAdversos: Array.isArray(p.eventosAdversos)?p.eventosAdversos:[],
+      inasistencias: Array.isArray(p.inasistencias)?p.inasistencias:[],
       consentimientoImagen: p.consentimientoImagen||{aceptado:false,fecha:null,hora:null,alcance:'',observaciones:''},
       consentimientoWhatsApp: p.consentimientoWhatsApp||{aceptado:false,fecha:null,hora:null,telefono:'',aceptaRecordatorios:false,aceptaEjercicios:false,observaciones:''},
     };
@@ -2025,6 +2026,7 @@ async function _persistirHistoricoFirestore(p, camposHist){
     // Guards con != null / Array.isArray: solo se escribe lo presente (evita pisar con vacío).
     if(p.sexo!=null)                     outCl.sexo = p.sexo;
     if(Array.isArray(p.eventosAdversos)) outCl.eventosAdversos = p.eventosAdversos;
+    if(Array.isArray(p.inasistencias))   outCl.inasistencias = p.inasistencias;
     if(p.revalSolicitada!=null)          outCl.revalSolicitada = p.revalSolicitada;
     if(Array.isArray(p.etiquetas))       outCl.etiquetas = p.etiquetas;
     if(Array.isArray(p.historialCambios))outCl.historialCambios = p.historialCambios;
@@ -2904,6 +2906,7 @@ function sanearPaciente(p){
     altaClinica: (p.altaClinica && typeof p.altaClinica==='object') ? p.altaClinica : {activa:false,fecha:null,hora:null,criterio:'',objetivosCumplidos:'',estadoFuncional:'',indicaciones:'',terapeuta:'',observaciones:''},
     revaloraciones: Array.isArray(p.revaloraciones) ? p.revaloraciones : [],
     eventosAdversos: Array.isArray(p.eventosAdversos) ? p.eventosAdversos : [],
+    inasistencias: Array.isArray(p.inasistencias) ? p.inasistencias : [],
     // LOOP2: protección de datos (compatible con pacientes antiguos)
     consentimientoDatos: (p.consentimientoDatos && typeof p.consentimientoDatos==='object') ? p.consentimientoDatos : {aceptado:false,fecha:null,hora:null,responsable:'',versionAviso:'v3.0',fechaVersionAviso:null,avisoLegalRevisado:false,medio:'app'},
     consentimientoImagen: (p.consentimientoImagen && typeof p.consentimientoImagen==='object') ? p.consentimientoImagen : {aceptado:false,fecha:null,hora:null,alcance:'',observaciones:''},
@@ -3319,8 +3322,22 @@ function diasDesdeUltimoSoap(p){
   if(!f) return Infinity;
   return Math.floor((Date.now()-new Date(f))/(24*60*60*1000));
 }
+// Última inasistencia registrada ("No acudió") en ISO, o null.
+function obtenerUltimaFechaInasistencia(p){
+  const arr=Array.isArray(p&&p.inasistencias)?p.inasistencias:[];
+  const fechas=arr.map(function(x){return x&&x.fechaISO;}).filter(Boolean).sort();
+  return fechas.length?fechas[fechas.length-1]:null;
+}
+// Días desde la última ACTIVIDAD registrada (nota SOAP o inasistencia "No acudió", lo más reciente).
+// Una inasistencia cuenta como actividad: la terapeuta cumplió al registrarla, no debe alarmar.
+function diasDesdeUltimaActividad(p){
+  const fS=obtenerUltimaFechaSoap(p), fI=obtenerUltimaFechaInasistencia(p);
+  const f=(fS&&fI)?(fS>fI?fS:fI):(fS||fI);
+  if(!f) return Infinity;
+  return Math.floor((Date.now()-new Date(f))/(24*60*60*1000));
+}
 function necesitaAlertaSoapSemanal(p){
-  return diasDesdeUltimoSoap(p) > 7;
+  return diasDesdeUltimaActividad(p) > 7;
 }
 
 // Consentimiento firmado: considera nuevo array consentimientos[] y legacy.
@@ -7330,30 +7347,82 @@ function renderIndicadorCompletitud(p){
   const segTienePrecaucion = !!(p.seguridadClinica?.tienePrecaucion);
   const nSoap = _ses.length;
   const semanal = nSoap>0 && !necesitaAlertaSoapSemanal(p);
-  const chip=(ok,txt,bad)=>`<span style="font-size:11px;font-weight:600;padding:4px 10px;border-radius:20px;background:${ok?'#DCFCE7':bad?'#FEE2E2':'#FEF3C7'};color:${ok?'#166534':bad?'#991B1B':'#92400E'}">${txt}</span>`;
-  return `<div style="display:flex;flex-wrap:wrap;gap:6px;padding:10px 14px;background:#F8FAFB;border-radius:10px;margin-bottom:12px">
-    ${chip(hist,`Historia ${hist?'✅':'⚠️'}`)}
-    ${chip(val,`Valoración ${val?'✅':'⚠️'}`)}
-    ${cons
-      ? `<span style="font-size:11px;font-weight:600;padding:4px 10px;border-radius:20px;background:#DCFCE7;color:#166534">Consentimiento ✅</span>`
-      : esPrimeraCita
-        ? `<span style="font-size:11px;font-weight:600;padding:4px 10px;border-radius:20px;background:#EFF6FF;color:#1E40AF">Consentimiento ⏳ previo</span>`
-        : `<span style="font-size:11px;font-weight:600;padding:4px 10px;border-radius:20px;background:#FEE2E2;color:#991B1B">Consentimiento ❌</span>`
+
+  // ── Modelo de indicadores: cada uno con estado ok | warn | bad | info ──────
+  // ok  → correcto (se colapsa en el contador "al día")
+  // warn/bad → pendiente accionable (se muestra arriba, ámbar/rojo)
+  // info → dato neutro, ni bien ni mal (se muestra suave, no penaliza el score)
+  const items=[];
+  items.push({label:'Historia', estado: hist?'ok':'warn'});
+  items.push({label:'Valoración', estado: val?'ok':'warn'});
+  if(cons) items.push({label:'Consentimiento', estado:'ok'});
+  else if(esPrimeraCita) items.push({label:'Consentimiento previo', estado:'info'});
+  else items.push({label:'Consentimiento', estado:'bad'});
+  items.push({label:'Datos personales', estado: datos?'ok':'bad'});
+  items.push({label:'Sexo', estado: sexoOk?'ok':'warn'});
+  items.push({label:'Revaloración', estado: tieneRevalor?'ok':'warn'});
+  if(muchasSesiones) items.push({label:'Alta clínica', estado: tieneAlta?'ok':'warn'});
+  if(nEventos>0) items.push({label:`Eventos adversos: ${nEventos}`, estado:'info-red'});
+  if(segCapturada) items.push({label:'Seguridad clínica'+(segTienePrecaucion?' · precaución':''), estado: segTienePrecaucion?'bad':'ok'});
+  else items.push({label:'Seguridad clínica', estado:'info'});
+  items.push({label:`SOAP: ${nSoap} ${nSoap===1?'sesión':'sesiones'}`, estado:'info'});
+  if(nSoap>0) items.push({label:'SOAP semanal', estado: semanal?'ok':'warn'});
+
+  // Score de completitud: solo cuentan los evaluables (ok/warn/bad). Los info quedan fuera.
+  const evaluables=items.filter(it=>it.estado==='ok'||it.estado==='warn'||it.estado==='bad');
+  const okCount=evaluables.filter(it=>it.estado==='ok').length;
+  const total=evaluables.length;
+  const pct=total?Math.round(okCount/total*100):100;
+  const pendientes=items.filter(it=>it.estado==='warn'||it.estado==='bad');
+  const infos=items.filter(it=>it.estado==='info'||it.estado==='info-red');
+  const oks=items.filter(it=>it.estado==='ok');
+  const _uid='cmpl-'+escapeAttr_(p.id);
+
+  const chipPend=it=>{
+    const bad=it.estado==='bad';
+    return `<span style="font-size:12px;font-weight:700;padding:5px 12px;border-radius:20px;background:${bad?'#FEE2E2':'#FEF3C7'};color:${bad?'#991B1B':'#92400E'};border:1px solid ${bad?'#FCA5A5':'#FCD34D'}">${bad?'❌':'⚠️'} ${escapeHTML(it.label)}</span>`;
+  };
+  const chipInfo=it=>{
+    const rojo=it.estado==='info-red';
+    return `<span style="font-size:11px;font-weight:600;padding:4px 10px;border-radius:20px;background:${rojo?'#FEE2E2':'#EEF2F6'};color:${rojo?'#991B1B':'#475569'}">${escapeHTML(it.label)}</span>`;
+  };
+  const chipOk=it=>`<span style="font-size:11px;font-weight:600;padding:4px 10px;border-radius:20px;background:#DCFCE7;color:#166534">✅ ${escapeHTML(it.label)}</span>`;
+
+  // Barra de salud del expediente
+  const barColor = pct>=100?'#16A34A' : pct>=60?'#C9A84C' : '#DC2626';
+  let html=`<div style="padding:10px 14px;background:#F8FAFB;border-radius:10px;margin-bottom:12px">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:${pendientes.length||infos.length?'10px':'0'}">
+      <span style="font-size:12px;font-weight:800;color:var(--navy);white-space:nowrap">Expediente ${okCount}/${total}</span>
+      <div style="flex:1;height:8px;background:#E5E7EB;border-radius:5px;overflow:hidden"><div style="height:100%;width:${pct}%;background:${barColor};border-radius:5px"></div></div>
+    </div>`;
+
+  // Fila de pendientes (lo que pide acción)
+  if(pendientes.length){
+    html+=`<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:${infos.length||oks.length?'8px':'0'}">
+      <span style="font-size:11px;font-weight:700;color:var(--gray-500);text-transform:uppercase;letter-spacing:.03em;margin-right:2px">Pendiente</span>
+      ${pendientes.map(chipPend).join('')}
+    </div>`;
+  }
+
+  // Fila informativa (datos neutros, siempre visibles pero sin alarmar)
+  if(infos.length){
+    html+=`<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:${oks.length?'8px':'0'}">
+      ${infos.map(chipInfo).join('')}
+    </div>`;
+  }
+
+  // Lo que ya está al día: sin pendientes → banner verde; con pendientes → contador colapsable.
+  if(oks.length){
+    if(!pendientes.length){
+      html+=`<div style="font-size:12.5px;font-weight:700;color:#166534;background:#DCFCE7;border-radius:20px;padding:6px 14px;display:inline-flex;align-items:center;gap:6px">✅ Expediente completo · al día</div>`;
+    } else {
+      html+=`<div onclick="var b=document.getElementById('${_uid}');if(b){var open=b.style.display!=='none';b.style.display=open?'none':'flex';this.querySelector('.cmpl-caret').textContent=open?'▾ ver todo':'▴ ocultar';}" style="font-size:11.5px;font-weight:600;color:#166534;cursor:pointer;display:inline-flex;align-items:center;gap:5px">✅ ${oks.length} al día <span class="cmpl-caret" style="color:var(--gray-400);font-size:10px">▾ ver todo</span></div>
+      <div id="${_uid}" style="display:none;flex-wrap:wrap;gap:6px;margin-top:8px">${oks.map(chipOk).join('')}</div>`;
     }
-    ${chip(datos,`Datos ${datos?'✅':'❌'}`,!datos)}
-    ${chip(sexoOk,`Sexo ${sexoOk?'✅':'⚠️'}`,false)}
-    ${chip(tieneRevalor,`Revalor. ${tieneRevalor?'✅':'⚠️'}`,false)}
-    ${muchasSesiones?chip(tieneAlta,`Alta ${tieneAlta?'✅':'⚠️'}`,false):''}
-    ${nEventos>0?`<span style="font-size:11px;font-weight:600;padding:4px 10px;border-radius:20px;background:#FEE2E2;color:#991B1B">Eventos: ${nEventos}</span>`:''}
-    ${segCapturada
-      ? segTienePrecaucion
-        ? `<span style="font-size:11px;font-weight:600;padding:4px 10px;border-radius:20px;background:#FEE2E2;color:#991B1B">Seg. clínica ⚠️ precaución</span>`
-        : `<span style="font-size:11px;font-weight:600;padding:4px 10px;border-radius:20px;background:#DCFCE7;color:#166534">Seg. clínica ✅</span>`
-      : `<span style="font-size:11px;font-weight:600;padding:4px 10px;border-radius:20px;background:#FEF3C7;color:#92400E">Seg. clínica ⏳</span>`
-    }
-    ${chip(true,`SOAP: ${nSoap} sesiones`)}
-    ${chip(semanal,`SOAP semanal ${semanal?'✅':'⚠️'}`)}
-  </div>`;
+  }
+
+  html+=`</div>`;
+  return html;
 }
 
 // ── Fechas clínicas (Prompt B v2) ──────────────────────────────────────────
@@ -7816,6 +7885,18 @@ function renderExpediente(tab='historia'){
 
   if(tab==='soap'){
     html+=generarGraficaEVA(p);
+    // Botón "No acudió": registra inasistencia sin crear nota → silencia la alerta semanal esa semana.
+    html+=`<div style="text-align:right;margin:0 0 10px"><button data-pid="${escapeAttr_(p.id)}" onclick="marcarNoAcudioHoy(this.dataset.pid)" style="background:#FFFBEB;border:1px solid #FDE68A;color:#92400E;border-radius:16px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer">🚫 No acudió hoy</button></div>`;
+    if(Array.isArray(p.inasistencias)&&p.inasistencias.length){
+      const _inas=p.inasistencias.slice().sort((a,b)=>String(b.fechaISO||'').localeCompare(String(a.fechaISO||'')));
+      html+=`<div style="margin:0 0 12px;padding:8px 12px;background:#FFFBEB;border:1px solid #FDE68A;border-radius:10px">
+        <div style="font-size:11px;font-weight:800;color:#92400E;margin-bottom:4px">🚫 Inasistencias (${_inas.length})</div>
+        ${_inas.map((x,i)=>`<div style="display:flex;justify-content:space-between;align-items:center;font-size:12px;color:#78350F;padding:2px 0">
+          <span>${escapeHTML(x.fecha||x.fechaISO||'')}${x.terapeuta?` · ${escapeHTML(x.terapeuta)}`:''}</span>
+          <button data-pid="${escapeAttr_(p.id)}" data-iid="${escapeAttr_(x.id||'')}" onclick="deshacerNoAcudio(this.dataset.pid,this.dataset.iid)" style="background:none;border:none;color:#92400E;font-weight:800;cursor:pointer;padding:0 4px" title="Deshacer">↩︎</button>
+        </div>`).join('')}
+      </div>`;
+    }
     // BUG 1 fix — histórico (mig_pac_): Firestore es la ÚNICA fuente de verdad de sus sesiones.
     // NO renderizar el p.soap local (puede haber quedado congelado con un valor viejo si el mig_pac_
     // se filtró a localStorage). Las sesiones se pintan FRESCAS por FST_renderHistorialSoap
@@ -8651,6 +8732,7 @@ async function FST_hidratarCamposClinicos(p, id) {
     if (d.fechaCreacion)                 p.fechaCreacion = d.fechaCreacion;
     if (d.fechaInicio)                   p.fechaInicio = d.fechaInicio;
     if (Array.isArray(d.eventosAdversos) && d.eventosAdversos.length)   p.eventosAdversos = d.eventosAdversos;
+    if (Array.isArray(d.inasistencias) && d.inasistencias.length)       p.inasistencias = d.inasistencias;
     if (Array.isArray(d.historialCambios) && d.historialCambios.length) p.historialCambios = d.historialCambios;
     if (d.revalSolicitada != null)       p.revalSolicitada = d.revalSolicitada;
     // LOOP B (v14) — baseline de recencia para la detección de conflictos: guarda el updatedAt
@@ -14511,6 +14593,45 @@ function registrarEventoAdverso(){
     showToast(res?.ok?'Evento adverso registrado ✅':(_esHistEa?'❌ El evento NO se guardó en la nube — reintenta':'⚠️ Evento local, Sheets pendiente'),res?.ok?'success':(_esHistEa?'error':'warning'));
   }).catch(()=>showToast(_esHistEa?'❌ El evento NO se guardó en la nube — reintenta':'⚠️ Sin conexión — evento local',_esHistEa?'error':'warning'));
   renderExpediente(currentTab||'historia');
+}
+
+// ── NO ACUDIÓ (perfil) ── Registra inasistencia sin crear nota SOAP. Cuenta como actividad de la
+// semana → silencia la alerta "SOAP semanal ⚠️" (la terapeuta cumplió), NO infla el nº de sesiones.
+function marcarNoAcudioHoy(pid){
+  const p = (pid && currentPatient && currentPatient.id===pid) ? currentPatient : currentPatient;
+  if(!p) return;
+  if(!confirm('¿Registrar que el paciente NO acudió hoy?\n\nNo se crea nota de sesión y no contará como falta esta semana.')) return;
+  if(!Array.isArray(p.inasistencias)) p.inasistencias=[];
+  const hoy=new Date();
+  const iso=hoy.toISOString().slice(0,10);
+  if(p.inasistencias.some(x=>x&&x.fechaISO===iso)){ showToast('Ya hay una inasistencia registrada hoy','warning'); return; }
+  const _inNueva = {
+    id:generarIdSeguro_('ina_'), fecha:todayFmt(), fechaISO:iso, hora:_horaActual(),
+    terapeuta:currentUser?.name||''
+  };
+  p.inasistencias.push(_inNueva);
+  p.updatedAt = Date.now();
+  const _esHist = String(p.id||'').startsWith('mig_pac_');
+  (_esHist ? _persistirAdicionHistorico(p, {inasistencias:_inNueva})
+           : saveDB('pts',[p],{camposHist:['inasistencias']})
+  ).then(res=>{
+    if(res && res.pendiente) return;
+    showToast(res?.ok?'🚫 Registrado: no acudió hoy':(_esHist?'❌ No se guardó en la nube — reintenta':'⚠️ Local, Sheets pendiente'),res?.ok?'success':(_esHist?'error':'warning'));
+  }).catch(()=>showToast(_esHist?'❌ No se guardó en la nube — reintenta':'⚠️ Sin conexión — registro local',_esHist?'error':'warning'));
+  renderExpediente(currentTab||'soap');
+}
+function deshacerNoAcudio(pid, iid){
+  const p = currentPatient;
+  if(!p || !Array.isArray(p.inasistencias)) return;
+  const idx=p.inasistencias.findIndex(x=>x&&x.id===iid);
+  if(idx<0) return;
+  if(!confirm('¿Deshacer esta inasistencia?')) return;
+  p.inasistencias.splice(idx,1);
+  p.updatedAt = Date.now();
+  saveDB('pts',[p],{camposHist:['inasistencias']}).then(res=>{
+    showToast(res?.ok?'↩︎ Inasistencia deshecha':'⚠️ Local, Sheets pendiente',res?.ok?'success':'warning');
+  }).catch(()=>showToast('⚠️ Sin conexión — cambio local','warning'));
+  renderExpediente(currentTab||'soap');
 }
 
 function guardarAntecedentesCompleto(){
