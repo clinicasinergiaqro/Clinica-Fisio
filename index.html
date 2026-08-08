@@ -10045,7 +10045,8 @@ function _evaBtnsHTML(cual){
   var val=(cual==='i')?tempEvaI:tempEvaF;
   var h='';
   for(var n=0;n<=10;n++){
-    h+='<button type="button" class="evabtn'+(val===n?' on':'')+'" onclick="_setEvaTap(\''+cual+'\','+n+')">'+n+'</button>';
+    var sel=val===n;
+    h+='<button type="button" class="evabtn'+(sel?' '+_nEvaColorClass(n):'')+'" style="'+(sel?'':_nEvaTint(n))+'" onclick="_setEvaTap(\''+cual+'\','+n+')">'+n+'</button>';
   }
   if(cual==='f'){
     var neOn=(val===null && typeof tempEvaF!=='undefined');
