@@ -7964,84 +7964,8 @@ function renderExpediente(tab='historia'){
 }
 
 // ── SOAP FORM ──────────────────────────────────────────────────────────────
-// ── LOOP4: modos clínicos de nota SOAP (distinto de modoRapidoIA = velocidad IA) ──
 let modoNotaActual = '';
-// Chips contextuales por modo clínico: {campoId: [[etiqueta, texto], ...]}
-const CHIPS_POR_MODO = {
-  rapido: {
-    'f-aevolucion': [['Evoluciona favorablemente','Evoluciona favorablemente.'],['Sin cambios','Sin cambios significativos.'],['Aumento de dolor','Refiere aumento de dolor.']],
-    'f-arespuesta': [['Tolera sesión','Tolera sesión sin complicaciones.']],
-    'f-ptratamiento': [['Continúa plan','Se continúa plan actual.']]
-  },
-  seguro: {
-    'f-aanalisis': [['Documenta respuesta','Se documenta respuesta al tratamiento.'],['Ajusta plan','Se ajusta plan según evolución.']],
-    'f-pindicaciones': [['Ejercicios domiciliarios','Se indican ejercicios domiciliarios.']]
-  },
-  postquirurgico: {
-    'f-ohallazgos': [['Sin signos de alarma','Sin signos de alarma.'],['Respeta fase protección','Se respeta fase de protección.']],
-    'f-ptratamiento': [['Progresión según tolerancia','Progresión según tolerancia.']]
-  },
-  deportivo: {
-    'f-aanalisis': [['Control neuromuscular','Trabajo de control neuromuscular.'],['Readaptación progresiva','Readaptación progresiva.']],
-    'f-aevolucion': [['Criterios de retorno','Criterios de retorno funcional en progreso.']]
-  },
-  revaloracion: {
-    'f-scambios': [['Revalora EVA/ROM/fuerza','Se revalora EVA, ROM, fuerza y función.']],
-    'f-aanalisis': [['Actualiza objetivos','Se actualizan objetivos.']],
-    'f-ptratamiento': [['Ajusta plan','Se ajusta plan terapéutico.']]
-  },
-  alta: {
-    'f-aanalisis': [['Objetivos cumplidos','Objetivos funcionales cumplidos.']],
-    'f-pindicaciones': [['Indicaciones domiciliarias','Se entregan indicaciones domiciliarias.'],['Seguimiento si reaparece','Se sugiere seguimiento si reaparecen síntomas.']]
-  }
-};
-const HINT_POR_MODO = {
-  rapido:'Nota ágil de seguimiento.', completo:'Nota detallada con todos los campos.',
-  seguro:'Orientada a documentación para aseguradora.', postquirurgico:'Enfocada en fase postquirúrgica y signos de alarma.',
-  deportivo:'Enfocada en readaptación y retorno deportivo.', revaloracion:'Revaloración periódica de EVA/ROM/fuerza/función.', alta:'Nota de cierre y alta clínica.'
-};
-
-function seleccionarModoNota(modo){
-  modoNotaActual = modo;
-  document.querySelectorAll('.modo-nota-chip').forEach(b=>{
-    const on=b.dataset.modo===modo;
-    b.style.background=on?'var(--navy)':'white';
-    b.style.color=on?'white':'var(--gray-600)';
-    b.style.borderColor=on?'var(--navy)':'var(--gray-200)';
-  });
-  const hint=document.getElementById('soap-modo-hint');
-  if(hint) hint.textContent=HINT_POR_MODO[modo]||'';
-  // SPRINT3: mostrar campos opcionales en modos que los requieren
-  const opc=document.getElementById('soap-campos-opcionales');
-  if(opc){
-    const modosConCampos=['completo','seguro','revaloracion','alta'];
-    opc.style.display = modosConCampos.includes(modo)?'block':'none';
-  }
-  // Renderizar chips contextuales bajo cada campo del modo
-  renderChipsModoNota(modo);
-  marcarDirty();
-}
-
-function renderChipsModoNota(modo){
-  // Limpiar chips de modo previos
-  document.querySelectorAll('.chips-modo-nota').forEach(el=>el.remove());
-  const mapa = CHIPS_POR_MODO[modo];
-  if(!mapa) return;
-  Object.keys(mapa).forEach(campoId=>{
-    const campo=document.getElementById(campoId);
-    if(!campo) return;
-    const cont=document.createElement('div');
-    cont.className='chips-modo-nota chip-row';
-    cont.style.marginTop='6px';
-    mapa[campoId].forEach(([lbl,txt])=>{
-      const b=document.createElement('button');
-      b.type='button'; b.className='chip-quick'; b.textContent=lbl;
-      b.onclick=()=>{ aplicarChipTexto(campoId,txt); marcarDirty(); };
-      cont.appendChild(b);
-    });
-    campo.parentNode.insertBefore(cont, campo.nextSibling);
-  });
-}
+function seleccionarModoNota(modo){ modoNotaActual = modo; }
 
 // Agrega el texto del chip al campo (igual que los chips actuales: append si ya hay texto)
 function aplicarChipTexto(campoId, texto){
@@ -9635,23 +9559,7 @@ function renderSOAPForm(){
     </div>
   </div>`+selectorMotivoHtml+`
 
-  <!-- MODO CLÍNICO DE NOTA (LOOP4) — 1A: colapsado por default (casi siempre queda el default;
-       ocupaba un bloque entero de pantalla). El estado y seleccionarModoNota NO cambian. -->
-  <div class="form-section">
-    <div class="soap-expand-btn" id="soap-modo-btn" onclick="_tgSoapSec2('soap-modo-wrap','soap-modo-btn')">
-      <span class="seb-icon">🎯</span>
-      <div class="seb-text"><div class="seb-label">Modo de nota clínica</div><div class="seb-sub">Rápido, completo, deportivo…</div></div>
-      <span class="seb-arrow">›</span>
-    </div>
-    <div id="soap-modo-wrap" style="display:none">
-    <div style="padding:0 14px 6px"><div id="soap-modo-chips" style="display:flex;flex-wrap:wrap;gap:6px">
-      ${['rapido|⚡ Rápido','completo|📝 Completo','seguro|🏥 Seguro/aseg.','postquirurgico|🔧 Postquirúrgico','deportivo|🏃 Deportivo','revaloracion|🔄 Revaloración','alta|🏁 Alta'].map(m=>{const[val,lbl]=m.split('|');return `<button type="button" class="modo-nota-chip" data-modo="${val}" onclick="seleccionarModoNota('${val}')" style="font-size:12px;font-weight:600;padding:6px 12px;border-radius:16px;border:1.5px solid var(--gray-200);background:white;color:var(--gray-600);cursor:pointer">${lbl}</button>`}).join('')}
-    </div>
-    <div id="soap-modo-hint" style="font-size:11px;color:var(--gray-400);margin-top:6px"></div></div>
-    </div>
-  </div>
-
-  <!-- SPRINT3 L4A: dictado clínico SOAP — 1A: colapsado por default (ocupaba media pantalla
+  <!-- SPRINT3 L4A: dictado clínico SOAP — colapsado por default (ocupaba media pantalla
        aunque no se usara). La maquinaria de dictado NO cambia; solo se muestra al tocar. -->
   <div class="form-section">
     <div class="soap-expand-btn" id="soap-dictado-btn" onclick="_tgSoapSec2('soap-dictado-wrap','soap-dictado-btn')">
@@ -9814,23 +9722,6 @@ function renderSOAPForm(){
     </div>
   </div>
 
-  <!-- SPRINT3: campos opcionales por modo clínico (visibles según modo) -->
-  <div class="form-section" id="soap-campos-opcionales" style="display:none">
-    <div class="form-section-title">📋 Detalle clínico de la sesión <span style="font-size:11px;font-weight:400;color:var(--gray-400)">(opcional)</span></div>
-    <div class="form-group">
-      <div class="form-field"><div class="form-label">Objetivo de la sesión</div><textarea class="form-input" id="f-objetivo-sesion" placeholder="Ej: Mejorar ROM de flexión, reducir dolor en marcha..."></textarea></div>
-<!-- 1A: campo "Respuesta al tratamiento" ELIMINADO de este bloque opcional — duplicaba
-     f-arespuesta (A del SOAP principal). El campo del MODELO (respuestaTratamiento) se conserva
-     para notas viejas; guardarSOAP lo sigue leyendo y queda '' en notas nuevas. -->
-      <div class="form-field"><div class="form-label">Tolerancia</div><input class="form-input" type="text" id="f-tolerancia" placeholder="Ej: Buena tolerancia, sin molestias"></div>
-      <div class="form-field"><div class="form-label">Eventos adversos en la sesión</div><input class="form-input" type="text" id="f-eventos-sesion" placeholder="Ej: Ninguno"></div>
-      <div class="form-field"><div class="form-label">Cambios al plan</div><textarea class="form-input" id="f-cambios-plan" placeholder="Ej: Se progresa carga, se añade ejercicio excéntrico..."></textarea></div>
-      <div class="form-field"><div class="form-label">Criterios de progreso</div><textarea class="form-input" id="f-criterios-progreso" placeholder="Ej: Aumento de fuerza a 4/5, EVA en descenso..."></textarea></div>
-<!-- 1A: campo "Indicaciones domiciliarias" ELIMINADO — duplicaba f-pindicaciones (P del SOAP
-     principal). El campo del MODELO (indicacionesDomiciliarias) se conserva para notas viejas. -->
-    </div>
-  </div>
-
   <div class="form-section">
     <div class="form-section-title">📷 Fotos de sesión</div>
     <input type="file" id="si-foto" accept="image/*" capture="environment" style="display:none" onchange="handleSoapPhoto(event,'foto')">
@@ -9986,7 +9877,7 @@ function renderSOAPForm(){
 // localStorage del dispositivo — nada de nube, rules ni backend.
 // 1A: f-respuesta-tto y f-indicaciones-dom fuera de la lista (campos duplicados eliminados del
 // form; los borradores viejos que los traigan simplemente ignoran esos IDs al restaurar).
-const CAMPOS_SOAP_TEXTO=['f-sdolor','f-scambios','f-sactfisica','f-orom','f-ofuerza','f-ohallazgos','f-aevolucion','f-arespuesta','f-aanalisis','f-ptratamiento','f-pindicaciones','f-pcontra','f-objetivo-sesion','f-tolerancia','f-eventos-sesion','f-cambios-plan','f-criterios-progreso','dictado-textarea','f-fecha-consulta','f-soap-terapeuta','f-soap-textoriginal'];
+const CAMPOS_SOAP_TEXTO=['f-sdolor','f-scambios','f-sactfisica','f-orom','f-ofuerza','f-ohallazgos','f-aevolucion','f-arespuesta','f-aanalisis','f-ptratamiento','f-pindicaciones','f-pcontra','dictado-textarea','f-fecha-consulta','f-soap-terapeuta','f-soap-textoriginal'];
 function _soapDraftKey(){
   var pid=(currentPatient&&currentPatient.id)?String(currentPatient.id):'';
   if(!pid) return '';
