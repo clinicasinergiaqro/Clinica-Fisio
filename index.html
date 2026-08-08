@@ -7755,7 +7755,7 @@ function renderExpediente(tab='historia'){
         <button onclick="abrirEditarAntecedentesCompleto()" style="margin-left:auto;background:var(--navy);color:white;border:none;border-radius:20px;padding:3px 12px;font-size:11px;font-weight:700;cursor:pointer">✏️ Editar</button>
       </div>
       <div class="field-row"><div class="field-label">Heredofamiliares</div><div class="field-value">${escapeHTML(p.antecedentes?.patologicos||'—')}</div></div>
-      <div class="field-row"><div class="field-label">Patologías personales</div><div class="field-value">${escapeHTML(p.antecedentes?.patologiasPersonales||'—')}</div></div>
+      <div class="field-row"><div class="field-label">Condiciones médicas</div><div class="field-value">${(function(){ var c=(p.seguridadClinica&&p.seguridadClinica.condiciones)||[]; var o=(p.seguridadClinica&&p.seguridadClinica.condicionesObs)||''; var items=c.filter(function(x){return x!=='Otro';}); if(o) items.push(o); return items.length?escapeHTML(items.join(', ')):'—'; })()}</div></div>
       <div class="field-row"><div class="field-label">Deportivos</div><div class="field-value">${escapeHTML(p.antecedentes?.deportivos||'—')}</div></div>
       <div class="field-row"><div class="field-label">Deporte / frecuencia</div><div class="field-value">${escapeHTML(p.antecedentes?.deporteFrecuencia||'—')}</div></div>
       <div class="field-row"><div class="field-label">Cirugías</div><div class="field-value">${escapeHTML(p.antecedentes?.cirugias||'—')}</div></div>
@@ -13891,7 +13891,7 @@ function renderNuevoPaciente(){
   // (REACOMODO fase 2, 2026-08: ficha → antecedentes → seguridad → motivo → valoración → dx → plan)
   const camposOrden=[
     'n-nombre','n-fechanac','n-telefono','n-medico',
-    'n-patologicos','n-patologias-personales','n-cirugias','n-medicamentos','n-alergias','n-deportivos','n-deporte-freq',
+    'n-patologicos','n-cirugias','n-medicamentos','n-alergias','n-deportivos','n-deporte-freq',
     'n-motivoconsulta','n-dxmedico','n-mecanismo','n-evolucion',
     'n-inflamacion','n-marcha','n-rom','n-fuerza','n-flex',
     'n-pruebas','n-palpacion','n-estudios',
@@ -13958,7 +13958,6 @@ function renderNuevoPaciente(){
     <div class="form-section-title">🏥 Antecedentes</div>
     <div class="form-group" style="margin-bottom:10px">
       <div class="form-field"><div class="form-label">Antecedentes heredofamiliares</div><input class="form-input" id="n-patologicos" type="text" placeholder="Ej. diabetes, hipertensión, cáncer, cardiopatías u otros antecedentes familiares relevantes"><div class="chip-row"><button type="button" class="chip-quick" onclick="setCampoRapido('n-patologicos','Sin antecedentes heredofamiliares relevantes')">Sin antecedentes heredofamiliares relevantes</button></div></div>
-      <div class="form-field"><div class="form-label">Patologías personales</div><input class="form-input" id="n-patologias-personales" type="text" placeholder="Ej. diabetes tipo 2, hipertensión, hipotiroidismo, asma…"><div class="chip-row"><button type="button" class="chip-quick" onclick="setCampoRapido('n-patologias-personales','Sin patologías personales conocidas')">Sin patologías personales conocidas</button></div></div>
     </div>
     <!-- Personales patológicos: checkboxes mudados desde "Seguridad clínica" (REACOMODO fase 1).
          Mismas clases sc-condicion / sc-condiciones-obs → siguen guardando en seguridadClinica. -->
@@ -14225,7 +14224,7 @@ function guardarNuevoPaciente(){
     dx:dxmedicoFinal,
     contraindicaciones:v('n-contra','Ninguna'),
     alergias,
-    antecedentes:{patologicos:v('n-patologicos','Ninguno'),patologiasPersonales:v('n-patologias-personales',''),deportivos:v('n-deportivos','Ninguno'),
+    antecedentes:{patologicos:v('n-patologicos','Ninguno'),deportivos:v('n-deportivos','Ninguno'),
       deporteFrecuencia:v('n-deporte-freq','No aplica'),cirugias:v('n-cirugias','Ninguna'),medicamentos:v('n-medicamentos','Ninguno')},
     motivo:{dxMedico:dxmedicoFinal, padecimiento, mecanismo:v('n-mecanismo','No especificado'),
       evolucion:v('n-evolucion','No especificado'),estudios:v('n-estudios','Pendiente'),hallazgos:v('n-hallazgos','Pendiente')},
@@ -14394,11 +14393,6 @@ function abrirEditarAntecedentesCompleto(){
           ${chipsHTML2('ed-patologicos',[['Sin antecedentes heredofamiliares relevantes','Sin antecedentes heredofamiliares relevantes']])}
         </div>
         <div class="form-field">
-          <div class="form-label">Patologías personales</div>
-          <textarea class="form-input" id="ed-patologias-personales" placeholder="Ej. diabetes tipo 2, hipertensión, hipotiroidismo, asma…">${lt(a.patologiasPersonales,'')}</textarea>
-          ${chipsHTML2('ed-patologias-personales',[['Sin patologías personales conocidas','Sin patologías personales conocidas']])}
-        </div>
-        <div class="form-field">
           <div class="form-label">Antecedentes deportivos</div>
           <input class="form-input" type="text" id="ed-deportivos" value="${lt(a.deportivos,'').replace(/"/g,'&quot;')}">
           ${chipsHTML2('ed-deportivos',[['No practica','No practica actividad deportiva']])}
@@ -14543,7 +14537,6 @@ function guardarAntecedentesCompleto(){
   const antes = `Heredofamiliares: ${p.antecedentes.patologicos||'—'}, Medicamentos: ${p.antecedentes.medicamentos||'—'}`;
 
   p.antecedentes.patologicos     = v('ed-patologicos');
-  p.antecedentes.patologiasPersonales = v('ed-patologias-personales');
   p.antecedentes.deportivos      = v('ed-deportivos');
   p.antecedentes.deporteFrecuencia = v('ed-deporte-freq');
   p.antecedentes.cirugias        = v('ed-cirugias');
@@ -14642,7 +14635,6 @@ function editarHistoria(seccion){
       <div class="form-section-title">🏥 Antecedentes</div>
       <div class="form-group">
         <div class="form-field"><div class="form-label">Heredofamiliares</div><textarea class="form-input" id="ed-patologicos">${escapeHTML(p.antecedentes?.patologicos||'—')}</textarea></div>
-        <div class="form-field"><div class="form-label">Patologías personales</div><textarea class="form-input" id="ed-patologias-personales">${escapeHTML(p.antecedentes?.patologiasPersonales||'')}</textarea></div>
         <div class="form-field"><div class="form-label">Deportivos</div><input class="form-input" type="text" id="ed-deportivos" value="${escapeAttr_(p.antecedentes?.deportivos||'—')}"></div>
         <div class="form-field"><div class="form-label">Deporte y frecuencia</div><input class="form-input" type="text" id="ed-deporte-freq" value="${escapeAttr_(p.antecedentes?.deporteFrecuencia||'—')}"></div>
         <div class="form-field"><div class="form-label">Cirugías previas</div><input class="form-input" type="text" id="ed-cirugias" value="${escapeAttr_(p.antecedentes?.cirugias||'—')}"></div>
@@ -14778,7 +14770,6 @@ function guardarEdicionHistoria(seccion, tabRetorno){
 
   if(seccion==='antecedentes'){
     p.antecedentes.patologicos = v('ed-patologicos');
-    p.antecedentes.patologiasPersonales = v('ed-patologias-personales');
     p.antecedentes.deportivos = v('ed-deportivos');
     p.antecedentes.deporteFrecuencia = v('ed-deporte-freq');
     p.antecedentes.cirugias = v('ed-cirugias');
@@ -14999,7 +14990,6 @@ function abrirEditarValoracion(esNuevoMotivo){
     bannerHeredados+
     seccion('2','🩺 Antecedentes',
       `<div class="form-field"><div class="form-label">Antecedentes heredofamiliares</div><textarea class="form-input" id="ev-patologicos" placeholder="Ej. diabetes, hipertensión, cáncer, cardiopatías u otros antecedentes familiares relevantes">${a.patologicos||''}</textarea>${chipsHTML2('ev-patologicos',[['Sin antecedentes heredofamiliares relevantes','Sin antecedentes heredofamiliares relevantes']])}</div>`+
-      `<div class="form-field"><div class="form-label">Patologías personales</div><textarea class="form-input" id="ev-patologias-personales" placeholder="Ej. diabetes tipo 2, hipertensión, hipotiroidismo, asma…">${a.patologiasPersonales||''}</textarea>${chipsHTML2('ev-patologias-personales',[['Sin patologías personales conocidas','Sin patologías personales conocidas']])}</div>`+
       `<div class="form-field"><div class="form-label">Antecedentes deportivos</div><input class="form-input" type="text" id="ev-deportivos" value="${(a.deportivos||'').replace(/"/g,'&quot;')}">${chipsHTML2('ev-deportivos',[['No practica','No practica actividad deportiva']])}</div>`+
       `<div class="form-field"><div class="form-label">Deporte y frecuencia</div><input class="form-input" type="text" id="ev-deporte-freq" value="${(a.deporteFrecuencia||'').replace(/"/g,'&quot;')}">${chipsHTML('ev-deporte-freq',['No aplica'])}</div>`+
       `<div class="form-field"><div class="form-label">Cirugías previas</div><input class="form-input" type="text" id="ev-cirugias" value="${(a.cirugias||'').replace(/"/g,'&quot;')}">${chipsHTML2('ev-cirugias',[['Sin cirugías previas relevantes','Sin cirugías previas relevantes']])}</div>`+
@@ -15087,7 +15077,6 @@ function guardarValoracionCompleta(){
   // antecedentes (FASE A: vacío → conserva lo heredado del expediente)
   p.antecedentes = {...(p.antecedentes||{}),
     patologicos: permanente(v('ev-patologicos'),'patologicos'),
-    patologiasPersonales: permanente(v('ev-patologias-personales'),'patologiasPersonales'),
     deportivos: permanente(v('ev-deportivos'),'deportivos'),
     deporteFrecuencia: permanente(v('ev-deporte-freq'),'deporteFrecuencia'),
     cirugias: permanente(v('ev-cirugias'),'cirugias'),
@@ -15180,7 +15169,7 @@ function setChecks(cls,values){ try{ const arr=Array.isArray(values)?values:[]; 
 
 // IDs reales de los campos de texto de editar valoración
 const CAMPOS_EV=['ev-motivoconsulta','ev-dxmedico','ev-padecimiento','ev-mecanismo','ev-evolucion','ev-estudios','ev-hallazgos',
-  'ev-patologicos','ev-patologias-personales','ev-deportivos','ev-deporte-freq','ev-cirugias','ev-medicamentos','ev-alergias','ev-contra',
+  'ev-patologicos','ev-deportivos','ev-deporte-freq','ev-cirugias','ev-medicamentos','ev-alergias','ev-contra',
   'ev-sc-implantes-detalle','ev-sc-condiciones-obs','ev-sc-banderas-detalle',
   'ev-eva','ev-inflamacion','ev-marcha','ev-rom','ev-fuerza','ev-flex','ev-pruebas','ev-palpacion',
   'ev-dxclinico','ev-dxfuncional','ev-limitaciones','ev-objcp','ev-objlp','ev-pronostico',
@@ -15259,7 +15248,7 @@ const DRAFT_NUEVO='sinergia_borrador_nuevo_paciente';
 // Fase 2: 'n-banderas' salió de la lista — el campo se eliminó del alta (duplicaba sc-bandera).
 const CAMPOS_NUEVO=['n-nombre','n-fechanac','n-edad','n-telefono','n-terapeuta','n-terapeuta-seguimiento','n-medico',
   'n-motivoconsulta','n-dxmedico','n-padecimiento','n-mecanismo','n-evolucion',
-  'n-patologicos','n-patologias-personales','sc-condiciones-obs','n-cirugias','n-medicamentos','n-alergias','n-deportivos','n-deporte-freq',
+  'n-patologicos','sc-condiciones-obs','n-cirugias','n-medicamentos','n-alergias','n-deportivos','n-deporte-freq',
   'sc-implantes-detalle','sc-banderas-detalle','n-contra',
   'n-inflamacion','n-marcha','n-rom','n-fuerza','n-flex','n-pruebas','n-palpacion','n-estudios','n-hallazgos',
   'n-dxclinico','n-dxfuncional','n-limitaciones','n-objcp','n-objlp','n-pronostico',
@@ -16069,7 +16058,7 @@ function _RPT_armarPayloadCorto(p, sesiones){
     nombre:p.name, edad:p.age,
     dxFuncional:(typeof p.dxFuncional==='string'?p.dxFuncional:(p.dxFuncional&&p.dxFuncional.dxFuncional))||p.dx||'Sin documentar',
     contraindicaciones:p.contraindicaciones||'Ninguna',
-    patologiasPersonales:(p.antecedentes&&p.antecedentes.patologiasPersonales)||'',
+    condicionesMedicas:(function(){ var c=(p.seguridadClinica&&p.seguridadClinica.condiciones)||[]; var o=(p.seguridadClinica&&p.seguridadClinica.condicionesObs)||''; var items=c.filter(function(x){return x!=='Otro';}); if(o) items.push(o); return items.join(', ')||'Ninguna referida'; })(),
     medicamentos:(p.antecedentes&&p.antecedentes.medicamentos)||'No documentados',
     totalSesiones:n,
     evaInicial:evas.length?evas[0]:null,
