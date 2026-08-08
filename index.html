@@ -928,6 +928,9 @@ select.form-input{font-size:14px}
 .evabtn.on{background:var(--navy);color:#fff;border-color:var(--navy);box-shadow:0 2px 6px rgba(27,58,107,.35)}
 .evabtn.ne{font-size:12px}
 .evabtn.ne.on{background:var(--gray-600);border-color:var(--gray-600)}
+.evabtn.on-low{background:#16A34A;color:#fff;border-color:#16A34A;box-shadow:0 2px 6px rgba(22,163,74,.35)}
+.evabtn.on-mid{background:#F59E0B;color:#fff;border-color:#F59E0B;box-shadow:0 2px 6px rgba(245,158,11,.35)}
+.evabtn.on-high{background:#C0392B;color:#fff;border-color:#C0392B;box-shadow:0 2px 6px rgba(192,57,43,.35)}
 /* 1B: botón ⧉ "traer de la sesión anterior" por campo (SOAP) */
 .traer-btn{margin-left:6px;padding:2px 9px;border-radius:8px;border:1px solid var(--gray-200);background:var(--gray-50);color:var(--navy);font-size:11px;font-weight:700;font-family:inherit;cursor:pointer;vertical-align:middle;white-space:nowrap}
 .traer-btn:active{background:var(--navy);color:#fff;border-color:var(--navy)}
@@ -10016,6 +10019,21 @@ function _purgarBorradoresSoapViejos(){   // req #5: purga borradores SOAP de >1
 
 function updateEvaVal(id,v){const el=document.getElementById(id);if(el)el.className=`eva-val ${getEvaClass(v)}`}
 
+var _nEvaVal=null;
+function _nEvaColorClass(n){return n<=3?'on-low':n<=6?'on-mid':'on-high';}
+function _nEvaBtnsHTML(){
+  var h='';
+  for(var n=0;n<=10;n++){
+    h+='<button type="button" class="evabtn'+(_nEvaVal===n?' '+_nEvaColorClass(n):'')+'" onclick="_setNEva('+n+')">'+n+'</button>';
+  }
+  return h;
+}
+function _setNEva(n){
+  _nEvaVal=n;
+  var row=document.getElementById('n-eva-row');
+  if(row) row.innerHTML=_nEvaBtnsHTML();
+}
+
 // ── 1A: EVA por botones ──────────────────────────────────────────────────────
 // Estados: tempEvaI null = sin tocar (BLOQUEA guardar; EVA inicial es obligatorio).
 // tempEvaF undefined = sin tocar (BLOQUEA) · null = "No evaluado" EXPLÍCITO (constancia
@@ -13882,6 +13900,7 @@ function showNuevoPaciente(){
   screenStack.push('screen-nuevo');showScreen('screen-nuevo',false);renderNuevoPaciente();
 }
 function renderNuevoPaciente(){
+  _nEvaVal=null;
   const ters=['CARLOS','DAF','ZARA','CAMI','GORE','JESS','DUL'];
   // Opciones para terapeuta de seguimiento — todos menos el actual
   const optsSegimiento=['— Sin asignar —',...ters]
@@ -14039,11 +14058,8 @@ function renderNuevoPaciente(){
     <div class="form-section-title">📊 Valoración inicial</div>
     <div class="form-group">
       <div class="form-field">
-        <div class="form-label">EVA inicial <span class="req">*</span></div>
-        <div class="eva-slider-wrap">
-          <input type="range" class="eva-slider" min="0" max="10" value="0" id="n-eva-sl" oninput="document.getElementById('n-eva-v').textContent=this.value;updateEvaVal('n-eva-v',+this.value)">
-          <div class="eva-val eva-low" id="n-eva-v">0</div>
-        </div>
+        <div class="form-label">EVA inicial <span class="req">*</span> <span style="font-size:11px;color:var(--gray-400);font-weight:400">(toca el número)</span></div>
+        <div class="evabtn-row" id="n-eva-row">${_nEvaBtnsHTML()}</div>
       </div>
       <div class="form-field"><div class="form-label">Inflamación</div><input class="form-input" id="n-inflamacion" type="text" placeholder="Ej: Moderada, leve, ninguna"></div>
       <div class="form-field"><div class="form-label">Marcha / postura</div><input class="form-input" id="n-marcha" type="text" placeholder="Ej: Pronación bilateral"></div>
@@ -14062,7 +14078,7 @@ function renderNuevoPaciente(){
   <div class="form-section">
     <div class="form-section-title">🔎 Diagnóstico funcional</div>
     <div class="form-group">
-      <div class="form-field"><div class="form-label">Dx clínico</div><input class="form-input" id="n-dxclinico" type="text" placeholder="Igual al dx médico o más específico"></div>
+      <div class="form-field"><div class="form-label">Dx clínico</div><input class="form-input" id="n-dxclinico" type="text" placeholder="Igual al dx médico o más específico"><div style="margin-top:4px;font-size:12px;color:var(--gray-400);line-height:1.4">Ej: Tendinopatía rotuliana grado II, síndrome facetario L4-L5, esguince de tobillo grado I</div></div>
       <div class="form-field"><div class="form-label">Dx funcional</div><textarea class="form-input" id="n-dxfuncional" placeholder="Disfunción de [zona] por [causa] que limita [función]"></textarea><div style="margin-top:4px;font-size:12px;color:var(--gray-400);line-height:1.4">Ej: Disfunción de rodilla derecha por debilidad de cuádriceps que limita bajar escaleras y sentadilla</div></div>
       <div class="form-field"><div class="form-label">Limitaciones</div><input class="form-input" id="n-limitaciones" type="text" placeholder="Ej: Bajar escaleras, sentadilla"></div>
       <div class="form-field"><div class="form-label">Objetivos corto plazo</div><input class="form-input" id="n-objcp" type="text" placeholder="Ej: Reducir dolor a 3/10 en 3 semanas"></div>
@@ -14211,7 +14227,8 @@ function guardarNuevoPaciente(){
   const dxmedicoFinal = dxmedico || 'No cuenta con diagnóstico médico referido';
   const frecuenciaFinal = frecuencia || '[pendiente]';
   const sesionesFinal = sesiones || '[pendiente]';
-  const evaVal=parseInt(document.getElementById('n-eva-sl')?.value||0);
+  if(_nEvaVal===null){ showToast('Falta: EVA inicial (toca un número)','error'); return; }
+  const evaVal=_nEvaVal;
   const nuevo={
     id:generarIdSeguro_('p'), name:nombre, age:edadFinal,
     sexo: v('n-sexo') || '',
@@ -15258,7 +15275,7 @@ function guardarBorradorNuevo(){
   try{
     const data={};
     CAMPOS_NUEVO.forEach(id=>{ data[id]=getVal(id); });
-    data._evaSl=getVal('n-eva-sl');
+    data._nEvaVal=_nEvaVal;
     data._implantes=getChecks('sc-implante');
     data._condiciones=getChecks('sc-condicion');
     data._banderas=getChecks('sc-bandera');
@@ -15272,7 +15289,7 @@ function aplicarBorradorNuevo(data){
   try{
     if(!data) return;
     CAMPOS_NUEVO.forEach(id=>{ if(data[id]!==undefined) setVal(id,data[id]); });
-    if(data._evaSl) setVal('n-eva-sl',data._evaSl);
+    if(data._nEvaVal!=null){ _nEvaVal=data._nEvaVal; var _r=document.getElementById('n-eva-row'); if(_r) _r.innerHTML=_nEvaBtnsHTML(); }
     if(data._implantes) setChecks('sc-implante',data._implantes);
     if(data._condiciones) setChecks('sc-condicion',data._condiciones);
     if(data._banderas) setChecks('sc-bandera',data._banderas);
