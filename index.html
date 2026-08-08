@@ -7782,7 +7782,7 @@ function renderExpediente(tab='historia'){
       <div class="field-row"><div class="field-label">🚩 Banderas rojas</div><div class="field-value" style="color:${v.banderasRojas&&v.banderasRojas!=='Ninguna'?'var(--red)':'var(--green)'};font-weight:600;">${valorSeguroHTML(v.banderasRojas,'Ninguna')}</div></div>
     </div>
     <div class="section-card">
-      <div class="section-title">🔎 Diagnóstico funcional${_epSufijo}
+      <div class="section-title">🔎 Diagnóstico y plan${_epSufijo}
         <button onclick="editarHistoria('dxfuncional')" style="margin-left:auto;background:var(--navy);color:white;border:none;border-radius:20px;padding:3px 12px;font-size:11px;font-weight:700;cursor:pointer">✏️ Editar</button>
       </div>
       <div class="field-row"><div class="field-label">Dx clínico</div><div class="field-value">${valorSeguroHTML(mv.dxFuncional.dxClinico)}</div></div>
@@ -7791,17 +7791,8 @@ function renderExpediente(tab='historia'){
       <div class="field-row"><div class="field-label">Objetivos CP</div><div class="field-value">${valorSeguroHTML(mv.dxFuncional.objetivosCP)}</div></div>
       <div class="field-row"><div class="field-label">Objetivos LP</div><div class="field-value">${valorSeguroHTML(mv.dxFuncional.objetivosLP)}</div></div>
       <div class="field-row"><div class="field-label">Pronóstico</div><div class="field-value">${valorSeguroHTML(mv.dxFuncional.pronostico)}</div></div>
-    </div>
-    <div class="section-card">
-      <div class="section-title">🎯 Plan de tratamiento${_epSufijo}
-        <button onclick="editarHistoria('plan')" style="margin-left:auto;background:var(--navy);color:white;border:none;border-radius:20px;padding:3px 12px;font-size:11px;font-weight:700;cursor:pointer">✏️ Editar</button>
-      </div>
-      <div class="field-row"><div class="field-label">Frecuencia</div><div class="field-value">${valorSeguroHTML(mv.planTto.frecuencia)}</div></div>
-      <div class="field-row"><div class="field-label">Sesiones</div><div class="field-value">${mv.planTto.sesiones}</div></div>
-      <div class="field-row"><div class="field-label">Ejercicio</div><div class="field-value">${valorSeguroHTML(mv.planTto.ejercicioTerapeutico)}</div></div>
-      <div class="field-row"><div class="field-label">Terapia manual</div><div class="field-value">${valorSeguroHTML(mv.planTto.terapiaManual)}</div></div>
-      <div class="field-row"><div class="field-label">Agentes físicos</div><div class="field-value">${valorSeguroHTML(mv.planTto.agentesFisicos)}</div></div>
-      <div class="field-row"><div class="field-label">Contraindicaciones</div><div class="field-value">${mv.planTto.contraindicaciones}</div></div>
+      <div class="field-row"><div class="field-label">Enfoque terapéutico</div><div class="field-value narrative">${valorSeguroHTML(mv.planTto.enfoqueTerapeutico||(([mv.planTto.ejercicioTerapeutico,mv.planTto.terapiaManual,mv.planTto.agentesFisicos].filter(x=>x&&x!=='Pendiente'&&x!=='[pendiente]').join(', '))||'Pendiente'))}</div></div>
+      <div class="field-row"><div class="field-label">Precauciones</div><div class="field-value">${valorSeguroHTML(mv.planTto.contraindicaciones)}</div></div>
     </div>
     ${Array.isArray(p.historialCambios)&&p.historialCambios.length>0?`
     <div class="section-card">
@@ -10960,7 +10951,7 @@ async function generarSoapConIA(){
     if(_motivoP1) payloadDatos.motivoEpisodio = _motivoP1;
 
     const _planP1 = p.planTto||{};
-    const _planTxt = [_planP1.ejercicioTerapeutico, _planP1.terapiaManual, _planP1.agentesFisicos]
+    const _planTxt = _planP1.enfoqueTerapeutico || [_planP1.ejercicioTerapeutico, _planP1.terapiaManual, _planP1.agentesFisicos]
       .map(x=>String(x||'').trim()).filter(x=>x && x!=='Pendiente').join(' · ');
     if(_planTxt) payloadDatos.planTratamiento = _planTxt;
 
@@ -13901,7 +13892,7 @@ function renderNuevoPaciente(){
     'n-inflamacion','n-marcha','n-rom','n-fuerza','n-flex',
     'n-pruebas','n-palpacion','n-estudios',
     'n-dxclinico','n-limitaciones','n-objcp','n-objlp','n-pronostico',
-    'n-frecuencia','n-sesiones','n-tmanual','n-agentes','n-plancontra','n-ttohoy'
+    'n-enfoque','n-plancontra','n-ttohoy'
   ];
 
   const c=document.getElementById('content-nuevo');
@@ -14061,7 +14052,7 @@ function renderNuevoPaciente(){
     </div>
   </div>
   <div class="form-section">
-    <div class="form-section-title">🔎 Diagnóstico funcional</div>
+    <div class="form-section-title">🔎 Diagnóstico y plan</div>
     <div class="form-group">
       <div class="form-field"><div class="form-label">Dx clínico</div><input class="form-input" id="n-dxclinico" type="text" placeholder="Igual al dx médico o más específico"><div style="margin-top:4px;font-size:12px;color:var(--gray-400);line-height:1.4">Ej: Tendinopatía rotuliana grado II, síndrome facetario L4-L5, esguince de tobillo grado I</div></div>
       <div class="form-field"><div class="form-label">Dx funcional</div><textarea class="form-input" id="n-dxfuncional" placeholder="Disfunción de [zona] por [causa] que limita [función]"></textarea><div style="margin-top:4px;font-size:12px;color:var(--gray-400);line-height:1.4">Ej: Disfunción de rodilla derecha por debilidad de cuádriceps que limita bajar escaleras y sentadilla</div></div>
@@ -14069,17 +14060,8 @@ function renderNuevoPaciente(){
       <div class="form-field"><div class="form-label">Objetivos corto plazo</div><input class="form-input" id="n-objcp" type="text" placeholder="Ej: Reducir dolor a 3/10 en 3 semanas"></div>
       <div class="form-field"><div class="form-label">Objetivos largo plazo</div><input class="form-input" id="n-objlp" type="text" placeholder="Ej: Retorno al deporte sin limitaciones"></div>
       <div class="form-field"><div class="form-label">Pronóstico</div><input class="form-input" id="n-pronostico" type="text" placeholder="Ej: Favorable, 8-10 semanas"></div>
-    </div>
-  </div>
-  <div class="form-section">
-    <div class="form-section-title">🎯 Plan de tratamiento</div>
-    <div class="form-group">
-      <div class="form-field"><div class="form-label">Frecuencia</div><input class="form-input" id="n-frecuencia" type="text" placeholder="Ej: 2x semana"></div>
-      <div class="form-field"><div class="form-label">No. de sesiones</div><input class="form-input" id="n-sesiones" type="number" placeholder="10"></div>
-      <div class="form-field"><div class="form-label">Ejercicio terapéutico</div><textarea class="form-input" id="n-ejercicio" placeholder="Ej: Excéntricos, estabilización lumbar..."></textarea></div>
-      <div class="form-field"><div class="form-label">Terapia manual</div><input class="form-input" id="n-tmanual" type="text" placeholder="Ej: Movilización STJ, liberación miofascial"></div>
-      <div class="form-field"><div class="form-label">Agentes físicos</div><input class="form-input" id="n-agentes" type="text" placeholder="Ej: US, MEP, TENS, ESWT"></div>
-      <div class="form-field"><div class="form-label">Precauciones del plan</div><input class="form-input" id="n-plancontra" type="text" placeholder="Ej: Sin impacto, sin AINES"></div>
+      <div class="form-field"><div class="form-label">Enfoque terapéutico</div><textarea class="form-input" id="n-enfoque" placeholder="Ej: Fortalecimiento de cuádriceps, liberación miofascial lumbar, US para control de dolor"></textarea><div style="margin-top:4px;font-size:12px;color:var(--gray-400);line-height:1.4">Dirección general del tratamiento — los detalles específicos se registran en cada SOAP</div></div>
+      <div class="form-field"><div class="form-label">Precauciones</div><input class="form-input" id="n-plancontra" type="text" placeholder="Ej: Sin impacto, sin AINES"></div>
       <!-- NOTA DE VALORACIÓN: estos 2 campos alimentan la nota SOAP #1 auto-generada al guardar.
            max=hoy — jamás se generan notas con fecha futura (limpieza FECHA_FUTURA). -->
       <div class="form-field">
@@ -14170,7 +14152,6 @@ function guardarNuevoPaciente(){
   const v=(id,def='')=>document.getElementById(id)?.value.trim()||def;
   const nombre=v('n-nombre'), alergias=v('n-alergias');
   const dxmedico=v('n-dxmedico'), padecimiento=v('n-padecimiento');
-  const frecuencia=v('n-frecuencia'), sesiones=v('n-sesiones');
   const fechaNacimiento=v('n-fechanac');
   const telefono=v('n-telefono');
   const motivoConsulta=v('n-motivoconsulta');
@@ -14210,8 +14191,6 @@ function guardarNuevoPaciente(){
   }
   // Campos opcionales con valor por defecto
   const dxmedicoFinal = dxmedico || 'No cuenta con diagnóstico médico referido';
-  const frecuenciaFinal = frecuencia || '[pendiente]';
-  const sesionesFinal = sesiones || '[pendiente]';
   if(_nEvaVal===null){ showToast('Falta: EVA inicial (toca un número)','error'); return; }
   const evaVal=_nEvaVal;
   const nuevo={
@@ -14243,8 +14222,8 @@ function guardarNuevoPaciente(){
     dxFuncional:{dxClinico:v('n-dxclinico',dxmedicoFinal),dxFuncional:v('n-dxfuncional','Pendiente'),
       limitaciones:v('n-limitaciones','Pendiente'),objetivosCP:v('n-objcp','Pendiente'),
       objetivosLP:v('n-objlp','Pendiente'),pronostico:v('n-pronostico','Pendiente')},
-    planTto:{frecuencia:frecuenciaFinal,sesiones:sesionesFinal,ejercicioTerapeutico:v('n-ejercicio','Pendiente'),
-      terapiaManual:v('n-tmanual','Pendiente'),agentesFisicos:v('n-agentes','Pendiente'),
+    planTto:{frecuencia:'[pendiente]',sesiones:'[pendiente]',ejercicioTerapeutico:'',
+      terapiaManual:'',agentesFisicos:'',enfoqueTerapeutico:v('n-enfoque','Pendiente'),
       contraindicaciones:v('n-plancontra','Ninguna')},
     consentimientos:[], consentimiento:{},
     consentimientoDatos:(()=>{
@@ -14308,14 +14287,14 @@ function guardarNuevoPaciente(){
       horaCreacion:new Date().toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'}),
       fechaHoraISO:new Date().toISOString(),
       terapeuta:nuevo.terapeuta, semana:1,
-      totalSesiones:parseInt(sesionesFinal)||10,
+      totalSesiones:10,
       s:{ dolor:'EVA '+evaVal+'/10 en valoración inicial', cambios:padecimiento,
           actFisica:nuevo.antecedentes.deportivos+((nuevo.antecedentes.deporteFrecuencia&&nuevo.antecedentes.deporteFrecuencia!=='No aplica')?(' ('+nuevo.antecedentes.deporteFrecuencia+')'):'') },
       o:{ rom:nuevo.valoracion.rom, fuerza:nuevo.valoracion.fuerza, hallazgos:_oExtra },
       a:{ evolucion:'Valoración inicial — primera consulta del episodio.', respuesta:'',
           analisis:(nuevo.dxFuncional.dxClinico||'')+'. '+(nuevo.dxFuncional.dxFuncional||'') },
       p:{ tratamiento:_ttoHoy||'Sesión de valoración (sin tratamiento adicional registrado)',
-          indicaciones:'Plan: '+frecuenciaFinal+', '+sesionesFinal+' sesiones. Ejercicio: '+nuevo.planTto.ejercicioTerapeutico+'. T. manual: '+nuevo.planTto.terapiaManual+'. Agentes: '+nuevo.planTto.agentesFisicos,
+          indicaciones:'Enfoque: '+(nuevo.planTto.enfoqueTerapeutico||'Pendiente'),
           contraindicaciones:nuevo.planTto.contraindicaciones },
       evaI:evaVal, evaF:null, modalidades:[],
       completa:true, modoNota:'valoracion', revisionPendiente:false,
@@ -14698,9 +14677,10 @@ function editarHistoria(seccion){
   }
 
   if(seccion==='dxfuncional'){
+    const _enfoqueVal = p.planTto?.enfoqueTerapeutico || [p.planTto?.ejercicioTerapeutico,p.planTto?.terapiaManual,p.planTto?.agentesFisicos].filter(x=>x&&x!=='Pendiente'&&x!=='[pendiente]').join(', ');
     formHtml += `
     <div class="form-section">
-      <div class="form-section-title">🔎 Diagnóstico funcional</div>
+      <div class="form-section-title">🔎 Diagnóstico y plan</div>
       <div class="form-group">
         <div class="form-field"><div class="form-label">Dx clínico</div><input class="form-input" type="text" id="ed-dxclinico" value="${escapeAttr_(p.dxFuncional?.dxClinico||'')}"></div>
         <div class="form-field"><div class="form-label">Dx funcional</div><textarea class="form-input" id="ed-dxfuncional" style="min-height:72px">${escapeHTML(p.dxFuncional?.dxFuncional||'')}</textarea></div>
@@ -14708,26 +14688,13 @@ function editarHistoria(seccion){
         <div class="form-field"><div class="form-label">Objetivos CP</div><input class="form-input" type="text" id="ed-objcp" value="${escapeAttr_(p.dxFuncional?.objetivosCP||'')}"></div>
         <div class="form-field"><div class="form-label">Objetivos LP</div><input class="form-input" type="text" id="ed-objlp" value="${escapeAttr_(p.dxFuncional?.objetivosLP||'')}"></div>
         <div class="form-field"><div class="form-label">Pronóstico</div><input class="form-input" type="text" id="ed-pronostico" value="${escapeAttr_(p.dxFuncional?.pronostico||'')}"></div>
+        <div class="form-field"><div class="form-label">Enfoque terapéutico</div><textarea class="form-input" id="ed-enfoque" style="min-height:72px">${escapeHTML(_enfoqueVal||'')}</textarea></div>
+        <div class="form-field"><div class="form-label">Precauciones</div><input class="form-input" type="text" id="ed-plancontra" value="${escapeAttr_(p.planTto?.contraindicaciones||'')}"></div>
       </div>
     </div>`;
   }
 
-  if(seccion==='plan'){
-    formHtml += `
-    <div class="form-section">
-      <div class="form-section-title">🎯 Plan de tratamiento</div>
-      <div class="form-group">
-        <div class="form-field"><div class="form-label">Frecuencia</div><input class="form-input" type="text" id="ed-frecuencia" value="${escapeAttr_(p.planTto?.frecuencia||'')}"></div>
-        <div class="form-field"><div class="form-label">Sesiones</div><input class="form-input" type="number" id="ed-sesiones" value="${escapeAttr_(p.planTto?.sesiones??'')}"></div>
-        <div class="form-field"><div class="form-label">Ejercicio terapéutico</div><textarea class="form-input" id="ed-ejercicio">${escapeHTML(p.planTto?.ejercicioTerapeutico||'')}</textarea></div>
-        <div class="form-field"><div class="form-label">Terapia manual</div><input class="form-input" type="text" id="ed-tmanual" value="${escapeAttr_(p.planTto?.terapiaManual||'')}"></div>
-        <div class="form-field"><div class="form-label">Agentes físicos</div><input class="form-input" type="text" id="ed-agentes" value="${escapeAttr_(p.planTto?.agentesFisicos||'')}"></div>
-        <div class="form-field"><div class="form-label">Contraindicaciones</div><input class="form-input" type="text" id="ed-plancontra" value="${escapeAttr_(p.planTto?.contraindicaciones||'')}"></div>
-      </div>
-    </div>`;
-  }
-
-  const tabRetorno = seccion==='valoracion'||seccion==='dxfuncional'||seccion==='plan' ? 'valoracion' : 'historia';
+  const tabRetorno = seccion==='valoracion'||seccion==='dxfuncional' ? 'valoracion' : 'historia';
 
   formHtml += `
     <button class="btn-primary" onclick="guardarEdicionHistoria('${seccion}','${tabRetorno}')">💾 Guardar cambios</button>
@@ -14780,7 +14747,6 @@ function guardarEdicionHistoria(seccion, tabRetorno){
   else if(seccion==='motivo') valorAnterior = `Dx médico: ${p.motivo?.dxMedico||'—'}, Padecimiento: ${(p.motivo?.padecimiento||'—').substring(0,60)}...`;
   else if(seccion==='valoracion') valorAnterior = `EVA: ${p.valoracion?.eva||'—'}, ROM: ${p.valoracion?.rom||'—'}`;
   else if(seccion==='dxfuncional') valorAnterior = `Dx funcional: ${(p.dxFuncional?.dxFuncional||'—').substring(0,60)}...`;
-  else if(seccion==='plan') valorAnterior = `Frecuencia: ${p.planTto?.frecuencia||'—'}, Sesiones: ${p.planTto?.sesiones||'—'}`;
 
   if(seccion==='antecedentes'){
     p.antecedentes.patologicos = v('ed-patologicos');
@@ -14814,13 +14780,8 @@ function guardarEdicionHistoria(seccion, tabRetorno){
     p.dxFuncional.objetivosCP = v('ed-objcp');
     p.dxFuncional.objetivosLP = v('ed-objlp');
     p.dxFuncional.pronostico = v('ed-pronostico');
-  }
-  if(seccion==='plan'){
-    p.planTto.frecuencia = v('ed-frecuencia');
-    p.planTto.sesiones = v('ed-sesiones');
-    p.planTto.ejercicioTerapeutico = v('ed-ejercicio');
-    p.planTto.terapiaManual = v('ed-tmanual');
-    p.planTto.agentesFisicos = v('ed-agentes');
+    if(!p.planTto) p.planTto = {};
+    p.planTto.enfoqueTerapeutico = v('ed-enfoque');
     p.planTto.contraindicaciones = v('ed-plancontra');
   }
 
@@ -14830,8 +14791,7 @@ function guardarEdicionHistoria(seccion, tabRetorno){
   else if(seccion==='antecedentes') valorNuevo = `Heredofamiliares: ${p.antecedentes?.patologicos||'—'}, Medicamentos: ${p.antecedentes?.medicamentos||'—'}`;
   else if(seccion==='motivo') valorNuevo = `Dx médico: ${p.motivo?.dxMedico||'—'}, Padecimiento: ${(p.motivo?.padecimiento||'—').substring(0,60)}...`;
   else if(seccion==='valoracion') valorNuevo = `EVA: ${p.valoracion?.eva||'—'}, ROM: ${p.valoracion?.rom||'—'}`;
-  else if(seccion==='dxfuncional') valorNuevo = `Dx funcional: ${(p.dxFuncional?.dxFuncional||'—').substring(0,60)}...`;
-  else if(seccion==='plan') valorNuevo = `Frecuencia: ${p.planTto?.frecuencia||'—'}, Sesiones: ${p.planTto?.sesiones||'—'}`;
+  else if(seccion==='dxfuncional') valorNuevo = `Dx funcional: ${(p.dxFuncional?.dxFuncional||'—').substring(0,60)}..., Enfoque: ${(p.planTto?.enfoqueTerapeutico||'—').substring(0,40)}`;
 
   // Registrar auditoría — quién editó y cuándo
   const ahora = new Date();
@@ -14861,8 +14821,7 @@ function guardarEdicionHistoria(seccion, tabRetorno){
     antecedentes:['antecedentes'],
     motivo:['motivo'],
     valoracion:['valoracion'],
-    dxfuncional:['dxFuncional'],
-    plan:['planTto']
+    dxfuncional:['dxFuncional','planTto']
   };
   var _camposHistSec = (_camposSec[seccion]||[]).concat(['fechaActualizacion','ultimoUsuario','historialCambios']);
   saveDB('pts', [p], {camposHist:_camposHistSec}).then(res => {
@@ -15024,21 +14983,15 @@ function abrirEditarValoracion(esNuevoMotivo){
       campo('Pruebas especiales','ev-pruebas',val.pruebasEspeciales,['Negativas','Positivas según región','No realizadas','No aplica'])+
       campo('Palpación','ev-palpacion',val.palpacion,['Sin dolor','Dolor localizado','Hipertonía muscular','Punto gatillo','No valorado'])
     )+
-    seccion('5','🎯 Diagnóstico funcional',
+    seccion('5','🎯 Diagnóstico y plan',
       campo('Diagnóstico clínico','ev-dxclinico',dxf.dxClinico,['Limitación funcional leve','Limitación funcional moderada','Dolor musculoesquelético mecánico','Déficit de fuerza','Déficit de movilidad','Déficit de control motor','Pendiente de completar'])+
       campo('Diagnóstico funcional','ev-dxfuncional',dxf.dxFuncional,['Limitación funcional leve','Limitación moderada','Dolor musculoesquelético mecánico','Déficit de fuerza','Déficit de movilidad','Déficit de control motor'])+
       campo('Limitaciones funcionales y/o movimientos que generan dolor','ev-limitaciones',dxf.limitaciones)+
       campo('Objetivos a corto plazo','ev-objcp',dxf.objetivosCP)+
       campo('Objetivos a largo plazo','ev-objlp',dxf.objetivosLP)+
-      campo('Pronóstico','ev-pronostico',dxf.pronostico)
-    )+
-    seccion('6','📝 Plan de tratamiento',
-      campo('Frecuencia','ev-frecuencia',plan.frecuencia)+
-      campo('Número de sesiones','ev-sesiones',plan.sesiones)+
-      campo('Ejercicio terapéutico','ev-ejercicio',plan.ejercicioTerapeutico)+
-      campo('Terapia manual','ev-tmanual',plan.terapiaManual)+
-      campo('Agentes físicos','ev-agentes',plan.agentesFisicos)+
-      campo('Contraindicaciones del plan','ev-plancontra',plan.contraindicaciones,['Continuar valoración','Manejo conservador','Educación y ejercicio','Revalorar evolución','Referir si no mejora'])
+      campo('Pronóstico','ev-pronostico',dxf.pronostico)+
+      campo('Enfoque terapéutico','ev-enfoque',plan.enfoqueTerapeutico||[plan.ejercicioTerapeutico,plan.terapiaManual,plan.agentesFisicos].filter(function(x){return x&&x!=='Pendiente'&&x!=='[pendiente]';}).join(', '))+
+      campo('Precauciones','ev-plancontra',plan.contraindicaciones,['Continuar valoración','Manejo conservador','Educación y ejercicio','Revalorar evolución','Referir si no mejora'])
     )+
     `<div style="font-size:11px;color:var(--gray-400);text-align:center;margin:8px 0">💾 Borrador local automático activado</div>
      <button class="btn-primary" style="position:sticky;bottom:8px;z-index:5" onclick="guardarValoracionCompleta()">💾 Guardar valoración</button>
@@ -15115,11 +15068,7 @@ function guardarValoracionCompleta(){
   };
   // plan (frecuencia y sesiones opcionales → [pendiente])
   p.planTto = {...(p.planTto||{}),
-    frecuencia: vp('ev-frecuencia'),
-    sesiones: vp('ev-sesiones'),
-    ejercicioTerapeutico: v('ev-ejercicio'),
-    terapiaManual: v('ev-tmanual'),
-    agentesFisicos: v('ev-agentes'),
+    enfoqueTerapeutico: v('ev-enfoque'),
     contraindicaciones: v('ev-plancontra')
   };
   // seguridad clínica
@@ -15184,7 +15133,7 @@ const CAMPOS_EV=['ev-motivoconsulta','ev-dxmedico','ev-padecimiento','ev-mecanis
   'ev-sc-implantes-detalle','ev-sc-condiciones-obs','ev-sc-banderas-detalle',
   'ev-eva','ev-inflamacion','ev-marcha','ev-rom','ev-fuerza','ev-flex','ev-pruebas','ev-palpacion',
   'ev-dxclinico','ev-dxfuncional','ev-limitaciones','ev-objcp','ev-objlp','ev-pronostico',
-  'ev-frecuencia','ev-sesiones','ev-ejercicio','ev-tmanual','ev-agentes','ev-plancontra'];
+  'ev-enfoque','ev-plancontra'];
 
 function draftKeyValoracion(patientId){ return `sinergia_borrador_valoracion_${patientId}`; }
 
@@ -15263,7 +15212,7 @@ const CAMPOS_NUEVO=['n-nombre','n-fechanac','n-edad','n-telefono','n-terapeuta',
   'sc-implantes-detalle','sc-banderas-detalle','n-contra',
   'n-inflamacion','n-marcha','n-rom','n-fuerza','n-flex','n-pruebas','n-palpacion','n-estudios',
   'n-dxclinico','n-dxfuncional','n-limitaciones','n-objcp','n-objlp','n-pronostico',
-  'n-frecuencia','n-sesiones','n-ejercicio','n-tmanual','n-agentes','n-plancontra','n-fecha-valoracion','n-ttohoy'];
+  'n-enfoque','n-plancontra','n-fecha-valoracion','n-ttohoy'];
 
 function guardarBorradorNuevo(){
   try{
@@ -15427,7 +15376,7 @@ function aplicarFaseCronica(){
 function aplicarValoracionPendiente(){
   const campos=['ev-rom','ev-fuerza','ev-flex','ev-pruebas','ev-palpacion','ev-dxclinico',
     'ev-dxfuncional','ev-limitaciones','ev-objcp','ev-objlp','ev-pronostico',
-    'ev-frecuencia','ev-sesiones','ev-ejercicio','ev-tmanual','ev-agentes','ev-plancontra'];
+    'ev-enfoque','ev-plancontra'];
   campos.forEach(id=>{ const el=document.getElementById(id); if(el&&!el.value.trim()) el.value='[pendiente]'; });
   programarBorradorValoracion();
   showToast('⏳ Campos vacíos marcados como [pendiente]','');
@@ -15438,7 +15387,7 @@ function limpiarCamposValoracionFisica(){
   if(!confirm('¿Limpiar los campos de valoración física, diagnóstico funcional y plan?')) return;
   const campos=['ev-inflamacion','ev-marcha','ev-rom','ev-fuerza','ev-flex','ev-pruebas','ev-palpacion',
     'ev-dxclinico','ev-dxfuncional','ev-limitaciones','ev-objcp','ev-objlp','ev-pronostico',
-    'ev-ejercicio','ev-tmanual','ev-agentes','ev-plancontra'];
+    'ev-enfoque','ev-plancontra'];
   campos.forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
   programarBorradorValoracion();
   showToast('🗑 Campos de valoración limpiados','');
