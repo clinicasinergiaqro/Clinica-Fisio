@@ -7703,36 +7703,6 @@ function renderExpediente(tab='historia'){
       ${p.ultimoUsuario&&p.ultimoUsuario!==p.creadoPor?`<div class="field-row"><div class="field-label">Última edición</div><div class="field-value" style="color:var(--gray-400);font-size:13px">${escapeHTML(p.ultimoUsuario)} · ${_fmtFecha(p.fechaActualizacion)}</div></div>`:''}
     </div>
     <div class="section-card">
-      <div class="section-title">🔒 Protección de datos</div>
-      ${(()=>{
-        const cd=p.consentimientoDatos||{}, ci=p.consentimientoImagen||{}, cw=p.consentimientoWhatsApp||{};
-        const fila=(lbl,ok,extra)=>`<div class="field-row"><div class="field-label">${escapeHTML(lbl)}</div><div class="field-value" style="color:${ok?'var(--green)':'var(--gray-400)'};font-weight:600">${ok?'✅ '+escapeHTML(extra||'Aceptado'):'❌ '+escapeHTML(extra||'No autorizado')}</div></div>`;
-        let waExtra='No autorizado';
-        if(cw.aceptado){ const partes=[]; if(cw.aceptaRecordatorios)partes.push('recordatorios'); if(cw.aceptaEjercicios)partes.push('ejercicios'); waExtra='Autorizado'+(partes.length?' ('+partes.join(', ')+')':''); }
-        return fila('Datos personales', !!cd.aceptado, cd.aceptado?('Aceptado'+(cd.fecha?' · '+cd.fecha:'')):'Pendiente')
-          + fila('Imagen / video', !!ci.aceptado, ci.aceptado?'Autorizado':'No autorizado')
-          + fila('WhatsApp', !!cw.aceptado, waExtra);
-      })()}
-    </div>
-    <div class="section-card">
-      <div class="section-title">🩺 Seguimiento NOM / Cierre clínico</div>
-      ${(()=>{
-        const ac=p.altaClinica||{}, revs=Array.isArray(p.revaloraciones)?p.revaloraciones:[], eas=Array.isArray(p.eventosAdversos)?p.eventosAdversos:[];
-        const ultRev = revs.length? revs[revs.length-1] : null;
-        let h='';
-        // A) Alta clínica
-        h+=`<div class="field-row"><div class="field-label">Alta clínica</div><div class="field-value" style="color:${ac.activa?'var(--green)':'var(--gray-400)'};font-weight:600">${ac.activa?('✅ Registrada · '+escapeHTML(ac.fecha||'')+(ac.criterio?' — '+escapeHTML(ac.criterio):'')):'Pendiente'}</div></div>`;
-        if(!ac.activa) h+=`<button onclick="registrarAltaClinica()" style="margin:4px 0 10px;background:var(--navy);color:white;border:none;border-radius:18px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer">📋 Registrar alta clínica</button>`;
-        // B) Revaloraciones
-        h+=`<div class="field-row"><div class="field-label">Revaloraciones</div><div class="field-value">${revs.length?('📈 '+revs.length+' · última: '+escapeHTML(ultRev.fecha||'')):'Sin revaloraciones'}</div></div>`;
-        h+=`<button onclick="agregarRevaloracion()" style="margin:4px 0 10px;background:var(--navy);color:white;border:none;border-radius:18px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer">➕ Agregar revaloración</button>`;
-        // C) Eventos adversos
-        h+=`<div class="field-row"><div class="field-label">Eventos adversos</div><div class="field-value" style="color:${eas.length?'var(--red)':'var(--green)'};font-weight:600">${eas.length?('⚠️ '+eas.length+' registrado'+(eas.length>1?'s':'')):'Ninguno'}</div></div>`;
-        h+=`<button onclick="registrarEventoAdverso()" style="margin:4px 0 2px;background:var(--red);color:white;border:none;border-radius:18px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer">🚨 Registrar evento adverso</button>`;
-        return h;
-      })()}
-    </div>
-    <div class="section-card">
       <div class="section-title">🏥 Antecedentes
         <button onclick="abrirEditarAntecedentesCompleto()" style="margin-left:auto;background:var(--navy);color:white;border:none;border-radius:20px;padding:3px 12px;font-size:11px;font-weight:700;cursor:pointer">✏️ Editar</button>
       </div>
@@ -7755,6 +7725,41 @@ function renderExpediente(tab='historia'){
       <div class="field-row"><div class="field-label">Mecanismo</div><div class="field-value">${escapeHTML(mv.motivo.mecanismo)}</div></div>
       <div class="field-row"><div class="field-label">Evolución</div><div class="field-value">${escapeHTML(mv.motivo.evolucion)}</div></div>
       <div class="field-row"><div class="field-label">Estudios y hallazgos</div><div class="field-value narrative">${escapeHTML((mv.motivo.estudios||'')+(mv.motivo.hallazgos?' — '+mv.motivo.hallazgos:''))}</div></div>`}
+    </div>
+    <div class="section-card">
+      <div class="section-title" onclick="var b=this.nextElementSibling;if(b){b.style.display=b.style.display==='none'?'':'none';this.querySelector('.hist-arrow').textContent=b.style.display==='none'?'▸':'▾'}" style="cursor:pointer">🔒 Protección de datos
+        <span class="hist-arrow" style="margin-left:auto;font-size:14px;color:var(--gray-400)">▸</span>
+      </div>
+      <div style="display:none">
+      ${(()=>{
+        const cd=p.consentimientoDatos||{}, ci=p.consentimientoImagen||{}, cw=p.consentimientoWhatsApp||{};
+        const fila=(lbl,ok,extra)=>`<div class="field-row"><div class="field-label">${escapeHTML(lbl)}</div><div class="field-value" style="color:${ok?'var(--green)':'var(--gray-400)'};font-weight:600">${ok?'✅ '+escapeHTML(extra||'Aceptado'):'❌ '+escapeHTML(extra||'No autorizado')}</div></div>`;
+        let waExtra='No autorizado';
+        if(cw.aceptado){ const partes=[]; if(cw.aceptaRecordatorios)partes.push('recordatorios'); if(cw.aceptaEjercicios)partes.push('ejercicios'); waExtra='Autorizado'+(partes.length?' ('+partes.join(', ')+')':''); }
+        return fila('Datos personales', !!cd.aceptado, cd.aceptado?('Aceptado'+(cd.fecha?' · '+cd.fecha:'')):'Pendiente')
+          + fila('Imagen / video', !!ci.aceptado, ci.aceptado?'Autorizado':'No autorizado')
+          + fila('WhatsApp', !!cw.aceptado, waExtra);
+      })()}
+      </div>
+    </div>
+    <div class="section-card">
+      <div class="section-title" onclick="var b=this.nextElementSibling;if(b){b.style.display=b.style.display==='none'?'':'none';this.querySelector('.hist-arrow').textContent=b.style.display==='none'?'▸':'▾'}" style="cursor:pointer">🩺 Seguimiento NOM / Cierre clínico
+        <span class="hist-arrow" style="margin-left:auto;font-size:14px;color:var(--gray-400)">▸</span>
+      </div>
+      <div style="display:none">
+      ${(()=>{
+        const ac=p.altaClinica||{}, revs=Array.isArray(p.revaloraciones)?p.revaloraciones:[], eas=Array.isArray(p.eventosAdversos)?p.eventosAdversos:[];
+        const ultRev = revs.length? revs[revs.length-1] : null;
+        let h='';
+        h+=`<div class="field-row"><div class="field-label">Alta clínica</div><div class="field-value" style="color:${ac.activa?'var(--green)':'var(--gray-400)'};font-weight:600">${ac.activa?('✅ Registrada · '+escapeHTML(ac.fecha||'')+(ac.criterio?' — '+escapeHTML(ac.criterio):'')):'Pendiente'}</div></div>`;
+        if(!ac.activa) h+=`<button onclick="registrarAltaClinica()" style="margin:4px 0 10px;background:var(--navy);color:white;border:none;border-radius:18px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer">📋 Registrar alta clínica</button>`;
+        h+=`<div class="field-row"><div class="field-label">Revaloraciones</div><div class="field-value">${revs.length?('📈 '+revs.length+' · última: '+escapeHTML(ultRev.fecha||'')):'Sin revaloraciones'}</div></div>`;
+        h+=`<button onclick="agregarRevaloracion()" style="margin:4px 0 10px;background:var(--navy);color:white;border:none;border-radius:18px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer">➕ Agregar revaloración</button>`;
+        h+=`<div class="field-row"><div class="field-label">Eventos adversos</div><div class="field-value" style="color:${eas.length?'var(--red)':'var(--green)'};font-weight:600">${eas.length?('⚠️ '+eas.length+' registrado'+(eas.length>1?'s':'')):'Ninguno'}</div></div>`;
+        h+=`<button onclick="registrarEventoAdverso()" style="margin:4px 0 2px;background:var(--red);color:white;border:none;border-radius:18px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer">🚨 Registrar evento adverso</button>`;
+        return h;
+      })()}
+      </div>
     </div>`;
   }
 
