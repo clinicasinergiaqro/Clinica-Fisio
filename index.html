@@ -7775,8 +7775,7 @@ function renderExpediente(tab='historia'){
       <div class="field-row"><div class="field-label">Padecimiento</div><div class="field-value narrative">${escapeHTML(mv.motivo.padecimiento)}</div></div>
       <div class="field-row"><div class="field-label">Mecanismo</div><div class="field-value">${escapeHTML(mv.motivo.mecanismo)}</div></div>
       <div class="field-row"><div class="field-label">Evolución</div><div class="field-value">${escapeHTML(mv.motivo.evolucion)}</div></div>
-      <div class="field-row"><div class="field-label">Estudios</div><div class="field-value">${escapeHTML(mv.motivo.estudios)}</div></div>
-      <div class="field-row"><div class="field-label">Hallazgos</div><div class="field-value narrative">${escapeHTML(mv.motivo.hallazgos)}</div></div>`}
+      <div class="field-row"><div class="field-label">Estudios y hallazgos</div><div class="field-value narrative">${escapeHTML((mv.motivo.estudios||'')+(mv.motivo.hallazgos?' — '+mv.motivo.hallazgos:''))}</div></div>`}
     </div>`;
   }
 
@@ -10021,10 +10020,12 @@ function updateEvaVal(id,v){const el=document.getElementById(id);if(el)el.classN
 
 var _nEvaVal=null;
 function _nEvaColorClass(n){return n<=3?'on-low':n<=6?'on-mid':'on-high';}
+function _nEvaTint(n){return n<=3?'background:#E8F5E9;color:#2E7D32;border-color:#A5D6A7':n<=6?'background:#FFF8E1;color:#E65100;border-color:#FFE082':'background:#FFEBEE;color:#C62828;border-color:#EF9A9A';}
 function _nEvaBtnsHTML(){
   var h='';
   for(var n=0;n<=10;n++){
-    h+='<button type="button" class="evabtn'+(_nEvaVal===n?' '+_nEvaColorClass(n):'')+'" onclick="_setNEva('+n+')">'+n+'</button>';
+    var sel=_nEvaVal===n;
+    h+='<button type="button" class="evabtn'+(sel?' '+_nEvaColorClass(n):'')+'" style="'+(sel?'':_nEvaTint(n))+'" onclick="_setNEva('+n+')">'+n+'</button>';
   }
   return h;
 }
@@ -14071,8 +14072,7 @@ function renderNuevoPaciente(){
       <!-- REACOMODO fase 2 (2026-08): el campo texto "🚩 Banderas rojas" (n-banderas) se eliminó del
            alta — duplicaba los checkboxes sc-bandera de Seguridad. valoracion.banderasRojas se sigue
            escribiendo SIEMPRE (derivado de los checkboxes en guardarNuevoPaciente). -->
-      <div class="form-field"><div class="form-label">Estudios de imagen</div><input class="form-input" id="n-estudios" type="text" placeholder="Ej: US tendón rotuliano"></div>
-      <div class="form-field"><div class="form-label">Hallazgos / conclusión</div><textarea class="form-input" id="n-hallazgos" placeholder="Resumen del reporte de imagen..."></textarea></div>
+      <div class="form-field"><div class="form-label">Estudios de imagen y hallazgos</div><textarea class="form-input" id="n-estudios" placeholder="Ej: US tendón rotuliano — engrosamiento con áreas hipoecoicas"></textarea></div>
     </div>
   </div>
   <div class="form-section">
@@ -14244,7 +14244,7 @@ function guardarNuevoPaciente(){
     antecedentes:{patologicos:v('n-patologicos','Ninguno'),deportivos:v('n-deportivos','Ninguno'),
       deporteFrecuencia:v('n-deporte-freq','No aplica'),cirugias:v('n-cirugias','Ninguna'),medicamentos:v('n-medicamentos','Ninguno')},
     motivo:{dxMedico:dxmedicoFinal, padecimiento, mecanismo:v('n-mecanismo','No especificado'),
-      evolucion:v('n-evolucion','No especificado'),estudios:v('n-estudios','Pendiente'),hallazgos:v('n-hallazgos','Pendiente')},
+      evolucion:v('n-evolucion','No especificado'),estudios:v('n-estudios','Pendiente'),hallazgos:''},
     // valoracion.banderasRojas: DERIVADO de los checkboxes sc-bandera (los mismos que guardan en
     // seguridadClinica.banderasRojas) desde el REACOMODO fase 2 (2026-08). El campo texto n-banderas
     // del alta se eliminó por duplicado, pero el campo del MODELO se conserva porque lo leen:
@@ -14669,8 +14669,7 @@ function editarHistoria(seccion){
         <div class="form-field"><div class="form-label">Padecimiento actual</div><textarea class="form-input" id="ed-padecimiento" style="min-height:80px">${escapeHTML(p.motivo?.padecimiento||'')}</textarea></div>
         <div class="form-field"><div class="form-label">Mecanismo de lesión</div><input class="form-input" type="text" id="ed-mecanismo" value="${escapeAttr_(p.motivo?.mecanismo||'')}"></div>
         <div class="form-field"><div class="form-label">Tiempo de evolución</div><input class="form-input" type="text" id="ed-evolucion" value="${escapeAttr_(p.motivo?.evolucion||'')}"></div>
-        <div class="form-field"><div class="form-label">Estudios de imagen</div><input class="form-input" type="text" id="ed-estudios" value="${escapeAttr_(p.motivo?.estudios||'')}"></div>
-        <div class="form-field"><div class="form-label">Hallazgos / conclusión</div><textarea class="form-input" id="ed-hallazgos" style="min-height:80px">${escapeHTML(p.motivo?.hallazgos||'')}</textarea></div>
+        <div class="form-field"><div class="form-label">Estudios de imagen y hallazgos</div><textarea class="form-input" id="ed-estudios" style="min-height:80px">${escapeHTML((p.motivo?.estudios||'')+(p.motivo?.hallazgos?' — '+p.motivo.hallazgos:''))}</textarea></div>
       </div>
     </div>`;
   }
@@ -14798,7 +14797,6 @@ function guardarEdicionHistoria(seccion, tabRetorno){
     p.motivo.mecanismo = v('ed-mecanismo');
     p.motivo.evolucion = v('ed-evolucion');
     p.motivo.estudios = v('ed-estudios');
-    p.motivo.hallazgos = v('ed-hallazgos');
   }
   if(seccion==='valoracion'){
     p.valoracion.eva = parseInt(document.getElementById('ed-eva')?.value||p.valoracion.eva);
@@ -15001,8 +14999,7 @@ function abrirEditarValoracion(esNuevoMotivo){
       campo('Padecimiento actual','ev-padecimiento',m.padecimiento,null,true)+
       campo('Mecanismo de lesión','ev-mecanismo',m.mecanismo)+
       campo('Tiempo de evolución','ev-evolucion',m.evolucion)+
-      campo('Estudios de imagen','ev-estudios',m.estudios)+
-      campo('Hallazgos / conclusión','ev-hallazgos',m.hallazgos)
+      campo('Estudios de imagen y hallazgos','ev-estudios',(m.estudios||'')+(m.hallazgos?' — '+m.hallazgos:''))
     )+
     bannerHeredados+
     seccion('2','🩺 Antecedentes',
@@ -15088,8 +15085,7 @@ function guardarValoracionCompleta(){
     padecimiento: v('ev-padecimiento'),
     mecanismo: v('ev-mecanismo'),
     evolucion: v('ev-evolucion'),
-    estudios: vp('ev-estudios'),
-    hallazgos: vp('ev-hallazgos')
+    estudios: vp('ev-estudios')
   };
   // antecedentes (FASE A: vacío → conserva lo heredado del expediente)
   p.antecedentes = {...(p.antecedentes||{}),
@@ -15185,7 +15181,7 @@ function getChecks(cls){ try{ return Array.from(document.querySelectorAll('.'+cl
 function setChecks(cls,values){ try{ const arr=Array.isArray(values)?values:[]; document.querySelectorAll('.'+cls).forEach(x=>{ x.checked=arr.includes(x.value); }); }catch(e){} }
 
 // IDs reales de los campos de texto de editar valoración
-const CAMPOS_EV=['ev-motivoconsulta','ev-dxmedico','ev-padecimiento','ev-mecanismo','ev-evolucion','ev-estudios','ev-hallazgos',
+const CAMPOS_EV=['ev-motivoconsulta','ev-dxmedico','ev-padecimiento','ev-mecanismo','ev-evolucion','ev-estudios',
   'ev-patologicos','ev-deportivos','ev-deporte-freq','ev-cirugias','ev-medicamentos','ev-alergias','ev-contra',
   'ev-sc-implantes-detalle','ev-sc-condiciones-obs','ev-sc-banderas-detalle',
   'ev-eva','ev-inflamacion','ev-marcha','ev-rom','ev-fuerza','ev-flex','ev-pruebas','ev-palpacion',
@@ -15267,7 +15263,7 @@ const CAMPOS_NUEVO=['n-nombre','n-fechanac','n-edad','n-telefono','n-terapeuta',
   'n-motivoconsulta','n-dxmedico','n-padecimiento','n-mecanismo','n-evolucion',
   'n-patologicos','sc-condiciones-obs','n-cirugias','n-medicamentos','n-alergias','n-deportivos','n-deporte-freq',
   'sc-implantes-detalle','sc-banderas-detalle','n-contra',
-  'n-inflamacion','n-marcha','n-rom','n-fuerza','n-flex','n-pruebas','n-palpacion','n-estudios','n-hallazgos',
+  'n-inflamacion','n-marcha','n-rom','n-fuerza','n-flex','n-pruebas','n-palpacion','n-estudios',
   'n-dxclinico','n-dxfuncional','n-limitaciones','n-objcp','n-objlp','n-pronostico',
   'n-frecuencia','n-sesiones','n-ejercicio','n-tmanual','n-agentes','n-plancontra','n-fecha-valoracion','n-ttohoy'];
 
