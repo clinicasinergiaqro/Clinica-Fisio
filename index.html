@@ -952,6 +952,26 @@ select.form-input{font-size:14px}
 .checkbox-item.checked .cb-box{background:var(--gold);border-color:var(--gold);color:var(--navy-dark)}
 .cb-label{font-size:12px;font-weight:600;color:var(--gray-600)}
 
+/* SEGURIDAD COLAPSABLE */
+.seg-toggle{background:#F0FDF4;border:1.5px solid #BBF7D0;border-radius:var(--radius);margin:6px 14px 10px;padding:14px 16px;cursor:pointer;transition:all .2s;-webkit-tap-highlight-color:transparent}
+.seg-toggle.has-alert{background:#FEF2F2;border-color:#FECACA}
+.seg-toggle-row{display:flex;align-items:center;gap:10px}
+.seg-toggle-icon{font-size:22px;flex-shrink:0}
+.seg-toggle-text{flex:1}
+.seg-toggle-label{font-size:14px;font-weight:700;color:#16A34A}
+.seg-toggle.has-alert .seg-toggle-label{color:#DC2626}
+.seg-toggle-sub{font-size:11px;color:var(--gray-400);margin-top:2px}
+.seg-toggle-arrow{font-size:18px;color:var(--gray-400);transition:transform .2s;flex-shrink:0}
+.seg-toggle.open .seg-toggle-arrow{transform:rotate(90deg)}
+.seg-detail{max-height:0;overflow:hidden;transition:max-height .3s ease;margin:0 14px}
+.seg-detail.open{max-height:1200px}
+.seg-detail-inner{padding:0 0 14px}
+.seg-block{background:var(--white);border:1px solid var(--gray-200);border-radius:var(--radius-sm);padding:12px 14px;margin-bottom:8px}
+.seg-block-title{font-size:12px;font-weight:700;color:var(--gray-600);margin-bottom:8px}
+.seg-pills{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.seg-pill{font-size:11px;font-weight:700;padding:3px 10px;border-radius:12px;background:var(--gray-50);color:var(--gray-600);border:1px solid var(--gray-200)}
+.seg-pill.alert{background:#FEF2F2;color:#DC2626;border-color:#FECACA}
+
 /* BUTTONS */
 .btn-primary{width:100%;background:var(--navy);color:var(--white);border:none;border-radius:var(--radius);padding:15px;font-size:15px;font-weight:700;cursor:pointer;margin-top:8px;font-family:inherit}
 .btn-primary:active{transform:scale(.98)}
@@ -2969,6 +2989,44 @@ function setCampoRapido(id, texto){
   const el=document.getElementById(id);
   if(el){ el.value=texto; el.focus(); el.blur(); }
 }
+
+var _segOpen=false;
+function toggleSeguridad(){
+  _segOpen=!_segOpen;
+  var t=document.getElementById('seg-toggle'),d=document.getElementById('seg-detail');
+  if(t)t.classList.toggle('open',_segOpen);
+  if(d)d.classList.toggle('open',_segOpen);
+  if(_segOpen){var s=document.getElementById('seg-sub');if(s)s.textContent='Marca lo que aplique; deja vacío lo que no';}
+  else updateSegSummary();
+}
+function updateSegSummary(){
+  var imps=Array.from(document.querySelectorAll('.sc-implante:checked')).map(function(c){return c.value;});
+  var brs=Array.from(document.querySelectorAll('.sc-bandera:checked')).map(function(c){return c.value;}).filter(function(x){return x!=='Ninguna referida';});
+  var has=imps.length>0||brs.length>0;
+  var toggle=document.getElementById('seg-toggle');
+  var icon=document.getElementById('seg-icon');
+  var label=document.getElementById('seg-label');
+  var sub=document.getElementById('seg-sub');
+  var pills=document.getElementById('seg-pills');
+  if(!toggle||!icon||!label||!sub||!pills)return;
+  if(has){
+    toggle.classList.add('has-alert');icon.textContent='🔴';
+    var parts=[];
+    if(imps.length)parts.push(imps.length+' implante'+(imps.length>1?'s':''));
+    if(brs.length)parts.push(brs.length+' bandera'+(brs.length>1?'s':'')+' roja'+(brs.length>1?'s':''));
+    label.textContent=parts.join(' + ');
+    var h='';
+    imps.forEach(function(i){h+='<span class="seg-pill alert">'+i+'</span>';});
+    brs.forEach(function(b){h+='<span class="seg-pill alert">🚩 '+b+'</span>';});
+    pills.innerHTML=h;
+    if(!_segOpen)sub.textContent='Toca para ver o editar los detalles';
+  }else{
+    toggle.classList.remove('has-alert');icon.textContent='🟢';
+    label.textContent='Sin hallazgos de seguridad';pills.innerHTML='';
+    if(!_segOpen)sub.textContent='Toca para reportar implantes, banderas rojas o contraindicaciones';
+  }
+}
+
 // Genera fila de chips para un campo
 function chipsHTML(targetId, opciones){
   return '<div class="chip-row">'+opciones.map(o=>
@@ -13964,32 +14022,46 @@ function renderNuevoPaciente(){
   <div class="form-section">
     <div class="form-section-title">🛡️ Seguridad y banderas rojas</div>
 
-    <!-- BLOQUE 1 — Implantes -->
-    <div class="form-group" style="margin-bottom:10px">
-      <div class="form-field">
-        <div class="form-label">Aparatos / implantes</div>
-        <div class="checkbox-grid" id="sc-implantes-grid">${['Marcapasos','Prótesis articular','Prótesis metálica','Material de osteosíntesis','Implante electrónico','Otro'].map(o=>`<label class="checkbox-item"><input type="checkbox" class="sc-implante" value="${o}" style="width:16px;height:16px"> <span class="cb-label">${o}</span></label>`).join('')}</div>
-        <input class="form-input" id="sc-implantes-detalle" type="text" placeholder="Especificar ubicación / tipo" style="margin-top:8px">
-        <div class="chip-row"><button type="button" class="chip-oneshot" onclick="document.querySelectorAll('.sc-implante').forEach(c=>c.checked=false);setCampoRapido('sc-implantes-detalle','Sin marcapasos ni implantes referidos')">Sin marcapasos ni implantes referidos</button></div>
+    <!-- Toggle colapsable: por defecto cerrado, verde = sin hallazgos -->
+    <div class="seg-toggle" id="seg-toggle" onclick="toggleSeguridad()">
+      <div class="seg-toggle-row">
+        <span class="seg-toggle-icon" id="seg-icon">🟢</span>
+        <div class="seg-toggle-text">
+          <div class="seg-toggle-label" id="seg-label">Sin hallazgos de seguridad</div>
+          <div class="seg-toggle-sub" id="seg-sub">Toca para reportar implantes, banderas rojas o contraindicaciones</div>
+        </div>
+        <span class="seg-toggle-arrow" id="seg-arrow">›</span>
       </div>
+      <div class="seg-pills" id="seg-pills"></div>
     </div>
 
-    <!-- BLOQUE 2 — Banderas rojas (checkboxes): FUENTE ÚNICA desde fase 2 del reacomodo
-         (el campo texto duplicado del alta se eliminó; valoracion.banderasRojas se deriva de aquí). -->
-    <div class="form-group" style="margin-bottom:10px">
-      <div class="form-field">
-        <div class="form-label">🚩 Banderas rojas</div>
-        <div class="checkbox-grid" id="sc-banderas-grid">${['Fiebre','Pérdida de peso inexplicable','Dolor nocturno severo no mecánico','Trauma importante reciente','Alteración neurológica progresiva','Pérdida de control de esfínteres','Sospecha de TVP','Dolor torácico','Disnea','Sangrado anormal','Ninguna referida'].map(o=>`<label class="checkbox-item"><input type="checkbox" class="sc-bandera" value="${o}" ${o==='Ninguna referida'?'checked':''} style="width:16px;height:16px"> <span class="cb-label">${o}</span></label>`).join('')}</div>
-        <input class="form-input" id="sc-banderas-detalle" type="text" placeholder="Detalle / conducta tomada" style="margin-top:8px">
-        <div class="chip-row"><button type="button" class="chip-oneshot" onclick="document.querySelectorAll('.sc-bandera').forEach(c=>c.checked=(c.value==='Ninguna referida'));setCampoRapido('sc-banderas-detalle','Sin banderas rojas')">Sin banderas rojas</button></div>
-      </div>
-    </div>
+    <div class="seg-detail" id="seg-detail">
+      <div class="seg-detail-inner">
 
-    <!-- BLOQUE 3 — Contraindicaciones médicas (texto libre, antes en "Alertas clínicas").
-         Guarda en p.contraindicaciones (campo raíz) — distinto del tamizaje (seguridadClinica)
-         y de las precauciones del plan (planTto.contraindicaciones). -->
-    <div class="form-group">
-      <div class="form-field"><div class="form-label">Contraindicaciones médicas</div><textarea class="form-input" id="n-contra" placeholder="Marcapasos, bypass, anticoagulantes..."></textarea><div class="chip-row"><button type="button" class="chip-oneshot" onclick="setCampoRapido('n-contra','Ninguna')">Sin contraindicaciones referidas</button></div></div>
+        <!-- BLOQUE 1 — Implantes (IDs idénticos para guardar/restaurar) -->
+        <div class="seg-block">
+          <div class="seg-block-title">Aparatos / implantes</div>
+          <div class="checkbox-grid" id="sc-implantes-grid">${['Marcapasos','Prótesis articular','Prótesis metálica','Material de osteosíntesis','Implante electrónico','Otro'].map(o=>`<label class="checkbox-item"><input type="checkbox" class="sc-implante" value="${o}" onchange="updateSegSummary()" style="width:16px;height:16px"> <span class="cb-label">${o}</span></label>`).join('')}</div>
+          <input class="form-input" id="sc-implantes-detalle" type="text" placeholder="Si marcaste 'Otro': especifica ubicación / tipo" style="margin-top:8px;font-size:15px;padding:14px;border:2px dashed var(--gray-300)">
+        </div>
+
+        <!-- BLOQUE 2 — Banderas rojas (checkboxes): FUENTE ÚNICA desde fase 2 del reacomodo
+             (valoracion.banderasRojas se deriva de aquí). -->
+        <div class="seg-block">
+          <div class="seg-block-title">🚩 Banderas rojas</div>
+          <div class="checkbox-grid" id="sc-banderas-grid">${['Fiebre','Pérdida de peso inexplicable','Dolor nocturno severo no mecánico','Trauma importante reciente','Alteración neurológica progresiva','Pérdida de control de esfínteres','Sospecha de TVP','Dolor torácico','Disnea','Sangrado anormal','Ninguna referida'].map(o=>`<label class="checkbox-item"><input type="checkbox" class="sc-bandera" value="${o}" ${o==='Ninguna referida'?'checked':''} onchange="updateSegSummary()" style="width:16px;height:16px"> <span class="cb-label">${o}</span></label>`).join('')}</div>
+          <input class="form-input" id="sc-banderas-detalle" type="text" placeholder="Detalle / conducta tomada" style="margin-top:8px">
+        </div>
+
+        <!-- BLOQUE 3 — Contraindicaciones médicas (texto libre).
+             Guarda en p.contraindicaciones (campo raíz) — distinto del tamizaje (seguridadClinica)
+             y de las precauciones del plan (planTto.contraindicaciones). -->
+        <div class="seg-block">
+          <div class="seg-block-title">Contraindicaciones médicas</div>
+          <textarea class="form-input" id="n-contra" placeholder="Marcapasos, bypass, anticoagulantes..."></textarea>
+        </div>
+
+      </div>
     </div>
   </div>
   <div class="form-section">
@@ -15257,7 +15329,7 @@ function cargarBorradorNuevoSiExiste(){
     if(!draft||!draft.data) return;
     const fecha=new Date(draft.updatedAt||Date.now()).toLocaleString('es-MX');
     if(confirm(`Hay un borrador de nuevo paciente sin guardar.\n\nÚltima edición: ${fecha}\n\n¿Deseas recuperarlo?`)){
-      aplicarBorradorNuevo(draft.data); showToast('Borrador recuperado','success');
+      aplicarBorradorNuevo(draft.data); if(typeof updateSegSummary==='function')updateSegSummary(); showToast('Borrador recuperado','success');
     } else {
       if(confirm('¿Deseas descartar este borrador?')){ localStorage.removeItem(DRAFT_NUEVO); showToast('Borrador descartado','warning'); }
     }
