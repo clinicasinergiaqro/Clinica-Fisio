@@ -2924,7 +2924,7 @@ function calcularTienePrecaucion(sc){
 document.addEventListener('change', function(e){
   const t=e.target;
   if(!t||t.type!=='checkbox') return;
-  const grupos=['sc-condicion','ev-sc-condicion','sc-bandera','ev-sc-bandera'];
+  const grupos=['sc-condicion','ev-sc-condicion','ed-sc-condicion','sc-bandera','ev-sc-bandera'];
   const cls=grupos.find(g=>t.classList.contains(g));
   if(!cls) return;
   const grupo=Array.from(document.querySelectorAll('.'+cls));
@@ -2937,7 +2937,7 @@ document.addEventListener('change', function(e){
   }
   // Al marcar "Otro" en condiciones → enfocar observaciones
   if(t.value==='Otro' && t.checked && cls.includes('condicion')){
-    const obsId = cls.startsWith('ev-') ? 'ev-sc-condiciones-obs' : 'sc-condiciones-obs';
+    const obsId = cls.startsWith('ev-') ? 'ev-sc-condiciones-obs' : cls.startsWith('ed-') ? 'ed-sc-condiciones-obs' : 'sc-condiciones-obs';
     const obs=document.getElementById(obsId);
     if(obs){ obs.focus(); obs.style.borderColor='var(--navy)'; }
   }
@@ -14367,6 +14367,7 @@ function abrirEditarAntecedentesCompleto(){
   const p = currentPatient;
   if(!p) return;
   const a = p.antecedentes || {};
+  const sc = p.seguridadClinica || {};
   const c = document.getElementById('content-expediente');
   const lt = limpiarTextoClinico;
 
@@ -14394,6 +14395,15 @@ function abrirEditarAntecedentesCompleto(){
           <textarea class="form-input" id="ed-patologicos" placeholder="Ej. diabetes, hipertensión, cáncer, cardiopatías u otros antecedentes familiares relevantes">${lt(a.patologicos,'')}</textarea>
           ${chipsHTML2('ed-patologicos',[['Sin antecedentes heredofamiliares relevantes','Sin antecedentes heredofamiliares relevantes']])}
         </div>
+      </div>
+      <div class="form-group" style="margin-bottom:10px">
+        <div class="form-field">
+          <div class="form-label">Condiciones médicas <span style="color:var(--gray-400);font-weight:400">(personales patológicos)</span></div>
+          <div class="checkbox-grid">${['Cáncer activo','Antecedente de cáncer','Hemofilia / trastorno de coagulación','Anticoagulantes','Diabetes','Hipertensión','Osteoporosis','Embarazo','Epilepsia','Alteración de sensibilidad','Alteración vascular','Infección activa','Herida abierta','Otro','Ninguna referida'].map(o=>`<label class="checkbox-item"><input type="checkbox" class="ed-sc-condicion" value="${o}" ${(sc.condiciones||[]).includes(o)?'checked':''} style="width:16px;height:16px"> <span class="cb-label">${o}</span></label>`).join('')}</div>
+          <input class="form-input" id="ed-sc-condiciones-obs" type="text" placeholder="Si marcaste 'Otro': especifica la condición aquí" value="${lt(sc.condicionesObs||'','').replace(/"/g,'&quot;')}" style="margin-top:8px;font-size:15px;padding:14px;border:2px dashed var(--gray-300)">
+        </div>
+      </div>
+      <div class="form-group">
         <div class="form-field">
           <div class="form-label">Antecedentes deportivos</div>
           <input class="form-input" type="text" id="ed-deportivos" value="${lt(a.deportivos,'').replace(/"/g,'&quot;')}">
@@ -14545,6 +14555,9 @@ function guardarAntecedentesCompleto(){
   p.antecedentes.medicamentos    = v('ed-medicamentos');
   p.alergias = alergias;
   p.contraindicaciones = lt(v('ed-contra'),'') || 'Ninguna';
+  if(!p.seguridadClinica) p.seguridadClinica = {};
+  p.seguridadClinica.condiciones = Array.from(document.querySelectorAll('.ed-sc-condicion:checked')).map(c=>c.value);
+  p.seguridadClinica.condicionesObs = v('ed-sc-condiciones-obs');
   // LOOP3A: guardar sexo (campo opcional, no bloquea)
   p.sexo = v('ed-sexo') || '';
 
@@ -14564,7 +14577,7 @@ function guardarAntecedentesCompleto(){
   const idx = patientsDB.findIndex(x=>x.id===p.id);
   if(idx>=0) patientsDB[idx]=p;
 
-  saveDB('pts',[p],{camposHist:['antecedentes','alergias','contraindicaciones','sexo','fechaActualizacion','ultimoUsuario','historialCambios']}).then(res=>{
+  saveDB('pts',[p],{camposHist:['antecedentes','alergias','contraindicaciones','seguridadClinica','sexo','fechaActualizacion','ultimoUsuario','historialCambios']}).then(res=>{
     showToast(res?.ok?'Antecedentes guardados ✅':'⚠️ Guardado local, Sheets no confirmó',res?.ok?'success':'warning');
     renderExpediente('historia');
   }).catch(()=>{ showToast('⚠️ Sin conexión — guardado local','warning'); renderExpediente('historia'); });
