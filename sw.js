@@ -2,7 +2,7 @@
 // Service Worker — Clínica Sinergia (offline shell)
 // CAMBIAR la fecha de CACHE en cada deploy para forzar actualización
 // ═══════════════════════════════════════════════════════════
-const CACHE = 'sinergia-shell-v1-2026-08-08x';
+const CACHE = 'sinergia-shell-v1-2026-08-08y';
 const SHELL = [
   './',
   './index.html',
@@ -45,15 +45,29 @@ self.addEventListener('fetch', e => {
     return;
   }
   if (req.method !== 'GET') return;
-  // Navegación: app shell fallback (solo aquí se devuelve index.html)
+  // Navegación: red-primero CON TIMEOUT. En datos móviles con ruteo IPv6 degradado (ej. AT&T MX),
+  // la petición a GitHub Pages no falla — se queda COLGADA — y sin timeout la app espera en blanco
+  // indefinidamente. Con timeout: si la red no responde a tiempo y HAY copia guardada, se abre la
+  // copia en ~3.5 s. Si NO hay copia (primera instalación) damos más margen (12 s) porque no hay
+  // nada que servir. Con buena red (WiFi) se comporta igual que antes: trae lo último y lo cachea.
   if (req.mode === 'navigate' || req.destination === 'document') {
-    e.respondWith(
-      fetch(req).then(resp => {
-        const copy = resp.clone();
-        caches.open(CACHE).then(c => c.put('./index.html', copy)).catch(()=>{});
+    e.respondWith((async () => {
+      const cached = await caches.match('./index.html');
+      const limiteMs = cached ? 3500 : 12000;
+      try {
+        const resp = await Promise.race([
+          fetch(req),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('timeout-red')), limiteMs))
+        ]);
+        if (resp && resp.ok) {
+          const copy = resp.clone();
+          caches.open(CACHE).then(c => c.put('./index.html', copy)).catch(()=>{});
+        }
         return resp;
-      }).catch(() => caches.match('./index.html').then(hit => hit || caches.match('./')))
-    );
+      } catch (err) {
+        return cached || (await caches.match('./')) || fetch(req);
+      }
+    })());
     return;
   }
   // Librerías estáticas: cache-first + refresh silencioso
