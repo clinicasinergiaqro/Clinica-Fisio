@@ -14041,8 +14041,8 @@ function renderNuevoPaciente(){
       <div class="form-field">
         <div class="form-label">EVA inicial <span class="req">*</span></div>
         <div class="eva-slider-wrap">
-          <input type="range" class="eva-slider" min="0" max="10" value="5" id="n-eva-sl" oninput="document.getElementById('n-eva-v').textContent=this.value;updateEvaVal('n-eva-v',+this.value)">
-          <div class="eva-val eva-mid" id="n-eva-v">5</div>
+          <input type="range" class="eva-slider" min="0" max="10" value="0" id="n-eva-sl" oninput="document.getElementById('n-eva-v').textContent=this.value;updateEvaVal('n-eva-v',+this.value)">
+          <div class="eva-val eva-low" id="n-eva-v">0</div>
         </div>
       </div>
       <div class="form-field"><div class="form-label">Inflamación</div><input class="form-input" id="n-inflamacion" type="text" placeholder="Ej: Moderada, leve, ninguna"></div>
@@ -14063,7 +14063,7 @@ function renderNuevoPaciente(){
     <div class="form-section-title">🔎 Diagnóstico funcional</div>
     <div class="form-group">
       <div class="form-field"><div class="form-label">Dx clínico</div><input class="form-input" id="n-dxclinico" type="text" placeholder="Igual al dx médico o más específico"></div>
-      <div class="form-field"><div class="form-label">Dx funcional</div><textarea class="form-input" id="n-dxfuncional" placeholder="Disfunción de [zona] por [causa] que limita [función]"></textarea></div>
+      <div class="form-field"><div class="form-label">Dx funcional</div><textarea class="form-input" id="n-dxfuncional" placeholder="Disfunción de [zona] por [causa] que limita [función]"></textarea><div style="margin-top:4px;font-size:12px;color:var(--gray-400);line-height:1.4">Ej: Disfunción de rodilla derecha por debilidad de cuádriceps que limita bajar escaleras y sentadilla</div></div>
       <div class="form-field"><div class="form-label">Limitaciones</div><input class="form-input" id="n-limitaciones" type="text" placeholder="Ej: Bajar escaleras, sentadilla"></div>
       <div class="form-field"><div class="form-label">Objetivos corto plazo</div><input class="form-input" id="n-objcp" type="text" placeholder="Ej: Reducir dolor a 3/10 en 3 semanas"></div>
       <div class="form-field"><div class="form-label">Objetivos largo plazo</div><input class="form-input" id="n-objlp" type="text" placeholder="Ej: Retorno al deporte sin limitaciones"></div>
@@ -14211,7 +14211,7 @@ function guardarNuevoPaciente(){
   const dxmedicoFinal = dxmedico || 'No cuenta con diagnóstico médico referido';
   const frecuenciaFinal = frecuencia || '[pendiente]';
   const sesionesFinal = sesiones || '[pendiente]';
-  const evaVal=parseInt(document.getElementById('n-eva-sl')?.value||5);
+  const evaVal=parseInt(document.getElementById('n-eva-sl')?.value||0);
   const nuevo={
     id:generarIdSeguro_('p'), name:nombre, age:edadFinal,
     sexo: v('n-sexo') || '',
