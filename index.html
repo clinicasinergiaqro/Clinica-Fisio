@@ -2779,6 +2779,23 @@ function formatearFechaNac(raw){
   if(s.length===8) return s.slice(0,2)+'/'+s.slice(2,4)+'/'+s.slice(4,8);
   return raw; // devolver tal cual si ya tiene formato
 }
+function _formatFechaNac(raw){
+  if(!raw) return '';
+  var s=String(raw);
+  var m=s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if(m) return m[3]+'/'+m[2]+'/'+m[1];
+  if(/^\d{2}\/\d{2}\/\d{4}$/.test(s)) return s;
+  var d=String(s).replace(/\D/g,'');
+  if(d.length===8) return d.slice(0,2)+'/'+d.slice(2,4)+'/'+d.slice(4,8);
+  return s;
+}
+function _fmtFecha(raw){
+  if(!raw) return '—';
+  var s=String(raw);
+  var m=s.match(/^(\d{4})-(\d{2})-(\d{2})T?/);
+  if(m) return m[3]+'/'+m[2]+'/'+m[1];
+  return s;
+}
 
 function autoformatoFechaNac(input){
   // Llamado en el evento blur del campo fechaNacimiento
@@ -7647,7 +7664,7 @@ function renderExpediente(tab='historia'){
         <div style="font-size:12px;color:var(--gray-400);font-weight:700;margin-bottom:4px">📋 MOTIVO DE CONSULTA ACTIVO${mv.tieneEps?' · EPISODIO '+mv.epNum:''}</div>
         <div style="font-size:15px;color:${_pendienteCaptura?'#92400E':'var(--navy)'};font-weight:600;margin-bottom:2px">${_pendienteCaptura?'⚠️ ':'"'}${escapeHTML(motivoActivo)}${_pendienteCaptura?'':'"'}</div>
         ${_pendienteCaptura?`<div style="font-size:12px;color:#92400E;background:#FEF3C7;border-radius:8px;padding:6px 10px;margin-bottom:8px">Toca <b>✏️ Editar valoración completa</b> para capturar el motivo del Episodio ${mv.epNum}.</div>`:''}
-        ${desdeFecha?`<div style="font-size:12px;color:var(--gray-400);margin-bottom:10px">Desde: ${desdeFecha}</div>`:'<div style="margin-bottom:10px"></div>'}
+        ${desdeFecha?`<div style="font-size:12px;color:var(--gray-400);margin-bottom:10px">Desde: ${_fmtFecha(desdeFecha)}</div>`:'<div style="margin-bottom:10px"></div>'}
         <button onclick="abrirEditarValoracion()" style="width:100%;background:linear-gradient(135deg,#1B3A6B,#2E5BBE);color:white;border:none;border-radius:var(--radius);padding:12px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;margin-bottom:8px">✏️ Editar valoración completa</button>
         <button onclick="abrirNuevoMotivoConsulta()" style="width:100%;background:transparent;color:var(--navy);border:1.5px solid var(--navy);border-radius:var(--radius);padding:11px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">➕ Nuevo motivo de consulta</button>
       </div>
@@ -7667,7 +7684,7 @@ function renderExpediente(tab='historia'){
               <div style="padding:9px 0;cursor:pointer" onclick="toggleMotivoEpisodio(${i})">
                 <span id="mep-arrow-${i}" style="font-size:11px">▶</span>
                 <span style="font-size:14px;color:var(--navy);font-weight:600">${escapeHTML(m.motivoConsulta||m.dx||'Motivo sin título')}</span>
-                <div style="font-size:11.5px;color:var(--gray-400);margin-top:2px">${escapeHTML(m.fechaInicio||'—')} → ${escapeHTML(m.fechaCierre||'—')}${m.creadoPor?' · '+escapeHTML(m.creadoPor):''}${epIdx!==undefined?' · Episodio '+(epIdx+1):''}${epSesiones.length?' · '+epSesiones.length+' sesión'+(epSesiones.length!==1?'es':''):''}</div>
+                <div style="font-size:11.5px;color:var(--gray-400);margin-top:2px">${_fmtFecha(m.fechaInicio)} → ${_fmtFecha(m.fechaCierre)}${m.creadoPor?' · '+escapeHTML(m.creadoPor):''}${epIdx!==undefined?' · Episodio '+(epIdx+1):''}${epSesiones.length?' · '+epSesiones.length+' sesión'+(epSesiones.length!==1?'es':''):''}</div>
               </div>
               <div id="mep-body-${i}" style="display:none;padding-bottom:8px">
                 ${epSesiones.length
@@ -7690,18 +7707,18 @@ function renderExpediente(tab='historia'){
       <div class="section-title">📋 Datos generales
         <button onclick="editarHistoria('generales')" style="margin-left:auto;background:var(--navy);color:white;border:none;border-radius:20px;padding:3px 12px;font-size:11px;font-weight:700;cursor:pointer">✏️ Editar</button>
       </div>
-      ${p.fechaNacimiento?`<div class="field-row"><div class="field-label">Fecha de nacimiento</div><div class="field-value">${escapeHTML(p.fechaNacimiento)}</div></div>`:''}
+      ${p.fechaNacimiento?`<div class="field-row"><div class="field-label">Fecha de nacimiento</div><div class="field-value">${escapeHTML(_formatFechaNac(p.fechaNacimiento))}</div></div>`:''}
       ${(p.age&&!isNaN(p.age))?`<div class="field-row"><div class="field-label">Edad</div><div class="field-value">${escapeHTML(p.age)} años</div></div>`:''}
       <div class="field-row"><div class="field-label">Sexo</div><div class="field-value">${escapeHTML(p.sexo||'Pendiente')}</div></div>
       ${p.telefono?`<div class="field-row"><div class="field-label">Teléfono</div><div class="field-value">${escapeHTML(p.telefono)}</div></div>`:''}
       ${mv.motivoConsulta?`<div class="field-row"><div class="field-label">Motivo de consulta</div><div class="field-value">${escapeHTML(mv.motivoConsulta)}</div></div>`:''}
       <div class="field-row"><div class="field-label">Médico referente</div><div class="field-value">${escapeHTML(p.medicoReferente||'—')}</div></div>
       <div class="field-row"><div class="field-label">Terapeuta</div><div class="field-value">${escapeHTML(p.terapeuta)}${p.terapeutaSeguimiento?` <span style="color:var(--green);font-size:12px">→ Seguimiento: ${escapeHTML(p.terapeutaSeguimiento)}</span>`:''}</div></div>
-      <div class="field-row"><div class="field-label">Creado por</div><div class="field-value" style="color:var(--gray-400);font-size:13px">${escapeHTML(p.creadoPor||'—')} · ${escapeHTML(p.fechaCreacion||'—')}</div></div>
-      ${p.ultimoUsuario&&p.ultimoUsuario!==p.creadoPor?`<div class="field-row"><div class="field-label">Última edición</div><div class="field-value" style="color:var(--gray-400);font-size:13px">${escapeHTML(p.ultimoUsuario)} · ${escapeHTML(p.fechaActualizacion||'—')}</div></div>`:''}
       <div class="field-row"><div class="field-label">Diagnóstico</div><div class="field-value">${escapeHTML(p.dx)}</div></div>
       <div class="field-row"><div class="field-label">Contraindicaciones</div><div class="field-value" style="color:${hasContra?'var(--red)':'inherit'}">${escapeHTML(p.contraindicaciones)}</div></div>
       <div class="field-row"><div class="field-label">Alergias</div><div class="field-value" style="color:${hasAllergy?'#AD1457':'inherit'}">${escapeHTML(p.alergias)}</div></div>
+      <div class="field-row"><div class="field-label">Creado por</div><div class="field-value" style="color:var(--gray-400);font-size:13px">${escapeHTML(p.creadoPor||'—')} · ${_fmtFecha(p.fechaCreacion)}</div></div>
+      ${p.ultimoUsuario&&p.ultimoUsuario!==p.creadoPor?`<div class="field-row"><div class="field-label">Última edición</div><div class="field-value" style="color:var(--gray-400);font-size:13px">${escapeHTML(p.ultimoUsuario)} · ${_fmtFecha(p.fechaActualizacion)}</div></div>`:''}
     </div>
     <div class="section-card">
       <div class="section-title">🔒 Protección de datos</div>
@@ -7738,16 +7755,17 @@ function renderExpediente(tab='historia'){
         <button onclick="abrirEditarAntecedentesCompleto()" style="margin-left:auto;background:var(--navy);color:white;border:none;border-radius:20px;padding:3px 12px;font-size:11px;font-weight:700;cursor:pointer">✏️ Editar</button>
       </div>
       <div class="field-row"><div class="field-label">Heredofamiliares</div><div class="field-value">${escapeHTML(p.antecedentes?.patologicos||'—')}</div></div>
-      <div class="field-row"><div class="field-label">Deportivos</div><div class="field-value">${(p.antecedentes?.deportivos||'—')}</div></div>
-      <div class="field-row"><div class="field-label">Deporte / frecuencia</div><div class="field-value">${(p.antecedentes?.deporteFrecuencia||'—')}</div></div>
-      <div class="field-row"><div class="field-label">Cirugías</div><div class="field-value">${(p.antecedentes?.cirugias||'—')}</div></div>
-      <div class="field-row"><div class="field-label">Medicamentos</div><div class="field-value">${(p.antecedentes?.medicamentos||'—')}</div></div>
+      <div class="field-row"><div class="field-label">Patologías personales</div><div class="field-value">${escapeHTML(p.antecedentes?.patologiasPersonales||'—')}</div></div>
+      <div class="field-row"><div class="field-label">Deportivos</div><div class="field-value">${escapeHTML(p.antecedentes?.deportivos||'—')}</div></div>
+      <div class="field-row"><div class="field-label">Deporte / frecuencia</div><div class="field-value">${escapeHTML(p.antecedentes?.deporteFrecuencia||'—')}</div></div>
+      <div class="field-row"><div class="field-label">Cirugías</div><div class="field-value">${escapeHTML(p.antecedentes?.cirugias||'—')}</div></div>
+      <div class="field-row"><div class="field-label">Medicamentos</div><div class="field-value">${escapeHTML(p.antecedentes?.medicamentos||'—')}</div></div>
     </div>
     <div class="section-card">
       <div class="section-title">💬 Motivo de consulta${_epSufijo}
         <button onclick="editarHistoria('motivo')" style="margin-left:auto;background:var(--navy);color:white;border:none;border-radius:20px;padding:3px 12px;font-size:11px;font-weight:700;cursor:pointer">✏️ Editar</button>
       </div>
-      <div class="field-row"><div class="field-label">Registrado</div><div class="field-value">${escapeHTML(mv.fechaInicio||p.fechaCreacion||p.date||'—')}</div></div>
+      <div class="field-row"><div class="field-label">Registrado</div><div class="field-value">${_fmtFecha(mv.fechaInicio||p.fechaCreacion||p.date)}</div></div>
       ${(mv.tieneEps&&!mv.capturado)
         ?`<div style="margin:10px 14px;font-size:13px;color:#92400E;background:#FEF3C7;border-radius:10px;padding:10px 12px">⚠️ Este episodio aún no tiene motivo capturado. Los motivos cerrados están en «Motivos anteriores».</div>`
         :`<div class="field-row"><div class="field-label">Dx médico</div><div class="field-value">${escapeHTML(mv.motivo.dxMedico)}</div></div>
@@ -7858,7 +7876,7 @@ function renderExpediente(tab='historia'){
           <div style="background:var(--gray-100);border-radius:10px;padding:10px 14px;cursor:pointer;display:flex;justify-content:space-between;align-items:center" onclick="toggleSoapEpisodio(${i})">
             <div>
               <div style="font-size:13px;font-weight:700;color:var(--navy)">Episodio ${epIdx+1} · ${escapeHTML(m.motivoConsulta||m.dx||'Sin título')} · ${soapsEp.length} sesión${soapsEp.length!==1?'es':''}</div>
-              <div style="font-size:11px;color:var(--gray-500)">${escapeHTML(m.fechaInicio||'—')} → ${escapeHTML(m.fechaCierre||'—')}</div>
+              <div style="font-size:11px;color:var(--gray-500)">${_fmtFecha(m.fechaInicio)} → ${_fmtFecha(m.fechaCierre)}</div>
             </div>
             <span id="ep-${i}-arrow" style="font-size:16px;color:var(--navy)">▶</span>
           </div>
@@ -13527,7 +13545,7 @@ async function guardarConsentimiento(){
     campo('Paciente', nombre);
     // Fecha de nacimiento — solo si existe
     const fnPDF = (document.getElementById('con-fechanac')?.value.trim())||currentPatient.fechaNacimiento||'';
-    if(fnPDF) campo('Fecha de nacimiento', fnPDF);
+    if(fnPDF) campo('Fecha de nacimiento', _formatFechaNac(fnPDF));
     // Edad — usar campo del formulario si fue editado, si no currentPatient.age
     const edadPDF = parseInt(document.getElementById('con-edad')?.value)||currentPatient.age||'';
     if(edadPDF) campo('Edad', edadPDF + ' a\u00f1os');
@@ -14375,6 +14393,11 @@ function abrirEditarAntecedentesCompleto(){
           ${chipsHTML2('ed-patologicos',[['Sin antecedentes heredofamiliares relevantes','Sin antecedentes heredofamiliares relevantes']])}
         </div>
         <div class="form-field">
+          <div class="form-label">Patologías personales</div>
+          <textarea class="form-input" id="ed-patologias-personales" placeholder="Ej. diabetes tipo 2, hipertensión, hipotiroidismo, asma…">${lt(a.patologiasPersonales,'')}</textarea>
+          ${chipsHTML2('ed-patologias-personales',[['Sin patologías personales conocidas','Sin patologías personales conocidas']])}
+        </div>
+        <div class="form-field">
           <div class="form-label">Antecedentes deportivos</div>
           <input class="form-input" type="text" id="ed-deportivos" value="${lt(a.deportivos,'').replace(/"/g,'&quot;')}">
           ${chipsHTML2('ed-deportivos',[['No practica','No practica actividad deportiva']])}
@@ -14519,6 +14542,7 @@ function guardarAntecedentesCompleto(){
   const antes = `Heredofamiliares: ${p.antecedentes.patologicos||'—'}, Medicamentos: ${p.antecedentes.medicamentos||'—'}`;
 
   p.antecedentes.patologicos     = v('ed-patologicos');
+  p.antecedentes.patologiasPersonales = v('ed-patologias-personales');
   p.antecedentes.deportivos      = v('ed-deportivos');
   p.antecedentes.deporteFrecuencia = v('ed-deporte-freq');
   p.antecedentes.cirugias        = v('ed-cirugias');
