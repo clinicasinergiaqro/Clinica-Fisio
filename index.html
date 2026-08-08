@@ -7804,7 +7804,7 @@ function renderExpediente(tab='historia'){
       </div>
       <div class="field-row"><div class="field-label">Dx clínico</div><div class="field-value">${valorSeguroHTML(mv.dxFuncional.dxClinico)}</div></div>
       <div class="field-row"><div class="field-label">Dx funcional</div><div class="field-value narrative">${valorSeguroHTML(mv.dxFuncional.dxFuncional)}</div></div>
-      <div class="field-row"><div class="field-label">Limitaciones</div><div class="field-value">${valorSeguroHTML(mv.dxFuncional.limitaciones)}</div></div>
+      <div class="field-row"><div class="field-label">Limitaciones / dolor</div><div class="field-value">${valorSeguroHTML(mv.dxFuncional.limitaciones)}</div></div>
       <div class="field-row"><div class="field-label">Objetivos CP</div><div class="field-value">${valorSeguroHTML(mv.dxFuncional.objetivosCP)}</div></div>
       <div class="field-row"><div class="field-label">Objetivos LP</div><div class="field-value">${valorSeguroHTML(mv.dxFuncional.objetivosLP)}</div></div>
       <div class="field-row"><div class="field-label">Pronóstico</div><div class="field-value">${valorSeguroHTML(mv.dxFuncional.pronostico)}</div></div>
@@ -14080,7 +14080,7 @@ function renderNuevoPaciente(){
     <div class="form-group">
       <div class="form-field"><div class="form-label">Dx clínico</div><input class="form-input" id="n-dxclinico" type="text" placeholder="Igual al dx médico o más específico"><div style="margin-top:4px;font-size:12px;color:var(--gray-400);line-height:1.4">Ej: Tendinopatía rotuliana grado II, síndrome facetario L4-L5, esguince de tobillo grado I</div></div>
       <div class="form-field"><div class="form-label">Dx funcional</div><textarea class="form-input" id="n-dxfuncional" placeholder="Disfunción de [zona] por [causa] que limita [función]"></textarea><div style="margin-top:4px;font-size:12px;color:var(--gray-400);line-height:1.4">Ej: Disfunción de rodilla derecha por debilidad de cuádriceps que limita bajar escaleras y sentadilla</div></div>
-      <div class="form-field"><div class="form-label">Limitaciones</div><input class="form-input" id="n-limitaciones" type="text" placeholder="Ej: Bajar escaleras, sentadilla"></div>
+      <div class="form-field"><div class="form-label">Limitaciones funcionales y/o movimientos que generan dolor</div><input class="form-input" id="n-limitaciones" type="text" placeholder="Ej: No puede bajar escaleras, dolor al manejar >30 min, no tolera correr"></div>
       <div class="form-field"><div class="form-label">Objetivos corto plazo</div><input class="form-input" id="n-objcp" type="text" placeholder="Ej: Reducir dolor a 3/10 en 3 semanas"></div>
       <div class="form-field"><div class="form-label">Objetivos largo plazo</div><input class="form-input" id="n-objlp" type="text" placeholder="Ej: Retorno al deporte sin limitaciones"></div>
       <div class="form-field"><div class="form-label">Pronóstico</div><input class="form-input" id="n-pronostico" type="text" placeholder="Ej: Favorable, 8-10 semanas"></div>
@@ -14707,7 +14707,7 @@ function editarHistoria(seccion){
       <div class="form-group">
         <div class="form-field"><div class="form-label">Dx clínico</div><input class="form-input" type="text" id="ed-dxclinico" value="${escapeAttr_(p.dxFuncional?.dxClinico||'')}"></div>
         <div class="form-field"><div class="form-label">Dx funcional</div><textarea class="form-input" id="ed-dxfuncional" style="min-height:72px">${escapeHTML(p.dxFuncional?.dxFuncional||'')}</textarea></div>
-        <div class="form-field"><div class="form-label">Limitaciones</div><input class="form-input" type="text" id="ed-limitaciones" value="${escapeAttr_(p.dxFuncional?.limitaciones||'')}"></div>
+        <div class="form-field"><div class="form-label">Limitaciones funcionales y/o movimientos que generan dolor</div><input class="form-input" type="text" id="ed-limitaciones" value="${escapeAttr_(p.dxFuncional?.limitaciones||'')}"></div>
         <div class="form-field"><div class="form-label">Objetivos CP</div><input class="form-input" type="text" id="ed-objcp" value="${escapeAttr_(p.dxFuncional?.objetivosCP||'')}"></div>
         <div class="form-field"><div class="form-label">Objetivos LP</div><input class="form-input" type="text" id="ed-objlp" value="${escapeAttr_(p.dxFuncional?.objetivosLP||'')}"></div>
         <div class="form-field"><div class="form-label">Pronóstico</div><input class="form-input" type="text" id="ed-pronostico" value="${escapeAttr_(p.dxFuncional?.pronostico||'')}"></div>
@@ -15032,7 +15032,7 @@ function abrirEditarValoracion(esNuevoMotivo){
     seccion('5','🎯 Diagnóstico funcional',
       campo('Diagnóstico clínico','ev-dxclinico',dxf.dxClinico,['Limitación funcional leve','Limitación funcional moderada','Dolor musculoesquelético mecánico','Déficit de fuerza','Déficit de movilidad','Déficit de control motor','Pendiente de completar'])+
       campo('Diagnóstico funcional','ev-dxfuncional',dxf.dxFuncional,['Limitación funcional leve','Limitación moderada','Dolor musculoesquelético mecánico','Déficit de fuerza','Déficit de movilidad','Déficit de control motor'])+
-      campo('Limitaciones funcionales','ev-limitaciones',dxf.limitaciones)+
+      campo('Limitaciones funcionales y/o movimientos que generan dolor','ev-limitaciones',dxf.limitaciones)+
       campo('Objetivos a corto plazo','ev-objcp',dxf.objetivosCP)+
       campo('Objetivos a largo plazo','ev-objlp',dxf.objetivosLP)+
       campo('Pronóstico','ev-pronostico',dxf.pronostico)
