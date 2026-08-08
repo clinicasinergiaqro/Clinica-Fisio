@@ -15760,8 +15760,9 @@ function _RPT_htmlDashboard(p, sesiones){
     + _RPT_card('Última sesión', ultTxt, 'var(--navy)', true)
     + '</div>';
 }
-// Resumen diagnóstico — tabla clave-valor breve al inicio del reporte (sin IA, campos ya capturados).
+// Diagnóstico y plan — tabla clave-valor breve al inicio del reporte (sin IA, campos ya capturados).
 // Va después de la franja de paciente y antes de "1 Antecedentes"; SIN badge para no alterar la numeración.
+// Unifica dx (médico/funcional/limitaciones) + plan (objetivos/pronóstico/enfoque terapéutico).
 function _RPT_htmlResumen(p){
   // Vacío o placeholder ("Pendiente"/"[pendiente]") → cadena vacía (luego _RPT_val => "No registrado").
   function _limpio(s){ var t=String(s==null?'':s).trim(); return (!t||/^\[?pendiente\]?$/i.test(t))?'':t; }
@@ -15776,18 +15777,29 @@ function _RPT_htmlResumen(p){
   if(!dxMed){ var dxRaw=(typeof p.dx==='string')?p.dx.trim():''; if(dxRaw && dxRaw.indexOf('\n')===-1 && dxRaw.length<=120) dxMed=dxRaw; }
   // Diagnóstico funcional ← dxFuncional.dxFuncional.
   var dxFunc=_limpio(dxf.dxFuncional);
+  // Limitaciones funcionales ← dxFuncional.limitaciones.
+  var limit=_limpio(dxf.limitaciones);
   // Objetivos del tratamiento ← objetivosCP + objetivosLP, fallback a planTto.objetivos.
   var objs=[_limpio(dxf.objetivosCP),_limpio(dxf.objetivosLP)].filter(Boolean);
   var obj=objs.length?objs.join(' · '):_limpio(p.planTto&&p.planTto.objetivos);
+  // Pronóstico ← dxFuncional.pronostico.
+  var pron=_limpio(dxf.pronostico);
+  // Enfoque terapéutico ← planTto.enfoqueTerapeutico; fallback: campos legacy (ejercicio/t.manual/agentes).
+  var plan=(p.planTto&&typeof p.planTto==='object')?p.planTto:{};
+  var enfoque=_limpio(plan.enfoqueTerapeutico);
+  if(!enfoque) enfoque=[_limpio(plan.ejercicioTerapeutico),_limpio(plan.terapiaManual),_limpio(plan.agentesFisicos)].filter(Boolean).join(', ');
   function row(k,val,last){ return '<tr'+(last?'':' style="border-bottom:0.5px solid #EEEFEC"')+'><td style="padding:7px 10px;font-weight:700;color:#3A3B38;font-size:10.5px;width:160px;vertical-align:top">'+k+'</td><td style="padding:7px 10px;color:#4A4B48;font-size:11px">'+_RPT_val(val)+'</td></tr>'; }
   return '<div class="rc-sec-head" style="display:flex;align-items:center;gap:8px;margin:6px 0 8px">'
-    + '<span style="font-size:11.5px;font-weight:700;color:#2E3192;letter-spacing:0.5px;text-transform:uppercase;white-space:nowrap">Resumen diagnóstico</span>'
+    + '<span style="font-size:11.5px;font-weight:700;color:#2E3192;letter-spacing:0.5px;text-transform:uppercase;white-space:nowrap">Diagnóstico y plan</span>'
     + '<span style="flex:1;height:1px;background:#E2E4E0"></span></div>'
     + '<div class="rc-avoid" style="margin-bottom:12px"><table style="width:100%;border-collapse:collapse">'
     + row('Motivo de consulta', motivo)
     + row('Diagnóstico médico', dxMed)
     + row('Diagnóstico funcional', dxFunc)
-    + row('Objetivos del tratamiento', obj, true)
+    + row('Limitaciones funcionales', limit)
+    + row('Objetivos del tratamiento', obj)
+    + row('Pronóstico', pron)
+    + row('Enfoque terapéutico', enfoque, true)
     + '</table></div>';
 }
 function _RPT_htmlAntecedentes(p){
@@ -15857,7 +15869,6 @@ function _RPT_htmlValoracion(p, sesiones){
   var v=p.valoracion||{}, mo=p.motivo||{};
   var dolorIni=v.dolor||v.eva||'';
   if(!String(dolorIni).trim()){ for(var i=0;i<sesiones.length;i++){ var e=_RPT_evaDeSesion(sesiones[i]); if(e!=null){ dolorIni=e+'/10'; break; } } }
-  var obj=(p.dxFuncional&&typeof p.dxFuncional==='object'&&(p.dxFuncional.objetivosCP||p.dxFuncional.objetivosLP))||(p.planTto&&p.planTto.objetivos)||'';
   function row(k,val,last){ return '<tr'+(last?'':' style="border-bottom:0.5px solid #EEEFEC"')+'><td style="padding:7px 10px;font-weight:700;color:#3A3B38;font-size:10.5px;width:160px;vertical-align:top">'+k+'</td><td style="padding:7px 10px;color:#4A4B48;font-size:11px">'+_RPT_val(val)+'</td></tr>'; }
   return _RPT_secHead(3,'Valoración funcional inicial')
     + '<table style="width:100%;border-collapse:collapse">'
@@ -15867,8 +15878,7 @@ function _RPT_htmlValoracion(p, sesiones){
     + row('Palpación', v.palpacion)
     + row('ROM', v.rom)
     + row('Fuerza', v.fuerza)
-    + row('Neurológico', v.neurologico||v.banderasRojas)
-    + row('Objetivos', obj, true)
+    + row('Neurológico', v.neurologico||v.banderasRojas, true)
     + '</table>';
 }
 function _RPT_htmlBanderas(p, sesiones){
