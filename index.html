@@ -15832,11 +15832,15 @@ function _RPT_htmlResumen(p){
 }
 function _RPT_htmlAntecedentes(p){
   var a=p.antecedentes||{};
+  var sc=p.seguridadClinica||{};
+  var conds=(sc.condiciones||[]).filter(function(x){return x!=='Otro';});
+  if(sc.condicionesObs) conds.push(sc.condicionesObs);
+  var condStr=conds.length?conds.join(', '):'';
   function rowL(k,v,last){ return '<tr'+(last?'':' style="border-bottom:0.5px solid #EEEFEC"')+'><td style="padding:7px 10px;font-weight:700;color:#3A3B38;font-size:10.5px;width:110px;vertical-align:top">'+k+'</td><td style="padding:7px 10px;color:#4A4B48;font-size:11px">'+_RPT_val(v)+'</td></tr>'; }
   return _RPT_secHead(1,'Antecedentes relevantes')
     + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:0 24px">'
     + '<table style="width:100%;border-collapse:collapse">'
-    +   rowL('Patológicos', a.patologicos) + rowL('Quirúrgicos', a.cirugias) + rowL('Deportivos', a.deportivos, true)
+    +   rowL('Heredofamiliares', a.patologicos) + rowL('Condiciones médicas', condStr) + rowL('Quirúrgicos', a.cirugias) + rowL('Deportivos', a.deportivos, true)
     + '</table>'
     + '<table style="width:100%;border-collapse:collapse">'
     +   rowL('Medicamentos', a.medicamentos) + rowL('Alergias', p.alergias) + rowL('Estudios previos', (p.motivo&&p.motivo.estudios), true)
