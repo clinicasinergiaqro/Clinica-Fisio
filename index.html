@@ -13950,12 +13950,7 @@ function renderNuevoPaciente(){
       <div class="form-field">
         <div class="form-label">Condiciones médicas <span style="color:var(--gray-400);font-weight:400">(personales patológicos)</span></div>
         <div class="checkbox-grid" id="sc-condiciones-grid">${['Cáncer activo','Antecedente de cáncer','Hemofilia / trastorno de coagulación','Anticoagulantes','Diabetes','Hipertensión','Osteoporosis','Embarazo','Epilepsia','Alteración de sensibilidad','Alteración vascular','Infección activa','Herida abierta','Otro','Ninguna referida'].map(o=>`<label class="checkbox-item"><input type="checkbox" class="sc-condicion" value="${o}" ${o==='Ninguna referida'?'checked':''} style="width:16px;height:16px"> <span class="cb-label">${o}</span></label>`).join('')}</div>
-        <input class="form-input" id="sc-condiciones-obs" type="text" placeholder="Especificar otra enfermedad o condición médica relevante" style="margin-top:8px">
-        <div class="chip-row">
-          <button type="button" class="chip-quick" onclick="setCampoRapido('sc-condiciones-obs','Sin antecedentes oncológicos')">Sin antecedentes oncológicos</button>
-          <button type="button" class="chip-quick" onclick="setCampoRapido('sc-condiciones-obs','Sin trastornos de coagulación')">Sin trastornos de coagulación</button>
-          <button type="button" class="chip-quick" onclick="setCampoRapido('sc-condiciones-obs','Sin contraindicaciones para agentes físicos')">Sin contraindicaciones para agentes físicos</button>
-        </div>
+        <input class="form-input" id="sc-condiciones-obs" type="text" placeholder="Si marcaste 'Otro': especifica la condición aquí" style="margin-top:8px;font-size:15px;padding:14px;border:2px dashed var(--gray-300)">
       </div>
     </div>
     <div class="form-group">
