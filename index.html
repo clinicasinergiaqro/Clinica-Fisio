@@ -931,9 +931,18 @@ select.form-input{font-size:14px}
 /* 1B: botón ⧉ "traer de la sesión anterior" por campo (SOAP) */
 .traer-btn{margin-left:6px;padding:2px 9px;border-radius:8px;border:1px solid var(--gray-200);background:var(--gray-50);color:var(--navy);font-size:11px;font-weight:700;font-family:inherit;cursor:pointer;vertical-align:middle;white-space:nowrap}
 .traer-btn:active{background:var(--navy);color:#fff;border-color:var(--navy)}
-/* 1B: filas de protocolo por modalidad seleccionada (SOAP) */
-.proto-row{margin:6px 14px 0;padding:8px 10px;background:var(--gray-50);border:1.5px dashed var(--gray-200);border-radius:10px}
-.proto-row-nombre{font-size:11px;font-weight:800;color:var(--navy);text-transform:uppercase;letter-spacing:.3px}
+.mod-grp-label{font-size:10px;font-weight:800;color:var(--gray-400);text-transform:uppercase;letter-spacing:.6px;margin:8px 0 4px}
+.mod-detail-card{margin:5px 0;padding:8px 10px;background:var(--white);border:1.5px solid var(--navy);border-radius:10px;animation:modCardIn .2s ease}
+@keyframes modCardIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:translateY(0)}}
+.mod-detail-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:5px}
+.mod-detail-name{font-size:12px;font-weight:700;color:var(--navy)}
+.mod-detail-x{font-size:14px;color:var(--gray-400);cursor:pointer;padding:0 4px}
+.mod-detail-input{width:100%;padding:8px 10px;font-size:13px;border:1px solid var(--gray-200);border-radius:6px;background:var(--gray-50);color:var(--text);font-family:inherit;resize:none;line-height:1.4}
+.mod-detail-input::placeholder{color:var(--gray-400);font-size:12px}
+.mod-auto-tto{background:#F0FDF4;border:1.5px solid #BBF7D0;border-radius:10px;padding:10px 12px;margin-top:6px}
+.mod-auto-label{font-size:10px;font-weight:800;color:#16A34A;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px}
+.mod-auto-text{font-size:12px;color:var(--text);line-height:1.6;white-space:pre-wrap}
+.mod-auto-note{font-size:11px;color:var(--gray-400);margin-top:4px;text-align:center}
 /* 1C: atajo sesión de descarga muscular */
 .btn-descarga{width:100%;background:#FFF8E6;color:var(--navy);border:2px solid var(--gold);border-radius:var(--radius);padding:12px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit}
 .btn-descarga.on{background:var(--gold);color:var(--navy-dark)}
@@ -1307,42 +1316,52 @@ body.modo-oscuro .topbar{background:#141824}
 // emergencia para el admin CARLOS, definido en RESPALDO_ADMIN.
 const USERS = {};
 
-const MODALIDADES=[
-  'Tecarterapia resistiva','Tecarterapia capacitiva',
-  'Ultrasonido','Láser','Ondas de choque',
-  'Aguja seca','MEP','Electroterapia',
-  'Corriente Aura','ILIB',
-  'Ejercicio terapéutico','Estiramiento',
-  'Movilidad pasiva','Movilidad activa',
-  'Propiocepción / Equilibrio',
-  'Readaptación deportiva',
-  'Programa domiciliario',
-  'Terapia manual','Masoterapia',
-  'Liberación miofascial',
-  'Punción seca',
-  'Vendaje neuromuscular',
-  'Presoterapia','Termoterapia','Crioterapia',
-  'Drenaje linfático',
-  'Tracciones','Otra'];
-
-// 1B: protocolo por modalidad — tabla REAL de la clínica (CERRADA por Carlos 2026-08-07).
-// SIN tiempos: los aparatos ya traen sus protocolos fijos; solo se captura lo que VARÍA. Tipos:
-//   'simple'   → un solo chip "+ Agregar al tratamiento" (la modalidad se anota tal cual)
-//   'opciones' → chips de sub-opción; tocar una compone "Modalidad sub-opción"
-//   'texto'    → campo libre + Agregar; compone "Modalidad: <texto>" (Terapia manual y Láser)
-// Tecarterapia NO necesita sub-opción extra: resistiva/capacitiva ya son modalidades separadas
-// en el grid. MEP e ILIB fuera de la tabla (no se usan). Modalidades sin entrada aquí:
-// solo se marcan en el grid, sin fila (comportamiento de siempre).
-const PROTOCOLOS_MODALIDAD={
-  'Tecarterapia resistiva':{tipo:'simple'},
-  'Tecarterapia capacitiva':{tipo:'simple'},
-  'Ultrasonido':{tipo:'opciones', ops:['0%','10%','20%','30%','40%','50%','60%','70%','80%','90%','100%']},
-  'Láser':{tipo:'texto', ph:'Ej: cicatriz, dolor crónico, neuropático...'},
-  'Ondas de choque':{tipo:'simple'},
-  'Presoterapia':{tipo:'simple'},
-  'Corriente Aura':{tipo:'simple'},
-  'Terapia manual':{tipo:'texto', ph:'Ej: liberación miofascial, movilización grado III...'}
+const MODALIDADES_GRUPOS={
+  'Agentes físicos':['Tecarterapia R','Tecarterapia C','Ultrasonido','Láser','Ondas de choque','MEP','Electroterapia','Corriente Aura','ILIB','Presoterapia','Termoterapia','Crioterapia'],
+  'Terapia manual':['Terapia manual','Masoterapia','Lib. miofascial','Punción seca','Vendaje NM','Tracciones','Drenaje linfático','Movilidad pasiva','Movilidad activa'],
+  'Ejercicio terapéutico':['Ejercicio terap.','Estiramiento','Propiocepción','Readapt. deportiva','Programa domic.','Otra']
 };
+const MODALIDADES=Object.values(MODALIDADES_GRUPOS).flat();
+const MODALIDADES_PH={
+  'Tecarterapia R':'Ej: Zona anterior y lateral de hombro, 15 min',
+  'Tecarterapia C':'Ej: Fascia plantar pie dcho, 10 min',
+  'Ultrasonido':'Ej: 1 MHz continuo, tendón rotuliano izq, 8 min',
+  'Láser':'Ej: Regenerativo, desinflamatorio, supraespinoso dcho',
+  'Ondas de choque':'Ej: Radial, 2000 disp, fascia plantar dcha',
+  'MEP':'Ej: Regeneración, 45 min, tibia proximal izq',
+  'Electroterapia':'Ej: TENS 20 min, cruzado rodilla dcha',
+  'Corriente Aura':'Ej: Programa 2, regeneración, columna cervical, 25 min',
+  'ILIB':'Ej: Rojo 635 nm, 30 min, sesión 4 de 10',
+  'Presoterapia':'Ej: MMII completos, secuencial, 50 mmHg, 40 min',
+  'Termoterapia':'Ej: Compresa húmeda, lumbar bilateral, 15 min',
+  'Crioterapia':'Ej: Cold pack, rodilla dcha, 15 min post-ejercicio',
+  'Terapia manual':'Ej: Movilización grado III-IV, glenohumeral dcha',
+  'Masoterapia':'Ej: Descontracturante cervical y trapecios, 20 min',
+  'Lib. miofascial':'Ej: IASTM banda iliotibial pierna dcha',
+  'Punción seca':'Ej: Trapecio sup. bilateral, infraespinoso dcho',
+  'Vendaje NM':'Ej: Inhibición trapecio sup., técnica en Y',
+  'Tracciones':'Ej: Cervical mecánica intermitente, 8 kg, 15 min',
+  'Drenaje linfático':'Ej: Vodder, MSD postmastectomía, 45 min',
+  'Movilidad pasiva':'Ej: Rodilla dcha flexión 85° a 100°, extensión -10° a -5°',
+  'Movilidad activa':'Ej: Hombro dcho flexión 140°, abd 120° con arco doloroso',
+  'Ejercicio terap.':'Ej: Excéntrico cuádriceps, sentadilla declinada, 3×15',
+  'Estiramiento':'Ej: Isquiotibiales 3×30 seg bilateral',
+  'Propiocepción':'Ej: Unipodal sobre BOSU, ojos abiertos 30s',
+  'Readapt. deportiva':'Ej: Fase III, pliometría bilateral, carrera 70%',
+  'Programa domic.':'Ej: Puente glúteo 3×12, estir. piriforme 3×30s, 2×/día',
+  'Otra':'Describa la modalidad y parámetros aplicados'
+};
+const _MOD_LEGACY={
+  'Tecarterapia resistiva':'Tecarterapia R','Tecarterapia capacitiva':'Tecarterapia C',
+  'Aguja seca':'Punción seca','Ejercicio terapéutico':'Ejercicio terap.',
+  'Propiocepción / Equilibrio':'Propiocepción','Readaptación deportiva':'Readapt. deportiva',
+  'Programa domiciliario':'Programa domic.','Vendaje neuromuscular':'Vendaje NM',
+  'Liberación miofascial':'Lib. miofascial'
+};
+function _migrarMods(arr){
+  if(!Array.isArray(arr)) return [];
+  return arr.map(function(m){return _MOD_LEGACY[m]||m;});
+}
 
 const today=new Date();
 const todayISO=today.toISOString().split('T')[0];
@@ -1361,7 +1380,7 @@ function confirmarSalidaSiDirty(callback){
   }
 }
 // 1A: EVA sin defaults — null/undefined = sin tocar (bloquea guardar); ya no se inventa el 5→3.
-let tempMods=[], tempEvaI=null, tempEvaF, tempEvolMedia=[];
+let tempMods=[], tempModDetalles={}, tempEvaI=null, tempEvaF, tempEvolMedia=[];
 // FIX media-edición (flag sentinel): distingue "el usuario tocó el preview de media" (agregó/quitó)
 // de "el form nunca cargó la media". Se pone true en handleSoapPhoto/removeSoapMedia y se resetea a
 // false al abrir cualquier form (después del preload). Permite VACIAR media a propósito sin que la
@@ -8065,23 +8084,23 @@ function detectarEVAenTexto(texto){
 const _MAPA_MODALIDADES_DICTADO={
   'terapia manual':'Terapia manual', 'masoterapia':'Masoterapia',
   'ultrasonido':'Ultrasonido', 'laser':'Láser', 'láser':'Láser',
-  'ejercicio terapeutico':'Ejercicio terapéutico', 'ejercicio terapéutico':'Ejercicio terapéutico',
+  'ejercicio terapeutico':'Ejercicio terap.', 'ejercicio terapéutico':'Ejercicio terap.', 'ejercicio':'Ejercicio terap.',
   'estiramiento':'Estiramiento',
-  'puncion seca':'Punción seca', 'punción seca':'Punción seca',
+  'puncion seca':'Punción seca', 'punción seca':'Punción seca', 'aguja seca':'Punción seca',
   'mep':'MEP', 'electroterapia':'Electroterapia',
-  'tecarterapia':'Tecarterapia resistiva', 'tecar':'Tecarterapia resistiva',
-  'tecarterapia resistiva':'Tecarterapia resistiva', 'tecar resistiva':'Tecarterapia resistiva',
-  'tecarterapia capacitiva':'Tecarterapia capacitiva', 'tecar capacitiva':'Tecarterapia capacitiva',
+  'tecarterapia':'Tecarterapia R', 'tecar':'Tecarterapia R',
+  'tecarterapia resistiva':'Tecarterapia R', 'tecar resistiva':'Tecarterapia R',
+  'tecarterapia capacitiva':'Tecarterapia C', 'tecar capacitiva':'Tecarterapia C',
   'presoterapia':'Presoterapia', 'crioterapia':'Crioterapia', 'termoterapia':'Termoterapia',
-  'vendaje neuromuscular':'Vendaje neuromuscular',
+  'vendaje neuromuscular':'Vendaje NM', 'vendaje nm':'Vendaje NM',
   'drenaje linfatico':'Drenaje linfático', 'drenaje linfático':'Drenaje linfático',
   'movilidad pasiva':'Movilidad pasiva', 'movilidad activa':'Movilidad activa',
-  'propiocepcion':'Propiocepción / Equilibrio', 'propiocepción':'Propiocepción / Equilibrio', 'equilibrio':'Propiocepción / Equilibrio',
-  'readaptacion deportiva':'Readaptación deportiva', 'readaptación deportiva':'Readaptación deportiva',
-  'ondas de choque':'Ondas de choque', 'aguja seca':'Aguja seca',
+  'propiocepcion':'Propiocepción', 'propiocepción':'Propiocepción', 'equilibrio':'Propiocepción',
+  'readaptacion deportiva':'Readapt. deportiva', 'readaptación deportiva':'Readapt. deportiva',
+  'ondas de choque':'Ondas de choque',
   'ilib':'ILIB', 'corriente aura':'Corriente Aura', 'tracciones':'Tracciones',
-  'liberacion miofascial':'Liberación miofascial', 'liberación miofascial':'Liberación miofascial',
-  'programa domiciliario':'Programa domiciliario'
+  'liberacion miofascial':'Lib. miofascial', 'liberación miofascial':'Lib. miofascial',
+  'programa domiciliario':'Programa domic.', 'terapia manual':'Terapia manual', 'masoterapia':'Masoterapia'
 };
 // Devuelve el nombre canónico solo si existe en MODALIDADES[]; si no, null
 function normalizarModalidad(texto){
@@ -8817,24 +8836,25 @@ function detectarFuerzav2(t){
 }
 const _MAPA_MOD_V2={
   'terapia manual':'Terapia manual','masoterapia':'Masoterapia','ultrasonido':'Ultrasonido','laser':'Láser','láser':'Láser',
-  'ondas de choque':'Ondas de choque','punción seca':'Punción seca','puncion seca':'Punción seca','aguja seca':'Aguja seca',
+  'ondas de choque':'Ondas de choque','punción seca':'Punción seca','puncion seca':'Punción seca','aguja seca':'Punción seca',
   'mep':'MEP','electroterapia':'Electroterapia',
-  'radiofrecuencia resistiva':'Tecarterapia resistiva','radiofrecuencia capacitiva':'Tecarterapia capacitiva',
-  'tecarterapia resistiva':'Tecarterapia resistiva','tecarterapia capacitiva':'Tecarterapia capacitiva',
-  'tecar resistiva':'Tecarterapia resistiva','tecar capacitiva':'Tecarterapia capacitiva',
-  'ejercicio terapéutico':'Ejercicio terapéutico','ejercicio terapeutico':'Ejercicio terapéutico','estiramiento':'Estiramiento',
+  'radiofrecuencia resistiva':'Tecarterapia R','radiofrecuencia capacitiva':'Tecarterapia C',
+  'tecarterapia resistiva':'Tecarterapia R','tecarterapia capacitiva':'Tecarterapia C',
+  'tecar resistiva':'Tecarterapia R','tecar capacitiva':'Tecarterapia C',
+  'ejercicio terapéutico':'Ejercicio terap.','ejercicio terapeutico':'Ejercicio terap.','estiramiento':'Estiramiento',
   'movilidad pasiva':'Movilidad pasiva','movilidad activa':'Movilidad activa',
-  'propiocepción':'Propiocepción / Equilibrio','propiocepcion':'Propiocepción / Equilibrio',
-  'readaptación deportiva':'Readaptación deportiva','readaptacion deportiva':'Readaptación deportiva',
-  'vendaje neuromuscular':'Vendaje neuromuscular','presoterapia':'Presoterapia','crioterapia':'Crioterapia',
+  'propiocepción':'Propiocepción','propiocepcion':'Propiocepción',
+  'readaptación deportiva':'Readapt. deportiva','readaptacion deportiva':'Readapt. deportiva',
+  'vendaje neuromuscular':'Vendaje NM','presoterapia':'Presoterapia','crioterapia':'Crioterapia',
   'termoterapia':'Termoterapia','drenaje linfático':'Drenaje linfático','drenaje linfatico':'Drenaje linfático',
-  'tracciones':'Tracciones','liberación miofascial':'Liberación miofascial','liberacion miofascial':'Liberación miofascial'
+  'tracciones':'Tracciones','liberación miofascial':'Lib. miofascial','liberacion miofascial':'Lib. miofascial',
+  'programa domiciliario':'Programa domic.'
 };
 function detectarModalidadesv2(t){
   let work=' '+t+' ';
   const found=[];
   if(/(?:radiofrecuencia|tecarterapia|tecar)\s+resistiva\s+y\s+capacitiva/.test(work)){
-    found.push('Tecarterapia resistiva','Tecarterapia capacitiva');
+    found.push('Tecarterapia R','Tecarterapia C');
     work=work.replace(/(?:radiofrecuencia|tecarterapia|tecar)\s+resistiva\s+y\s+capacitiva/g,' ');
   }
   Object.keys(_MAPA_MOD_V2).sort((a,b)=>b.length-a.length).forEach(term=>{
@@ -8844,8 +8864,8 @@ function detectarModalidadesv2(t){
       work=work.split(term).join(' ');
     }
   });
-  if(/(?:radiofrecuencia|tecarterapia|tecar)\b/.test(work) && !found.includes('Tecarterapia resistiva')) found.push('Tecarterapia resistiva');
-  if(/trabajo de fuerza|ejercicio/.test(t) && !found.includes('Ejercicio terapéutico')) found.push('Ejercicio terapéutico');
+  if(/(?:radiofrecuencia|tecarterapia|tecar)\b/.test(work) && !found.includes('Tecarterapia R')) found.push('Tecarterapia R');
+  if(/trabajo de fuerza|ejercicio/.test(t) && !found.includes('Ejercicio terap.')) found.push('Ejercicio terap.');
   if(/estiramiento/.test(t) && !found.includes('Estiramiento')) found.push('Estiramiento');
   return found;
 }
@@ -8865,15 +8885,14 @@ function resolverModalidadesIA(arr){
     const capacitiva = /\bcapacitiva\b/.test(n);
     // 4 casos Tecar (regla clínica)
     if(esTecar || resistiva || capacitiva){
-      if(resistiva)  add('Tecarterapia resistiva');
-      if(capacitiva) add('Tecarterapia capacitiva');
+      if(resistiva)  add('Tecarterapia R');
+      if(capacitiva) add('Tecarterapia C');
       if(esTecar && !resistiva && !capacitiva){
         pendientes.push('Tecar/RF genérica sin resistiva/capacitiva: "'+raw+'" — selecciona manualmente');
       }
       return;
     }
-    // Aguja seca solo si explícito
-    if(/aguja seca/.test(n)){ add('Aguja seca'); return; }
+    if(/aguja seca|punci[oó]n seca/.test(n)){ add('Punción seca'); return; }
     // Match genérico exacto contra MODALIDADES normalizadas (Caso A: nombres completos)
     const hit = idxCanon.find(o=>o.norm===n);
     if(hit){ add(hit.canon); return; }
@@ -8983,10 +9002,8 @@ function aplicarEstructuraSOAPv2(r){
   // Modalidades
   if(r.modalidades.length){
     if(!Array.isArray(tempMods)) tempMods=[];
-    r.modalidades.forEach(m=>{ if(!tempMods.includes(m)) tempMods.push(m); });
-    const g=document.getElementById('mod-grid');
-    if(g && typeof MODALIDADES!=='undefined') g.innerHTML=MODALIDADES.map(mod=>{const chk=tempMods.includes(mod);return `<div class="checkbox-item ${chk?'checked':''}" onclick="toggleMod('${mod}')"><div class="cb-box">${chk?'✓':''}</div><div class="cb-label">${mod}</div></div>`;}).join('');
-    try{ _renderProtoRows(); }catch(_){}
+    _migrarMods(r.modalidades).forEach(m=>{ if(!tempMods.includes(m)) tempMods.push(m); });
+    _renderModGrid(); _renderModDetailCards();
   }
   // Banderas
   _dictadoBanderas = Array.isArray(r.banderas)?[...r.banderas]:[];
@@ -9034,10 +9051,8 @@ function acomodarTranscripcionSOAP_v1_legacy(){
   if(mods.length){
     if(!Array.isArray(tempMods)) tempMods=[];
     let nuevas=0;
-    mods.forEach(m=>{ if(!tempMods.includes(m)){ tempMods.push(m); nuevas++; } });
-    const g=document.getElementById('mod-grid');
-    if(g && typeof MODALIDADES!=='undefined') g.innerHTML=MODALIDADES.map(mod=>{const chk=tempMods.includes(mod);return `<div class="checkbox-item ${chk?'checked':''}" onclick="toggleMod('${mod}')"><div class="cb-box">${chk?'✓':''}</div><div class="cb-label">${mod}</div></div>`;}).join('');
-    try{ _renderProtoRows(); }catch(_){}
+    _migrarMods(mods).forEach(m=>{ if(!tempMods.includes(m)){ tempMods.push(m); nuevas++; } });
+    _renderModGrid(); _renderModDetailCards();
     if(nuevas) showToast(`${nuevas} modalidad(es) detectada(s)`,'success');
   }
   chequearBanderasDictado(texto);
@@ -9419,7 +9434,7 @@ function showNuevoSOAP(){
   if(!currentPatient) return;
   // reset dictado 2.2
   _dictado.activo=false; _dictado.textoFinal=''; _dictado.textoInterino=''; _dictado.palabras=0; _dictadoSoapPreview=null; _dictadoMetadata=null; _dictadoManual=false;
-  tempMods=[]; tempEvaI=null; tempEvaF=undefined; tempEvolMedia=[]; _soapMediaTocada=false; editingSoapId=null; editingSoapPid=null; editingSoapEsHistorico=false; _editingSoapHistoricoNota=null; modoNotaActual=''; _dictadoBanderas=[]; _dictadoActivo=false; _dictadoTransPrecargada=false; _soapV2Resultado=null; _modoDescarga=false; limpiarDirty();
+  tempMods=[]; tempModDetalles={}; tempEvaI=null; tempEvaF=undefined; tempEvolMedia=[]; _soapMediaTocada=false; editingSoapId=null; editingSoapPid=null; editingSoapEsHistorico=false; _editingSoapHistoricoNota=null; modoNotaActual=''; _dictadoBanderas=[]; _dictadoActivo=false; _dictadoTransPrecargada=false; _soapV2Resultado=null; _modoDescarga=false; limpiarDirty();
   tempEvolucionChips=[];
   const sesNum=(typeof currentPatient.sesiones==='number'?currentPatient.sesiones:0)+1; // FIX SESIÓN-NaN: guard defensivo
   const totalSes=parseInt(currentPatient.planTto?.sesiones);
@@ -9487,11 +9502,16 @@ function renderSOAPForm(){
   const _tieneAnterior=_soapVivas(p).filter(function(s){return !editingSoapId||s.id!==editingSoapId;}).length>0;
   const _traerBtn=function(id){ return _tieneAnterior?'<button type="button" class="traer-btn" onclick="traerCampoAnterior(\''+id+'\')">⧉ anterior</button>':''; };
 
-  let modHtml=MODALIDADES.map(m=>{
-    const chk=tempMods.includes(m);
-    return `<div class="checkbox-item ${chk?'checked':''}" onclick="toggleMod('${m}')">
-      <div class="cb-box">${chk?'✓':''}</div><div class="cb-label">${m}</div></div>`;
-  }).join('');
+  let modHtml='';
+  Object.keys(MODALIDADES_GRUPOS).forEach(function(grp){
+    modHtml+='<div class="mod-grp-label">'+escapeHTML(grp)+'</div><div class="checkbox-grid">';
+    MODALIDADES_GRUPOS[grp].forEach(function(m){
+      var chk=tempMods.includes(m);
+      modHtml+='<div class="checkbox-item '+(chk?'checked':'')+'" onclick="toggleMod(\''+m.replace(/'/g,"\\'")+'\')">'
+        +'<div class="cb-box">'+(chk?'✓':'')+'</div><div class="cb-label">'+escapeHTML(m)+'</div></div>';
+    });
+    modHtml+='</div>';
+  });
 
   const c=document.getElementById('content-soap');
   const alertaPrecaucion=(p.seguridadClinica&&p.seguridadClinica.tienePrecaucion)
@@ -9689,26 +9709,22 @@ function renderSOAPForm(){
         <div class="evabtn-row" id="eva-row-f">${_evaBtnsHTML('f')}</div>
       </div></div>
     </div>
-    <div class="form-section-title" style="margin-top:8px;">⚡ Modalidades aplicadas <span style="color:var(--red)">*</span></div>
+    <div class="form-section-title" style="margin-top:8px;">Modalidades aplicadas <span style="color:var(--red)">*</span></div>
     <div class="form-group">
       <div class="form-field">
-        <div class="checkbox-grid" id="mod-grid">${modHtml}</div>
-        <div id="proto-rows">${_protoRowsHTML()}</div>
+        <div id="mod-grid">${modHtml}</div>
       </div>
     </div>
-    <div class="form-section-title" style="margin-top:8px;">👥 ¿Quién atendió esta sesión?</div>
-    <div class="form-group">
-      <div class="form-field">
-        <div class="checkbox-grid" id="atendio-grid">${atendioHtml}</div>
+    <div id="mod-detail-cards"></div>
+    <div id="mod-auto-tto-wrap" style="display:none">
+      <div class="mod-auto-tto">
+        <div class="mod-auto-label">Tratamiento (auto-generado)</div>
+        <div class="mod-auto-text" id="mod-auto-tto-text"></div>
+        <div class="mod-auto-note">Se guarda automáticamente al guardar la nota</div>
       </div>
     </div>
     <div class="form-group">
-      <div class="form-field">
-        <div class="form-label">Tratamiento aplicado y dosis <span class="req">*</span></div>
-        <textarea class="form-input" id="f-ptratamiento" placeholder="Ej: Tecarterapia 448kHz resistivo 10min. Láser polo inferior rótula. Isométricos cuádriceps 4×45seg..."></textarea>
-        ${chipsHTML('f-ptratamiento',['Continuar protocolo','Progresar carga','Reducir intensidad'])}
-        ${_ejChipsHTML(p)}
-      </div>
+      <textarea class="form-input" id="f-ptratamiento" style="display:none"></textarea>
       <div class="form-field">
         <div class="form-label">Indicaciones para casa <span class="req">*</span>${_traerBtn('f-pindicaciones')}</div>
         <textarea class="form-input" id="f-pindicaciones" placeholder="Ej: Isométricos 4 series 45seg, 3 veces al día. Hielo 10min post ejercicio..."></textarea>
@@ -9733,6 +9749,15 @@ function renderSOAPForm(){
       <button class="media-btn" onclick="document.getElementById('si-doc').click()"><span class="media-icon">📄</span>Escanear</button>
     </div>
     <div id="soap-media-preview" class="media-grid" style="margin-top:0"></div>
+  </div>
+
+  <div class="form-section">
+    <div class="form-section-title" style="margin-top:0;">👥 ¿Quién atendió esta sesión?</div>
+    <div class="form-group">
+      <div class="form-field">
+        <div class="checkbox-grid" id="atendio-grid">${atendioHtml}</div>
+      </div>
+    </div>
   </div>
 
   <!-- PANEL ASISTENTE IA -->
@@ -9899,7 +9924,7 @@ function guardarBorradorSoap(){
     var data={ updatedAt:Date.now(), patientName:(currentPatient&&currentPatient.name)||'',
       esEdicion:!!editingSoapId, modoNota:(typeof modoNotaActual!=='undefined'?modoNotaActual:''), campos:campos,
       evaI:tempEvaI, evaF:tempEvaF,
-      mods:Array.isArray(tempMods)?tempMods.slice():[],
+      mods:Array.isArray(tempMods)?tempMods.slice():[],modDetalles:Object.assign({},tempModDetalles),
       atendido:Array.isArray(tempAtendio)?tempAtendio.slice():[],
       motivoIndex:(typeof tempMotivoIndex==='number')?tempMotivoIndex:null };
     _purgarBorradoresSoapViejos();   // req #5: liberar espacio ANTES de escribir (purga >14 días)
@@ -9937,7 +9962,7 @@ function aplicarBorradorSoap(d){
     CAMPOS_SOAP_TEXTO.forEach(function(id){ if(d.campos[id]!==undefined){ var el=document.getElementById(id); if(el) el.value=d.campos[id]; } });
     if(typeof d.evaI==='number'){ _setEvaProg('i', d.evaI); }
     if(typeof d.evaF==='number' || d.evaF===null){ _setEvaProg('f', d.evaF); }
-    if(Array.isArray(d.mods)){ tempMods=d.mods.slice(); var g=document.getElementById('mod-grid'); if(g) g.innerHTML=MODALIDADES.map(function(mod){ var chk=tempMods.includes(mod); return '<div class="checkbox-item '+(chk?'checked':'')+'" onclick="toggleMod(\''+mod+'\')"><div class="cb-box">'+(chk?'✓':'')+'</div><div class="cb-label">'+mod+'</div></div>'; }).join(''); try{ _renderProtoRows(); }catch(_){} }
+    if(Array.isArray(d.mods)){ tempMods=_migrarMods(d.mods); tempModDetalles=(d.modDetalles&&typeof d.modDetalles==='object')?Object.assign({},d.modDetalles):{}; _renderModGrid(); _renderModDetailCards(); }
     if(Array.isArray(d.atendido)){ tempAtendio=d.atendido.slice(); if(typeof _renderAtendioGrid==='function') _renderAtendioGrid(); }
     if(typeof d.motivoIndex==='number') tempMotivoIndex=d.motivoIndex;
     if(typeof d.modoNota==='string' && d.modoNota && typeof seleccionarModoNota==='function'){ try{ seleccionarModoNota(d.modoNota); }catch(_){} } // [BORRADOR-SOAP] restaurar modo clínico → re-muestra la sección opcional y su metadato
@@ -10050,35 +10075,63 @@ function traerCampoAnterior(id){
   el.value=val; marcarDirty();
   showToast('⧉ Traído de la sesión anterior. Ajusta lo que cambió hoy.','');
 }
-// ── 1B: tratamiento unificado — la modalidad marcada muestra su fila de protocolo ────────────
-// Tocar compone la línea en el campo Tratamiento vía _agregarLineaTratamiento: SIEMPRE
-// append (nunca borra ni reemplaza texto escrito) y con dedupe de línea exacta.
-function _protoRowsHTML(){
-  if(typeof PROTOCOLOS_MODALIDAD==='undefined') return '';
-  var sel=(Array.isArray(tempMods)?tempMods:[]).filter(function(m){return PROTOCOLOS_MODALIDAD[m];});
-  if(!sel.length) return '';
-  return sel.map(function(m){
-    var cfg=PROTOCOLOS_MODALIDAD[m], mAttr=JSON.stringify(m).replace(/"/g,'&quot;'), inner='';
-    if(cfg.tipo==='opciones'){
-      inner='<div class="chip-row">'+cfg.ops.map(function(op){
-        return '<button type="button" class="chip-quick" onclick="_protoAplicar('+mAttr+','+JSON.stringify(op).replace(/"/g,'&quot;')+')">'+escapeHTML(op)+'</button>';
-      }).join('')+'</div>';
-    } else if(cfg.tipo==='texto'){
-      var idIn='proto-txt-'+m.replace(/[^a-zA-Z0-9]/g,'');
-      inner='<div style="display:flex;gap:6px;margin-top:4px"><input class="form-input" type="text" id="'+idIn+'" placeholder="'+escapeHTML(cfg.ph||'')+'" style="flex:1;font-size:13px"><button type="button" class="chip-quick" onclick="_protoAplicarTexto('+mAttr+',\''+idIn+'\')">+ Agregar</button></div>';
-    } else {
-      inner='<div class="chip-row"><button type="button" class="chip-quick" onclick="_protoAplicar('+mAttr+',null)">+ Agregar al tratamiento</button></div>';
-    }
-    return '<div class="proto-row"><div class="proto-row-nombre">'+escapeHTML(m)+'</div>'+inner+'</div>';
-  }).join('');
+function _renderModDetailCards(){
+  var wrap=document.getElementById('mod-detail-cards'); if(!wrap) return;
+  if(!tempMods.length){ wrap.innerHTML=''; _updateModAutoTto(); return; }
+  var html='';
+  tempMods.forEach(function(name){
+    var ph=MODALIDADES_PH[name]||'';
+    var val=tempModDetalles[name]||'';
+    html+='<div class="mod-detail-card"><div class="mod-detail-head"><span class="mod-detail-name">'+escapeHTML(name)+'</span>'
+      +'<span class="mod-detail-x" onclick="removeMod(\''+name.replace(/'/g,"\\'")+'\')">\u2715</span></div>'
+      +'<textarea class="mod-detail-input" rows="1" placeholder="'+escapeHTML(ph)+'" '
+      +'oninput="_updateModDetalle(\''+name.replace(/'/g,"\\'")+'\',this.value);_autoGrowMod(this)">'+escapeHTML(val)+'</textarea></div>';
+  });
+  wrap.innerHTML=html;
+  wrap.querySelectorAll('.mod-detail-input').forEach(function(t){_autoGrowMod(t);});
+  _updateModAutoTto();
 }
-function _renderProtoRows(){
-  var el=document.getElementById('proto-rows'); if(!el) return;
-  // Preservar lo tecleado en campos de texto (Terapia manual) al re-render por toggle de otra modalidad
-  var prev={};
-  el.querySelectorAll('input[id^="proto-txt-"]').forEach(function(i){ prev[i.id]=i.value; });
-  el.innerHTML=_protoRowsHTML();
-  Object.keys(prev).forEach(function(id){ var i=document.getElementById(id); if(i&&prev[id]) i.value=prev[id]; });
+function _autoGrowMod(el){el.style.height='auto';el.style.height=el.scrollHeight+'px';}
+function _updateModDetalle(mod,val){tempModDetalles[mod]=val;_updateModAutoTto();marcarDirty();}
+function _updateModAutoTto(){
+  var wrap=document.getElementById('mod-auto-tto-wrap');
+  var box=document.getElementById('mod-auto-tto-text');
+  var hidden=document.getElementById('f-ptratamiento');
+  if(!wrap||!box) return;
+  if(!tempMods.length){wrap.style.display='none';if(hidden)hidden.value='';return;}
+  wrap.style.display='block';
+  var lines=[];
+  tempMods.forEach(function(name){
+    var det=(tempModDetalles[name]||'').trim();
+    lines.push(det?(name+': '+det):name);
+  });
+  var txt=lines.join('. ')+'.';
+  box.textContent=txt;
+  if(hidden) hidden.value=txt;
+}
+function removeMod(name){
+  tempMods=tempMods.filter(function(x){return x!==name;});
+  delete tempModDetalles[name];
+  _renderModGrid(); _renderModDetailCards(); _updateModCounter();
+  marcarDirty();
+}
+function _updateModCounter(){
+  var el=document.getElementById('mod-counter-soap');
+  if(el) el.textContent=tempMods.length+' seleccionada'+(tempMods.length!==1?'s':'');
+}
+function _renderModGrid(){
+  var g=document.getElementById('mod-grid'); if(!g) return;
+  var html='';
+  Object.keys(MODALIDADES_GRUPOS).forEach(function(grp){
+    html+='<div class="mod-grp-label">'+escapeHTML(grp)+'</div><div class="checkbox-grid">';
+    MODALIDADES_GRUPOS[grp].forEach(function(m){
+      var chk=tempMods.includes(m);
+      html+='<div class="checkbox-item '+(chk?'checked':'')+'" onclick="toggleMod(\''+m.replace(/'/g,"\\'")+'\')">'
+        +'<div class="cb-box">'+(chk?'✓':'')+'</div><div class="cb-label">'+escapeHTML(m)+'</div></div>';
+    });
+    html+='</div>';
+  });
+  g.innerHTML=html;
 }
 function _agregarLineaTratamiento(linea){
   var el=document.getElementById('f-ptratamiento'); if(!el) return false;
@@ -10086,16 +10139,6 @@ function _agregarLineaTratamiento(linea){
   if(txt.split('\n').some(function(l){return l.trim()===linea;})){ showToast('Esa línea ya está en el tratamiento.','warning'); return false; }
   el.value=txt?(txt+'\n'+linea):linea;
   marcarDirty(); return true;
-}
-function _protoAplicar(mod,op){
-  var linea=op?(mod+' '+op):mod;   // "Ultrasonido 80%", "Láser antiinflamatorio"; simple → solo la modalidad
-  if(_agregarLineaTratamiento(linea)) showToast('Agregado al tratamiento: '+linea,'success');
-}
-function _protoAplicarTexto(mod,inputId){
-  var el=document.getElementById(inputId);
-  var t=((el&&el.value)||'').trim();
-  if(!t){ showToast('Escribe la(s) técnica(s) primero.','warning'); return; }
-  if(_agregarLineaTratamiento(mod+': '+t)){ showToast('Agregado al tratamiento: '+mod+': '+t,'success'); if(el) el.value=''; }
 }
 // 1B: ejercicios del paciente (pestaña Ejercicios) como chips → línea en el tratamiento.
 // La dosis (series×reps) se escribe/ajusta en el propio campo: no se inventa un default.
@@ -10154,8 +10197,8 @@ async function guardarDescarga(){
   if(/electro|tens|corriente/i.test(comp)) mods.push('Electroterapia');
   if(/preso/i.test(comp)) mods.push('Presoterapia');
   if(/punci|aguja/i.test(comp)) mods.push('Punción seca');
-  tempMods=mods;
-  modoNotaActual='descarga';   // guardarSOAP ya persiste modoNota (L10120): etiqueta sin tocarla
+  tempMods=mods; tempModDetalles={};
+  modoNotaActual='descarga';
   await guardarSOAP();
 }
 // F3: ¿quién atendió la sesión? (multi-selección; default = terapeuta de la nota)
@@ -10186,14 +10229,10 @@ function toggleAtendio(name){
   _renderAtendioGrid();
 }
 function toggleMod(m){
-  tempMods=tempMods.includes(m)?tempMods.filter(x=>x!==m):[...tempMods,m];
-  const g=document.getElementById('mod-grid');
-  if(g) g.innerHTML=MODALIDADES.map(mod=>{
-    const chk=tempMods.includes(mod);
-    return `<div class="checkbox-item ${chk?'checked':''}" onclick="toggleMod('${mod}')">
-      <div class="cb-box">${chk?'✓':''}</div><div class="cb-label">${mod}</div></div>`;
-  }).join('');
-  _renderProtoRows();   // 1B: la fila de protocolo sigue a la selección de modalidades
+  if(tempMods.includes(m)){tempMods=tempMods.filter(function(x){return x!==m;});delete tempModDetalles[m];}
+  else{tempMods.push(m);tempModDetalles[m]='';}
+  _renderModGrid(); _renderModDetailCards(); _updateModCounter();
+  marcarDirty();
 }
 
 // H-02: liberar guard anti-doble-toque de guardarSOAP
@@ -10210,6 +10249,7 @@ async function guardarSOAP(){
   const _btnGuardarSOAP = document.querySelector('[onclick="guardarSOAP()"]');
   if(_btnGuardarSOAP){ _btnGuardarSOAP.disabled = true; _btnGuardarSOAP.style.opacity = '0.6'; }
   detenerCualquierDictadoSOAP(); // B1: nunca dejar micrófono activo al guardar
+  if(typeof _updateModAutoTto==='function') _updateModAutoTto();
   const v=(id)=>document.getElementById(id)?.value.trim()||'';
   const _esTextoLibreHist=editingSoapEsHistorico&&_editingSoapHistoricoNota?.formatoOriginal==='texto_libre';
   const missing=[];
@@ -10220,7 +10260,6 @@ async function guardarSOAP(){
   if(!v('f-aevolucion')) missing.push('Evolución (A)');
   if(!v('f-arespuesta')) missing.push('Respuesta (A)');
   if(!v('f-aanalisis')) missing.push('Análisis (A)');
-  if(!v('f-ptratamiento')) missing.push('Tratamiento (P)');
   if(!v('f-pindicaciones')) missing.push('Indicaciones (P)');
   if(tempMods.length===0) missing.push('Modalidades');
   }
@@ -10250,7 +10289,7 @@ async function guardarSOAP(){
     o:{rom:v('f-orom')||'[pendiente]', fuerza:v('f-ofuerza')||'[pendiente]', hallazgos:v('f-ohallazgos')},
     a:{evolucion:v('f-aevolucion'), respuesta:v('f-arespuesta'), analisis:v('f-aanalisis')},
     p:{tratamiento:v('f-ptratamiento'), indicaciones:v('f-pindicaciones'), contraindicaciones:v('f-pcontra')||'[pendiente]'},
-    modalidades:[...tempMods], evaI:tempEvaI, evaF:tempEvaF,
+    modalidades:[...tempMods], modalidadesDetalle:Object.assign({},tempModDetalles), evaI:tempEvaI, evaF:tempEvaF,
     atendidoPor:[...(Array.isArray(tempAtendio)?tempAtendio:[])],
     media:[...tempEvolMedia], completa:true,
     modoNota: modoNotaActual||'',
@@ -10680,8 +10719,8 @@ function editarSOAP(soapId){
   editingSoapId=soapId;
   editingSoapPid=p.id||''; editingSoapEsHistorico=false; _editingSoapHistoricoNota=null;
   // Cargar datos en variables globales
-  tempMods=Array.isArray(nota.modalidades)?[...nota.modalidades]:[];
-  // 1A: al editar, precargar lo guardado tal cual (evaF null = "No evaluado" queda marcado).
+  tempMods=_migrarMods(nota.modalidades);
+  tempModDetalles=(nota.modalidadesDetalle&&typeof nota.modalidadesDetalle==='object')?Object.assign({},nota.modalidadesDetalle):{};
   tempEvaI=(nota.evaI!=null)?nota.evaI:null;
   tempEvaF=(nota.evaF!==undefined)?nota.evaF:null;
   tempEvolMedia=Array.isArray(nota.media)?nota.media.map(m=>({...m})):[]; // FIX media-edición: precargar media existente (evita WIPE al guardar)
@@ -10735,13 +10774,7 @@ function editarSOAP(soapId){
     }
     // EVA (1A: botones — repintar grillas desde los temps ya seteados)
     _pintarEvaBtns('i'); _pintarEvaBtns('f');
-    // Grid de modalidades
-    const g=document.getElementById('mod-grid');
-    if(g) g.innerHTML=MODALIDADES.map(mod=>{
-      const chk=tempMods.includes(mod);
-      return `<div class="checkbox-item ${chk?'checked':''}" onclick="toggleMod('${mod}')"><div class="cb-box">${chk?'✓':''}</div><div class="cb-label">${mod}</div></div>`;
-    }).join('');
-    _renderProtoRows();   // 1B: filas de protocolo de las modalidades de la nota
+    _renderModGrid(); _renderModDetailCards();
     // Pre-seleccionar terapeuta en el selector de edición
     const stEl=document.getElementById('f-soap-terapeuta');
     if(stEl && nota.terapeuta) stEl.value=nota.terapeuta;
@@ -10764,8 +10797,8 @@ async function editarSoapHistorico(sid, pid){
   editingSoapPid=pid;
   editingSoapEsHistorico=true;
   _editingSoapHistoricoNota=nota;
-  tempMods=Array.isArray(nota.modalidades)?[...nota.modalidades]:[];
-  // 1A: precargar lo guardado tal cual (evaF null = "No evaluado" marcado; sin defaults 5/3).
+  tempMods=_migrarMods(nota.modalidades);
+  tempModDetalles=(nota.modalidadesDetalle&&typeof nota.modalidadesDetalle==='object')?Object.assign({},nota.modalidadesDetalle):{};
   tempEvaI=nota.evaI!=null?Number(nota.evaI):null;
   tempEvaF=(nota.evaF!==undefined)?(nota.evaF!=null?Number(nota.evaF):null):null;
   tempEvolMedia=Array.isArray(nota.media)?nota.media.map(function(m){return Object.assign({},m);}):[]; // FIX media-edición: precargar media existente de la nota histórica
@@ -10799,10 +10832,7 @@ async function editarSoapHistorico(sid, pid){
     if(nota.modoNota) seleccionarModoNota(nota.modoNota);
     // EVA (1A: botones — repintar grillas desde los temps ya seteados)
     _pintarEvaBtns('i'); _pintarEvaBtns('f');
-    // Grid modalidades
-    var g=document.getElementById('mod-grid');
-    if(g) g.innerHTML=MODALIDADES.map(function(mod){var chk=tempMods.includes(mod);return '<div class="checkbox-item '+(chk?'checked':'')+'" onclick="toggleMod(\''+mod+'\')"><div class="cb-box">'+(chk?'✓':'')+'</div><div class="cb-label">'+mod+'</div></div>';}).join('');
-    try{ _renderProtoRows(); }catch(_){}   // 1B: filas de protocolo de las modalidades de la nota
+    _renderModGrid(); _renderModDetailCards();
     // Cambiar título del botón guardar
     var btnGuardar=document.querySelector('[onclick="guardarSOAP()"]');
     if(btnGuardar) btnGuardar.textContent='💾 Guardar cambios (histórico)';
@@ -11152,7 +11182,8 @@ function copiarSesionAnterior(){
   set('f-pcontra',       lastSoap.p?.contraindicaciones);
 
   // 8. Copiar modalidades
-  tempMods = Array.isArray(lastSoap.modalidades) ? [...lastSoap.modalidades] : [];
+  tempMods = _migrarMods(lastSoap.modalidades);
+  tempModDetalles = (lastSoap.modalidadesDetalle && typeof lastSoap.modalidadesDetalle==='object') ? Object.assign({},lastSoap.modalidadesDetalle) : {};
 
   // 9. Copiar EVA inicial (1A: botones; solo si trae número real)
   if(lastSoap.evaI != null && isFinite(Number(lastSoap.evaI))){
@@ -11166,17 +11197,7 @@ function copiarSesionAnterior(){
   }
 
   // 11. Actualizar grid de modalidades visualmente
-  const g = document.getElementById('mod-grid');
-  if(g){
-    g.innerHTML = MODALIDADES.map(mod => {
-      const chk = tempMods.includes(mod);
-      return `<div class="checkbox-item ${chk?'checked':''}" onclick="toggleMod('${mod}')">
-        <div class="cb-box">${chk?'✓':''}</div>
-        <div class="cb-label">${mod}</div>
-      </div>`;
-    }).join('');
-  }
-  _renderProtoRows();   // 1B: refleja las modalidades copiadas
+  _renderModGrid(); _renderModDetailCards();
 
   // 12. Aviso — nunca guarda automáticamente
   showToast('Sesión anterior copiada como base editable. Revisa cambios antes de guardar.','');
