@@ -6563,6 +6563,7 @@ function _detHTMLAcciones(hayHallazgos){
     +((function(){ try{ var _a=JSON.parse(localStorage.getItem('COLA_SYNC_HIST_FALLIDOS')||'[]'); return Array.isArray(_a)&&_a.some(function(it){ return it && it.tipo==='nueva'; }); }catch(e){ return false; } })()?('<button id="det-limpia-hist" onclick="_detLimpiarHistFallidos()" style="font-size:13px;font-weight:800;border:none;border-radius:10px;padding:9px 16px;cursor:pointer;font-family:inherit;background:#EEF1F6;color:var(--gray-500)">🔁 Verificar histórico en nube</button>'):'')
     +((typeof esSupervisorUI==='function'&&esSupervisorUI())?('<button id="det-diag-exp" onclick="_detDiagnosticoExpediente()" style="font-size:13px;font-weight:800;border:none;border-radius:10px;padding:9px 16px;cursor:pointer;font-family:inherit;background:#EEF1F6;color:var(--navy)">🩺 Diagnóstico de expediente</button>'):'')
     +((typeof esSupervisorUI==='function'&&esSupervisorUI())?('<button id="det-retro-val" onclick="_retroValAbrir()" style="font-size:13px;font-weight:800;border:none;border-radius:10px;padding:9px 16px;cursor:pointer;font-family:inherit;background:#EEF1F6;color:var(--navy)">🗓️ Generar valoraciones faltantes</button>'):'')
+    +((typeof esSupervisorUI==='function'&&esSupervisorUI())?('<button id="det-cur-nom" onclick="_curNombresAbrir()" style="font-size:13px;font-weight:800;border:none;border-radius:10px;padding:9px 16px;cursor:pointer;font-family:inherit;background:#EEF1F6;color:var(--navy)">🧹 Curación de nombres</button>'):'')
     +'<button onclick="_detExportar()" style="font-size:13px;font-weight:800;border:none;border-radius:10px;padding:9px 16px;cursor:pointer;font-family:inherit;background:var(--gold);color:var(--navy-dark)">📤 Exportar este dispositivo</button>'
     +'</div>';
 }
@@ -6684,6 +6685,134 @@ async function _retroValGenerar(){
   var goBtn=document.getElementById('retroval-go'); if(goBtn) goBtn.remove();
   var cancelBtn=document.getElementById('retroval-cancel'); if(cancelBtn){ cancelBtn.textContent='Cerrar'; cancelBtn.style.background='var(--navy)'; cancelBtn.style.color='#fff'; }
   showToast('Retroactivo: '+okN+' generada(s), '+skipN+' omitida(s)'+(errN?(', '+errN+' error(es)'):''), errN?'warning':'success');
+}
+
+// ── CURACIÓN DE NOMBRES (supervisor) ── Detecta problemas de formato (capitalización), duplicados
+// exactos (mismo nombre) y expedientes con el mismo teléfono. Corrige el nombre o manda a papelera
+// desde un solo lugar. NO decide borrados solo: la papelera reutiliza el flujo seguro existente
+// (confirmación + backup). Excluye históricos migrados y pacientes de prueba.
+var _CUR_PART={de:1,del:1,la:1,las:1,los:1,y:1,e:1,da:1,di:1,san:1,von:1};
+function _curNorm(s){ return String(s||'').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,' '); }
+function _curLev(a,b){
+  a=_curNorm(a); b=_curNorm(b); var m=a.length,n=b.length; if(!m)return n; if(!n)return m;
+  var prev=[],cur=[],i,j; for(j=0;j<=n;j++)prev[j]=j;
+  for(i=1;i<=m;i++){ cur[0]=i; for(j=1;j<=n;j++){ var c=a[i-1]===b[j-1]?0:1; cur[j]=Math.min(prev[j]+1,cur[j-1]+1,prev[j-1]+c); } for(j=0;j<=n;j++)prev[j]=cur[j]; }
+  return prev[n];
+}
+function _curSim(a,b){ var L=Math.max(_curNorm(a).length,_curNorm(b).length); return L?(1-_curLev(a,b)/L):1; }
+function _curCapitalizar(nombre){
+  var toks=String(nombre||'').trim().replace(/\s+/g,' ').split(' ');
+  return toks.map(function(w,i){
+    if(!w) return w;
+    var low=w.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+    if(i>0 && _CUR_PART[low]) return w.toLowerCase();
+    return w.charAt(0).toUpperCase()+w.slice(1);
+  }).join(' ');
+}
+function _curFormatoMalo(nombre){
+  var n=String(nombre||''); if(!n.trim()) return false;
+  if(/\s{2,}/.test(n) || n!==n.trim()) return true;
+  var toks=n.trim().split(/\s+/);
+  for(var i=0;i<toks.length;i++){
+    var w=toks[i]; if(!w) continue;
+    var low=w.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+    if(w[0]===w[0].toLowerCase() && w[0]!==w[0].toUpperCase() && !(i>0 && _CUR_PART[low])) return true;
+  }
+  return false;
+}
+function _curReales(){
+  return (Array.isArray(patientsDB)?patientsDB:[]).filter(function(p){
+    return p&&p.id && String(p.id).indexOf('mig_pac_')!==0 && String(p.name||'').indexOf('TEST_QA_')!==0;
+  });
+}
+function _curNSes(p){ var s=(typeof _soapVivas==='function')?_soapVivas(p):(p.soap||[]); return (s||[]).length; }
+function _curLineaPac(p, conPapelera){
+  var t=String(p.telefono||'').replace(/\D/g,'');
+  var meta=(p.terapeuta||'—')+' · '+_curNSes(p)+' ses · '+String(p.fechaCreacion||p.date||'').slice(0,10)+(t?(' · tel '+t):'');
+  var pap = conPapelera ? '<button data-pid="'+escapeAttr_(p.id)+'" onclick="_curPapelera(this)" style="margin-left:8px;background:#FEE2E2;color:#B91C1C;border:none;border-radius:8px;padding:3px 10px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">🗑️ Papelera</button>' : '';
+  return '<div style="padding:5px 0;border-bottom:1px solid #F1F3F5;font-size:12.5px;display:flex;align-items:center;justify-content:space-between;gap:8px"><span><b>'+escapeHTML(p.name||'(sin nombre)')+'</b> <span style="color:#9CA3AF">· '+escapeHTML(meta)+'</span></span>'+pap+'</div>';
+}
+function _curNombresAbrir(){
+  if(!(typeof esSupervisorUI==='function'&&esSupervisorUI())){ showToast('Solo el supervisor','warning'); return; }
+  var reales=_curReales();
+  // 1) Formato (capitalización)
+  var fmt=reales.filter(function(p){ return _curFormatoMalo(p.name); }).map(function(p){ return {p:p, prop:_curCapitalizar(p.name)}; }).filter(function(x){ return x.prop!==x.p.name; });
+  // 2) Duplicados exactos (nombre normalizado idéntico)
+  var g={}; reales.forEach(function(p){ var k=_curNorm(p.name); (g[k]=g[k]||[]).push(p); });
+  var dups=Object.keys(g).map(function(k){return g[k];}).filter(function(a){return a.length>1;});
+  // 3) Mismo teléfono, nombre distinto (posibles familiares o duplicados)
+  var tg={}; reales.forEach(function(p){ var t=String(p.telefono||'').replace(/\D/g,''); if(t.length>=10)(tg[t]=tg[t]||[]).push(p); });
+  var telDup=Object.keys(tg).map(function(t){return {t:t,g:tg[t]};}).filter(function(o){ var s={}; o.g.forEach(function(p){s[_curNorm(p.name)]=1;}); return Object.keys(s).length>1; });
+  // 4) Nombres muy parecidos (≥90%): captura typos como "Herrera"/"Herrara" sin traer hermanos.
+  var parecidos=[];
+  for(var _i=0;_i<reales.length;_i++){ for(var _j=_i+1;_j<reales.length;_j++){
+    var _A=reales[_i],_B=reales[_j];
+    if(_curNorm(_A.name)===_curNorm(_B.name)) continue;
+    if(_curSim(_A.name,_B.name)>=0.90) parecidos.push([_A,_B]);
+  }}
+
+  var html='';
+  html+='<div style="margin-bottom:14px"><div style="font-size:13px;font-weight:800;color:var(--navy);margin-bottom:4px">🟡 Formato / capitalización ('+fmt.length+')</div>';
+  html+= fmt.length ? fmt.map(function(x){
+    return '<div style="padding:6px 0;border-bottom:1px solid #F1F3F5;font-size:12.5px;display:flex;align-items:center;justify-content:space-between;gap:8px">'
+      +'<span><span style="color:#9CA3AF;text-decoration:line-through">'+escapeHTML(x.p.name)+'</span> → <b>'+escapeHTML(x.prop)+'</b></span>'
+      +'<button data-pid="'+escapeAttr_(x.p.id)+'" data-nombre="'+escapeAttr_(x.prop)+'" onclick="_curCorregir(this)" style="background:var(--navy);color:#fff;border:none;border-radius:8px;padding:3px 12px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">Corregir</button></div>';
+  }).join('') : '<div style="color:#166534;font-size:12px">✅ Sin problemas de formato.</div>';
+  html+='</div>';
+
+  html+='<div style="margin-bottom:14px"><div style="font-size:13px;font-weight:800;color:var(--navy);margin-bottom:4px">🔴 Duplicados (mismo nombre) ('+dups.length+')</div>';
+  html+= dups.length ? dups.map(function(gr){
+    return '<div style="background:#FEF2F2;border:1px solid #FECACA;border-radius:8px;padding:6px 10px;margin-bottom:6px">'+gr.map(function(p){return _curLineaPac(p,true);}).join('')+'</div>';
+  }).join('') : '<div style="color:#166534;font-size:12px">✅ Sin duplicados por nombre.</div>';
+  html+='</div>';
+
+  html+='<div style="margin-bottom:14px"><div style="font-size:13px;font-weight:800;color:var(--navy);margin-bottom:4px">🔴 Nombres casi idénticos — posible typo ('+parecidos.length+')</div>';
+  html+= parecidos.length ? parecidos.map(function(pr){
+    return '<div style="background:#FEF2F2;border:1px solid #FECACA;border-radius:8px;padding:6px 10px;margin-bottom:6px">'+_curLineaPac(pr[0],true)+_curLineaPac(pr[1],true)+'</div>';
+  }).join('') : '<div style="color:#166534;font-size:12px">✅ Sin nombres casi idénticos.</div>';
+  html+='</div>';
+
+  html+='<div><div style="font-size:13px;font-weight:800;color:var(--navy);margin-bottom:4px">🟠 Mismo teléfono, nombre distinto ('+telDup.length+')</div>';
+  html+='<div style="font-size:11px;color:#9CA3AF;margin-bottom:4px">Pueden ser familiares (mismo contacto) o teléfono mal capturado. Revisa antes de tocar nada.</div>';
+  html+= telDup.length ? telDup.map(function(o){
+    return '<div style="background:#FFFBEB;border:1px solid #FDE68A;border-radius:8px;padding:6px 10px;margin-bottom:6px">'+o.g.map(function(p){return _curLineaPac(p,true);}).join('')+'</div>';
+  }).join('') : '<div style="color:#166534;font-size:12px">✅ Sin coincidencias de teléfono.</div>';
+  html+='</div>';
+
+  var prev=document.getElementById('curnom-overlay'); if(prev) prev.remove();
+  var ov=document.createElement('div');
+  ov.id='curnom-overlay';
+  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:99999;display:flex;align-items:center;justify-content:center;padding:16px';
+  ov.innerHTML='<div style="background:#fff;border-radius:16px;max-width:560px;width:100%;max-height:86vh;display:flex;flex-direction:column;overflow:hidden">'
+    +'<div style="background:linear-gradient(135deg,var(--navy),var(--navy-light));color:#fff;padding:14px 18px"><div style="font-weight:800;font-size:15px">🧹 Curación de nombres</div><div style="font-size:12px;opacity:.85;margin-top:2px">'+reales.length+' expedientes revisados</div></div>'
+    +'<div style="padding:14px 18px;overflow:auto">'+html+'</div>'
+    +'<div style="padding:12px 18px;border-top:1px solid #E5E7EB;display:flex;justify-content:flex-end"><button onclick="var o=document.getElementById(\'curnom-overlay\');if(o)o.remove()" style="background:var(--navy);color:#fff;border:none;border-radius:10px;padding:9px 16px;font-size:13px;font-weight:800;cursor:pointer;font-family:inherit">Cerrar</button></div>'
+    +'</div>';
+  document.body.appendChild(ov);
+}
+async function _curCorregir(btn){
+  var pid=btn.dataset.pid, nuevo=btn.dataset.nombre;
+  var p=(typeof _resolverPaciente==='function')?_resolverPaciente(pid):null;
+  if(!p){ showToast('Paciente no encontrado','error'); return; }
+  if(!confirm('Corregir nombre a:\n\n'+nuevo+'\n\n¿Continuar?')) return;
+  p.name=nuevo;
+  if(typeof FST_normalizarNombreLive==='function') p.nombreNormalizado=FST_normalizarNombreLive(nuevo);
+  p.updatedAt=Date.now();
+  btn.disabled=true; btn.textContent='Guardando…';
+  try{
+    var res=await _persistirDatosPaciente(p);
+    var ok=!!(res&&res.ok);
+    if(ok && typeof window._FST_invalidarIndicePacientes==='function') window._FST_invalidarIndicePacientes();
+    btn.textContent = ok?'✓ Corregido':'⚠️ Local';
+    btn.style.background = ok?'#16A34A':'#F59E0B';
+    showToast(ok?'✅ Nombre corregido':(res&&res.pendiente?'📴 Se sincronizará al reconectar':'⚠️ Guardado local, nube pendiente'), ok?'success':'warning');
+  }catch(e){ btn.disabled=false; btn.textContent='Corregir'; showToast('No se pudo: '+((e&&e.message)||'error'),'error'); }
+}
+function _curPapelera(btn){
+  var pid=btn.dataset.pid;
+  var o=document.getElementById('curnom-overlay'); if(o) o.remove();
+  if(typeof _borrarPacienteDesdeReval==='function') _borrarPacienteDesdeReval(pid);
+  else showToast('Función de papelera no disponible','error');
 }
 async function _detHTMLVersion(){
   try{
