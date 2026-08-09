@@ -6635,7 +6635,7 @@ function _retroValAbrir(){
     +'<div id="retroval-body" style="padding:12px 18px;overflow:auto">'+lista+'</div>'
     +'<div style="padding:10px 18px;border-top:1px solid #E5E7EB;font-size:11.5px;color:#6B7280;line-height:1.5">Se creará la <b>nota de valoración (sesión 1)</b> con la fecha original de cada expediente, a partir de sus propios datos. Los que ya tienen alguna sesión NO se tocan; antes de crear cada nota se verifica en la nube que no exista.</div>'
     +'<div style="padding:12px 18px;display:flex;gap:10px;justify-content:flex-end;border-top:1px solid #E5E7EB">'
-    +'<button onclick="var o=document.getElementById(\'retroval-overlay\');if(o)o.remove()" style="background:#EEF1F6;color:var(--gray-600);border:none;border-radius:10px;padding:9px 16px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">Cancelar</button>'
+    +'<button id="retroval-cancel" onclick="var o=document.getElementById(\'retroval-overlay\');if(o)o.remove()" style="background:#EEF1F6;color:var(--gray-600);border:none;border-radius:10px;padding:9px 16px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">Cancelar</button>'
     +(cands.length?('<button id="retroval-go" onclick="_retroValGenerar()" style="background:var(--navy);color:#fff;border:none;border-radius:10px;padding:9px 16px;font-size:13px;font-weight:800;cursor:pointer;font-family:inherit">Generar '+cands.length+' nota(s)</button>'):'')
     +'</div></div>';
   document.body.appendChild(ov);
@@ -6682,6 +6682,7 @@ async function _retroValGenerar(){
       +'<div style="max-height:44vh;overflow:auto;font-size:12.5px">'+detalles.map(function(x){return '<div style="padding:2px 0">'+escapeHTML(x)+'</div>';}).join('')+'</div>';
   }
   var goBtn=document.getElementById('retroval-go'); if(goBtn) goBtn.remove();
+  var cancelBtn=document.getElementById('retroval-cancel'); if(cancelBtn){ cancelBtn.textContent='Cerrar'; cancelBtn.style.background='var(--navy)'; cancelBtn.style.color='#fff'; }
   showToast('Retroactivo: '+okN+' generada(s), '+skipN+' omitida(s)'+(errN?(', '+errN+' error(es)'):''), errN?'warning':'success');
 }
 async function _detHTMLVersion(){
