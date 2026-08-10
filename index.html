@@ -6721,11 +6721,26 @@ function _curFormatoMalo(nombre){
   return false;
 }
 function _curReales(){
+  // Excluir los ya marcados como eliminados EN CALIENTE (papelera no los quita de patientsDB local;
+  // los marca en estos sets/localStorage). Sin esto, un paciente recién mandado a papelera seguía
+  // apareciendo en la herramienta.
+  var elimA=null, elimH=null, elimLS={};
+  try{ elimA=window._FST_activosEliminados; }catch(_){}
+  try{ elimH=window._FST_pidsEliminados; }catch(_){}
+  try{ var _c=JSON.parse(localStorage.getItem('ACTIVOS_ELIMINADOS_IDS')||localStorage.getItem(typeof LS_ACTIVOS_ELIM!=='undefined'?LS_ACTIVOS_ELIM:'')||'{}'); (Array.isArray(_c.ids)?_c.ids:[]).forEach(function(id){ elimLS[String(id)]=1; }); }catch(_){}
+  function _estaElim(id){
+    id=String(id);
+    try{ if(elimA && elimA.has && elimA.has(id)) return true; }catch(_){}
+    try{ if(elimH && elimH.has && elimH.has(id)) return true; }catch(_){}
+    return !!elimLS[id];
+  }
   return (Array.isArray(patientsDB)?patientsDB:[]).filter(function(p){
-    return p&&p.id && String(p.id).indexOf('mig_pac_')!==0 && String(p.name||'').indexOf('TEST_QA_')!==0;
+    return p&&p.id && String(p.id).indexOf('mig_pac_')!==0 && String(p.name||'').indexOf('TEST_QA_')!==0 && !_estaElim(p.id);
   });
 }
 function _curNSes(p){ var s=(typeof _soapVivas==='function')?_soapVivas(p):(p.soap||[]); return (s||[]).length; }
+function _curTelIgnorados(){ try{ var a=JSON.parse(localStorage.getItem('sinergia_cur_tel_ok')||'[]'); var o={}; (Array.isArray(a)?a:[]).forEach(function(t){o[String(t)]=1;}); return o; }catch(_){ return {}; } }
+function _curTelOk(btn){ var t=String(btn.dataset.tel||''); try{ var a=JSON.parse(localStorage.getItem('sinergia_cur_tel_ok')||'[]'); if(!Array.isArray(a))a=[]; if(a.indexOf(t)===-1)a.push(t); localStorage.setItem('sinergia_cur_tel_ok',JSON.stringify(a)); }catch(_){} showToast('✓ Marcado como familiares — no volverá a aparecer','success'); _curNombresAbrir(); }
 function _curLineaPac(p, conPapelera){
   var t=String(p.telefono||'').replace(/\D/g,'');
   var meta=(p.terapeuta||'—')+' · '+_curNSes(p)+' ses · '+String(p.fechaCreacion||p.date||'').slice(0,10)+(t?(' · tel '+t):'');
@@ -6742,7 +6757,8 @@ function _curNombresAbrir(){
   var dups=Object.keys(g).map(function(k){return g[k];}).filter(function(a){return a.length>1;});
   // 3) Mismo teléfono, nombre distinto (posibles familiares o duplicados)
   var tg={}; reales.forEach(function(p){ var t=String(p.telefono||'').replace(/\D/g,''); if(t.length>=10)(tg[t]=tg[t]||[]).push(p); });
-  var telDup=Object.keys(tg).map(function(t){return {t:t,g:tg[t]};}).filter(function(o){ var s={}; o.g.forEach(function(p){s[_curNorm(p.name)]=1;}); return Object.keys(s).length>1; });
+  var _telIgn=_curTelIgnorados();
+  var telDup=Object.keys(tg).map(function(t){return {t:t,g:tg[t]};}).filter(function(o){ if(_telIgn[o.t]) return false; var s={}; o.g.forEach(function(p){s[_curNorm(p.name)]=1;}); return Object.keys(s).length>1; });
   // 4) Nombres muy parecidos (≥90%): captura typos como "Herrera"/"Herrara" sin traer hermanos.
   var parecidos=[];
   for(var _i=0;_i<reales.length;_i++){ for(var _j=_i+1;_j<reales.length;_j++){
@@ -6775,7 +6791,8 @@ function _curNombresAbrir(){
   html+='<div><div style="font-size:13px;font-weight:800;color:var(--navy);margin-bottom:4px">🟠 Mismo teléfono, nombre distinto ('+telDup.length+')</div>';
   html+='<div style="font-size:11px;color:#9CA3AF;margin-bottom:4px">Pueden ser familiares (mismo contacto) o teléfono mal capturado. Revisa antes de tocar nada.</div>';
   html+= telDup.length ? telDup.map(function(o){
-    return '<div style="background:#FFFBEB;border:1px solid #FDE68A;border-radius:8px;padding:6px 10px;margin-bottom:6px">'+o.g.map(function(p){return _curLineaPac(p,true);}).join('')+'</div>';
+    return '<div style="background:#FFFBEB;border:1px solid #FDE68A;border-radius:8px;padding:6px 10px;margin-bottom:6px">'+o.g.map(function(p){return _curLineaPac(p,true);}).join('')
+      +'<div style="text-align:right;margin-top:4px"><button data-tel="'+escapeAttr_(o.t)+'" onclick="_curTelOk(this)" style="background:#DCFCE7;color:#166534;border:none;border-radius:8px;padding:3px 12px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">✓ Son familiares (no mostrar)</button></div></div>';
   }).join('') : '<div style="color:#166534;font-size:12px">✅ Sin coincidencias de teléfono.</div>';
   html+='</div>';
 
@@ -6784,7 +6801,7 @@ function _curNombresAbrir(){
   ov.id='curnom-overlay';
   ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:99999;display:flex;align-items:center;justify-content:center;padding:16px';
   ov.innerHTML='<div style="background:#fff;border-radius:16px;max-width:560px;width:100%;max-height:86vh;display:flex;flex-direction:column;overflow:hidden">'
-    +'<div style="background:linear-gradient(135deg,var(--navy),var(--navy-light));color:#fff;padding:14px 18px"><div style="font-weight:800;font-size:15px">🧹 Curación de nombres</div><div style="font-size:12px;opacity:.85;margin-top:2px">'+reales.length+' expedientes revisados</div></div>'
+    +'<div style="background:linear-gradient(135deg,var(--navy),var(--navy-light));color:#fff;padding:14px 18px;display:flex;align-items:center;justify-content:space-between;gap:10px"><div><div style="font-weight:800;font-size:15px">🧹 Curación de nombres</div><div style="font-size:12px;opacity:.85;margin-top:2px">'+reales.length+' expedientes revisados</div></div><button onclick="_curNombresAbrir()" style="background:rgba(255,255,255,.18);color:#fff;border:1px solid rgba(255,255,255,.35);border-radius:10px;padding:7px 12px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap">🔄 Actualizar</button></div>'
     +'<div style="padding:14px 18px;overflow:auto">'+html+'</div>'
     +'<div style="padding:12px 18px;border-top:1px solid #E5E7EB;display:flex;justify-content:flex-end"><button onclick="var o=document.getElementById(\'curnom-overlay\');if(o)o.remove()" style="background:var(--navy);color:#fff;border:none;border-radius:10px;padding:9px 16px;font-size:13px;font-weight:800;cursor:pointer;font-family:inherit">Cerrar</button></div>'
     +'</div>';
@@ -6803,9 +6820,8 @@ async function _curCorregir(btn){
     var res=await _persistirDatosPaciente(p);
     var ok=!!(res&&res.ok);
     if(ok && typeof window._FST_invalidarIndicePacientes==='function') window._FST_invalidarIndicePacientes();
-    btn.textContent = ok?'✓ Corregido':'⚠️ Local';
-    btn.style.background = ok?'#16A34A':'#F59E0B';
     showToast(ok?'✅ Nombre corregido':(res&&res.pendiente?'📴 Se sincronizará al reconectar':'⚠️ Guardado local, nube pendiente'), ok?'success':'warning');
+    _curNombresAbrir();   // refrescar: el corregido ya no aparece en la lista
   }catch(e){ btn.disabled=false; btn.textContent='Corregir'; showToast('No se pudo: '+((e&&e.message)||'error'),'error'); }
 }
 function _curPapelera(btn){
