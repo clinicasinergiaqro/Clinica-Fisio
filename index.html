@@ -8151,7 +8151,7 @@ function renderExpediente(tab='historia'){
   if(tab==='soap'){
     html+=generarGraficaEVA(p);
     // Botón "No acudió": registra inasistencia sin crear nota → silencia la alerta semanal esa semana.
-    html+=`<div style="text-align:right;margin:0 0 10px"><button data-pid="${escapeAttr_(p.id)}" onclick="marcarNoAcudioHoy(this.dataset.pid)" style="background:#FFFBEB;border:1px solid #FDE68A;color:#92400E;border-radius:16px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer">🚫 No acudió hoy</button></div>`;
+    html+=`<div style="text-align:right;margin:0 0 10px"><button data-pid="${escapeAttr_(p.id)}" onclick="marcarNoAcudio(this.dataset.pid)" style="background:#FFFBEB;border:1px solid #FDE68A;color:#92400E;border-radius:16px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer">🚫 No acudió</button></div>`;
     if(Array.isArray(p.inasistencias)&&p.inasistencias.length){
       const _inas=p.inasistencias.slice().sort((a,b)=>String(b.fechaISO||'').localeCompare(String(a.fechaISO||'')));
       html+=`<div style="margin:0 0 12px;padding:8px 12px;background:#FFFBEB;border:1px solid #FDE68A;border-radius:10px">
@@ -14860,30 +14860,69 @@ function registrarEventoAdverso(){
   renderExpediente(currentTab||'historia');
 }
 
-// ── NO ACUDIÓ (perfil) ── Registra inasistencia sin crear nota SOAP. Cuenta como actividad de la
-// semana → silencia la alerta "SOAP semanal ⚠️" (la terapeuta cumplió), NO infla el nº de sesiones.
-function marcarNoAcudioHoy(pid){
-  const p = (pid && currentPatient && currentPatient.id===pid) ? currentPatient : currentPatient;
-  if(!p) return;
-  if(!confirm('¿Registrar que el paciente NO acudió hoy?\n\nNo se crea nota de sesión y no contará como falta esta semana.')) return;
+// ── NO ACUDIÓ (perfil) ── Registra una inasistencia en la FECHA elegida (no siempre hoy: el fisio
+// puede marcarla días después). Doble efecto: (1) p.inasistencias silencia la alerta "SOAP semanal"
+// del perfil; (2) citasNoAcudio (por nombre+fecha) hace que esa cita NO cuente como falta en el
+// reporte de cobertura del supervisor. Queda registrado quién la marcó (marcadoPor). Reversible.
+function marcarNoAcudio(pid){
+  const p = currentPatient;
+  if(!p){ showToast('Abre el expediente','error'); return; }
+  var prev=document.getElementById('noacudio-overlay'); if(prev) prev.remove();
+  var hoyISO=new Date().toISOString().slice(0,10);
+  var ov=document.createElement('div');
+  ov.id='noacudio-overlay';
+  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px';
+  ov.innerHTML='<div style="background:#fff;border-radius:16px;max-width:360px;width:100%;padding:20px">'
+    +'<div style="font-size:16px;font-weight:800;color:var(--navy);margin-bottom:6px">🚫 Registrar inasistencia</div>'
+    +'<div style="font-size:13px;color:var(--gray-600);margin-bottom:12px">¿Qué día NO acudió <b>'+escapeHTML((p.name||'').split(' ').slice(0,2).join(' '))+'</b>?</div>'
+    +'<input type="date" id="noacudio-fecha" value="'+hoyISO+'" max="'+hoyISO+'" style="width:100%;box-sizing:border-box;font-size:15px;padding:12px;border:2px solid var(--gray-200);border-radius:10px;font-family:inherit;margin-bottom:8px">'
+    +'<div style="font-size:11px;color:var(--gray-400);margin-bottom:14px;line-height:1.4">Elige el día real de la cita. No se crea nota; esa cita no contará como falta en el reporte.</div>'
+    +'<button onclick="_confirmarNoAcudio(this.getAttribute(\'data-pid\'))" data-pid="'+escapeAttr_(p.id)+'" style="width:100%;background:var(--navy);color:#fff;border:none;border-radius:10px;padding:12px;font-size:14px;font-weight:800;cursor:pointer;font-family:inherit;margin-bottom:6px">Registrar inasistencia</button>'
+    +'<button onclick="var o=document.getElementById(\'noacudio-overlay\');if(o)o.remove()" style="width:100%;background:none;border:none;color:var(--gray-400);font-size:13px;cursor:pointer;font-family:inherit;padding:6px">Cancelar</button>'
+    +'</div>';
+  document.body.appendChild(ov);
+}
+function _confirmarNoAcudio(pid){
+  const p = currentPatient;
+  if(!p || String(p.id)!==String(pid)){ showToast('Expediente no coincide','error'); return; }
+  var iso=(document.getElementById('noacudio-fecha')||{}).value||'';
+  if(!iso){ showToast('Elige una fecha','error'); return; }
+  var hoyISO=new Date().toISOString().slice(0,10);
+  if(iso>hoyISO){ showToast('La fecha no puede ser futura','error'); return; }
   if(!Array.isArray(p.inasistencias)) p.inasistencias=[];
-  const hoy=new Date();
-  const iso=hoy.toISOString().slice(0,10);
-  if(p.inasistencias.some(x=>x&&x.fechaISO===iso)){ showToast('Ya hay una inasistencia registrada hoy','warning'); return; }
-  const _inNueva = {
-    id:generarIdSeguro_('ina_'), fecha:todayFmt(), fechaISO:iso, hora:_horaActual(),
-    terapeuta:currentUser?.name||''
-  };
+  if(p.inasistencias.some(x=>x&&x.fechaISO===iso)){ showToast('Ya hay una inasistencia en esa fecha','warning'); return; }
+  var parts=iso.split('-');
+  var ddmm=(parts.length===3)?(parts[2]+'/'+parts[1]+'/'+parts[0]):todayFmt();
+  var _inNueva={ id:generarIdSeguro_('ina_'), fecha:ddmm, fechaISO:iso, hora:_horaActual(), terapeuta:currentUser?.name||'', marcadoPor:currentUser?.name||'' };
   p.inasistencias.push(_inNueva);
-  p.updatedAt = Date.now();
-  const _esHist = String(p.id||'').startsWith('mig_pac_');
-  (_esHist ? _persistirAdicionHistorico(p, {inasistencias:_inNueva})
+  p.updatedAt=Date.now();
+  var o=document.getElementById('noacudio-overlay'); if(o) o.remove();
+  // (1) persistir en el expediente (silencia el chip "SOAP semanal" del perfil)
+  const _esHist=String(p.id||'').startsWith('mig_pac_');
+  (_esHist ? _persistirAdicionHistorico(p,{inasistencias:_inNueva})
            : saveDB('pts',[p],{camposHist:['inasistencias']})
-  ).then(res=>{
-    if(res && res.pendiente) return;
-    showToast(res?.ok?'🚫 Registrado: no acudió hoy':(_esHist?'❌ No se guardó en la nube — reintenta':'⚠️ Local, Sheets pendiente'),res?.ok?'success':(_esHist?'error':'warning'));
-  }).catch(()=>showToast(_esHist?'❌ No se guardó en la nube — reintenta':'⚠️ Sin conexión — registro local',_esHist?'error':'warning'));
+  ).then(res=>{ if(res&&res.pendiente) return; showToast(res?.ok?('🚫 Inasistencia registrada — '+ddmm):'⚠️ Local, pendiente de subir',res?.ok?'success':'warning'); })
+   .catch(()=>showToast('⚠️ Sin conexión — registro local','warning'));
+  // (2) conectar con el reporte de cobertura (citasNoAcudio, por nombre+fecha)
+  _noAcudioCita(p.name, ddmm, true);
   renderExpediente(currentTab||'soap');
+}
+// Escribe/borra en citasNoAcudio (sistema del reporte de cobertura). A diferencia de _marcarNoAcudio
+// (supervisor-only, desde Rendimiento), este lo dispara el fisio desde el perfil; queda marcadoPor+origen.
+async function _noAcudioCita(nombre, ddmm, marcar){
+  try{
+    if(typeof _normPend!=='function' || typeof _keyCitaResuelta!=='function') return;
+    var clave=_normPend(nombre); if(!clave||!ddmm) return;
+    var ok=await FST_init(); if(!ok||!window._fstDb) return;
+    var docId=clave+'__'+String(ddmm).replace(/\//g,'-');
+    if(marcar){
+      await window._fstDb.collection('citasNoAcudio').doc(docId).set({ fecha:ddmm, claveNorm:clave, motivo:'no_acudio', marcadoPor:(currentUser&&currentUser.name)||'', origen:'perfil', updatedAt:firebase.firestore.FieldValue.serverTimestamp() });
+      try{ window._citasNoAcudioCache=window._citasNoAcudioCache||{ts:Date.now(),map:{}}; window._citasNoAcudioCache.map[_keyCitaResuelta(clave,ddmm)]=true; }catch(_){}
+    } else {
+      await window._fstDb.collection('citasNoAcudio').doc(docId).delete();
+      try{ if(window._citasNoAcudioCache&&window._citasNoAcudioCache.map) delete window._citasNoAcudioCache.map[_keyCitaResuelta(clave,ddmm)]; }catch(_){}
+    }
+  }catch(e){ console.warn('[no-acudio-cita]', e&&e.message); }
 }
 function deshacerNoAcudio(pid, iid){
   const p = currentPatient;
@@ -14891,11 +14930,14 @@ function deshacerNoAcudio(pid, iid){
   const idx=p.inasistencias.findIndex(x=>x&&x.id===iid);
   if(idx<0) return;
   if(!confirm('¿Deshacer esta inasistencia?')) return;
+  var _rem=p.inasistencias[idx];
   p.inasistencias.splice(idx,1);
-  p.updatedAt = Date.now();
+  p.updatedAt=Date.now();
   saveDB('pts',[p],{camposHist:['inasistencias']}).then(res=>{
-    showToast(res?.ok?'↩︎ Inasistencia deshecha':'⚠️ Local, Sheets pendiente',res?.ok?'success':'warning');
+    showToast(res?.ok?'↩︎ Inasistencia deshecha':'⚠️ Local, pendiente',res?.ok?'success':'warning');
   }).catch(()=>showToast('⚠️ Sin conexión — cambio local','warning'));
+  // quitar también del reporte de cobertura
+  if(_rem && _rem.fecha) _noAcudioCita(p.name, _rem.fecha, false);
   renderExpediente(currentTab||'soap');
 }
 
