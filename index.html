@@ -16915,8 +16915,9 @@ async function _validarLinkEjercicios(token){
 async function enviarEjerciciosWhatsApp(){
   var p=currentPatient; if(!p) return;
   var ejs=Array.isArray(p.ejercicios)?p.ejercicios:[];
-  // PART 3: sin ejercicios → no mandar link vacío
-  if(!ejs.length){ showToast('Sin ejercicios asignados — agrega al menos uno antes de enviar','warning'); return; }
+  // PART 3: sin ejercicios PARA CASA → no mandar link vacío (los "solo consulta" no cuentan)
+  var ejsCasa=ejs.filter(function(e){ return e && (e.estado||'activo')==='activo' && e.paraCasa!==false; });
+  if(!ejsCasa.length){ showToast('No hay ejercicios marcados como "Tarea para casa". Marca al menos uno antes de enviar.','warning'); return; }
   if(!p.ejerciciosToken){ p.ejerciciosToken=generateToken(); p.ejerciciosLinkActivo=true; }
   if(p.ejerciciosLinkActivo===false){ showToast('El link está desactivado. Actívalo primero (🔓).','warning'); return; }
   showToast('⏳ Preparando link…','');
@@ -17044,6 +17045,8 @@ function renderEjercicios(){
           ${ej.precauciones?`<div style="font-size:13px;color:var(--red);margin-bottom:6px"><b>⚠ Precauciones:</b> ${ej.precauciones}</div>`:''}
           ${ej.observaciones?'':''}
 
+          ${(function(){ var _pc=ej.paraCasa!==false; return '<div style="margin-bottom:8px"><button onclick="_toggleEjParaCasa('+i+')" style="width:100%;padding:9px 12px;font-size:12.5px;font-weight:700;border-radius:12px;cursor:pointer;font-family:inherit;border:1.5px solid '+(_pc?'var(--green)':'#D0D5DD')+';background:'+(_pc?'#E8F5E9':'#F5F5F5')+';color:'+(_pc?'var(--green)':'var(--gray-600)')+';display:flex;align-items:center;justify-content:center;gap:6px">'+(_pc?'📤 Tarea para casa (se envía)':'🏥 Solo en consulta (no se envía)')+'</button></div>'; })()}
+
           <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px">
             ${['activo','pausado','completado'].map(est=>`<button onclick="cambiarEstadoEjercicio(${i},'${est}')" style="padding:4px 10px;font-size:11px;font-weight:700;border-radius:12px;cursor:pointer;font-family:inherit;border:1.5px solid ${(ej.estado||'activo')===est?'var(--navy)':'#D0D5DD'};background:${(ej.estado||'activo')===est?'var(--navy)':'white'};color:${(ej.estado||'activo')===est?'white':'var(--gray-600)'}">${est.charAt(0).toUpperCase()+est.slice(1)}</button>`).join('')}
           </div>
@@ -17157,6 +17160,20 @@ function cambiarEstadoEjercicio(idx, estado){
   const idxP=patientsDB.findIndex(x=>x.id===currentPatient.id);
   if(idxP>=0) patientsDB[idxP]=currentPatient;
   saveDB('pts',[currentPatient],{camposHist:['ejercicios']}).catch(()=>{});
+  renderEjercicios();
+}
+// Tarea para casa vs solo consulta: alterna paraCasa. Los "solo consulta" (paraCasa===false) NO se
+// envían al paciente (se filtran en la vista pública). Sin marca = para casa (retrocompatible).
+function _toggleEjParaCasa(idx){
+  const p=currentPatient; if(!p||!Array.isArray(p.ejercicios)) return;
+  const ej=p.ejercicios[idx]; if(!ej) return;
+  ej.paraCasa = (ej.paraCasa===false);   // false→true (para casa); true/undefined→false (solo consulta)
+  p.updatedAt=Date.now();
+  const idxP=patientsDB.findIndex(x=>x.id===p.id);
+  if(idxP>=0) patientsDB[idxP]=p;
+  saveDB('pts',[p],{camposHist:['ejercicios']}).then(function(res){
+    showToast(ej.paraCasa?'📤 Tarea para casa — se enviará al paciente':'🏥 Solo en consulta — no se envía','success');
+  }).catch(function(){ showToast('⚠️ Guardado local, pendiente de subir','warning'); });
   renderEjercicios();
 }
 
@@ -17724,7 +17741,9 @@ function renderVistaPublica(p, opts={}){
   const previewTerapeuta = (typeof opts.previewTerapeuta==='boolean')
     ? opts.previewTerapeuta
     : esVistaPublicaPreviewTerapeuta();
-  const ejs = (p.ejercicios || []).filter(e=>(e.estado||'activo')==='activo');
+  // Solo activos y marcados "para casa" (paraCasa!==false; los sin marca = para casa, retrocompatible).
+  // Los de "solo consulta" (paraCasa===false) NO se muestran al paciente.
+  const ejs = (p.ejercicios || []).filter(e=>(e.estado||'activo')==='activo' && e.paraCasa!==false);
   const fechaPrograma = ejs.length ? ejs[ejs.length-1].fecha : todayFmt();
 
   let html = previewTerapeuta ? `<div style="position:sticky;top:0;z-index:999;background:#122950;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;color:white">
