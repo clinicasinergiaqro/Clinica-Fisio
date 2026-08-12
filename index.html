@@ -1384,6 +1384,9 @@ function confirmarSalidaSiDirty(callback){
 }
 // 1A: EVA sin defaults — null/undefined = sin tocar (bloquea guardar); ya no se inventa el 5→3.
 let tempMods=[], tempModDetalles={}, tempEvaI=null, tempEvaF, tempEvolMedia=[];
+// FASE 1 EJERCICIOS-EN-SESIÓN: ejercicios del paciente marcados como "trabajados hoy" en esta nota.
+// Cada item: {id, nombre, dosisSesion, media:{url,fbPath,type,label}}. Se guarda en datosNota.ejerciciosSesion.
+let tempEjerciciosSesion=[];
 // FIX media-edición (flag sentinel): distingue "el usuario tocó el preview de media" (agregó/quitó)
 // de "el form nunca cargó la media". Se pone true en handleSoapPhoto/removeSoapMedia y se resetea a
 // false al abrir cualquier form (después del preload). Permite VACIAR media a propósito sin que la
@@ -7870,6 +7873,11 @@ function _renderSoapCard(s,p,readOnly){
         <div class="soap-sub">Tratamiento aplicado:</div><div class="soap-text">${escapeHTML(s.p.tratamiento)}</div>
         <div class="soap-sub">Indicaciones para casa:</div><div class="soap-text">${escapeHTML(s.p.indicaciones)}</div>
         <div class="soap-sub">Contraindicaciones vigentes:</div><div class="soap-text" style="color:var(--red);font-weight:600;">${escapeHTML(s.p.contraindicaciones)}</div>
+        ${(Array.isArray(s.ejerciciosSesion)&&s.ejerciciosSesion.length)?`<div class="soap-sub">🏋️ Ejercicios trabajados:</div><div style="display:flex;flex-direction:column;gap:5px;margin-top:2px">${s.ejerciciosSesion.map(function(ej){
+          var _t=(ej.media&&ej.media.type)||''; var icon=_t.indexOf('video')===0?'🎥':_t.indexOf('image')===0?'🖼️':'📝';
+          var verBtn=(ej.media&&ej.media.url)?'<button type="button" onclick="_verMediaSesion('+JSON.stringify(ej.media.url).replace(/"/g,'&quot;')+','+JSON.stringify(_t).replace(/"/g,'&quot;')+','+JSON.stringify(ej.nombre||'').replace(/"/g,'&quot;')+')" style="background:#EEF4FB;border:none;border-radius:8px;padding:3px 10px;font-size:11px;font-weight:700;color:var(--navy);cursor:pointer">▶ Ver</button>':'';
+          return '<div style="display:flex;align-items:center;gap:8px;background:#F8FAFB;border:1px solid var(--gray-100);border-radius:8px;padding:6px 9px"><span style="font-size:15px">'+icon+'</span><span style="flex:1;font-size:12.5px;font-weight:600;color:var(--navy)">'+escapeHTML(ej.nombre||'Ejercicio')+'</span>'+(ej.dosisSesion?'<span style="font-size:11.5px;color:var(--gray-500);white-space:nowrap">'+escapeHTML(ej.dosisSesion)+'</span>':'')+verBtn+'</div>';
+        }).join('')}</div>`:''}
       </div>`;
   var mediaHTML=(s.media&&s.media.length)?`<div style="margin-top:10px;">
     <div style="font-size:11px;font-weight:700;color:var(--navy);margin-bottom:6px;">📷 Fotos (${s.media.length})</div>
@@ -9345,7 +9353,7 @@ function aplicarEstructuraSOAPv2(r){
   if(r.modalidades.length){
     if(!Array.isArray(tempMods)) tempMods=[];
     _migrarMods(r.modalidades).forEach(m=>{ if(!tempMods.includes(m)) tempMods.push(m); });
-    _renderModGrid(); _renderModDetailCards();
+    _renderModGrid(); _renderModDetailCards(); if(typeof _renderEjSesion==='function') _renderEjSesion();
   }
   // Banderas
   _dictadoBanderas = Array.isArray(r.banderas)?[...r.banderas]:[];
@@ -9394,7 +9402,7 @@ function acomodarTranscripcionSOAP_v1_legacy(){
     if(!Array.isArray(tempMods)) tempMods=[];
     let nuevas=0;
     _migrarMods(mods).forEach(m=>{ if(!tempMods.includes(m)){ tempMods.push(m); nuevas++; } });
-    _renderModGrid(); _renderModDetailCards();
+    _renderModGrid(); _renderModDetailCards(); if(typeof _renderEjSesion==='function') _renderEjSesion();
     if(nuevas) showToast(`${nuevas} modalidad(es) detectada(s)`,'success');
   }
   chequearBanderasDictado(texto);
@@ -9776,7 +9784,7 @@ function showNuevoSOAP(){
   if(!currentPatient) return;
   // reset dictado 2.2
   _dictado.activo=false; _dictado.textoFinal=''; _dictado.textoInterino=''; _dictado.palabras=0; _dictadoSoapPreview=null; _dictadoMetadata=null; _dictadoManual=false;
-  tempMods=[]; tempModDetalles={}; tempEvaI=null; tempEvaF=undefined; tempEvolMedia=[]; _soapMediaTocada=false; editingSoapId=null; editingSoapPid=null; editingSoapEsHistorico=false; _editingSoapHistoricoNota=null; modoNotaActual=''; _dictadoBanderas=[]; _dictadoActivo=false; _dictadoTransPrecargada=false; _soapV2Resultado=null; _modoDescarga=false; limpiarDirty();
+  tempMods=[]; tempModDetalles={}; tempEvaI=null; tempEvaF=undefined; tempEvolMedia=[]; tempEjerciciosSesion=[]; _soapMediaTocada=false; editingSoapId=null; editingSoapPid=null; editingSoapEsHistorico=false; _editingSoapHistoricoNota=null; modoNotaActual=''; _dictadoBanderas=[]; _dictadoActivo=false; _dictadoTransPrecargada=false; _soapV2Resultado=null; _modoDescarga=false; limpiarDirty();
   tempEvolucionChips=[];
   const sesNum=(typeof currentPatient.sesiones==='number'?currentPatient.sesiones:0)+1; // FIX SESIÓN-NaN: guard defensivo
   const totalSes=parseInt(currentPatient.planTto?.sesiones);
@@ -10065,6 +10073,7 @@ function renderSOAPForm(){
         <div class="mod-auto-note">Se guarda automáticamente al guardar la nota</div>
       </div>
     </div>
+    <div id="ej-sesion-wrap" style="margin-top:10px"></div>
     <div class="form-group">
       <textarea class="form-input" id="f-ptratamiento" style="display:none"></textarea>
       <div class="form-field">
@@ -10267,6 +10276,7 @@ function guardarBorradorSoap(){
       esEdicion:!!editingSoapId, modoNota:(typeof modoNotaActual!=='undefined'?modoNotaActual:''), campos:campos,
       evaI:tempEvaI, evaF:tempEvaF,
       mods:Array.isArray(tempMods)?tempMods.slice():[],modDetalles:Object.assign({},tempModDetalles),
+      ejSesion:Array.isArray(tempEjerciciosSesion)?tempEjerciciosSesion.map(function(x){return Object.assign({},x);}):[],
       atendido:Array.isArray(tempAtendio)?tempAtendio.slice():[],
       motivoIndex:(typeof tempMotivoIndex==='number')?tempMotivoIndex:null };
     _purgarBorradoresSoapViejos();   // req #5: liberar espacio ANTES de escribir (purga >14 días)
@@ -10305,6 +10315,7 @@ function aplicarBorradorSoap(d){
     if(typeof d.evaI==='number'){ _setEvaProg('i', d.evaI); }
     if(typeof d.evaF==='number' || d.evaF===null){ _setEvaProg('f', d.evaF); }
     if(Array.isArray(d.mods)){ tempMods=_migrarMods(d.mods); tempModDetalles=(d.modDetalles&&typeof d.modDetalles==='object')?Object.assign({},d.modDetalles):{}; _renderModGrid(); _renderModDetailCards(); }
+    if(Array.isArray(d.ejSesion)){ tempEjerciciosSesion=d.ejSesion.map(function(x){return Object.assign({},x);}); if(typeof _renderEjSesion==='function') _renderEjSesion(); }
     if(Array.isArray(d.atendido)){ tempAtendio=d.atendido.slice(); if(typeof _renderAtendioGrid==='function') _renderAtendioGrid(); }
     if(typeof d.motivoIndex==='number') tempMotivoIndex=d.motivoIndex;
     if(typeof d.modoNota==='string' && d.modoNota && typeof seleccionarModoNota==='function'){ try{ seleccionarModoNota(d.modoNota); }catch(_){} } // [BORRADOR-SOAP] restaurar modo clínico → re-muestra la sección opcional y su metadato
@@ -10511,6 +10522,72 @@ function _ejChipsHTML(p){
 function _ejAplicar(n){
   if(_agregarLineaTratamiento('Ejercicio: '+n)) showToast('Agregado: '+n+'. Anota series×reps en el tratamiento.','success');
 }
+// ── FASE 1: EJERCICIOS TRABAJADOS EN SESIÓN ──────────────────────────────────
+// Marca cuáles de los ejercicios (con video) del paciente se trabajaron HOY y con qué dosis en
+// esta sesión. Queda ligado a la nota (datosNota.ejerciciosSesion) → continuidad entre fisios.
+function _ejSesIcon(ej){ var t=(ej&&ej.media&&ej.media.type)||''; return t.indexOf('video')===0?'🎥':t.indexOf('image')===0?'🖼️':'📝'; }
+function _ejSesSeleccionado(id){ return (Array.isArray(tempEjerciciosSesion)?tempEjerciciosSesion:[]).some(function(x){return x&&String(x.id)===String(id);}); }
+function _renderEjSesion(){
+  var wrap=document.getElementById('ej-sesion-wrap'); if(!wrap) return;
+  var p=currentPatient||{};
+  var ejs=Array.isArray(p.ejercicios)?p.ejercicios:[];
+  var head='<div style="font-size:12px;font-weight:800;color:var(--navy);margin-bottom:6px">🏋️ Ejercicios trabajados hoy <span style="font-weight:400;color:var(--gray-400)">(toca los que se hicieron en la sesión)</span></div>';
+  if(!ejs.length){
+    wrap.innerHTML=head+'<div style="font-size:12px;color:var(--gray-400);background:var(--gray-50);border:1px dashed var(--gray-300);border-radius:10px;padding:10px">Este paciente aún no tiene ejercicios con video. Créalos en la pestaña <b>Ejercicios</b> y aquí podrás marcar cuáles se trabajaron.</div>';
+    return;
+  }
+  var items=ejs.map(function(ej){
+    var id=String(ej.id||'');
+    var nombre=String(ej.nombre||ej.name||ej.label||'Ejercicio').trim();
+    var sel=_ejSesSeleccionado(id);
+    var dosisSel=(function(){ var it=(tempEjerciciosSesion||[]).find(function(x){return x&&String(x.id)===id;}); return it?(it.dosisSesion||''):(ej.dosis||''); })();
+    var fila='<div onclick="_toggleEjSesion(\''+escapeAttr_(id)+'\')" style="display:flex;align-items:center;gap:9px;padding:8px 10px;border:1px solid '+(sel?'var(--navy)':'var(--gray-200)')+';border-radius:10px;margin-bottom:6px;cursor:pointer;background:'+(sel?'#EEF4FB':'var(--card,#fff)')+'">'
+      +'<div style="width:30px;height:30px;border-radius:8px;background:#F0F5FB;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0">'+_ejSesIcon(ej)+'</div>'
+      +'<div style="flex:1;font-size:13px;font-weight:600;color:var(--ink,#1F2937)">'+escapeHTML(nombre)+'</div>'
+      +'<div style="width:22px;height:22px;border-radius:6px;border:2px solid '+(sel?'var(--navy)':'var(--gray-300)')+';background:'+(sel?'var(--navy)':'transparent')+';color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;flex-shrink:0">'+(sel?'✓':'')+'</div>'
+      +'</div>';
+    if(sel){
+      fila+='<div style="margin:-2px 0 8px 39px"><input type="text" value="'+escapeAttr_(dosisSel)+'" onclick="event.stopPropagation()" oninput="_setEjSesionDosis(\''+escapeAttr_(id)+'\',this.value)" placeholder="Dosis de hoy (ej. 3×12 · 5 kg)" style="width:calc(100% - 39px);box-sizing:border-box;font-size:12.5px;padding:7px 10px;border:1px solid var(--gray-200);border-radius:8px;font-family:inherit"></div>';
+    }
+    return fila;
+  }).join('');
+  wrap.innerHTML=head+items;
+}
+function _toggleEjSesion(id){
+  id=String(id);
+  var p=currentPatient||{};
+  var ej=(Array.isArray(p.ejercicios)?p.ejercicios:[]).find(function(e){return e&&String(e.id)===id;});
+  if(!Array.isArray(tempEjerciciosSesion)) tempEjerciciosSesion=[];
+  var idx=tempEjerciciosSesion.findIndex(function(x){return x&&String(x.id)===id;});
+  if(idx>=0){ tempEjerciciosSesion.splice(idx,1); }
+  else if(ej){
+    var m=ej.media||null;
+    tempEjerciciosSesion.push({
+      id:id, nombre:String(ej.nombre||ej.name||ej.label||'Ejercicio').trim(),
+      dosisSesion:String(ej.dosis||''),
+      media:m?{ type:m.type||'', url:m.url||'', fbPath:m.fbPath||'', label:m.label||m.name||'' }:null
+    });
+  }
+  _renderEjSesion(); marcarDirty();
+}
+function _setEjSesionDosis(id, val){
+  id=String(id);
+  var it=(Array.isArray(tempEjerciciosSesion)?tempEjerciciosSesion:[]).find(function(x){return x&&String(x.id)===id;});
+  if(it){ it.dosisSesion=val; marcarDirty(); }
+}
+// Visor de media para una nota guardada (la media viene copiada en la nota, no por índice).
+function _verMediaSesion(url, type, label){
+  if(!url){ showToast('Video no disponible','warning'); return; }
+  var ov=document.createElement('div');
+  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:100000;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:16px';
+  ov.onclick=function(e){ if(e.target===ov) ov.remove(); };
+  var media=(String(type||'').indexOf('image')===0)
+    ? '<img src="'+escapeAttr_(url)+'" style="max-width:100%;max-height:80vh;border-radius:10px">'
+    : '<video src="'+escapeAttr_(url)+'" controls autoplay playsinline style="max-width:100%;max-height:80vh;border-radius:10px"></video>';
+  ov.innerHTML='<div style="color:#fff;font-size:13px;font-weight:700;margin-bottom:10px">'+escapeHTML(label||'')+'</div>'+media
+    +'<button onclick="this.closest(\'div\').parentNode.remove()" style="margin-top:14px;background:#fff;color:#111;border:none;border-radius:10px;padding:8px 20px;font-size:13px;font-weight:700;cursor:pointer">Cerrar</button>';
+  document.body.appendChild(ov);
+}
 // ── 1C: atajo "sesión de descarga muscular" ──────────────────────────────────
 // Apaga TODO el SOAP (#soap-full) y deja solo el cuadro de descarga. Los EVA son los MISMOS
 // nodos del form (se mueven de lugar): tempEvaI/tempEvaF y la validación 1A quedan intactos.
@@ -10650,6 +10727,7 @@ async function guardarSOAP(){
     a:{evolucion:v('f-aevolucion'), respuesta:v('f-arespuesta'), analisis:v('f-aanalisis')},
     p:{tratamiento:v('f-ptratamiento'), indicaciones:v('f-pindicaciones'), contraindicaciones:v('f-pcontra')||'[pendiente]'},
     modalidades:[...tempMods], modalidadesDetalle:Object.assign({},tempModDetalles), evaI:tempEvaI, evaF:tempEvaF,
+    ejerciciosSesion:(Array.isArray(tempEjerciciosSesion)?tempEjerciciosSesion.map(function(x){return Object.assign({},x);}):[]),
     atendidoPor:[...(Array.isArray(tempAtendio)?tempAtendio:[])],
     media:[...tempEvolMedia], completa:true,
     modoNota: modoNotaActual||'',
@@ -11081,6 +11159,7 @@ function editarSOAP(soapId){
   // Cargar datos en variables globales
   tempMods=_migrarMods(nota.modalidades);
   tempModDetalles=(nota.modalidadesDetalle&&typeof nota.modalidadesDetalle==='object')?Object.assign({},nota.modalidadesDetalle):{};
+  tempEjerciciosSesion=Array.isArray(nota.ejerciciosSesion)?nota.ejerciciosSesion.map(function(x){return Object.assign({},x);}):[];
   tempEvaI=(nota.evaI!=null)?nota.evaI:null;
   tempEvaF=(nota.evaF!==undefined)?nota.evaF:null;
   tempEvolMedia=Array.isArray(nota.media)?nota.media.map(m=>({...m})):[]; // FIX media-edición: precargar media existente (evita WIPE al guardar)
@@ -11134,7 +11213,7 @@ function editarSOAP(soapId){
     }
     // EVA (1A: botones — repintar grillas desde los temps ya seteados)
     _pintarEvaBtns('i'); _pintarEvaBtns('f');
-    _renderModGrid(); _renderModDetailCards();
+    _renderModGrid(); _renderModDetailCards(); if(typeof _renderEjSesion==='function') _renderEjSesion();
     // Pre-seleccionar terapeuta en el selector de edición
     const stEl=document.getElementById('f-soap-terapeuta');
     if(stEl && nota.terapeuta) stEl.value=nota.terapeuta;
@@ -11159,6 +11238,7 @@ async function editarSoapHistorico(sid, pid){
   _editingSoapHistoricoNota=nota;
   tempMods=_migrarMods(nota.modalidades);
   tempModDetalles=(nota.modalidadesDetalle&&typeof nota.modalidadesDetalle==='object')?Object.assign({},nota.modalidadesDetalle):{};
+  tempEjerciciosSesion=Array.isArray(nota.ejerciciosSesion)?nota.ejerciciosSesion.map(function(x){return Object.assign({},x);}):[];
   tempEvaI=nota.evaI!=null?Number(nota.evaI):null;
   tempEvaF=(nota.evaF!==undefined)?(nota.evaF!=null?Number(nota.evaF):null):null;
   tempEvolMedia=Array.isArray(nota.media)?nota.media.map(function(m){return Object.assign({},m);}):[]; // FIX media-edición: precargar media existente de la nota histórica
@@ -11192,7 +11272,7 @@ async function editarSoapHistorico(sid, pid){
     if(nota.modoNota) seleccionarModoNota(nota.modoNota);
     // EVA (1A: botones — repintar grillas desde los temps ya seteados)
     _pintarEvaBtns('i'); _pintarEvaBtns('f');
-    _renderModGrid(); _renderModDetailCards();
+    _renderModGrid(); _renderModDetailCards(); if(typeof _renderEjSesion==='function') _renderEjSesion();
     // Cambiar título del botón guardar
     var btnGuardar=document.querySelector('[onclick="guardarSOAP()"]');
     if(btnGuardar) btnGuardar.textContent='💾 Guardar cambios (histórico)';
@@ -11544,6 +11624,8 @@ function copiarSesionAnterior(){
   // 8. Copiar modalidades
   tempMods = _migrarMods(lastSoap.modalidades);
   tempModDetalles = (lastSoap.modalidadesDetalle && typeof lastSoap.modalidadesDetalle==='object') ? Object.assign({},lastSoap.modalidadesDetalle) : {};
+  // Copiar también los ejercicios trabajados de la sesión anterior como punto de partida (editable).
+  tempEjerciciosSesion = Array.isArray(lastSoap.ejerciciosSesion) ? lastSoap.ejerciciosSesion.map(function(x){return Object.assign({},x);}) : [];
 
   // 9. Copiar EVA inicial (1A: botones; solo si trae número real)
   if(lastSoap.evaI != null && isFinite(Number(lastSoap.evaI))){
