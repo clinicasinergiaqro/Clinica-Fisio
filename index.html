@@ -7978,6 +7978,7 @@ function renderExpediente(tab='historia'){
     <button class="tab ${tab==='estudios'?'active':''}" onclick="renderExpediente('estudios')">Estudios</button>
     <button class="tab ${tab==='reporte'?'active':''}" onclick="renderExpediente('reporte')">📄 Reporte${(typeof _RPT_tieneSintesisValidada==='function' && !_RPT_tieneSintesisValidada(p))?' <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--amber);vertical-align:middle"></span>':''}</button>
     <button class="tab ${tab==='ejercicios'?'active':''}" onclick="showEjercicios()">🏃 Ejercicios</button>
+    <button class="tab ${tab==='biomecanica'?'active':''}" onclick="renderExpediente('biomecanica')">🦴 Biomecánica</button>
     <button class="tab ${tab==='consent'?'active':''}" onclick="renderExpediente('consent')">Consentimiento</button>
   </div>
   ${(currentUser&&(currentUser.role==='supervisor'||currentUser.name==='CARLOS'||p.terapeuta===currentUser.name||p.terapeutaSeguimiento===currentUser.name))?`<div style="padding:4px 14px 0;text-align:right"><button data-pid="${escapeAttr_(p.id)}" onclick="exportarExpedienteJSON(this.dataset.pid)" style="background:transparent;border:1px solid rgba(255,255,255,.4);color:white;border-radius:16px;padding:4px 12px;font-size:11px;cursor:pointer;font-weight:600">📥 Exportar JSON</button></div>`:''}
@@ -8326,6 +8327,11 @@ function renderExpediente(tab='historia'){
         <div class="alert-banner-text">Este paciente aún no tiene consentimiento informado firmado.</div></div>
         <button class="btn-gold" onclick="showConsentimiento()">✍️ Firmar consentimiento ahora</button>`;
     }
+  }
+
+  if(tab==='biomecanica'){
+    html += (typeof BIO_renderPestana==='function') ? BIO_renderPestana(p)
+      : '<div style="padding:20px;text-align:center;color:var(--gray-400);font-size:13px">Módulo biomecánico no disponible (recarga la app).</div>';
   }
 
   c.innerHTML=html;
@@ -21109,5 +21115,7 @@ async function guardarPDFScannerMultipagina(){
 })();
 
 </script>
+<!-- MÓDULO BIOMECÁNICO — Fase 1 (ROM en vivo + análisis de video). Archivo nuevo, aislado. -->
+<script src="medidor-biomecanico.js"></script>
 </body>
 </html>
