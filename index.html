@@ -10536,11 +10536,11 @@ function _renderEjSesion(){
   var p=currentPatient||{};
   var ejs=Array.isArray(p.ejercicios)?p.ejercicios:[];
   var head='<div style="font-size:12px;font-weight:800;color:var(--navy);margin-bottom:6px">🏋️ Ejercicios trabajados hoy <span style="font-weight:400;color:var(--gray-400)">(toca los que se hicieron en la sesión)</span></div>';
+  var items;
   if(!ejs.length){
-    wrap.innerHTML=head+'<div style="font-size:12px;color:var(--gray-400);background:var(--gray-50);border:1px dashed var(--gray-300);border-radius:10px;padding:10px">Este paciente aún no tiene ejercicios con video. Créalos en la pestaña <b>Ejercicios</b> y aquí podrás marcar cuáles se trabajaron.</div>';
-    return;
-  }
-  var items=ejs.map(function(ej){
+    items='<div style="font-size:12px;color:var(--gray-400);background:var(--gray-50);border:1px dashed var(--gray-300);border-radius:10px;padding:10px;margin-bottom:6px">Aún no hay ejercicios. Graba uno aquí mismo con el botón de abajo, o créalos en la pestaña <b>Ejercicios</b>.</div>';
+  } else {
+  items=ejs.map(function(ej){
     var id=String(ej.id||'');
     var nombre=String(ej.nombre||ej.name||ej.label||'Ejercicio').trim();
     var sel=_ejSesSeleccionado(id);
@@ -10555,7 +10555,10 @@ function _renderEjSesion(){
     }
     return fila;
   }).join('');
-  wrap.innerHTML=head+items;
+  }
+  var _cap='<input type="file" id="ej-ses-capture" accept="image/*,video/*" style="display:none" onchange="_grabarEjSesion(event)">'
+    +'<button type="button" onclick="var i=document.getElementById(\'ej-ses-capture\');if(i)i.click()" style="width:100%;margin-top:4px;background:#F0F5FB;color:var(--navy);border:1.5px dashed var(--navy);border-radius:10px;padding:9px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit">➕ Grabar / subir ejercicio</button>';
+  wrap.innerHTML=head+items+_cap;
 }
 function _toggleEjSesion(id){
   id=String(id);
@@ -10578,6 +10581,37 @@ function _setEjSesionDosis(id, val){
   id=String(id);
   var it=(Array.isArray(tempEjerciciosSesion)?tempEjerciciosSesion:[]).find(function(x){return x&&String(x.id)===id;});
   if(it){ it.dosisSesion=val; marcarDirty(); }
+}
+// Grabar/subir un ejercicio DESDE la nota SOAP: sube la media, crea el ejercicio en el paciente
+// (aparece también en la pestaña Ejercicios) y lo marca como trabajado en esta sesión. Sin nombre:
+// se identifica por su video/foto + la dosis de la sesión (editable). Reutiliza la subida a Storage.
+async function _grabarEjSesion(ev){
+  var file=ev&&ev.target&&ev.target.files&&ev.target.files[0]; if(ev&&ev.target) ev.target.value='';
+  if(!file) return;
+  var p=currentPatient; if(!p||!p.id){ showToast('Sin paciente activo','error'); return; }
+  if(file.size>80*1024*1024){ showToast('Archivo muy pesado. Graba uno más corto.','error'); return; }
+  if(String(file.type).indexOf('video/')===0 && !navigator.onLine){ showToast('Sin conexión — conéctate para subir videos','error'); return; }
+  if(String(file.type).indexOf('image/')!==0 && String(file.type).indexOf('video/')!==0){ showToast('Solo foto o video','error'); return; }
+  showToast('☁️ Subiendo…','');
+  try{
+    var res=await subirMediaEjercicioAStorage(file);   // {url, fbPath}
+    var ahora=(typeof todayFmt==='function')?todayFmt():'';
+    var hora=new Date().toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'});
+    var media={ id:'media_'+Date.now(), name:file.name, label:'', type:file.type, mimeType:file.type, sizeBytes:file.size, storageProvider:'firebase', fbPath:res.fbPath, url:res.url, data:null };
+    var ejId='ej'+Date.now();
+    var ej={ id:ejId, nombre:'Ejercicio '+ahora+' · '+hora, name:'Ejercicio '+ahora+' · '+hora,
+      objetivo:'Registrado en sesión', dosis:'', series:'',repeticiones:'',tiempo:'',frecuencia:'',duracion:'',
+      indicaciones:'', precauciones:'', observaciones:'', fecha:ahora, terapeuta:(currentUser&&currentUser.name)||'',
+      estado:'activo', media:media };
+    if(!Array.isArray(p.ejercicios)) p.ejercicios=[];
+    p.ejercicios.push(ej);
+    p.updatedAt=Date.now();
+    if(!Array.isArray(tempEjerciciosSesion)) tempEjerciciosSesion=[];
+    tempEjerciciosSesion.push({ id:ejId, nombre:ej.nombre, dosisSesion:'', media:{ type:media.type, url:media.url, fbPath:media.fbPath, label:'' } });
+    try{ saveDB('pts',[p],{camposHist:['ejercicios']}); }catch(_){}
+    _renderEjSesion(); marcarDirty();
+    showToast('✅ Ejercicio grabado y marcado en la sesión','success');
+  }catch(e){ console.warn('[grabar-ej-sesion]', e&&e.message); showToast('No se pudo subir: '+((e&&e.message)||'error'),'error'); }
 }
 // Visor de media para una nota guardada (la media viene copiada en la nota, no por índice).
 function _verMediaSesion(url, type, label){
