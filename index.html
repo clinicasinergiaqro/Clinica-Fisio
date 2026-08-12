@@ -10243,6 +10243,10 @@ function renderSOAPForm(){
   <div style="height:20px"></div>`;
   // [BORRADOR-SOAP] write-ahead: attach autosave a los campos, y tras el poblado de edición (~150ms) ofrecer restaurar.
   setTimeout(function(){ try{ activarAutosaveSoap(); }catch(_){} }, 60);
+  // FASE 1 EJERCICIOS: el grid de modalidades se pinta inline, así que el bloque de "ejercicios
+  // trabajados hoy" hay que renderizarlo aquí tras pintar el form (nota nueva). En edición/copiar
+  // se re-renderiza en sus puntos tras poblar tempEjerciciosSesion.
+  setTimeout(function(){ try{ if(typeof _renderEjSesion==='function') _renderEjSesion(); }catch(_){} }, 80);
   setTimeout(function(){ try{ cargarBorradorSoapSiExiste(); }catch(_){} }, 260);
 }
 
