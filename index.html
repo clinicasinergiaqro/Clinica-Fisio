@@ -1387,6 +1387,9 @@ let tempMods=[], tempModDetalles={}, tempEvaI=null, tempEvaF, tempEvolMedia=[];
 // FASE 1 EJERCICIOS-EN-SESIÓN: ejercicios del paciente marcados como "trabajados hoy" en esta nota.
 // Cada item: {id, nombre, dosisSesion, media:{url,fbPath,type,label}}. Se guarda en datosNota.ejerciciosSesion.
 let tempEjerciciosSesion=[];
+// FASE 2 VALORACIÓN VISUAL: fotos/videos de movimiento en el bloque O (ángulo/biomecánica) por sesión.
+// Cada item: {id, type, url, fbPath}. Se guarda en datosNota.mediaObjetivo.
+let tempMediaObjetivo=[];
 // FIX media-edición (flag sentinel): distingue "el usuario tocó el preview de media" (agregó/quitó)
 // de "el form nunca cargó la media". Se pone true en handleSoapPhoto/removeSoapMedia y se resetea a
 // false al abrir cualquier form (después del preload). Permite VACIAR media a propósito sin que la
@@ -7861,6 +7864,12 @@ function _renderSoapCard(s,p,readOnly){
         <div class="soap-sub">ROM:</div><div class="soap-text">${escapeHTML(s.o.rom)}</div>
         <div class="soap-sub">Fuerza:</div><div class="soap-text">${escapeHTML(s.o.fuerza)}</div>
         <div class="soap-sub">Hallazgos:</div><div class="soap-text">${escapeHTML(s.o.hallazgos)}</div>
+        ${(Array.isArray(s.mediaObjetivo)&&s.mediaObjetivo.length)?`<div class="soap-sub">📐 Valoración visual:</div><div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:2px">${s.mediaObjetivo.map(function(m){
+          var src=m.url||m.data||''; var t=String(m.type||'');
+          var verArgs=JSON.stringify(src).replace(/"/g,'&quot;')+','+JSON.stringify(t).replace(/"/g,'&quot;')+','+JSON.stringify('Valoración').replace(/"/g,'&quot;');
+          var inner=(src&&t.indexOf('video')===0)?'<video src="'+escapeAttr_(src)+'" preload="metadata" muted playsinline style="width:100%;height:100%;object-fit:cover"></video><div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:16px;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.7)">▶</div>':(src&&t.indexOf('image')===0)?'<img src="'+escapeAttr_(src)+'" loading="lazy" style="width:100%;height:100%;object-fit:cover">':'<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:18px">📎</div>';
+          return '<div onclick="'+(src?('_verMediaSesion('+verArgs+')'):'')+'" style="width:72px;height:72px;border-radius:9px;overflow:hidden;position:relative;background:#0E1622;cursor:'+(src?'pointer':'default')+'">'+inner+'</div>';
+        }).join('')}</div>`:''}
       </div>
       <div class="soap-section">
         <div class="soap-label"><span class="soap-a">A — Análisis</span></div>
@@ -9353,7 +9362,7 @@ function aplicarEstructuraSOAPv2(r){
   if(r.modalidades.length){
     if(!Array.isArray(tempMods)) tempMods=[];
     _migrarMods(r.modalidades).forEach(m=>{ if(!tempMods.includes(m)) tempMods.push(m); });
-    _renderModGrid(); _renderModDetailCards(); if(typeof _renderEjSesion==='function') _renderEjSesion();
+    _renderModGrid(); _renderModDetailCards(); if(typeof _renderEjSesion==='function') _renderEjSesion(); if(typeof _renderMediaObjetivo==='function') _renderMediaObjetivo();
   }
   // Banderas
   _dictadoBanderas = Array.isArray(r.banderas)?[...r.banderas]:[];
@@ -9402,7 +9411,7 @@ function acomodarTranscripcionSOAP_v1_legacy(){
     if(!Array.isArray(tempMods)) tempMods=[];
     let nuevas=0;
     _migrarMods(mods).forEach(m=>{ if(!tempMods.includes(m)){ tempMods.push(m); nuevas++; } });
-    _renderModGrid(); _renderModDetailCards(); if(typeof _renderEjSesion==='function') _renderEjSesion();
+    _renderModGrid(); _renderModDetailCards(); if(typeof _renderEjSesion==='function') _renderEjSesion(); if(typeof _renderMediaObjetivo==='function') _renderMediaObjetivo();
     if(nuevas) showToast(`${nuevas} modalidad(es) detectada(s)`,'success');
   }
   chequearBanderasDictado(texto);
@@ -9784,7 +9793,7 @@ function showNuevoSOAP(){
   if(!currentPatient) return;
   // reset dictado 2.2
   _dictado.activo=false; _dictado.textoFinal=''; _dictado.textoInterino=''; _dictado.palabras=0; _dictadoSoapPreview=null; _dictadoMetadata=null; _dictadoManual=false;
-  tempMods=[]; tempModDetalles={}; tempEvaI=null; tempEvaF=undefined; tempEvolMedia=[]; tempEjerciciosSesion=[]; _soapMediaTocada=false; editingSoapId=null; editingSoapPid=null; editingSoapEsHistorico=false; _editingSoapHistoricoNota=null; modoNotaActual=''; _dictadoBanderas=[]; _dictadoActivo=false; _dictadoTransPrecargada=false; _soapV2Resultado=null; _modoDescarga=false; limpiarDirty();
+  tempMods=[]; tempModDetalles={}; tempEvaI=null; tempEvaF=undefined; tempEvolMedia=[]; tempEjerciciosSesion=[]; tempMediaObjetivo=[]; _soapMediaTocada=false; editingSoapId=null; editingSoapPid=null; editingSoapEsHistorico=false; _editingSoapHistoricoNota=null; modoNotaActual=''; _dictadoBanderas=[]; _dictadoActivo=false; _dictadoTransPrecargada=false; _soapV2Resultado=null; _modoDescarga=false; limpiarDirty();
   tempEvolucionChips=[];
   const sesNum=(typeof currentPatient.sesiones==='number'?currentPatient.sesiones:0)+1; // FIX SESIÓN-NaN: guard defensivo
   const totalSes=parseInt(currentPatient.planTto?.sesiones);
@@ -10024,6 +10033,7 @@ function renderSOAPForm(){
         <div class="form-label">Hallazgos / pruebas clínicas <span class="req">*</span>${_traerBtn('f-ohallazgos')}</div>
         <textarea class="form-input" id="f-ohallazgos" placeholder="Ej: Clarke (+) con crepitación. Polo inferior rótula 7/10 a palpación..."></textarea>
       </div>
+      <div id="media-obj-wrap" style="margin-top:4px"></div>
     </div>
   </div>
 
@@ -10246,7 +10256,7 @@ function renderSOAPForm(){
   // FASE 1 EJERCICIOS: el grid de modalidades se pinta inline, así que el bloque de "ejercicios
   // trabajados hoy" hay que renderizarlo aquí tras pintar el form (nota nueva). En edición/copiar
   // se re-renderiza en sus puntos tras poblar tempEjerciciosSesion.
-  setTimeout(function(){ try{ if(typeof _renderEjSesion==='function') _renderEjSesion(); }catch(_){} }, 80);
+  setTimeout(function(){ try{ if(typeof _renderEjSesion==='function') _renderEjSesion(); if(typeof _renderMediaObjetivo==='function') _renderMediaObjetivo(); }catch(_){} }, 80);
   setTimeout(function(){ try{ cargarBorradorSoapSiExiste(); }catch(_){} }, 260);
 }
 
@@ -10281,6 +10291,7 @@ function guardarBorradorSoap(){
       evaI:tempEvaI, evaF:tempEvaF,
       mods:Array.isArray(tempMods)?tempMods.slice():[],modDetalles:Object.assign({},tempModDetalles),
       ejSesion:Array.isArray(tempEjerciciosSesion)?tempEjerciciosSesion.map(function(x){return Object.assign({},x);}):[],
+      mediaObj:Array.isArray(tempMediaObjetivo)?tempMediaObjetivo.map(function(x){return Object.assign({},x);}):[],
       atendido:Array.isArray(tempAtendio)?tempAtendio.slice():[],
       motivoIndex:(typeof tempMotivoIndex==='number')?tempMotivoIndex:null };
     _purgarBorradoresSoapViejos();   // req #5: liberar espacio ANTES de escribir (purga >14 días)
@@ -10320,6 +10331,7 @@ function aplicarBorradorSoap(d){
     if(typeof d.evaF==='number' || d.evaF===null){ _setEvaProg('f', d.evaF); }
     if(Array.isArray(d.mods)){ tempMods=_migrarMods(d.mods); tempModDetalles=(d.modDetalles&&typeof d.modDetalles==='object')?Object.assign({},d.modDetalles):{}; _renderModGrid(); _renderModDetailCards(); }
     if(Array.isArray(d.ejSesion)){ tempEjerciciosSesion=d.ejSesion.map(function(x){return Object.assign({},x);}); if(typeof _renderEjSesion==='function') _renderEjSesion(); }
+    if(Array.isArray(d.mediaObj)){ tempMediaObjetivo=d.mediaObj.map(function(x){return Object.assign({},x);}); if(typeof _renderMediaObjetivo==='function') _renderMediaObjetivo(); }
     if(Array.isArray(d.atendido)){ tempAtendio=d.atendido.slice(); if(typeof _renderAtendioGrid==='function') _renderAtendioGrid(); }
     if(typeof d.motivoIndex==='number') tempMotivoIndex=d.motivoIndex;
     if(typeof d.modoNota==='string' && d.modoNota && typeof seleccionarModoNota==='function'){ try{ seleccionarModoNota(d.modoNota); }catch(_){} } // [BORRADOR-SOAP] restaurar modo clínico → re-muestra la sección opcional y su metadato
@@ -10609,6 +10621,55 @@ function _borrarEjSesion(id){
   _renderEjSesion(); marcarDirty();
   showToast('🗑 Ejercicio eliminado','success');
 }
+
+// ── FASE 2: VALORACIÓN VISUAL (foto/video en el bloque O) ─────────────────────
+// Documenta el movimiento de forma objetiva: foto para medir ángulo, video para biomecánica.
+// Se sube a Storage y queda ligado a la nota (datosNota.mediaObjetivo). Reutiliza el visor y la subida.
+function _renderMediaObjetivo(){
+  var wrap=document.getElementById('media-obj-wrap'); if(!wrap) return;
+  var arr=Array.isArray(tempMediaObjetivo)?tempMediaObjetivo:[];
+  var head='<div style="font-size:12px;font-weight:800;color:var(--navy);margin:8px 0 6px">📐 Foto / video de valoración <span style="font-weight:400;color:var(--gray-400)">(ángulo con foto · movimiento con video)</span></div>';
+  var thumbs='';
+  if(arr.length){
+    thumbs='<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:6px">'+arr.map(function(m){
+      var id=String(m.id||''); var src=m.url||m.data||''; var t=String(m.type||'');
+      var verArgs=JSON.stringify(src).replace(/"/g,'&quot;')+','+JSON.stringify(t).replace(/"/g,'&quot;')+','+JSON.stringify('Valoración').replace(/"/g,'&quot;');
+      var inner = (src && t.indexOf('video')===0) ? '<video src="'+escapeAttr_(src)+'" preload="metadata" muted playsinline style="width:100%;height:100%;object-fit:cover"></video><div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:18px;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.7)">▶</div>'
+        : (src && t.indexOf('image')===0) ? '<img src="'+escapeAttr_(src)+'" loading="lazy" style="width:100%;height:100%;object-fit:cover">'
+        : '<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:20px">📎</div>';
+      return '<div style="width:82px;height:82px;border-radius:10px;overflow:hidden;position:relative;background:#0E1622">'
+        +'<div onclick="'+(src?('_verMediaSesion('+verArgs+')'):'')+'" style="position:absolute;inset:0;cursor:'+(src?'pointer':'default')+'">'+inner+'</div>'
+        +'<button type="button" onclick="event.stopPropagation();_borrarMediaObjetivo(\''+escapeAttr_(id)+'\')" title="Eliminar" style="position:absolute;top:2px;right:2px;background:rgba(185,28,28,.92);border:none;border-radius:50%;width:22px;height:22px;color:#fff;font-size:12px;font-weight:800;cursor:pointer;line-height:1">✕</button>'
+        +'</div>';
+    }).join('')+'</div>';
+  }
+  var cap='<input type="file" id="media-obj-capture" accept="image/*,video/*" style="display:none" onchange="_capturarMediaObjetivo(event)">'
+    +'<button type="button" onclick="var i=document.getElementById(\'media-obj-capture\');if(i)i.click()" style="width:100%;background:#F0F5FB;color:var(--navy);border:1.5px dashed var(--navy);border-radius:10px;padding:9px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit">📷 Agregar foto / video de valoración</button>';
+  wrap.innerHTML=head+thumbs+cap;
+}
+async function _capturarMediaObjetivo(ev){
+  var file=ev&&ev.target&&ev.target.files&&ev.target.files[0]; if(ev&&ev.target) ev.target.value='';
+  if(!file) return;
+  if(!currentPatient||!currentPatient.id){ showToast('Sin paciente activo','error'); return; }
+  if(file.size>80*1024*1024){ showToast('Archivo muy pesado. Graba uno más corto.','error'); return; }
+  if(String(file.type).indexOf('video/')===0 && !navigator.onLine){ showToast('Sin conexión — conéctate para subir videos','error'); return; }
+  if(String(file.type).indexOf('image/')!==0 && String(file.type).indexOf('video/')!==0){ showToast('Solo foto o video','error'); return; }
+  showToast('☁️ Subiendo…','');
+  try{
+    var res=await subirMediaEjercicioAStorage(file);   // reutiliza la subida (guarda bajo /ejercicios pero sirve)
+    if(!Array.isArray(tempMediaObjetivo)) tempMediaObjetivo=[];
+    tempMediaObjetivo.push({ id:'mo'+Date.now(), type:file.type, url:res.url, fbPath:res.fbPath });
+    _renderMediaObjetivo(); marcarDirty();
+    showToast('✅ Registro visual agregado','success');
+  }catch(e){ console.warn('[media-obj]', e&&e.message); showToast('No se pudo subir: '+((e&&e.message)||'error'),'error'); }
+}
+function _borrarMediaObjetivo(id){
+  id=String(id);
+  if(!confirm('¿Eliminar este registro visual de valoración?')) return;
+  if(Array.isArray(tempMediaObjetivo)) tempMediaObjetivo=tempMediaObjetivo.filter(function(x){return !(x&&String(x.id)===id);});
+  _renderMediaObjetivo(); marcarDirty();
+  showToast('🗑 Eliminado','success');
+}
 // Grabar/subir un ejercicio DESDE la nota SOAP: sube la media, crea el ejercicio en el paciente
 // (aparece también en la pestaña Ejercicios) y lo marca como trabajado en esta sesión. Sin nombre:
 // se identifica por su video/foto + la dosis de la sesión (editable). Reutiliza la subida a Storage.
@@ -10797,6 +10858,7 @@ async function guardarSOAP(){
     p:{tratamiento:v('f-ptratamiento'), indicaciones:v('f-pindicaciones'), contraindicaciones:v('f-pcontra')||'[pendiente]'},
     modalidades:[...tempMods], modalidadesDetalle:Object.assign({},tempModDetalles), evaI:tempEvaI, evaF:tempEvaF,
     ejerciciosSesion:(Array.isArray(tempEjerciciosSesion)?tempEjerciciosSesion.map(function(x){return Object.assign({},x);}):[]),
+    mediaObjetivo:(Array.isArray(tempMediaObjetivo)?tempMediaObjetivo.map(function(x){return Object.assign({},x);}):[]),
     atendidoPor:[...(Array.isArray(tempAtendio)?tempAtendio:[])],
     media:[...tempEvolMedia], completa:true,
     modoNota: modoNotaActual||'',
@@ -11229,6 +11291,7 @@ function editarSOAP(soapId){
   tempMods=_migrarMods(nota.modalidades);
   tempModDetalles=(nota.modalidadesDetalle&&typeof nota.modalidadesDetalle==='object')?Object.assign({},nota.modalidadesDetalle):{};
   tempEjerciciosSesion=Array.isArray(nota.ejerciciosSesion)?nota.ejerciciosSesion.map(function(x){return Object.assign({},x);}):[];
+  tempMediaObjetivo=Array.isArray(nota.mediaObjetivo)?nota.mediaObjetivo.map(function(x){return Object.assign({},x);}):[];
   tempEvaI=(nota.evaI!=null)?nota.evaI:null;
   tempEvaF=(nota.evaF!==undefined)?nota.evaF:null;
   tempEvolMedia=Array.isArray(nota.media)?nota.media.map(m=>({...m})):[]; // FIX media-edición: precargar media existente (evita WIPE al guardar)
@@ -11282,7 +11345,7 @@ function editarSOAP(soapId){
     }
     // EVA (1A: botones — repintar grillas desde los temps ya seteados)
     _pintarEvaBtns('i'); _pintarEvaBtns('f');
-    _renderModGrid(); _renderModDetailCards(); if(typeof _renderEjSesion==='function') _renderEjSesion();
+    _renderModGrid(); _renderModDetailCards(); if(typeof _renderEjSesion==='function') _renderEjSesion(); if(typeof _renderMediaObjetivo==='function') _renderMediaObjetivo();
     // Pre-seleccionar terapeuta en el selector de edición
     const stEl=document.getElementById('f-soap-terapeuta');
     if(stEl && nota.terapeuta) stEl.value=nota.terapeuta;
@@ -11308,6 +11371,7 @@ async function editarSoapHistorico(sid, pid){
   tempMods=_migrarMods(nota.modalidades);
   tempModDetalles=(nota.modalidadesDetalle&&typeof nota.modalidadesDetalle==='object')?Object.assign({},nota.modalidadesDetalle):{};
   tempEjerciciosSesion=Array.isArray(nota.ejerciciosSesion)?nota.ejerciciosSesion.map(function(x){return Object.assign({},x);}):[];
+  tempMediaObjetivo=Array.isArray(nota.mediaObjetivo)?nota.mediaObjetivo.map(function(x){return Object.assign({},x);}):[];
   tempEvaI=nota.evaI!=null?Number(nota.evaI):null;
   tempEvaF=(nota.evaF!==undefined)?(nota.evaF!=null?Number(nota.evaF):null):null;
   tempEvolMedia=Array.isArray(nota.media)?nota.media.map(function(m){return Object.assign({},m);}):[]; // FIX media-edición: precargar media existente de la nota histórica
@@ -11341,7 +11405,7 @@ async function editarSoapHistorico(sid, pid){
     if(nota.modoNota) seleccionarModoNota(nota.modoNota);
     // EVA (1A: botones — repintar grillas desde los temps ya seteados)
     _pintarEvaBtns('i'); _pintarEvaBtns('f');
-    _renderModGrid(); _renderModDetailCards(); if(typeof _renderEjSesion==='function') _renderEjSesion();
+    _renderModGrid(); _renderModDetailCards(); if(typeof _renderEjSesion==='function') _renderEjSesion(); if(typeof _renderMediaObjetivo==='function') _renderMediaObjetivo();
     // Cambiar título del botón guardar
     var btnGuardar=document.querySelector('[onclick="guardarSOAP()"]');
     if(btnGuardar) btnGuardar.textContent='💾 Guardar cambios (histórico)';
