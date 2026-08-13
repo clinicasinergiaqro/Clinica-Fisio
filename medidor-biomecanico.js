@@ -293,6 +293,7 @@
       +   '<div class="bio-cron" id="bio-cron" style="display:none">00:00</div>'
       +   '<div class="bio-panel" id="bio-panel-vivo"></div>'
       +   '<div class="bio-acciones">'
+      +     '<button class="bio-b-sec" id="bio-btn-flip" style="flex:0 0 auto;min-width:auto;padding:13px 16px">🔄 Cámara</button>'
       +     '<button class="bio-b-rec" id="bio-btn-rec" disabled>⏺️ Grabar sesión</button>'
       +   '</div>'
       + '</div>'
@@ -316,6 +317,7 @@
       if(f) procesarVideo(f);
     });
     document.getElementById('bio-btn-rec').addEventListener('click', toggleGrabacion);
+    document.getElementById('bio-btn-flip').addEventListener('click', voltearCamara);
     document.getElementById('bio-prog-cancel').addEventListener('click', function(){ BIO.cancelVideo=true; });
   }
 
@@ -337,13 +339,20 @@
   function resetEstado(){
     BIO.modo=null; BIO.recording=false; BIO.procesandoVideo=false; BIO.cancelVideo=false;
     BIO.acc=null; BIO.framesTotales=0; BIO.srcEl=null; BIO.sending=false;
+    BIO.facing='environment';           // cada medición arranca con la cámara TRASERA
+    detenerGrabadorVideo(); BIO.pendingVideo=null;
     detenerLoopCamara(); pararCronometro();
   }
   function cerrarMedidor(){
     BIO.cancelVideo=true;
+    detenerGrabadorVideo(); BIO.pendingVideo=null;
     detenerCamaraStream(); detenerLoopCamara(); pararCronometro();
     BIO.recording=false; BIO.procesandoVideo=false; BIO.modo=null; BIO.srcEl=null;
     var ov=document.getElementById('bio-overlay'); if(ov) ov.style.display='none';
+  }
+  function detenerGrabadorVideo(){
+    try{ if(BIO.recorder && BIO.recorder.state!=='inactive') BIO.recorder.stop(); }catch(e){}
+    BIO.recorder=null; BIO.recChunks=null;
   }
   function detenerCamaraStream(){
     try{ if(BIO.stream){ BIO.stream.getTracks().forEach(function(t){ t.stop(); }); BIO.stream=null; } }catch(e){}
@@ -354,6 +363,7 @@
   // ── MODO A: cámara en vivo ─────────────────────────────────────────────────
   async function iniciarCamara(){
     BIO.modo='camara';
+    BIO.facing = BIO.facing || 'environment';   // TRASERA por defecto (se apunta al paciente)
     mostrarVista('bio-vista-camara');
     BIO.canvas=document.getElementById('bio-canvas'); BIO.ctx=BIO.canvas.getContext('2d');
     pintarPanelVivo(null);
@@ -361,21 +371,38 @@
     estado.textContent='Cargando modelo de pose…';
     var ok = await ensureMediaPipeReady();
     if(!ok){ estado.textContent='⚠️ No se pudo cargar el motor de pose. Revisa tu conexión e inténtalo de nuevo.'; return; }
-    try{
-      // Cámara FRONTAL (patrón del consentimiento).
-      BIO.stream = await navigator.mediaDevices.getUserMedia({
-        video:{ facingMode:{ideal:'user'}, width:{ideal:1280}, height:{ideal:720} }, audio:false
-      });
-    }catch(e){
-      estado.textContent='⚠️ Permiso de cámara denegado o no disponible. Puedes usar "📁 Subir video".';
-      return;
-    }
-    var v=document.createElement('video'); v.autoplay=true; v.muted=true; v.playsInline=true;
-    v.srcObject=BIO.stream; BIO.video=v; BIO.srcEl=v;
-    await v.play();
-    estado.textContent='Colócate de cuerpo completo frente a la cámara';
+    var camOk = await abrirStreamCamara(BIO.facing);
+    if(!camOk) return;
+    estado.textContent='Coloca al paciente de cuerpo completo en el encuadre';
     BIO.acc=null; BIO.framesTotales=0;
     loopCamara();
+  }
+  // Abre (o reabre) el stream con la cámara indicada. Reutiliza el <video> y el loop.
+  async function abrirStreamCamara(facing){
+    detenerCamaraStream();
+    var estado=document.getElementById('bio-estado');
+    try{
+      BIO.stream = await navigator.mediaDevices.getUserMedia({
+        video:{ facingMode:{ideal:facing}, width:{ideal:1280}, height:{ideal:720} }, audio:false
+      });
+    }catch(e){
+      // Fallback: cualquier cámara disponible (iPads viejos o sin cámara trasera enumerable).
+      try{ BIO.stream = await navigator.mediaDevices.getUserMedia({ video:true, audio:false }); }
+      catch(e2){ if(estado) estado.textContent='⚠️ Permiso de cámara denegado o no disponible. Puedes usar "📁 Subir video".'; return false; }
+    }
+    var v = BIO.video || document.createElement('video');
+    v.autoplay=true; v.muted=true; v.playsInline=true; v.setAttribute('playsinline','');
+    v.srcObject=BIO.stream; BIO.video=v; BIO.srcEl=v;
+    try{ await v.play(); }catch(_){}
+    return true;
+  }
+  // Alterna trasera/frontal sin reiniciar el flujo (el loop sigue leyendo BIO.video).
+  async function voltearCamara(){
+    if(BIO.recording){ toast('Detén la grabación para cambiar de cámara','warning'); return; }
+    BIO.facing = (BIO.facing==='environment') ? 'user' : 'environment';
+    var estado=document.getElementById('bio-estado');
+    if(estado) estado.textContent = (BIO.facing==='environment') ? 'Cámara trasera' : 'Cámara frontal';
+    await abrirStreamCamara(BIO.facing);
   }
   function loopCamara(){
     var intervalo = 1000/FPS_CAMARA, last=0;
@@ -401,18 +428,52 @@
       && (lm[24].visibility==null||lm[24].visibility>=VIS_MIN);
     btn.disabled = !ok;
     var estado=document.getElementById('bio-estado');
-    if(estado) estado.textContent = ok ? '✓ Cuerpo detectado — listo para grabar' : 'Colócate de cuerpo completo frente a la cámara';
+    if(estado) estado.textContent = ok ? '✓ Cuerpo detectado — listo para grabar' : 'Coloca al paciente de cuerpo completo en el encuadre';
   }
-  function toggleGrabacion(){
+  // Inicia la grabación del clip de cámara (MediaRecorder) en paralelo a la medición de ángulos.
+  function iniciarGrabadorVideo(){
+    BIO.recChunks=[]; BIO.recorder=null; BIO.recMime='';
+    try{
+      if(typeof MediaRecorder==='undefined' || !BIO.stream) return;
+      var cands=['video/mp4','video/webm;codecs=vp9','video/webm;codecs=vp8','video/webm'];
+      var mime=''; for(var i=0;i<cands.length;i++){ if(MediaRecorder.isTypeSupported(cands[i])){ mime=cands[i]; break; } }
+      BIO.recorder = mime ? new MediaRecorder(BIO.stream,{mimeType:mime}) : new MediaRecorder(BIO.stream);
+      BIO.recMime = BIO.recorder.mimeType || mime || 'video/webm';
+      BIO.recorder.ondataavailable = function(e){ if(e.data && e.data.size) BIO.recChunks.push(e.data); };
+      BIO.recorder.start();
+    }catch(e){ BIO.recorder=null; console.warn('[BIO] MediaRecorder no disponible (se guardarán solo ángulos):', e && e.message); }
+  }
+  // Detiene el grabador y arma el blob del clip (Promise).
+  function finalizarGrabadorVideo(){
+    return new Promise(function(resolve){
+      if(!BIO.recorder || BIO.recorder.state==='inactive'){
+        var chunks0=BIO.recChunks||[];
+        resolve(chunks0.length ? { blob:new Blob(chunks0,{type:BIO.recMime||'video/webm'}), mime:BIO.recMime||'video/webm', ext:((BIO.recMime||'').indexOf('mp4')>=0?'mp4':'webm') } : null);
+        BIO.recorder=null; return;
+      }
+      BIO.recorder.onstop=function(){
+        var chunks=BIO.recChunks||[];
+        resolve(chunks.length ? { blob:new Blob(chunks,{type:BIO.recMime||'video/webm'}), mime:BIO.recMime||'video/webm', ext:((BIO.recMime||'').indexOf('mp4')>=0?'mp4':'webm') } : null);
+        BIO.recorder=null;
+      };
+      try{ BIO.recorder.stop(); }catch(e){ resolve(null); BIO.recorder=null; }
+    });
+  }
+  async function toggleGrabacion(){
+    var fb=document.getElementById('bio-btn-flip');
     if(!BIO.recording){
       BIO.acc = nuevoAcumulador(); BIO.framesTotales=0; BIO.tStart=Date.now();
+      BIO.pendingVideo=null; iniciarGrabadorVideo();     // graba el clip de cámara en paralelo
       BIO.recording=true;
+      if(fb) fb.disabled=true;                            // no cambiar de cámara a media grabación
       document.getElementById('bio-btn-rec').className='bio-b-stop'; document.getElementById('bio-btn-rec').textContent='⏹️ Detener';
       document.getElementById('bio-cron').style.display='block';
       iniciarCronometro();
     } else {
       BIO.recording=false; pararCronometro();
+      if(fb) fb.disabled=false;
       var dur = Math.round((Date.now()-BIO.tStart)/1000);
+      BIO.pendingVideo = await finalizarGrabadorVideo();  // clip listo para subir al guardar
       var artic = finalizarArticulaciones(BIO.acc);
       var fps = dur>0 ? Math.round(BIO.framesTotales/dur) : BIO.framesTotales;
       mostrarResumen(artic, {
@@ -465,6 +526,9 @@
   async function procesarVideo(file){
     if(!file.type || file.type.indexOf('video')!==0){ toast('Selecciona un archivo de video','error'); return; }
     BIO.modo='video';
+    // Guardar el archivo elegido para subirlo al expediente al guardar (antes/después visual).
+    var _ext=(String(file.name||'').split('.').pop()||'').toLowerCase().replace(/[^a-z0-9]/g,'') || (file.type.indexOf('mp4')>=0?'mp4':(file.type.indexOf('quicktime')>=0?'mov':'webm'));
+    BIO.pendingVideo = { file:file, mime:file.type||'video/mp4', ext:_ext };
     mostrarVista('bio-vista-progreso');
     var fill=document.getElementById('bio-prog-fill'), txt=document.getElementById('bio-prog-txt');
     fill.style.width='0%'; txt.textContent='Cargando motor de pose…';
@@ -563,8 +627,30 @@
       articulaciones:articulaciones,
       calidad:meta.calidad||{},
       reportePdf:null,
+      video:null,
       eliminado:false
     };
+    // Subir el video (clip grabado en cámara o archivo elegido) a Storage y enlazarlo a la sesión.
+    // Sirve de antes/después visual para el paciente. Si falla, se guardan los ángulos igual.
+    if(BIO.pendingVideo && typeof fbStorage!=='undefined' && fbStorage){
+      try{
+        var _src = BIO.pendingVideo.blob || BIO.pendingVideo.file;
+        var _ext = BIO.pendingVideo.ext || 'webm';
+        var _ts = Date.now();
+        var _safe = 'rom_'+String(p.name||'paciente').replace(/[^\w]/g,'_')+'_'+_ts+'.'+_ext;
+        var _path = 'clinica/sinergia/'+p.id+'/biomecanica/'+_ts+'_'+_safe;
+        var _ref = fbStorage.ref(_path);
+        var _url = await new Promise(function(resolve,reject){
+          var task=_ref.put(_src,{contentType:BIO.pendingVideo.mime||('video/'+_ext)});
+          task.on('state_changed',
+            function(s){ var pct=s.totalBytes?Math.round(s.bytesTransferred/s.totalBytes*100):0; if(btn) btn.textContent='☁️ Subiendo video… '+pct+'%'; },
+            function(err){ reject(err); },
+            function(){ task.snapshot.ref.getDownloadURL().then(resolve).catch(reject); });
+        });
+        sesion.video = { url:_url, fbPath:_path, mime:BIO.pendingVideo.mime||('video/'+_ext), tamanoBytes:(_src&&_src.size)||0, fuente:meta.fuente };
+      }catch(e){ console.warn('[BIO] subida de video falló:', e && e.message); toast('⚠️ El video no se pudo subir; se guardan los ángulos','warning'); }
+    }
+    if(btn){ btn.textContent='⏳ Guardando…'; }
     p.biomecanica.push(sesion);
     if(!Array.isArray(p.historialCambios)) p.historialCambios=[];
     p.historialCambios.push({ usuario:usuarioActual(), seccion:'biomecanica', fecha:sesion.fecha+' '+sesion.horaCreacion, accion:'Medición ROM ('+sesion.fuente+')', antes:'', despues:'ROM '+sesion.fuente });
@@ -606,6 +692,9 @@
       var pdfBtn = (s.reportePdf && s.reportePdf.url)
         ? '<button data-url="'+esc(s.reportePdf.url)+'" onclick="window.open(this.dataset.url,\'_blank\')" style="background:var(--navy);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer">📄 Ver PDF</button>'
         : '<button data-sid="'+esc(s.id)+'" onclick="BIO_pdf(this.dataset.sid)" style="background:var(--white);color:var(--navy);border:1.5px solid var(--gray-200);border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer">📄 Generar PDF</button>';
+      var videoBtn = (s.video && s.video.url)
+        ? '<button data-url="'+esc(s.video.url)+'" onclick="window.open(this.dataset.url,\'_blank\')" style="background:var(--green);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer">▶️ Ver video</button>'
+        : '';
       return '<div class="section-card" style="margin-bottom:10px">'
         + '<div class="section-title" style="display:flex;align-items:center;justify-content:space-between">'
         +   '<span>🦴 ROM · '+esc(s.fecha)+' '+esc(s.horaCreacion||'')+'</span>'
@@ -613,7 +702,8 @@
         + '</div>'
         + '<div class="field-row"><div class="field-label">Terapeuta</div><div class="field-value">'+esc(s.terapeuta||'—')+' · '+(s.duracionSeg||0)+' s · '+((s.calidad&&s.calidad.framesValidos)||0)+' cuadros</div></div>'
         + filas
-        + '<div style="display:flex;gap:8px;justify-content:flex-end;padding:10px 14px">'
+        + '<div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;padding:10px 14px">'
+        +   videoBtn
         +   pdfBtn
         +   '<button data-sid="'+esc(s.id)+'" onclick="BIO_eliminar(this.dataset.sid)" style="background:var(--red-light);color:var(--red);border:1.5px solid #FCA5A5;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer">🗑️ Eliminar</button>'
         + '</div>'
