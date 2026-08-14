@@ -160,18 +160,40 @@ async function FST_init(){
 // por eso re-loguear no lo cura. Solución: forzar signOut + signInAnonymously para regenerar el token.
 function _esErrorPermiso(txt){ return /insufficient permissions|permission[- ]denied|Missing or insufficient/i.test(String(txt||'')); }
 var _FST_reauthTs = 0;
+// Devuelve {ok:true} o {ok:false, error:'<código exacto>'} para poder DIAGNOSTICAR por qué no reconecta
+// (auth/operation-not-allowed = anónimo deshabilitado; auth/web-storage-unsupported o quota = disco del
+// navegador dañado/lleno; auth/network-request-failed = red). Intento 2: si el disco falla, autentica
+// EN MEMORIA (persistencia NONE) para que la sesión funcione aunque el almacenamiento del equipo esté mal.
 async function FST_reautenticarStaging(){
   try{
-    if(typeof firebase==='undefined' || !firebase.apps) return false;
-    var app=firebase.apps.find(function(a){ return a && a.name==='staging'; });
-    if(!app) return false;
+    if(typeof firebase==='undefined') return {ok:false, error:'firebase-no-cargado'};
+    if(!(firebase.apps||[]).find(function(a){ return a && a.name==='staging'; })){
+      if(typeof FST_init==='function'){ try{ await FST_init(); }catch(_){} }
+    }
+    var app=(firebase.apps||[]).find(function(a){ return a && a.name==='staging'; });
+    if(!app) return {ok:false, error:'staging-no-inicializado'};
     var sa=app.auth();
     try{ await sa.signOut(); }catch(_){}
-    await sa.signInAnonymously();
-    window._fstInitDone=true;
-    console.log('[FST] re-auth anónima OK tras permisos insuficientes');
-    return true;
-  }catch(e){ console.warn('[FST] re-auth staging falló:', e && e.message); return false; }
+    try{
+      await sa.signInAnonymously();
+      window._fstInitDone=true;
+      console.log('[FST] re-auth anónima OK');
+      return {ok:true};
+    }catch(e1){
+      var c1=String((e1&&(e1.code||e1.message))||'auth-error');
+      // Fallback: almacenamiento del navegador dañado/lleno → persistencia EN MEMORIA (sin disco).
+      try{
+        if(firebase.auth && firebase.auth.Auth && firebase.auth.Auth.Persistence){
+          await sa.setPersistence(firebase.auth.Auth.Persistence.NONE);
+          await sa.signInAnonymously();
+          window._fstInitDone=true;
+          console.log('[FST] re-auth anónima OK (persistencia en memoria)');
+          return {ok:true, nota:'memoria'};
+        }
+      }catch(e2){ return {ok:false, error:String((e2&&(e2.code||e2.message))||c1)}; }
+      return {ok:false, error:c1};
+    }
+  }catch(e){ return {ok:false, error:String((e&&(e.code||e.message))||'desconocido')}; }
 }
 
 // ── BORRADO LÓGICO — LADO LECTURA (cimiento; SIN botón de borrado aún) ──────────
@@ -2435,7 +2457,7 @@ async function drenarColaSoapActivo(){
     if(_permisoDenegado && (Date.now()-_FST_reauthTs>30000)){
       _FST_reauthTs=Date.now();
       try{ showToast('Reconectando con la nube…','info'); }catch(_){}
-      FST_reautenticarStaging().then(function(ok){ if(ok) setTimeout(function(){ try{ drenarColaSoapActivo(); }catch(_e){} }, 1500); });
+      FST_reautenticarStaging().then(function(res){ if(res && res.ok) setTimeout(function(){ try{ drenarColaSoapActivo(); }catch(_e){} }, 1500); });
     }
   }
 }
@@ -6719,9 +6741,15 @@ async function _detReconectarYSubir(){
   if(!navigator.onLine){ try{ showToast('Sin conexión — conéctate e intenta','warning'); }catch(_){} return; }
   set('Reconectando…', true);
   try{
-    var reok=await FST_reautenticarStaging();
+    var reres=await FST_reautenticarStaging();
     var cu=null; try{ cu=firebase.app('staging').auth().currentUser; }catch(_e){}
-    if(!reok || !cu){ set('🔧 Reconectar y subir', false); try{ showToast('No pude reconectar la sesión de la nube — revisa tu conexión y reintenta','error'); }catch(_){} return; }
+    if(!reres || !reres.ok || !cu){
+      set('🔧 Reconectar y subir', false);
+      var _err=(reres&&reres.error)||'sin-sesión';
+      // Mostrar el CÓDIGO EXACTO en un aviso persistente para poder diagnosticar (captura de pantalla).
+      try{ if(typeof showToastCritico_==='function') showToastCritico_('❌ No reconectó la nube · motivo: '+_err+' — mándale esta captura a soporte'); else showToast('No reconectó · '+_err,'error'); }catch(_){}
+      return;
+    }
     // Quitar backoff y reiniciar intentos para que TODAS las sesiones intenten subir de inmediato.
     try{ var q=JSON.parse(localStorage.getItem('COLA_SOAP_ACT')||'[]'); if(Array.isArray(q)){ q.forEach(function(it){ if(it){ delete it.proximoIntento; it.intentos=0; } }); localStorage.setItem('COLA_SOAP_ACT', JSON.stringify(q)); } }catch(_e){}
     set('Subiendo…', true);
