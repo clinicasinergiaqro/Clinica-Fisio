@@ -537,29 +537,61 @@
     if(!ok){ txt.textContent='⚠️ No se pudo cargar el motor de pose. Revisa tu conexión.'; return; }
 
     var url=URL.createObjectURL(file);
-    var v=document.createElement('video'); v.muted=true; v.playsInline=true; v.preload='auto'; v.src=url;
+    var v=document.createElement('video');
+    v.muted=true; v.defaultMuted=true; v.setAttribute('muted',''); v.playsInline=true; v.setAttribute('playsinline',''); v.preload='auto'; v.src=url;
+    // iOS: el <video> debe estar en el DOM para reproducir. Offscreen 2px (el cuadro se ve en el canvas).
+    v.style.cssText='position:fixed;left:-9999px;top:0;width:2px;height:2px;opacity:0;pointer-events:none';
+    document.body.appendChild(v);
     BIO.video=v; BIO.srcEl=v;
     try{
       await new Promise(function(res,rej){ v.onloadedmetadata=function(){res();}; v.onerror=function(){rej(new Error('No se pudo leer el video'));}; });
-    }catch(e){ URL.revokeObjectURL(url); txt.textContent='⚠️ '+e.message; return; }
+    }catch(e){ URL.revokeObjectURL(url); try{ v.remove(); }catch(_){} txt.textContent='⚠️ '+e.message; return; }
 
     var dur = (isFinite(v.duration) && v.duration>0) ? v.duration : 0;
-    if(!dur){ URL.revokeObjectURL(url); txt.textContent='⚠️ Video sin duración legible.'; return; }
+    if(!dur){ URL.revokeObjectURL(url); try{ v.remove(); }catch(_){} txt.textContent='⚠️ Video sin duración legible.'; return; }
 
     BIO.acc = nuevoAcumulador(); BIO.framesTotales=0;
     BIO.procesandoVideo=true; BIO.cancelVideo=false;
-    var step = 1/FPS_VIDEO;
-    for(var t=0; t<dur && !BIO.cancelVideo; t+=step){
-      try{
-        await buscarFrame(v, t);
-        if(BIO.pose){ BIO.sending=true; await BIO.pose.send({ image:v }); BIO.sending=false; }
-        BIO.framesTotales++;
-      }catch(e){ /* frame ilegible: continuar */ }
-      var pct=Math.min(100, Math.round((t/dur)*100));
-      fill.style.width=pct+'%'; txt.textContent=pct+'%';
-    }
+    txt.textContent='0%';
+    // MUESTREO DURANTE REPRODUCCIÓN (robusto en iOS). El método anterior (seek cuadro-a-cuadro
+    // con await pose.send) se colgaba en el 2º cuadro en Safari. Aquí reproducimos el video
+    // muteado y enviamos cuadros a MediaPipe SIN await (fire-and-forget con guarda BIO.sending,
+    // igual que el modo cámara que sí funciona). Progreso = currentTime / duración.
+    await new Promise(function(resolve){
+      var minGap = 1/FPS_VIDEO, lastSample = -1, rafId = 0, terminado = false, arranque = Date.now();
+      function terminar(){
+        if(terminado) return; terminado = true;
+        if(rafId) cancelAnimationFrame(rafId);
+        clearInterval(watchdog);
+        try{ v.pause(); }catch(_){}
+        resolve();
+      }
+      // Watchdog: cierra si termina, se cancela, llega al final, o se pasa mucho del tiempo esperado.
+      var watchdog = setInterval(function(){
+        if(terminado) return;
+        if(BIO.cancelVideo || v.ended || v.currentTime >= dur - 0.05) terminar();
+        else if(Date.now() - arranque > (dur*1000)*2 + 8000) terminar();
+      }, 400);
+      function tick(){
+        if(terminado) return;
+        if(BIO.cancelVideo){ terminar(); return; }
+        var t = v.currentTime || 0;
+        if(!BIO.sending && BIO.pose && v.videoWidth>0 && (t - lastSample) >= minGap){
+          lastSample = t; BIO.sending = true; BIO.framesTotales++;
+          BIO.pose.send({ image:v }).then(function(){ BIO.sending=false; }).catch(function(){ BIO.sending=false; });
+        }
+        var pct = Math.min(99, Math.round((t/dur)*100));
+        fill.style.width = pct+'%'; txt.textContent = pct+'%';
+        if(v.ended){ terminar(); return; }
+        rafId = requestAnimationFrame(tick);
+      }
+      v.onended = terminar;
+      var pp = v.play();
+      if(pp && pp.then){ pp.then(function(){ tick(); }).catch(function(){ tick(); }); } else { tick(); }
+    });
     BIO.procesandoVideo=false;
     URL.revokeObjectURL(url);
+    try{ v.remove(); }catch(_){}
 
     if(BIO.cancelVideo){ mostrarVista('bio-vista-inicio'); return; }
     fill.style.width='100%'; txt.textContent='100%';
@@ -569,16 +601,6 @@
       calidad:{ fpsMuestreo:FPS_VIDEO, framesTotales:BIO.framesTotales, framesValidos:BIO.acc.framesValidos }
     });
   }
-  function buscarFrame(v, t){
-    return new Promise(function(res){
-      var done=false;
-      v.onseeked=function(){ if(!done){ done=true; res(); } };
-      // respaldo: si 'seeked' no dispara, resolver por timeout
-      setTimeout(function(){ if(!done){ done=true; res(); } }, 400);
-      try{ v.currentTime = Math.min(t, Math.max(0, v.duration-0.05)); }catch(e){ if(!done){ done=true; res(); } }
-    });
-  }
-
   // ── Resumen + guardado ─────────────────────────────────────────────────────
   function fmtRango(a){
     if(!a || a.min===null) return '—';
