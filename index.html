@@ -6646,6 +6646,7 @@ function mostrarDeteccionDatos(){
 function _detHTMLAcciones(hayHallazgos){
   return '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px">'
     +'<button id="det-forzar-update" onclick="_detForzarUpdate()" style="font-size:13px;font-weight:800;border:none;border-radius:10px;padding:9px 16px;cursor:pointer;font-family:inherit;background:var(--navy);color:#fff">🔄 Forzar actualización</button>'
+    +'<button id="det-reconectar" onclick="_detReconectarYSubir()" style="font-size:13px;font-weight:800;border:none;border-radius:10px;padding:9px 16px;cursor:pointer;font-family:inherit;background:#B45309;color:#fff">🔧 Reconectar y subir</button>'
     +'<button id="det-rescatar" onclick="_detRescatar()" style="font-size:13px;font-weight:800;border:none;border-radius:10px;padding:9px 16px;cursor:pointer;font-family:inherit;background:'+(hayHallazgos?'#B91C1C':'#EEF1F6')+';color:'+(hayHallazgos?'#fff':'var(--gray-500)')+'">☁️ Rescatar (subir lo pendiente)</button>'
     +((function(){ try{ var _a=JSON.parse(localStorage.getItem('COLA_SYNC_HIST_FALLIDOS')||'[]'); return Array.isArray(_a)&&_a.some(function(it){ return it && it.tipo==='nueva'; }); }catch(e){ return false; } })()?('<button id="det-limpia-hist" onclick="_detLimpiarHistFallidos()" style="font-size:13px;font-weight:800;border:none;border-radius:10px;padding:9px 16px;cursor:pointer;font-family:inherit;background:#EEF1F6;color:var(--gray-500)">🔁 Verificar histórico en nube</button>'):'')
     +((typeof esSupervisorUI==='function'&&esSupervisorUI())?('<button id="det-diag-exp" onclick="_detDiagnosticoExpediente()" style="font-size:13px;font-weight:800;border:none;border-radius:10px;padding:9px 16px;cursor:pointer;font-family:inherit;background:#EEF1F6;color:var(--navy)">🩺 Diagnóstico de expediente</button>'):'')
@@ -6708,6 +6709,35 @@ function _retroConstruirNota(p){
     completa:true, modoNota:'valoracion', revisionPendiente:false,
     atendidoPor:[p.terapeuta||''], creadoPor:(currentUser&&currentUser.name)||'', _retroGenerada:true
   };
+}
+// RECONECTAR Y SUBIR (manual, on-demand) — el escape real cuando la cola no drena sola: fuerza
+// regenerar la sesión de Firebase (cura "permisos insuficientes"), quita el backoff para que TODO
+// intente ya, drena, y REPORTA en pantalla cuántas subieron / cuántas faltan / el motivo real.
+async function _detReconectarYSubir(){
+  var btn=document.getElementById('det-reconectar');
+  var set=function(t,dis){ if(btn){ btn.textContent=t; btn.disabled=!!dis; } };
+  if(!navigator.onLine){ try{ showToast('Sin conexión — conéctate e intenta','warning'); }catch(_){} return; }
+  set('Reconectando…', true);
+  try{
+    var reok=await FST_reautenticarStaging();
+    var cu=null; try{ cu=firebase.app('staging').auth().currentUser; }catch(_e){}
+    if(!reok || !cu){ set('🔧 Reconectar y subir', false); try{ showToast('No pude reconectar la sesión de la nube — revisa tu conexión y reintenta','error'); }catch(_){} return; }
+    // Quitar backoff y reiniciar intentos para que TODAS las sesiones intenten subir de inmediato.
+    try{ var q=JSON.parse(localStorage.getItem('COLA_SOAP_ACT')||'[]'); if(Array.isArray(q)){ q.forEach(function(it){ if(it){ delete it.proximoIntento; it.intentos=0; } }); localStorage.setItem('COLA_SOAP_ACT', JSON.stringify(q)); } }catch(_e){}
+    set('Subiendo…', true);
+    // Drenar todas las colas relevantes; dos pasadas con pausa (la 1ª puede re-autenticar, la 2ª sube).
+    try{ if(typeof drenarColaSoapActivo==='function') await drenarColaSoapActivo(); }catch(_e){}
+    try{ if(typeof sincronizarPendientes==='function') await sincronizarPendientes(); }catch(_e){}
+    await new Promise(function(r){ setTimeout(r, 2500); });
+    try{ if(typeof drenarColaSoapActivo==='function') await drenarColaSoapActivo(); }catch(_e){}
+    // Resultado real
+    var rest=[]; try{ rest=JSON.parse(localStorage.getItem('COLA_SOAP_ACT')||'[]')||[]; }catch(_e){}
+    var motivo=''; for(var i=0;i<rest.length;i++){ if(rest[i] && rest[i].ultimoError){ motivo=String(rest[i].ultimoError); break; } }
+    set('🔧 Reconectar y subir', false);
+    try{ actualizarIndicadorSync(); }catch(_e){}
+    if(!rest.length){ try{ showToast('✅ Todo subido — 0 pendientes','success'); }catch(_){} }
+    else { try{ showToast('Subieron algunas. Faltan '+rest.length+(motivo?(' · '+motivo.slice(0,90)):''), 'warning'); }catch(_){} }
+  }catch(e){ set('🔧 Reconectar y subir', false); try{ showToast('Error: '+((e&&e.message)||''),'error'); }catch(_){} }
 }
 // Refresco con señal: siempre da feedback al tocar (aunque la lista no cambie) y recalcula candidatos.
 function _retroValRefrescar(){
