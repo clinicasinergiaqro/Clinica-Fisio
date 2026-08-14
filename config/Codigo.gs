@@ -43,7 +43,8 @@ const HEADERS = [
   'sexo',
   'altaClinica','revaloraciones','eventosAdversos',
   'motivoActualIndex','numSesionEpisodioActual','fechaInicio',
-  'revalSolicitada'
+  'revalSolicitada',
+  'biomecanica'
 ];
 
 // ── SPRINT TOKEN PASO 1: validación de Firebase ID Token ──
@@ -109,15 +110,15 @@ function leerPacientes(ss){
     'planTto','consentimiento','soap','soap2','soap3','ejercicios','fotos','docs','historialCambios',
     'consentimientos','seguridadClinica','motivosAnteriores','etiquetas',
     'consentimientoDatos','consentimientoImagen','consentimientoWhatsApp',
-    'altaClinica','revaloraciones','eventosAdversos','revalSolicitada'];
+    'altaClinica','revaloraciones','eventosAdversos','revalSolicitada','biomecanica'];
   return data
     .filter(row => row[0] !== '')
     .map(row => {
       const obj = {};
       HEADERS.forEach((h, i) => {
         if (CAMPOS_JSON.includes(h)) {
-          try { obj[h] = JSON.parse(row[i] || (h === 'consentimientos' ? '[]' : '{}')); }
-          catch(e) { obj[h] = (h === 'consentimientos' ? [] : {}); }
+          try { obj[h] = JSON.parse(row[i] || ((h === 'consentimientos' || h === 'biomecanica') ? '[]' : '{}')); }
+          catch(e) { obj[h] = ((h === 'consentimientos' || h === 'biomecanica') ? [] : {}); }
         } else if (h === 'updatedAt') {
           obj[h] = Number(row[i]) || 0;
         } else {

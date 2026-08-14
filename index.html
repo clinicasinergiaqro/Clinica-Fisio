@@ -1876,6 +1876,7 @@ async function saveDB(k, v, opts){
       updatedAt: (typeof p.updatedAt==='number' ? p.updatedAt : Date.now()),
       ultimoUsuario: p.ultimoUsuario||'',
       historialCambios: Array.isArray(p.historialCambios)?p.historialCambios:[],
+      biomecanica: Array.isArray(p.biomecanica)?p.biomecanica:[],
       fechaNacimiento: p.fechaNacimiento||'',
       telefono:        p.telefono||'',
       motivoConsulta:  p.motivoConsulta||'',
@@ -2734,6 +2735,22 @@ async function loadFromCloud(){
               pSano.soap = _nubeSoap.concat(_localOnly);
               encolarSync(pSano.id); // no están en Sheets → re-subir en el próximo drenado de COLA_SYNC
               console.warn('[CLOBBER-FIX] '+_localOnly.length+' sesión(es) SOAP local-only preservada(s) para', pSano.id);
+            }
+          }
+          // ── BIOMECÁNICA (Fase 1) — preservar sesiones ROM local-only (mismo criterio append-only que SOAP) ──
+          // 'biomecanica' NO viaja a Sheets hasta desplegar el Codigo.gs actualizado; sin esto la rama
+          // "Sheets gana" reconstruía el paciente SIN este campo y las mediciones se PERDÍAN al recargar.
+          // Unión por id (soft-delete via eliminado). Tras el deploy sigue siendo correcto (une nube + local-only).
+          if(Array.isArray(pLocal.biomecanica) && pLocal.biomecanica.length){
+            const _nubeBm = Array.isArray(pSano.biomecanica) ? pSano.biomecanica : [];
+            const _idsBm = new Set(_nubeBm.map(s=>s&&s.id).filter(Boolean));
+            const _bmLocalOnly = pLocal.biomecanica.filter(s=> s&&s.id && !_idsBm.has(s.id));
+            if(_bmLocalOnly.length){
+              pSano.biomecanica = _nubeBm.concat(_bmLocalOnly);
+              encolarSync(pSano.id);
+              console.warn('[CLOBBER-FIX] '+_bmLocalOnly.length+' medición(es) biomecánica local-only preservada(s) para', pSano.id);
+            } else if(!Array.isArray(pSano.biomecanica)){
+              pSano.biomecanica = pLocal.biomecanica;
             }
           }
         }

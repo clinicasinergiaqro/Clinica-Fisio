@@ -805,10 +805,11 @@
 
   function BIO_eliminar(sid){
     var p=(typeof currentPatient!=='undefined')?currentPatient:null; if(!p || !Array.isArray(p.biomecanica)) return;
-    if(!window.confirm('¿Eliminar esta medición biomecánica? Esta acción no se puede deshacer.')) return;
-    var i=p.biomecanica.findIndex(function(x){return x.id===sid;});
-    if(i<0) return;
-    p.biomecanica.splice(i,1);
+    if(!window.confirm('¿Eliminar esta medición biomecánica?')) return;
+    var s=p.biomecanica.find(function(x){return x.id===sid;});
+    if(!s) return;
+    // Borrado SUAVE (no splice): así la unión al sincronizar no lo resucita y el borrado es duradero.
+    s.eliminado=true; s.eliminadoPor=usuarioActual(); s.eliminadoEn=new Date().toISOString();
     p.fechaActualizacion=fechaHoy(); p.ultimoUsuario=usuarioActual();
     if(typeof saveDB==='function'){ saveDB('pts',[p]).then(function(){}).catch(function(){}); }
     if(typeof renderExpediente==='function') renderExpediente('biomecanica');
