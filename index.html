@@ -6609,7 +6609,9 @@ function _retroConstruirNota(p){
     'Palpación: '+(val.palpacion||'No evaluada')].join(' · ');
   var enfoque = plan.enfoqueTerapeutico || [plan.ejercicioTerapeutico,plan.terapiaManual,plan.agentesFisicos].filter(function(x){return x&&x!=='Pendiente'&&x!=='[pendiente]';}).join(', ') || 'Pendiente';
   return {
-    id:generarIdSeguro_('s'), num:1, fecha:_retroFechaFmt(p),
+    // ID DETERMINISTA por expediente (idempotente): re-correr el retroactivo, o correrlo en otro
+    // dispositivo, escribe SIEMPRE el mismo id → merge, nunca una segunda valoración duplicada.
+    id:'sVal_'+String(p.id||generarIdSeguro_('s')), num:1, fecha:_retroFechaFmt(p),
     horaCreacion:'—', fechaHoraISO:iso,
     terapeuta:p.terapeuta||'', semana:1, totalSesiones:10,
     s:{ dolor:(evaNum!=null?('EVA '+evaNum+'/10 en valoración inicial'):'Valoración inicial'),
@@ -6642,6 +6644,7 @@ function _retroValAbrir(){
     +'<div id="retroval-body" style="padding:12px 18px;overflow:auto">'+lista+'</div>'
     +'<div style="padding:10px 18px;border-top:1px solid #E5E7EB;font-size:11.5px;color:#6B7280;line-height:1.5">Se creará la <b>nota de valoración (sesión 1)</b> con la fecha original de cada expediente, a partir de sus propios datos. Los que ya tienen alguna sesión NO se tocan; antes de crear cada nota se verifica en la nube que no exista.</div>'
     +'<div style="padding:12px 18px;display:flex;gap:10px;justify-content:flex-end;border-top:1px solid #E5E7EB">'
+    +'<button id="retroval-refresh" onclick="_retroValAbrir()" style="background:#EEF1F6;color:var(--navy);border:none;border-radius:10px;padding:9px 16px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">🔄 Actualizar</button>'
     +'<button id="retroval-cancel" onclick="var o=document.getElementById(\'retroval-overlay\');if(o)o.remove()" style="background:#EEF1F6;color:var(--gray-600);border:none;border-radius:10px;padding:9px 16px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">Cancelar</button>'
     +(cands.length?('<button id="retroval-go" onclick="_retroValGenerar()" style="background:var(--navy);color:#fff;border:none;border-radius:10px;padding:9px 16px;font-size:13px;font-weight:800;cursor:pointer;font-family:inherit">Generar '+cands.length+' nota(s)</button>'):'')
     +'</div></div>';
@@ -6651,41 +6654,61 @@ async function _retroValGenerar(){
   var btn=document.getElementById('retroval-go');
   if(btn){ btn.disabled=true; btn.textContent='Generando…'; }
   var cands=_retroValCandidatos();
-  var okN=0, skipN=0, errN=0, detalles=[];
+  var okN=0, skipN=0, errN=0, dupN=0, detalles=[], _modificados=[];
   for(var i=0;i<cands.length;i++){
     var p=cands[i];
     try{
-      var yaTiene=false;
+      // Doble-guarda LOCAL: si el propio expediente ya tiene sesiones, no se toca.
+      var sesLocal=(typeof _soapVivas==='function')?_soapVivas(p):(p.soap||[]);
+      if(sesLocal&&sesLocal.length>0){ skipN++; detalles.push('⏭️ '+(p.name||'')+' — ya tenía sesiones'); continue; }
+      // Nota idempotente: id determinista por expediente (sVal_<id>). Re-correr NUNCA duplica.
+      var nota=_retroConstruirNota(p);
+      // ── Verificación en la nube ACOTADA A ESTE EXPEDIENTE ────────────────────────
+      // BUG viejo: se saltaba el expediente si CUALQUIER doc del MISMO NOMBRE tenía sesiones
+      // (el gemelo de migración/duplicado) → los vacíos jamás recibían su nota. Ahora solo se
+      // mira si ESTA MISMA nota (id determinista) ya existe, y si el nombre resuelve a un HISTÓRICO
+      // (mig_pac_) se marca como posible duplicado para NO escribir en él (no contaminar el migrado).
+      var yaEstaNota=false, esGemeloHist=false;
       try{
         if(navigator.onLine && window._fstDb && typeof FST_resolverPidPaciente==='function'){
           var r=await FST_resolverPidPaciente(p);
           if(r&&r.ok&&r.pid){
-            var sn=await window._fstDb.collection('pacientes').doc(r.pid).collection('sesiones').get();
-            sn.forEach(function(dc){ if((dc.data()||{}).eliminado!==true) yaTiene=true; });
+            if(String(r.pid).indexOf('mig_pac_')===0 && String(p.id||'').indexOf('mig_pac_')!==0) esGemeloHist=true;
+            var dsn=await window._fstDb.collection('pacientes').doc(r.pid).collection('sesiones').doc(nota.id).get();
+            if(dsn && dsn.exists && (dsn.data()||{}).eliminado!==true) yaEstaNota=true;
           }
         }
-      }catch(_v){ /* verificación no disponible → seguimos con criterio local (ya filtrado a 0 sesiones) */ }
-      var sesLocal=(typeof _soapVivas==='function')?_soapVivas(p):(p.soap||[]);
-      if(yaTiene || (sesLocal&&sesLocal.length>0)){ skipN++; detalles.push('⏭️ '+(p.name||'')+' — ya tenía sesiones'); continue; }
-      var nota=_retroConstruirNota(p);
+      }catch(_v){ /* sin verificación → seguimos con criterio local (ya filtrado a 0 sesiones) */ }
+      // Escribe en el expediente LOCAL (fuente de la vista de activos), idempotente por id.
       if(!Array.isArray(p.soap)) p.soap=[];
-      p.soap.push(nota); p.sesiones=1; p.updatedAt=Date.now();
+      p.soap=p.soap.filter(function(s){ return !(s && s.id===nota.id); });
+      p.soap.push(nota);
+      p.sesiones=(p.soap||[]).length; p.updatedAt=Date.now();
+      _modificados.push(p);
+      // Nube: NO escribir si el nombre resuelve a un histórico (contaminaría el expediente migrado).
       var subido=false;
-      try{
-        if(typeof FST_guardarSesionFirestore==='function'){
-          var rr=await FST_guardarSesionFirestore(p, nota, 'nueva');
-          subido=!!(rr&&rr.ok);
-        }
-      }catch(_s){ subido=false; }
-      if(!subido){ try{ _encolarSoapActivo(p.id, nota, 'nueva'); }catch(_e){} }
-      okN++; detalles.push((subido?'✅ ':'📴 ')+(p.name||'')+(subido?'':' (se subirá al reconectar)'));
+      if(!esGemeloHist){
+        try{
+          if(typeof FST_guardarSesionFirestore==='function'){
+            var rr=await FST_guardarSesionFirestore(p, nota, 'nueva');
+            subido=!!(rr&&rr.ok);
+          }
+        }catch(_s){ subido=false; }
+        if(!subido){ try{ _encolarSoapActivo(p.id, nota, 'nueva'); }catch(_e){} }
+      }
+      okN++;
+      if(esGemeloHist){ dupN++; detalles.push('⚠️ '+(p.name||'')+' — generada en el expediente (posible duplicado con histórico; revisar/fusionar)'); }
+      else { detalles.push((subido||yaEstaNota?'✅ ':'📴 ')+(p.name||'')+(subido||yaEstaNota?'':' (se subirá al reconectar)')); }
     }catch(_e){ errN++; detalles.push('❌ '+((p&&p.name)||'')+' — '+((_e&&_e.message)||'error')); }
   }
+  // PERSISTENCIA LOCAL (faltaba): sin este saveDB la nota vivía SOLO en memoria y se perdía al
+  // recargar — por eso los expedientes seguían apareciendo vacíos aunque el retroactivo "generaba".
+  try{ if(_modificados.length && typeof saveDB==='function') await saveDB('pts', _modificados); }catch(_sv){ console.warn('[retro] saveDB local falló:', _sv&&_sv.message); }
   try{ if(typeof window._FST_invalidarVistaPacientes==='function') window._FST_invalidarVistaPacientes(); }catch(_e){}
   var body=document.getElementById('retroval-body');
   if(body){
     body.innerHTML='<div style="font-size:14px;font-weight:800;color:var(--navy);margin-bottom:8px">Resultado</div>'
-      +'<div style="font-size:13px;margin-bottom:8px">✅ Generadas: <b>'+okN+'</b> · ⏭️ Omitidas: <b>'+skipN+'</b> · ❌ Errores: <b>'+errN+'</b></div>'
+      +'<div style="font-size:13px;margin-bottom:8px">✅ Generadas: <b>'+okN+'</b> · ⏭️ Omitidas: <b>'+skipN+'</b>'+(dupN?(' · ⚠️ Posibles duplicados: <b>'+dupN+'</b>'):'')+' · ❌ Errores: <b>'+errN+'</b></div>'
       +'<div style="max-height:44vh;overflow:auto;font-size:12.5px">'+detalles.map(function(x){return '<div style="padding:2px 0">'+escapeHTML(x)+'</div>';}).join('')+'</div>';
   }
   var goBtn=document.getElementById('retroval-go'); if(goBtn) goBtn.remove();
