@@ -2,7 +2,7 @@
 // Service Worker — Clínica Sinergia (offline shell)
 // CAMBIAR la fecha de CACHE en cada deploy para forzar actualización
 // ═══════════════════════════════════════════════════════════
-const CACHE = 'sinergia-shell-v1-2026-08-14d';
+const CACHE = 'sinergia-shell-v1-2026-08-14e';
 const SHELL = [
   './',
   './index.html',
@@ -50,19 +50,29 @@ self.addEventListener('fetch', e => {
     return;
   }
   if (req.method !== 'GET') return;
-  // Navegación: red-primero CON TIMEOUT. En datos móviles con ruteo IPv6 degradado (ej. AT&T MX),
-  // la petición a GitHub Pages no falla — se queda COLGADA — y sin timeout la app espera en blanco
-  // indefinidamente. Con timeout: si la red no responde a tiempo y HAY copia guardada, se abre la
-  // copia en ~3.5 s. Si NO hay copia (primera instalación) damos más margen (12 s) porque no hay
-  // nada que servir. Con buena red (WiFi) se comporta igual que antes: trae lo último y lo cachea.
+  // Navegación: CACHÉ-PRIMERO (stale-while-revalidate). En datos móviles mexicanos (AT&T y Telcel),
+  // la petición a GitHub Pages se queda COLGADA por ruteo IPv6 degradado. Antes esperábamos 3.5s a la
+  // red antes de servir la copia → apertura lenta y, si la red engañaba, versión vieja igual. Ahora:
+  // si HAY copia, se abre AL INSTANTE desde ella (funciona con datos malos o sin señal) y se revalida
+  // en 2º plano (con timeout, para no dejar el fetch colgado) para la PRÓXIMA apertura; el auto-update
+  // de la app aplica la versión nueva cuando sea seguro y la red lo permita. Sin copia (primera
+  // instalación) sí vamos a la red con margen amplio.
   if (req.mode === 'navigate' || req.destination === 'document') {
     e.respondWith((async () => {
       const cached = await caches.match('./index.html');
-      const limiteMs = cached ? 3500 : 12000;
+      if (cached) {
+        const ctrl = ('AbortController' in self) ? new AbortController() : null;
+        const to = setTimeout(() => { try { ctrl && ctrl.abort(); } catch(_){} }, 6000);
+        fetch(req, ctrl ? { signal: ctrl.signal } : undefined).then(resp => {
+          clearTimeout(to);
+          if (resp && resp.ok) { const copy = resp.clone(); caches.open(CACHE).then(c => c.put('./index.html', copy)).catch(()=>{}); }
+        }).catch(() => { clearTimeout(to); });
+        return cached;
+      }
       try {
         const resp = await Promise.race([
           fetch(req),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('timeout-red')), limiteMs))
+          new Promise((_, reject) => setTimeout(() => reject(new Error('timeout-red')), 12000))
         ]);
         if (resp && resp.ok) {
           const copy = resp.clone();
@@ -70,7 +80,7 @@ self.addEventListener('fetch', e => {
         }
         return resp;
       } catch (err) {
-        return cached || (await caches.match('./')) || fetch(req);
+        return (await caches.match('./')) || fetch(req);
       }
     })());
     return;
