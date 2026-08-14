@@ -244,7 +244,9 @@
       '.bio-modo-vid{background:rgba(255,255,255,.1);color:#fff;border:1.5px solid rgba(255,255,255,.25)}',
       '.bio-canvas-wrap{position:relative;width:100%;flex:1;min-height:0;background:#000;display:flex;align-items:center;justify-content:center;overflow:hidden}',
       '#bio-canvas{width:100%;height:100%;object-fit:contain;display:block}',
-      '#bio-canvas-vid{width:100%;max-height:64vh;object-fit:contain;display:block}',
+      '.bio-vidwrap{position:relative;width:100%;height:58vh;flex-shrink:0;background:#000}',
+      '#bio-vid-src{position:absolute;left:0;top:0;width:100%;height:100%;object-fit:contain;background:#000}',
+      '#bio-canvas-vid{position:absolute;left:0;top:0;width:100%;height:100%;object-fit:contain}',
       '.bio-estado{padding:7px 16px;font-size:13px;font-weight:600;text-align:center;background:#0d1626;color:#E8C96A;flex-shrink:0}',
       '.bio-panel{position:absolute;left:0;right:0;bottom:0;margin:0;background:linear-gradient(to top,rgba(13,22,38,.94),rgba(13,22,38,0));padding:10px 10px 8px}',
       '.bio-panel table{width:100%;border-collapse:collapse;font-size:13px}',
@@ -260,7 +262,7 @@
       '.bio-b-save{background:#2E7D52;color:#fff}',
       '.bio-b-sec{background:rgba(255,255,255,.1);color:#fff;border:1.5px solid rgba(255,255,255,.25)!important}',
       '.bio-b-rec:disabled{opacity:.45;cursor:default}',
-      '.bio-prog-wrap{padding:30px 22px;align-items:center;justify-content:center;gap:16px;display:flex;flex-direction:column;flex:1}',
+      '.bio-prog-wrap{padding:12px;align-items:center;justify-content:flex-start;gap:12px;display:flex;flex-direction:column;flex:1;overflow-y:auto}',
       '.bio-prog-bar{width:100%;max-width:360px;height:14px;background:rgba(255,255,255,.12);border-radius:8px;overflow:hidden}',
       '.bio-prog-fill{height:100%;width:0;background:#C9A84C;transition:width .15s}',
       '.bio-resumen{padding:14px}',
@@ -301,8 +303,8 @@
       + '</div>'
       // Vista progreso (análisis de video)
       + '<div class="bio-vista bio-prog-wrap" id="bio-vista-progreso">'
-      +   '<div style="font-size:15px;font-weight:700">Analizando video…</div>'
-      +   '<canvas id="bio-canvas-vid" style="max-height:62vh;width:100%"></canvas>'
+      +   '<div style="font-size:14px;font-weight:700;flex-shrink:0">Analizando video…</div>'
+      +   '<div class="bio-vidwrap"><video id="bio-vid-src" playsinline webkit-playsinline muted></video><canvas id="bio-canvas-vid"></canvas></div>'
       +   '<div class="bio-prog-bar"><div class="bio-prog-fill" id="bio-prog-fill"></div></div>'
       +   '<div id="bio-prog-txt" style="color:#9BA3B5;font-size:13px">0%</div>'
       +   '<button class="bio-modo-btn bio-modo-vid" id="bio-prog-cancel" style="max-width:200px;padding:12px">Cancelar</button>'
@@ -361,6 +363,7 @@
     if(BIO.video && BIO.video.srcObject){ BIO.video.srcObject=null; }
   }
   function detenerLoopCamara(){ if(BIO.rafId){ cancelAnimationFrame(BIO.rafId); BIO.rafId=null; } }
+  function limpiarVideoSrc(v){ try{ if(v){ v.pause(); v.onclick=null; v.removeAttribute('src'); try{ v.srcObject=null; }catch(_e){} v.load(); } }catch(e){} }
 
   // ── MODO A: cámara en vivo ─────────────────────────────────────────────────
   async function iniciarCamara(){
@@ -539,18 +542,22 @@
     if(!ok){ txt.textContent='⚠️ No se pudo cargar el motor de pose. Revisa tu conexión.'; return; }
 
     var url=URL.createObjectURL(file);
-    var v=document.createElement('video');
-    v.muted=true; v.defaultMuted=true; v.setAttribute('muted',''); v.playsInline=true; v.setAttribute('playsinline',''); v.preload='auto'; v.src=url;
-    // iOS: el <video> debe estar en el DOM para reproducir. Offscreen 2px (el cuadro se ve en el canvas).
-    v.style.cssText='position:fixed;left:-9999px;top:0;width:2px;height:2px;opacity:0;pointer-events:none';
-    document.body.appendChild(v);
+    // iOS Safari NO reproduce un <video> oculto → se quedaba en 0%. Usamos el <video> VISIBLE
+    // que está en la vista de progreso; el esqueleto se dibuja encima (canvas superpuesto).
+    var v=document.getElementById('bio-vid-src');
+    v.muted=true; v.defaultMuted=true; v.setAttribute('muted',''); v.playsInline=true; v.setAttribute('playsinline',''); v.setAttribute('webkit-playsinline',''); v.preload='auto';
+    try{ v.srcObject=null; }catch(_){} v.src=url;
     BIO.video=v; BIO.srcEl=v;
     try{
-      await new Promise(function(res,rej){ v.onloadedmetadata=function(){res();}; v.onerror=function(){rej(new Error('No se pudo leer el video'));}; });
-    }catch(e){ URL.revokeObjectURL(url); try{ v.remove(); }catch(_){} txt.textContent='⚠️ '+e.message; return; }
+      await new Promise(function(res,rej){
+        v.onloadedmetadata=function(){ res(); };
+        v.onerror=function(){ rej(new Error('No se pudo leer el video')); };
+        setTimeout(function(){ if((v.videoWidth>0)||(isFinite(v.duration)&&v.duration>0)) res(); }, 2500);
+      });
+    }catch(e){ URL.revokeObjectURL(url); limpiarVideoSrc(v); txt.textContent='⚠️ '+e.message; return; }
 
     var dur = (isFinite(v.duration) && v.duration>0) ? v.duration : 0;
-    if(!dur){ URL.revokeObjectURL(url); try{ v.remove(); }catch(_){} txt.textContent='⚠️ Video sin duración legible.'; return; }
+    if(!dur){ URL.revokeObjectURL(url); limpiarVideoSrc(v); txt.textContent='⚠️ Video sin duración legible.'; return; }
 
     BIO.acc = nuevoAcumulador(); BIO.framesTotales=0;
     BIO.procesandoVideo=true; BIO.cancelVideo=false;
@@ -568,12 +575,14 @@
         try{ v.pause(); }catch(_){}
         resolve();
       }
+      var hintShown = false;
       // Watchdog: cierra si termina, se cancela, llega al final, o se pasa mucho del tiempo esperado.
       var watchdog = setInterval(function(){
         if(terminado) return;
         if(BIO.cancelVideo || v.ended || v.currentTime >= dur - 0.05) terminar();
-        else if(Date.now() - arranque > (dur*1000)*2 + 8000) terminar();
+        else if(Date.now() - arranque > (dur*1000)*3 + 10000) terminar();
       }, 400);
+      function intentarPlay(){ try{ var pp=v.play(); if(pp && pp.catch) pp.catch(function(){}); }catch(_){} }
       function tick(){
         if(terminado) return;
         if(BIO.cancelVideo){ terminar(); return; }
@@ -583,17 +592,21 @@
           BIO.pose.send({ image:v }).then(function(){ BIO.sending=false; }).catch(function(){ BIO.sending=false; });
         }
         var pct = Math.min(99, Math.round((t/dur)*100));
-        fill.style.width = pct+'%'; txt.textContent = pct+'%';
+        fill.style.width = pct+'%';
+        // Si a los ~1.8s no arrancó, iOS exige gesto: mostrar pista y permitir tocar para reproducir.
+        if(!hintShown && t < 0.05 && (Date.now()-arranque) > 1800){ hintShown=true; txt.textContent='▶︎ Toca el video para reproducir'; }
+        else if(t >= 0.05){ txt.textContent = pct+'%'; }
         if(v.ended){ terminar(); return; }
         rafId = requestAnimationFrame(tick);
       }
       v.onended = terminar;
-      var pp = v.play();
-      if(pp && pp.then){ pp.then(function(){ tick(); }).catch(function(){ tick(); }); } else { tick(); }
+      v.onclick = intentarPlay;                 // iOS: tocar el video reintenta la reproducción
+      intentarPlay();
+      tick();
     });
     BIO.procesandoVideo=false;
     URL.revokeObjectURL(url);
-    try{ v.remove(); }catch(_){}
+    limpiarVideoSrc(v);
 
     if(BIO.cancelVideo){ mostrarVista('bio-vista-inicio'); return; }
     fill.style.width='100%'; txt.textContent='100%';
