@@ -6674,6 +6674,11 @@ function _retroConstruirNota(p){
     atendidoPor:[p.terapeuta||''], creadoPor:(currentUser&&currentUser.name)||'', _retroGenerada:true
   };
 }
+// Refresco con señal: siempre da feedback al tocar (aunque la lista no cambie) y recalcula candidatos.
+function _retroValRefrescar(){
+  try{ showToast('Lista actualizada','info'); }catch(_){}
+  _retroValAbrir();
+}
 function _retroValAbrir(){
   if(!(typeof esSupervisorUI==='function'&&esSupervisorUI())){ showToast('Solo el supervisor','warning'); return; }
   var cands=_retroValCandidatos();
@@ -6690,7 +6695,7 @@ function _retroValAbrir(){
     +'<div id="retroval-body" style="padding:12px 18px;overflow:auto">'+lista+'</div>'
     +'<div style="padding:10px 18px;border-top:1px solid #E5E7EB;font-size:11.5px;color:#6B7280;line-height:1.5">Se creará la <b>nota de valoración (sesión 1)</b> con la fecha original de cada expediente, a partir de sus propios datos. Los que ya tienen alguna sesión NO se tocan; antes de crear cada nota se verifica en la nube que no exista.</div>'
     +'<div style="padding:12px 18px;display:flex;gap:10px;justify-content:flex-end;border-top:1px solid #E5E7EB">'
-    +'<button id="retroval-refresh" onclick="_retroValAbrir()" style="background:#EEF1F6;color:var(--navy);border:none;border-radius:10px;padding:9px 16px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">🔄 Actualizar</button>'
+    +'<button id="retroval-refresh" onclick="_retroValRefrescar()" style="background:#EEF1F6;color:var(--navy);border:none;border-radius:10px;padding:9px 16px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">🔄 Actualizar</button>'
     +'<button id="retroval-cancel" onclick="var o=document.getElementById(\'retroval-overlay\');if(o)o.remove()" style="background:#EEF1F6;color:var(--gray-600);border:none;border-radius:10px;padding:9px 16px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">Cancelar</button>'
     +(cands.length?('<button id="retroval-go" onclick="_retroValGenerar()" style="background:var(--navy);color:#fff;border:none;border-radius:10px;padding:9px 16px;font-size:13px;font-weight:800;cursor:pointer;font-family:inherit">Generar '+cands.length+' nota(s)</button>'):'')
     +'</div></div>';
@@ -6698,11 +6703,15 @@ function _retroValAbrir(){
 }
 async function _retroValGenerar(){
   var btn=document.getElementById('retroval-go');
-  if(btn){ btn.disabled=true; btn.textContent='Generando…'; }
   var cands=_retroValCandidatos();
+  var total=cands.length;
+  if(btn){ btn.disabled=true; btn.textContent='Generando 0/'+total+'…'; }
   var okN=0, skipN=0, errN=0, dupN=0, detalles=[], _modificados=[];
+  // Timeout por llamada de red: un solo dato colgado (datos móviles) NO debe congelar todo el lote.
+  var _to=function(pr,ms){ try{ return (typeof _conTimeout==='function')?_conTimeout(pr,ms):pr; }catch(_e){ return pr; } };
   for(var i=0;i<cands.length;i++){
     var p=cands[i];
+    if(btn) btn.textContent='Generando '+(i+1)+'/'+total+'…';   // progreso visible: no parece trabado
     try{
       // Doble-guarda LOCAL: si el propio expediente ya tiene sesiones, no se toca.
       var sesLocal=(typeof _soapVivas==='function')?_soapVivas(p):(p.soap||[]);
@@ -6717,10 +6726,10 @@ async function _retroValGenerar(){
       var yaEstaNota=false, esGemeloHist=false;
       try{
         if(navigator.onLine && window._fstDb && typeof FST_resolverPidPaciente==='function'){
-          var r=await FST_resolverPidPaciente(p);
+          var r=await _to(FST_resolverPidPaciente(p), 6000);
           if(r&&r.ok&&r.pid){
             if(String(r.pid).indexOf('mig_pac_')===0 && String(p.id||'').indexOf('mig_pac_')!==0) esGemeloHist=true;
-            var dsn=await window._fstDb.collection('pacientes').doc(r.pid).collection('sesiones').doc(nota.id).get();
+            var dsn=await _to(window._fstDb.collection('pacientes').doc(r.pid).collection('sesiones').doc(nota.id).get(), 6000);
             if(dsn && dsn.exists && (dsn.data()||{}).eliminado!==true) yaEstaNota=true;
           }
         }
@@ -6736,7 +6745,7 @@ async function _retroValGenerar(){
       if(!esGemeloHist){
         try{
           if(typeof FST_guardarSesionFirestore==='function'){
-            var rr=await FST_guardarSesionFirestore(p, nota, 'nueva');
+            var rr=await _to(FST_guardarSesionFirestore(p, nota, 'nueva'), 8000);
             subido=!!(rr&&rr.ok);
           }
         }catch(_s){ subido=false; }
@@ -6747,9 +6756,11 @@ async function _retroValGenerar(){
       else { detalles.push((subido||yaEstaNota?'✅ ':'📴 ')+(p.name||'')+(subido||yaEstaNota?'':' (se subirá al reconectar)')); }
     }catch(_e){ errN++; detalles.push('❌ '+((p&&p.name)||'')+' — '+((_e&&_e.message)||'error')); }
   }
-  // PERSISTENCIA LOCAL (faltaba): sin este saveDB la nota vivía SOLO en memoria y se perdía al
-  // recargar — por eso los expedientes seguían apareciendo vacíos aunque el retroactivo "generaba".
-  try{ if(_modificados.length && typeof saveDB==='function') await saveDB('pts', _modificados); }catch(_sv){ console.warn('[retro] saveDB local falló:', _sv&&_sv.message); }
+  // PERSISTENCIA: local AL INSTANTE (saveLocal → localStorage) para que la nota sobreviva a recargar;
+  // y Sheets en SEGUNDO PLANO (SIN await) porque Apps Script es lento y congelaba "Generando…".
+  // La nota ya se dual-escribió a Firestore por paciente; Sheets es el respaldo y puede terminar solo.
+  try{ if(typeof saveLocal==='function') saveLocal('pts', patientsDB); }catch(_sl){}
+  try{ if(_modificados.length && typeof saveDB==='function') saveDB('pts', _modificados).catch(function(){}); }catch(_sv){ console.warn('[retro] saveDB Sheets (2º plano) falló:', _sv&&_sv.message); }
   try{ if(typeof window._FST_invalidarVistaPacientes==='function') window._FST_invalidarVistaPacientes(); }catch(_e){}
   var body=document.getElementById('retroval-body');
   if(body){
