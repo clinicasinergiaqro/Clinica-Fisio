@@ -3836,8 +3836,7 @@ function _recargarPorUpdate(){
     var _colasOk = (typeof _totalPendientesSync!=='function') || (_totalPendientesSync()===0);
     if(!esSeguroRecargar() || !_colasOk){ _swAplicandoUpdate = false; mostrarBannerActualizacion(); return; }
     try{ if(firma) localStorage.setItem(LS_SW_FIRMA_APLICADA, firma); }catch(e){}
-    _swRecargando = true;
-    try{ location.reload(); }catch(e2){ location.href = location.href; }
+    _recargarConShellLimpio();   // recarga robusta: limpia el shell (con red) para no servir la copia vieja
   });
 }
 // [FIX-AUTOUPDATE p4] Revisor por ESTADO (el corazón del fix): cuando el SW nuevo se instala,
@@ -3880,6 +3879,29 @@ function esSeguroRecargar(){
   }catch(e){ return false; } // ante cualquier error, NO recargar
 }
 
+// Recarga ROBUSTA para aplicar una versión nueva: pide update al SW, y si HAY red borra los caches
+// del shell ANTES de recargar. Esto cierra el hueco de la navegación red-primero-con-timeout: sin
+// borrar el shell, en red lenta el timeout (3.5s) servía la copia VIEJA y la app "no cambiaba".
+// Offline: NO borra (dejaría la navegación sin fallback → pantalla en blanco); recarga tal cual.
+// NO toca IndexedDB/media/datos ni las colas de sync (durables en localStorage). Uso compartido:
+// banner "Actualizar ahora", recarga automática segura y botón manual "Forzar actualización".
+async function _recargarConShellLimpio(){
+  if(_swRecargando) return;
+  _swRecargando = true;
+  try{
+    if('serviceWorker' in navigator){
+      var reg=await navigator.serviceWorker.getRegistration();
+      if(reg){ try{ await reg.update(); }catch(_u){} if(reg.waiting){ try{ reg.waiting.postMessage({type:'SKIP_WAITING'}); }catch(_p){} } }
+    }
+  }catch(_e){}
+  if(navigator.onLine){
+    try{
+      var ks=await caches.keys();
+      await Promise.all(ks.filter(function(k){ return k.indexOf(SW_CACHE_PREFIX)===0; }).map(function(k){ return caches.delete(k); }));
+    }catch(_c){}
+  }
+  setTimeout(function(){ try{ location.reload(); }catch(_r){ location.href=location.href; } }, 300);
+}
 function mostrarBannerActualizacion(){
   if(document.getElementById('sw-update-banner')) return;
   var b=document.createElement('div');
@@ -3893,7 +3915,7 @@ function mostrarBannerActualizacion(){
   document.body.appendChild(b);
   var btn=document.getElementById('sw-update-btn');
   if(btn) btn.onclick=function(){
-    if(esSeguroRecargar()){ _swRecargando=true; try{ location.reload(); }catch(e){ location.href=location.href; } }
+    if(esSeguroRecargar()){ _recargarConShellLimpio(); }
     else { try{ showToast('Guarda tu nota primero — la app se actualizará al terminar','warning'); }catch(e){} }
   };
 }
@@ -6886,19 +6908,7 @@ async function _detForzarUpdate(){
     if(!_colasOk){ try{ showToast('Tienes cambios sin subir — espera al "Todo sincronizado" y reintenta','warning'); }catch(_){}; return; }
     var btn=document.getElementById('det-forzar-update'); if(btn){ btn.disabled=true; btn.textContent='Actualizando…'; }
     try{ showToast('Buscando versión nueva…','info'); }catch(_){}
-    try{
-      if('serviceWorker' in navigator){
-        var reg=await navigator.serviceWorker.getRegistration();
-        if(reg){ try{ await reg.update(); }catch(_u){} if(reg.waiting){ try{ reg.waiting.postMessage({type:'SKIP_WAITING'}); }catch(_p){} } }
-      }
-    }catch(_e){}
-    // Borra SOLO los caches del shell (prefijo sinergia-shell-): NO toca IndexedDB, media ni datos.
-    try{
-      var ks=await caches.keys();
-      await Promise.all(ks.filter(function(k){ return k.indexOf(SW_CACHE_PREFIX)===0; }).map(function(k){ return caches.delete(k); }));
-    }catch(_c){}
-    _swRecargando=true;
-    setTimeout(function(){ try{ location.reload(); }catch(_r){ location.href=location.href; } }, 400);
+    await _recargarConShellLimpio();   // update SW + limpia shell (con red) + recarga
   }catch(_all){ try{ location.reload(); }catch(_r2){} }
 }
 async function _detEjecutar(){
