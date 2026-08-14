@@ -6769,21 +6769,39 @@ async function _detReconectarYSubir(){
       }
       return;
     }
+    // Mover los FALLIDOS de vuelta a la cola activa para REINTENTARLOS con la sesión ya reconectada
+    // (aquí estaban las 34: se habían movido a FALLIDOS y el drenado normal ya no los tocaba).
+    try{
+      var fall=JSON.parse(localStorage.getItem('COLA_SOAP_ACT_FALLIDOS')||'[]');
+      if(Array.isArray(fall) && fall.length){
+        var viva=JSON.parse(localStorage.getItem('COLA_SOAP_ACT')||'[]'); if(!Array.isArray(viva)) viva=[];
+        var _vistos={}; viva.forEach(function(it){ if(it&&it.sesion) _vistos[String(it.sesion.id)]=1; });
+        fall.forEach(function(it){ if(!it||!it.sesion) return; var sid=String(it.sesion.id); if(_vistos[sid]) return; _vistos[sid]=1; var c=Object.assign({},it); delete c.error; delete c.falladoEn; delete c.ultimoError; c.intentos=0; delete c.proximoIntento; viva.push(c); });
+        localStorage.setItem('COLA_SOAP_ACT', JSON.stringify(viva));
+        localStorage.setItem('COLA_SOAP_ACT_FALLIDOS','[]');
+      }
+    }catch(_e){}
     // Quitar backoff y reiniciar intentos para que TODAS las sesiones intenten subir de inmediato.
     try{ var q=JSON.parse(localStorage.getItem('COLA_SOAP_ACT')||'[]'); if(Array.isArray(q)){ q.forEach(function(it){ if(it){ delete it.proximoIntento; it.intentos=0; } }); localStorage.setItem('COLA_SOAP_ACT', JSON.stringify(q)); } }catch(_e){}
     set('Subiendo…', true);
-    // Drenar todas las colas relevantes; dos pasadas con pausa (la 1ª puede re-autenticar, la 2ª sube).
+    // Varias pasadas con pausa (la 1ª puede re-autenticar/re-drenar, las siguientes suben).
     try{ if(typeof drenarColaSoapActivo==='function') await drenarColaSoapActivo(); }catch(_e){}
     try{ if(typeof sincronizarPendientes==='function') await sincronizarPendientes(); }catch(_e){}
     await new Promise(function(r){ setTimeout(r, 2500); });
     try{ if(typeof drenarColaSoapActivo==='function') await drenarColaSoapActivo(); }catch(_e){}
-    // Resultado real
-    var rest=[]; try{ rest=JSON.parse(localStorage.getItem('COLA_SOAP_ACT')||'[]')||[]; }catch(_e){}
-    var motivo=''; for(var i=0;i<rest.length;i++){ if(rest[i] && rest[i].ultimoError){ motivo=String(rest[i].ultimoError); break; } }
+    await new Promise(function(r){ setTimeout(r, 2500); });
+    try{ if(typeof drenarColaSoapActivo==='function') await drenarColaSoapActivo(); }catch(_e){}
+    // Resultado HONESTO: contar activos + FALLIDOS (no solo la cola activa) y sacar el motivo real.
+    var restA=[], restF=[];
+    try{ restA=JSON.parse(localStorage.getItem('COLA_SOAP_ACT')||'[]')||[]; }catch(_e){}
+    try{ restF=JSON.parse(localStorage.getItem('COLA_SOAP_ACT_FALLIDOS')||'[]')||[]; }catch(_e){}
+    var totalRest=restA.length+restF.length;
+    var motivo=''; var _all=restA.concat(restF);
+    for(var i=0;i<_all.length;i++){ var mm=_all[i]&&(_all[i].ultimoError||_all[i].error); if(mm){ motivo=String(mm); break; } }
     set('🔧 Reconectar y subir', false);
     try{ actualizarIndicadorSync(); }catch(_e){}
-    if(!rest.length){ try{ showToast('✅ Todo subido — 0 pendientes','success'); }catch(_){} }
-    else { try{ showToast('Subieron algunas. Faltan '+rest.length+(motivo?(' · '+motivo.slice(0,90)):''), 'warning'); }catch(_){} }
+    if(totalRest===0){ try{ if(typeof showToastCritico_==='function') showToastCritico_('✅ ¡Todo subido! 0 pendientes. Ya puedes cerrar esto.'); else showToast('✅ Todo subido — 0 pendientes','success'); }catch(_){} }
+    else { try{ if(typeof showToastCritico_==='function') showToastCritico_('Subieron algunas. Faltan '+totalRest+(motivo?(' · motivo: '+motivo.slice(0,110)):'')+' — mándale esta captura a soporte'); else showToast('Faltan '+totalRest+(motivo?(' · '+motivo.slice(0,90)):''),'warning'); }catch(_){} }
   }catch(e){ set('🔧 Reconectar y subir', false); try{ showToast('Error: '+((e&&e.message)||''),'error'); }catch(_){} }
 }
 // Refresco con señal: siempre da feedback al tocar (aunque la lista no cambie) y recalcula candidatos.
