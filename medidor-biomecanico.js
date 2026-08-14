@@ -242,16 +242,17 @@
       '.bio-modo-btn{width:100%;max-width:360px;border:none;border-radius:16px;padding:20px;font-size:17px;font-weight:800;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px}',
       '.bio-modo-cam{background:#C9A84C;color:#122950}',
       '.bio-modo-vid{background:rgba(255,255,255,.1);color:#fff;border:1.5px solid rgba(255,255,255,.25)}',
-      '.bio-canvas-wrap{position:relative;width:100%;background:#000;display:flex;align-items:center;justify-content:center}',
-      '#bio-canvas,#bio-canvas-vid{width:100%;max-height:56vh;object-fit:contain;display:block}',
-      '.bio-estado{padding:8px 16px;font-size:13px;font-weight:600;text-align:center;background:#0d1626;color:#E8C96A}',
-      '.bio-panel{margin:8px 12px;background:rgba(255,255,255,.06);border-radius:12px;padding:8px 10px}',
+      '.bio-canvas-wrap{position:relative;width:100%;flex:1;min-height:0;background:#000;display:flex;align-items:center;justify-content:center;overflow:hidden}',
+      '#bio-canvas{width:100%;height:100%;object-fit:contain;display:block}',
+      '#bio-canvas-vid{width:100%;max-height:64vh;object-fit:contain;display:block}',
+      '.bio-estado{padding:7px 16px;font-size:13px;font-weight:600;text-align:center;background:#0d1626;color:#E8C96A;flex-shrink:0}',
+      '.bio-panel{position:absolute;left:0;right:0;bottom:0;margin:0;background:linear-gradient(to top,rgba(13,22,38,.94),rgba(13,22,38,0));padding:10px 10px 8px}',
       '.bio-panel table{width:100%;border-collapse:collapse;font-size:13px}',
       '.bio-panel th{color:#9BA3B5;font-weight:700;text-align:left;padding:4px 6px;font-size:11px;text-transform:uppercase;letter-spacing:.5px}',
       '.bio-panel td{padding:5px 6px;border-top:1px solid rgba(255,255,255,.08);font-variant-numeric:tabular-nums}',
       '.bio-panel td.g{color:#fff;font-weight:700}',
       '.bio-panel td.v{color:#3DDC97;font-weight:700;text-align:right}',
-      '.bio-cron{font-size:15px;font-weight:800;color:#E8C96A;text-align:center;padding:2px}',
+      '.bio-cron{position:absolute;top:8px;right:10px;font-size:15px;font-weight:800;color:#fff;background:rgba(192,57,43,.92);padding:3px 11px;border-radius:12px}',
       '.bio-acciones{display:flex;gap:8px;padding:10px 12px 16px;flex-wrap:wrap}',
       '.bio-acciones button{flex:1;min-width:120px;border:none;border-radius:14px;padding:13px;font-size:15px;font-weight:800;cursor:pointer}',
       '.bio-b-rec{background:#C0392B;color:#fff}',
@@ -288,10 +289,11 @@
       + '</div>'
       // Vista cámara en vivo
       + '<div class="bio-vista" id="bio-vista-camara">'
-      +   '<div class="bio-canvas-wrap"><canvas id="bio-canvas"></canvas></div>'
+      +   '<div class="bio-canvas-wrap"><canvas id="bio-canvas"></canvas>'
+      +     '<div class="bio-cron" id="bio-cron" style="display:none">00:00</div>'
+      +     '<div class="bio-panel" id="bio-panel-vivo"></div>'
+      +   '</div>'
       +   '<div class="bio-estado" id="bio-estado">Iniciando cámara…</div>'
-      +   '<div class="bio-cron" id="bio-cron" style="display:none">00:00</div>'
-      +   '<div class="bio-panel" id="bio-panel-vivo"></div>'
       +   '<div class="bio-acciones">'
       +     '<button class="bio-b-sec" id="bio-btn-flip" style="flex:0 0 auto;min-width:auto;padding:13px 16px">🔄 Cámara</button>'
       +     '<button class="bio-b-rec" id="bio-btn-rec" disabled>⏺️ Grabar sesión</button>'
@@ -300,7 +302,7 @@
       // Vista progreso (análisis de video)
       + '<div class="bio-vista bio-prog-wrap" id="bio-vista-progreso">'
       +   '<div style="font-size:15px;font-weight:700">Analizando video…</div>'
-      +   '<canvas id="bio-canvas-vid" style="max-height:38vh"></canvas>'
+      +   '<canvas id="bio-canvas-vid" style="max-height:62vh;width:100%"></canvas>'
       +   '<div class="bio-prog-bar"><div class="bio-prog-fill" id="bio-prog-fill"></div></div>'
       +   '<div id="bio-prog-txt" style="color:#9BA3B5;font-size:13px">0%</div>'
       +   '<button class="bio-modo-btn bio-modo-vid" id="bio-prog-cancel" style="max-width:200px;padding:12px">Cancelar</button>'
