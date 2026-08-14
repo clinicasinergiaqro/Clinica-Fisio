@@ -286,7 +286,8 @@
       '.bio-modo-cam{background:#C9A84C;color:#122950}',
       '.bio-modo-vid{background:rgba(255,255,255,.1);color:#fff;border:1.5px solid rgba(255,255,255,.25)}',
       '.bio-canvas-wrap{position:relative;width:100%;flex:1;min-height:0;background:#000;display:flex;align-items:center;justify-content:center;overflow:hidden}',
-      '#bio-canvas{width:100%;height:100%;object-fit:contain;display:block}',
+      '#bio-cam-src{position:absolute;left:0;top:0;width:100%;height:100%;object-fit:contain;background:#000}',
+      '#bio-canvas{position:absolute;left:0;top:0;width:100%;height:100%;object-fit:contain;display:block}',
       '.bio-vidwrap{position:relative;width:100%;height:58vh;flex-shrink:0;background:#000}',
       '#bio-vid-src{position:absolute;left:0;top:0;width:100%;height:100%;object-fit:contain;background:#000}',
       '#bio-canvas-vid{position:absolute;left:0;top:0;width:100%;height:100%;object-fit:contain}',
@@ -334,7 +335,7 @@
       + '</div>'
       // Vista cámara en vivo
       + '<div class="bio-vista" id="bio-vista-camara">'
-      +   '<div class="bio-canvas-wrap"><canvas id="bio-canvas"></canvas>'
+      +   '<div class="bio-canvas-wrap"><video id="bio-cam-src" playsinline webkit-playsinline muted autoplay></video><canvas id="bio-canvas"></canvas>'
       +     '<div class="bio-cron" id="bio-cron" style="display:none">00:00</div>'
       +     '<div class="bio-panel" id="bio-panel-vivo"></div>'
       +   '</div>'
@@ -438,8 +439,10 @@
       try{ BIO.stream = await navigator.mediaDevices.getUserMedia({ video:true, audio:false }); }
       catch(e2){ if(estado) estado.textContent='⚠️ Permiso de cámara denegado o no disponible. Puedes usar "📁 Subir video".'; return false; }
     }
-    var v = BIO.video || document.createElement('video');
-    v.autoplay=true; v.muted=true; v.playsInline=true; v.setAttribute('playsinline','');
+    // iOS Safari NO reproduce un <video> fuera del DOM → cámara negra. Usamos el <video> visible
+    // que está en la vista de cámara (el canvas se dibuja encima con esqueleto + ángulos).
+    var v = document.getElementById('bio-cam-src') || document.createElement('video');
+    v.autoplay=true; v.muted=true; v.defaultMuted=true; v.setAttribute('muted',''); v.playsInline=true; v.setAttribute('playsinline',''); v.setAttribute('webkit-playsinline','');
     v.srcObject=BIO.stream; BIO.video=v; BIO.srcEl=v;
     try{ await v.play(); }catch(_){}
     return true;
