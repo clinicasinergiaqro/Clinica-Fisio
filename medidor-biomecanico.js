@@ -262,7 +262,7 @@
       '.bio-b-save{background:#2E7D52;color:#fff}',
       '.bio-b-sec{background:rgba(255,255,255,.1);color:#fff;border:1.5px solid rgba(255,255,255,.25)!important}',
       '.bio-b-rec:disabled{opacity:.45;cursor:default}',
-      '.bio-prog-wrap{padding:12px;align-items:center;justify-content:flex-start;gap:12px;display:flex;flex-direction:column;flex:1;overflow-y:auto}',
+      '.bio-prog-wrap{padding:12px;align-items:center;justify-content:flex-start;gap:12px;flex-direction:column;flex:1;overflow-y:auto}',
       '.bio-prog-bar{width:100%;max-width:360px;height:14px;background:rgba(255,255,255,.12);border-radius:8px;overflow:hidden}',
       '.bio-prog-fill{height:100%;width:0;background:#C9A84C;transition:width .15s}',
       '.bio-resumen{padding:14px}',
