@@ -23,22 +23,27 @@
   //  - hombro_flex: elevación del brazo en el PLANO SAGITAL (brazo al frente).
   //  - hombro_abd:  elevación del brazo en el PLANO FRONTAL (brazo al lado).
   //    Ambos 0°=brazo al costado. Se usan hombros+caderas para el marco del cuerpo.
+  // En UNA grabación el paciente hace TODOS los movimientos activos; cada uno se llena por su
+  // cuenta. Para hombro se clasifica el frame por DIRECCIÓN del brazo (lateral=abducción,
+  // adelante=flexión, atrás=extensión) y se guarda la elevación máxima de cada uno. base0: el ROM
+  // se reporta desde 0° (neutro). dir: qué dirección llena esta métrica.
   var MEDIDAS = [
-    { key:'codo_flex_izq',   grupo:'Codo',   mov:'Flexión',   lado:'Izq', calc:'codo',        vertice:13, pts:[11,13,15] },
-    { key:'codo_flex_der',   grupo:'Codo',   mov:'Flexión',   lado:'Der', calc:'codo',        vertice:14, pts:[12,14,16] },
-    { key:'hombro_flex_izq', grupo:'Hombro', mov:'Flexión',   lado:'Izq', calc:'hombro_flex', vertice:11, hombro:11, codo:13 },
-    { key:'hombro_flex_der', grupo:'Hombro', mov:'Flexión',   lado:'Der', calc:'hombro_flex', vertice:12, hombro:12, codo:14 },
-    { key:'hombro_abd_izq',  grupo:'Hombro', mov:'Abducción', lado:'Izq', calc:'hombro_abd',  vertice:11, hombro:11, codo:13 },
-    { key:'hombro_abd_der',  grupo:'Hombro', mov:'Abducción', lado:'Der', calc:'hombro_abd',  vertice:12, hombro:12, codo:14 }
+    { key:'codo_flex_izq',   grupo:'Codo',   mov:'Flexión',   lado:'Izq', calc:'codo',   vertice:13, pts:[11,13,15] },
+    { key:'codo_flex_der',   grupo:'Codo',   mov:'Flexión',   lado:'Der', calc:'codo',   vertice:14, pts:[12,14,16] },
+    { key:'hombro_flex_izq', grupo:'Hombro', mov:'Flexión',   lado:'Izq', calc:'hombro', dir:'flex', base0:true, vertice:11, hombro:11, codo:13 },
+    { key:'hombro_flex_der', grupo:'Hombro', mov:'Flexión',   lado:'Der', calc:'hombro', dir:'flex', base0:true, vertice:12, hombro:12, codo:14 },
+    { key:'hombro_ext_izq',  grupo:'Hombro', mov:'Extensión', lado:'Izq', calc:'hombro', dir:'ext',  base0:true, vertice:11, hombro:11, codo:13 },
+    { key:'hombro_ext_der',  grupo:'Hombro', mov:'Extensión', lado:'Der', calc:'hombro', dir:'ext',  base0:true, vertice:12, hombro:12, codo:14 },
+    { key:'hombro_abd_izq',  grupo:'Hombro', mov:'Abducción', lado:'Izq', calc:'hombro', dir:'abd',  base0:true, vertice:11, hombro:11, codo:13 },
+    { key:'hombro_abd_der',  grupo:'Hombro', mov:'Abducción', lado:'Der', calc:'hombro', dir:'abd',  base0:true, vertice:12, hombro:12, codo:14 }
   ];
   // Filas de la tabla (una por movimiento, con columnas Izq/Der).
   var FILAS = [
     { etq:'Codo · Flexo-ext.',  izq:'codo_flex_izq',   der:'codo_flex_der' },
     { etq:'Hombro · Flexión',   izq:'hombro_flex_izq', der:'hombro_flex_der' },
+    { etq:'Hombro · Extensión', izq:'hombro_ext_izq',  der:'hombro_ext_der' },
     { etq:'Hombro · Abducción', izq:'hombro_abd_izq',  der:'hombro_abd_der' }
   ];
-  // Vértices donde va etiqueta en vivo (codos y hombros).
-  var VERT_MED = [11,12,13,14];
 
   // Segmentos a dibujar (esqueleto simple: torso + brazos + piernas).
   var CONEXIONES = [
@@ -140,12 +145,27 @@
     var up=_norm(_sub(midS,midH));
     var lateral=_norm(_sub(Rs,Ls));
     var forward=_norm(_cross(up,lateral));
+    // Orientar 'forward' hacia ADELANTE del cuerpo (nariz) para separar flexión (adelante, +)
+    // de extensión (atrás, −). Sin nariz visible, queda la orientación del producto cruz.
+    var nose=world[0];
+    if(nose){ var toNose=_sub(nose, midH); if(_dot(toNose, forward) < 0){ forward={x:-forward.x, y:-forward.y, z:-forward.z}; } }
     return { up:up, lateral:lateral, forward:forward };
+  }
+  // Estado del hombro en un frame: elevación total (0=colgando) y dirección dominante del brazo.
+  function _estadoHombro(world, marco, sIdx, eIdx){
+    var arm=_sub(world[eIdx], world[sIdx]);
+    var au=_dot(arm, marco.up), al=_dot(arm, marco.lateral), af=_dot(arm, marco.forward);
+    var h=Math.sqrt(al*al+af*af);
+    var theta=Math.atan2(h, -au)*180/Math.PI;   // 0=abajo, 90=horizontal, 180=arriba
+    var dir=null;
+    if(theta>=12){ dir = (Math.abs(al)>=Math.abs(af)) ? 'abd' : (af>0 ? 'flex' : 'ext'); }
+    return { theta:theta, dir:dir };
   }
   // Calcula los valores clínicos de cada MOVIMIENTO para un frame.
   function calcularAngulos(world, lm){
     var out = { _algunoValido:false };
     var marco = world ? _marcoCuerpo(world) : null;
+    var cacheHombro = {};   // sIdx → estado (se calcula una vez por hombro)
     for(var i=0;i<MEDIDAS.length;i++){
       var m=MEDIDAS[i], val=null, ok=false;
       if(m.calc==='codo'){
@@ -154,21 +174,11 @@
           var interior = angulo3D(world[p1], world[p2], world[p3]);
           val = 180 - interior; if(val<0) val=0; ok=true;
         }
-      } else { // hombro_flex / hombro_abd
+      } else { // hombro: la métrica se llena solo si el brazo va en SU dirección (flex/ext/abd)
         var s=m.hombro, e=m.codo;
         if(marco && _vis(lm,s)&&_vis(lm,e)&&_vis(lm,11)&&_vis(lm,12)&&_vis(lm,23)&&_vis(lm,24) && world && world[s]&&world[e]){
-          var arm=_sub(world[e], world[s]);
-          // Componentes del brazo en el marco del cuerpo. 0°=colgando (au<0).
-          var au=_dot(arm, marco.up), al=_dot(arm, marco.lateral), af=_dot(arm, marco.forward);
-          // GATING por plano dominante: la abducción solo cuenta cuando el brazo se eleva más
-          // hacia el lado (|al|≥|af|); la flexión, cuando se eleva más al frente (|af|≥|al|).
-          // Así cada métrica captura su propio movimiento y no se contamina con el otro plano.
-          if(m.calc==='hombro_abd'){
-            if(Math.abs(al) >= Math.abs(af)){ val=Math.atan2(Math.abs(al), -au)*180/Math.PI; ok=true; }
-          } else {
-            if(Math.abs(af) >= Math.abs(al)){ val=Math.atan2(Math.abs(af), -au)*180/Math.PI; ok=true; }
-          }
-          if(ok && val<0) val=0;
+          var est = cacheHombro[s] || (cacheHombro[s] = _estadoHombro(world, marco, s, e));
+          if(est.dir === m.dir){ val = est.theta; if(val<0) val=0; ok=true; }
         }
       }
       out[m.key] = { val:val, ok:ok };
@@ -203,7 +213,9 @@
     return MEDIDAS.map(function(m){
       var s=acc[m.key];
       if(s && s.muestras>0 && s.min!==null){
-        return { key:m.key, grupo:m.grupo, mov:m.mov, lado:m.lado, min:Math.round(s.min), max:Math.round(s.max), rango:Math.round(s.max-s.min), muestras:s.muestras };
+        var mn = m.base0 ? 0 : Math.round(s.min);   // ROM de hombro se reporta desde 0° (neutro)
+        var mx = Math.round(s.max);
+        return { key:m.key, grupo:m.grupo, mov:m.mov, lado:m.lado, min:mn, max:mx, rango:Math.round(mx-mn), muestras:s.muestras };
       }
       return { key:m.key, grupo:m.grupo, mov:m.mov, lado:m.lado, min:null, max:null, rango:null, muestras:0 };
     });
@@ -253,14 +265,13 @@
     if(ang){
       ctx.font = 'bold '+Math.max(11, Math.round(w*0.026))+'px -apple-system,Arial';
       ctx.textAlign='center'; ctx.textBaseline='middle';
-      var usados={};
+      // Por hombro solo hay UNA métrica activa por frame (la dirección en curso) → sin apilar.
+      var pref={ flex:'Fl ', ext:'Ex ', abd:'Ab ' };
       MEDIDAS.forEach(function(m){
         var r=ang[m.key]; if(!r || !r.ok) return;
         var vtx=lm[m.vertice]; if(!vtx) return;
-        var n=usados[m.vertice]||0; usados[m.vertice]=n+1;
-        var prefijo = (m.grupo==='Hombro') ? (m.mov==='Flexión'?'F ':'A ') : '';
-        var txt = prefijo + Math.round(r.val)+'°';
-        var tx=vtx.x*w, ty=vtx.y*h + n*Math.round(w*0.052);
+        var txt = (m.calc==='hombro' ? (pref[m.dir]||'') : '') + Math.round(r.val)+'°';
+        var tx=vtx.x*w, ty=vtx.y*h;
         var pad=Math.round(w*0.012), tw=ctx.measureText(txt).width;
         ctx.fillStyle='rgba(18,41,80,.82)';
         ctx.fillRect(tx-tw/2-pad, ty-Math.round(w*0.022), tw+pad*2, Math.round(w*0.044));
@@ -472,11 +483,11 @@
   function actualizarGateGrabacion(lm){
     if(BIO.recording) return;
     var btn=document.getElementById('bio-btn-rec'); if(!btn) return;
-    // Codo + hombro requieren hombros, caderas y codos visibles (no hace falta cuerpo completo).
-    var ok = _vis(lm,11)&&_vis(lm,12)&&_vis(lm,23)&&_vis(lm,24)&&_vis(lm,13)&&_vis(lm,14);
+    // Listo en cuanto se detecta el tronco (hombros + caderas). Los brazos se miden al moverlos.
+    var ok = _vis(lm,11)&&_vis(lm,12)&&_vis(lm,23)&&_vis(lm,24);
     btn.disabled = !ok;
     var estado=document.getElementById('bio-estado');
-    if(estado) estado.textContent = ok ? '✓ Detectado — listo para grabar' : 'Encuadra tronco y brazos (hombros, codos y caderas)';
+    if(estado) estado.textContent = ok ? '✓ Detectado — graba y pide TODOS los movimientos' : 'Encuadra tronco y brazos (hombros y caderas)';
   }
   // Inicia la grabación del clip de cámara (MediaRecorder) en paralelo a la medición de ángulos.
   function iniciarGrabadorVideo(){
