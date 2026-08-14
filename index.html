@@ -153,6 +153,27 @@ async function FST_init(){
   }
 }
 
+// AUTO-REPARACIÓN DE SESIÓN FIREBASE (caso "solo falla con Jess"): la sesión anónima del proyecto de
+// datos puede quedar VENCIDA en un dispositivo — Firebase la cree viva (currentUser existe), por eso
+// FST_init NO re-autentica, pero su token ya no sirve → Firestore rechaza CADA escritura con
+// "Missing or insufficient permissions". El logout de la app NO toca esta sesión (es de otro proyecto),
+// por eso re-loguear no lo cura. Solución: forzar signOut + signInAnonymously para regenerar el token.
+function _esErrorPermiso(txt){ return /insufficient permissions|permission[- ]denied|Missing or insufficient/i.test(String(txt||'')); }
+var _FST_reauthTs = 0;
+async function FST_reautenticarStaging(){
+  try{
+    if(typeof firebase==='undefined' || !firebase.apps) return false;
+    var app=firebase.apps.find(function(a){ return a && a.name==='staging'; });
+    if(!app) return false;
+    var sa=app.auth();
+    try{ await sa.signOut(); }catch(_){}
+    await sa.signInAnonymously();
+    window._fstInitDone=true;
+    console.log('[FST] re-auth anónima OK tras permisos insuficientes');
+    return true;
+  }catch(e){ console.warn('[FST] re-auth staging falló:', e && e.message); return false; }
+}
+
 // ── BORRADO LÓGICO — LADO LECTURA (cimiento; SIN botón de borrado aún) ──────────
 // Set de pids eliminados: poblado como BYPRODUCTO del read del índice (sin lectura extra),
 // reconstruido en cada carga/SWR. Solo se necesita para el caso cross-paciente (collectionGroup
@@ -2345,7 +2366,7 @@ async function drenarColaSoapActivo(){
   try{ q=JSON.parse(localStorage.getItem('COLA_SOAP_ACT')||'[]'); }catch(e){ q=[]; }
   if(!Array.isArray(q) || !q.length) return;
   _DRENANDO_SOAP_ACT=true;
-  var restantes=[], fallidos=[], ahora=Date.now();
+  var restantes=[], fallidos=[], ahora=Date.now(), _permisoDenegado=false;
   try{
     for(const it of q){
       if(it && it.proximoIntento && ahora < it.proximoIntento){ restantes.push(it); continue; }
@@ -2388,12 +2409,14 @@ async function drenarColaSoapActivo(){
             // DIAGNÓSTICO: dejar el motivo real EN el item vivo (ultimoError). Así, aunque el item
             // no llegue a FALLIDOS (el barrido los resucita reiniciando intentos), CUALQUIER export
             // muestra POR QUÉ no sube esta sesión — clave para el caso "solo falla con Jess".
+            if(_esErrorPermiso(_reason)) _permisoDenegado=true;   // sesión Firebase caída → auto-reparar
             if(n>=_MAX_INTENTOS_HIST){ fallidos.push(Object.assign({}, it, {error:'max-reintentos('+n+') '+_reason, falladoEn:ahora})); }
             else { restantes.push(Object.assign({}, it, {intentos:n, proximoIntento: ahora + Math.min(60000, 2000*Math.pow(2, n-1)), ultimoError:_reason})); }
           }
         }
       }catch(e){
         var _cod=String((e && (e.code||e.message))||'');
+        if(_esErrorPermiso(_cod)) _permisoDenegado=true;
         if(_esErrorPermanenteHist(e)){ fallidos.push(Object.assign({}, it, {error:_cod||'permanente', falladoEn:ahora})); }
         else {
           var n2=(Number(it && it.intentos)||0)+1;
@@ -2405,7 +2428,16 @@ async function drenarColaSoapActivo(){
     try{ localStorage.setItem('COLA_SOAP_ACT', JSON.stringify(restantes)); }catch(e){}
     if(fallidos.length){ _persistirFallidosSoapAct(fallidos); console.warn('[SOAP-act]', fallidos.length, 'sesión(es) a FALLIDOS'); }
     if(restantes.length) console.warn('[SOAP-act]', restantes.length, 'sesión(es) de activos aún sin sincronizar');
-  } finally { _DRENANDO_SOAP_ACT=false; actualizarIndicadorSync(); }
+  } finally {
+    _DRENANDO_SOAP_ACT=false; actualizarIndicadorSync();
+    // AUTO-REPARACIÓN: si hubo "permisos insuficientes" (sesión Firebase vencida en este equipo),
+    // regenerar la sesión anónima y re-drenar. Cooldown 30s para no entrar en bucle.
+    if(_permisoDenegado && (Date.now()-_FST_reauthTs>30000)){
+      _FST_reauthTs=Date.now();
+      try{ showToast('Reconectando con la nube…','info'); }catch(_){}
+      FST_reautenticarStaging().then(function(ok){ if(ok) setTimeout(function(){ try{ drenarColaSoapActivo(); }catch(_e){} }, 1500); });
+    }
+  }
 }
 
 // ── LOOP C: cola de reintento para el DOC de paciente HISTÓRICO (COLA_SYNC_HIST_DOC) ──
