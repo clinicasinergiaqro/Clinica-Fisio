@@ -17,17 +17,28 @@
   // ── Configuración de articulaciones ──────────────────────────────────────
   // pts = [extremo, VÉRTICE, extremo] en índices de landmarks MediaPipe Pose.
   // art = tipo de articulación → define la conversión a convención clínica.
-  var ARTIC = [
-    { key:'codoIzq',    grupo:'Codo',    lado:'Izq', art:'codo',    pts:[11,13,15] },
-    { key:'codoDer',    grupo:'Codo',    lado:'Der', art:'codo',    pts:[12,14,16] },
-    { key:'hombroIzq',  grupo:'Hombro',  lado:'Izq', art:'hombro',  pts:[23,11,13] },
-    { key:'hombroDer',  grupo:'Hombro',  lado:'Der', art:'hombro',  pts:[24,12,14] },
-    { key:'caderaIzq',  grupo:'Cadera',  lado:'Izq', art:'cadera',  pts:[11,23,25] },
-    { key:'caderaDer',  grupo:'Cadera',  lado:'Der', art:'cadera',  pts:[12,24,26] },
-    { key:'rodillaIzq', grupo:'Rodilla', lado:'Izq', art:'rodilla', pts:[23,25,27] },
-    { key:'rodillaDer', grupo:'Rodilla', lado:'Der', art:'rodilla', pts:[24,26,28] }
+  // MOVIMIENTOS medidos (Fase 1 enfocada): codo flexo-extensión + hombro flexión y abducción,
+  // por lado. 'calc' define cómo se calcula. vertice = landmark donde se dibuja la etiqueta.
+  //  - codo: ángulo interior hombro-codo-muñeca → clínico = 180-interior (0°=extendido).
+  //  - hombro_flex: elevación del brazo en el PLANO SAGITAL (brazo al frente).
+  //  - hombro_abd:  elevación del brazo en el PLANO FRONTAL (brazo al lado).
+  //    Ambos 0°=brazo al costado. Se usan hombros+caderas para el marco del cuerpo.
+  var MEDIDAS = [
+    { key:'codo_flex_izq',   grupo:'Codo',   mov:'Flexión',   lado:'Izq', calc:'codo',        vertice:13, pts:[11,13,15] },
+    { key:'codo_flex_der',   grupo:'Codo',   mov:'Flexión',   lado:'Der', calc:'codo',        vertice:14, pts:[12,14,16] },
+    { key:'hombro_flex_izq', grupo:'Hombro', mov:'Flexión',   lado:'Izq', calc:'hombro_flex', vertice:11, hombro:11, codo:13 },
+    { key:'hombro_flex_der', grupo:'Hombro', mov:'Flexión',   lado:'Der', calc:'hombro_flex', vertice:12, hombro:12, codo:14 },
+    { key:'hombro_abd_izq',  grupo:'Hombro', mov:'Abducción', lado:'Izq', calc:'hombro_abd',  vertice:11, hombro:11, codo:13 },
+    { key:'hombro_abd_der',  grupo:'Hombro', mov:'Abducción', lado:'Der', calc:'hombro_abd',  vertice:12, hombro:12, codo:14 }
   ];
-  var GRUPOS = ['Codo','Hombro','Cadera','Rodilla'];
+  // Filas de la tabla (una por movimiento, con columnas Izq/Der).
+  var FILAS = [
+    { etq:'Codo · Flexo-ext.',  izq:'codo_flex_izq',   der:'codo_flex_der' },
+    { etq:'Hombro · Flexión',   izq:'hombro_flex_izq', der:'hombro_flex_der' },
+    { etq:'Hombro · Abducción', izq:'hombro_abd_izq',  der:'hombro_abd_der' }
+  ];
+  // Vértices donde va etiqueta en vivo (codos y hombros).
+  var VERT_MED = [11,12,13,14];
 
   // Segmentos a dibujar (esqueleto simple: torso + brazos + piernas).
   var CONEXIONES = [
@@ -111,29 +122,57 @@
     var cos=dot/(m1*m2); if(cos>1) cos=1; if(cos<-1) cos=-1;
     return Math.acos(cos)*180/Math.PI;
   }
-  // Interior (0–180) → convención clínica (0° neutro).
-  //  Codo / Rodilla / Cadera: flexión = 180 − interior (0° extendido → máx flexionado).
-  //  Hombro: flexión/abducción ≈ interior directo (0° brazo al costado → 180° arriba).
-  function aClinico(art, interior){
-    var v = (art==='hombro') ? interior : (180 - interior);
-    return v < 0 ? 0 : v;
+  // ── Álgebra de vectores 3D (para la descomposición de hombro) ──
+  function _sub(a,b){ return {x:a.x-b.x, y:a.y-b.y, z:(a.z||0)-(b.z||0)}; }
+  function _dot(a,b){ return a.x*b.x+a.y*b.y+a.z*b.z; }
+  function _mag(a){ return Math.sqrt(a.x*a.x+a.y*a.y+a.z*a.z); }
+  function _norm(a){ var m=_mag(a)||1; return {x:a.x/m, y:a.y/m, z:a.z/m}; }
+  function _cross(a,b){ return {x:a.y*b.z-a.z*b.y, y:a.z*b.x-a.x*b.z, z:a.x*b.y-a.y*b.x}; }
+  function _vis(lm,i){ return !!(lm && lm[i] && (lm[i].visibility==null || lm[i].visibility>=VIS_MIN)); }
+
+  // Marco de referencia ANATÓMICO del propio cuerpo (robusto a la orientación de la cámara):
+  //  up = cadera→hombro (eje del tronco); lateral = hombro izq→der; forward = up × lateral (sagital).
+  function _marcoCuerpo(world){
+    var Ls=world[11], Rs=world[12], Lh=world[23], Rh=world[24];
+    if(!Ls||!Rs||!Lh||!Rh) return null;
+    var midS={x:(Ls.x+Rs.x)/2, y:(Ls.y+Rs.y)/2, z:((Ls.z||0)+(Rs.z||0))/2};
+    var midH={x:(Lh.x+Rh.x)/2, y:(Lh.y+Rh.y)/2, z:((Lh.z||0)+(Rh.z||0))/2};
+    var up=_norm(_sub(midS,midH));
+    var lateral=_norm(_sub(Rs,Ls));
+    var forward=_norm(_cross(up,lateral));
+    return { up:up, lateral:lateral, forward:forward };
   }
-  // Calcula los ángulos clínicos de todas las articulaciones para un frame.
+  // Calcula los valores clínicos de cada MOVIMIENTO para un frame.
   function calcularAngulos(world, lm){
     var out = { _algunoValido:false };
-    for(var i=0;i<ARTIC.length;i++){
-      var j=ARTIC[i], p1=j.pts[0], p2=j.pts[1], p3=j.pts[2];
-      var okVis = lm && lm[p1] && lm[p2] && lm[p3]
-        && (lm[p1].visibility==null || lm[p1].visibility>=VIS_MIN)
-        && (lm[p2].visibility==null || lm[p2].visibility>=VIS_MIN)
-        && (lm[p3].visibility==null || lm[p3].visibility>=VIS_MIN);
-      if(okVis && world && world[p1] && world[p2] && world[p3]){
-        var interior = angulo3D(world[p1], world[p2], world[p3]);
-        out[j.key] = { val: aClinico(j.art, interior), ok:true };
-        out._algunoValido = true;
-      } else {
-        out[j.key] = { val:null, ok:false };
+    var marco = world ? _marcoCuerpo(world) : null;
+    for(var i=0;i<MEDIDAS.length;i++){
+      var m=MEDIDAS[i], val=null, ok=false;
+      if(m.calc==='codo'){
+        var p1=m.pts[0], p2=m.pts[1], p3=m.pts[2];
+        if(_vis(lm,p1)&&_vis(lm,p2)&&_vis(lm,p3) && world && world[p1]&&world[p2]&&world[p3]){
+          var interior = angulo3D(world[p1], world[p2], world[p3]);
+          val = 180 - interior; if(val<0) val=0; ok=true;
+        }
+      } else { // hombro_flex / hombro_abd
+        var s=m.hombro, e=m.codo;
+        if(marco && _vis(lm,s)&&_vis(lm,e)&&_vis(lm,11)&&_vis(lm,12)&&_vis(lm,23)&&_vis(lm,24) && world && world[s]&&world[e]){
+          var arm=_sub(world[e], world[s]);
+          // Componentes del brazo en el marco del cuerpo. 0°=colgando (au<0).
+          var au=_dot(arm, marco.up), al=_dot(arm, marco.lateral), af=_dot(arm, marco.forward);
+          // GATING por plano dominante: la abducción solo cuenta cuando el brazo se eleva más
+          // hacia el lado (|al|≥|af|); la flexión, cuando se eleva más al frente (|af|≥|al|).
+          // Así cada métrica captura su propio movimiento y no se contamina con el otro plano.
+          if(m.calc==='hombro_abd'){
+            if(Math.abs(al) >= Math.abs(af)){ val=Math.atan2(Math.abs(al), -au)*180/Math.PI; ok=true; }
+          } else {
+            if(Math.abs(af) >= Math.abs(al)){ val=Math.atan2(Math.abs(af), -au)*180/Math.PI; ok=true; }
+          }
+          if(ok && val<0) val=0;
+        }
       }
+      out[m.key] = { val:val, ok:ok };
+      if(ok) out._algunoValido = true;
     }
     return out;
   }
@@ -141,14 +180,14 @@
   // ── Acumulador de mín/máx ──────────────────────────────────────────────────
   function nuevoAcumulador(){
     var a = { framesValidos:0 };
-    ARTIC.forEach(function(j){ a[j.key] = { min:null, max:null, muestras:0 }; });
+    MEDIDAS.forEach(function(m){ a[m.key] = { min:null, max:null, muestras:0 }; });
     return a;
   }
   function acumular(acc, ang){
     if(!acc || !ang) return;
     var alguno=false;
-    for(var i=0;i<ARTIC.length;i++){
-      var k=ARTIC[i].key, r=ang[k];
+    for(var i=0;i<MEDIDAS.length;i++){
+      var k=MEDIDAS[i].key, r=ang[k];
       if(r && r.ok){
         alguno=true;
         var s=acc[k];
@@ -159,18 +198,17 @@
     }
     if(alguno) acc.framesValidos++;
   }
-  function finalizarArticulaciones(acc){
-    var out={};
-    ARTIC.forEach(function(j){
-      var s=acc[j.key];
+  // Devuelve un ARREGLO autodescriptivo de medidas (para render/PDF sin depender del orden).
+  function finalizarMedidas(acc){
+    return MEDIDAS.map(function(m){
+      var s=acc[m.key];
       if(s && s.muestras>0 && s.min!==null){
-        out[j.key] = { min:Math.round(s.min), max:Math.round(s.max), rango:Math.round(s.max-s.min), muestras:s.muestras };
-      } else {
-        out[j.key] = { min:null, max:null, rango:null, muestras:0 };
+        return { key:m.key, grupo:m.grupo, mov:m.mov, lado:m.lado, min:Math.round(s.min), max:Math.round(s.max), rango:Math.round(s.max-s.min), muestras:s.muestras };
       }
+      return { key:m.key, grupo:m.grupo, mov:m.mov, lado:m.lado, min:null, max:null, rango:null, muestras:0 };
     });
-    return out;
   }
+  function medidasPorKey(medidas){ var o={}; (medidas||[]).forEach(function(x){ o[x.key]=x; }); return o; }
 
   // ── Callback único de resultados de MediaPipe ──────────────────────────────
   function onResults(res){
@@ -210,14 +248,19 @@
       if(p.visibility!=null && p.visibility<VIS_MIN) return;
       ctx.beginPath(); ctx.arc(p.x*w, p.y*h, Math.max(3, Math.round(w*0.008)), 0, Math.PI*2); ctx.fill();
     });
-    // etiqueta del ángulo clínico en cada vértice
+    // etiqueta por MOVIMIENTO en su vértice (codo → codo; hombro flexión "F" y abducción "A"
+    // apiladas en el hombro para no encimarse).
     if(ang){
       ctx.font = 'bold '+Math.max(11, Math.round(w*0.026))+'px -apple-system,Arial';
       ctx.textAlign='center'; ctx.textBaseline='middle';
-      ARTIC.forEach(function(j){
-        var r=ang[j.key]; if(!r || !r.ok) return;
-        var vtx=lm[j.pts[1]]; if(!vtx) return;
-        var tx=vtx.x*w, ty=vtx.y*h, txt=Math.round(r.val)+'°';
+      var usados={};
+      MEDIDAS.forEach(function(m){
+        var r=ang[m.key]; if(!r || !r.ok) return;
+        var vtx=lm[m.vertice]; if(!vtx) return;
+        var n=usados[m.vertice]||0; usados[m.vertice]=n+1;
+        var prefijo = (m.grupo==='Hombro') ? (m.mov==='Flexión'?'F ':'A ') : '';
+        var txt = prefijo + Math.round(r.val)+'°';
+        var tx=vtx.x*w, ty=vtx.y*h + n*Math.round(w*0.052);
         var pad=Math.round(w*0.012), tw=ctx.measureText(txt).width;
         ctx.fillStyle='rgba(18,41,80,.82)';
         ctx.fillRect(tx-tw/2-pad, ty-Math.round(w*0.022), tw+pad*2, Math.round(w*0.044));
@@ -426,14 +469,11 @@
   function actualizarGateGrabacion(lm){
     if(BIO.recording) return;
     var btn=document.getElementById('bio-btn-rec'); if(!btn) return;
-    var ok = lm && lm[11] && lm[12] && lm[23] && lm[24]
-      && (lm[11].visibility==null||lm[11].visibility>=VIS_MIN)
-      && (lm[12].visibility==null||lm[12].visibility>=VIS_MIN)
-      && (lm[23].visibility==null||lm[23].visibility>=VIS_MIN)
-      && (lm[24].visibility==null||lm[24].visibility>=VIS_MIN);
+    // Codo + hombro requieren hombros, caderas y codos visibles (no hace falta cuerpo completo).
+    var ok = _vis(lm,11)&&_vis(lm,12)&&_vis(lm,23)&&_vis(lm,24)&&_vis(lm,13)&&_vis(lm,14);
     btn.disabled = !ok;
     var estado=document.getElementById('bio-estado');
-    if(estado) estado.textContent = ok ? '✓ Cuerpo detectado — listo para grabar' : 'Coloca al paciente de cuerpo completo en el encuadre';
+    if(estado) estado.textContent = ok ? '✓ Detectado — listo para grabar' : 'Encuadra tronco y brazos (hombros, codos y caderas)';
   }
   // Inicia la grabación del clip de cámara (MediaRecorder) en paralelo a la medición de ángulos.
   function iniciarGrabadorVideo(){
@@ -479,7 +519,7 @@
       if(fb) fb.disabled=false;
       var dur = Math.round((Date.now()-BIO.tStart)/1000);
       BIO.pendingVideo = await finalizarGrabadorVideo();  // clip listo para subir al guardar
-      var artic = finalizarArticulaciones(BIO.acc);
+      var artic = finalizarMedidas(BIO.acc);
       var fps = dur>0 ? Math.round(BIO.framesTotales/dur) : BIO.framesTotales;
       mostrarResumen(artic, {
         fuente:'camara', duracionSeg:dur,
@@ -500,28 +540,26 @@
   // Panel de ángulos en vivo (cámara).
   function pintarPanelVivo(ang){
     var panel=document.getElementById('bio-panel-vivo'); if(!panel) return;
-    var filas = GRUPOS.map(function(g){
-      var iz=ARTIC.find(function(a){return a.grupo===g&&a.lado==='Izq';});
-      var de=ARTIC.find(function(a){return a.grupo===g&&a.lado==='Der';});
-      var vi = valorVivo(ang, iz), vd = valorVivo(ang, de);
-      return '<tr><td class="g">'+g+'</td><td class="v" id="bv-'+iz.key+'">'+vi+'</td><td class="v" id="bv-'+de.key+'">'+vd+'</td></tr>';
+    var filas = FILAS.map(function(f){
+      var vi = valorVivoK(ang, f.izq), vd = valorVivoK(ang, f.der);
+      return '<tr><td class="g">'+f.etq+'</td><td class="v" id="bv-'+f.izq+'">'+vi+'</td><td class="v" id="bv-'+f.der+'">'+vd+'</td></tr>';
     }).join('');
-    panel.innerHTML = '<table><thead><tr><th>Articulación</th><th style="text-align:right">Izq</th><th style="text-align:right">Der</th></tr></thead><tbody>'+filas+'</tbody></table>';
+    panel.innerHTML = '<table><thead><tr><th>Movimiento</th><th style="text-align:right">Izq</th><th style="text-align:right">Der</th></tr></thead><tbody>'+filas+'</tbody></table>';
   }
-  function valorVivo(ang, j){
+  function valorVivoK(ang, key){
     if(!ang){ return '—'; }
-    var r=ang[j.key];
+    var r=ang[key];
     return (r && r.ok) ? (Math.round(r.val)+'°') : '—';
   }
   function actualizarPanelVivo(ang){
-    if(!document.getElementById('bv-codoIzq')){ pintarPanelVivo(ang); return; }
-    ARTIC.forEach(function(j){
-      var td=document.getElementById('bv-'+j.key); if(!td) return;
+    if(!document.getElementById('bv-codo_flex_izq')){ pintarPanelVivo(ang); return; }
+    MEDIDAS.forEach(function(m){
+      var td=document.getElementById('bv-'+m.key); if(!td) return;
       if(BIO.recording && BIO.acc){
-        var s=BIO.acc[j.key];
+        var s=BIO.acc[m.key];
         td.textContent = (s && s.min!==null) ? (Math.round(s.min)+'–'+Math.round(s.max)) : '—';
       } else {
-        var r=ang?ang[j.key]:null;
+        var r=ang?ang[m.key]:null;
         td.textContent = (r && r.ok) ? (Math.round(r.val)+'°') : '—';
       }
     });
@@ -610,7 +648,7 @@
 
     if(BIO.cancelVideo){ mostrarVista('bio-vista-inicio'); return; }
     fill.style.width='100%'; txt.textContent='100%';
-    var artic=finalizarArticulaciones(BIO.acc);
+    var artic=finalizarMedidas(BIO.acc);
     mostrarResumen(artic, {
       fuente:'video', duracionSeg:Math.round(dur),
       calidad:{ fpsMuestreo:FPS_VIDEO, framesTotales:BIO.framesTotales, framesValidos:BIO.acc.framesValidos }
@@ -621,21 +659,20 @@
     if(!a || a.min===null) return '—';
     return a.min+'°–'+a.max+'° <b style="color:#3DDC97">Δ'+a.rango+'°</b>';
   }
-  function mostrarResumen(articulaciones, meta){
+  function mostrarResumen(medidas, meta){
     detenerCamaraStream(); detenerLoopCamara();
     var cont=document.getElementById('bio-vista-resumen');
     var fuenteTxt = meta.fuente==='camara' ? '📷 Cámara en vivo' : '📁 Video';
-    var filas = GRUPOS.map(function(g){
-      var iz=ARTIC.find(function(a){return a.grupo===g&&a.lado==='Izq';});
-      var de=ARTIC.find(function(a){return a.grupo===g&&a.lado==='Der';});
-      return '<tr><td class="g">'+g+'</td><td>'+fmtRango(articulaciones[iz.key])+'</td><td>'+fmtRango(articulaciones[de.key])+'</td></tr>';
+    var by = medidasPorKey(medidas);
+    var filas = FILAS.map(function(f){
+      return '<tr><td class="g">'+f.etq+'</td><td>'+fmtRango(by[f.izq])+'</td><td>'+fmtRango(by[f.der])+'</td></tr>';
     }).join('');
-    var hayDato = ARTIC.some(function(j){ return articulaciones[j.key] && articulaciones[j.key].min!==null; });
+    var hayDato = (medidas||[]).some(function(x){ return x && x.min!==null; });
     cont.innerHTML =
       '<h3>Resumen de la medición</h3>'
       + '<div style="color:#9BA3B5;font-size:13px;margin-bottom:10px">'+fuenteTxt+' · '+meta.duracionSeg+' s · '+(meta.calidad.framesValidos||0)+' cuadros válidos · convención clínica (0° neutro)</div>'
-      + '<table class="bio-tabla-res"><thead><tr><th>Articulación</th><th>Izquierda</th><th>Derecha</th></tr></thead><tbody>'+filas+'</tbody></table>'
-      + (hayDato ? '' : '<div style="color:#E8C96A;font-size:13px;margin-top:10px">⚠️ No se detectaron articulaciones con suficiente visibilidad. Repite con el cuerpo completo en cuadro y buena luz.</div>')
+      + '<table class="bio-tabla-res"><thead><tr><th>Movimiento</th><th>Izquierda</th><th>Derecha</th></tr></thead><tbody>'+filas+'</tbody></table>'
+      + (hayDato ? '' : '<div style="color:#E8C96A;font-size:13px;margin-top:10px">⚠️ No se detectó tronco + brazos con suficiente visibilidad. Repite con hombros, codos y caderas en cuadro y buena luz.</div>')
       + '<div class="bio-acciones">'
       +   '<button class="bio-b-sec" id="bio-res-repetir">🔄 Repetir</button>'
       +   (hayDato ? '<button class="bio-b-save" id="bio-res-guardar">💾 Guardar en expediente</button>' : '')
@@ -643,10 +680,10 @@
     mostrarVista('bio-vista-resumen');
     document.getElementById('bio-res-repetir').addEventListener('click', function(){ resetEstado(); mostrarVista('bio-vista-inicio'); });
     var g=document.getElementById('bio-res-guardar');
-    if(g) g.addEventListener('click', function(){ guardarSesion(articulaciones, meta); });
+    if(g) g.addEventListener('click', function(){ guardarSesion(medidas, meta); });
   }
 
-  async function guardarSesion(articulaciones, meta){
+  async function guardarSesion(medidas, meta){
     var p = (typeof currentPatient!=='undefined') ? currentPatient : null;
     if(!p){ toast('Sin paciente activo','error'); return; }
     var btn=document.getElementById('bio-res-guardar'); if(btn){ btn.disabled=true; btn.textContent='⏳ Guardando…'; }
@@ -661,7 +698,7 @@
       terapeuta:usuarioActual(),
       convencion:'clinica',
       duracionSeg:meta.duracionSeg||0,
-      articulaciones:articulaciones,
+      medidas:medidas,                    // arreglo de movimientos {grupo,mov,lado,min,max,rango,muestras}
       calidad:meta.calidad||{},
       reportePdf:null,
       video:null,
@@ -707,25 +744,33 @@
     if(!a || a.min===null) return '<span style="color:var(--gray-400)">—</span>';
     return a.min+'°–'+a.max+'° <b style="color:var(--green)">Δ'+a.rango+'°</b>';
   }
+  // Filas de una sesión guardada: desde s.medidas (nuevo) o s.articulaciones (sesiones viejas).
+  function filasSesionHTML(s){
+    var fila=function(etq,izq,der){
+      return '<div class="field-row"><div class="field-label">'+etq+'</div><div class="field-value" style="display:flex;gap:14px;flex-wrap:wrap">'
+        + '<span><b style="color:var(--gray-400);font-weight:600">Izq</b> '+fmtRangoTxt(izq)+'</span>'
+        + '<span><b style="color:var(--gray-400);font-weight:600">Der</b> '+fmtRangoTxt(der)+'</span></div></div>';
+    };
+    if(Array.isArray(s.medidas)){
+      var by=medidasPorKey(s.medidas);
+      return FILAS.map(function(f){ return fila(f.etq, by[f.izq], by[f.der]); }).join('');
+    }
+    var a=s.articulaciones||{}; // compatibilidad con sesiones anteriores
+    return [['Codo','codoIzq','codoDer'],['Hombro','hombroIzq','hombroDer'],['Cadera','caderaIzq','caderaDer'],['Rodilla','rodillaIzq','rodillaDer']]
+      .map(function(g){ return fila(g[0], a[g[1]], a[g[2]]); }).join('');
+  }
   function renderPestana(p){
     var lista = Array.isArray(p.biomecanica) ? p.biomecanica.filter(function(s){ return s && !s.eliminado; }) : [];
     var html = ''
       + '<button class="btn-gold" style="width:100%;margin-bottom:12px;font-size:15px;font-weight:800;border:none;border-radius:var(--radius);padding:14px;cursor:pointer;background:var(--gold);color:var(--navy-dark)" onclick="abrirMedidorBiomecanico()">▶️ Nueva medición ROM</button>';
     if(!lista.length){
-      html += '<div style="text-align:center;padding:22px;color:var(--gray-400);font-size:13px">Sin mediciones — toca <b>▶️ Nueva medición ROM</b> para empezar.<br>Mide rangos articulares con la cámara en vivo o subiendo un video.</div>';
+      html += '<div style="text-align:center;padding:22px;color:var(--gray-400);font-size:13px">Sin mediciones — toca <b>▶️ Nueva medición ROM</b> para empezar.<br>Mide codo (flexo-extensión) y hombro (flexión y abducción) con la cámara o subiendo un video.</div>';
       return html;
     }
     var orden = lista.slice().reverse(); // más reciente primero
     html += orden.map(function(s){
       var fuente = s.fuente==='video' ? '📁 Video' : '📷 Cámara';
-      var a=s.articulaciones||{};
-      var filas = GRUPOS.map(function(g){
-        var iz=ARTIC.find(function(x){return x.grupo===g&&x.lado==='Izq';});
-        var de=ARTIC.find(function(x){return x.grupo===g&&x.lado==='Der';});
-        return '<div class="field-row"><div class="field-label">'+g+'</div><div class="field-value" style="display:flex;gap:14px;flex-wrap:wrap">'
-          + '<span><b style="color:var(--gray-400);font-weight:600">Izq</b> '+fmtRangoTxt(a[iz.key])+'</span>'
-          + '<span><b style="color:var(--gray-400);font-weight:600">Der</b> '+fmtRangoTxt(a[de.key])+'</span></div></div>';
-      }).join('');
+      var filas = filasSesionHTML(s);
       var pdfBtn = (s.reportePdf && s.reportePdf.url)
         ? '<button data-url="'+esc(s.reportePdf.url)+'" onclick="window.open(this.dataset.url,\'_blank\')" style="background:var(--navy);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer">📄 Ver PDF</button>'
         : '<button data-sid="'+esc(s.id)+'" onclick="BIO_pdf(this.dataset.sid)" style="background:var(--white);color:var(--navy);border:1.5px solid var(--gray-200);border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer">📄 Generar PDF</button>';
@@ -771,15 +816,15 @@
       // tabla
       var col=[M, M+150, M+320], rowH=22;
       pdf.setFontSize(11); pdf.setTextColor(27,58,107); pdf.setFont(undefined,'bold');
-      pdf.text('Articulación', col[0], y); pdf.text('Izquierda', col[1], y); pdf.text('Derecha', col[2], y);
+      pdf.text('Movimiento', col[0], y); pdf.text('Izquierda', col[1], y); pdf.text('Derecha', col[2], y);
       pdf.setFont(undefined,'normal'); pdf.setTextColor(40,40,40); y+=8;
       pdf.setDrawColor(210,210,210); pdf.line(M, y, W-M, y); y+=16;
-      var a=s.articulaciones||{};
       function cel(x){ return (!x||x.min===null)?'—':(x.min+'°–'+x.max+'°  (Δ'+x.rango+'°)'); }
-      GRUPOS.forEach(function(g){
-        var iz=ARTIC.find(function(x){return x.grupo===g&&x.lado==='Izq';});
-        var de=ARTIC.find(function(x){return x.grupo===g&&x.lado==='Der';});
-        pdf.text(g, col[0], y); pdf.text(cel(a[iz.key]), col[1], y); pdf.text(cel(a[de.key]), col[2], y);
+      var _filasPdf, _byPdf;
+      if(Array.isArray(s.medidas)){ _byPdf=medidasPorKey(s.medidas); _filasPdf=FILAS.map(function(f){ return [f.etq.replace(/·/g,'-'), _byPdf[f.izq], _byPdf[f.der]]; }); }
+      else { var a=s.articulaciones||{}; _filasPdf=[['Codo',a.codoIzq,a.codoDer],['Hombro',a.hombroIzq,a.hombroDer],['Cadera',a.caderaIzq,a.caderaDer],['Rodilla',a.rodillaIzq,a.rodillaDer]]; }
+      _filasPdf.forEach(function(r){
+        pdf.text(String(r[0]), col[0], y); pdf.text(cel(r[1]), col[1], y); pdf.text(cel(r[2]), col[2], y);
         y+=rowH;
       });
       var blob=pdf.output('blob');
