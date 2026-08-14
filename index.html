@@ -167,6 +167,30 @@ var _FST_reauthTs = 0;
 async function FST_reautenticarStaging(){
   try{
     if(typeof firebase==='undefined') return {ok:false, error:'firebase-no-cargado'};
+    var authObj = (typeof fbAuth!=='undefined' && fbAuth) ? fbAuth : firebase.auth();
+    // MODO PRODUCCIÓN (el de esta app): la escritura usa el proyecto Firebase principal con el LOGIN
+    // NORMAL (correo/contraseña). El "permisos insuficientes" solo-Jess = su sesión principal no está
+    // viva/rehidratada en el iPad → los writes van sin credencial → Firestore los rechaza. Arreglo:
+    // esperar/rehidratar la sesión, forzar un token FRESCO y re-inicializar la conexión de escritura.
+    if (typeof FST_PROD_MODE!=='undefined' && FST_PROD_MODE){
+      var u = authObj && authObj.currentUser;
+      if(!u && authObj && typeof authObj.onAuthStateChanged==='function'){
+        u = await new Promise(function(res){
+          var done=false, off=null;
+          try{ off=authObj.onAuthStateChanged(function(x){ if(!done){ done=true; if(off) off(); res(x||null); } }); }
+          catch(_e){ res((authObj&&authObj.currentUser)||null); return; }
+          setTimeout(function(){ if(!done){ done=true; if(off) off(); res((authObj&&authObj.currentUser)||null); } }, 5000);
+        });
+      }
+      if(!u){ return {ok:false, error:'sin-sesion-firebase'}; }   // → cerrar sesión y volver a entrar
+      try{ await u.getIdToken(true); }catch(e){ return {ok:false, error:'token:'+String((e&&(e.code||e.message))||'')}; }
+      window._fstInitDone=false; window._fstDb=null;
+      var ok = (typeof FST_init==='function') ? await FST_init() : false;
+      if(!ok || !window._fstDb){ return {ok:false, error:'fst-init-fallo'}; }
+      console.log('[FST] reconexión producción OK · uid='+(u.uid||'?'));
+      return {ok:true};
+    }
+    // MODO STAGING (no usado en producción): reconectar sesión anónima, con fallback en memoria.
     if(!(firebase.apps||[]).find(function(a){ return a && a.name==='staging'; })){
       if(typeof FST_init==='function'){ try{ await FST_init(); }catch(_){} }
     }
@@ -174,21 +198,13 @@ async function FST_reautenticarStaging(){
     if(!app) return {ok:false, error:'staging-no-inicializado'};
     var sa=app.auth();
     try{ await sa.signOut(); }catch(_){}
-    try{
-      await sa.signInAnonymously();
-      window._fstInitDone=true;
-      console.log('[FST] re-auth anónima OK');
-      return {ok:true};
-    }catch(e1){
+    try{ await sa.signInAnonymously(); window._fstInitDone=true; return {ok:true}; }
+    catch(e1){
       var c1=String((e1&&(e1.code||e1.message))||'auth-error');
-      // Fallback: almacenamiento del navegador dañado/lleno → persistencia EN MEMORIA (sin disco).
       try{
         if(firebase.auth && firebase.auth.Auth && firebase.auth.Auth.Persistence){
           await sa.setPersistence(firebase.auth.Auth.Persistence.NONE);
-          await sa.signInAnonymously();
-          window._fstInitDone=true;
-          console.log('[FST] re-auth anónima OK (persistencia en memoria)');
-          return {ok:true, nota:'memoria'};
+          await sa.signInAnonymously(); window._fstInitDone=true; return {ok:true, nota:'memoria'};
         }
       }catch(e2){ return {ok:false, error:String((e2&&(e2.code||e2.message))||c1)}; }
       return {ok:false, error:c1};
@@ -6742,12 +6758,15 @@ async function _detReconectarYSubir(){
   set('Reconectando…', true);
   try{
     var reres=await FST_reautenticarStaging();
-    var cu=null; try{ cu=firebase.app('staging').auth().currentUser; }catch(_e){}
-    if(!reres || !reres.ok || !cu){
+    if(!reres || !reres.ok){
       set('🔧 Reconectar y subir', false);
       var _err=(reres&&reres.error)||'sin-sesión';
-      // Mostrar el CÓDIGO EXACTO en un aviso persistente para poder diagnosticar (captura de pantalla).
-      try{ if(typeof showToastCritico_==='function') showToastCritico_('❌ No reconectó la nube · motivo: '+_err+' — mándale esta captura a soporte'); else showToast('No reconectó · '+_err,'error'); }catch(_){}
+      if(_err==='sin-sesion-firebase'){
+        // La sesión de Firebase no está viva: la ÚNICA cura es cerrar sesión y volver a entrar.
+        try{ if(typeof showToastCritico_==='function') showToastCritico_('🔐 Tu sesión de la nube no está activa. CIERRA SESIÓN y vuelve a entrar (con tu correo y contraseña), luego toca de nuevo "Reconectar y subir".'); else showToast('Cierra sesión y vuelve a entrar','error'); }catch(_){}
+      } else {
+        try{ if(typeof showToastCritico_==='function') showToastCritico_('❌ No reconectó la nube · motivo: '+_err+' — mándale esta captura a soporte'); else showToast('No reconectó · '+_err,'error'); }catch(_){}
+      }
       return;
     }
     // Quitar backoff y reiniciar intentos para que TODAS las sesiones intenten subir de inmediato.
