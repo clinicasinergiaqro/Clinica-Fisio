@@ -3836,7 +3836,7 @@ function _recargarPorUpdate(){
     var _colasOk = (typeof _totalPendientesSync!=='function') || (_totalPendientesSync()===0);
     if(!esSeguroRecargar() || !_colasOk){ _swAplicandoUpdate = false; mostrarBannerActualizacion(); return; }
     try{ if(firma) localStorage.setItem(LS_SW_FIRMA_APLICADA, firma); }catch(e){}
-    _recargarConShellLimpio();   // recarga robusta: limpia el shell (con red) para no servir la copia vieja
+    _recargarConShellLimpio(false);   // automático: sondea red y limpia el shell; si no llega, reintenta luego
   });
 }
 // [FIX-AUTOUPDATE p4] Revisor por ESTADO (el corazón del fix): cuando el SW nuevo se instala,
@@ -3879,14 +3879,35 @@ function esSeguroRecargar(){
   }catch(e){ return false; } // ante cualquier error, NO recargar
 }
 
-// Recarga ROBUSTA para aplicar una versión nueva: pide update al SW, y si HAY red borra los caches
-// del shell ANTES de recargar. Esto cierra el hueco de la navegación red-primero-con-timeout: sin
-// borrar el shell, en red lenta el timeout (3.5s) servía la copia VIEJA y la app "no cambiaba".
-// Offline: NO borra (dejaría la navegación sin fallback → pantalla en blanco); recarga tal cual.
-// NO toca IndexedDB/media/datos ni las colas de sync (durables en localStorage). Uso compartido:
-// banner "Actualizar ahora", recarga automática segura y botón manual "Forzar actualización".
-async function _recargarConShellLimpio(){
+// Recarga ROBUSTA y CONSCIENTE DE LA RED para aplicar una versión nueva.
+// Problema real: en datos móviles (ruteo AT&T/IPv6 degradado) la petición a GitHub Pages se CUELGA;
+// si borráramos el shell y recargáramos a ciegas, la navegación red-primero se quedaría sin copia
+// y la app abriría EN BLANCO (o serviría la vieja por timeout). Por eso, ANTES de tocar nada,
+// SONDEAMOS que de verdad se puede bajar index.html fresco (con timeout). Solo si el sondeo pasa se
+// limpia el shell y se recarga (garantiza traer lo nuevo). Si el sondeo falla:
+//   - manual (botón/banner): avisa "conéctate a WiFi" y NO toca el caché (la app sigue usable).
+//   - automático: se rinde en silencio y reintenta en el próximo gancho (resume/online/tic).
+// NUNCA toca IndexedDB/media/datos ni las colas de sync (durables en localStorage).
+async function _recargarConShellLimpio(manual){
   if(_swRecargando) return;
+  if(!navigator.onLine){
+    if(manual){ try{ showToast('Sin conexión — conéctate a WiFi para actualizar','warning'); }catch(_){} _resetBtnForzar(); }
+    return;
+  }
+  // SONDEO: ¿la red llega y trae index.html fresco? (no-store + cache-buster + timeout 8s)
+  var fresco=false;
+  try{
+    var ctrl=('AbortController' in window)?new AbortController():null;
+    var to=setTimeout(function(){ try{ ctrl&&ctrl.abort(); }catch(_){} }, 8000);
+    var resp=await fetch('./index.html?swcheck='+Date.now(), { cache:'no-store', signal: ctrl?ctrl.signal:undefined });
+    clearTimeout(to);
+    fresco=!!(resp&&resp.ok);
+  }catch(_f){ fresco=false; }
+  if(!fresco){
+    // Red presente pero NO llega a GitHub (típico de datos móviles AT&T): no arriesgar pantalla en blanco.
+    if(manual){ try{ showToast('No pude bajar la versión nueva — conéctate a WiFi e intenta otra vez','warning'); }catch(_){} _resetBtnForzar(); }
+    return;
+  }
   _swRecargando = true;
   try{
     if('serviceWorker' in navigator){
@@ -3894,14 +3915,13 @@ async function _recargarConShellLimpio(){
       if(reg){ try{ await reg.update(); }catch(_u){} if(reg.waiting){ try{ reg.waiting.postMessage({type:'SKIP_WAITING'}); }catch(_p){} } }
     }
   }catch(_e){}
-  if(navigator.onLine){
-    try{
-      var ks=await caches.keys();
-      await Promise.all(ks.filter(function(k){ return k.indexOf(SW_CACHE_PREFIX)===0; }).map(function(k){ return caches.delete(k); }));
-    }catch(_c){}
-  }
+  try{
+    var ks=await caches.keys();
+    await Promise.all(ks.filter(function(k){ return k.indexOf(SW_CACHE_PREFIX)===0; }).map(function(k){ return caches.delete(k); }));
+  }catch(_c){}
   setTimeout(function(){ try{ location.reload(); }catch(_r){ location.href=location.href; } }, 300);
 }
+function _resetBtnForzar(){ try{ var b=document.getElementById('det-forzar-update'); if(b){ b.disabled=false; b.textContent='🔄 Forzar actualización'; } }catch(_){} }
 function mostrarBannerActualizacion(){
   if(document.getElementById('sw-update-banner')) return;
   var b=document.createElement('div');
@@ -3915,7 +3935,7 @@ function mostrarBannerActualizacion(){
   document.body.appendChild(b);
   var btn=document.getElementById('sw-update-btn');
   if(btn) btn.onclick=function(){
-    if(esSeguroRecargar()){ _recargarConShellLimpio(); }
+    if(esSeguroRecargar()){ _recargarConShellLimpio(true); }
     else { try{ showToast('Guarda tu nota primero — la app se actualizará al terminar','warning'); }catch(e){} }
   };
 }
@@ -6908,8 +6928,8 @@ async function _detForzarUpdate(){
     if(!_colasOk){ try{ showToast('Tienes cambios sin subir — espera al "Todo sincronizado" y reintenta','warning'); }catch(_){}; return; }
     var btn=document.getElementById('det-forzar-update'); if(btn){ btn.disabled=true; btn.textContent='Actualizando…'; }
     try{ showToast('Buscando versión nueva…','info'); }catch(_){}
-    await _recargarConShellLimpio();   // update SW + limpia shell (con red) + recarga
-  }catch(_all){ try{ location.reload(); }catch(_r2){} }
+    await _recargarConShellLimpio(true);   // manual: sondea red; si no llega, avisa "conéctate a WiFi" sin dejar en blanco
+  }catch(_all){ _resetBtnForzar(); }
 }
 async function _detEjecutar(){
   var cont=document.getElementById('det-resultados'); if(!cont) return;
