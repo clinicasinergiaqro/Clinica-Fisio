@@ -2385,8 +2385,11 @@ async function drenarColaSoapActivo(){
             fallidos.push(Object.assign({}, it, {error:_reason, falladoEn:ahora}));
           } else {
             var n=(Number(it && it.intentos)||0)+1;
+            // DIAGNÓSTICO: dejar el motivo real EN el item vivo (ultimoError). Así, aunque el item
+            // no llegue a FALLIDOS (el barrido los resucita reiniciando intentos), CUALQUIER export
+            // muestra POR QUÉ no sube esta sesión — clave para el caso "solo falla con Jess".
             if(n>=_MAX_INTENTOS_HIST){ fallidos.push(Object.assign({}, it, {error:'max-reintentos('+n+') '+_reason, falladoEn:ahora})); }
-            else { restantes.push(Object.assign({}, it, {intentos:n, proximoIntento: ahora + Math.min(60000, 2000*Math.pow(2, n-1))})); }
+            else { restantes.push(Object.assign({}, it, {intentos:n, proximoIntento: ahora + Math.min(60000, 2000*Math.pow(2, n-1)), ultimoError:_reason})); }
           }
         }
       }catch(e){
@@ -2395,7 +2398,7 @@ async function drenarColaSoapActivo(){
         else {
           var n2=(Number(it && it.intentos)||0)+1;
           if(n2>=_MAX_INTENTOS_HIST){ fallidos.push(Object.assign({}, it, {error:'max-reintentos('+n2+') '+_cod, falladoEn:ahora})); }
-          else { restantes.push(Object.assign({}, it, {intentos:n2, proximoIntento: ahora + Math.min(60000, 2000*Math.pow(2, n2-1))})); }
+          else { restantes.push(Object.assign({}, it, {intentos:n2, proximoIntento: ahora + Math.min(60000, 2000*Math.pow(2, n2-1)), ultimoError:_cod})); }
         }
       }
     }
