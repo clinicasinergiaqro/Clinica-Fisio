@@ -425,6 +425,10 @@
     BIO.modo='camara';
     BIO.facing = BIO.facing || 'environment';   // TRASERA por defecto (se apunta al paciente)
     mostrarVista('bio-vista-camara');
+    // Reset del botón de grabar y cronómetro (evita estado viejo al volver a grabar).
+    var _br=document.getElementById('bio-btn-rec'); if(_br){ _br.className='bio-b-rec'; _br.textContent='⏺️ Grabar sesión'; _br.disabled=true; }
+    var _bf=document.getElementById('bio-btn-flip'); if(_bf) _bf.disabled=false;
+    var _cr=document.getElementById('bio-cron'); if(_cr){ _cr.style.display='none'; _cr.textContent='00:00'; }
     BIO.canvas=document.getElementById('bio-canvas'); BIO.ctx=BIO.canvas.getContext('2d');
     pintarPanelVivo(null);
     var estado=document.getElementById('bio-estado');
@@ -498,7 +502,7 @@
       var mime=''; for(var i=0;i<cands.length;i++){ if(MediaRecorder.isTypeSupported(cands[i])){ mime=cands[i]; break; } }
       BIO.recorder = mime ? new MediaRecorder(BIO.stream,{mimeType:mime}) : new MediaRecorder(BIO.stream);
       BIO.recMime = BIO.recorder.mimeType || mime || 'video/webm';
-      BIO.recorder.ondataavailable = function(e){ if(e.data && e.data.size) BIO.recChunks.push(e.data); };
+      BIO.recorder.ondataavailable = function(e){ if(e.data && e.data.size && BIO.recChunks) BIO.recChunks.push(e.data); };  // guard: evento tardío tras reset → recChunks null
       BIO.recorder.start();
     }catch(e){ BIO.recorder=null; console.warn('[BIO] MediaRecorder no disponible (se guardarán solo ángulos):', e && e.message); }
   }

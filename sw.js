@@ -2,11 +2,11 @@
 // Service Worker — Clínica Sinergia (offline shell)
 // CAMBIAR la fecha de CACHE en cada deploy para forzar actualización
 // ═══════════════════════════════════════════════════════════
-const CACHE = 'sinergia-shell-v1-2026-08-15a';
+const CACHE = 'sinergia-shell-v1-2026-08-15b';
 const SHELL = [
   './',
   './index.html',
-  './medidor-biomecanico.js?v=2026-08-15a',
+  './medidor-biomecanico.js?v=2026-08-15b',
   'https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js',
   'https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js',
   'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js',
