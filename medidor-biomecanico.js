@@ -187,14 +187,15 @@
     return out;
   }
 
-  // ── Acumulador de mín/máx ──────────────────────────────────────────────────
+  // ── Acumulador: mín/máx + SERIE por movimiento (para detectar repeticiones) ──
   function nuevoAcumulador(){
-    var a = { framesValidos:0 };
-    MEDIDAS.forEach(function(m){ a[m.key] = { min:null, max:null, muestras:0 }; });
+    var a = { framesValidos:0, _frame:0 };
+    MEDIDAS.forEach(function(m){ a[m.key] = { min:null, max:null, muestras:0, serie:[] }; });
     return a;
   }
   function acumular(acc, ang){
     if(!acc || !ang) return;
+    acc._frame++;                                   // índice monotónico de frame (separa repeticiones)
     var alguno=false;
     for(var i=0;i<MEDIDAS.length;i++){
       var k=MEDIDAS[i].key, r=ang[k];
@@ -204,20 +205,64 @@
         if(s.min===null || r.val<s.min) s.min=r.val;
         if(s.max===null || r.val>s.max) s.max=r.val;
         s.muestras++;
+        if(s.serie.length<4000) s.serie.push({ i:acc._frame, v:r.val });   // cota de memoria
       }
     }
     if(alguno) acc.framesValidos++;
   }
-  // Devuelve un ARREGLO autodescriptivo de medidas (para render/PDF sin depender del orden).
+  // Detecta los picos (tope de cada repetición) en una serie {i,v} con histéresis adaptativa y
+  // separación por hueco temporal (frames sin muestra = el brazo fue a otra dirección o al neutro).
+  // Un frame ruidoso suelto NO crea un pico falso. Devuelve el arreglo de valores de pico.
+  function _detPicos(serie, minPico, gap){
+    var out=[]; if(!serie || !serie.length) return out;
+    var vmax=-Infinity, vmin=Infinity, k;
+    for(k=0;k<serie.length;k++){ var v0=serie[k].v; if(v0>vmax)vmax=v0; if(v0<vmin)vmin=v0; }
+    var rango=vmax-vmin;
+    if(rango<8){ if(vmax>=minPico) out.push(vmax); return out; }   // casi plano ⇒ un solo pico
+    var enter=vmin+0.55*rango, exit=vmin+0.30*rango, enRep=false, pico=-Infinity, lastI=null;
+    for(k=0;k<serie.length;k++){
+      var s=serie[k], v=s.v, i=s.i;
+      if(enRep && lastI!=null && (i-lastI)>gap){ if(pico>=minPico) out.push(pico); enRep=false; pico=-Infinity; }
+      lastI=i;
+      if(!enRep){ if(v>=enter){ enRep=true; pico=v; } }
+      else { if(v>pico) pico=v; if(v<=exit){ if(pico>=minPico) out.push(pico); enRep=false; pico=-Infinity; } }
+    }
+    if(enRep && pico>=minPico) out.push(pico);
+    if(!out.length && vmax>=minPico) out.push(vmax);
+    return out;
+  }
+  function _percentil(serie, q){                    // percentil robusto (0..1) de los valores
+    if(!serie || !serie.length) return null;
+    var a=serie.map(function(s){return s.v;}).sort(function(x,y){return x-y;});
+    return a[Math.max(0, Math.min(a.length-1, Math.round(q*(a.length-1))))];
+  }
+  function _media(arr){ if(!arr.length) return null; var t=0,i; for(i=0;i<arr.length;i++) t+=arr[i]; return t/arr.length; }
+  function _desv(arr){                               // DE muestral = ± consistencia entre repeticiones
+    if(arr.length<2) return null; var m=_media(arr), t=0,i;
+    for(i=0;i<arr.length;i++){ var d=arr[i]-m; t+=d*d; } return Math.sqrt(t/(arr.length-1));
+  }
+  // Resume cada movimiento como la MEDIA de los picos de sus repeticiones (más reproducible que un
+  // máximo suelto y robusto al ruido). Codo añade extensión (mínimo robusto). Mantiene min/max/rango
+  // por compatibilidad con el render/PDF y con sesiones ya guardadas.
   function finalizarMedidas(acc){
     return MEDIDAS.map(function(m){
-      var s=acc[m.key];
-      if(s && s.muestras>0 && s.min!==null){
-        var mn = m.base0 ? 0 : Math.round(s.min);   // ROM de hombro se reporta desde 0° (neutro)
-        var mx = Math.round(s.max);
-        return { key:m.key, grupo:m.grupo, mov:m.mov, lado:m.lado, min:mn, max:mx, rango:Math.round(mx-mn), muestras:s.muestras };
+      var s = acc && acc[m.key];
+      var base = { key:m.key, grupo:m.grupo, mov:m.mov, lado:m.lado,
+                   media:null, mejor:null, de:null, reps:0, ext:null,
+                   min:null, max:null, rango:null, muestras:(s&&s.muestras)||0 };
+      if(!s || s.muestras<6 || !s.serie || !s.serie.length) return base;   // <6 muestras = incidental
+      var picos=_detPicos(s.serie, m.calc==='codo'?20:15, 8);
+      if(!picos.length) return base;
+      var de=_desv(picos);
+      base.media=Math.round(_media(picos)); base.mejor=Math.round(Math.max.apply(null,picos));
+      base.de=(de!=null)?Math.round(de):null; base.reps=picos.length;
+      if(m.calc==='codo'){                            // codo: extensión = mínimo robusto (0°=extendido)
+        var ext=_percentil(s.serie, 0.05); if(ext<0) ext=0;
+        base.ext=Math.round(ext); base.min=base.ext; base.max=base.media; base.rango=Math.round(base.media-base.ext);
+      } else {                                        // hombro: ROM desde 0° neutro
+        base.min=0; base.max=base.mejor; base.rango=base.media;
       }
-      return { key:m.key, grupo:m.grupo, mov:m.mov, lado:m.lado, min:null, max:null, rango:null, muestras:0 };
+      return base;
     });
   }
   function medidasPorKey(medidas){ var o={}; (medidas||[]).forEach(function(x){ o[x.key]=x; }); return o; }
@@ -680,10 +725,22 @@
     });
   }
   // ── Resumen + guardado ─────────────────────────────────────────────────────
-  function fmtRango(a){
-    if(!a || a.min===null) return '—';
-    return a.min+'°–'+a.max+'° <b style="color:#3DDC97">Δ'+a.rango+'°</b>';
+  // Formato de una medida: MEDIA de los picos como valor principal; mejor, ± consistencia y nº de
+  // repeticiones como apoyo. Codo muestra extensión–flexión. Compatible con sesiones viejas (min–max Δ).
+  function _fmtMedida(m, verde, gris){
+    gris = gris || '#9BA3B5';
+    if(!m) return '<span style="color:'+gris+'">—</span>';
+    if(m.media!=null){
+      var principal = (m.grupo==='Codo') ? (m.min+'°–'+m.max+'°') : (m.media+'°');
+      var de = (m.de!=null) ? (' <span style="color:'+gris+'">±'+m.de+'°</span>') : '';
+      var reps = m.reps ? (' · '+m.reps+(m.reps===1?' rep':' reps')) : '';
+      return '<b style="color:'+verde+'">'+principal+'</b>'+de
+           + '<span style="color:'+gris+';font-size:11px"> máx '+m.mejor+'°'+reps+'</span>';
+    }
+    if(m.reps==null && m.min!=null) return m.min+'°–'+m.max+'° <b style="color:'+verde+'">Δ'+m.rango+'°</b>';  // sesión vieja
+    return '<span style="color:'+gris+'">—</span>';
   }
+  function fmtRango(a){ return _fmtMedida(a, '#3DDC97', '#9BA3B5'); }
   function mostrarResumen(medidas, meta){
     detenerCamaraStream(); detenerLoopCamara();
     var cont=document.getElementById('bio-vista-resumen');
@@ -695,7 +752,7 @@
     var hayDato = (medidas||[]).some(function(x){ return x && x.min!==null; });
     cont.innerHTML =
       '<h3>Resumen de la medición</h3>'
-      + '<div style="color:#9BA3B5;font-size:13px;margin-bottom:10px">'+fuenteTxt+' · '+meta.duracionSeg+' s · '+(meta.calidad.framesValidos||0)+' cuadros válidos · convención clínica (0° neutro)</div>'
+      + '<div style="color:#9BA3B5;font-size:13px;margin-bottom:10px">'+fuenteTxt+' · '+meta.duracionSeg+' s · '+(meta.calidad.framesValidos||0)+' cuadros válidos · convención clínica (0° neutro)<br>ROM = <b style="color:#C9D2E8">media de los picos</b> de cada repetición · máx = mejor intento · ± = consistencia entre reps</div>'
       + '<table class="bio-tabla-res"><thead><tr><th>Movimiento</th><th>Izquierda</th><th>Derecha</th></tr></thead><tbody>'+filas+'</tbody></table>'
       + (hayDato ? '' : '<div style="color:#E8C96A;font-size:13px;margin-top:10px">⚠️ No se detectó tronco + brazos con suficiente visibilidad. Repite con hombros, codos y caderas en cuadro y buena luz.</div>')
       + '<div class="bio-acciones">'
@@ -765,10 +822,7 @@
   }
 
   // ── Render de la pestaña "Biomecánica" (devuelve HTML string) ──────────────
-  function fmtRangoTxt(a){
-    if(!a || a.min===null) return '<span style="color:var(--gray-400)">—</span>';
-    return a.min+'°–'+a.max+'° <b style="color:var(--green)">Δ'+a.rango+'°</b>';
-  }
+  function fmtRangoTxt(a){ return _fmtMedida(a, 'var(--green)', 'var(--gray-400)'); }
   // Filas de una sesión guardada: desde s.medidas (nuevo) o s.articulaciones (sesiones viejas).
   function filasSesionHTML(s){
     var fila=function(etq,izq,der){
@@ -860,14 +914,17 @@
     y+=cardH+16;
     // Método
     doc.setFont('helvetica','italic'); doc.setFontSize(8.5); doc.setTextColor(GRIS[0],GRIS[1],GRIS[2]);
-    doc.text('Convención goniométrica clínica (0° = neutro). Fuente: '+(s.fuente==='video'?'video':'cámara en vivo')+' · '+(s.duracionSeg||0)+' s · '+((s.calidad&&s.calidad.framesValidos)||0)+' cuadros válidos.', M, y);
-    y+=14;
+    var metodo='Convención clínica (0° = neutro). ROM = media de los picos de cada repetición (± = consistencia entre reps). '
+             + 'Fuente: '+(s.fuente==='video'?'video':'cámara en vivo')+' · '+(s.duracionSeg||0)+' s · '+((s.calidad&&s.calidad.framesValidos)||0)+' cuadros válidos.';
+    var metodoL=doc.splitTextToSize(metodo, W-2*M);
+    doc.text(metodoL, M, y);
+    y+=metodoL.length*11+3;
     // Tabla
-    var cMov=M+6, cLado=M+156, cRan=M+200, cDel=M+290, cRef=M+338, cBar=M+400, barW=(W-M)-cBar, rowH=22;
+    var cMov=M+6, cLado=M+150, cRom=M+186, cMejor=M+254, cReps=M+306, cRef=M+380, cBar=M+452, barW=(W-M)-cBar, rowH=22;
     doc.setFillColor(NAVY[0],NAVY[1],NAVY[2]); doc.rect(M,y,W-2*M,20,'F');
     doc.setTextColor(255,255,255); doc.setFont('helvetica','bold'); doc.setFontSize(9);
-    doc.text('Movimiento',cMov,y+14); doc.text('Lado',cLado,y+14); doc.text('Mín–Máx',cRan,y+14);
-    doc.text('ROM',cDel,y+14); doc.text('Ref.',cRef,y+14); doc.text('ROM vs referencia',cBar,y+14);
+    doc.text('Movimiento',cMov,y+14); doc.text('Lado',cLado,y+14); doc.text('ROM',cRom,y+14);
+    doc.text('Mejor',cMejor,y+14); doc.text('Reps',cReps,y+14); doc.text('Ref.',cRef,y+14); doc.text('ROM vs ref.',cBar,y+14);
     y+=20;
     var filas=[];
     if(Array.isArray(s.medidas)){
@@ -885,18 +942,27 @@
         filas.push({etq:g[0],lado:'Der',d:a[g[2]],grupo:g[0],movn:'',primero:false});
       });
     }
+    function _pdfCampos(d){
+      if(d && d.media!=null){
+        var rom=(d.grupo==='Codo')?(d.min+'°–'+d.max+'°'):(d.media+'°');
+        return { rom:rom, mejor:(d.mejor!=null?d.mejor+'°':'—'), reps:(d.reps?(d.reps+(d.de!=null?('  ±'+d.de+'°'):'')):'—'), rango:d.rango };
+      }
+      if(d && d.min!=null) return { rom:(d.min+'°–'+d.max+'°'), mejor:(d.max!=null?d.max+'°':'—'), reps:'—', rango:d.rango };  // sesión vieja
+      return { rom:'—', mejor:'—', reps:'—', rango:null };
+    }
     doc.setFont('helvetica','normal'); doc.setFontSize(9.5);
     filas.forEach(function(r,i){
       if(i%2===1){ doc.setFillColor(245,247,250); doc.rect(M,y,W-2*M,rowH,'F'); }
-      var d=r.d||{};
+      var cx=_pdfCampos(r.d);
       if(r.primero){ doc.setFont('helvetica','bold'); doc.setTextColor(45,51,68); doc.text(r.etq, cMov, y+15); doc.setFont('helvetica','normal'); }
       doc.setTextColor(GRIS[0],GRIS[1],GRIS[2]); doc.text(r.lado, cLado, y+15);
-      doc.setTextColor(45,51,68); doc.text((d.min==null?'—':(d.min+'°–'+d.max+'°')), cRan, y+15);
-      doc.setFont('helvetica','bold'); doc.setTextColor(VERDE[0],VERDE[1],VERDE[2]); doc.text((d.rango!=null?(d.rango+'°'):'—'), cDel, y+15); doc.setFont('helvetica','normal');
+      doc.setFont('helvetica','bold'); doc.setTextColor(VERDE[0],VERDE[1],VERDE[2]); doc.text(cx.rom, cRom, y+15); doc.setFont('helvetica','normal');
+      doc.setTextColor(45,51,68); doc.text(cx.mejor, cMejor, y+15);
+      doc.setTextColor(GRIS[0],GRIS[1],GRIS[2]); doc.text(cx.reps, cReps, y+15);
       var ref=_refNormal(r.grupo,r.movn);
-      doc.setTextColor(GRIS[0],GRIS[1],GRIS[2]); doc.text(ref?('0–'+ref+'°'):'—', cRef, y+15);
-      if(ref && d.rango!=null){
-        var frac=Math.max(0,Math.min(1,d.rango/ref));
+      doc.text(ref?('0–'+ref+'°'):'—', cRef, y+15);
+      if(ref && cx.rango!=null){
+        var frac=Math.max(0,Math.min(1,cx.rango/ref));
         doc.setFillColor(230,233,239); doc.roundedRect(cBar,y+7,barW,8,3,3,'F');
         var c = frac>=0.8?VERDE : frac>=0.5?GOLD : [192,57,43];
         doc.setFillColor(c[0],c[1],c[2]); doc.roundedRect(cBar,y+7,Math.max(3,barW*frac),8,3,3,'F');
@@ -906,12 +972,12 @@
     });
     y+=16;
     // Nota de interpretación
-    doc.setFillColor(254,243,199); doc.setDrawColor(240,214,120); doc.roundedRect(M,y,W-2*M,56,6,6,'FD');
+    doc.setFillColor(254,243,199); doc.setDrawColor(240,214,120); doc.roundedRect(M,y,W-2*M,66,6,6,'FD');
     doc.setTextColor(120,90,20); doc.setFont('helvetica','bold'); doc.setFontSize(8.5); doc.text('Nota de interpretación', M+12, y+16);
     doc.setFont('helvetica','normal'); doc.setTextColor(90,74,30);
-    var nota='Valores estimados por análisis de pose con una sola cámara. La abducción (plano frontal) es la más confiable; flexión y extensión (plano sagital) son aproximadas — para valores finos, capturar de perfil. Herramienta de cribado y seguimiento; no sustituye la goniometría manual.';
+    var nota='ROM = media de los picos de cada repetición; ± indica la consistencia entre repeticiones (menor = más fiable). Estimado por análisis de pose con una sola cámara: la abducción (plano frontal) es la más confiable; flexión y extensión (plano sagital) son aproximadas — para valores finos, capturar de perfil. Cribado y seguimiento; no sustituye la goniometría manual.';
     doc.text(doc.splitTextToSize(nota, W-2*M-24), M+12, y+30);
-    y+=56;
+    y+=66;
     // Pie
     var fy=H-38;
     doc.setDrawColor(GOLD[0],GOLD[1],GOLD[2]); doc.setLineWidth(1.2); doc.line(M,fy,W-M,fy); doc.setLineWidth(1);
