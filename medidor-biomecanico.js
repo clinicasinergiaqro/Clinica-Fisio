@@ -98,7 +98,7 @@
           if(typeof Pose === 'undefined'){ clearTimeout(timeout); resolve(false); return; }
           var pose = new Pose({ locateFile:function(f){ return MP_BASE + '/' + f; } });
           pose.setOptions({
-            modelComplexity:1, smoothLandmarks:true, enableSegmentation:false,
+            modelComplexity:0, smoothLandmarks:true, enableSegmentation:false,  // 0=lite: mucho más rápido en iPad
             minDetectionConfidence:0.5, minTrackingConfidence:0.5
           });
           pose.onResults(onResults);
@@ -396,7 +396,7 @@
     document.getElementById('bio-overlay').style.display='flex';
   }
   function resetEstado(){
-    BIO.modo=null; BIO.recording=false; BIO.procesandoVideo=false; BIO.cancelVideo=false;
+    BIO.modo=null; BIO.recording=false; BIO.procesandoVideo=false; BIO.cancelVideo=false; BIO.finalizando=false;
     BIO.acc=null; BIO.framesTotales=0; BIO.srcEl=null; BIO.sending=false;
     BIO.facing='environment';           // cada medición arranca con la cámara TRASERA
     detenerGrabadorVideo(); BIO.pendingVideo=null;
@@ -443,7 +443,7 @@
     var estado=document.getElementById('bio-estado');
     try{
       BIO.stream = await navigator.mediaDevices.getUserMedia({
-        video:{ facingMode:{ideal:facing}, width:{ideal:1280}, height:{ideal:720} }, audio:false
+        video:{ facingMode:{ideal:facing}, width:{ideal:640}, height:{ideal:480} }, audio:false
       });
     }catch(e){
       // Fallback: cualquier cámara disponible (iPads viejos o sin cámara trasera enumerable).
@@ -505,36 +505,43 @@
   // Detiene el grabador y arma el blob del clip (Promise).
   function finalizarGrabadorVideo(){
     return new Promise(function(resolve){
-      if(!BIO.recorder || BIO.recorder.state==='inactive'){
-        var chunks0=BIO.recChunks||[];
-        resolve(chunks0.length ? { blob:new Blob(chunks0,{type:BIO.recMime||'video/webm'}), mime:BIO.recMime||'video/webm', ext:((BIO.recMime||'').indexOf('mp4')>=0?'mp4':'webm') } : null);
-        BIO.recorder=null; return;
+      var rec=BIO.recorder;
+      function armar(){
+        var c=BIO.recChunks||[]; BIO.recorder=null;
+        return c.length ? { blob:new Blob(c,{type:BIO.recMime||'video/webm'}), mime:BIO.recMime||'video/webm', ext:((BIO.recMime||'').indexOf('mp4')>=0?'mp4':'webm') } : null;
       }
-      BIO.recorder.onstop=function(){
-        var chunks=BIO.recChunks||[];
-        resolve(chunks.length ? { blob:new Blob(chunks,{type:BIO.recMime||'video/webm'}), mime:BIO.recMime||'video/webm', ext:((BIO.recMime||'').indexOf('mp4')>=0?'mp4':'webm') } : null);
-        BIO.recorder=null;
-      };
-      try{ BIO.recorder.stop(); }catch(e){ resolve(null); BIO.recorder=null; }
+      if(!rec || rec.state==='inactive'){ resolve(armar()); return; }
+      var done=false;
+      function acabar(){ if(done) return; done=true; resolve(armar()); }   // idempotente
+      rec.onstop=acabar;
+      // iOS Safari: a veces 'onstop' NUNCA dispara → sin este timeout el Detener se colgaba.
+      setTimeout(acabar, 1500);
+      try{ rec.stop(); }catch(e){ acabar(); }
     });
   }
   async function toggleGrabacion(){
+    if(BIO.finalizando) return;                          // ignora toques mientras cierra la grabación
     var fb=document.getElementById('bio-btn-flip');
+    var btnRec=document.getElementById('bio-btn-rec');
     if(!BIO.recording){
       BIO.acc = nuevoAcumulador(); BIO.framesTotales=0; BIO.tStart=Date.now();
       BIO.pendingVideo=null; iniciarGrabadorVideo();     // graba el clip de cámara en paralelo
       BIO.recording=true;
       if(fb) fb.disabled=true;                            // no cambiar de cámara a media grabación
-      document.getElementById('bio-btn-rec').className='bio-b-stop'; document.getElementById('bio-btn-rec').textContent='⏹️ Detener';
+      if(btnRec){ btnRec.className='bio-b-stop'; btnRec.textContent='⏹️ Detener'; }
       document.getElementById('bio-cron').style.display='block';
       iniciarCronometro();
     } else {
+      BIO.finalizando=true;                              // evita doble-toque / reentrada
       BIO.recording=false; pararCronometro();
       if(fb) fb.disabled=false;
+      if(btnRec){ btnRec.disabled=true; btnRec.textContent='⏳ Procesando…'; }
       var dur = Math.round((Date.now()-BIO.tStart)/1000);
-      BIO.pendingVideo = await finalizarGrabadorVideo();  // clip listo para subir al guardar
+      // El video NUNCA bloquea la medición: finalizarGrabadorVideo tiene timeout (1.5s).
+      try{ BIO.pendingVideo = await finalizarGrabadorVideo(); }catch(e){ BIO.pendingVideo=null; }
       var artic = finalizarMedidas(BIO.acc);
       var fps = dur>0 ? Math.round(BIO.framesTotales/dur) : BIO.framesTotales;
+      BIO.finalizando=false;
       mostrarResumen(artic, {
         fuente:'camara', duracionSeg:dur,
         calidad:{ fpsPromedio:fps, framesTotales:BIO.framesTotales, framesValidos:BIO.acc?BIO.acc.framesValidos:0 }
