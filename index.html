@@ -6781,6 +6781,9 @@ async function _detReconectarYSubir(){
       }
       return;
     }
+    // Limpiar el CACHÉ de resolución de pid: uno viejo (de antes del arreglo de duplicados) puede
+    // seguir devolviendo "ambiguo"/pid equivocado. Vaciarlo obliga a resolver con la lógica nueva.
+    try{ window._fstPidCache = {}; }catch(_e){}
     // Mover los FALLIDOS de vuelta a la cola activa para REINTENTARLOS con la sesión ya reconectada
     // (aquí estaban las 34: se habían movido a FALLIDOS y el drenado normal ya no los tocaba).
     try{
