@@ -677,7 +677,19 @@ async function FST_resolverPidPaciente(paciente) {
     // viene completo (SDK web sin proyección) → el campo eliminado siempre está presente.
     const _vivos = snap.docs.filter(function(dd){ return (dd.data()||{}).eliminado !== true; });
     if (_vivos.length === 1) { const pid = _vivos[0].id; if (cacheKey) window._fstPidCache[cacheKey] = pid; return { ok: true, pid: pid, matchType: 'nombreNormalizado_unico' }; }
-    if (_vivos.length > 1) { console.warn('[FST] PID ambiguo:', nombre, _vivos.length, 'matches → no escribe'); return { ok: false, reason: 'PID_AMBIGUO', matches: _vivos.length }; }
+    if (_vivos.length > 1) {
+      // DESAMBIGUACIÓN de homónimos/duplicados en la nube (caso Jess: notas atoradas en PID_AMBIGUO).
+      // 1) Preferir el doc ESPEJO de ESTE expediente: appSourceId === appId → es, sin duda, el mismo
+      //    paciente. Escribir ahí NUNCA contamina a un homónimo.
+      var _mio = appId ? _vivos.find(function(dd){ return (dd.data()||{}).appSourceId === appId; }) : null;
+      if (_mio) { const pid = _mio.id; if (cacheKey) window._fstPidCache[cacheKey] = pid; return { ok: true, pid: pid, matchType: 'appSourceId_desambiguado' }; }
+      // 2) Sin espejo identificable: NO adivinar cuál homónimo es → escribir en un doc PROPIO
+      //    determinista (app_live_ por appId). Peor caso: un doc extra a consolidar luego en curación;
+      //    jamás escribe en otro paciente. Muy superior a que la nota clínica no se guarde nunca.
+      if (appId) { const pidOwn = 'app_live_' + FST_hashSimpleLive(appId); if (cacheKey) window._fstPidCache[cacheKey] = pidOwn; console.warn('[FST] PID ambiguo ('+_vivos.length+') → doc propio app_live_:', nombre); return { ok: true, pid: pidOwn, matchType: 'app_live_desambiguado' }; }
+      console.warn('[FST] PID ambiguo sin appId → no escribe:', nombre);
+      return { ok: false, reason: 'PID_AMBIGUO', matches: _vivos.length };
+    }
   }
   const base = appId || nombre || ('sin_nombre_' + Date.now());
   const pid = 'app_live_' + FST_hashSimpleLive(base);
@@ -14809,17 +14821,26 @@ function renderNuevoPaciente(){
     </div>
   </div>
   <div class="form-section">
-    <div class="form-section-title">💬 Motivo de consulta y padecimiento actual</div>
+    <div class="form-section-title">💬 Motivo de consulta</div>
     <div class="form-group">
       <div class="form-field">
-        <div class="form-label">Motivo de consulta <span style="color:var(--gray-400);font-weight:400">(resumen en una línea)</span></div>
-        <input class="form-input" id="n-motivoconsulta" type="text" autocapitalize="sentences" placeholder="Ej: Dolor lumbar de 2 semanas, postquirúrgico de LCA">
-        <div style="font-size:11px;color:var(--gray-400);padding:3px 14px">Título del episodio — aparece en el expediente y el consentimiento</div>
+        <div class="form-label">¿Qué le pasa? — motivo y padecimiento actual <span class="req">*</span></div>
+        <!-- Título del episodio (motivoConsulta): oculto; se genera solo de la 1ª línea del padecimiento -->
+        <input type="hidden" id="n-motivoconsulta">
+        <textarea class="form-input" id="n-padecimiento" autocapitalize="sentences" style="min-height:120px" placeholder="Escríbelo como lo cuenta el paciente…"></textarea>
+        <div style="background:#F0F5FB;border:1px solid #DCE8F5;border-radius:10px;padding:10px 12px;font-size:12px;color:var(--navy-light);margin:7px 14px 0;line-height:1.7">
+          <b style="color:var(--navy)">Guíate con esto 👇</b><br>
+          • ¿Desde cuándo y cómo empezó? · ¿de golpe o poco a poco?<br>
+          • ¿Dónde le duele? · ¿se corre a otro lado?<br>
+          • ¿Cómo es? (punzante, ardor, peso, rigidez, hormigueo)<br>
+          • ¿Cuándo es peor? · ¿qué lo mejora y qué lo empeora?<br>
+          • ¿Cómo le afecta su día, trabajo, sueño o deporte?
+        </div>
+        <div style="font-size:11px;color:var(--gray-400);padding:5px 14px 0">💡 La primera línea se usa como título del episodio (aparece en el expediente y el consentimiento).</div>
       </div>
       <div class="form-field"><div class="form-label">Diagnóstico médico</div><input class="form-input" id="n-dxmedico" type="text" placeholder="Ej: Tendinopatía rotuliana"><div class="chip-row"><button type="button" class="chip-quick" onclick="setCampoRapido('n-dxmedico','No cuenta con diagnóstico médico referido')">Sin diagnóstico médico referido</button></div></div>
-      <div class="form-field"><div class="form-label">Padecimiento actual <span class="req">*</span></div><textarea class="form-input" id="n-padecimiento" placeholder="Descripción del paciente..."></textarea></div>
-      <div class="form-field"><div class="form-label">Mecanismo de lesión</div><input class="form-input" id="n-mecanismo" type="text" placeholder="Ej: Sobreuso, trauma directo"></div>
       <div class="form-field"><div class="form-label">Tiempo de evolución</div><input class="form-input" id="n-evolucion" type="text" placeholder="Ej: 3 meses"></div>
+      <div class="form-field"><div class="form-label">Mecanismo de lesión</div><input class="form-input" id="n-mecanismo" type="text" placeholder="Ej: Sobreuso, trauma directo"></div>
     </div>
   </div>
   <div class="form-section">
@@ -14945,7 +14966,13 @@ function guardarNuevoPaciente(){
   const dxmedico=v('n-dxmedico'), padecimiento=v('n-padecimiento');
   const fechaNacimiento=v('n-fechanac');
   const telefono=v('n-telefono');
-  const motivoConsulta=v('n-motivoconsulta');
+  // Título del episodio: si el campo (oculto) viene vacío, se genera de la 1ª línea del padecimiento
+  // (unificación motivo+padecimiento). Se recorta a ~90 chars sin cortar palabra.
+  let motivoConsulta=v('n-motivoconsulta');
+  if(!motivoConsulta && padecimiento){
+    const _pl=String(padecimiento).split('\n')[0].trim();
+    motivoConsulta = _pl.length>90 ? (_pl.slice(0,90).replace(/\s+\S*$/,'')+'…') : _pl;
+  }
 
   // Calcular edad: desde fechaNacimiento si existe, si no leer campo n-edad
   let edadFinal = null;
