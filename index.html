@@ -8329,17 +8329,15 @@ function renderExpediente(tab='historia'){
         // Historia híbrida (Fase 1): toques estructurados del Motivo. Solo se muestran si existen
         // (pacientes nuevos); los viejos no tienen motivoHC y este bloque queda vacío.
         const hc=p.motivoHC||{};
-        if(!hc.zonaPrincipal && !hc.desdeCuando && !hc.irradiacion && !hc.irritabilidad) return '';
+        if(!hc.zonaPrincipal && !hc.desdeCuando && !hc.irradiacion) return '';
         const zL = hc.zonaPrincipal==='otra' ? (hc.zonaPrincipalOtra||'Otra zona') : _hcLabelZona(hc.zonaPrincipal||'');
         const ladoL = {izquierdo:'Izquierdo',derecho:'Derecho',ambos:'Ambos',central:'Centro / línea media'}[hc.lado]||'';
         const irrL = hc.irradiacion==='Otra…' ? (hc.irradiacionOtra||'Otra') : (hc.irradiacion||'');
-        const irritL = {al_parar:'Al parar / segundos',menos_30:'Menos de 30 min','30_2h':'Entre 30 min y 2 h',varias_horas:'Varias horas',no_vuelve:'No vuelven al nivel habitual'}[hc.irritabilidad]||'';
         const secL = (Array.isArray(hc.zonasSecundarias)&&hc.zonasSecundarias.length) ? hc.zonasSecundarias.map(function(z){return _hcLabelZona(z);}).filter(Boolean).join(', ') : '';
         let r='';
         if(zL) r+=`<div class="field-row"><div class="field-label">Zona</div><div class="field-value">${escapeHTML(zL+(ladoL?(' · '+ladoL):''))}</div></div>`;
         if(hc.desdeCuando) r+=`<div class="field-row"><div class="field-label">Desde cuándo</div><div class="field-value narrative">${escapeHTML(hc.desdeCuando)}</div></div>`;
         if(irrL) r+=`<div class="field-row"><div class="field-label">Irradiación</div><div class="field-value">${escapeHTML(irrL)}</div></div>`;
-        if(irritL) r+=`<div class="field-row"><div class="field-label">Irritabilidad</div><div class="field-value">${escapeHTML(irritL)}</div></div>`;
         if(secL) r+=`<div class="field-row"><div class="field-label">Otras zonas</div><div class="field-value">${escapeHTML(secL)}</div></div>`;
         return r;
       })()}
@@ -15027,10 +15025,6 @@ function renderNuevoPaciente(){
         <div id="hc-irrad-otra-wrap" style="display:none;margin-top:7px"><input class="form-input" id="hc-irrad-otra" type="text" placeholder="¿A dónde se corre? (especifica el patrón)"></div>
       </div>
       <div class="hc-row">
-        <div class="hc-q">Irritabilidad <span class="opt">OPCIONAL</span> <span class="hint">· al aumentar los síntomas, ¿cuánto tardan en volver a su nivel habitual?</span></div>
-        <div class="hc-chips">${_hcChip('irrit','al_parar','Al parar / segundos',false)}${_hcChip('irrit','menos_30','Menos de 30 min',false)}${_hcChip('irrit','30_2h','Entre 30 min y 2 h',false)}${_hcChip('irrit','varias_horas','Varias horas',false)}${_hcChip('irrit','no_vuelve','No vuelven al nivel habitual',false)}</div>
-      </div>
-      <div class="hc-row">
         <button type="button" class="chip-quick" id="hc-sec-btn" onclick="_hcMostrarSec()">＋ Agregar otra zona</button>
         <div id="hc-sec-box" style="display:none">
           <div class="hc-q">Otras zonas que también le molestan <span class="opt">OPCIONAL</span> <span class="hint">· molestias adicionales distintas de la irradiación registrada</span></div>
@@ -15050,7 +15044,7 @@ function renderNuevoPaciente(){
         <div class="form-label">EVA inicial <span class="req">*</span> <span style="font-size:11px;color:var(--gray-400);font-weight:400">(toca el número)</span></div>
         <div class="evabtn-row" id="n-eva-row">${_nEvaBtnsHTML()}</div>
       </div>
-      <div class="form-field"><div class="form-label">Inflamación</div><input class="form-input" id="n-inflamacion" type="text" placeholder="Ej: Moderada, leve, ninguna"></div>
+      <div class="form-field"><div class="form-label">Inflamación</div><input class="form-input" id="n-inflamacion" type="text" placeholder="Ej: Inflamación en cara anterior y lateral del tobillo con edema y equimosis"><div style="margin-top:4px;font-size:12px;color:var(--gray-400);line-height:1.4">Anota intensidad + zona + signos (edema, equimosis, calor, enrojecimiento). Ej: "Moderada en cara anterior y lateral del tobillo con edema y equimosis"</div></div>
       <div class="form-field"><div class="form-label">Marcha / postura</div><input class="form-input" id="n-marcha" type="text" placeholder="Ej: Pronación bilateral"></div>
       <div class="form-field"><div class="form-label">ROM</div><input class="form-input" id="n-rom" type="text" placeholder="Ej: Limitado en flexión lumbar"></div>
       <div class="form-field"><div class="form-label">Fuerza muscular <span style="font-weight:400;color:var(--gray-400);font-size:11px">· 10 = lado sano/control; califica el afectado (simetría)</span></div><input class="form-input" id="n-fuerza" type="text" placeholder="Ej: sano 10/10, afectado 7/10"></div>
@@ -15256,7 +15250,6 @@ function guardarNuevoPaciente(){
       desdeCuando: _hcDesdeTexto||null,
       irradiacion: _hc.irrad||null,
       irradiacionOtra: (_hc.irrad==='Otra…') ? (_hcIrradOtra||null) : null,
-      irritabilidad: _hc.irrit||null,
       capturadoEn: (typeof todayISO!=='undefined'?todayISO:''), version:1
     },
     // valoracion.banderasRojas: DERIVADO de los checkboxes sc-bandera (los mismos que guardan en
