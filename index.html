@@ -31,6 +31,11 @@
   firebase.initializeApp(firebaseConfig);
   const fbStorage = firebase.storage();
   const fbAuth = firebase.auth();
+  // Persistencia LOCAL explícita: la sesión debe sobrevivir al relanzar la PWA. En iOS a veces
+  // no se conserva sola → el token muere → los writes se rechazan con "permission-denied"
+  // (el caso de Jess: 30 notas atoradas). Best-effort: en navegación privada/sin IndexedDB
+  // puede fallar; se ignora (ahí igual avisamos con el banner de sesión caducada).
+  try{ fbAuth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(function(){}); }catch(_pe){}
   // Forzar dominio correcto para GitHub Pages
   fbAuth.useDeviceLanguage();
   console.log('✅ Firebase Storage y Auth listos');
@@ -2493,7 +2498,10 @@ async function drenarColaSoapActivo(){
     if(_permisoDenegado && (Date.now()-_FST_reauthTs>30000)){
       _FST_reauthTs=Date.now();
       try{ showToast('Reconectando con la nube…','info'); }catch(_){}
-      FST_reautenticarStaging().then(function(res){ if(res && res.ok) setTimeout(function(){ try{ drenarColaSoapActivo(); }catch(_e){} }, 1500); });
+      FST_reautenticarStaging().then(function(res){
+        if(res && res.ok){ try{ _ocultarBannerSesionCaducada(); }catch(_){} setTimeout(function(){ try{ drenarColaSoapActivo(); }catch(_e){} }, 1500); }
+        else { try{ _mostrarBannerSesionCaducada(); }catch(_){} }   // sesión muerta → avisar, no acumular en silencio
+      });
     }
   }
 }
@@ -3737,6 +3745,9 @@ async function doLogin(){
     }
     restaurarBtn();
     entrarComo(perfil, email);
+    // Sesión fresca: quitar el aviso de "sesión caducada" y empujar lo pendiente a la nube.
+    try{ _ocultarBannerSesionCaducada(); }catch(_){}
+    setTimeout(function(){ try{ if(typeof drenarColaSoapActivo==='function') drenarColaSoapActivo(); }catch(_e){} }, 2500);
 
   }catch(e){
     restaurarBtn();
@@ -4156,6 +4167,26 @@ if ('serviceWorker' in navigator) {
     });
   }
 }
+// ── SESIÓN CADUCADA (durable) ────────────────────────────────────────────────────
+// Cuando un write clínico se rechaza con "permission-denied" y la auto-reparación NO puede
+// recuperar el token (currentUser null = sesión muerta en este equipo), en vez de acumular
+// notas en silencio (el caso Jess: 30 sin avisar), se muestra un banner IMPOSIBLE de ignorar
+// que la lleva a re-loguear. Al volver a entrar, la cola se drena sola.
+function _mostrarBannerSesionCaducada(){
+  if(document.getElementById('sesion-caducada-banner')) return;
+  var b=document.createElement('div');
+  b.id='sesion-caducada-banner';
+  b.style.cssText='position:fixed;left:0;right:0;bottom:0;z-index:100001;background:#B91C1C;color:#fff;'
+    +'padding:12px 16px;padding-bottom:calc(12px + env(safe-area-inset-bottom,0px));display:flex;align-items:center;'
+    +'gap:12px;font-family:inherit;font-size:13.5px;box-shadow:0 -2px 12px rgba(0,0,0,.3)';
+  b.innerHTML='<span style="flex:1;line-height:1.4">⚠️ <b>Tu sesión caducó.</b> Tus notas NO se están guardando en la nube — vuelve a iniciar sesión.</span>'
+    +'<button id="sesion-caducada-btn" style="background:#fff;color:#B91C1C;border:none;border-radius:10px;'
+    +'padding:9px 16px;font-weight:800;font-family:inherit;cursor:pointer;white-space:nowrap">Iniciar sesión</button>';
+  document.body.appendChild(b);
+  var btn=document.getElementById('sesion-caducada-btn');
+  if(btn) btn.onclick=function(){ try{ _ocultarBannerSesionCaducada(); }catch(_){} try{ doLogout(); }catch(_e){ try{ showScreen('screen-login',false); }catch(__){} } };
+}
+function _ocultarBannerSesionCaducada(){ var b=document.getElementById('sesion-caducada-banner'); if(b) b.remove(); }
 async function doLogout(){
   registrarAcceso('LOGOUT');
   try{ _detenerAutoLogout(); }catch(e){} // detener timer de inactividad
