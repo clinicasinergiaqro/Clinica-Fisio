@@ -8424,7 +8424,7 @@ function renderExpediente(tab='historia'){
       <div class="section-title">🔎 Diagnóstico y plan${_epSufijo}
         <button onclick="editarHistoria('dxfuncional')" style="margin-left:auto;background:var(--navy);color:white;border:none;border-radius:20px;padding:3px 12px;font-size:11px;font-weight:700;cursor:pointer">✏️ Editar</button>
       </div>
-      <div class="field-row"><div class="field-label">Dx clínico</div><div class="field-value">${valorSeguroHTML(mv.dxFuncional.dxClinico)}</div></div>
+      ${(mv.dxFuncional.dxClinico && mv.dxFuncional.dxClinico!==mv.motivo.dxMedico && mv.dxFuncional.dxClinico!=='Pendiente') ? `<div class="field-row"><div class="field-label">Dx clínico</div><div class="field-value">${valorSeguroHTML(mv.dxFuncional.dxClinico)}</div></div>` : ''}
       <div class="field-row"><div class="field-label">Dx funcional</div><div class="field-value narrative">${valorSeguroHTML(mv.dxFuncional.dxFuncional)}</div></div>
       <div class="field-row"><div class="field-label">Objetivos CP</div><div class="field-value">${valorSeguroHTML(mv.dxFuncional.objetivosCP)}</div></div>
       <div class="field-row"><div class="field-label">Objetivos LP</div><div class="field-value">${valorSeguroHTML(mv.dxFuncional.objetivosLP)}</div></div>
@@ -14873,7 +14873,7 @@ function renderNuevoPaciente(){
     'n-padecimiento','n-limitaciones','n-dxmedico',
     'n-inflamacion','n-marcha','n-rom','n-fuerza','n-flex',
     'n-pruebas','n-palpacion','n-estudios',
-    'n-dxclinico','n-objcp','n-objlp','n-pronostico',
+    'n-objcp','n-objlp','n-pronostico',
     'n-enfoque','n-plancontra','n-ttohoy'
   ];
 
@@ -15084,7 +15084,6 @@ function renderNuevoPaciente(){
   <div class="form-section">
     <div class="form-section-title">🔎 Diagnóstico y plan</div>
     <div class="form-group">
-      <div class="form-field"><div class="form-label">Dx clínico</div><input class="form-input" id="n-dxclinico" type="text" placeholder="Igual al dx médico o más específico"><div style="margin-top:4px;font-size:12px;color:var(--gray-400);line-height:1.4">Ej: Tendinopatía rotuliana grado II, síndrome facetario L4-L5, esguince de tobillo grado I</div></div>
       <div class="form-field"><div class="form-label">Dx funcional</div><textarea class="form-input" id="n-dxfuncional" placeholder="Disfunción de [zona] por [causa] que limita [función]"></textarea><div style="margin-top:4px;font-size:12px;color:var(--gray-400);line-height:1.4">Ej: Disfunción de rodilla derecha por debilidad de cuádriceps que limita bajar escaleras y sentadilla</div></div>
       <div class="form-field"><div class="form-label">Objetivos corto plazo</div><input class="form-input" id="n-objcp" type="text" placeholder="Ej: Reducir dolor a 3/10 en 3 semanas"></div>
       <div class="form-field"><div class="form-label">Objetivos largo plazo</div><input class="form-input" id="n-objlp" type="text" placeholder="Ej: Retorno al deporte sin limitaciones"></div>
@@ -15281,7 +15280,7 @@ function guardarNuevoPaciente(){
       pruebasEspeciales:v('n-pruebas','No realizadas'),palpacion:v('n-palpacion','No evaluada'),
       mediaBaseline:(Array.isArray(window._altaMediaAntes)?window._altaMediaAntes.map(function(x){return Object.assign({},x);}):[]),
       banderasRojas:(()=>{const b=Array.from(document.querySelectorAll('.sc-bandera:checked')).map(c=>c.value).filter(x=>x!=='Ninguna referida');return b.length?b.join(', '):'Ninguna';})()},
-    dxFuncional:{dxClinico:v('n-dxclinico',dxmedicoFinal),dxFuncional:v('n-dxfuncional','Pendiente'),
+    dxFuncional:{dxClinico:dxmedicoFinal,dxFuncional:v('n-dxfuncional','Pendiente'),
       limitaciones:v('n-limitaciones','Pendiente'),objetivosCP:v('n-objcp','Pendiente'),
       objetivosLP:v('n-objlp','Pendiente'),pronostico:v('n-pronostico','Pendiente')},
     planTto:{frecuencia:'[pendiente]',sesiones:'[pendiente]',ejercicioTerapeutico:'',
@@ -16354,7 +16353,7 @@ const CAMPOS_NUEVO=['n-nombre','n-fechanac','n-edad','n-telefono','n-terapeuta',
   'n-patologicos','sc-condiciones-obs','n-cirugias','n-medicamentos','n-alergias','n-deportivos','n-deporte-freq',
   'sc-implantes-detalle','sc-banderas-detalle','n-contra',
   'n-inflamacion','n-marcha','n-rom','n-fuerza','n-flex','n-pruebas','n-palpacion','n-estudios',
-  'n-dxclinico','n-dxfuncional','n-limitaciones','n-objcp','n-objlp','n-pronostico',
+  'n-dxfuncional','n-limitaciones','n-objcp','n-objlp','n-pronostico',
   'n-enfoque','n-plancontra','n-fecha-valoracion','n-ttohoy'];
 
 function guardarBorradorNuevo(){
