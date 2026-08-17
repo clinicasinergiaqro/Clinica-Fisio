@@ -8426,8 +8426,8 @@ function renderExpediente(tab='historia'){
       </div>
       ${(mv.dxFuncional.dxClinico && mv.dxFuncional.dxClinico!==mv.motivo.dxMedico && mv.dxFuncional.dxClinico!=='Pendiente') ? `<div class="field-row"><div class="field-label">Dx clínico</div><div class="field-value">${valorSeguroHTML(mv.dxFuncional.dxClinico)}</div></div>` : ''}
       <div class="field-row"><div class="field-label">Dx funcional</div><div class="field-value narrative">${valorSeguroHTML(mv.dxFuncional.dxFuncional)}</div></div>
-      <div class="field-row"><div class="field-label">Objetivos CP</div><div class="field-value">${valorSeguroHTML(mv.dxFuncional.objetivosCP)}</div></div>
-      <div class="field-row"><div class="field-label">Objetivos LP</div><div class="field-value">${valorSeguroHTML(mv.dxFuncional.objetivosLP)}</div></div>
+      <div class="field-row"><div class="field-label">Objetivos</div><div class="field-value">${valorSeguroHTML(mv.dxFuncional.objetivosCP)}</div></div>
+      ${(mv.dxFuncional.objetivosLP && mv.dxFuncional.objetivosLP!=='Pendiente') ? `<div class="field-row"><div class="field-label">Objetivos LP</div><div class="field-value">${valorSeguroHTML(mv.dxFuncional.objetivosLP)}</div></div>` : ''}
       <div class="field-row"><div class="field-label">Pronóstico</div><div class="field-value">${valorSeguroHTML(mv.dxFuncional.pronostico)}</div></div>
       <div class="field-row"><div class="field-label">Enfoque terapéutico</div><div class="field-value narrative">${valorSeguroHTML(mv.planTto.enfoqueTerapeutico||(([mv.planTto.ejercicioTerapeutico,mv.planTto.terapiaManual,mv.planTto.agentesFisicos].filter(x=>x&&x!=='Pendiente'&&x!=='[pendiente]').join(', '))||'Pendiente'))}</div></div>
       <div class="field-row"><div class="field-label">Precauciones</div><div class="field-value">${valorSeguroHTML(mv.planTto.contraindicaciones)}</div></div>
@@ -14873,7 +14873,7 @@ function renderNuevoPaciente(){
     'n-padecimiento','n-limitaciones','n-dxmedico',
     'n-inflamacion','n-marcha','n-rom','n-fuerza','n-flex',
     'n-pruebas','n-palpacion','n-estudios',
-    'n-objcp','n-objlp','n-pronostico',
+    'n-objcp','n-pronostico',
     'n-enfoque','n-plancontra','n-ttohoy'
   ];
 
@@ -15085,8 +15085,7 @@ function renderNuevoPaciente(){
     <div class="form-section-title">🔎 Diagnóstico y plan</div>
     <div class="form-group">
       <div class="form-field"><div class="form-label">Dx funcional</div><textarea class="form-input" id="n-dxfuncional" placeholder="Disfunción de [zona] por [causa] que limita [función]"></textarea><div style="margin-top:4px;font-size:12px;color:var(--gray-400);line-height:1.4">Ej: Disfunción de rodilla derecha por debilidad de cuádriceps que limita bajar escaleras y sentadilla</div></div>
-      <div class="form-field"><div class="form-label">Objetivos corto plazo</div><input class="form-input" id="n-objcp" type="text" placeholder="Ej: Reducir dolor a 3/10 en 3 semanas"></div>
-      <div class="form-field"><div class="form-label">Objetivos largo plazo</div><input class="form-input" id="n-objlp" type="text" placeholder="Ej: Retorno al deporte sin limitaciones"></div>
+      <div class="form-field"><div class="form-label">Objetivos</div><input class="form-input" id="n-objcp" type="text" placeholder="Ej: Reducir dolor a 3/10 en 3 sem y retornar al deporte sin limitaciones"></div>
       <div class="form-field"><div class="form-label">Pronóstico</div><input class="form-input" id="n-pronostico" type="text" placeholder="Ej: Favorable, 8-10 semanas"></div>
       <div class="form-field"><div class="form-label">Enfoque terapéutico</div><textarea class="form-input" id="n-enfoque" placeholder="Ej: Fortalecimiento de cuádriceps, liberación miofascial lumbar, US para control de dolor"></textarea><div style="margin-top:4px;font-size:12px;color:var(--gray-400);line-height:1.4">Dirección general del tratamiento — los detalles específicos se registran en cada SOAP</div></div>
       <div class="form-field"><div class="form-label">Precauciones</div><input class="form-input" id="n-plancontra" type="text" placeholder="Ej: Sin impacto, sin AINES"></div>
@@ -15282,7 +15281,7 @@ function guardarNuevoPaciente(){
       banderasRojas:(()=>{const b=Array.from(document.querySelectorAll('.sc-bandera:checked')).map(c=>c.value).filter(x=>x!=='Ninguna referida');return b.length?b.join(', '):'Ninguna';})()},
     dxFuncional:{dxClinico:dxmedicoFinal,dxFuncional:v('n-dxfuncional','Pendiente'),
       limitaciones:v('n-limitaciones','Pendiente'),objetivosCP:v('n-objcp','Pendiente'),
-      objetivosLP:v('n-objlp','Pendiente'),pronostico:v('n-pronostico','Pendiente')},
+      objetivosLP:'',pronostico:v('n-pronostico','Pendiente')},
     planTto:{frecuencia:'[pendiente]',sesiones:'[pendiente]',ejercicioTerapeutico:'',
       terapiaManual:'',agentesFisicos:'',enfoqueTerapeutico:v('n-enfoque','Pendiente'),
       contraindicaciones:v('n-plancontra','Ninguna')},
@@ -16353,7 +16352,7 @@ const CAMPOS_NUEVO=['n-nombre','n-fechanac','n-edad','n-telefono','n-terapeuta',
   'n-patologicos','sc-condiciones-obs','n-cirugias','n-medicamentos','n-alergias','n-deportivos','n-deporte-freq',
   'sc-implantes-detalle','sc-banderas-detalle','n-contra',
   'n-inflamacion','n-marcha','n-rom','n-fuerza','n-flex','n-pruebas','n-palpacion','n-estudios',
-  'n-dxfuncional','n-limitaciones','n-objcp','n-objlp','n-pronostico',
+  'n-dxfuncional','n-limitaciones','n-objcp','n-pronostico',
   'n-enfoque','n-plancontra','n-fecha-valoracion','n-ttohoy'];
 
 function guardarBorradorNuevo(){
