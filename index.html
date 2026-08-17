@@ -10187,7 +10187,7 @@ function renderSOAPForm(){
     const _nom=String(p.name||'').split(' ')[0];
     _tbSoap.textContent=(_tieneEps&&!editingSoapId&&!editingSoapEsHistorico)
       ? `${_nom} · Sesión ${(p.numSesionEpisodioActual||0)+1} · Ep ${(p.motivoActualIndex||0)+1} · ${totalPrevias+1}ª visita`
-      : `${_nom} · Sesión ${sesNum}${(()=>{const t=parseInt(p.planTto?.sesiones);return(t&&t>0)?' de '+t:''})()}`;
+      : `${_nom} · Sesión ${sesNum}`;
   }
   // 1C: atajo "sesión de descarga muscular" — SOLO nota nueva (al editar se ve el SOAP normal).
   // Activarlo oculta #soap-full y muestra un cuadro mínimo (dónde + complemento + EVA reales).
@@ -10218,7 +10218,7 @@ function renderSOAPForm(){
       <div class="form-field"><div class="form-label">Sesión Nº</div><div style="font-size:15px;font-weight:700;color:var(--navy)">${
         (_tieneEps&&!editingSoapId&&!editingSoapEsHistorico)
           ? `${(p.numSesionEpisodioActual||0)+1} <span style="font-size:11px;color:var(--gray-400);font-weight:400">· Episodio ${(p.motivoActualIndex||0)+1}</span>`
-          : `${sesNum}${(()=>{const t=parseInt(p.planTto?.sesiones);return(t&&t>0)?' de '+t:''})()}`
+          : `${sesNum}`
       }</div>${(_tieneEps&&!editingSoapId&&!editingSoapEsHistorico)?`<div style="font-size:10px;color:var(--gray-400);margin-top:1px">${totalPrevias+1}ª visita real · el Nº de sesión es un identificador fijo (no baja al borrar)</div>`:''}</div>
       <div class="form-field"><div class="form-label">Semana</div><div style="font-size:15px;font-weight:700;color:var(--navy)">${semana}</div></div>
       <div class="form-field"><div class="form-label">Terapeuta</div><div style="font-size:15px;font-weight:700;color:var(--navy)">${ter}</div></div>
