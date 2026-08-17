@@ -4002,28 +4002,35 @@ async function _recargarConShellLimpio(manual){
     return;
   }
   _swRecargando = true;
-  // Guardar la copia FRESCA (no-store) del HTML en el/los cache(s) del shell ANTES de recargar: la
-  // navegación es cache-PRIMERO, así que si NO metemos aquí la versión nueva, al recargar el SW la
-  // vuelve a bajar pegando en el caché HTTP de ~10 min de GitHub y regresa la VIEJA (el bucle que
-  // hacía que "Forzar" no sirviera). Con esto la recarga sirve la versión nueva de inmediato.
+  // RECARGA GARANTIZADA: en iPad/Safari algunos fetch/caches se pueden colgar. Antes eso dejaba el
+  // botón "Actualizando…" para siempre (sin recargar). Ahora hay un tope duro: pase lo que pase,
+  // recargamos a los 3.5 s; y en el camino normal, apenas termina de guardar el shell.
+  var _yaRecargo=false;
+  var _hacerReload=function(){ if(_yaRecargo) return; _yaRecargo=true; try{ location.reload(); }catch(_r){ try{ location.href=location.href; }catch(_rr){} } };
+  setTimeout(_hacerReload, 3500);
+  // Guardar la copia FRESCA del HTML en el/los cache(s) del shell ANTES de recargar (cache-PRIMERO
+  // sirve lo nuevo de una). Reutilizamos la respuesta del SONDEO —ya vino no-store + con timeout— para
+  // NO hacer un fetch extra que pueda colgarse en iPad.
   try{
-    var frescaResp=await fetch('./index.html?swforce='+Date.now(), { cache:'no-store' });
-    if(frescaResp && frescaResp.ok){
+    if(resp && resp.ok){
       var ksPut=await caches.keys();
       var shellKeys=ksPut.filter(function(k){ return k.indexOf(SW_CACHE_PREFIX)===0; });
       if(!shellKeys.length) shellKeys=[SW_CACHE_PREFIX+'v1-forced'];
       for(var i=0;i<shellKeys.length;i++){
-        try{ var cc=await caches.open(shellKeys[i]); await cc.put('./index.html', frescaResp.clone()); await cc.put('./', frescaResp.clone()); }catch(_pc){}
+        try{ var cc=await caches.open(shellKeys[i]); await cc.put('./index.html', resp.clone()); await cc.put('./', resp.clone()); }catch(_pc){}
       }
     }
   }catch(_pf){}
+  // Pedir al SW nuevo que tome control SIN await (reg.update puede tardar/colgarse en iPad).
   try{
     if('serviceWorker' in navigator){
-      var reg=await navigator.serviceWorker.getRegistration();
-      if(reg){ try{ await reg.update(); }catch(_u){} if(reg.waiting){ try{ reg.waiting.postMessage({type:'SKIP_WAITING'}); }catch(_p){} } }
+      navigator.serviceWorker.getRegistration().then(function(reg){
+        if(!reg) return; try{ reg.update(); }catch(_u){}
+        if(reg.waiting){ try{ reg.waiting.postMessage({type:'SKIP_WAITING'}); }catch(_p){} }
+      }).catch(function(){});
     }
   }catch(_e){}
-  setTimeout(function(){ try{ location.reload(); }catch(_r){ location.href=location.href; } }, 300);
+  setTimeout(_hacerReload, 300);
 }
 function _resetBtnForzar(){ try{ var b=document.getElementById('det-forzar-update'); if(b){ b.disabled=false; b.textContent='🔄 Forzar actualización'; } }catch(_){} }
 function mostrarBannerActualizacion(){
