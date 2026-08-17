@@ -14776,10 +14776,10 @@ function renderNuevoPaciente(){
   const camposOrden=[
     'n-nombre','n-fechanac','n-telefono','n-medico',
     'n-patologicos','n-cirugias','n-medicamentos','n-alergias','n-deportivos','n-deporte-freq',
-    'n-padecimiento','n-dxmedico',
+    'n-padecimiento','n-limitaciones','n-dxmedico',
     'n-inflamacion','n-marcha','n-rom','n-fuerza','n-flex',
     'n-pruebas','n-palpacion','n-estudios',
-    'n-dxclinico','n-limitaciones','n-objcp','n-objlp','n-pronostico',
+    'n-dxclinico','n-objcp','n-objlp','n-pronostico',
     'n-enfoque','n-plancontra','n-ttohoy'
   ];
 
@@ -14960,6 +14960,8 @@ function renderNuevoPaciente(){
         </div>
       </div>
 
+      <div class="form-field" style="margin-top:14px"><div class="form-label">Limitaciones funcionales y/o movimientos que generan dolor <span style="font-weight:400;color:var(--gray-400);font-size:11px">· ¿qué no puede hacer o qué le duele al moverse?</span></div><input class="form-input" id="n-limitaciones" type="text" placeholder="Ej: No puede bajar escaleras, dolor al manejar >30 min, no tolera correr"></div>
+
       <div class="form-field" style="margin-top:14px"><div class="form-label">Diagnóstico médico</div><input class="form-input" id="n-dxmedico" type="text" placeholder="Ej: Tendinopatía rotuliana"><div class="chip-row"><button type="button" class="chip-quick" onclick="setCampoRapido('n-dxmedico','No cuenta con diagnóstico médico referido')">Sin diagnóstico médico referido</button></div></div>
     </div>
   </div>
@@ -14988,7 +14990,6 @@ function renderNuevoPaciente(){
     <div class="form-group">
       <div class="form-field"><div class="form-label">Dx clínico</div><input class="form-input" id="n-dxclinico" type="text" placeholder="Igual al dx médico o más específico"><div style="margin-top:4px;font-size:12px;color:var(--gray-400);line-height:1.4">Ej: Tendinopatía rotuliana grado II, síndrome facetario L4-L5, esguince de tobillo grado I</div></div>
       <div class="form-field"><div class="form-label">Dx funcional</div><textarea class="form-input" id="n-dxfuncional" placeholder="Disfunción de [zona] por [causa] que limita [función]"></textarea><div style="margin-top:4px;font-size:12px;color:var(--gray-400);line-height:1.4">Ej: Disfunción de rodilla derecha por debilidad de cuádriceps que limita bajar escaleras y sentadilla</div></div>
-      <div class="form-field"><div class="form-label">Limitaciones funcionales y/o movimientos que generan dolor</div><input class="form-input" id="n-limitaciones" type="text" placeholder="Ej: No puede bajar escaleras, dolor al manejar >30 min, no tolera correr"></div>
       <div class="form-field"><div class="form-label">Objetivos corto plazo</div><input class="form-input" id="n-objcp" type="text" placeholder="Ej: Reducir dolor a 3/10 en 3 semanas"></div>
       <div class="form-field"><div class="form-label">Objetivos largo plazo</div><input class="form-input" id="n-objlp" type="text" placeholder="Ej: Retorno al deporte sin limitaciones"></div>
       <div class="form-field"><div class="form-label">Pronóstico</div><input class="form-input" id="n-pronostico" type="text" placeholder="Ej: Favorable, 8-10 semanas"></div>
