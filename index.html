@@ -14728,10 +14728,11 @@ function _hcTap(el){
   st[g] = apaga ? null : v;
   var cont=el.parentNode; if(cont){ Array.prototype.forEach.call(cont.querySelectorAll('.hc-chip'), function(b){ b.classList.remove('on'); }); }
   if(!apaga) el.classList.add('on');
-  if(g==='zona'){ st.irrad=null; _hcRenderIrrad(); var ow=document.getElementById('hc-zona-otra-wrap'); if(ow) ow.style.display=(v==='otra')?'block':'none'; var iow=document.getElementById('hc-irrad-otra-wrap'); if(iow) iow.style.display='none'; }
+  if(g==='zona'){ st.irrad=null; _hcRenderIrrad(); _hcRenderSecundarias(); var ow=document.getElementById('hc-zona-otra-wrap'); if(ow) ow.style.display=(v==='otra')?'block':'none'; var iow=document.getElementById('hc-irrad-otra-wrap'); if(iow) iow.style.display='none'; }
   // Campos que se revelan al elegir la opción "especifica": irradiación "Otra…" y fecha exacta.
   if(g==='irrad'){ var iw=document.getElementById('hc-irrad-otra-wrap'); if(iw) iw.style.display=(st.irrad==='Otra…')?'block':'none'; }
-  if(g==='desde'){ var dw=document.getElementById('hc-desde-exacto-wrap'); if(dw) dw.style.display=(st.desde==='exacto')?'block':'none'; }
+  if(g==='desde'){ var dw=document.getElementById('hc-desde-exacto-wrap'); if(dw) dw.style.display=(st.desde==='exacto')?'block':'none';
+    var eh=document.getElementById('hc-evol-hint'); if(eh) eh.textContent=(st.desde==='hoy_semana')?'· desde que comenzó':'· últimas 2 semanas'; }
   if(typeof marcarDirty==='function') marcarDirty();
 }
 function _hcRenderZonas(){
@@ -14742,7 +14743,14 @@ function _hcRenderZonas(){
 }
 function _hcRenderSecundarias(){
   var wrap=document.getElementById('hc-sec-wrap'); if(!wrap) return;
-  wrap.innerHTML=_HC_ZONAS.map(function(z){ return _hcChip('sec',z[0],z[1],true); }).join('');
+  var st=window._HC||{}, prin=st.zona;
+  // La zona principal NO debe ofrecerse como "otra zona" (ya está capturada arriba).
+  if(prin && prin!=='otra' && Array.isArray(st.sec)){ st.sec=st.sec.filter(function(x){ return x!==prin; }); }
+  wrap.innerHTML=_HC_ZONAS.filter(function(z){ return z[0]!==prin; }).map(function(z){ return _hcChip('sec',z[0],z[1],true); }).join('');
+}
+function _hcMostrarSec(){
+  var btn=document.getElementById('hc-sec-btn'); if(btn) btn.style.display='none';
+  var box=document.getElementById('hc-sec-box'); if(box) box.style.display='block';
 }
 function _hcRenderIrrad(){
   var wrap=document.getElementById('hc-irrad-wrap'); if(!wrap) return;
@@ -14925,11 +14933,11 @@ function renderNuevoPaciente(){
         <div id="hc-zona-otra-wrap" style="display:none;margin-top:7px"><input class="form-input" id="hc-zona-otra" type="text" placeholder="¿Cuál zona? (especifica)"></div>
       </div>
       <div class="hc-row">
-        <div class="hc-q">Lado</div>
+        <div class="hc-q">Lado <span class="req">*</span></div>
         <div class="hc-chips">${_hcChip('lado','izquierdo','Izquierdo',false)}${_hcChip('lado','derecho','Derecho',false)}${_hcChip('lado','ambos','Ambos',false)}${_hcChip('lado','central','Centro / línea media',false)}</div>
       </div>
       <div class="hc-row">
-        <div class="hc-q">¿Desde cuándo?</div>
+        <div class="hc-q">¿Desde cuándo? <span class="req">*</span></div>
         <div class="hc-chips">${_hcChip('desde','hoy_semana','Hoy / esta semana',false)}${_hcChip('desde','1_4_sem','1–4 semanas',false)}${_hcChip('desde','1_3_meses','1–3 meses',false)}${_hcChip('desde','3_6_meses','3–6 meses',false)}${_hcChip('desde','mas_6_meses','Más de 6 meses',false)}${_hcChip('desde','exacto','Fecha o tiempo exacto…',false)}</div>
         <div id="hc-desde-exacto-wrap" style="display:none;margin-top:7px"><input class="form-input" id="hc-desde-exacto" type="text" placeholder="Fecha o tiempo exacto (ej: cirugía 03/02/2026, trauma hace 9 días)"></div>
       </div>
@@ -14939,20 +14947,23 @@ function renderNuevoPaciente(){
         <div id="hc-irrad-otra-wrap" style="display:none;margin-top:7px"><input class="form-input" id="hc-irrad-otra" type="text" placeholder="¿A dónde se corre? (especifica el patrón)"></div>
       </div>
       <div class="hc-row">
-        <div class="hc-q">Evolución <span class="hint">· últimas 2 semanas</span></div>
+        <div class="hc-q">Evolución <span class="req">*</span> <span class="hint" id="hc-evol-hint">· últimas 2 semanas</span></div>
         <div class="hc-chips">${_hcChip('tray','mejorando','Mejorando',false)}${_hcChip('tray','igual','Igual',false)}${_hcChip('tray','empeorando','Empeorando',false)}</div>
       </div>
       <div class="hc-row">
-        <div class="hc-q">¿Cómo se comporta?</div>
+        <div class="hc-q">¿Cómo se comporta? <span class="req">*</span></div>
         <div class="hc-chips">${_hcChip('comp','constante','Constante',false)}${_hcChip('comp','intermitente','Intermitente (va y viene)',false)}</div>
       </div>
       <div class="hc-row">
-        <div class="hc-q">Irritabilidad <span class="opt">OPCIONAL</span> <span class="hint">· al provocarse, ¿cuánto tarda en ceder?</span></div>
-        <div class="hc-chips">${_hcChip('irrit','al_parar','Al parar / segundos',false)}${_hcChip('irrit','menos_30','Menos de 30 min',false)}${_hcChip('irrit','30_2h','Entre 30 min y 2 h',false)}${_hcChip('irrit','varias_horas','Varias horas',false)}${_hcChip('irrit','no_cede','No se calma por completo',false)}</div>
+        <div class="hc-q">Irritabilidad <span class="opt">OPCIONAL</span> <span class="hint">· al aumentar los síntomas, ¿cuánto tardan en volver a su nivel habitual?</span></div>
+        <div class="hc-chips">${_hcChip('irrit','al_parar','Al parar / segundos',false)}${_hcChip('irrit','menos_30','Menos de 30 min',false)}${_hcChip('irrit','30_2h','Entre 30 min y 2 h',false)}${_hcChip('irrit','varias_horas','Varias horas',false)}${_hcChip('irrit','no_vuelve','No vuelven al nivel habitual',false)}</div>
       </div>
       <div class="hc-row">
-        <div class="hc-q">Otras zonas que también le molestan <span class="opt">OPCIONAL</span> <span class="hint">· solo etiqueta</span></div>
-        <div class="hc-chips" id="hc-sec-wrap"></div>
+        <button type="button" class="chip-quick" id="hc-sec-btn" onclick="_hcMostrarSec()">＋ Agregar otra zona</button>
+        <div id="hc-sec-box" style="display:none">
+          <div class="hc-q">Otras zonas que también le molestan <span class="opt">OPCIONAL</span> <span class="hint">· molestias adicionales distintas de la irradiación registrada</span></div>
+          <div class="hc-chips" id="hc-sec-wrap"></div>
+        </div>
       </div>
 
       <div class="form-field" style="margin-top:14px"><div class="form-label">Diagnóstico médico</div><input class="form-input" id="n-dxmedico" type="text" placeholder="Ej: Tendinopatía rotuliana"><div class="chip-row"><button type="button" class="chip-quick" onclick="setCampoRapido('n-dxmedico','No cuenta con diagnóstico médico referido')">Sin diagnóstico médico referido</button></div></div>
@@ -15116,6 +15127,11 @@ function guardarNuevoPaciente(){
   if(!_hc.zona){
     showToast('Falta: toca la ZONA principal del dolor','error');return;
   }
+  if(!_hc.lado){ showToast('Falta: toca el LADO','error');return; }
+  if(!_hc.desde){ showToast('Falta: toca ¿DESDE CUÁNDO?','error');return; }
+  if((_hc.desde==='exacto') && !_hcDesdeExacto){ showToast('Escribe la fecha o tiempo exacto','error');return; }
+  if(!_hc.tray){ showToast('Falta: toca la EVOLUCIÓN','error');return; }
+  if(!_hc.comp){ showToast('Falta: toca ¿CÓMO SE COMPORTA?','error');return; }
   // LOOP2.1: bloqueo real — sin consentimiento de datos NO se crea el expediente
   /* RIESGO RESIDUAL — Token de Apps Script expuesto en frontend.
      Migración a Firebase ID Token pendiente para sub-loop dedicado.
