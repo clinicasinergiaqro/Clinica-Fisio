@@ -2,7 +2,7 @@
 // Service Worker — Clínica Sinergia (offline shell)
 // CAMBIAR la fecha de CACHE en cada deploy para forzar actualización
 // ═══════════════════════════════════════════════════════════
-const CACHE = 'sinergia-shell-v1-2026-08-17n';
+const CACHE = 'sinergia-shell-v1-2026-08-17o';
 const SHELL = [
   './',
   './index.html',
@@ -19,11 +19,23 @@ self.addEventListener('message', e => {
   if (e.data && e.data.type === 'SKIP_WAITING') self.skipWaiting();
 });
 
+// index.html y './' se piden SIEMPRE con no-store + cache-buster: GitHub Pages sirve el HTML con
+// Cache-Control de ~10 min y, sin esto, el SW revalida contra ESE caché HTTP y vuelve a guardar la
+// versión vieja → la app "no se actualiza" hasta que expira. Con cache:'no-store'+?v= se salta ese
+// caché y trae el HTML recién publicado de una vez.
+function _fetchIndexFresco() {
+  return fetch('./index.html?swfresh=' + Date.now(), { cache: 'no-store' });
+}
 self.addEventListener('install', e => {
   self.skipWaiting();
-  e.waitUntil(
-    caches.open(CACHE).then(c => c.addAll(SHELL).catch(()=>{}))
-  );
+  e.waitUntil((async () => {
+    const c = await caches.open(CACHE);
+    try { await c.addAll(SHELL.filter(u => u !== './' && u !== './index.html')); } catch(_) {}
+    try {
+      const fresh = await _fetchIndexFresco();
+      if (fresh && fresh.ok) { await c.put('./index.html', fresh.clone()); await c.put('./', fresh.clone()); }
+    } catch(_) {}
+  })());
 });
 
 self.addEventListener('activate', e => {
@@ -63,7 +75,8 @@ self.addEventListener('fetch', e => {
       if (cached) {
         const ctrl = ('AbortController' in self) ? new AbortController() : null;
         const to = setTimeout(() => { try { ctrl && ctrl.abort(); } catch(_){} }, 6000);
-        fetch(req, ctrl ? { signal: ctrl.signal } : undefined).then(resp => {
+        // Revalidación FRESCA (no-store): trae el HTML recién publicado, no el del caché HTTP de GitHub.
+        fetch('./index.html?swfresh=' + Date.now(), ctrl ? { cache:'no-store', signal: ctrl.signal } : { cache:'no-store' }).then(resp => {
           clearTimeout(to);
           if (resp && resp.ok) { const copy = resp.clone(); caches.open(CACHE).then(c => c.put('./index.html', copy)).catch(()=>{}); }
         }).catch(() => { clearTimeout(to); });
@@ -71,7 +84,7 @@ self.addEventListener('fetch', e => {
       }
       try {
         const resp = await Promise.race([
-          fetch(req),
+          _fetchIndexFresco(),
           new Promise((_, reject) => setTimeout(() => reject(new Error('timeout-red')), 12000))
         ]);
         if (resp && resp.ok) {
