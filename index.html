@@ -14715,7 +14715,7 @@ var _HC_IRRAD = {
   cabeza_mandibula:['No, local','Difuso / varias zonas']
 };
 function _hcLabelZona(v){ for(var i=0;i<_HC_ZONAS.length;i++){ if(_HC_ZONAS[i][0]===v) return _HC_ZONAS[i][1]; } return v==='otra'?'Otra':''; }
-function _hcReset(){ window._HC = {zona:null,zonaOtra:'',lado:null,sec:[],desde:null,irrad:null,tray:null,irrit:null}; }
+function _hcReset(){ window._HC = {zona:null,zonaOtra:'',lado:null,sec:[],desde:null,irrad:null,tray:null,comp:null,irrit:null}; }
 function _hcChip(g,v,label,multi){
   var st=window._HC||{}; var on = multi ? (st[g]||[]).indexOf(v)!==-1 : st[g]===v;
   return '<button type="button" class="hc-chip'+(on?' on':'')+'" data-g="'+g+'" data-v="'+String(v).replace(/"/g,'&quot;')+'"'+(multi?' data-multi="1"':'')+' onclick="_hcTap(this)">'+escapeHTML(label)+'</button>';
@@ -14728,7 +14728,10 @@ function _hcTap(el){
   st[g] = apaga ? null : v;
   var cont=el.parentNode; if(cont){ Array.prototype.forEach.call(cont.querySelectorAll('.hc-chip'), function(b){ b.classList.remove('on'); }); }
   if(!apaga) el.classList.add('on');
-  if(g==='zona'){ st.irrad=null; _hcRenderIrrad(); var ow=document.getElementById('hc-zona-otra-wrap'); if(ow) ow.style.display=(v==='otra')?'block':'none'; }
+  if(g==='zona'){ st.irrad=null; _hcRenderIrrad(); var ow=document.getElementById('hc-zona-otra-wrap'); if(ow) ow.style.display=(v==='otra')?'block':'none'; var iow=document.getElementById('hc-irrad-otra-wrap'); if(iow) iow.style.display='none'; }
+  // Campos que se revelan al elegir la opción "especifica": irradiación "Otra…" y fecha exacta.
+  if(g==='irrad'){ var iw=document.getElementById('hc-irrad-otra-wrap'); if(iw) iw.style.display=(st.irrad==='Otra…')?'block':'none'; }
+  if(g==='desde'){ var dw=document.getElementById('hc-desde-exacto-wrap'); if(dw) dw.style.display=(st.desde==='exacto')?'block':'none'; }
   if(typeof marcarDirty==='function') marcarDirty();
 }
 function _hcRenderZonas(){
@@ -14745,7 +14748,8 @@ function _hcRenderIrrad(){
   var wrap=document.getElementById('hc-irrad-wrap'); if(!wrap) return;
   var st=window._HC||{}, z=st.zona;
   if(!z || z==='otra'){ wrap.innerHTML='<div style="font-size:11.5px;color:var(--gray-400);padding:2px 0">Elige primero la zona.</div>'; return; }
-  var ops=_HC_IRRAD[z]||['No, local','Difuso'];
+  var ops=(_HC_IRRAD[z]||['No, local','Difuso']).slice();
+  if(ops.indexOf('Otra…')===-1) ops.push('Otra…');   // ninguna lista cubre todo → siempre "Otra…"
   wrap.innerHTML=ops.map(function(o){ return _hcChip('irrad',o,o,false); }).join('');
 }
 function _hcInit(){ try{ _hcRenderZonas(); _hcRenderSecundarias(); _hcRenderIrrad(); }catch(_e){ console.warn('[HC] init',_e&&_e.message); } }
@@ -14926,19 +14930,25 @@ function renderNuevoPaciente(){
       </div>
       <div class="hc-row">
         <div class="hc-q">¿Desde cuándo?</div>
-        <div class="hc-chips">${_hcChip('desde','hoy_semana','Hoy / esta semana',false)}${_hcChip('desde','1_4_sem','1–4 semanas',false)}${_hcChip('desde','1_3_meses','1–3 meses',false)}${_hcChip('desde','3_6_meses','3–6 meses',false)}${_hcChip('desde','mas_6_meses','Más de 6 meses',false)}</div>
+        <div class="hc-chips">${_hcChip('desde','hoy_semana','Hoy / esta semana',false)}${_hcChip('desde','1_4_sem','1–4 semanas',false)}${_hcChip('desde','1_3_meses','1–3 meses',false)}${_hcChip('desde','3_6_meses','3–6 meses',false)}${_hcChip('desde','mas_6_meses','Más de 6 meses',false)}${_hcChip('desde','exacto','Fecha o tiempo exacto…',false)}</div>
+        <div id="hc-desde-exacto-wrap" style="display:none;margin-top:7px"><input class="form-input" id="hc-desde-exacto" type="text" placeholder="Fecha o tiempo exacto (ej: cirugía 03/02/2026, trauma hace 9 días)"></div>
       </div>
       <div class="hc-row">
         <div class="hc-q">¿Se corre a otro lado? <span class="hint">· depende de la zona</span></div>
         <div class="hc-chips" id="hc-irrad-wrap"></div>
+        <div id="hc-irrad-otra-wrap" style="display:none;margin-top:7px"><input class="form-input" id="hc-irrad-otra" type="text" placeholder="¿A dónde se corre? (especifica el patrón)"></div>
       </div>
       <div class="hc-row">
-        <div class="hc-q">¿Cómo va? <span class="hint">· últimas 2 semanas</span></div>
-        <div class="hc-chips">${_hcChip('tray','mejorando','Mejorando',false)}${_hcChip('tray','igual','Igual',false)}${_hcChip('tray','empeorando','Empeorando',false)}${_hcChip('tray','fluctua','Va y viene',false)}</div>
+        <div class="hc-q">Evolución <span class="hint">· últimas 2 semanas</span></div>
+        <div class="hc-chips">${_hcChip('tray','mejorando','Mejorando',false)}${_hcChip('tray','igual','Igual',false)}${_hcChip('tray','empeorando','Empeorando',false)}</div>
       </div>
       <div class="hc-row">
-        <div class="hc-q">Irritabilidad <span class="opt">OPCIONAL</span> <span class="hint">· cuando se dispara, ¿cuánto tarda en calmarse?</span></div>
-        <div class="hc-chips">${_hcChip('irrit','segundos','Segundos / al parar',false)}${_hcChip('irrit','minutos','Unos minutos',false)}${_hcChip('irrit','horas','Horas',false)}${_hcChip('irrit','todo_dia','Todo el día',false)}</div>
+        <div class="hc-q">¿Cómo se comporta?</div>
+        <div class="hc-chips">${_hcChip('comp','constante','Constante',false)}${_hcChip('comp','intermitente','Intermitente (va y viene)',false)}</div>
+      </div>
+      <div class="hc-row">
+        <div class="hc-q">Irritabilidad <span class="opt">OPCIONAL</span> <span class="hint">· al provocarse, ¿cuánto tarda en ceder?</span></div>
+        <div class="hc-chips">${_hcChip('irrit','al_parar','Al parar / segundos',false)}${_hcChip('irrit','menos_30','Menos de 30 min',false)}${_hcChip('irrit','30_2h','Entre 30 min y 2 h',false)}${_hcChip('irrit','varias_horas','Varias horas',false)}${_hcChip('irrit','no_cede','No se calma por completo',false)}</div>
       </div>
       <div class="hc-row">
         <div class="hc-q">Otras zonas que también le molestan <span class="opt">OPCIONAL</span> <span class="hint">· solo etiqueta</span></div>
@@ -15075,12 +15085,14 @@ function guardarNuevoPaciente(){
   // Toques rápidos estructurados (historia híbrida Fase 1).
   const _hc = (window._HC || {});
   const _hcZonaOtra = (document.getElementById('hc-zona-otra')?.value||'').trim();
+  const _hcDesdeExacto = (document.getElementById('hc-desde-exacto')?.value||'').trim();
+  const _hcIrradOtra = (document.getElementById('hc-irrad-otra')?.value||'').trim();
   // Título del episodio: preferir ZONA (+lado +desde) estructurado; si no hay, 1ª línea del relato.
   let motivoConsulta=v('n-motivoconsulta');
   if(!motivoConsulta){
     const _zl = _hc.zona ? (_hc.zona==='otra' ? (_hcZonaOtra||'Otra zona') : _hcLabelZona(_hc.zona)) : '';
     const _ladoL = {izquierdo:'izq.',derecho:'der.',ambos:'bilateral',central:'central'}[_hc.lado]||'';
-    const _desdeL = {hoy_semana:'esta semana','1_4_sem':'1–4 sem','1_3_meses':'1–3 meses','3_6_meses':'3–6 meses',mas_6_meses:'+6 meses'}[_hc.desde]||'';
+    const _desdeL = (_hc.desde==='exacto') ? _hcDesdeExacto : ({hoy_semana:'esta semana','1_4_sem':'1–4 sem','1_3_meses':'1–3 meses','3_6_meses':'3–6 meses',mas_6_meses:'+6 meses'}[_hc.desde]||'');
     if(_zl){ motivoConsulta = _zl + (_ladoL?(' '+_ladoL):'') + (_desdeL?(' · '+_desdeL):''); }
     else if(padecimiento){ const _pl=String(padecimiento).split('\n')[0].trim(); motivoConsulta = _pl.length>90 ? (_pl.slice(0,90).replace(/\s+\S*$/,'')+'…') : _pl; }
   }
@@ -15150,8 +15162,11 @@ function guardarNuevoPaciente(){
       lado: _hc.lado||null,
       zonasSecundarias: Array.isArray(_hc.sec) ? _hc.sec.slice() : [],
       desdeCuando: _hc.desde||null,
+      desdeExacto: (_hc.desde==='exacto') ? (_hcDesdeExacto||null) : null,
       irradiacion: _hc.irrad||null,
+      irradiacionOtra: (_hc.irrad==='Otra…') ? (_hcIrradOtra||null) : null,
       trayectoria: _hc.tray||null,
+      comportamiento: _hc.comp||null,
       irritabilidad: _hc.irrit||null,
       capturadoEn: (typeof todayISO!=='undefined'?todayISO:''), version:1
     },
