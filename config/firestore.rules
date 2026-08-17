@@ -12,6 +12,8 @@ service cloud.firestore {
         'dulcesalazar_1799@hotmail.com'
       ];
     }
+    // OJO: este email tambien esta hardcodeado en el gate del front.
+    // Si cambia, hay que cambiarlo en LOS DOS lados.
     function isSupervisor() {
       return request.auth != null &&
              request.auth.token.email == 'lftaranda@gmail.com';
@@ -21,8 +23,6 @@ service cloud.firestore {
         .hasOnly(['id','appSourceId','name','nombreNormalizado','dxLive',
                   'terapeutaActualLive','ultimaSesionLive','tieneAppLive',
                   'origenLive','pidMatchType','updatedAt',
-                  // ── CAPA 3: set de fechas de todas las sesiones (arrayUnion) para que el
-                  // dashboard vea el historial completo del histórico, no solo la última.
                   'fechasSesiones']);
     }
     function pacienteEjerciciosUpdateOK() {
@@ -39,24 +39,26 @@ service cloud.firestore {
                   'altaClinica','revaloraciones','consentimientos',
                   'consentimientoDatos','consentimientoImagen','consentimientoWhatsApp',
                   'estudiosDocs','fotos','docs',
-                  // ── v12: campos de históricos (mig_pac_) que solo vivían en el iPad que
-                  // los editó y no viajaban a Firestore (auditoría "todo en la nube" 🔴P2).
                   'sexo','eventosAdversos','revalSolicitada','etiquetas','historialCambios',
-                  // ── FIX SYNC: 'inasistencias' (registro "No acudió") lo escribe outCl pero
-                  // faltaba en la whitelist → todo write de un paciente con inasistencias se
-                  // rechazaba con "Missing or insufficient permissions" (le pegaba a quien usa
-                  // "No acudió", p.ej. Jess: 30 cambios atorados). Agregado para que sí sincronice.
+                  // FIX SYNC: 'inasistencias' ("No acudio") lo escribe el front pero faltaba
+                  // aqui -> Firestore rechazaba con "Missing or insufficient permissions"
+                  // (le pegaba a quien usa "No acudio", p.ej. Jess: 30 cambios atorados).
                   'inasistencias',
                   'telefono','fechaNacimiento','medicoReferente','age',
                   'fechaCreacion','fechaInicio',
-                  // ── v12: _persistirDatosPaciente (LOOP E) escribe estos junto a name/age/telefono
-                  // en un solo set(merge); sin ellos hasOnly rechaza TODO el write (permission-denied).
                   'nombreNormalizado','terapeuta',
-                  // ── v14: rastro de recencia para detección de conflictos en históricos (LOOP B).
-                  // updatedAt = serverTimestamp del último write clínico; ultimoUsuario/fechaActualizacion =
-                  // quién y cuándo (legibles); ultimosCampos = qué campos escribió el último write — permite
-                  // que el aviso de conflicto diga "X tocó [campos]" en vez de avisar a ciegas.
                   'updatedAt','ultimoUsuario','fechaActualizacion','ultimosCampos']);
+    }
+    // Borrado LOGICO: solo el flag y su metadata. Cubre marcar Y restaurar.
+    function pacienteBorradoOK() {
+      return request.resource.data.diff(resource.data).affectedKeys()
+        .hasOnly(['eliminado','eliminadoPor','eliminadoFecha','eliminadoMotivo',
+                  'restauradoPor','restauradoFecha']);
+    }
+    function sesionBorradoOK() {
+      return request.resource.data.diff(resource.data).affectedKeys()
+        .hasOnly(['eliminado','eliminadoPor','eliminadoFecha','eliminadoMotivo',
+                  'restauradoPor','restauradoFecha']);
     }
     function sesionCreateOK() {
       return request.resource.data.keys().hasOnly([
@@ -70,7 +72,7 @@ service cloud.firestore {
         'indicacionesDomiciliarias','dictado','dictadoUnico','dictadoV2',
         'pacienteId','media','historialEdiciones',
         'motivoIndex','numEpisodio',
-        'atendidoPor'   // v12: quién atendió la sesión (no viajaba a subcolección de históricos)
+        'atendidoPor'
       ]);
     }
     function sesionUpdateOK() {
@@ -87,80 +89,56 @@ service cloud.firestore {
           'terapeutaEstado','terapeutaOriginal','motivosRevision',
           'imagenesPendientes','motivoImagenesPendientes','hashesImagenesPendientes',
           'textoOriginal','textoOriginalUrl',
-          'atendidoPor'   // v12: quién atendió la sesión (edición de nota histórica)
+          'atendidoPor'
         ]);
     }
-    // ── v8: asignaciones persistentes de agenda (LOOP S3) ──
-    // Doc id = nombre normalizado del calendario. Solo el supervisor asigna;
-    // todas las terapeutas pueden leer el mapa (lo usan pendientes y rendimiento).
     function asignacionAgendaOK() {
       return request.resource.data.keys().hasOnly([
         'nombreOriginal','terapeuta','asignadoPor','fechaAsignacion','updatedAt'
       ]);
     }
-    // ── v9: citas resueltas a mano (dashboard triangulación V2) ──
-    // Doc id = claveNorm + '__' + DD-MM-YYYY. Solo el supervisor resuelve;
-    // todas las terapeutas pueden leer (el dashboard las descuenta de 🔴).
     function citaResueltaOK() {
       return request.resource.data.keys().hasOnly([
         'fecha','claveNorm','resueltoPor','updatedAt'
       ]);
     }
-    // ── v13: vinculación permanente nombre-calendario → paciente (dashboard) ──
-    // Doc id = claveNorm (nombreNormalizado del nombre del calendario). Solo el
-    // supervisor vincula; todas las terapeutas leen (el resolver del dashboard la
-    // aplica antes del match automático). Reversible: overwrite o delete del doc.
     function citaVinculadaOK() {
       return request.resource.data.keys().hasOnly([
         'pid','tipo','nombreOriginal','vinculadoPor','fecha','updatedAt'
       ]);
     }
-    // ── BORRADO LÓGICO (papelera) ──
-    // Poner/quitar el tombstone eliminado:true — SOLO isSupervisor() (= lftaranda@gmail.com,
-    // punto ÚNICO de verdad del email en estas reglas). Whitelist estricta: SOLO los campos del
-    // borrado/restauración; ningún otro campo puede cambiar en el mismo write (no abre un update amplio).
-    // Cubre borrar (eliminado:true + eliminadoMotivo) y des-borrar (eliminado:false + restauradoPor/Fecha).
-    // Sincronizado con las reglas PUBLICADAS por Carlos: funciones separadas paciente/sesión + eliminadoMotivo.
-    function pacienteBorradoOK() {
-      return request.resource.data.diff(resource.data).affectedKeys()
-        .hasOnly(['eliminado','eliminadoPor','eliminadoFecha','eliminadoMotivo','restauradoPor','restauradoFecha']);
-    }
-    function sesionBorradoOK() {
-      return request.resource.data.diff(resource.data).affectedKeys()
-        .hasOnly(['eliminado','eliminadoPor','eliminadoFecha','eliminadoMotivo','restauradoPor','restauradoFecha']);
-    }
     match /pacientes/{pacienteId} {
       allow read: if isWriter();
       allow create: if isWriter();
       allow update: if (isWriter() && (
-                        pacienteLiveUpdateOK() ||
-                        pacienteEjerciciosUpdateOK() ||
-                        pacienteClinicoUpdateOK()
-                      ))
-                    || (isSupervisor() && pacienteBorradoOK());   // borrado/restauración: solo lftaranda
+        pacienteLiveUpdateOK() ||
+        pacienteEjerciciosUpdateOK() ||
+        pacienteClinicoUpdateOK()
+      )) || (isSupervisor() && pacienteBorradoOK());
+      // Queda abierto: _limpiarTodosLosTest borra docs de pacientes TEST en fisico.
+      // El front ya no tiene ningun otro camino de borrado fisico de datos clinicos.
+      // Cerrarlo requiere un campo durable esTest + backfill (entrega futura).
       allow delete: if isSupervisor();
     }
     match /pacientes/{pacienteId}/sesiones/{sesionId} {
       allow read: if isWriter();
       allow create: if isWriter() && sesionCreateOK();
       allow update: if (isWriter() && sesionUpdateOK())
-                    || (isSupervisor() && sesionBorradoOK());   // borrado/restauración de nota: solo lftaranda
-      allow delete: if isSupervisor();
+                    || (isSupervisor() && sesionBorradoOK());
+      // CERRADO: verificado cero rutas de borrado fisico de sesiones en el codigo.
+      // _limpiarTodosLosTest borra solo el doc padre, nunca la subcoleccion.
+      // Una nota clinica NO puede borrarse fisicamente (NOM-004), enforced por la DB.
+      allow delete: if false;
     }
-    // Backup clínico completo del contenido borrado (doc + sesiones) — SOLO lftaranda.
-    // Recursivo: cubre revision/{tipo}/{id}/{ts} y cualquier profundidad. Si falta, el backup
-    // falla y el flujo de borrado NO marca el tombstone (orden estricto).
+    // {document=**} para cubrir revision/{tipo}/{id}/{ts} (rutas anidadas).
     match /revision/{document=**} {
       allow read, write: if isSupervisor();
     }
-    // Papelera: índice de lo borrado para la vista de Papelera y la restauración. SOLO lftaranda.
-    // Allowlist explícita por email vía isSupervisor() (NO "writer excepto cfag1092").
+    // Papelera: entradas de lo borrado, para listar y restaurar desde la app.
     match /papelera/{document=**} {
-      allow read, create, delete: if isSupervisor();
+      allow read, write: if isSupervisor();
     }
-    // Set de borrados de ACTIVOS/notas (filtro lado-local). SHAPE distinta a papelera:
-    // TODAS las apps (terapeutas) deben LEER para filtrar; SOLO lftaranda escribe. Campo `tipo`
-    // ('pacienteActivo' | 'notaActiva') para que Entrega 4 reuse sin republicar reglas.
+    // Set de activos eliminados: TODAS las apps deben poder leerlo para filtrar.
     match /pacientesEliminados/{docId} {
       allow read: if isWriter();
       allow write: if isSupervisor();
@@ -180,10 +158,6 @@ service cloud.firestore {
       allow create, update: if isSupervisor() && citaVinculadaOK();
       allow delete: if isSupervisor();
     }
-    // ── v10: lectura por collection group de 'sesiones' (cola de revisión) ──
-    // Habilita collectionGroup('sesiones').where(...) para writers. NO amplía la
-    // audiencia: los writers ya pueden leer cada sesión por la ruta anidada de arriba.
-    // Solo lectura — los writes siguen exclusivamente por la ruta anidada con whitelists.
     match /{path=**}/sesiones/{sesionId} {
       allow read: if isWriter();
     }
