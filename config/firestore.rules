@@ -1,8 +1,13 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    // FIX IDENTIDAD (case-insensitive): la comparacion `in` es SENSIBLE a mayusculas y el
+    // token conserva el casing con que se creo la cuenta en Firebase Auth. Si un correo se
+    // registro con alguna mayuscula (p.ej. Jriveare2000@hotmail.com), isWriter daba FALSE solo
+    // para esa persona -> Firestore rechazaba TODAS sus escrituras (permission-denied) aunque
+    // las lecturas salieran del cache. Comparar en minusculas con .lower() lo vuelve robusto.
     function isWriter() {
-      return request.auth != null && request.auth.token.email in [
+      return request.auth != null && request.auth.token.email.lower() in [
         'lftaranda@gmail.com',
         'gutierrezgarciazaray96@gmail.com',
         'camislerma26@gmail.com',
@@ -16,7 +21,7 @@ service cloud.firestore {
     // Si cambia, hay que cambiarlo en LOS DOS lados.
     function isSupervisor() {
       return request.auth != null &&
-             request.auth.token.email == 'lftaranda@gmail.com';
+             request.auth.token.email.lower() == 'lftaranda@gmail.com';
     }
     function pacienteLiveUpdateOK() {
       return request.resource.data.diff(resource.data).affectedKeys()
