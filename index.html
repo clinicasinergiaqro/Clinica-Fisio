@@ -14698,21 +14698,24 @@ var _HC_ZONAS = [
 // Zonas mostradas como chips rápidos; el resto entra por "Otra…". (Ajustable sin tocar lógica.)
 var _HC_ZONAS_COMUNES = ['cuello','dorsal','lumbar','hombro','cadera','rodilla','tobillo_pie'];
 // Irradiación DEPENDIENTE de la zona: nunca ofrecer "hasta el pie" a un cuello, etc. (config, no disperso)
+// AUDITORÍA CLÍNICA 2026-08: cada zona con su patrón de irradiación/referido REAL
+// (antes eran 4 plantillas genéricas copiadas; cadera heredaba el patrón ciático lumbar, etc.).
 var _HC_IRRAD = {
-  lumbar:['No, local','Al glúteo','Muslo posterior','Hasta la rodilla','Hasta el pie'],
-  cadera:['No, local','Al glúteo','Muslo posterior','Hasta la rodilla','Hasta el pie'],
-  ingle:['No, local','Al glúteo','Muslo posterior','Hasta la rodilla','Hasta el pie'],
-  muslo:['No, local','Al glúteo','Muslo posterior','Hasta la rodilla','Hasta el pie'],
-  pierna:['No, local','Al glúteo','Muslo posterior','Hasta la rodilla','Hasta el pie'],
-  cuello:['No, local','Al hombro','Baja por el brazo','Hasta la mano/dedos'],
-  dorsal:['No, local','Al hombro','Baja por el brazo','Hasta la mano/dedos'],
-  hombro:['No, local','Baja al brazo','Hasta el codo'],
-  codo:['No, local','Sube al antebrazo/codo','A los dedos'],
-  antebrazo:['No, local','Sube al antebrazo/codo','A los dedos'],
-  muneca_mano:['No, local','Sube al antebrazo/codo','A los dedos'],
-  rodilla:['No, local','Sube al muslo','Baja al pie/dedos'],
-  tobillo_pie:['No, local','Sube al muslo','Baja al pie/dedos'],
-  cabeza_mandibula:['No, local','Difuso / varias zonas']
+  lumbar:['No, local','Al glúteo','Cara posterior del muslo','Hasta la rodilla','Hasta el pie/dedos'],
+  cadera:['No, local','A la ingle','Cara anterior del muslo','A la rodilla','Cara lateral (trocánter)'],
+  ingle:['No, local','Cara interna del muslo (aductores)','A la cadera','Al pubis / abdomen bajo'],
+  muslo:['No, local','Cara anterior (cuádriceps)','Cara posterior (isquios)','A la rodilla','A la cadera'],
+  pierna:['No, local','A la pantorrilla','Baja al tobillo/pie','Sube a la rodilla'],
+  cuello:['No, local','A la cabeza/nuca','Al trapecio/escápula','Al hombro','Baja por el brazo','Hasta la mano/dedos'],
+  dorsal:['No, local','Contornea la costilla (intercostal)','Entre las escápulas','Al pecho'],
+  hombro:['No, local','Cara lateral (deltoides)','Baja al brazo (hasta el codo)','Viene del cuello'],
+  brazo:['No, local','Sube al hombro','Baja al codo/antebrazo','A la mano/dedos'],
+  codo:['No, local','Baja al antebrazo','A la mano/dedos','Sube al brazo'],
+  antebrazo:['No, local','A la mano/dedos','Sube al codo'],
+  muneca_mano:['No, local','A los dedos (pulgar-índice-medio)','A los dedos (anular-meñique)','Sube al antebrazo'],
+  rodilla:['No, local','Cara anterior / rótula','Parte posterior (hueco poplíteo)','Baja a la pierna','Viene de la cadera'],
+  tobillo_pie:['No, local','A los dedos','Al talón','Sube a la pantorrilla'],
+  cabeza_mandibula:['No, local','A la sien / temporal','Al oído','A la mandíbula (ATM)','A la nuca / cuello']
 };
 function _hcLabelZona(v){ for(var i=0;i<_HC_ZONAS.length;i++){ if(_HC_ZONAS[i][0]===v) return _HC_ZONAS[i][1]; } return v==='otra'?'Otra':''; }
 function _hcReset(){ window._HC = {zona:null,zonaOtra:'',lado:null,sec:[],desde:null,irrad:null,tray:null,comp:null,irrit:null}; }
