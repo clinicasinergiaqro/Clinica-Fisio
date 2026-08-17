@@ -73,7 +73,9 @@
     recording:false,         // grabando en vivo
     procesandoVideo:false,   // analizando archivo
     cancelVideo:false,
-    acc:null,                // acumulador de mín/máx
+    acc:null,                // acumulador de mín/máx (ROM)
+    accS:null,               // acumulador de sentadilla (Fase 2)
+    tipoMedicion:'rom',      // 'rom' | 'sent' (sentadilla frontal); se recuerda entre aperturas
     framesTotales:0,
     tStart:0,                // Date.now() al iniciar grabación
     rafId:null, timerId:null, sending:false
@@ -213,24 +215,31 @@
   // Detecta los picos (tope de cada repetición) en una serie {i,v} con histéresis adaptativa y
   // separación por hueco temporal (frames sin muestra = el brazo fue a otra dirección o al neutro).
   // Un frame ruidoso suelto NO crea un pico falso. Devuelve el arreglo de valores de pico.
-  function _detPicos(serie, minPico, gap){
+  // Versión con ÍNDICES: devuelve [{v, i, k, kIni, kFin}] (pico + frame del pico + ventana de la
+  // repetición dentro de la serie). La sentadilla la usa para leer métricas por repetición.
+  function _detPicosIdx(serie, minPico, gap){
     var out=[]; if(!serie || !serie.length) return out;
     var srt=serie.map(function(s){return s.v;}).sort(function(a,b){return a-b;}), n=srt.length;
     var vlo=srt[Math.floor(0.05*(n-1))], vhi=srt[Math.floor(0.95*(n-1))];   // rango ROBUSTO (un frame atípico no lo infla)
     var rango=vhi-vlo;
-    if(rango<8){ if(vhi>=minPico) out.push(vhi); return out; }   // casi plano ⇒ un solo pico
+    if(rango<8){
+      if(vhi>=minPico){ var kM=0; for(var q=1;q<serie.length;q++){ if(serie[q].v>serie[kM].v) kM=q; } out.push({v:vhi, i:serie[kM].i, k:kM, kIni:0, kFin:serie.length-1}); }
+      return out;   // casi plano ⇒ un solo pico
+    }
     var enter=vlo+0.55*rango, exit=vlo+0.30*rango;
-    var enRep=false, pico=-Infinity, dwell=0, lastI=null, MINDWELL=3;   // dwell rechaza chispazos de 1–2 frames
+    var enRep=false, pico=-Infinity, kPico=-1, kIni=-1, dwell=0, lastI=null, MINDWELL=3;   // dwell rechaza chispazos de 1–2 frames
+    function cierra(kFin){ if(pico>=minPico && dwell>=MINDWELL) out.push({v:pico, i:serie[kPico].i, k:kPico, kIni:kIni, kFin:kFin}); enRep=false; pico=-Infinity; kPico=-1; kIni=-1; dwell=0; }
     for(var k=0;k<serie.length;k++){
       var s=serie[k], v=s.v, i=s.i;
-      if(enRep && lastI!=null && (i-lastI)>gap){ if(pico>=minPico && dwell>=MINDWELL) out.push(pico); enRep=false; pico=-Infinity; dwell=0; }
+      if(enRep && lastI!=null && (i-lastI)>gap) cierra(k-1);
       lastI=i;
-      if(!enRep){ if(v>=enter){ enRep=true; pico=v; dwell=1; } }
-      else { dwell++; if(v>pico) pico=v; if(v<=exit){ if(pico>=minPico && dwell>=MINDWELL) out.push(pico); enRep=false; pico=-Infinity; dwell=0; } }
+      if(!enRep){ if(v>=enter){ enRep=true; pico=v; kPico=k; kIni=k; dwell=1; } }
+      else { dwell++; if(v>pico){ pico=v; kPico=k; } if(v<=exit) cierra(k); }
     }
-    if(enRep && pico>=minPico && dwell>=MINDWELL) out.push(pico);
+    if(enRep) cierra(serie.length-1);
     return out;
   }
+  function _detPicos(serie, minPico, gap){ return _detPicosIdx(serie, minPico, gap).map(function(r){ return r.v; }); }
   function _percentil(serie, q){                    // percentil robusto (0..1) de los valores
     if(!serie || !serie.length) return null;
     var a=serie.map(function(s){return s.v;}).sort(function(x,y){return x-y;});
@@ -241,6 +250,30 @@
     if(arr.length<2) return null; var m=_media(arr), t=0,i;
     for(i=0;i<arr.length;i++){ var d=arr[i]-m; t+=d*d; } return Math.sqrt(t/(arr.length-1));
   }
+  function _mediana(arr){ if(!arr||!arr.length) return null; var a=arr.slice().sort(function(x,y){return x-y;}); return a[Math.floor(a.length/2)]; }
+  // Filtro de MEDIANA de 5 muestras sobre una serie {i,v}: mata chispazos de 1–2 frames en el origen.
+  function _medFilt5(serie){
+    if(!serie || serie.length<5) return (serie||[]).slice();
+    var out=new Array(serie.length);
+    for(var k=0;k<serie.length;k++){
+      var a=Math.max(0,k-2), b=Math.min(serie.length-1,k+2), w=[];
+      for(var q=a;q<=b;q++) w.push(serie[q].v);
+      w.sort(function(x,y){return x-y;});
+      out[k]={i:serie[k].i, v:w[Math.floor(w.length/2)]};
+    }
+    return out;
+  }
+  function _r1(v){ return v==null?null:Math.round(v*10)/10; }
+  function _r2(v){ return v==null?null:Math.round(v*100)/100; }
+  // Ángulo interior 2D (grados) en el vértice b, SOLO plano de la imagen (para proyecciones frontales).
+  function _ang2D(a,b,c){
+    var v1x=a.x-b.x, v1y=a.y-b.y, v2x=c.x-b.x, v2y=c.y-b.y;
+    var m1=Math.hypot(v1x,v1y), m2=Math.hypot(v2x,v2y);
+    if(!m1||!m2) return 0;
+    var cos=(v1x*v2x+v1y*v2y)/(m1*m2); if(cos>1)cos=1; if(cos<-1)cos=-1;
+    return Math.acos(cos)*180/Math.PI;
+  }
+  function _dist2D(a,b){ return Math.hypot(a.x-b.x, a.y-b.y); }
   // Resume cada movimiento como la MEDIA de los picos de sus repeticiones (más reproducible que un
   // máximo suelto y robusto al ruido). Codo añade extensión (mínimo robusto). Mantiene min/max/rango
   // por compatibilidad con el render/PDF y con sesiones ya guardadas.
@@ -267,10 +300,174 @@
   }
   function medidasPorKey(medidas){ var o={}; (medidas||[]).forEach(function(x){ o[x.key]=x; }); return o; }
 
+  // ═════════════ FASE 2A — SENTADILLA (análisis FRONTAL) ═════════════
+  // Métricas por frame desde los landmarks 2D de IMAGEN (el FPPA es un ángulo de PROYECCIÓN,
+  // por definición se calcula en el plano de la imagen, no con el mundo 3D):
+  //  - FPPA con signo por pierna (+ = rodilla hacia MEDIAL / valgo; − = varo). Se reporta a MEDIA
+  //    BAJADA (~50% del descenso): en el fondo con muslo horizontal la proyección degenera y la
+  //    literatura lo valida a ~45–60° de flexión, no en el fondo.
+  //  - MKD: desplazamiento medial de la rodilla respecto a la línea cadera–tobillo, en % del ancho
+  //    de pelvis (robusto en el fondo, donde el FPPA ya no sirve).
+  //  - Ratio de separación rodillas/tobillos (adimensional; <1 = rodillas hacia adentro).
+  //  - Inclinación LATERAL de tronco (frontal) y descenso del sacro (punto medio de caderas) en
+  //    % de estatura (y cm si hay estatura del paciente; proxy nariz→tobillos ≈ 88% de estatura).
+  var SENT_MIN_DESC = 10;   // % de estatura de descenso mínimo para contar una repetición
+
+  function calcularSentFrontal(lm){
+    if(!lm) return null;
+    function vis(i){ return _vis(lm,i); }
+    var piernasOK = vis(23)&&vis(24)&&vis(25)&&vis(26)&&vis(27)&&vis(28);
+    var troncoOK  = vis(11)&&vis(12)&&vis(23)&&vis(24);
+    var out={ piernasOK:piernasOK, troncoOK:troncoOK, ok:(piernasOK||troncoOK),
+      fppaIzq:{val:null,ok:false}, fppaDer:{val:null,ok:false}, mkdIzq:{val:null,ok:false}, mkdDer:{val:null,ok:false},
+      sepRatio:{val:null,ok:false}, troncoLat:{val:null,ok:false}, sacro:{ok:false}, alturaPx:null, orientFrontal:null };
+    var midHip=(vis(23)&&vis(24))?{x:(lm[23].x+lm[24].x)/2, y:(lm[23].y+lm[24].y)/2}:null;
+    var midSh =(vis(11)&&vis(12))?{x:(lm[11].x+lm[12].x)/2, y:(lm[11].y+lm[12].y)/2}:null;
+    var midAnk=(vis(27)&&vis(28))?{x:(lm[27].x+lm[28].x)/2, y:(lm[27].y+lm[28].y)/2}:null;
+    // Orientación: ancho proyectado (hombros+caderas) vs alto del tronco. De frente ≈ ≥0.45.
+    if(midSh && midHip){
+      var ancho=(Math.abs(lm[11].x-lm[12].x)+Math.abs(lm[23].x-lm[24].x))/2;
+      var alto=Math.abs(midSh.y-midHip.y)||1e-6;
+      out.orientFrontal=(ancho/alto)>=0.45;
+    }
+    // Pierna en frontal: FPPA con signo + MKD (% ancho pelvis). midX = línea media del cuerpo.
+    var anchoPelvis = (vis(23)&&vis(24)) ? Math.abs(lm[23].x-lm[24].x) : null;
+    function pierna(hip,knee,ank,midX){
+      var interior=_ang2D(hip,knee,ank), mag=180-interior;
+      var dy=(ank.y-hip.y);
+      var t=Math.abs(dy)<1e-6 ? 0.5 : (knee.y-hip.y)/dy;
+      var xLine=hip.x+(ank.x-hip.x)*t;                    // punto de la línea cadera–tobillo a la altura de la rodilla
+      var dirMedial=(midX-xLine)>=0?1:-1;                 // hacia la línea media del cuerpo
+      var despl=(knee.x-xLine)*dirMedial;                 // + = rodilla medial
+      var signo=despl>=0?1:-1;
+      return { fppa:mag*signo, mkdPct:(anchoPelvis&&anchoPelvis>0.01)?(despl/anchoPelvis*100):null };
+    }
+    if(midHip){
+      if(vis(23)&&vis(25)&&vis(27)){ var pi=pierna(lm[23],lm[25],lm[27],midHip.x); out.fppaIzq={val:pi.fppa,ok:true}; if(pi.mkdPct!=null) out.mkdIzq={val:pi.mkdPct,ok:true}; }
+      if(vis(24)&&vis(26)&&vis(28)){ var pd=pierna(lm[24],lm[26],lm[28],midHip.x); out.fppaDer={val:pd.fppa,ok:true}; if(pd.mkdPct!=null) out.mkdDer={val:pd.mkdPct,ok:true}; }
+    }
+    if(vis(25)&&vis(26)&&vis(27)&&vis(28)){
+      var dA=_dist2D(lm[27],lm[28]);
+      if(dA>0.01) out.sepRatio={val:_dist2D(lm[25],lm[26])/dA, ok:true};
+    }
+    if(midSh && midHip){
+      var dx=midSh.x-midHip.x, dyT=midHip.y-midSh.y;
+      if(dyT>1e-6) out.troncoLat={val:Math.atan2(dx,dyT)*180/Math.PI, ok:true};   // + = hacia un lado de la imagen
+    }
+    if(midHip) out.sacro={x:midHip.x, y:midHip.y, ok:true};
+    if(midAnk && vis(0)) out.alturaPx=Math.abs(midAnk.y-lm[0].y);   // proxy nariz→tobillos
+    out.midAnk=midAnk;
+    out.p={ sacro:midHip, rodillaIzq:vis(25)?lm[25]:null, rodillaDer:vis(26)?lm[26]:null,
+            caderaIzq:vis(23)?lm[23]:null, caderaDer:vis(24)?lm[24]:null,
+            tobilloIzq:vis(27)?lm[27]:null, tobilloDer:vis(28)?lm[28]:null };
+    return out;
+  }
+
+  function nuevoAccSent(){
+    return { frames:0, framesValidos:0, _frame:0,
+      s:{ sacroY:[], sacroX:[], fppaIzq:[], fppaDer:[], mkdIzq:[], mkdDer:[], sepRatio:[], troncoLat:[], alturaPx:[] },
+      visPiernas:0, visTronco:0, orientFrontalN:0, orientN:0,
+      tray:{ sacro:[], rodillaIzq:[], rodillaDer:[], caderaIzq:[], caderaDer:[], tobilloIzq:[], tobilloDer:[] },
+      anclas:[] };
+  }
+  function _pushS(arr,i,v){ if(arr.length<4000) arr.push({i:i,v:v}); }
+  function acumularSent(acc,f){
+    if(!acc||!f) return;
+    acc._frame++; acc.frames++;
+    if(f.piernasOK) acc.visPiernas++;
+    if(f.troncoOK) acc.visTronco++;
+    if(f.orientFrontal!=null){ acc.orientN++; if(f.orientFrontal) acc.orientFrontalN++; }
+    var i=acc._frame, alguno=false;
+    if(f.sacro.ok){ _pushS(acc.s.sacroY,i,f.sacro.y); _pushS(acc.s.sacroX,i,f.sacro.x); alguno=true; }
+    if(f.fppaIzq.ok) _pushS(acc.s.fppaIzq,i,f.fppaIzq.val);
+    if(f.fppaDer.ok) _pushS(acc.s.fppaDer,i,f.fppaDer.val);
+    if(f.mkdIzq.ok) _pushS(acc.s.mkdIzq,i,f.mkdIzq.val);
+    if(f.mkdDer.ok) _pushS(acc.s.mkdDer,i,f.mkdDer.val);
+    if(f.sepRatio.ok) _pushS(acc.s.sepRatio,i,f.sepRatio.val);
+    if(f.troncoLat.ok) _pushS(acc.s.troncoLat,i,f.troncoLat.val);
+    if(f.alturaPx!=null) _pushS(acc.s.alturaPx,i,f.alturaPx);
+    if(f.midAnk && acc.anclas.length<4000) acc.anclas.push({x:f.midAnk.x,y:f.midAnk.y});
+    if(alguno) acc.framesValidos++;
+    var T=acc.tray, P=f.p||{};
+    for(var k in T){ var pt=P[k]; if(pt && T[k].length<3600) T[k].push([Math.round(pt.x*1000), Math.round(pt.y*1000)]); }
+  }
+
+  // Cierra la toma frontal: detecta repeticiones por el descenso del sacro y lee cada métrica
+  // POR REPETICIÓN (FPPA a media bajada; MKD/separación/tronco en el fondo). Con control de calidad:
+  // visibilidad, orientación y cámara movida → 'confiable' por medida, nunca un número sin respaldo.
+  function finalizarSent(acc, estaturaCm){
+    var out={ nReps:0, medidas:[], porRep:[], calidad:{framesValidos:0}, calibracion:{estaturaCm:estaturaCm||null} };
+    if(!acc) return out;
+    var visPct = acc.frames ? Math.round(acc.visPiernas/acc.frames*100) : 0;
+    var visPctTronco = acc.frames ? Math.round(acc.visTronco/acc.frames*100) : 0;
+    var orientOK = acc.orientN ? (acc.orientFrontalN/acc.orientN)>=0.7 : null;
+    var camMov=false;
+    if(acc.anclas.length>20){   // ancla natural: pies plantados → si los tobillos derivan, se movió la cámara
+      var xs=acc.anclas.map(function(a){return a.x;}).sort(function(a,b){return a-b;});
+      var ys=acc.anclas.map(function(a){return a.y;}).sort(function(a,b){return a-b;});
+      var nn=xs.length, sp=function(arr){ return arr[Math.floor(0.975*(nn-1))]-arr[Math.floor(0.025*(nn-1))]; };
+      camMov=(sp(xs)>0.06 || sp(ys)>0.06);
+    }
+    out.calidad={ framesValidos:acc.framesValidos, frames:acc.frames, visPctPiernas:visPct, visPctTronco:visPctTronco, orientacionOK:orientOK, camaraMovida:camMov };
+    var sacY=_medFilt5(acc.s.sacroY);
+    if(sacY.length<12) return out;
+    var hs=acc.s.alturaPx.map(function(s){return s.v;}).sort(function(a,b){return a-b;});
+    var hPx=hs.length?hs[Math.floor(0.90*(hs.length-1))]:null;   // p90 = fase DE PIE (agachado se ve más bajo); p90, no máx, contra chispazos
+    var hEst=hPx?hPx/0.88:null;                        // px de estatura (proxy nariz→tobillos ≈88%)
+    if(!hEst) return out;
+    var ys2=sacY.map(function(s){return s.v;}).sort(function(a,b){return a-b;});
+    var yBase=ys2[Math.floor(0.05*(ys2.length-1))];    // de pie = sacro en su punto más alto (y mínima)
+    var desc=sacY.map(function(s){ return {i:s.i, v:Math.max(0,(s.v-yBase)/hEst*100)}; });
+    var reps=_detPicosIdx(desc, SENT_MIN_DESC, 8);
+    out.nReps=reps.length;
+    var fIzq=_medFilt5(acc.s.fppaIzq), fDer=_medFilt5(acc.s.fppaDer);
+    var mIzq=_medFilt5(acc.s.mkdIzq), mDer=_medFilt5(acc.s.mkdDer);
+    var sep=_medFilt5(acc.s.sepRatio), tro=_medFilt5(acc.s.troncoLat);
+    function cerca(serie,iF){ if(iF==null) return null; var vals=[]; for(var k=0;k<serie.length;k++){ if(Math.abs(serie[k].i-iF)<=3) vals.push(serie[k].v); } return _mediana(vals); }
+    reps.forEach(function(r,ix){
+      // Frame a media BAJADA: retrocede desde el fondo hasta donde el descenso cae bajo el 50%
+      // (no usar kIni: es la entrada de la histéresis al 55%, sesgaría el FPPA hacia el fondo).
+      // Si la grabación EMPEZÓ ya abajo (rep parcial sin cruce del 50%), el FPPA de esa rep se
+      // marca nulo en vez de leerse en zona degenerada (muslo horizontal → proyección inflada).
+      var half=0.5*r.v, kM=r.k;
+      while(kM>0 && desc[kM-1].v>=half) kM--;
+      var iMedia=(kM===0 && desc[0].v>=half) ? null : desc[kM].i;
+      out.porRep.push({ n:ix+1, frameFondo:r.i,
+        fppaIzq:_r1(cerca(fIzq,iMedia)), fppaDer:_r1(cerca(fDer,iMedia)),
+        mkdIzq:_r1(cerca(mIzq,r.i)), mkdDer:_r1(cerca(mDer,r.i)),
+        sepRatio:_r2(cerca(sep,r.i)), troncoLat:_r1(cerca(tro,r.i)),
+        descPct:Math.round(r.v), descCm:(estaturaCm?_r1(r.v*estaturaCm/100):null) });
+    });
+    function agrega(key,grupo,mov,lado,unidad,vals,extremoFn,visOk,muestras){
+      var v=vals.filter(function(x){return x!=null;});
+      var conf=!!(visOk && v.length>=1 && muestras>=12 && out.nReps>=1 && orientOK!==false && !camMov);
+      out.medidas.push({ key:key, grupo:grupo, mov:mov, lado:lado, vista:'frontal', unidad:unidad,
+        media:(v.length?_r1(_media(v)):null), extremo:(v.length?_r1(extremoFn(v)):null),
+        de:(v.length>=2?_r1(_desv(v)):null), reps:v.length, confiable:conf, visPct:(lado==='—'&&grupo==='Tronco')?visPctTronco:visPct, muestras:muestras });
+    }
+    var vMax=function(v){return Math.max.apply(null,v);}, vMin=function(v){return Math.min.apply(null,v);};
+    agrega('fppa_izq','Rodilla','Valgo dinámico FPPA (media bajada)','Izq','°', out.porRep.map(function(p){return p.fppaIzq;}), vMax, visPct>=60, acc.s.fppaIzq.length);
+    agrega('fppa_der','Rodilla','Valgo dinámico FPPA (media bajada)','Der','°', out.porRep.map(function(p){return p.fppaDer;}), vMax, visPct>=60, acc.s.fppaDer.length);
+    agrega('mkd_izq','Rodilla','Desplaz. medial en fondo (MKD)','Izq','%pelvis', out.porRep.map(function(p){return p.mkdIzq;}), vMax, visPct>=60, acc.s.mkdIzq.length);
+    agrega('mkd_der','Rodilla','Desplaz. medial en fondo (MKD)','Der','%pelvis', out.porRep.map(function(p){return p.mkdDer;}), vMax, visPct>=60, acc.s.mkdDer.length);
+    agrega('sep_rodillas','Rodilla','Separación rodillas/tobillos (fondo)','—','ratio', out.porRep.map(function(p){return p.sepRatio;}), vMin, visPct>=60, acc.s.sepRatio.length);
+    agrega('tronco_lateral','Tronco','Inclinación lateral (fondo)','—','°', out.porRep.map(function(p){return p.troncoLat==null?null:Math.abs(p.troncoLat);}), vMax, visPctTronco>=60, acc.s.troncoLat.length);
+    agrega('sacro_descenso','Pelvis','Descenso del sacro','—','%', out.porRep.map(function(p){return p.descPct;}), vMax, visPct>=60, sacY.length);
+    return out;
+  }
+  // ═════════════ fin núcleo sentadilla ═════════════
+
   // ── Callback único de resultados de MediaPipe ──────────────────────────────
   function onResults(res){
     var lm = res && res.poseLandmarks;
     var world = res && res.poseWorldLandmarks;
+    if(BIO.tipoMedicion==='sent'){
+      var f = lm ? calcularSentFrontal(lm) : null;
+      if(f && (BIO.recording || BIO.procesandoVideo)) acumularSent(BIO.accS, f);
+      if(BIO.canvas && BIO.srcEl){ dibujar(lm, null); dibujarSentVivo(f); }
+      if(BIO.modo==='camara'){ actualizarPanelSent(f); actualizarGateSent(lm, f); }
+      return;
+    }
     var ang = (lm && world) ? calcularAngulos(world, lm) : null;
     if(ang && (BIO.recording || BIO.procesandoVideo)) acumular(BIO.acc, ang);
     if(BIO.canvas && BIO.srcEl) dibujar(lm, ang);
@@ -341,6 +538,9 @@
       '.bio-modo-btn{width:100%;max-width:360px;border:none;border-radius:16px;padding:20px;font-size:17px;font-weight:800;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px}',
       '.bio-modo-cam{background:#C9A84C;color:#122950}',
       '.bio-modo-vid{background:rgba(255,255,255,.1);color:#fff;border:1.5px solid rgba(255,255,255,.25)}',
+      '.bio-tipo-row{display:flex;gap:8px;width:100%;max-width:360px}',
+      '.bio-tipo-btn{flex:1;border:1.5px solid rgba(255,255,255,.25);background:rgba(255,255,255,.06);color:#9BA3B5;border-radius:12px;padding:11px 8px;font-size:14px;font-weight:800;cursor:pointer;font-family:inherit}',
+      '.bio-tipo-btn.on{background:#1d3b6e;color:#fff;border-color:#C9A84C}',
       '.bio-canvas-wrap{position:relative;width:100%;flex:1;min-height:0;background:#000;display:flex;align-items:center;justify-content:center;overflow:hidden}',
       '#bio-cam-src{position:absolute;left:0;top:0;width:100%;height:100%;object-fit:contain;background:#000}',
       '#bio-canvas{position:absolute;left:0;top:0;width:100%;height:100%;object-fit:contain;display:block}',
@@ -383,8 +583,15 @@
       '<div class="bio-top"><b>🦴 Medición biomecánica — ROM</b><button class="bio-x" id="bio-cerrar">×</button></div>'
       // Vista inicio: elección de modo
       + '<div class="bio-vista bio-inicio on" id="bio-vista-inicio">'
-      +   '<div style="font-size:40px">🦴</div>'
-      +   '<p>Mide los rangos articulares (codo, hombro, cadera y rodilla). Elige cómo capturar el movimiento.</p>'
+      +   '<div style="font-size:40px" id="bio-ini-icono">🦴</div>'
+      +   '<div class="bio-tipo-row">'
+      +     '<button class="bio-tipo-btn on" id="bio-tipo-rom">🦴 ROM brazos</button>'
+      +     '<button class="bio-tipo-btn" id="bio-tipo-sent">🏋️ Sentadilla</button>'
+      +   '</div>'
+      +   '<p id="bio-ini-desc">Mide los rangos articulares de codo y hombro. Elige cómo capturar el movimiento.</p>'
+      +   '<div id="bio-est-wrap" style="display:none;width:100%;max-width:360px">'
+      +     '<input type="number" id="bio-estatura" inputmode="numeric" min="80" max="230" placeholder="Estatura del paciente en cm (opcional)" style="width:100%;box-sizing:border-box;border:1.5px solid rgba(255,255,255,.25);background:rgba(255,255,255,.08);color:#fff;border-radius:12px;padding:12px;font-size:14px;font-family:inherit">'
+      +   '</div>'
       +   '<button class="bio-modo-btn bio-modo-cam" id="bio-go-cam">▶️ Cámara en vivo</button>'
       +   '<button class="bio-modo-btn bio-modo-vid" id="bio-go-vid">📁 Subir video</button>'
       +   '<input type="file" id="bio-file" accept="video/*" style="display:none">'
@@ -414,6 +621,8 @@
     document.body.appendChild(ov);
 
     document.getElementById('bio-cerrar').addEventListener('click', cerrarMedidor);
+    document.getElementById('bio-tipo-rom').addEventListener('click', function(){ aplicarTipoMedicion('rom'); });
+    document.getElementById('bio-tipo-sent').addEventListener('click', function(){ aplicarTipoMedicion('sent'); });
     document.getElementById('bio-go-cam').addEventListener('click', iniciarCamara);
     document.getElementById('bio-go-vid').addEventListener('click', function(){ document.getElementById('bio-file').click(); });
     document.getElementById('bio-file').addEventListener('change', function(ev){
@@ -437,12 +646,38 @@
     if(!pid){ toast('Abre un expediente primero','warning'); return; }
     construirOverlay();
     resetEstado();
+    aplicarTipoMedicion(BIO.tipoMedicion||'rom');
+    // Precargar estatura desde la última sentadilla guardada de ESTE paciente (si la hubo).
+    var est=document.getElementById('bio-estatura');
+    if(est){
+      var ult=(currentPatient.biomecanica||[]).slice().reverse().find(function(s){ return s && s.tipo==='sentadilla' && s.calibracion && s.calibracion.estaturaCm; });
+      est.value = ult ? ult.calibracion.estaturaCm : '';
+    }
     mostrarVista('bio-vista-inicio');
     document.getElementById('bio-overlay').style.display='flex';
   }
+  // Selector de tipo de medición en la vista de inicio (ROM de brazos vs sentadilla frontal).
+  function aplicarTipoMedicion(t){
+    BIO.tipoMedicion = (t==='sent') ? 'sent' : 'rom';
+    var bR=document.getElementById('bio-tipo-rom'), bS=document.getElementById('bio-tipo-sent');
+    if(bR) bR.classList.toggle('on', BIO.tipoMedicion==='rom');
+    if(bS) bS.classList.toggle('on', BIO.tipoMedicion==='sent');
+    var ic=document.getElementById('bio-ini-icono'); if(ic) ic.textContent = BIO.tipoMedicion==='sent' ? '🏋️' : '🦴';
+    var ew=document.getElementById('bio-est-wrap'); if(ew) ew.style.display = BIO.tipoMedicion==='sent' ? 'block' : 'none';
+    var de=document.getElementById('bio-ini-desc');
+    if(de) de.textContent = BIO.tipoMedicion==='sent'
+      ? 'Análisis FRONTAL de sentadilla: valgo dinámico (FPPA), desplazamiento medial de rodilla, separación y descenso. Paciente DE FRENTE, cuerpo completo, 3 a 5 sentadillas.'
+      : 'Mide los rangos articulares de codo y hombro. Elige cómo capturar el movimiento.';
+    var tt=document.querySelector('#bio-overlay .bio-top b');
+    if(tt) tt.textContent = BIO.tipoMedicion==='sent' ? '🏋️ Sentadilla — análisis frontal' : '🦴 Medición biomecánica — ROM';
+  }
+  function _leerEstatura(){
+    var el=document.getElementById('bio-estatura'); var v=el?parseFloat(el.value):NaN;
+    return (isFinite(v) && v>=80 && v<=230) ? v : null;
+  }
   function resetEstado(){
     BIO.modo=null; BIO.recording=false; BIO.procesandoVideo=false; BIO.cancelVideo=false; BIO.finalizando=false;
-    BIO.acc=null; BIO.framesTotales=0; BIO.srcEl=null; BIO.sending=false;
+    BIO.acc=null; BIO.accS=null; BIO.framesTotales=0; BIO.srcEl=null; BIO.sending=false;
     BIO.facing='environment';           // cada medición arranca con la cámara TRASERA
     detenerGrabadorVideo(); BIO.pendingVideo=null;
     detenerLoopCamara(); pararCronometro();
@@ -475,15 +710,17 @@
     var _bf=document.getElementById('bio-btn-flip'); if(_bf) _bf.disabled=false;
     var _cr=document.getElementById('bio-cron'); if(_cr){ _cr.style.display='none'; _cr.textContent='00:00'; }
     BIO.canvas=document.getElementById('bio-canvas'); BIO.ctx=BIO.canvas.getContext('2d');
-    pintarPanelVivo(null);
+    if(BIO.tipoMedicion==='sent') pintarPanelSent(null); else pintarPanelVivo(null);
     var estado=document.getElementById('bio-estado');
     estado.textContent='Cargando modelo de pose…';
     var ok = await ensureMediaPipeReady();
     if(!ok){ estado.textContent='⚠️ No se pudo cargar el motor de pose. Revisa tu conexión e inténtalo de nuevo.'; return; }
     var camOk = await abrirStreamCamara(BIO.facing);
     if(!camOk) return;
-    estado.textContent='Coloca al paciente de cuerpo completo en el encuadre';
-    BIO.acc=null; BIO.framesTotales=0;
+    estado.textContent = (BIO.tipoMedicion==='sent')
+      ? 'Paciente DE FRENTE, cuerpo completo (caderas, rodillas y tobillos en cuadro)'
+      : 'Coloca al paciente de cuerpo completo en el encuadre';
+    BIO.acc=null; BIO.accS=null; BIO.framesTotales=0;
     loopCamara();
   }
   // Abre (o reabre) el stream con la cámara indicada. Reutiliza el <video> y el loop.
@@ -573,7 +810,8 @@
     var fb=document.getElementById('bio-btn-flip');
     var btnRec=document.getElementById('bio-btn-rec');
     if(!BIO.recording){
-      BIO.acc = nuevoAcumulador(); BIO.framesTotales=0; BIO.tStart=Date.now();
+      if(BIO.tipoMedicion==='sent'){ BIO.accS=nuevoAccSent(); } else { BIO.acc = nuevoAcumulador(); }
+      BIO.framesTotales=0; BIO.tStart=Date.now();
       BIO.pendingVideo=null; iniciarGrabadorVideo();     // graba el clip de cámara en paralelo
       BIO.recording=true;
       if(fb) fb.disabled=true;                            // no cambiar de cámara a media grabación
@@ -588,13 +826,21 @@
       var dur = Math.round((Date.now()-BIO.tStart)/1000);
       // El video NUNCA bloquea la medición: finalizarGrabadorVideo tiene timeout (1.5s).
       try{ BIO.pendingVideo = await finalizarGrabadorVideo(); }catch(e){ BIO.pendingVideo=null; }
-      var artic = finalizarMedidas(BIO.acc);
       var fps = dur>0 ? Math.round(BIO.framesTotales/dur) : BIO.framesTotales;
       BIO.finalizando=false;
-      mostrarResumen(artic, {
-        fuente:'camara', duracionSeg:dur,
-        calidad:{ fpsPromedio:fps, framesTotales:BIO.framesTotales, framesValidos:BIO.acc?BIO.acc.framesValidos:0 }
-      });
+      if(BIO.tipoMedicion==='sent'){
+        var resS = finalizarSent(BIO.accS, _leerEstatura());
+        mostrarResumenSent(resS, {
+          fuente:'camara', duracionSeg:dur,
+          calidad:{ fpsPromedio:fps, framesTotales:BIO.framesTotales, framesValidos:(BIO.accS?BIO.accS.framesValidos:0) }
+        });
+      } else {
+        var artic = finalizarMedidas(BIO.acc);
+        mostrarResumen(artic, {
+          fuente:'camara', duracionSeg:dur,
+          calidad:{ fpsPromedio:fps, framesTotales:BIO.framesTotales, framesValidos:BIO.acc?BIO.acc.framesValidos:0 }
+        });
+      }
     }
   }
   function iniciarCronometro(){
@@ -667,7 +913,8 @@
     var dur = (isFinite(v.duration) && v.duration>0) ? v.duration : 0;
     if(!dur){ URL.revokeObjectURL(url); limpiarVideoSrc(v); txt.textContent='⚠️ Video sin duración legible.'; return; }
 
-    BIO.acc = nuevoAcumulador(); BIO.framesTotales=0;
+    if(BIO.tipoMedicion==='sent'){ BIO.accS=nuevoAccSent(); } else { BIO.acc = nuevoAcumulador(); }
+    BIO.framesTotales=0;
     BIO.procesandoVideo=true; BIO.cancelVideo=false;
     txt.textContent='0%';
     // MUESTREO DURANTE REPRODUCCIÓN (robusto en iOS). El método anterior (seek cuadro-a-cuadro
@@ -718,11 +965,19 @@
 
     if(BIO.cancelVideo){ mostrarVista('bio-vista-inicio'); return; }
     fill.style.width='100%'; txt.textContent='100%';
-    var artic=finalizarMedidas(BIO.acc);
-    mostrarResumen(artic, {
-      fuente:'video', duracionSeg:Math.round(dur),
-      calidad:{ fpsMuestreo:FPS_VIDEO, framesTotales:BIO.framesTotales, framesValidos:BIO.acc.framesValidos }
-    });
+    if(BIO.tipoMedicion==='sent'){
+      var resS=finalizarSent(BIO.accS, _leerEstatura());
+      mostrarResumenSent(resS, {
+        fuente:'video', duracionSeg:Math.round(dur),
+        calidad:{ fpsMuestreo:FPS_VIDEO, framesTotales:BIO.framesTotales, framesValidos:(BIO.accS?BIO.accS.framesValidos:0) }
+      });
+    } else {
+      var artic=finalizarMedidas(BIO.acc);
+      mostrarResumen(artic, {
+        fuente:'video', duracionSeg:Math.round(dur),
+        calidad:{ fpsMuestreo:FPS_VIDEO, framesTotales:BIO.framesTotales, framesValidos:BIO.acc.framesValidos }
+      });
+    }
   }
   // ── Resumen + guardado ─────────────────────────────────────────────────────
   // Formato de una medida: MEDIA de los picos como valor principal; mejor, ± consistencia y nº de
@@ -765,11 +1020,48 @@
     if(g) g.addEventListener('click', function(){ guardarSesion(medidas, meta); });
   }
 
+  // Sube el clip pendiente (cámara o archivo) a Storage. Devuelve el objeto video o null.
+  // Compartido por ROM y sentadilla; si falla, la sesión se guarda igual (solo métricas).
+  async function _subirVideoSesion(p, meta, btn, pref){
+    if(!(BIO.pendingVideo && typeof fbStorage!=='undefined' && fbStorage)) return null;
+    try{
+      var _src = BIO.pendingVideo.blob || BIO.pendingVideo.file;
+      var _ext = BIO.pendingVideo.ext || 'webm';
+      var _ts = Date.now();
+      var _safe = (pref||'rom')+'_'+String(p.name||'paciente').replace(/[^\w]/g,'_')+'_'+_ts+'.'+_ext;
+      var _path = 'clinica/sinergia/'+p.id+'/biomecanica/'+_ts+'_'+_safe;
+      var _ref = fbStorage.ref(_path);
+      var _url = await new Promise(function(resolve,reject){
+        var task=_ref.put(_src,{contentType:BIO.pendingVideo.mime||('video/'+_ext)});
+        task.on('state_changed',
+          function(s){ var pct=s.totalBytes?Math.round(s.bytesTransferred/s.totalBytes*100):0; if(btn) btn.textContent='☁️ Subiendo video… '+pct+'%'; },
+          function(err){ reject(err); },
+          function(){ task.snapshot.ref.getDownloadURL().then(resolve).catch(reject); });
+      });
+      return { url:_url, fbPath:_path, mime:BIO.pendingVideo.mime||('video/'+_ext), tamanoBytes:(_src&&_src.size)||0, fuente:meta.fuente };
+    }catch(e){ console.warn('[BIO] subida de video falló:', e && e.message); toast('⚠️ El video no se pudo subir; se guardan las métricas','warning'); return null; }
+  }
+  // Persistencia común: push a p.biomecanica + historial + saveDB + cierre y re-render.
+  async function _persistirSesion(p, sesion, btn, accionTxt){
+    if(btn){ btn.textContent='⏳ Guardando…'; }
+    if(!Array.isArray(p.biomecanica)) p.biomecanica=[];
+    p.biomecanica.push(sesion);
+    if(!Array.isArray(p.historialCambios)) p.historialCambios=[];
+    p.historialCambios.push({ usuario:usuarioActual(), seccion:'biomecanica', fecha:sesion.fecha+' '+sesion.horaCreacion, accion:accionTxt, antes:'', despues:accionTxt });
+    p.fechaActualizacion=fechaHoy(); p.ultimoUsuario=usuarioActual();
+    try{
+      var res = (typeof saveDB==='function') ? await saveDB('pts',[p]) : {ok:false};
+      toast(res && res.ok ? '✅ Medición guardada en el expediente' : '⚠️ Guardada local, Sheets pendiente', res && res.ok ? 'success' : 'warning');
+    }catch(e){
+      toast('⚠️ Sin conexión — guardada local, se sincronizará','warning');
+    }
+    cerrarMedidor();
+    if(typeof renderExpediente==='function') renderExpediente('biomecanica');
+  }
   async function guardarSesion(medidas, meta){
     var p = (typeof currentPatient!=='undefined') ? currentPatient : null;
     if(!p){ toast('Sin paciente activo','error'); return; }
     var btn=document.getElementById('bio-res-guardar'); if(btn){ btn.disabled=true; btn.textContent='⏳ Guardando…'; }
-    if(!Array.isArray(p.biomecanica)) p.biomecanica=[];
     var sesion = {
       id:'bm_'+p.id+'_'+Date.now(),
       tipo:'rom',
@@ -786,39 +1078,121 @@
       video:null,
       eliminado:false
     };
-    // Subir el video (clip grabado en cámara o archivo elegido) a Storage y enlazarlo a la sesión.
-    // Sirve de antes/después visual para el paciente. Si falla, se guardan los ángulos igual.
-    if(BIO.pendingVideo && typeof fbStorage!=='undefined' && fbStorage){
-      try{
-        var _src = BIO.pendingVideo.blob || BIO.pendingVideo.file;
-        var _ext = BIO.pendingVideo.ext || 'webm';
-        var _ts = Date.now();
-        var _safe = 'rom_'+String(p.name||'paciente').replace(/[^\w]/g,'_')+'_'+_ts+'.'+_ext;
-        var _path = 'clinica/sinergia/'+p.id+'/biomecanica/'+_ts+'_'+_safe;
-        var _ref = fbStorage.ref(_path);
-        var _url = await new Promise(function(resolve,reject){
-          var task=_ref.put(_src,{contentType:BIO.pendingVideo.mime||('video/'+_ext)});
-          task.on('state_changed',
-            function(s){ var pct=s.totalBytes?Math.round(s.bytesTransferred/s.totalBytes*100):0; if(btn) btn.textContent='☁️ Subiendo video… '+pct+'%'; },
-            function(err){ reject(err); },
-            function(){ task.snapshot.ref.getDownloadURL().then(resolve).catch(reject); });
-        });
-        sesion.video = { url:_url, fbPath:_path, mime:BIO.pendingVideo.mime||('video/'+_ext), tamanoBytes:(_src&&_src.size)||0, fuente:meta.fuente };
-      }catch(e){ console.warn('[BIO] subida de video falló:', e && e.message); toast('⚠️ El video no se pudo subir; se guardan los ángulos','warning'); }
+    sesion.video = await _subirVideoSesion(p, meta, btn, 'rom');
+    await _persistirSesion(p, sesion, btn, 'Medición ROM ('+sesion.fuente+')');
+  }
+
+  // ── Sentadilla: panel vivo, esqueleto, gate, resumen y guardado ────────────
+  function pintarPanelSent(f){
+    var panel=document.getElementById('bio-panel-vivo'); if(!panel) return;
+    panel.innerHTML = '<table><thead><tr><th>Sentadilla (frontal)</th><th style="text-align:right">Izq</th><th style="text-align:right">Der</th></tr></thead><tbody>'
+      + '<tr><td class="g">Valgo FPPA</td><td class="v" id="bs-fppa-izq">—</td><td class="v" id="bs-fppa-der">—</td></tr>'
+      + '<tr><td class="g">Separación rod./tob.</td><td class="v" id="bs-sep" colspan="2" style="text-align:right">—</td></tr>'
+      + '<tr><td class="g">Tronco lateral</td><td class="v" id="bs-tro" colspan="2" style="text-align:right">—</td></tr>'
+      + '</tbody></table>';
+  }
+  function actualizarPanelSent(f){
+    if(!document.getElementById('bs-fppa-izq')){ pintarPanelSent(f); if(!document.getElementById('bs-fppa-izq')) return; }
+    function pon(id,txt){ var el=document.getElementById(id); if(el) el.textContent=txt; }
+    if(!f){ pon('bs-fppa-izq','—'); pon('bs-fppa-der','—'); pon('bs-sep','—'); pon('bs-tro','—'); return; }
+    pon('bs-fppa-izq', f.fppaIzq.ok ? (Math.round(f.fppaIzq.val)+'°') : '—');
+    pon('bs-fppa-der', f.fppaDer.ok ? (Math.round(f.fppaDer.val)+'°') : '—');
+    pon('bs-sep', f.sepRatio.ok ? f.sepRatio.val.toFixed(2) : '—');
+    pon('bs-tro', f.troncoLat.ok ? (Math.abs(Math.round(f.troncoLat.val))+'°') : '—');
+  }
+  // Etiquetas vivas junto a cada rodilla (V + = valgo / − = varo), encima del esqueleto ya dibujado.
+  function dibujarSentVivo(f){
+    if(!f || !BIO.ctx || !BIO.canvas) return;
+    var ctx=BIO.ctx, w=BIO.canvas.width, h=BIO.canvas.height;
+    if(!w || !h) return;
+    ctx.font='bold '+Math.max(11, Math.round(w*0.026))+'px -apple-system,Arial';
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    [['rodillaIzq','fppaIzq'],['rodillaDer','fppaDer']].forEach(function(par){
+      var pt=f.p && f.p[par[0]], m=f[par[1]];
+      if(!pt || !m || !m.ok) return;
+      var x=pt.x*w, y=pt.y*h-14, txt='V '+Math.round(m.val)+'°';
+      ctx.fillStyle='rgba(13,22,38,.75)';
+      var tw=ctx.measureText(txt).width;
+      ctx.fillRect(x-tw/2-5, y-11, tw+10, 22);
+      ctx.fillStyle = (m.val>=10) ? '#E8C96A' : '#3DDC97';
+      ctx.fillText(txt, x, y);
+    });
+  }
+  function actualizarGateSent(lm, f){
+    if(BIO.recording) return;
+    var btn=document.getElementById('bio-btn-rec'); if(!btn) return;
+    var ok = !!(f && f.piernasOK && f.troncoOK && _vis(lm,0));
+    btn.disabled=!ok;
+    var estado=document.getElementById('bio-estado'); if(!estado) return;
+    if(!ok){ estado.textContent='Encuadra el cuerpo COMPLETO de frente (cabeza, caderas, rodillas y tobillos)'; return; }
+    if(f.orientFrontal===false){ estado.textContent='⚠️ Parece PERFIL — esta toma se hace DE FRENTE a la cámara'; return; }
+    estado.textContent='✓ Listo — pide 3 a 5 sentadillas a ritmo cómodo';
+  }
+  function mostrarResumenSent(res, meta){
+    detenerCamaraStream(); detenerLoopCamara();
+    var cont=document.getElementById('bio-vista-resumen');
+    var by={}; (res.medidas||[]).forEach(function(m){ by[m.key]=m; });
+    function fmtM(m, etqExt){
+      if(!m || m.media==null) return '<span style="color:#9BA3B5">—</span>';
+      var esRatio=(m.unidad==='ratio'), suf=esRatio?'':(m.unidad==='%'?'%':'°');
+      var val=esRatio?m.media.toFixed(2):(_r1(m.media)+suf);
+      var ext=(m.extremo!=null)?(' <span style="color:#9BA3B5;font-size:11px">'+etqExt+' '+(esRatio?m.extremo.toFixed(2):(_r1(m.extremo)+suf))+'</span>'):'';
+      var de=(m.de!=null)?(' <span style="color:#9BA3B5">±'+_r1(m.de)+'</span>'):'';
+      var conf=m.confiable?'':' <span style="color:#E8C96A;font-size:11px">⚠️ baja confianza</span>';
+      return '<b style="color:#3DDC97">'+val+'</b>'+de+ext+conf;
     }
-    if(btn){ btn.textContent='⏳ Guardando…'; }
-    p.biomecanica.push(sesion);
-    if(!Array.isArray(p.historialCambios)) p.historialCambios=[];
-    p.historialCambios.push({ usuario:usuarioActual(), seccion:'biomecanica', fecha:sesion.fecha+' '+sesion.horaCreacion, accion:'Medición ROM ('+sesion.fuente+')', antes:'', despues:'ROM '+sesion.fuente });
-    p.fechaActualizacion=fechaHoy(); p.ultimoUsuario=usuarioActual();
-    try{
-      var res = (typeof saveDB==='function') ? await saveDB('pts',[p]) : {ok:false};
-      toast(res && res.ok ? '✅ Medición guardada en el expediente' : '⚠️ Guardada local, Sheets pendiente', res && res.ok ? 'success' : 'warning');
-    }catch(e){
-      toast('⚠️ Sin conexión — guardada local, se sincronizará','warning');
+    var q=res.calidad||{}, avisos=[];
+    if(q.orientacionOK===false) avisos.push('⚠️ La toma no se vio de FRENTE — el valgo frontal no es interpretable; repite con el paciente de frente.');
+    if(q.camaraMovida) avisos.push('⚠️ La cámara se movió durante la toma — medidas marcadas como no confiables.');
+    if(!res.nReps) avisos.push('⚠️ No se detectaron sentadillas completas (descenso mínimo '+SENT_MIN_DESC+'% de la estatura). Repite con sentadillas más profundas o el cuerpo completo en cuadro.');
+    var desc=by['sacro_descenso'], cmTxt='';
+    if(desc && desc.media!=null && res.calibracion && res.calibracion.estaturaCm){
+      cmTxt=' <span style="color:#9BA3B5;font-size:11px">≈ '+_r1(desc.media*res.calibracion.estaturaCm/100)+' cm (±10%)</span>';
     }
-    cerrarMedidor();
-    if(typeof renderExpediente==='function') renderExpediente('biomecanica');
+    cont.innerHTML =
+      '<h3>Resumen — Sentadilla (análisis frontal)</h3>'
+      + '<div style="color:#9BA3B5;font-size:13px;margin-bottom:10px">'+(meta.fuente==='camara'?'📷 Cámara en vivo':'📁 Video')+' · '+meta.duracionSeg+' s · '
+      +   res.nReps+' repetición'+(res.nReps===1?'':'es')+' · FPPA a media bajada · MKD y separación en el fondo</div>'
+      + '<table class="bio-tabla-res"><thead><tr><th>Métrica</th><th>Izquierda</th><th>Derecha</th></tr></thead><tbody>'
+      + '<tr><td class="g">Valgo dinámico FPPA</td><td>'+fmtM(by['fppa_izq'],'peor')+'</td><td>'+fmtM(by['fppa_der'],'peor')+'</td></tr>'
+      + '<tr><td class="g">Desplaz. medial (MKD, % pelvis)</td><td>'+fmtM(by['mkd_izq'],'peor')+'</td><td>'+fmtM(by['mkd_der'],'peor')+'</td></tr>'
+      + '<tr><td class="g">Separación rodillas/tobillos</td><td colspan="2">'+fmtM(by['sep_rodillas'],'mín')+'</td></tr>'
+      + '<tr><td class="g">Tronco lateral</td><td colspan="2">'+fmtM(by['tronco_lateral'],'máx')+'</td></tr>'
+      + '<tr><td class="g">Descenso del sacro</td><td colspan="2">'+fmtM(by['sacro_descenso'],'máx')+cmTxt+'</td></tr>'
+      + '</tbody></table>'
+      + (avisos.length?('<div style="color:#E8C96A;font-size:13px;margin-top:10px">'+avisos.join('<br>')+'</div>'):'')
+      + '<div class="bio-acciones">'
+      +   '<button class="bio-b-sec" id="bio-res-repetir">🔄 Repetir</button>'
+      +   (res.nReps ? '<button class="bio-b-save" id="bio-res-guardar">💾 Guardar en expediente</button>' : '')
+      + '</div>';
+    mostrarVista('bio-vista-resumen');
+    document.getElementById('bio-res-repetir').addEventListener('click', function(){ resetEstado(); mostrarVista('bio-vista-inicio'); });
+    var g=document.getElementById('bio-res-guardar');
+    if(g) g.addEventListener('click', function(){ guardarSesionSent(res, meta); });
+  }
+  async function guardarSesionSent(res, meta){
+    var p = (typeof currentPatient!=='undefined') ? currentPatient : null;
+    if(!p){ toast('Sin paciente activo','error'); return; }
+    var btn=document.getElementById('bio-res-guardar'); if(btn){ btn.disabled=true; btn.textContent='⏳ Guardando…'; }
+    var sesion = {
+      id:'bm_'+p.id+'_'+Date.now(),
+      tipo:'sentadilla',
+      fuente:meta.fuente,
+      fecha:fechaHoy(), horaCreacion:horaAhora(), fechaHoraISO:new Date().toISOString(),
+      terapeuta:usuarioActual(), convencion:'clinica',
+      vistas:{ frontal:{ duracionSeg:meta.duracionSeg||0, nReps:res.nReps, calidad:res.calidad } },
+      duracionSeg:meta.duracionSeg||0,
+      medidas:res.medidas, porRep:res.porRep, calibracion:res.calibracion,
+      calidad:meta.calidad||{},
+      // Las trayectorias completas NO caben en Sheets: quedan en memoria (BIO.trayCache) y la
+      // subfase 2C las persiste en Storage + IndexedDB. Aquí solo el resumen.
+      trayectorias:{ estado:'pendiente', puntos:Object.keys((BIO.accS&&BIO.accS.tray)||{}), muestras:(BIO.accS&&BIO.accS.tray&&BIO.accS.tray.sacro)?BIO.accS.tray.sacro.length:0 },
+      reportePdf:null, video:null, eliminado:false
+    };
+    sesion.video = await _subirVideoSesion(p, meta, btn, 'sent');
+    BIO.trayCache = BIO.trayCache || {};
+    BIO.trayCache[sesion.id] = { fps:(meta.calidad&&(meta.calidad.fpsPromedio||meta.calidad.fpsMuestreo))||null, tray:(BIO.accS&&BIO.accS.tray)||null };
+    await _persistirSesion(p, sesion, btn, 'Sentadilla frontal ('+meta.fuente+')');
   }
 
   // ── Render de la pestaña "Biomecánica" (devuelve HTML string) ──────────────
@@ -838,16 +1212,65 @@
     return [['Codo','codoIzq','codoDer'],['Hombro','hombroIzq','hombroDer'],['Cadera','caderaIzq','caderaDer'],['Rodilla','rodillaIzq','rodillaDer']]
       .map(function(g){ return fila(g[0], a[g[1]], a[g[2]]); }).join('');
   }
+  // Tarjeta de una sesión de SENTADILLA en la pestaña (misma familia visual que las de ROM).
+  function tarjetaSentHTML(s){
+    var by={}; (s.medidas||[]).forEach(function(m){ by[m.key]=m; });
+    function fmtS(m, etqExt){
+      if(!m || m.media==null) return '<span style="color:var(--gray-400)">—</span>';
+      var esRatio=(m.unidad==='ratio'), suf=esRatio?'':(m.unidad==='%'?'%':'°');
+      var val=esRatio?m.media.toFixed(2):(_r1(m.media)+suf);
+      var ext=(m.extremo!=null)?(' <span style="color:var(--gray-400);font-size:11px">'+etqExt+' '+(esRatio?m.extremo.toFixed(2):(_r1(m.extremo)+suf))+'</span>'):'';
+      var conf=m.confiable?'':' <span style="color:#B45309;font-size:11px">⚠️</span>';
+      return '<b style="color:var(--green)">'+val+'</b>'+ext+conf;
+    }
+    function fila(etq, izq, der){
+      return '<div class="field-row"><div class="field-label">'+etq+'</div><div class="field-value" style="display:flex;gap:14px;flex-wrap:wrap">'
+        + (der!==undefined
+            ? '<span><b style="color:var(--gray-400);font-weight:600">Izq</b> '+izq+'</span><span><b style="color:var(--gray-400);font-weight:600">Der</b> '+der+'</span>'
+            : '<span>'+izq+'</span>')
+        + '</div></div>';
+    }
+    var fuente = s.fuente==='video' ? '📁 Video' : '📷 Cámara';
+    var vf=(s.vistas&&s.vistas.frontal)||{}, nReps=vf.nReps||0;
+    var desc=by['sacro_descenso'], descTxt=fmtS(desc,'máx');
+    if(desc && desc.media!=null && s.calibracion && s.calibracion.estaturaCm){
+      descTxt += ' <span style="color:var(--gray-400);font-size:11px">≈ '+_r1(desc.media*s.calibracion.estaturaCm/100)+' cm</span>';
+    }
+    var q=vf.calidad||{}, avisos=[];
+    if(q.orientacionOK===false) avisos.push('toma no frontal');
+    if(q.camaraMovida) avisos.push('cámara movida');
+    var videoBtn = (s.video && s.video.url)
+      ? '<button data-url="'+esc(s.video.url)+'" onclick="window.open(this.dataset.url,\'_blank\')" style="background:var(--green);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer">▶️ Ver video</button>'
+      : '';
+    return '<div class="section-card" style="margin-bottom:10px">'
+      + '<div class="section-title" style="display:flex;align-items:center;justify-content:space-between">'
+      +   '<span>🏋️ Sentadilla · '+esc(s.fecha)+' '+esc(s.horaCreacion||'')+'</span>'
+      +   '<span style="font-weight:600;text-transform:none;letter-spacing:0;color:var(--gray-400)">'+fuente+'</span>'
+      + '</div>'
+      + '<div class="field-row"><div class="field-label">Terapeuta</div><div class="field-value">'+esc(s.terapeuta||'—')+' · '+(s.duracionSeg||0)+' s · '+nReps+' rep'+(nReps===1?'':'s')+' (vista frontal)'+(avisos.length?(' · <span style="color:#B45309">⚠️ '+esc(avisos.join(', '))+'</span>'):'')+'</div></div>'
+      + fila('Valgo FPPA (media bajada)', fmtS(by['fppa_izq'],'peor'), fmtS(by['fppa_der'],'peor'))
+      + fila('Desplaz. medial MKD (fondo)', fmtS(by['mkd_izq'],'peor'), fmtS(by['mkd_der'],'peor'))
+      + fila('Separación rodillas/tobillos', fmtS(by['sep_rodillas'],'mín'))
+      + fila('Tronco lateral', fmtS(by['tronco_lateral'],'máx'))
+      + fila('Descenso del sacro', descTxt)
+      + '<div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;padding:10px 14px;align-items:center">'
+      +   '<span style="color:var(--gray-400);font-size:11px">PDF y reconstrucción: próximas subfases</span>'
+      +   videoBtn
+      +   '<button data-sid="'+esc(s.id)+'" onclick="BIO_eliminar(this.dataset.sid)" style="background:var(--red-light);color:var(--red);border:1.5px solid #FCA5A5;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer">🗑️ Eliminar</button>'
+      + '</div>'
+      + '</div>';
+  }
   function renderPestana(p){
     var lista = Array.isArray(p.biomecanica) ? p.biomecanica.filter(function(s){ return s && !s.eliminado; }) : [];
     var html = ''
       + '<button class="btn-gold" style="width:100%;margin-bottom:12px;font-size:15px;font-weight:800;border:none;border-radius:var(--radius);padding:14px;cursor:pointer;background:var(--gold);color:var(--navy-dark)" onclick="abrirMedidorBiomecanico()">▶️ Nueva medición ROM</button>';
     if(!lista.length){
-      html += '<div style="text-align:center;padding:22px;color:var(--gray-400);font-size:13px">Sin mediciones — toca <b>▶️ Nueva medición ROM</b> para empezar.<br>Mide codo (flexo-extensión) y hombro (flexión y abducción) con la cámara o subiendo un video.</div>';
+      html += '<div style="text-align:center;padding:22px;color:var(--gray-400);font-size:13px">Sin mediciones — toca <b>▶️ Nueva medición ROM</b> para empezar.<br>Mide ROM de brazos (codo y hombro) o analiza una SENTADILLA (valgo de rodilla), con la cámara o subiendo un video.</div>';
       return html;
     }
     var orden = lista.slice().reverse(); // más reciente primero
     html += orden.map(function(s){
+      if(s.tipo==='sentadilla') return tarjetaSentHTML(s);
       var fuente = s.fuente==='video' ? '📁 Video' : '📷 Cámara';
       var filas = filasSesionHTML(s);
       var pdfBtn = (s.reportePdf && s.reportePdf.url)
@@ -989,6 +1412,7 @@
   async function BIO_pdf(sid){
     var p=(typeof currentPatient!=='undefined')?currentPatient:null; if(!p) return;
     var s=(p.biomecanica||[]).find(function(x){return x.id===sid;}); if(!s) return;
+    if(s.tipo==='sentadilla'){ toast('El PDF de sentadilla llega en la siguiente versión','warning'); return; }
     if(s.reportePdf && s.reportePdf.url){ window.open(s.reportePdf.url,'_blank'); return; }
     var jsPDFCtor=(window.jspdf && window.jspdf.jsPDF) || window.jsPDF;
     if(!jsPDFCtor){ toast('jsPDF no disponible','error'); return; }
