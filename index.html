@@ -8402,6 +8402,7 @@ function renderExpediente(tab='historia'){
       <div class="field-row"><div class="field-label">Pruebas especiales</div><div class="field-value">${valorSeguroHTML(v.pruebasEspeciales)}</div></div>
       <div class="field-row"><div class="field-label">Palpación</div><div class="field-value">${valorSeguroHTML(v.palpacion)}</div></div>
       <div class="field-row"><div class="field-label">🚩 Banderas rojas</div><div class="field-value" style="color:${v.banderasRojas&&v.banderasRojas!=='Ninguna'?'var(--red)':'var(--green)'};font-weight:600;">${valorSeguroHTML(v.banderasRojas,'Ninguna')}</div></div>
+      ${(Array.isArray(v.mediaBaseline)&&v.mediaBaseline.length)?`<div class="field-row"><div class="field-label">📷 Antes (cómo llegó)</div><div class="field-value"><div style="display:flex;flex-wrap:wrap;gap:8px">${v.mediaBaseline.map(function(m){var src=m.url||'',t=String(m.type||'');var inner=(t.indexOf('video')===0)?'<video src="'+escapeAttr_(src)+'" preload="metadata" muted playsinline style="width:100%;height:100%;object-fit:cover"></video><div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:18px;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.7)">▶</div>':'<img src="'+escapeAttr_(src)+'" loading="lazy" style="width:100%;height:100%;object-fit:cover">';var verArgs=JSON.stringify(src).replace(/"/g,'&quot;')+','+JSON.stringify(t).replace(/"/g,'&quot;')+','+JSON.stringify('Antes · cómo llegó').replace(/"/g,'&quot;');return '<div onclick="_verMediaSesion('+verArgs+')" style="width:76px;height:76px;border-radius:10px;overflow:hidden;position:relative;background:#0E1622;cursor:pointer">'+inner+'</div>';}).join('')}</div></div></div>`:''}
     </div>
     <div class="section-card">
       <div class="section-title">🔎 Diagnóstico y plan${_epSufijo}
@@ -10938,6 +10939,59 @@ function _borrarMediaObjetivo(id){
   if(!confirm('¿Eliminar este registro visual de valoración?')) return;
   if(Array.isArray(tempMediaObjetivo)) tempMediaObjetivo=tempMediaObjetivo.filter(function(x){return !(x&&String(x.id)===id);});
   _renderMediaObjetivo(); marcarDirty();
+  showToast('🗑 Eliminado','success');
+}
+// ── BASELINE VISUAL DEL ALTA ("antes" / cómo llegó) ──────────────────────────────
+// Foto o video de línea base capturado en la Valoración inicial. Sube a Storage bajo el id
+// PRE-GENERADO del paciente (window._altaPid) y se guarda en valoracion.mediaBaseline. Reutiliza
+// el mismo visor (_verMediaSesion) que las notas SOAP. Solo {url,fbPath,type} → liviano y persiste.
+async function _subirMediaAntes(file, pid){
+  const safeName=String(file.name||'antes').replace(/[^\w.\-]+/g,'_');
+  const fbPath=`clinica/sinergia/${pid}/valoracion/${Date.now()}_${safeName}`;
+  const ref=fbStorage.ref(fbPath);
+  const url=await new Promise((resolve,reject)=>{
+    const task=ref.put(file,{ contentType:file.type||'application/octet-stream' });
+    task.on('state_changed', null, (err)=>reject(err), async()=>{ try{ resolve(await task.snapshot.ref.getDownloadURL()); }catch(e){ reject(e); } });
+  });
+  return { url, fbPath };
+}
+function _renderMediaAntes(){
+  var wrap=document.getElementById('n-media-antes-wrap'); if(!wrap) return;
+  var arr=Array.isArray(window._altaMediaAntes)?window._altaMediaAntes:[];
+  if(!arr.length){ wrap.innerHTML=''; return; }
+  wrap.innerHTML='<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:6px">'+arr.map(function(m){
+    var id=String(m.id||''), src=m.url||'', t=String(m.type||'');
+    var inner=(t.indexOf('video')===0)
+      ? '<video src="'+escapeAttr_(src)+'" preload="metadata" muted playsinline style="width:100%;height:100%;object-fit:cover"></video><div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:18px;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.7)">▶</div>'
+      : '<img src="'+escapeAttr_(src)+'" loading="lazy" style="width:100%;height:100%;object-fit:cover">';
+    var verArgs=JSON.stringify(src).replace(/"/g,'&quot;')+','+JSON.stringify(t).replace(/"/g,'&quot;')+','+JSON.stringify('Antes · cómo llegó').replace(/"/g,'&quot;');
+    return '<div style="width:82px;height:82px;border-radius:10px;overflow:hidden;position:relative;background:#0E1622">'
+      +'<div onclick="_verMediaSesion('+verArgs+')" style="position:absolute;inset:0;cursor:pointer">'+inner+'</div>'
+      +'<button type="button" onclick="_borrarMediaAntes(\''+escapeAttr_(id)+'\')" title="Eliminar" style="position:absolute;top:2px;right:2px;background:rgba(185,28,28,.92);border:none;border-radius:50%;width:22px;height:22px;color:#fff;font-size:12px;font-weight:800;cursor:pointer;line-height:1">✕</button>'
+      +'</div>';
+  }).join('')+'</div>';
+}
+async function _capturarMediaAntes(ev){
+  var file=ev&&ev.target&&ev.target.files&&ev.target.files[0]; if(ev&&ev.target) ev.target.value='';
+  if(!file) return;
+  if(file.size>80*1024*1024){ showToast('Archivo muy pesado. Graba uno más corto.','error'); return; }
+  if(String(file.type).indexOf('image/')!==0 && String(file.type).indexOf('video/')!==0){ showToast('Solo foto o video','error'); return; }
+  if(String(file.type).indexOf('video/')===0 && !navigator.onLine){ showToast('Sin conexión — conéctate para subir videos','error'); return; }
+  if(!window._altaPid) window._altaPid=(typeof generarIdSeguro_==='function'?generarIdSeguro_('p'):('p'+Date.now()));
+  showToast('☁️ Subiendo…','');
+  try{
+    var res=await _subirMediaAntes(file, window._altaPid);
+    if(!Array.isArray(window._altaMediaAntes)) window._altaMediaAntes=[];
+    window._altaMediaAntes.push({ id:'ba'+Date.now(), type:file.type, url:res.url, fbPath:res.fbPath });
+    _renderMediaAntes(); marcarDirty();
+    showToast('✅ Registro del "antes" agregado','success');
+  }catch(e){ console.warn('[media-antes]', e&&e.message); showToast('No se pudo subir: '+((e&&e.message)||'error'),'error'); }
+}
+function _borrarMediaAntes(id){
+  id=String(id);
+  if(!Array.isArray(window._altaMediaAntes)) return;
+  window._altaMediaAntes=window._altaMediaAntes.filter(function(x){return !(x&&String(x.id)===id);});
+  _renderMediaAntes();
   showToast('🗑 Eliminado','success');
 }
 // Grabar/subir un ejercicio DESDE la nota SOAP: sube la media, crea el ejercicio en el paciente
@@ -14787,6 +14841,9 @@ function showNuevoPaciente(){
 function renderNuevoPaciente(){
   _nEvaVal=null;
   _hcReset();
+  // Baseline visual del "antes": id pre-generado para poder subir media antes de guardar.
+  window._altaMediaAntes=[];
+  window._altaPid=(typeof generarIdSeguro_==='function'?generarIdSeguro_('p'):('p'+Date.now()));
   const ters=['CARLOS','DAF','ZARA','CAMI','GORE','JESS','DUL'];
   // Opciones para terapeuta de seguimiento — todos menos el actual
   const optsSegimiento=['— Sin asignar —',...ters]
@@ -15004,6 +15061,12 @@ function renderNuevoPaciente(){
            alta — duplicaba los checkboxes sc-bandera de Seguridad. valoracion.banderasRojas se sigue
            escribiendo SIEMPRE (derivado de los checkboxes en guardarNuevoPaciente). -->
       <div class="form-field"><div class="form-label">Estudios de imagen y hallazgos</div><textarea class="form-input" id="n-estudios" placeholder="Ej: US tendón rotuliano — engrosamiento con áreas hipoecoicas"></textarea></div>
+      <div class="form-field">
+        <div class="form-label">📷 Foto / video del antes <span style="font-weight:400;color:var(--gray-400);font-size:11px">· cómo llegó (línea base para comparar evolución)</span></div>
+        <input type="file" id="n-media-antes-capture" accept="image/*,video/*" style="display:none" onchange="_capturarMediaAntes(event)">
+        <div id="n-media-antes-wrap"></div>
+        <button type="button" onclick="var i=document.getElementById('n-media-antes-capture');if(i)i.click()" style="width:100%;background:#F0F5FB;color:var(--navy);border:1.5px dashed var(--navy);border-radius:10px;padding:10px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit">📷 Agregar foto / video del antes</button>
+      </div>
     </div>
   </div>
   <div class="form-section">
@@ -15167,7 +15230,7 @@ function guardarNuevoPaciente(){
   if(_nEvaVal===null){ showToast('Falta: EVA inicial (toca un número)','error'); return; }
   const evaVal=_nEvaVal;
   const nuevo={
-    id:generarIdSeguro_('p'), name:nombre, age:edadFinal,
+    id:(window._altaPid||generarIdSeguro_('p')), name:nombre, age:edadFinal,
     sexo: v('n-sexo') || '',
     fechaNacimiento: fechaNacimiento ? formatearFechaNac(fechaNacimiento) : '',
     telefono, motivoConsulta,
@@ -15205,6 +15268,7 @@ function guardarNuevoPaciente(){
     valoracion:{eva:evaVal,inflamacion:v('n-inflamacion','No evaluada'),marcha:v('n-marcha','No evaluada'),
       rom:v('n-rom','No evaluado'),fuerza:v('n-fuerza','No evaluada'),flexibilidad:v('n-flex','No evaluada'),
       pruebasEspeciales:v('n-pruebas','No realizadas'),palpacion:v('n-palpacion','No evaluada'),
+      mediaBaseline:(Array.isArray(window._altaMediaAntes)?window._altaMediaAntes.map(function(x){return Object.assign({},x);}):[]),
       banderasRojas:(()=>{const b=Array.from(document.querySelectorAll('.sc-bandera:checked')).map(c=>c.value).filter(x=>x!=='Ninguna referida');return b.length?b.join(', '):'Ninguna';})()},
     dxFuncional:{dxClinico:v('n-dxclinico',dxmedicoFinal),dxFuncional:v('n-dxfuncional','Pendiente'),
       limitaciones:v('n-limitaciones','Pendiente'),objetivosCP:v('n-objcp','Pendiente'),
