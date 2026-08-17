@@ -14729,10 +14729,8 @@ function _hcTap(el){
   var cont=el.parentNode; if(cont){ Array.prototype.forEach.call(cont.querySelectorAll('.hc-chip'), function(b){ b.classList.remove('on'); }); }
   if(!apaga) el.classList.add('on');
   if(g==='zona'){ st.irrad=null; _hcRenderIrrad(); _hcRenderSecundarias(); var ow=document.getElementById('hc-zona-otra-wrap'); if(ow) ow.style.display=(v==='otra')?'block':'none'; var iow=document.getElementById('hc-irrad-otra-wrap'); if(iow) iow.style.display='none'; }
-  // Campos que se revelan al elegir la opción "especifica": irradiación "Otra…" y fecha exacta.
+  // Campo que se revela al elegir la opción "especifica": irradiación "Otra…".
   if(g==='irrad'){ var iw=document.getElementById('hc-irrad-otra-wrap'); if(iw) iw.style.display=(st.irrad==='Otra…')?'block':'none'; }
-  if(g==='desde'){ var dw=document.getElementById('hc-desde-exacto-wrap'); if(dw) dw.style.display=(st.desde==='exacto')?'block':'none';
-    var eh=document.getElementById('hc-evol-hint'); if(eh) eh.textContent=(st.desde==='hoy_semana')?'· desde que comenzó':'· últimas 2 semanas'; }
   if(typeof marcarDirty==='function') marcarDirty();
 }
 function _hcRenderZonas(){
@@ -14937,9 +14935,13 @@ function renderNuevoPaciente(){
         <div class="hc-chips">${_hcChip('lado','izquierdo','Izquierdo',false)}${_hcChip('lado','derecho','Derecho',false)}${_hcChip('lado','ambos','Ambos',false)}${_hcChip('lado','central','Centro / línea media',false)}</div>
       </div>
       <div class="hc-row">
-        <div class="hc-q">¿Desde cuándo? <span class="req">*</span></div>
-        <div class="hc-chips">${_hcChip('desde','hoy_semana','Hoy / esta semana',false)}${_hcChip('desde','1_4_sem','1–4 semanas',false)}${_hcChip('desde','1_3_meses','1–3 meses',false)}${_hcChip('desde','3_6_meses','3–6 meses',false)}${_hcChip('desde','mas_6_meses','Más de 6 meses',false)}${_hcChip('desde','exacto','Fecha o tiempo exacto…',false)}</div>
-        <div id="hc-desde-exacto-wrap" style="display:none;margin-top:7px"><input class="form-input" id="hc-desde-exacto" type="text" placeholder="Fecha o tiempo exacto (ej: cirugía 03/02/2026, trauma hace 9 días)"></div>
+        <div class="hc-q">¿Desde cuándo? <span class="req">*</span> <span class="hint">· tiempo de evolución</span></div>
+        <textarea class="form-input" id="hc-desde-texto" autocapitalize="sentences" style="min-height:56px" placeholder="Cuándo empezó y cómo…"></textarea>
+        <div style="background:#F0F5FB;border:1px solid #DCE8F5;border-radius:10px;padding:9px 12px;font-size:11.5px;color:var(--navy-light);margin-top:7px;line-height:1.7">
+          • ¿Cuándo empezó? (fecha o tiempo aprox: "hace 3 semanas", "10 de enero")<br>
+          • ¿De golpe o poco a poco?<br>
+          • ¿Hubo algo que lo desencadenó? (caída, esfuerzo, cirugía, sin causa clara)
+        </div>
       </div>
       <div class="hc-row">
         <div class="hc-q">¿Se corre a otro lado? <span class="hint">· depende de la zona</span></div>
@@ -14947,7 +14949,7 @@ function renderNuevoPaciente(){
         <div id="hc-irrad-otra-wrap" style="display:none;margin-top:7px"><input class="form-input" id="hc-irrad-otra" type="text" placeholder="¿A dónde se corre? (especifica el patrón)"></div>
       </div>
       <div class="hc-row">
-        <div class="hc-q">Evolución <span class="req">*</span> <span class="hint" id="hc-evol-hint">· últimas 2 semanas</span></div>
+        <div class="hc-q">Evolución <span class="req">*</span> <span class="hint">· cómo ha ido desde que empezó</span></div>
         <div class="hc-chips">${_hcChip('tray','mejorando','Mejorando',false)}${_hcChip('tray','igual','Igual',false)}${_hcChip('tray','empeorando','Empeorando',false)}</div>
       </div>
       <div class="hc-row">
@@ -15096,15 +15098,14 @@ function guardarNuevoPaciente(){
   // Toques rápidos estructurados (historia híbrida Fase 1).
   const _hc = (window._HC || {});
   const _hcZonaOtra = (document.getElementById('hc-zona-otra')?.value||'').trim();
-  const _hcDesdeExacto = (document.getElementById('hc-desde-exacto')?.value||'').trim();
+  const _hcDesdeTexto = (document.getElementById('hc-desde-texto')?.value||'').trim();
   const _hcIrradOtra = (document.getElementById('hc-irrad-otra')?.value||'').trim();
-  // Título del episodio: preferir ZONA (+lado +desde) estructurado; si no hay, 1ª línea del relato.
+  // Título del episodio: preferir ZONA (+lado) estructurado; si no hay, 1ª línea del relato.
   let motivoConsulta=v('n-motivoconsulta');
   if(!motivoConsulta){
     const _zl = _hc.zona ? (_hc.zona==='otra' ? (_hcZonaOtra||'Otra zona') : _hcLabelZona(_hc.zona)) : '';
     const _ladoL = {izquierdo:'izq.',derecho:'der.',ambos:'bilateral',central:'central'}[_hc.lado]||'';
-    const _desdeL = (_hc.desde==='exacto') ? _hcDesdeExacto : ({hoy_semana:'esta semana','1_4_sem':'1–4 sem','1_3_meses':'1–3 meses','3_6_meses':'3–6 meses',mas_6_meses:'+6 meses'}[_hc.desde]||'');
-    if(_zl){ motivoConsulta = _zl + (_ladoL?(' '+_ladoL):'') + (_desdeL?(' · '+_desdeL):''); }
+    if(_zl){ motivoConsulta = _zl + (_ladoL?(' '+_ladoL):''); }
     else if(padecimiento){ const _pl=String(padecimiento).split('\n')[0].trim(); motivoConsulta = _pl.length>90 ? (_pl.slice(0,90).replace(/\s+\S*$/,'')+'…') : _pl; }
   }
 
@@ -15128,8 +15129,7 @@ function guardarNuevoPaciente(){
     showToast('Falta: toca la ZONA principal del dolor','error');return;
   }
   if(!_hc.lado){ showToast('Falta: toca el LADO','error');return; }
-  if(!_hc.desde){ showToast('Falta: toca ¿DESDE CUÁNDO?','error');return; }
-  if((_hc.desde==='exacto') && !_hcDesdeExacto){ showToast('Escribe la fecha o tiempo exacto','error');return; }
+  if(!_hcDesdeTexto){ showToast('Falta: escribe ¿DESDE CUÁNDO? (tiempo de evolución)','error');return; }
   if(!_hc.tray){ showToast('Falta: toca la EVOLUCIÓN','error');return; }
   if(!_hc.comp){ showToast('Falta: toca ¿CÓMO SE COMPORTA?','error');return; }
   // LOOP2.1: bloqueo real — sin consentimiento de datos NO se crea el expediente
@@ -15177,8 +15177,7 @@ function guardarNuevoPaciente(){
       zonaPrincipalOtra: (_hc.zona==='otra') ? (_hcZonaOtra||null) : null,
       lado: _hc.lado||null,
       zonasSecundarias: Array.isArray(_hc.sec) ? _hc.sec.slice() : [],
-      desdeCuando: _hc.desde||null,
-      desdeExacto: (_hc.desde==='exacto') ? (_hcDesdeExacto||null) : null,
+      desdeCuando: _hcDesdeTexto||null,
       irradiacion: _hc.irrad||null,
       irradiacionOtra: (_hc.irrad==='Otra…') ? (_hcIrradOtra||null) : null,
       trayectoria: _hc.tray||null,
