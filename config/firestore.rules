@@ -42,6 +42,11 @@ service cloud.firestore {
                   // ── v12: campos de históricos (mig_pac_) que solo vivían en el iPad que
                   // los editó y no viajaban a Firestore (auditoría "todo en la nube" 🔴P2).
                   'sexo','eventosAdversos','revalSolicitada','etiquetas','historialCambios',
+                  // ── FIX SYNC: 'inasistencias' (registro "No acudió") lo escribe outCl pero
+                  // faltaba en la whitelist → todo write de un paciente con inasistencias se
+                  // rechazaba con "Missing or insufficient permissions" (le pegaba a quien usa
+                  // "No acudió", p.ej. Jess: 30 cambios atorados). Agregado para que sí sincronice.
+                  'inasistencias',
                   'telefono','fechaNacimiento','medicoReferente','age',
                   'fechaCreacion','fechaInicio',
                   // ── v12: _persistirDatosPaciente (LOOP E) escribe estos junto a name/age/telefono
