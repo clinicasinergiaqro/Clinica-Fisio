@@ -14949,14 +14949,6 @@ function renderNuevoPaciente(){
         <div id="hc-irrad-otra-wrap" style="display:none;margin-top:7px"><input class="form-input" id="hc-irrad-otra" type="text" placeholder="¿A dónde se corre? (especifica el patrón)"></div>
       </div>
       <div class="hc-row">
-        <div class="hc-q">Evolución <span class="req">*</span> <span class="hint">· cómo ha ido desde que empezó</span></div>
-        <div class="hc-chips">${_hcChip('tray','mejorando','Mejorando',false)}${_hcChip('tray','igual','Igual',false)}${_hcChip('tray','empeorando','Empeorando',false)}</div>
-      </div>
-      <div class="hc-row">
-        <div class="hc-q">¿Cómo se comporta? <span class="req">*</span></div>
-        <div class="hc-chips">${_hcChip('comp','constante','Constante',false)}${_hcChip('comp','intermitente','Intermitente (va y viene)',false)}</div>
-      </div>
-      <div class="hc-row">
         <div class="hc-q">Irritabilidad <span class="opt">OPCIONAL</span> <span class="hint">· al aumentar los síntomas, ¿cuánto tardan en volver a su nivel habitual?</span></div>
         <div class="hc-chips">${_hcChip('irrit','al_parar','Al parar / segundos',false)}${_hcChip('irrit','menos_30','Menos de 30 min',false)}${_hcChip('irrit','30_2h','Entre 30 min y 2 h',false)}${_hcChip('irrit','varias_horas','Varias horas',false)}${_hcChip('irrit','no_vuelve','No vuelven al nivel habitual',false)}</div>
       </div>
@@ -15130,8 +15122,6 @@ function guardarNuevoPaciente(){
   }
   if(!_hc.lado){ showToast('Falta: toca el LADO','error');return; }
   if(!_hcDesdeTexto){ showToast('Falta: escribe ¿DESDE CUÁNDO? (tiempo de evolución)','error');return; }
-  if(!_hc.tray){ showToast('Falta: toca la EVOLUCIÓN','error');return; }
-  if(!_hc.comp){ showToast('Falta: toca ¿CÓMO SE COMPORTA?','error');return; }
   // LOOP2.1: bloqueo real — sin consentimiento de datos NO se crea el expediente
   /* RIESGO RESIDUAL — Token de Apps Script expuesto en frontend.
      Migración a Firebase ID Token pendiente para sub-loop dedicado.
@@ -15180,8 +15170,6 @@ function guardarNuevoPaciente(){
       desdeCuando: _hcDesdeTexto||null,
       irradiacion: _hc.irrad||null,
       irradiacionOtra: (_hc.irrad==='Otra…') ? (_hcIrradOtra||null) : null,
-      trayectoria: _hc.tray||null,
-      comportamiento: _hc.comp||null,
       irritabilidad: _hc.irrit||null,
       capturadoEn: (typeof todayISO!=='undefined'?todayISO:''), version:1
     },
