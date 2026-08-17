@@ -8325,8 +8325,27 @@ function renderExpediente(tab='historia'){
         ?`<div style="margin:10px 14px;font-size:13px;color:#92400E;background:#FEF3C7;border-radius:10px;padding:10px 12px">⚠️ Este episodio aún no tiene motivo capturado. Los motivos cerrados están en «Motivos anteriores».</div>`
         :`<div class="field-row"><div class="field-label">Dx médico</div><div class="field-value">${escapeHTML(mv.motivo.dxMedico)}</div></div>
       <div class="field-row"><div class="field-label">Padecimiento</div><div class="field-value narrative">${escapeHTML(mv.motivo.padecimiento)}</div></div>
-      <div class="field-row"><div class="field-label">Mecanismo</div><div class="field-value">${escapeHTML(mv.motivo.mecanismo)}</div></div>
-      <div class="field-row"><div class="field-label">Evolución</div><div class="field-value">${escapeHTML(mv.motivo.evolucion)}</div></div>
+      ${(()=>{
+        // Historia híbrida (Fase 1): toques estructurados del Motivo. Solo se muestran si existen
+        // (pacientes nuevos); los viejos no tienen motivoHC y este bloque queda vacío.
+        const hc=p.motivoHC||{};
+        if(!hc.zonaPrincipal && !hc.desdeCuando && !hc.irradiacion && !hc.irritabilidad) return '';
+        const zL = hc.zonaPrincipal==='otra' ? (hc.zonaPrincipalOtra||'Otra zona') : _hcLabelZona(hc.zonaPrincipal||'');
+        const ladoL = {izquierdo:'Izquierdo',derecho:'Derecho',ambos:'Ambos',central:'Centro / línea media'}[hc.lado]||'';
+        const irrL = hc.irradiacion==='Otra…' ? (hc.irradiacionOtra||'Otra') : (hc.irradiacion||'');
+        const irritL = {al_parar:'Al parar / segundos',menos_30:'Menos de 30 min','30_2h':'Entre 30 min y 2 h',varias_horas:'Varias horas',no_vuelve:'No vuelven al nivel habitual'}[hc.irritabilidad]||'';
+        const secL = (Array.isArray(hc.zonasSecundarias)&&hc.zonasSecundarias.length) ? hc.zonasSecundarias.map(function(z){return _hcLabelZona(z);}).filter(Boolean).join(', ') : '';
+        let r='';
+        if(zL) r+=`<div class="field-row"><div class="field-label">Zona</div><div class="field-value">${escapeHTML(zL+(ladoL?(' · '+ladoL):''))}</div></div>`;
+        if(hc.desdeCuando) r+=`<div class="field-row"><div class="field-label">Desde cuándo</div><div class="field-value narrative">${escapeHTML(hc.desdeCuando)}</div></div>`;
+        if(irrL) r+=`<div class="field-row"><div class="field-label">Irradiación</div><div class="field-value">${escapeHTML(irrL)}</div></div>`;
+        if(irritL) r+=`<div class="field-row"><div class="field-label">Irritabilidad</div><div class="field-value">${escapeHTML(irritL)}</div></div>`;
+        if(secL) r+=`<div class="field-row"><div class="field-label">Otras zonas</div><div class="field-value">${escapeHTML(secL)}</div></div>`;
+        return r;
+      })()}
+      ${(mv.motivo.mecanismo && mv.motivo.mecanismo!=='No especificado') ? `<div class="field-row"><div class="field-label">Mecanismo</div><div class="field-value">${escapeHTML(mv.motivo.mecanismo)}</div></div>`:''}
+      ${(mv.motivo.evolucion && mv.motivo.evolucion!=='No especificado') ? `<div class="field-row"><div class="field-label">Evolución</div><div class="field-value">${escapeHTML(mv.motivo.evolucion)}</div></div>`:''}
+      <div class="field-row"><div class="field-label">Limitación funcional</div><div class="field-value narrative">${valorSeguroHTML(mv.dxFuncional&&mv.dxFuncional.limitaciones)}</div></div>
       <div class="field-row"><div class="field-label">Estudios y hallazgos</div><div class="field-value narrative">${escapeHTML((mv.motivo.estudios||'')+(mv.motivo.hallazgos?' — '+mv.motivo.hallazgos:''))}</div></div>`}
     </div>
     <div class="section-card">
@@ -8390,7 +8409,6 @@ function renderExpediente(tab='historia'){
       </div>
       <div class="field-row"><div class="field-label">Dx clínico</div><div class="field-value">${valorSeguroHTML(mv.dxFuncional.dxClinico)}</div></div>
       <div class="field-row"><div class="field-label">Dx funcional</div><div class="field-value narrative">${valorSeguroHTML(mv.dxFuncional.dxFuncional)}</div></div>
-      <div class="field-row"><div class="field-label">Limitaciones / dolor</div><div class="field-value">${valorSeguroHTML(mv.dxFuncional.limitaciones)}</div></div>
       <div class="field-row"><div class="field-label">Objetivos CP</div><div class="field-value">${valorSeguroHTML(mv.dxFuncional.objetivosCP)}</div></div>
       <div class="field-row"><div class="field-label">Objetivos LP</div><div class="field-value">${valorSeguroHTML(mv.dxFuncional.objetivosLP)}</div></div>
       <div class="field-row"><div class="field-label">Pronóstico</div><div class="field-value">${valorSeguroHTML(mv.dxFuncional.pronostico)}</div></div>
