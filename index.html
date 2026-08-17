@@ -4002,16 +4002,27 @@ async function _recargarConShellLimpio(manual){
     return;
   }
   _swRecargando = true;
+  // Guardar la copia FRESCA (no-store) del HTML en el/los cache(s) del shell ANTES de recargar: la
+  // navegación es cache-PRIMERO, así que si NO metemos aquí la versión nueva, al recargar el SW la
+  // vuelve a bajar pegando en el caché HTTP de ~10 min de GitHub y regresa la VIEJA (el bucle que
+  // hacía que "Forzar" no sirviera). Con esto la recarga sirve la versión nueva de inmediato.
+  try{
+    var frescaResp=await fetch('./index.html?swforce='+Date.now(), { cache:'no-store' });
+    if(frescaResp && frescaResp.ok){
+      var ksPut=await caches.keys();
+      var shellKeys=ksPut.filter(function(k){ return k.indexOf(SW_CACHE_PREFIX)===0; });
+      if(!shellKeys.length) shellKeys=[SW_CACHE_PREFIX+'v1-forced'];
+      for(var i=0;i<shellKeys.length;i++){
+        try{ var cc=await caches.open(shellKeys[i]); await cc.put('./index.html', frescaResp.clone()); await cc.put('./', frescaResp.clone()); }catch(_pc){}
+      }
+    }
+  }catch(_pf){}
   try{
     if('serviceWorker' in navigator){
       var reg=await navigator.serviceWorker.getRegistration();
       if(reg){ try{ await reg.update(); }catch(_u){} if(reg.waiting){ try{ reg.waiting.postMessage({type:'SKIP_WAITING'}); }catch(_p){} } }
     }
   }catch(_e){}
-  try{
-    var ks=await caches.keys();
-    await Promise.all(ks.filter(function(k){ return k.indexOf(SW_CACHE_PREFIX)===0; }).map(function(k){ return caches.delete(k); }));
-  }catch(_c){}
   setTimeout(function(){ try{ location.reload(); }catch(_r){ location.href=location.href; } }, 300);
 }
 function _resetBtnForzar(){ try{ var b=document.getElementById('det-forzar-update'); if(b){ b.disabled=false; b.textContent='🔄 Forzar actualización'; } }catch(_){} }
