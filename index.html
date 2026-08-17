@@ -3982,6 +3982,23 @@ function esSeguroRecargar(){
     return true;
   }catch(e){ return false; } // ante cualquier error, NO recargar
 }
+// WATCHDOG anti-atoro: la bandera _dirty ("cambios sin guardar") a veces se queda en true y ya no se
+// limpia (p.ej. un guardado que falló) → "guarda tu nota primero" para SIEMPRE y no se puede Forzar
+// actualización. Si NO hay una pantalla de edición abierta NI un campo de texto enfocado, no hay nada
+// que perder: se limpia sola. Corre cada 15 s. No toca datos, solo la bandera de UI.
+var _EDITOR_SCREENS = ['screen-soap','screen-nuevo','screen-editar-valoracion','screen-consent','screen-nuevo-ejercicio'];
+function _watchdogDirtyAtorado(){
+  try{
+    if(typeof _dirty==='undefined' || !_dirty) return;
+    var scr=(document.querySelector('.screen.active')||{}).id||'';
+    var ae=document.activeElement, tag=(ae&&ae.tagName||'').toUpperCase();
+    var editando = _EDITOR_SCREENS.indexOf(scr)!==-1
+      || tag==='TEXTAREA'
+      || (tag==='INPUT' && ae && ae.id!=='buscador-pacientes');
+    if(!editando){ try{ limpiarDirty(); }catch(_){ _dirty=false; } }
+  }catch(_e){}
+}
+try{ setInterval(_watchdogDirtyAtorado, 15000); }catch(_wd){}
 
 // Recarga ROBUSTA y CONSCIENTE DE LA RED para aplicar una versión nueva.
 // Problema real: en datos móviles (ruteo AT&T/IPv6 degradado) la petición a GitHub Pages se CUELGA;
@@ -6754,6 +6771,7 @@ function _detHTMLAcciones(hayHallazgos){
   return '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px">'
     +'<button id="det-forzar-update" onclick="_detForzarUpdate()" style="font-size:13px;font-weight:800;border:none;border-radius:10px;padding:9px 16px;cursor:pointer;font-family:inherit;background:var(--navy);color:#fff">🔄 Forzar actualización</button>'
     +'<button id="det-reconectar" onclick="_detReconectarYSubir()" style="font-size:13px;font-weight:800;border:none;border-radius:10px;padding:9px 16px;cursor:pointer;font-family:inherit;background:#B45309;color:#fff">🔧 Reconectar y subir</button>'
+    +'<button id="det-diag-escritura" onclick="_diagnosticoEscritura()" style="font-size:13px;font-weight:800;border:none;border-radius:10px;padding:9px 16px;cursor:pointer;font-family:inherit;background:#EEF1F6;color:var(--navy)">🩺 Diagnóstico de escritura</button>'
     +'<button id="det-rescatar" onclick="_detRescatar()" style="font-size:13px;font-weight:800;border:none;border-radius:10px;padding:9px 16px;cursor:pointer;font-family:inherit;background:'+(hayHallazgos?'#B91C1C':'#EEF1F6')+';color:'+(hayHallazgos?'#fff':'var(--gray-500)')+'">☁️ Rescatar (subir lo pendiente)</button>'
     +((function(){ try{ var _a=JSON.parse(localStorage.getItem('COLA_SYNC_HIST_FALLIDOS')||'[]'); return Array.isArray(_a)&&_a.some(function(it){ return it && it.tipo==='nueva'; }); }catch(e){ return false; } })()?('<button id="det-limpia-hist" onclick="_detLimpiarHistFallidos()" style="font-size:13px;font-weight:800;border:none;border-radius:10px;padding:9px 16px;cursor:pointer;font-family:inherit;background:#EEF1F6;color:var(--gray-500)">🔁 Verificar histórico en nube</button>'):'')
     +((typeof esSupervisorUI==='function'&&esSupervisorUI())?('<button id="det-diag-exp" onclick="_detDiagnosticoExpediente()" style="font-size:13px;font-weight:800;border:none;border-radius:10px;padding:9px 16px;cursor:pointer;font-family:inherit;background:#EEF1F6;color:var(--navy)">🩺 Diagnóstico de expediente</button>'):'')
@@ -6820,6 +6838,35 @@ function _retroConstruirNota(p){
 // RECONECTAR Y SUBIR (manual, on-demand) — el escape real cuando la cola no drena sola: fuerza
 // regenerar la sesión de Firebase (cura "permisos insuficientes"), quita el backoff para que TODO
 // intente ya, drena, y REPORTA en pantalla cuántas subieron / cuántas faltan / el motivo real.
+// DIAGNÓSTICO DE ESCRITURA (solo lectura): dice la VERDAD del permiso desde este equipo — quién está
+// autenticado (email/uid del token), si el token está vivo, y si el SERVIDOR acepta una lectura (que
+// exige el mismo isWriter() que las escrituras). Sirve para el caso "permission-denied solo en X iPad".
+async function _diagnosticoEscritura(){
+  var out=[];
+  try{
+    var u = (typeof firebase!=='undefined' && firebase.auth) ? firebase.auth().currentUser : null;
+    out.push('currentUser: ' + (u ? (u.email||'(sin email)') : '❌ NULL — SIN SESIÓN'));
+    if(u){
+      out.push('uid: ' + (u.uid||'?'));
+      try{
+        var r = await u.getIdTokenResult(true);
+        out.push('token.email: ' + (r.claims.email||'(sin claim)'));
+        out.push('email_verified: ' + r.claims.email_verified);
+        out.push('token expira: ' + (r.expirationTime||'?'));
+      }catch(e){ out.push('getIdToken(true): ❌ ' + ((e&&(e.code||e.message))||'?')); }
+    }
+    try{
+      if(!window._fstDb && typeof FST_init==='function') await FST_init();
+      if(window._fstDb){
+        await window._fstDb.collection('pacientes').limit(1).get({source:'server'});
+        out.push('LECTURA de servidor: ✅ OK (token autorizado)');
+      } else { out.push('LECTURA de servidor: (sin conexión Firestore)'); }
+    }catch(e){ out.push('LECTURA de servidor: ❌ ' + ((e&&(e.code||e.message))||'?')); }
+  }catch(e){ out.push('ERROR: ' + ((e&&e.message)||'?')); }
+  var msg = '🩺 DIAGNÓSTICO DE ESCRITURA\n\n' + out.join('\n');
+  try{ alert(msg); }catch(_){ try{ showToast(out.join(' · '),'info'); }catch(__){} }
+  return msg;
+}
 async function _detReconectarYSubir(){
   var btn=document.getElementById('det-reconectar');
   var set=function(t,dis){ if(btn){ btn.textContent=t; btn.disabled=!!dis; } };
@@ -7133,12 +7180,17 @@ async function _detHTMLVersion(){
 async function _detForzarUpdate(){
   try{
     if(typeof esSeguroRecargar==='function' && !esSeguroRecargar()){
-      try{ showToast('Guarda tu nota primero — luego vuelve a forzar la actualización','warning'); }catch(_){}
-      return;
+      // ESCAPE: no dejar a nadie ATRAPADO. Recargar NO pierde lo guardado ni lo pendiente de subir
+      // (viven en el equipo); solo podrías perder texto que estés escribiendo AHORA en pantalla.
+      if(!confirm('Tienes cambios sin guardar en pantalla.\n\nLo que ya guardaste y lo que está pendiente de subir NO se pierde.\nSolo podrías perder lo que estés escribiendo en este momento.\n\n¿Actualizar de todas formas?')) return;
+      try{ limpiarDirty(); }catch(_){}
     }
     if(!navigator.onLine){ try{ showToast('Sin conexión — conéctate a WiFi y vuelve a intentar','warning'); }catch(_){}; return; }
     var _colasOk=(typeof _totalPendientesSync!=='function')||(_totalPendientesSync()===0);
-    if(!_colasOk){ try{ showToast('Tienes cambios sin subir — espera al "Todo sincronizado" y reintenta','warning'); }catch(_){}; return; }
+    if(!_colasOk){
+      // Los pendientes viven en el equipo y sobreviven la recarga: se pueden subir después. No atrapar.
+      if(!confirm('Tienes cambios pendientes de subir a la nube.\n\nNO se pierden: quedan guardados en el equipo y se suben después.\n\n¿Actualizar de todas formas?')) return;
+    }
     var btn=document.getElementById('det-forzar-update'); if(btn){ btn.disabled=true; btn.textContent='Actualizando…'; }
     try{ showToast('Buscando versión nueva…','info'); }catch(_){}
     await _recargarConShellLimpio(true);   // manual: sondea red; si no llega, avisa "conéctate a WiFi" sin dejar en blanco
