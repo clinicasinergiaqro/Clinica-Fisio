@@ -364,11 +364,13 @@
   }
 
   function nuevoAccSent(){
-    return { frames:0, framesValidos:0, _frame:0,
+    return { frames:0, framesValidos:0, _frame:0, aspect:null,
       s:{ sacroY:[], sacroX:[], fppaIzq:[], fppaDer:[], mkdIzq:[], mkdDer:[], sepRatio:[], troncoLat:[], alturaPx:[] },
       visPiernas:0, visTronco:0, orientFrontalN:0, orientN:0,
+      // Trayectorias ALINEADAS por frame (mismo índice k = mismo instante; null si el punto no se vio),
+      // para poder redibujar el esqueleto cuadro a cuadro en la reconstrucción.
       tray:{ sacro:[], rodillaIzq:[], rodillaDer:[], caderaIzq:[], caderaDer:[], tobilloIzq:[], tobilloDer:[] },
-      anclas:[] };
+      trayFrame:[], trayN:0, anclas:[] };
   }
   function _pushS(arr,i,v){ if(arr.length<4000) arr.push({i:i,v:v}); }
   function acumularSent(acc,f){
@@ -388,8 +390,11 @@
     if(f.alturaPx!=null) _pushS(acc.s.alturaPx,i,f.alturaPx);
     if(f.midAnk && acc.anclas.length<4000) acc.anclas.push({x:f.midAnk.x,y:f.midAnk.y});
     if(alguno) acc.framesValidos++;
-    var T=acc.tray, P=f.p||{};
-    for(var k in T){ var pt=P[k]; if(pt && T[k].length<3600) T[k].push([Math.round(pt.x*1000), Math.round(pt.y*1000)]); }
+    if(acc.trayN<3600){
+      var T=acc.tray, P=f.p||{};
+      for(var k in T){ var pt=P[k]; T[k].push(pt?[Math.round(pt.x*1000), Math.round(pt.y*1000)]:null); }
+      acc.trayFrame.push(i); acc.trayN++;
+    }
   }
 
   // Cierra la toma frontal: detecta repeticiones por el descenso del sacro y lee cada métrica
@@ -463,7 +468,10 @@
     var world = res && res.poseWorldLandmarks;
     if(BIO.tipoMedicion==='sent'){
       var f = lm ? calcularSentFrontal(lm) : null;
-      if(f && (BIO.recording || BIO.procesandoVideo)) acumularSent(BIO.accS, f);
+      if(f && (BIO.recording || BIO.procesandoVideo)){
+        if(BIO.accS && !BIO.accS.aspect && BIO.video && BIO.video.videoWidth){ BIO.accS.aspect = BIO.video.videoWidth/BIO.video.videoHeight; }
+        acumularSent(BIO.accS, f);
+      }
       if(BIO.canvas && BIO.srcEl){ dibujar(lm, null); dibujarSentVivo(f); }
       if(BIO.modo==='camara'){ actualizarPanelSent(f); actualizarGateSent(lm, f); }
       return;
@@ -617,7 +625,21 @@
       +   '<button class="bio-modo-btn bio-modo-vid" id="bio-prog-cancel" style="max-width:200px;padding:12px">Cancelar</button>'
       + '</div>'
       // Vista resumen
-      + '<div class="bio-vista bio-resumen" id="bio-vista-resumen"></div>';
+      + '<div class="bio-vista bio-resumen" id="bio-vista-resumen"></div>'
+      // Vista reconstrucción (esqueleto animado + trayectorias)
+      + '<div class="bio-vista" id="bio-vista-recon" style="padding:8px">'
+      +   '<div id="bio-recon-wrap" style="position:relative;width:100%;flex:1;min-height:0;display:flex;align-items:center;justify-content:center"><canvas id="bio-recon-canvas" style="border-radius:12px;max-width:100%;max-height:100%"></canvas></div>'
+      +   '<div id="bio-recon-info" style="text-align:center;color:#9BA3B5;font-size:12px;padding:5px">—</div>'
+      +   '<div style="display:flex;gap:8px;align-items:center;padding:2px 6px">'
+      +     '<button class="bio-b-sec" id="bio-recon-play" style="flex:0 0 auto;min-width:auto;padding:10px 14px">▶︎ Reproducir</button>'
+      +     '<input type="range" id="bio-recon-slider" min="0" max="100" value="0" style="flex:1">'
+      +     '<button class="bio-b-sec" id="bio-recon-speed" style="flex:0 0 auto;min-width:auto;padding:10px 12px">1×</button>'
+      +   '</div>'
+      +   '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:4px 6px 8px;font-size:11px;color:#9BA3B5">'
+      +     '<span>🟡 sacro · 🟢 rodilla izq · 🔵 rodilla der · 🟣 cadera · 🟠 tobillo</span>'
+      +     '<button class="bio-b-sec" id="bio-recon-cerrar" style="flex:0 0 auto;min-width:auto;padding:8px 12px">Cerrar</button>'
+      +   '</div>'
+      + '</div>';
     document.body.appendChild(ov);
 
     document.getElementById('bio-cerrar').addEventListener('click', cerrarMedidor);
@@ -632,10 +654,14 @@
     document.getElementById('bio-btn-rec').addEventListener('click', toggleGrabacion);
     document.getElementById('bio-btn-flip').addEventListener('click', voltearCamara);
     document.getElementById('bio-prog-cancel').addEventListener('click', function(){ BIO.cancelVideo=true; });
+    document.getElementById('bio-recon-play').addEventListener('click', _reconPlay);
+    document.getElementById('bio-recon-slider').addEventListener('input', function(){ _reconStop(); if(RECON.paquete){ RECON.frame=Math.max(0,Math.min(RECON.paquete.n-1, parseInt(this.value,10)||0)); _reconDibujar(); } });
+    document.getElementById('bio-recon-speed').addEventListener('click', function(){ RECON.speed = RECON.speed===1?0.5:(RECON.speed===0.5?2:1); this.textContent=RECON.speed+'×'; });
+    document.getElementById('bio-recon-cerrar').addEventListener('click', function(){ _reconStop(); cerrarMedidor(); });
   }
 
   function mostrarVista(id){
-    ['bio-vista-inicio','bio-vista-camara','bio-vista-progreso','bio-vista-resumen'].forEach(function(v){
+    ['bio-vista-inicio','bio-vista-camara','bio-vista-progreso','bio-vista-resumen','bio-vista-recon'].forEach(function(v){
       var el=document.getElementById(v); if(el) el.classList.toggle('on', v===id);
     });
   }
@@ -684,6 +710,7 @@
   }
   function cerrarMedidor(){
     BIO.cancelVideo=true;
+    _reconStop();
     detenerGrabadorVideo(); BIO.pendingVideo=null;
     detenerCamaraStream(); detenerLoopCamara(); pararCronometro();
     BIO.recording=false; BIO.procesandoVideo=false; BIO.modo=null; BIO.srcEl=null;
@@ -1190,17 +1217,153 @@
       duracionSeg:meta.duracionSeg||0,
       medidas:res.medidas, porRep:res.porRep, calibracion:res.calibracion,
       calidad:meta.calidad||{},
-      // Las trayectorias completas NO caben en Sheets: quedan en memoria (BIO.trayCache) y la
-      // subfase 2C las persiste en Storage + IndexedDB. Aquí solo el resumen.
-      trayectorias:{ estado:'pendiente', puntos:Object.keys((BIO.accS&&BIO.accS.tray)||{}), muestras:(BIO.accS&&BIO.accS.tray&&BIO.accS.tray.sacro)?BIO.accS.tray.sacro.length:0 },
+      // Las trayectorias completas NO caben en Sheets: se persisten aparte (Storage + IndexedDB)
+      // y aquí queda solo el puntero. En Sheets viaja únicamente este resumen.
+      trayectorias:null,
       reportePdf:null, video:null, eliminado:false
     };
     sesion.video = await _subirVideoSesion(p, meta, btn, 'sent');
-    BIO.trayCache = BIO.trayCache || {};
-    BIO.trayCache[sesion.id] = { fps:(meta.calidad&&(meta.calidad.fpsPromedio||meta.calidad.fpsMuestreo))||null, tray:(BIO.accS&&BIO.accS.tray)||null };
-    var _tc=Object.keys(BIO.trayCache);                       // cota de memoria: solo las últimas 5 tomas
-    while(_tc.length>5){ delete BIO.trayCache[_tc.shift()]; }
+    if(btn) btn.textContent='⏳ Guardando…';
+    await _persistirTray(p, sesion, _paqueteTray(BIO.accS, meta, res));
     await _persistirSesion(p, sesion, btn, 'Sentadilla frontal ('+meta.fuente+')');
+  }
+
+  // ═════════════ RECONSTRUCCIÓN VISUAL (esqueleto + trayectorias) ═════════════
+  // Empaqueta las trayectorias alineadas por frame + fps + aspecto + frame del fondo (sacro
+  // más bajo). Compacto: coords enteras 0..1000, null donde el punto no se vio.
+  function _paqueteTray(accS, meta, res){
+    if(!accS || !accS.tray || !accS.trayN) return null;
+    var sac=accS.tray.sacro||[], fondo=null, maxY=-1;
+    for(var k=0;k<sac.length;k++){ if(sac[k] && sac[k][1]>maxY){ maxY=sac[k][1]; fondo=k; } }
+    return { v:1, fps:(meta&&meta.calidad&&(meta.calidad.fpsPromedio||meta.calidad.fpsMuestreo))||12,
+      aspect:accS.aspect||0.5625, nReps:(res&&res.nReps)||0, fondo:fondo, n:accS.trayN, puntos:accS.tray };
+  }
+  // Persiste el paquete: memoria (replay inmediato) + IndexedDB (offline, mismo dispositivo) +
+  // Storage (viaja entre dispositivos). En la sesión solo queda el puntero.
+  async function _persistirTray(p, sesion, paquete){
+    if(!paquete){ sesion.trayectorias={ estado:'nada' }; return; }
+    BIO.trayCache = BIO.trayCache || {};
+    BIO.trayCache[sesion.id] = paquete;
+    var _tc=Object.keys(BIO.trayCache); while(_tc.length>5){ delete BIO.trayCache[_tc.shift()]; }
+    try{ if(typeof idbSet==='function') await idbSet('bio_tray_'+sesion.id, paquete); }catch(e){}
+    if(typeof fbStorage!=='undefined' && fbStorage){
+      try{
+        var blob=new Blob([JSON.stringify(paquete)],{type:'application/json'});
+        var path='clinica/sinergia/'+p.id+'/biomecanica/tray_'+sesion.id+'.json';
+        var ref=fbStorage.ref(path);
+        var url=await new Promise(function(resolve,reject){
+          var task=ref.put(blob,{contentType:'application/json'});
+          task.on('state_changed', null, function(err){ reject(err); }, function(){ task.snapshot.ref.getDownloadURL().then(resolve).catch(reject); });
+        });
+        sesion.trayectorias={ estado:'ok', url:url, fbPath:path, fps:paquete.fps, aspect:paquete.aspect, muestras:paquete.n, fondo:paquete.fondo };
+        return;
+      }catch(e){ console.warn('[BIO] subida de trayectorias falló:', e && e.message); }
+    }
+    sesion.trayectorias={ estado:'local', fps:paquete.fps, aspect:paquete.aspect, muestras:paquete.n, fondo:paquete.fondo };
+  }
+  // Carga el paquete de una sesión: memoria → IndexedDB → Storage (fetch del JSON).
+  async function _cargarTray(sid, sesion){
+    if(BIO.trayCache && BIO.trayCache[sid]) return BIO.trayCache[sid];
+    try{ if(typeof idbGet==='function'){ var loc=await idbGet('bio_tray_'+sid); if(loc && loc.puntos) return loc; } }catch(e){}
+    var tr=sesion && sesion.trayectorias;
+    if(tr && tr.url){
+      try{ var r=await fetch(tr.url); if(r.ok){ var j=await r.json(); if(j && j.puntos) return j; } }catch(e){}
+    }
+    return null;
+  }
+
+  var RECON_SEGS=[['caderaIzq','caderaDer'],['caderaIzq','rodillaIzq'],['rodillaIzq','tobilloIzq'],['caderaDer','rodillaDer'],['rodillaDer','tobilloDer']];
+  var RECON_COLORES={ sacro:'#E8C96A', rodillaIzq:'#3DDC97', rodillaDer:'#4FA3FF', caderaIzq:'#C99AF2', caderaDer:'#C99AF2', tobilloIzq:'#F2996B', tobilloDer:'#F2996B' };
+  var RECON={ paquete:null, frame:0, playing:false, raf:null, speed:1, last:0, box:null };
+
+  // Proyección: normaliza a espacio cuadrado (x·aspect, y), ajusta el bounding box de TODOS los
+  // puntos al canvas con margen, preservando proporciones reales.
+  function _reconCalcBox(paq, W, H){
+    var a=paq.aspect||0.5625, minX=1e9,maxX=-1e9,minY=1e9,maxY=-1e9, hay=false;
+    for(var key in paq.puntos){ var arr=paq.puntos[key]; for(var k=0;k<arr.length;k++){ var pt=arr[k]; if(!pt) continue; hay=true;
+      var X=(pt[0]/1000)*a, Y=pt[1]/1000; if(X<minX)minX=X; if(X>maxX)maxX=X; if(Y<minY)minY=Y; if(Y>maxY)maxY=Y; } }
+    if(!hay) return null;
+    var bw=Math.max(1e-3,maxX-minX), bh=Math.max(1e-3,maxY-minY), mg=0.12;
+    var s=Math.min(W*(1-2*mg)/bw, H*(1-2*mg)/bh);
+    return { a:a, s:s, ox:(W-s*bw)/2 - s*minX, oy:(H-s*bh)/2 - s*minY };
+  }
+  function _reconXY(pt, box){ if(!pt) return null; return { x:box.ox + box.s*(pt[0]/1000)*box.a, y:box.oy + box.s*(pt[1]/1000) }; }
+
+  function _reconDibujar(){
+    var paq=RECON.paquete, cv=document.getElementById('bio-recon-canvas'); if(!paq||!cv) return;
+    var ctx=cv.getContext('2d'), W=cv.width, H=cv.height;
+    ctx.clearRect(0,0,W,H); ctx.fillStyle='#0f1a2e'; ctx.fillRect(0,0,W,H);
+    // cuadrícula ligera
+    ctx.strokeStyle='rgba(255,255,255,.05)'; ctx.lineWidth=1;
+    for(var gx=0; gx<=W; gx+=Math.round(W/8)){ ctx.beginPath(); ctx.moveTo(gx,0); ctx.lineTo(gx,H); ctx.stroke(); }
+    for(var gy=0; gy<=H; gy+=Math.round(H/12)){ ctx.beginPath(); ctx.moveTo(0,gy); ctx.lineTo(W,gy); ctx.stroke(); }
+    var box=RECON.box; if(!box) return;
+    var fr=RECON.frame, N=paq.n;
+    // 1) TRAYECTORIAS completas, tenues (sacro más marcado)
+    Object.keys(paq.puntos).forEach(function(key){
+      var arr=paq.puntos[key], col=RECON_COLORES[key]||'#8891a6', esSacro=(key==='sacro');
+      ctx.strokeStyle=col; ctx.globalAlpha=esSacro?0.5:0.28; ctx.lineWidth=esSacro?3:2;
+      ctx.beginPath(); var started=false;
+      for(var k=0;k<arr.length;k++){ var q=_reconXY(arr[k],box); if(!q){ started=false; continue; }
+        if(!started){ ctx.moveTo(q.x,q.y); started=true; } else ctx.lineTo(q.x,q.y); }
+      ctx.stroke();
+    });
+    ctx.globalAlpha=1;
+    // 2) FONDO marcado (sacro más bajo)
+    if(paq.fondo!=null){ var fq=_reconXY(paq.puntos.sacro[paq.fondo],box); if(fq){ ctx.strokeStyle='#E8C96A'; ctx.lineWidth=1.5; ctx.beginPath(); ctx.arc(fq.x,fq.y,9,0,7); ctx.stroke(); } }
+    // 3) ESQUELETO en el frame actual
+    function P(key){ return _reconXY(paq.puntos[key][fr], box); }
+    ctx.strokeStyle='#cfe3ff'; ctx.lineWidth=Math.max(2,Math.round(W*0.008)); ctx.lineCap='round';
+    RECON_SEGS.forEach(function(seg){ var a=P(seg[0]), b=P(seg[1]); if(a&&b){ ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke(); } });
+    // articulaciones (puntos de color) + sacro
+    ['caderaIzq','caderaDer','rodillaIzq','rodillaDer','tobilloIzq','tobilloDer','sacro'].forEach(function(key){
+      var q=P(key); if(!q) return; ctx.fillStyle=RECON_COLORES[key]||'#fff';
+      ctx.beginPath(); ctx.arc(q.x,q.y, key==='sacro'?Math.max(4,W*0.012):Math.max(3,W*0.009), 0, 7); ctx.fill();
+    });
+    // lectura de la rep en curso (si el frame cae dentro de una)
+    var et=document.getElementById('bio-recon-info');
+    if(et){ var pct=N?Math.round(fr/(N-1)*100):0; et.textContent='Frame '+(fr+1)+'/'+N+' · '+pct+'%'; }
+  }
+  function _reconStop(){ if(RECON.raf){ cancelAnimationFrame(RECON.raf); RECON.raf=null; } RECON.playing=false;
+    var b=document.getElementById('bio-recon-play'); if(b) b.textContent='▶︎ Reproducir'; }
+  function _reconLoop(ts){
+    if(!RECON.playing){ return; }
+    RECON.raf=requestAnimationFrame(_reconLoop);
+    var fps=(RECON.paquete.fps||12)*RECON.speed, gap=1000/fps;
+    if(ts-RECON.last<gap) return; RECON.last=ts;
+    RECON.frame++; if(RECON.frame>=RECON.paquete.n){ RECON.frame=0; }
+    var sl=document.getElementById('bio-recon-slider'); if(sl) sl.value=RECON.frame;
+    _reconDibujar();
+  }
+  function _reconPlay(){ if(RECON.playing){ _reconStop(); return; }
+    if(RECON.frame>=RECON.paquete.n-1) RECON.frame=0;
+    RECON.playing=true; RECON.last=0; var b=document.getElementById('bio-recon-play'); if(b) b.textContent='⏸ Pausa';
+    RECON.raf=requestAnimationFrame(_reconLoop);
+  }
+  function _reconSetCanvas(){
+    var wrap=document.getElementById('bio-recon-wrap'), cv=document.getElementById('bio-recon-canvas'); if(!wrap||!cv) return;
+    var paq=RECON.paquete, a=(paq&&paq.aspect)||0.5625;
+    var W=Math.max(240, Math.min(wrap.clientWidth||360, 520));
+    var H=Math.round(W/a); var maxH=(wrap.clientHeight||640);
+    if(H>maxH){ H=maxH; W=Math.round(H*a); }
+    cv.width=W; cv.height=H;
+    RECON.box=_reconCalcBox(paq, W, H);
+    var sl=document.getElementById('bio-recon-slider'); if(sl){ sl.max=Math.max(0,paq.n-1); sl.value=RECON.frame; }
+    _reconDibujar();
+  }
+  async function BIO_reconstruccion(sid){
+    var p=(typeof currentPatient!=='undefined')?currentPatient:null; if(!p) return;
+    var s=(p.biomecanica||[]).find(function(x){return x.id===sid;}); if(!s) return;
+    construirOverlay();
+    var ov=document.getElementById('bio-overlay'); ov.style.display='flex';
+    BIO.tipoMedicion='sent';
+    mostrarVista('bio-vista-recon');
+    var info=document.getElementById('bio-recon-info'); if(info) info.textContent='Cargando trayectorias…';
+    var paq=await _cargarTray(sid, s);
+    if(!paq || !paq.puntos || !paq.n){ if(info) info.textContent='⚠️ No hay trayectorias guardadas para esta toma (se grabó antes de esta versión, o no se pudieron recuperar).'; return; }
+    RECON.paquete=paq; RECON.frame=0; RECON.speed=1; _reconStop();
+    _reconSetCanvas();
+    _reconPlay();
   }
 
   // ── Render de la pestaña "Biomecánica" (devuelve HTML string) ──────────────
@@ -1262,7 +1425,10 @@
       + fila('Tronco lateral', fmtS(by['tronco_lateral'],'máx'))
       + fila('Descenso del sacro', descTxt)
       + '<div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;padding:10px 14px;align-items:center">'
-      +   '<span style="color:var(--gray-400);font-size:11px">PDF y reconstrucción: próximas subfases</span>'
+      +   ((s.trayectorias && s.trayectorias.estado && s.trayectorias.estado!=='nada')
+          ? '<button data-sid="'+esc(s.id)+'" onclick="BIO_reconstruccion(this.dataset.sid)" style="background:var(--navy);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer">🎬 Reconstrucción</button>'
+          : '<span style="color:var(--gray-400);font-size:11px">sin trayectorias</span>')
+      +   '<span style="color:var(--gray-400);font-size:11px">PDF: próxima subfase</span>'
       +   videoBtn
       +   '<button data-sid="'+esc(s.id)+'" onclick="BIO_eliminar(this.dataset.sid)" style="background:var(--red-light);color:var(--red);border:1.5px solid #FCA5A5;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer">🗑️ Eliminar</button>'
       + '</div>'
@@ -1464,6 +1630,7 @@
   window.BIO_renderPestana = renderPestana;
   window.BIO_pdf = BIO_pdf;
   window.BIO_eliminar = BIO_eliminar;
+  window.BIO_reconstruccion = BIO_reconstruccion;
   window.BIO_construirPDF = BIO_construirPDF;   // para pruebas/render
 
 })();
