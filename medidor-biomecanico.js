@@ -907,6 +907,12 @@
         v.onloadedmetadata=function(){ res(); };
         v.onerror=function(){ rej(new Error('No se pudo leer el video')); };
         setTimeout(function(){ if((v.videoWidth>0)||(isFinite(v.duration)&&v.duration>0)) res(); }, 2500);
+        // Archivo dañado que NUNCA dispara metadata NI error → sin este corte duro la espera
+        // quedaba colgada para siempre en "Analizando video…".
+        setTimeout(function(){
+          if((v.videoWidth>0)||(isFinite(v.duration)&&v.duration>0)) res();
+          else rej(new Error('No se pudo leer el video (archivo dañado o formato no compatible)'));
+        }, 9000);
       });
     }catch(e){ URL.revokeObjectURL(url); limpiarVideoSrc(v); txt.textContent='⚠️ '+e.message; return; }
 
@@ -1143,7 +1149,7 @@
     }
     var q=res.calidad||{}, avisos=[];
     if(q.orientacionOK===false) avisos.push('⚠️ La toma no se vio de FRENTE — el valgo frontal no es interpretable; repite con el paciente de frente.');
-    if(q.camaraMovida) avisos.push('⚠️ La cámara se movió durante la toma — medidas marcadas como no confiables.');
+    if(q.camaraMovida) avisos.push('⚠️ La cámara o el paciente se desplazaron durante la toma — medidas marcadas como no confiables.');
     if(!res.nReps) avisos.push('⚠️ No se detectaron sentadillas completas (descenso mínimo '+SENT_MIN_DESC+'% de la estatura). Repite con sentadillas más profundas o el cuerpo completo en cuadro.');
     var desc=by['sacro_descenso'], cmTxt='';
     if(desc && desc.media!=null && res.calibracion && res.calibracion.estaturaCm){
@@ -1192,6 +1198,8 @@
     sesion.video = await _subirVideoSesion(p, meta, btn, 'sent');
     BIO.trayCache = BIO.trayCache || {};
     BIO.trayCache[sesion.id] = { fps:(meta.calidad&&(meta.calidad.fpsPromedio||meta.calidad.fpsMuestreo))||null, tray:(BIO.accS&&BIO.accS.tray)||null };
+    var _tc=Object.keys(BIO.trayCache);                       // cota de memoria: solo las últimas 5 tomas
+    while(_tc.length>5){ delete BIO.trayCache[_tc.shift()]; }
     await _persistirSesion(p, sesion, btn, 'Sentadilla frontal ('+meta.fuente+')');
   }
 
@@ -1238,7 +1246,7 @@
     }
     var q=vf.calidad||{}, avisos=[];
     if(q.orientacionOK===false) avisos.push('toma no frontal');
-    if(q.camaraMovida) avisos.push('cámara movida');
+    if(q.camaraMovida) avisos.push('cámara/paciente se movió');
     var videoBtn = (s.video && s.video.url)
       ? '<button data-url="'+esc(s.video.url)+'" onclick="window.open(this.dataset.url,\'_blank\')" style="background:var(--green);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer">▶️ Ver video</button>'
       : '';
