@@ -154,13 +154,26 @@
     return { up:up, lateral:lateral, forward:forward };
   }
   // Estado del hombro en un frame: elevación total (0=colgando) y dirección dominante del brazo.
-  function _estadoHombro(world, marco, sIdx, eIdx){
+  // La DIRECCIÓN se decide en 3D (marco del cuerpo). El VALOR de la ABDUCCIÓN se mide en 2D (plano
+  // de la imagen), porque de frente es un movimiento IN-PLANE y el z del modelo "lite" lo ensuciaba
+  // (lo volvía impreciso y asimétrico entre lados). Flexión/extensión van fuera del plano → 3D.
+  function _estadoHombro(world, lm, marco, sIdx, eIdx){
     var arm=_sub(world[eIdx], world[sIdx]);
     var au=_dot(arm, marco.up), al=_dot(arm, marco.lateral), af=_dot(arm, marco.forward);
     var h=Math.sqrt(al*al+af*af);
-    var theta=Math.atan2(h, -au)*180/Math.PI;   // 0=abajo, 90=horizontal, 180=arriba
+    var theta3D=Math.atan2(h, -au)*180/Math.PI;   // 0=abajo, 90=horizontal, 180=arriba
     var dir=null;
-    if(theta>=12){ dir = (Math.abs(al)>=Math.abs(af)) ? 'abd' : (af>0 ? 'flex' : 'ext'); }
+    if(theta3D>=12){ dir = (Math.abs(al)>=Math.abs(af)) ? 'abd' : (af>0 ? 'flex' : 'ext'); }
+    var theta=theta3D;
+    if(dir==='abd' && lm && lm[sIdx] && lm[eIdx] && lm[11] && lm[12] && lm[23] && lm[24]){
+      var downX=((lm[23].x+lm[24].x)/2)-((lm[11].x+lm[12].x)/2), downY=((lm[23].y+lm[24].y)/2)-((lm[11].y+lm[12].y)/2); // hombros→caderas (abajo)
+      var armX=lm[eIdx].x-lm[sIdx].x, armY=lm[eIdx].y-lm[sIdx].y;
+      var md=Math.hypot(downX,downY), ma=Math.hypot(armX,armY);
+      if(md>1e-6 && ma>1e-6){
+        var cos=(downX*armX+downY*armY)/(md*ma); if(cos>1)cos=1; if(cos<-1)cos=-1;
+        theta=Math.acos(cos)*180/Math.PI;   // 0=colgando, 90=horizontal, 180=arriba (in-plane, sin z)
+      }
+    }
     return { theta:theta, dir:dir };
   }
   // Calcula los valores clínicos de cada MOVIMIENTO para un frame.
@@ -174,12 +187,21 @@
         var p1=m.pts[0], p2=m.pts[1], p3=m.pts[2];
         if(_vis(lm,p1)&&_vis(lm,p2)&&_vis(lm,p3) && world && world[p1]&&world[p2]&&world[p3]){
           var interior = angulo3D(world[p1], world[p2], world[p3]);
+          // Codo en 2D cuando el brazo está EN EL PLANO de la imagen (de frente, al costado o en
+          // abducción): sin ruido de z, un brazo recto da ~0°. Si el antebrazo apunta a la cámara
+          // (foreshortening por flexión al frente) se queda en 3D.
+          var fa3=_mag(_sub(world[p3],world[p2])), ua3=_mag(_sub(world[p1],world[p2]));
+          if(fa3>1e-4 && ua3>1e-4){
+            var rFa=Math.hypot(lm[p3].x-lm[p2].x, lm[p3].y-lm[p2].y)/fa3, rUa=Math.hypot(lm[p1].x-lm[p2].x, lm[p1].y-lm[p2].y)/ua3;
+            var mn=Math.min(rFa,rUa), mx=Math.max(rFa,rUa);
+            if(mx>1e-6 && mn>=0.6*mx) interior=_ang2D(lm[p1], lm[p2], lm[p3]);   // ambos segmentos in-plane → 2D
+          }
           val = 180 - interior; if(val<0) val=0; ok=true;
         }
       } else { // hombro: la métrica se llena solo si el brazo va en SU dirección (flex/ext/abd)
         var s=m.hombro, e=m.codo;
         if(marco && _vis(lm,s)&&_vis(lm,e)&&_vis(lm,11)&&_vis(lm,12)&&_vis(lm,23)&&_vis(lm,24) && world && world[s]&&world[e]){
-          var est = cacheHombro[s] || (cacheHombro[s] = _estadoHombro(world, marco, s, e));
+          var est = cacheHombro[s] || (cacheHombro[s] = _estadoHombro(world, lm, marco, s, e));
           if(est.dir === m.dir){ val = est.theta; if(val<0) val=0; ok=true; }
         }
       }
@@ -263,6 +285,18 @@
     }
     return out;
   }
+  // Quita CHISPAZOS solitarios de 1 frame (glitch del modelo) SIN recortar picos reales: solo
+  // recorta una muestra si sobresale > thr° por encima de AMBOS vecinos (un pico real dura ≥2 frames).
+  function _quitaChispazos(serie, thr){
+    thr=thr||20;
+    if(!serie || serie.length<3) return (serie||[]).slice();
+    var out=serie.map(function(s){ return { i:s.i, v:s.v }; });
+    for(var i=1;i<serie.length-1;i++){
+      var a=serie[i-1].v, b=serie[i].v, c=serie[i+1].v, mx=Math.max(a,c), mn=Math.min(a,c);
+      if(b-mx>thr && b-mn>thr) out[i].v=mx;
+    }
+    return out;
+  }
   function _r1(v){ return v==null?null:Math.round(v*10)/10; }
   function _r2(v){ return v==null?null:Math.round(v*100)/100; }
   // Ángulo interior 2D (grados) en el vértice b, SOLO plano de la imagen (para proyecciones frontales).
@@ -284,13 +318,14 @@
                    media:null, mejor:null, de:null, reps:0, ext:null,
                    min:null, max:null, rango:null, muestras:(s&&s.muestras)||0 };
       if(!s || s.muestras<6 || !s.serie || !s.serie.length) return base;   // <6 muestras = incidental
-      var picos=_detPicos(s.serie, m.calc==='codo'?20:15, 8);
+      var serie=_quitaChispazos(s.serie);               // quita glitches de 1 frame sin recortar picos reales
+      var picos=_detPicos(serie, m.calc==='codo'?20:15, 8);
       if(!picos.length) return base;
       var de=_desv(picos);
       base.media=Math.round(_media(picos)); base.mejor=Math.round(Math.max.apply(null,picos));
       base.de=(de!=null)?Math.round(de):null; base.reps=picos.length;
       if(m.calc==='codo'){                            // codo: extensión = mínimo robusto (0°=extendido)
-        var ext=_percentil(s.serie, 0.05); if(ext<0) ext=0;
+        var ext=_percentil(serie, 0.05); if(ext<0) ext=0;
         base.ext=Math.round(ext); base.min=base.ext; base.max=base.media; base.rango=Math.round(base.media-base.ext);
       } else {                                        // hombro: ROM desde 0° neutro
         base.min=0; base.max=base.mejor; base.rango=base.media;
