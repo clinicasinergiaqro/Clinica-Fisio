@@ -357,8 +357,11 @@
     if(midHip) out.sacro={x:midHip.x, y:midHip.y, ok:true};
     if(midAnk && vis(0)) out.alturaPx=Math.abs(midAnk.y-lm[0].y);   // proxy nariz→tobillos
     out.midAnk=midAnk;
-    out.p={ sacro:midHip, rodillaIzq:vis(25)?lm[25]:null, rodillaDer:vis(26)?lm[26]:null,
+    out.p={ sacro:midHip,
+            nariz:vis(0)?lm[0]:null, hombroIzq:vis(11)?lm[11]:null, hombroDer:vis(12)?lm[12]:null,
+            codoIzq:vis(13)?lm[13]:null, codoDer:vis(14)?lm[14]:null, munecaIzq:vis(15)?lm[15]:null, munecaDer:vis(16)?lm[16]:null,
             caderaIzq:vis(23)?lm[23]:null, caderaDer:vis(24)?lm[24]:null,
+            rodillaIzq:vis(25)?lm[25]:null, rodillaDer:vis(26)?lm[26]:null,
             tobilloIzq:vis(27)?lm[27]:null, tobilloDer:vis(28)?lm[28]:null };
     return out;
   }
@@ -369,7 +372,8 @@
       visPiernas:0, visTronco:0, orientFrontalN:0, orientN:0,
       // Trayectorias ALINEADAS por frame (mismo índice k = mismo instante; null si el punto no se vio),
       // para poder redibujar el esqueleto cuadro a cuadro en la reconstrucción.
-      tray:{ sacro:[], rodillaIzq:[], rodillaDer:[], caderaIzq:[], caderaDer:[], tobilloIzq:[], tobilloDer:[] },
+      tray:{ sacro:[], nariz:[], hombroIzq:[], hombroDer:[], codoIzq:[], codoDer:[], munecaIzq:[], munecaDer:[],
+             caderaIzq:[], caderaDer:[], rodillaIzq:[], rodillaDer:[], tobilloIzq:[], tobilloDer:[] },
       trayFrame:[], trayN:0, anclas:[] };
   }
   function _pushS(arr,i,v){ if(arr.length<4000) arr.push({i:i,v:v}); }
@@ -636,7 +640,7 @@
       +     '<button class="bio-b-sec" id="bio-recon-speed" style="flex:0 0 auto;min-width:auto;padding:10px 12px">1×</button>'
       +   '</div>'
       +   '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:4px 6px 8px;font-size:11px;color:#9BA3B5">'
-      +     '<span>🟡 sacro · 🟢 rodilla izq · 🔵 rodilla der · 🟣 cadera · 🟠 tobillo</span>'
+      +     '<span>🟣/🟡 manos · 🔴/🟢 pies · 🟤 sacro · 🟢/🔵 rodillas · teal hombros</span>'
       +     '<button class="bio-b-sec" id="bio-recon-cerrar" style="flex:0 0 auto;min-width:auto;padding:8px 12px">Cerrar</button>'
       +   '</div>'
       + '</div>';
@@ -1272,8 +1276,18 @@
     return null;
   }
 
-  var RECON_SEGS=[['caderaIzq','caderaDer'],['caderaIzq','rodillaIzq'],['rodillaIzq','tobilloIzq'],['caderaDer','rodillaDer'],['rodillaDer','tobilloDer']];
-  var RECON_COLORES={ sacro:'#E8C96A', rodillaIzq:'#3DDC97', rodillaDer:'#4FA3FF', caderaIzq:'#C99AF2', caderaDer:'#C99AF2', tobilloIzq:'#F2996B', tobilloDer:'#F2996B' };
+  // Esqueleto COMPLETO (monito) por nombre de articulación; la cabeza se traza aparte (hombros→nariz).
+  var RECON_SEGS=[
+    ['hombroIzq','hombroDer'],['hombroIzq','caderaIzq'],['hombroDer','caderaDer'],['caderaIzq','caderaDer'],
+    ['hombroIzq','codoIzq'],['codoIzq','munecaIzq'],['hombroDer','codoDer'],['codoDer','munecaDer'],
+    ['caderaIzq','rodillaIzq'],['rodillaIzq','tobilloIzq'],['caderaDer','rodillaDer'],['rodillaDer','tobilloDer']
+  ];
+  // Colores por articulación imitando la referencia Kinect (manos morado/olivo, pies rojo/verde).
+  var RECON_COLORES={
+    sacro:'#8B2E2E', nariz:'#444444', hombroIzq:'#17A2A2', hombroDer:'#17A2A2',
+    codoIzq:'#8A6D3B', codoDer:'#8A6D3B', munecaIzq:'#9B30FF', munecaDer:'#9AA000',
+    caderaIzq:'#6E5AA8', caderaDer:'#6E5AA8', rodillaIzq:'#2E8B57', rodillaDer:'#3B6BC0',
+    tobilloIzq:'#E23B3B', tobilloDer:'#20A040' };
   var RECON={ paquete:null, frame:0, playing:false, raf:null, speed:1, last:0, box:null };
 
   // Proyección: normaliza a espacio cuadrado (x·aspect, y), ajusta el bounding box de TODOS los
@@ -1298,31 +1312,33 @@
     for(var gx=0; gx<=W; gx+=Math.round(W/8)){ ctx.beginPath(); ctx.moveTo(gx,0); ctx.lineTo(gx,H); ctx.stroke(); }
     for(var gy=0; gy<=H; gy+=Math.round(H/12)){ ctx.beginPath(); ctx.moveTo(0,gy); ctx.lineTo(W,gy); ctx.stroke(); }
     var box=RECON.box; if(!box) return;
-    var fr=RECON.frame, N=paq.n;
-    // 1) TRAYECTORIAS completas, tenues (sacro más marcado)
+    var fr=RECON.frame, N=paq.n, r=Math.max(1.4, W*0.0055);
+    // título
+    ctx.fillStyle='#9BA3B5'; ctx.font='bold '+Math.max(11,Math.round(W*0.03))+'px -apple-system,Arial'; ctx.textAlign='center'; ctx.textBaseline='top';
+    ctx.fillText('Trayectorias', W/2, 6);
+    // 1) TRAYECTORIAS como NUBE DE PUNTOS por articulación (imita Kinect)
     Object.keys(paq.puntos).forEach(function(key){
       var arr=paq.puntos[key], col=RECON_COLORES[key]||'#8891a6', esSacro=(key==='sacro');
-      ctx.strokeStyle=col; ctx.globalAlpha=esSacro?0.5:0.28; ctx.lineWidth=esSacro?3:2;
-      ctx.beginPath(); var started=false;
-      for(var k=0;k<arr.length;k++){ var q=_reconXY(arr[k],box); if(!q){ started=false; continue; }
-        if(!started){ ctx.moveTo(q.x,q.y); started=true; } else ctx.lineTo(q.x,q.y); }
-      ctx.stroke();
+      ctx.fillStyle=col; ctx.globalAlpha=esSacro?0.55:0.4;
+      for(var k=0;k<arr.length;k++){ var q=_reconXY(arr[k],box); if(!q) continue;
+        ctx.beginPath(); ctx.arc(q.x,q.y, esSacro?r*1.15:r, 0, 7); ctx.fill(); }
     });
     ctx.globalAlpha=1;
     // 2) FONDO marcado (sacro más bajo)
-    if(paq.fondo!=null){ var fq=_reconXY(paq.puntos.sacro[paq.fondo],box); if(fq){ ctx.strokeStyle='#E8C96A'; ctx.lineWidth=1.5; ctx.beginPath(); ctx.arc(fq.x,fq.y,9,0,7); ctx.stroke(); } }
-    // 3) ESQUELETO en el frame actual
-    function P(key){ return _reconXY(paq.puntos[key][fr], box); }
-    ctx.strokeStyle='#cfe3ff'; ctx.lineWidth=Math.max(2,Math.round(W*0.008)); ctx.lineCap='round';
+    if(paq.fondo!=null && paq.puntos.sacro){ var fq=_reconXY(paq.puntos.sacro[paq.fondo],box); if(fq){ ctx.strokeStyle='#E8C96A'; ctx.lineWidth=1.5; ctx.beginPath(); ctx.arc(fq.x,fq.y,10,0,7); ctx.stroke(); } }
+    // 3) ESQUELETO (monito) en el frame actual, en azul como la referencia
+    function P(key){ var a=paq.puntos[key]; return (a&&a[fr])?_reconXY(a[fr],box):null; }
+    ctx.strokeStyle='#3B6BE0'; ctx.lineWidth=Math.max(2,Math.round(W*0.007)); ctx.lineCap='round';
     RECON_SEGS.forEach(function(seg){ var a=P(seg[0]), b=P(seg[1]); if(a&&b){ ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke(); } });
-    // articulaciones (puntos de color) + sacro
-    ['caderaIzq','caderaDer','rodillaIzq','rodillaDer','tobilloIzq','tobilloDer','sacro'].forEach(function(key){
-      var q=P(key); if(!q) return; ctx.fillStyle=RECON_COLORES[key]||'#fff';
-      ctx.beginPath(); ctx.arc(q.x,q.y, key==='sacro'?Math.max(4,W*0.012):Math.max(3,W*0.009), 0, 7); ctx.fill();
-    });
-    // lectura de la rep en curso (si el frame cae dentro de una)
+    // cabeza: hombros→nariz + círculo
+    var hi=P('hombroIzq'), hd=P('hombroDer'), nz=P('nariz');
+    if(hi&&hd&&nz){ var mc={x:(hi.x+hd.x)/2,y:(hi.y+hd.y)/2}; ctx.beginPath(); ctx.moveTo(mc.x,mc.y); ctx.lineTo(nz.x,nz.y); ctx.stroke();
+      ctx.beginPath(); ctx.arc(nz.x,nz.y-r*1.5, Math.max(4,W*0.016),0,7); ctx.stroke(); }
+    // articulaciones (nodos azules) del frame actual
+    RECON_SEGS.forEach(function(seg){ seg.forEach(function(key){ var q=P(key); if(!q) return; ctx.fillStyle='#3B6BE0'; ctx.beginPath(); ctx.arc(q.x,q.y, Math.max(2.5,W*0.008),0,7); ctx.fill(); }); });
+    var sq=P('sacro'); if(sq){ ctx.fillStyle='#8B2E2E'; ctx.beginPath(); ctx.arc(sq.x,sq.y,Math.max(3,W*0.011),0,7); ctx.fill(); }
     var et=document.getElementById('bio-recon-info');
-    if(et){ var pct=N?Math.round(fr/(N-1)*100):0; et.textContent='Frame '+(fr+1)+'/'+N+' · '+pct+'%'; }
+    if(et){ var pct=N?Math.round(fr/(N-1)*100):0; et.textContent='Frame '+(fr+1)+'/'+N+' · '+pct+'%'+(paq.nReps?(' · '+paq.nReps+' rep'+(paq.nReps===1?'':'s')):''); }
   }
   function _reconStop(){ if(RECON.raf){ cancelAnimationFrame(RECON.raf); RECON.raf=null; } RECON.playing=false;
     var b=document.getElementById('bio-recon-play'); if(b) b.textContent='▶︎ Reproducir'; }
