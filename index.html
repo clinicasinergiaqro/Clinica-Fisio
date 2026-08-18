@@ -8266,6 +8266,7 @@ function _renderSoapCard(s,p,readOnly){
         <div class="soap-sub">Tratamiento aplicado:</div><div class="soap-text">${escapeHTML(s.p.tratamiento)}</div>
         <div class="soap-sub">Indicaciones para casa:</div><div class="soap-text">${escapeHTML(s.p.indicaciones)}</div>
         <div class="soap-sub">Contraindicaciones vigentes:</div><div class="soap-text" style="color:var(--red);font-weight:600;">${escapeHTML(s.p.contraindicaciones)}</div>
+        ${(s.objetivoSesion&&String(s.objetivoSesion).trim())?`<div class="soap-sub">🎯 Plan próximas sesiones:</div><div class="soap-text">${escapeHTML(s.objetivoSesion)}</div>`:''}
         ${(Array.isArray(s.ejerciciosSesion)&&s.ejerciciosSesion.length)?`<div class="soap-sub">🏋️ Ejercicios trabajados:</div><div style="display:flex;flex-direction:column;gap:5px;margin-top:2px">${s.ejerciciosSesion.map(function(ej){
           var _t=(ej.media&&ej.media.type)||''; var icon=_t.indexOf('video')===0?'🎥':_t.indexOf('image')===0?'🖼️':'📝';
           var verBtn=(ej.media&&ej.media.url)?'<button type="button" onclick="_verMediaSesion('+JSON.stringify(ej.media.url).replace(/"/g,'&quot;')+','+JSON.stringify(_t).replace(/"/g,'&quot;')+','+JSON.stringify(ej.nombre||'').replace(/"/g,'&quot;')+')" style="background:#EEF4FB;border:none;border-radius:8px;padding:3px 10px;font-size:11px;font-weight:700;color:var(--navy);cursor:pointer">▶ Ver</button>':'';
@@ -10502,11 +10503,9 @@ function renderSOAPForm(){
         ${chipsHTML('f-pcontra',['Sin restricciones vigentes','Sin impacto','Sin flexión lumbar','Sin carga en extremidad'])}
       </div>
       <div class="form-field">
-        <div class="form-label">Frecuencia y seguimiento <span style="color:var(--gray-400);font-weight:400">(agrega a indicaciones)</span></div>
-        <div style="font-size:10.5px;color:var(--gray-400);margin:0 0 4px">Frecuencia:</div>
-        ${chipsAppendHTML('f-pindicaciones',['Frecuencia 1×/semana','Frecuencia 2×/semana','Frecuencia 3×/semana'])}
-        <div style="font-size:10.5px;color:var(--gray-400);margin:6px 0 4px">Seguimiento:</div>
-        ${chipsAppendHTML('f-pindicaciones',['Continuar plan','Revalorar','Referir','Alta'])}
+        <div class="form-label">🎯 Plan para las próximas sesiones <span style="font-weight:400;color:var(--gray-400);font-size:11px">· qué sigue / qué se espera</span>${_traerBtn('f-objetivo-sesion')}</div>
+        <div style="font-size:11px;color:var(--gray-400);font-weight:400;margin:-2px 0 5px;line-height:1.45">Qué harás o esperas en las siguientes citas: progresión de carga, destete de muleta, retiro de tobillera, avanzar a ejercicio funcional, criterio de alta…</div>
+        <textarea class="form-input" id="f-objetivo-sesion" placeholder="Ej: Próxima cita: progresar carga a sentadilla parcial y destete de muleta. En 2-3 sesiones: retiro de tobillera si tolera marcha sin dolor."></textarea>
       </div>
     </div>
   </div>
@@ -10696,7 +10695,7 @@ function renderSOAPForm(){
 // localStorage del dispositivo — nada de nube, rules ni backend.
 // 1A: f-respuesta-tto y f-indicaciones-dom fuera de la lista (campos duplicados eliminados del
 // form; los borradores viejos que los traigan simplemente ignoran esos IDs al restaurar).
-const CAMPOS_SOAP_TEXTO=['f-sdolor','f-scambios','f-sactfisica','f-orom','f-ofuerza','f-ohallazgos','f-aevolucion','f-arespuesta','f-aanalisis','f-ptratamiento','f-pindicaciones','f-pcontra','dictado-textarea','f-fecha-consulta','f-soap-terapeuta','f-soap-textoriginal'];
+const CAMPOS_SOAP_TEXTO=['f-sdolor','f-scambios','f-sactfisica','f-orom','f-ofuerza','f-ohallazgos','f-aevolucion','f-arespuesta','f-aanalisis','f-ptratamiento','f-pindicaciones','f-pcontra','f-objetivo-sesion','dictado-textarea','f-fecha-consulta','f-soap-terapeuta','f-soap-textoriginal'];
 function _soapDraftKey(){
   var pid=(currentPatient&&currentPatient.id)?String(currentPatient.id):'';
   if(!pid) return '';
@@ -10870,7 +10869,8 @@ var _TRAER_CAMPO_ANT={
   'f-orom':          function(s){return s.o&&s.o.rom;},
   'f-ofuerza':       function(s){return s.o&&s.o.fuerza;},
   'f-ohallazgos':    function(s){return s.o&&s.o.hallazgos;},
-  'f-pindicaciones': function(s){return s.p&&s.p.indicaciones;}
+  'f-pindicaciones': function(s){return s.p&&s.p.indicaciones;},
+  'f-objetivo-sesion': function(s){return s.objetivoSesion;}
 };
 function _notaAnteriorParaTraer(){
   var p=currentPatient; if(!p) return null;
