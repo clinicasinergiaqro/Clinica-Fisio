@@ -10524,6 +10524,23 @@ function renderSOAPForm(){
   </div>
 
   <div class="form-section">
+    <div style="border:2px solid #00695C;border-radius:14px;overflow:hidden;background:#F4FBFA">
+      <div style="background:#00695C;color:#fff;padding:11px 14px;display:flex;align-items:center;gap:9px">
+        <span style="font-size:20px;line-height:1">🔬</span>
+        <div>
+          <div style="font-size:16px;font-weight:800;letter-spacing:.2px">Estudios y resultados</div>
+          <div style="font-size:11px;color:#CDE9E4;margin-top:1px">Sube aquí estudios o recetas de esta visita · quedan en la pestaña Estudios</div>
+        </div>
+      </div>
+      <div style="padding:12px 14px">
+        <div id="soap-estudios-wrap"></div>
+        <button type="button" onclick="if(currentPatient&&currentPatient.id)menuAgregarEstudio(currentPatient.id)" style="width:100%;background:#00695C;color:#fff;border:none;border-radius:12px;padding:13px;font-size:14.5px;font-weight:800;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px">➕ Agregar estudio / resultado</button>
+        <div style="font-size:10.5px;color:var(--gray-500);margin-top:7px;line-height:1.4">Foto, PDF, receta o link. Se guarda en el expediente y aparece en la pestaña Estudios (no se duplica).</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="form-section">
     <div class="form-section-title" style="margin-top:0;">👥 ¿Quién atendió esta sesión?</div>
     <div class="form-group">
       <div class="form-field">
@@ -10667,7 +10684,7 @@ function renderSOAPForm(){
   // FASE 1 EJERCICIOS: el grid de modalidades se pinta inline, así que el bloque de "ejercicios
   // trabajados hoy" hay que renderizarlo aquí tras pintar el form (nota nueva). En edición/copiar
   // se re-renderiza en sus puntos tras poblar tempEjerciciosSesion.
-  setTimeout(function(){ try{ if(typeof _renderEjSesion==='function') _renderEjSesion(); if(typeof _renderMediaObjetivo==='function') _renderMediaObjetivo(); }catch(_){} }, 80);
+  setTimeout(function(){ try{ if(typeof _renderEjSesion==='function') _renderEjSesion(); if(typeof _renderMediaObjetivo==='function') _renderMediaObjetivo(); if(typeof _renderSoapEstudios==='function') _renderSoapEstudios(); }catch(_){} }, 80);
   setTimeout(function(){ try{ cargarBorradorSoapSiExiste(); }catch(_){} }, 260);
 }
 
@@ -11063,6 +11080,31 @@ function _renderMediaObjetivo(){
     +'<button type="button" onclick="var i=document.getElementById(\'media-obj-capture\');if(i)i.click()" style="width:100%;background:#F0F5FB;color:var(--navy);border:1.5px dashed var(--navy);border-radius:10px;padding:9px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit">📷 Agregar foto / video de valoración</button>'
     +'<div style="font-size:10.5px;color:var(--gray-400);margin-top:5px;line-height:1.4">La etiqueta amarra la foto/video a lo que mediste (ROM, marcha…) para el seguimiento por sesión.</div>';
   wrap.innerHTML=head+thumbs+cap;
+}
+// Lista compacta (solo lectura) de los estudios del paciente dentro del SOAP. La gestión completa
+// (borrar, interpretar IA) vive en la pestaña Estudios; aquí solo se ve lo que hay y se agrega.
+function _renderSoapEstudios(){
+  var wrap=document.getElementById('soap-estudios-wrap'); if(!wrap) return;
+  var p=currentPatient; var arr=(p&&Array.isArray(p.estudiosDocs))?p.estudiosDocs:[];
+  arr=arr.filter(function(e){ return e && !e.eliminado; });
+  if(!arr.length){ wrap.innerHTML=''; return; }
+  var _tlab={link:'Link',receta:'Receta',interpretacion:'Interpretación',imagen:'Imagen',documento:'Documento'};
+  wrap.innerHTML='<div style="margin-bottom:10px">'+arr.slice().reverse().map(function(e){
+    var t=String(e.type||''); var src=e.url||'';
+    var esImg=(t.indexOf('image')===0)||String(e.tipo)==='imagen';
+    var ico=esImg?'🖼️':(String(e.tipo)==='receta'?'💊':(String(e.tipo)==='link'?'🔗':'📄'));
+    var titulo=escapeHTML(e.tipoClinico||e.descripcion||_tlab[String(e.tipo)]||'Estudio');
+    var interp=(e.resumenManual&&e.resumenManual.texto)?escapeHTML(e.resumenManual.texto):((e.resumenIA&&(e.resumenIA.resumenCorto||e.resumenIA.diagnostico))?escapeHTML(e.resumenIA.resumenCorto||e.resumenIA.diagnostico):'');
+    return '<div style="display:flex;gap:9px;align-items:flex-start;border:1px solid var(--gray-200);border-radius:10px;padding:8px;margin-bottom:6px;background:#fff">'
+      +'<div style="font-size:20px;flex:none;line-height:1.2">'+ico+'</div>'
+      +'<div style="flex:1;min-width:0">'
+        +'<div style="font-size:12.5px;font-weight:700;color:#00584E">'+titulo+'</div>'
+        +(interp?('<div style="font-size:11px;color:var(--gray-600);margin-top:2px;line-height:1.35">'+interp+'</div>'):'')
+        +'<div style="font-size:10px;color:var(--gray-400);margin-top:2px">'+escapeHTML(e.fechaEstudio||e.fechaAgregado||'')+'</div>'
+      +'</div>'
+      +(src?('<span onclick="_verMediaSesion('+(JSON.stringify(src).replace(/"/g,'&quot;'))+','+(JSON.stringify(t).replace(/"/g,'&quot;'))+','+(JSON.stringify(String(titulo)).replace(/"/g,'&quot;'))+')" style="font-size:11px;font-weight:700;color:#00695C;cursor:pointer;flex:none;align-self:center">ver</span>'):'')
+      +'</div>';
+  }).join('')+'</div>';
 }
 async function _capturarMediaObjetivo(ev){
   var file=ev&&ev.target&&ev.target.files&&ev.target.files[0]; if(ev&&ev.target) ev.target.value='';
@@ -12991,7 +13033,7 @@ async function agregarEstudioLink(pid){
     if(_re && _re.pendiente) showToast('📴 Link guardado — se sincronizará al reconectar','warning');
     else if(_re && _re.ok!==false) showToast('✅ Link agregado','success');
     else showToast('⚠️ Link guardado local, la nube no confirmó — se reintentará','warning');
-    FST_renderEstudiosApartado(pid);
+    FST_renderEstudiosApartado(pid); if(typeof _renderSoapEstudios==='function') _renderSoapEstudios();
   }
   catch(e){ showToast('❌ Error: '+e.message,'error'); }
 }
@@ -13025,7 +13067,7 @@ function agregarEstudioArchivo(pid, tipo){
       if(_re && _re.pendiente) showToast('📴 Estudio guardado — se sincronizará al reconectar','warning');
       else if(_re && _re.ok!==false) showToast('✅ Estudio agregado','success');
       else showToast('⚠️ Estudio guardado local, la nube no confirmó — se reintentará','warning');
-      FST_renderEstudiosApartado(pid);
+      FST_renderEstudiosApartado(pid); if(typeof _renderSoapEstudios==='function') _renderSoapEstudios();
     } catch(e){ showToast('❌ Error subiendo: '+e.message,'error'); }
   };
   inp.click();
@@ -13094,7 +13136,7 @@ async function interpretarEstudioIA(pid, estudioId){
 
     await _persistirEstudios(p);
     if (window._estudiosCache) delete window._estudiosCache[pid];
-    FST_renderEstudiosApartado(pid);
+    FST_renderEstudiosApartado(pid); if(typeof _renderSoapEstudios==='function') _renderSoapEstudios();
     showToast('🧠 Estudio interpretado','success');
 
     // Bitácora (control de costos)
@@ -13121,7 +13163,7 @@ async function agregarInterpretacionManual(pid, estudioId){
   est.resumenManual = { texto: texto, origen:'terapeuta', fecha:new Date().toISOString(), autor:(currentUser||{}).name||'' };
   await _persistirEstudios(p);
   if (window._estudiosCache) delete window._estudiosCache[pid];
-  FST_renderEstudiosApartado(pid);
+  FST_renderEstudiosApartado(pid); if(typeof _renderSoapEstudios==='function') _renderSoapEstudios();
   showToast('✏️ Interpretación guardada','success');
 }
 
@@ -13703,7 +13745,7 @@ async function borrarEstudio(pid, eid){
   var movido = await _moverArchivoABorrados(est.fbPath, {tipo:'estudio', pid:pid, tipoDoc:est.tipo||null, id:est.id});
   if (!movido){ showToast('❌ No se pudo mover el archivo a la papelera. No se eliminó; reintenta.','error'); return; }
   p.estudiosDocs = p.estudiosDocs.filter(function(e){ return String(e.id)!==String(eid); });
-  try { await _persistirEstudios(p); if (window._estudiosCache) delete window._estudiosCache[pid]; showToast('🗑️ Estudio movido a la papelera','success'); FST_renderEstudiosApartado(pid); }
+  try { await _persistirEstudios(p); if (window._estudiosCache) delete window._estudiosCache[pid]; showToast('🗑️ Estudio movido a la papelera','success'); FST_renderEstudiosApartado(pid); if(typeof _renderSoapEstudios==='function') _renderSoapEstudios(); }
   catch(e){ showToast('⚠️ Archivo movido, pero no se pudo guardar el índice: '+e.message,'error'); }
 }
 
@@ -13771,7 +13813,7 @@ async function clasificarImagenHistorica(pid, url){
     if (window._estudiosCache) delete window._estudiosCache[pid];
     showToast('✅ Clasificada como '+((ESTUDIO_TIPOS[nuevo]||{}).label||nuevo)+(fechaEst?' · '+_fechaLegible(fechaEst):''),'success');
     if (typeof FST_renderHistorialSoap==='function') FST_renderHistorialSoap(pid);
-    if (typeof FST_renderEstudiosApartado==='function') FST_renderEstudiosApartado(pid);
+    if (typeof FST_renderEstudiosApartado==='function') FST_renderEstudiosApartado(pid); if(typeof _renderSoapEstudios==='function') _renderSoapEstudios();
   } catch(e){ showToast('❌ Error: '+e.message,'error'); }
 }
 
@@ -13791,7 +13833,7 @@ async function reclasificarEstudio(pid, eid){
     await _persistirEstudios(p);
     if (window._estudiosCache) delete window._estudiosCache[pid];
     showToast('✅ Tipo cambiado a '+((ESTUDIO_TIPOS[nuevo]||{}).label||nuevo),'success');
-    FST_renderEstudiosApartado(pid);
+    FST_renderEstudiosApartado(pid); if(typeof _renderSoapEstudios==='function') _renderSoapEstudios();
   } catch(e){
     est.tipo = anterior;                            // rollback en memoria si no persistió
     showToast('❌ Error: '+e.message,'error');
