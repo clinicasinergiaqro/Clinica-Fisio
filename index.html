@@ -4027,6 +4027,24 @@ function _watchdogDirtyAtorado(){
 }
 try{ setInterval(_watchdogDirtyAtorado, 15000); }catch(_wd){}
 
+// GARANTÍA ANTI-PÉRDIDA: en iOS, al bloquear la pantalla, cambiar de app o cerrar la pestaña,
+// Safari dispara visibilitychange(hidden)/pagehide ANTES de descartar la página. Ahí volcamos de
+// inmediato (síncrono, sin el retraso de 1.2s del autosave) el borrador de la pantalla de edición
+// activa: historia (nuevo paciente), editar valoración y SOAP. Así nada a medio llenar se pierde.
+function _flushBorradoresActivos(){
+  try{
+    var scr=(document.querySelector('.screen.active')||{}).id||'';
+    if(scr==='screen-soap'){ if(typeof guardarBorradorSoap==='function') guardarBorradorSoap(); }
+    else if(scr==='screen-nuevo'){ if(typeof guardarBorradorNuevo==='function') guardarBorradorNuevo(); }
+    else if(scr==='screen-editar-valoracion'){ if(typeof guardarBorradorValoracion==='function') guardarBorradorValoracion(); }
+  }catch(_){}
+}
+try{
+  document.addEventListener('visibilitychange', function(){ if(document.visibilityState==='hidden') _flushBorradoresActivos(); });
+  window.addEventListener('pagehide', _flushBorradoresActivos);
+  window.addEventListener('freeze', _flushBorradoresActivos); // Page Lifecycle API (Chromium)
+}catch(_fl){}
+
 // Recarga ROBUSTA y CONSCIENTE DE LA RED para aplicar una versión nueva.
 // Problema real: en datos móviles (ruteo AT&T/IPv6 degradado) la petición a GitHub Pages se CUELGA;
 // si borráramos el shell y recargáramos a ciegas, la navegación red-primero se quedaría sin copia
@@ -10728,9 +10746,12 @@ function _soapFormTieneTexto(){
     if(el && String(el.value||'').trim()) return true;
   }
   // FIX PÉRDIDA DE DATOS: también cuenta como "hay algo que no perder" el media/ejercicios
-  // capturados aunque no se haya escrito texto (foto/video de valoración, ejercicios de sesión).
+  // capturados, el EVA tocado o las modalidades marcadas, aunque no se haya escrito texto.
   if(Array.isArray(tempMediaObjetivo)&&tempMediaObjetivo.length) return true;
   if(Array.isArray(tempEjerciciosSesion)&&tempEjerciciosSesion.length) return true;
+  if(typeof tempEvaI!=='undefined' && tempEvaI!=null) return true;
+  if(typeof tempEvaF!=='undefined' && tempEvaF!=null) return true;
+  if(Array.isArray(tempMods)&&tempMods.length) return true;
   return false;
 }
 function guardarBorradorSoap(){
@@ -16716,9 +16737,11 @@ function guardarBorradorNuevo(){
     data._altaEstudios=Array.isArray(window._altaEstudios)?window._altaEstudios:[];
     data._altaMediaAntes=Array.isArray(window._altaMediaAntes)?window._altaMediaAntes:[];
     data._altaPid=window._altaPid||'';
-    // Guardar si hay nombre O si ya hay estudios/media capturados (no perder lo escaneado
-    // aunque aún no se haya escrito el nombre).
-    if(!data['n-nombre'] && !data._altaEstudios.length && !data._altaMediaAntes.length) return;
+    // Guardar si hay CUALQUIER dato: algún campo con texto, EVA tocado, checks de seguridad, o
+    // estudios/media capturados. Así no se pierde nada a medio llenar aunque falte el nombre.
+    var _algoTexto=CAMPOS_NUEVO.some(function(id){ return String(data[id]||'').trim(); });
+    var _algoCheck=(Array.isArray(data._implantes)&&data._implantes.length)||(Array.isArray(data._condiciones)&&data._condiciones.length)||(Array.isArray(data._banderas)&&data._banderas.length);
+    if(!_algoTexto && data._nEvaVal==null && !_algoCheck && !data._altaEstudios.length && !data._altaMediaAntes.length) return;
     localStorage.setItem(DRAFT_NUEVO,JSON.stringify({updatedAt:Date.now(),data}));
   }catch(e){ console.warn('borrador nuevo:',e); }
 }
