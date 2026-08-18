@@ -15312,9 +15312,21 @@ function renderNuevoPaciente(){
         <div id="n-media-antes-wrap"></div>
         <button type="button" onclick="var i=document.getElementById('n-media-antes-capture');if(i)i.click()" style="width:100%;background:#F0F5FB;color:var(--navy);border:1.5px dashed var(--navy);border-radius:10px;padding:10px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit">📷 Agregar foto / video del antes</button>
       </div>
-      <div class="form-field">
-        <div class="form-label">🔬 Estudios y resultados <span style="font-weight:400;color:var(--gray-400);font-size:11px">· lo que trajo el paciente · queda en la pestaña Estudios</span></div>
-        <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px" id="n-estudio-val-tipos">
+    </div>
+  </div>
+  <!-- ETAPA 2 (UI): apartado INDEPENDIENTE y destacado de Estudios y resultados -->
+  <div class="form-section">
+    <div style="border:2px solid #00695C;border-radius:14px;overflow:hidden;background:#F4FBFA">
+      <div style="background:#00695C;color:#fff;padding:12px 14px;display:flex;align-items:center;gap:9px">
+        <span style="font-size:22px;line-height:1">🔬</span>
+        <div>
+          <div style="font-size:17px;font-weight:800;letter-spacing:.2px">Estudios y resultados</div>
+          <div style="font-size:11.5px;color:#CDE9E4;margin-top:1px">Agrega aquí lo que trajo el paciente · queda en la pestaña Estudios</div>
+        </div>
+      </div>
+      <div style="padding:14px">
+        <div style="font-size:12.5px;font-weight:700;color:#00584E;margin-bottom:7px">1. Tipo de estudio</div>
+        <div style="display:flex;flex-wrap:wrap;gap:7px;margin-bottom:14px" id="n-estudio-val-tipos">
           <button type="button" class="chip-quick" data-tipo="imagen" data-clinico="Rayos X" onclick="_selEstudioValTipo(this)">Rayos X</button>
           <button type="button" class="chip-quick" data-tipo="imagen" data-clinico="Resonancia" onclick="_selEstudioValTipo(this)">Resonancia</button>
           <button type="button" class="chip-quick" data-tipo="imagen" data-clinico="Ultrasonido" onclick="_selEstudioValTipo(this)">Ultrasonido</button>
@@ -15322,11 +15334,13 @@ function renderNuevoPaciente(){
           <button type="button" class="chip-quick" data-tipo="receta" data-clinico="Receta" onclick="_selEstudioValTipo(this)">Receta</button>
           <button type="button" class="chip-quick" data-tipo="imagen" data-clinico="Otro" onclick="_selEstudioValTipo(this)">Otro</button>
         </div>
-        <input class="form-input" type="text" id="n-estudio-val-interp" placeholder="Interpretación / indicación médica (opcional) — ej: Rotura parcial de menisco interno, reporta Dr. Pérez">
+        <div style="font-size:12.5px;font-weight:700;color:#00584E;margin-bottom:7px">2. Interpretación <span style="font-weight:400;color:var(--gray-400);font-size:11px">(opcional)</span></div>
+        <input type="text" id="n-estudio-val-interp" placeholder="Ej: Rotura parcial de menisco interno, reporta Dr. Pérez" style="width:100%;box-sizing:border-box;border:1.5px solid #B7D8D2;border-radius:10px;padding:11px 12px;font-size:14px;font-family:inherit;color:var(--gray-800);background:#fff;outline:none">
         <input type="file" id="n-estudio-val-capture" accept="image/*,application/pdf" style="display:none" onchange="_capturarEstudioVal(event)">
-        <div id="n-estudios-val-wrap" style="margin-top:8px"></div>
-        <button type="button" onclick="var i=document.getElementById('n-estudio-val-capture');if(i)i.click()" style="width:100%;background:#F0FAF9;color:#00695C;border:1.5px dashed #00695C;border-radius:10px;padding:10px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit;margin-top:8px">📷 Escanear / foto / PDF de estudio</button>
-        <div style="font-size:10.5px;color:var(--gray-400);margin-top:5px;line-height:1.4">Elige el tipo y escribe la interpretación (opcional) ANTES de capturar. Cada estudio queda ligado al paciente y visible en la pestaña Estudios.</div>
+        <div id="n-estudios-val-wrap" style="margin-top:10px"></div>
+        <div style="font-size:12.5px;font-weight:700;color:#00584E;margin:14px 0 7px">3. Captura el documento</div>
+        <button type="button" onclick="var i=document.getElementById('n-estudio-val-capture');if(i)i.click()" style="width:100%;background:#00695C;color:#fff;border:none;border-radius:12px;padding:14px;font-size:15px;font-weight:800;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px">📷 Escanear / foto / PDF de estudio</button>
+        <div style="font-size:11px;color:var(--gray-500);margin-top:8px;line-height:1.45">Elige el tipo y escribe la interpretación <b>antes</b> de capturar. Cada estudio queda ligado al paciente y visible en la pestaña Estudios.</div>
       </div>
     </div>
   </div>
