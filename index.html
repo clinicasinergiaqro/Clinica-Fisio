@@ -10430,11 +10430,11 @@ function renderSOAPForm(){
         <textarea class="form-input" id="f-orom" placeholder="Ej: Flexión 130°, dolor 3/10 a partir de 60°..."></textarea>
       </div>
       <div class="form-field">
-        <div class="form-label">Fuerza muscular (escala Daniels) ${_traerBtn('f-ofuerza')}</div>
-        <textarea class="form-input" id="f-ofuerza" placeholder="Ej: Cuádriceps 4/5 con dolor en arco 30-60°. Glúteo medio 3+/5..."></textarea>
+        <div class="form-label">Fuerza muscular <span style="font-weight:400;color:var(--gray-400);font-size:11px">· 10 = lado sano/control; califica el afectado (simetría)</span> ${_traerBtn('f-ofuerza')}</div>
+        <textarea class="form-input" id="f-ofuerza" placeholder="Ej: Cuádriceps sano 10/10, afectado 7/10 con dolor en arco 30-60°..."></textarea>
       </div>
       <div class="form-field">
-        <div class="form-label">Hallazgos / pruebas clínicas <span class="req">*</span>${_traerBtn('f-ohallazgos')}</div>
+        <div class="form-label">Hallazgos / pruebas clínicas <span style="font-weight:400;color:var(--gray-400);font-size:11px">· si exploraste</span>${_traerBtn('f-ohallazgos')}</div>
         <textarea class="form-input" id="f-ohallazgos" placeholder="Ej: Clarke (+) con crepitación. Polo inferior rótula 7/10 a palpación..."></textarea>
       </div>
       <div id="media-obj-wrap" style="margin-top:4px"></div>
@@ -10453,10 +10453,6 @@ function renderSOAPForm(){
         <div class="form-label">Respuesta inmediata a la sesión <span class="req">*</span></div>
         <textarea class="form-input" id="f-arespuesta" placeholder="Ej: Mejoró tras la sesión. Reducción de dolor en reposo y a la palpación..."></textarea>
         ${chipsHTML('f-arespuesta',['Mejoró','Sin cambio significativo','Aumento transitorio esperado','Empeoró','No evaluada'])}
-      </div>
-      <div class="form-field">
-        <div class="form-label">Evolución / análisis rápido <span style="color:var(--gray-400);font-weight:400">(combina varias)</span></div>
-        <div id="soap-evolucion-chips" style="display:flex;flex-wrap:wrap;gap:6px"></div>
       </div>
       <div class="form-field">
         <div class="form-label">Decisión clínica <span style="color:var(--gray-400);font-weight:400">(agrega al análisis)</span></div>
@@ -11393,8 +11389,10 @@ async function guardarSOAP(){
   if(!_esTextoLibreHist){
   if(!v('f-sdolor')) missing.push('Dolor (S)');
   if(!v('f-scambios')) missing.push('Cambios (S)');
-  if(!v('f-ohallazgos')) missing.push('Hallazgos (O)');
-  if(!v('f-aevolucion')) missing.push('Evolución (A)');
+  // AUDITORÍA (2026-08): Hallazgos/pruebas NO obligatorio en seguimiento — no siempre se explora;
+  // obligarlo hacía inventar o atorarse. Sigue capturándose cuando aplica. En valoración inicial
+  // (form nuevo paciente) la exploración tiene su propia captura.
+  if(!v('f-aevolucion')) missing.push('Progreso (A)');
   if(!v('f-arespuesta')) missing.push('Respuesta (A)');
   if(!v('f-aanalisis')) missing.push('Análisis (A)');
   if(!v('f-pindicaciones')) missing.push('Indicaciones (P)');
