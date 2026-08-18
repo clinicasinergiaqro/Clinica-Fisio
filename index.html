@@ -8231,10 +8231,14 @@ function _renderSoapCard(s,p,readOnly){
         <div class="soap-sub">Fuerza:</div><div class="soap-text">${escapeHTML(s.o.fuerza)}</div>
         <div class="soap-sub">Hallazgos:</div><div class="soap-text">${escapeHTML(s.o.hallazgos)}</div>
         ${(Array.isArray(s.mediaObjetivo)&&s.mediaObjetivo.length)?`<div class="soap-sub">📐 Valoración visual:</div><div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:2px">${s.mediaObjetivo.map(function(m){
-          var src=m.url||m.data||''; var t=String(m.type||'');
-          var verArgs=JSON.stringify(src).replace(/"/g,'&quot;')+','+JSON.stringify(t).replace(/"/g,'&quot;')+','+JSON.stringify('Valoración').replace(/"/g,'&quot;');
+          var src=m.url||m.data||''; var t=String(m.type||''); var etq=String(m.etiqueta||'');
+          var titulo=etq||'Valoración';
+          var verArgs=JSON.stringify(src).replace(/"/g,'&quot;')+','+JSON.stringify(t).replace(/"/g,'&quot;')+','+JSON.stringify(titulo).replace(/"/g,'&quot;');
           var inner=(src&&t.indexOf('video')===0)?'<video src="'+escapeAttr_(src)+'" preload="metadata" muted playsinline style="width:100%;height:100%;object-fit:cover"></video><div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:16px;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.7)">▶</div>':(src&&t.indexOf('image')===0)?'<img src="'+escapeAttr_(src)+'" loading="lazy" style="width:100%;height:100%;object-fit:cover">':'<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:18px">📎</div>';
-          return '<div onclick="'+(src?('_verMediaSesion('+verArgs+')'):'')+'" style="width:72px;height:72px;border-radius:9px;overflow:hidden;position:relative;background:#0E1622;cursor:'+(src?'pointer':'default')+'">'+inner+'</div>';
+          return '<div style="width:72px;display:flex;flex-direction:column;align-items:center">'
+            +'<div onclick="'+(src?('_verMediaSesion('+verArgs+')'):'')+'" style="width:72px;height:72px;border-radius:9px;overflow:hidden;position:relative;background:#0E1622;cursor:'+(src?'pointer':'default')+'">'+inner+'</div>'
+            +(etq?('<div style="font-size:9px;line-height:1.2;color:var(--navy);font-weight:700;margin-top:2px;max-width:72px;text-align:center">'+escapeHTML(etq)+'</div>'):'')
+            +'</div>';
         }).join('')}</div>`:''}
       </div>
       <div class="soap-section">
@@ -10391,8 +10395,9 @@ function renderSOAPForm(){
         <textarea class="form-input" id="f-sdolor" placeholder="Ej: 6/10 al bajar escaleras, 3/10 en reposo..."></textarea>
       </div>
       <div class="form-field">
-        <div class="form-label">Cambios desde última sesión <span class="req">*</span></div>
-        <textarea class="form-input" id="f-scambios" placeholder="Ej: Hizo los isométricos 3 días, refiere leve mejoría..."></textarea>
+        <div class="form-label">Cambios que refiere el paciente <span class="req">*</span></div>
+        <div style="font-size:11px;color:var(--gray-400);font-weight:400;margin:-2px 0 5px;line-height:1.45">En palabras del paciente o escrito por ti · sé específico: qué mejoró, qué NO sintió, en qué actividad y en qué zona.</div>
+        <textarea class="form-input" id="f-scambios" placeholder="Ej: Camina más sin dolor pero al subir escaleras aún molesta la rodilla derecha; no sintió cambio en la rigidez de la mañana."></textarea>
       </div>
       <div class="form-field">
         <div class="form-label">Actividad física ${_traerBtn('f-sactfisica')}</div>
@@ -11015,19 +11020,25 @@ function _renderMediaObjetivo(){
   var thumbs='';
   if(arr.length){
     thumbs='<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:6px">'+arr.map(function(m){
-      var id=String(m.id||''); var src=m.url||m.data||''; var t=String(m.type||'');
-      var verArgs=JSON.stringify(src).replace(/"/g,'&quot;')+','+JSON.stringify(t).replace(/"/g,'&quot;')+','+JSON.stringify('Valoración').replace(/"/g,'&quot;');
+      var id=String(m.id||''); var src=m.url||m.data||''; var t=String(m.type||''); var etq=String(m.etiqueta||'');
+      var titulo=etq||'Valoración';
+      var verArgs=JSON.stringify(src).replace(/"/g,'&quot;')+','+JSON.stringify(t).replace(/"/g,'&quot;')+','+JSON.stringify(titulo).replace(/"/g,'&quot;');
       var inner = (src && t.indexOf('video')===0) ? '<video src="'+escapeAttr_(src)+'" preload="metadata" muted playsinline style="width:100%;height:100%;object-fit:cover"></video><div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:18px;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.7)">▶</div>'
         : (src && t.indexOf('image')===0) ? '<img src="'+escapeAttr_(src)+'" loading="lazy" style="width:100%;height:100%;object-fit:cover">'
         : '<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:20px">📎</div>';
-      return '<div style="width:82px;height:82px;border-radius:10px;overflow:hidden;position:relative;background:#0E1622">'
+      var capEtq='<div onclick="_etiquetarMediaObjetivo(\''+escapeAttr_(id)+'\')" style="font-size:9.5px;line-height:1.2;color:'+(etq?'var(--navy)':'var(--gray-400)')+';font-weight:'+(etq?'700':'400')+';margin-top:3px;max-width:82px;cursor:pointer;text-align:center" title="Toca para etiquetar">'+(etq?escapeHTML(etq):'🏷 etiquetar')+'</div>';
+      return '<div style="width:82px;display:flex;flex-direction:column;align-items:center">'
+        +'<div style="width:82px;height:82px;border-radius:10px;overflow:hidden;position:relative;background:#0E1622">'
         +'<div onclick="'+(src?('_verMediaSesion('+verArgs+')'):'')+'" style="position:absolute;inset:0;cursor:'+(src?'pointer':'default')+'">'+inner+'</div>'
         +'<button type="button" onclick="event.stopPropagation();_borrarMediaObjetivo(\''+escapeAttr_(id)+'\')" title="Eliminar" style="position:absolute;top:2px;right:2px;background:rgba(185,28,28,.92);border:none;border-radius:50%;width:22px;height:22px;color:#fff;font-size:12px;font-weight:800;cursor:pointer;line-height:1">✕</button>'
+        +'</div>'+capEtq
         +'</div>';
     }).join('')+'</div>';
   }
-  var cap='<input type="file" id="media-obj-capture" accept="image/*,video/*" style="display:none" onchange="_capturarMediaObjetivo(event)">'
-    +'<button type="button" onclick="var i=document.getElementById(\'media-obj-capture\');if(i)i.click()" style="width:100%;background:#F0F5FB;color:var(--navy);border:1.5px dashed var(--navy);border-radius:10px;padding:9px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit">📷 Agregar foto / video de valoración</button>';
+  var cap='<input type="text" id="media-obj-etiqueta" placeholder="Etiqueta (ej: ROM rodilla D) — opcional" style="width:100%;box-sizing:border-box;border:1.5px solid var(--gray-200);border-radius:9px;padding:8px 10px;font-size:12px;font-family:inherit;margin-bottom:6px">'
+    +'<input type="file" id="media-obj-capture" accept="image/*,video/*" style="display:none" onchange="_capturarMediaObjetivo(event)">'
+    +'<button type="button" onclick="var i=document.getElementById(\'media-obj-capture\');if(i)i.click()" style="width:100%;background:#F0F5FB;color:var(--navy);border:1.5px dashed var(--navy);border-radius:10px;padding:9px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit">📷 Agregar foto / video de valoración</button>'
+    +'<div style="font-size:10.5px;color:var(--gray-400);margin-top:5px;line-height:1.4">La etiqueta amarra la foto/video a lo que mediste (ROM, marcha…) para el seguimiento por sesión.</div>';
   wrap.innerHTML=head+thumbs+cap;
 }
 async function _capturarMediaObjetivo(ev){
@@ -11041,10 +11052,22 @@ async function _capturarMediaObjetivo(ev){
   try{
     var res=await subirMediaEjercicioAStorage(file);   // reutiliza la subida (guarda bajo /ejercicios pero sirve)
     if(!Array.isArray(tempMediaObjetivo)) tempMediaObjetivo=[];
-    tempMediaObjetivo.push({ id:'mo'+Date.now(), type:file.type, url:res.url, fbPath:res.fbPath });
+    var _inpEtq=document.getElementById('media-obj-etiqueta');
+    var _etq=(_inpEtq&&_inpEtq.value?String(_inpEtq.value).trim():'').slice(0,60);
+    tempMediaObjetivo.push({ id:'mo'+Date.now(), type:file.type, url:res.url, fbPath:res.fbPath, etiqueta:_etq });
+    if(_inpEtq) _inpEtq.value='';
     _renderMediaObjetivo(); marcarDirty();
     showToast('✅ Registro visual agregado','success');
   }catch(e){ console.warn('[media-obj]', e&&e.message); showToast('No se pudo subir: '+((e&&e.message)||'error'),'error'); }
+}
+function _etiquetarMediaObjetivo(id){
+  id=String(id);
+  if(!Array.isArray(tempMediaObjetivo)) return;
+  var it=tempMediaObjetivo.find(function(x){return x&&String(x.id)===id;}); if(!it) return;
+  var val=prompt('Etiqueta de este registro (ej: ROM rodilla D, marcha, edema tobillo):', String(it.etiqueta||''));
+  if(val===null) return;
+  it.etiqueta=String(val).trim().slice(0,60);
+  _renderMediaObjetivo(); marcarDirty();
 }
 function _borrarMediaObjetivo(id){
   id=String(id);
