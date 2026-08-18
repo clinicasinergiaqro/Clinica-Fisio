@@ -10727,6 +10727,10 @@ function _soapFormTieneTexto(){
     var el=document.getElementById(CAMPOS_SOAP_TEXTO[i]);
     if(el && String(el.value||'').trim()) return true;
   }
+  // FIX PÉRDIDA DE DATOS: también cuenta como "hay algo que no perder" el media/ejercicios
+  // capturados aunque no se haya escrito texto (foto/video de valoración, ejercicios de sesión).
+  if(Array.isArray(tempMediaObjetivo)&&tempMediaObjetivo.length) return true;
+  if(Array.isArray(tempEjerciciosSesion)&&tempEjerciciosSesion.length) return true;
   return false;
 }
 function guardarBorradorSoap(){
@@ -11144,6 +11148,7 @@ async function _capturarMediaObjetivo(ev){
     tempMediaObjetivo.push({ id:'mo'+Date.now(), type:file.type, url:res.url, fbPath:res.fbPath, etiqueta:_etq });
     if(_inpEtq) _inpEtq.value='';
     _renderMediaObjetivo(); marcarDirty();
+    try{ if(typeof guardarBorradorSoap==='function') guardarBorradorSoap(); }catch(_){}
     showToast('✅ Registro visual agregado','success');
   }catch(e){ console.warn('[media-obj]', e&&e.message); showToast('No se pudo subir: '+((e&&e.message)||'error'),'error'); }
 }
@@ -11206,6 +11211,7 @@ async function _capturarMediaAntes(ev){
     if(!Array.isArray(window._altaMediaAntes)) window._altaMediaAntes=[];
     window._altaMediaAntes.push({ id:'ba'+Date.now(), type:file.type, url:res.url, fbPath:res.fbPath });
     _renderMediaAntes(); marcarDirty();
+    try{ if(typeof guardarBorradorNuevo==='function') guardarBorradorNuevo(); }catch(_){}
     showToast('✅ Registro del "antes" agregado','success');
   }catch(e){ console.warn('[media-antes]', e&&e.message); showToast('No se pudo subir: '+((e&&e.message)||'error'),'error'); }
 }
@@ -11214,6 +11220,7 @@ function _borrarMediaAntes(id){
   if(!Array.isArray(window._altaMediaAntes)) return;
   window._altaMediaAntes=window._altaMediaAntes.filter(function(x){return !(x&&String(x.id)===id);});
   _renderMediaAntes();
+  try{ if(typeof guardarBorradorNuevo==='function') guardarBorradorNuevo(); }catch(_){}
   showToast('🗑 Eliminado','success');
 }
 // ── ETAPA 2: ESTUDIOS Y RESULTADOS EN LA VALORACIÓN INICIAL ───────────────────────
@@ -11256,6 +11263,7 @@ async function _capturarEstudioVal(ev){
     window._altaEstudios.push(item);
     if(interpEl) interpEl.value='';
     _renderEstudiosVal(); marcarDirty();
+    try{ if(typeof guardarBorradorNuevo==='function') guardarBorradorNuevo(); }catch(_){}
     showToast('✅ Estudio agregado','success');
   }catch(e){ console.warn('[estudio-val]', e&&e.message); showToast('No se pudo subir: '+((e&&e.message)||'error'),'error'); }
 }
@@ -11291,6 +11299,7 @@ function _editarInterpEstudioVal(id){
   if(val) it.resumenManual={ texto:val.slice(0,600), autor:(currentUser&&currentUser.name)||'', fecha:new Date().toISOString() };
   else delete it.resumenManual;
   _renderEstudiosVal(); marcarDirty();
+  try{ if(typeof guardarBorradorNuevo==='function') guardarBorradorNuevo(); }catch(_){}
 }
 function _borrarEstudioVal(id){
   id=String(id);
@@ -11298,6 +11307,7 @@ function _borrarEstudioVal(id){
   if(!confirm('¿Eliminar este estudio de la valoración?')) return;
   window._altaEstudios=window._altaEstudios.filter(function(x){return !(x&&String(x.id)===id);});
   _renderEstudiosVal(); marcarDirty();
+  try{ if(typeof guardarBorradorNuevo==='function') guardarBorradorNuevo(); }catch(_){}
   showToast('🗑 Eliminado','success');
 }
 // Grabar/subir un ejercicio DESDE la nota SOAP: sube la media, crea el ejercicio en el paciente
@@ -16698,8 +16708,17 @@ function guardarBorradorNuevo(){
     data._implantes=getChecks('sc-implante');
     data._condiciones=getChecks('sc-condicion');
     data._banderas=getChecks('sc-bandera');
-    // Solo guardar si hay al menos un nombre escrito (evita borradores vacíos)
-    if(!data['n-nombre']) return;
+    // FIX PÉRDIDA DE DATOS: los estudios escaneados y el media del "antes" viven en globals
+    // (window._altaEstudios / _altaMediaAntes) y ANTES no se guardaban en el borrador → si el
+    // iPad se bloqueaba o cerraba la página, se perdían aunque ya estuvieran subidos a Storage.
+    // Son solo referencias livianas (url/fbPath), seguras para localStorage. Guardamos también el
+    // pid pre-generado para conservar continuidad.
+    data._altaEstudios=Array.isArray(window._altaEstudios)?window._altaEstudios:[];
+    data._altaMediaAntes=Array.isArray(window._altaMediaAntes)?window._altaMediaAntes:[];
+    data._altaPid=window._altaPid||'';
+    // Guardar si hay nombre O si ya hay estudios/media capturados (no perder lo escaneado
+    // aunque aún no se haya escrito el nombre).
+    if(!data['n-nombre'] && !data._altaEstudios.length && !data._altaMediaAntes.length) return;
     localStorage.setItem(DRAFT_NUEVO,JSON.stringify({updatedAt:Date.now(),data}));
   }catch(e){ console.warn('borrador nuevo:',e); }
 }
@@ -16712,6 +16731,12 @@ function aplicarBorradorNuevo(data){
     if(data._implantes) setChecks('sc-implante',data._implantes);
     if(data._condiciones) setChecks('sc-condicion',data._condiciones);
     if(data._banderas) setChecks('sc-bandera',data._banderas);
+    // FIX PÉRDIDA DE DATOS: restaurar estudios/media del "antes" y el pid pre-generado.
+    if(data._altaPid) window._altaPid=data._altaPid;
+    if(Array.isArray(data._altaEstudios)) window._altaEstudios=data._altaEstudios.map(function(x){return Object.assign({},x);});
+    if(Array.isArray(data._altaMediaAntes)) window._altaMediaAntes=data._altaMediaAntes.map(function(x){return Object.assign({},x);});
+    if(typeof _renderEstudiosVal==='function') _renderEstudiosVal();
+    if(typeof _renderMediaAntes==='function') _renderMediaAntes();
   }catch(e){ console.warn('aplicar borrador nuevo:',e); }
 }
 
