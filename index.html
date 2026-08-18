@@ -17295,8 +17295,38 @@ function _RPT_htmlEstudios(p){
   }).join('');
   return '<div class="rpt-sec"><h3 class="rpt-h">🔬 Estudios</h3>'+items+'</div>';
 }
+// ETAPA 3: línea de tiempo visual — baseline "antes" de la valoración + foto/video de cada
+// sesión (mediaObjetivo, con su etiqueta), en orden cronológico y numeradas Imagen 1/2/3…
+// Se omite entera si no hay media. Los videos muestran referencia (se ven en la app).
+function _RPT_htmlLineaVisual(p, sesiones){
+  var items=[];
+  var vb=(p&&p.valoracion&&Array.isArray(p.valoracion.mediaBaseline))?p.valoracion.mediaBaseline:[];
+  var fVal=(p&&p.valoracion&&p.valoracion.fecha)||(p&&p.fechaCreacion)||'';
+  vb.forEach(function(m){ if(m&&m.url) items.push({url:m.url,type:String(m.type||''),etiqueta:'Antes · cómo llegó',fechaTxt:_RPT_fechaCorta(fVal),ses:'Valoración'}); });
+  var orden=(sesiones||[]).slice().sort(function(a,b){ var fa=obtenerFechaSoapISO(a)||'',fb=obtenerFechaSoapISO(b)||''; return fa<fb?-1:(fa>fb?1:0); });
+  var posMap=(typeof _numeroSesionMap==='function')?_numeroSesionMap(sesiones,false):{};
+  orden.forEach(function(s){
+    var arr=Array.isArray(s.mediaObjetivo)?s.mediaObjetivo:[];
+    arr.forEach(function(m){ if(m&&m.url){ var n=(posMap[String(s.id)]&&posMap[String(s.id)].n)||''; items.push({url:m.url,type:String(m.type||''),etiqueta:String(m.etiqueta||''),fechaTxt:_RPT_fechaCorta(s.fecha||s.date),ses:(n?('Sesión '+n):'')}); } });
+  });
+  if(!items.length) return '';
+  var thumbs=items.map(function(it,i){
+    var esVid=it.type.indexOf('video')===0;
+    var inner=esVid?('<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:#0E1622;color:#fff;font-size:22px;-webkit-print-color-adjust:exact;print-color-adjust:exact">▶</div>'):('<img src="'+escapeAttr_(it.url)+'" style="width:100%;height:100%;object-fit:cover">');
+    var sub=[it.ses,it.fechaTxt].filter(Boolean).join(' · ');
+    return '<div class="rc-avoid" style="width:132px">'
+      +'<div style="width:132px;height:132px;border-radius:8px;overflow:hidden;background:#0E1622;border:0.5px solid #E2E4E0">'+inner+'</div>'
+      +'<div style="font-size:9px;font-weight:800;color:#2E3192;margin-top:3px">Imagen '+(i+1)+(esVid?' (video)':'')+'</div>'
+      +(it.etiqueta?('<div style="font-size:8.5px;color:#4A4B48;line-height:1.25">'+escapeHTML(it.etiqueta)+'</div>'):'')
+      +(sub?('<div style="font-size:8px;color:#9497A2">'+escapeHTML(sub)+'</div>'):'')
+      +'</div>';
+  }).join('');
+  return _RPT_secHead(5,'Línea de tiempo visual')
+    +'<div style="font-size:9px;color:#9497A2;margin:-4px 0 8px">Registro fotográfico/video de la evolución — del "antes" a las sesiones. Los videos se ven en la app; en el PDF aparece la referencia.</div>'
+    +'<div style="display:flex;flex-wrap:wrap;gap:12px">'+thumbs+'</div>';
+}
 function _RPT_htmlSoap(sesiones){
-  if(!sesiones.length) return _RPT_secHead(5,'Síntesis de notas SOAP')+'<div style="color:#9095A5;font-size:11px">Sin sesiones registradas</div>';
+  if(!sesiones.length) return _RPT_secHead(6,'Síntesis de notas SOAP')+'<div style="color:#9095A5;font-size:11px">Sin sesiones registradas</div>';
   var orden=sesiones.slice().sort(function(a,b){ var fa=obtenerFechaSoapISO(a)||'',fb=obtenerFechaSoapISO(b)||''; if(fa!==fb)return fa<fb?1:-1; return (Number(b&&b.num)||0)-(Number(a&&a.num)||0); });
   var _posMap=_numeroSesionMap(sesiones, false);   // [NUM-SESIÓN] número por posición-fecha (este set ya viene filtrado por episodio); orden de arriba es solo para MOSTRAR (reciente primero)
   function pill(eva){
@@ -17326,7 +17356,7 @@ function _RPT_htmlSoap(sesiones){
       + '<td style="'+tdB+';color:#4A4B48">'+escapeHTML(resumen)+'</td>'
       + '<td style="'+tdB+';color:#4A4B48">'+escapeHTML(trat)+'</td></tr>';
   }).join('');
-  return _RPT_secHead(5,'Síntesis de notas SOAP ('+orden.length+')')
+  return _RPT_secHead(6,'Síntesis de notas SOAP ('+orden.length+')')
     + '<table style="width:100%;border-collapse:collapse;font-size:10px">'
     + '<thead><tr><th style="'+th+';border-radius:4px 0 0 0;width:110px">Sesión</th><th style="'+th+';width:50px">Dolor</th><th style="'+th+(hayP?'':';border-radius:0 4px 0 0')+'">Hallazgos'+(hayP?' (O/A)':'')+'</th>'+(hayP?('<th style="'+th+';border-radius:0 4px 0 0;width:34%">Tratamiento (P)</th>'):'')+'</tr></thead>'
     + '<tbody>'+rows+'</tbody></table>';
@@ -17337,7 +17367,7 @@ function _RPT_htmlMetricas(p, sesiones){
   var ini=evas.length?evas[0]:null, act=evas.length?evas[evas.length-1]:null;
   var red=(ini!=null&&act!=null&&ini>0)?Math.round((ini-act)/ini*100):null;
   function m(val,lbl){ return '<div style="text-align:center"><div style="font-size:22px;font-weight:700;line-height:1">'+val+'</div><div style="font-size:8px;letter-spacing:0.5px;text-transform:uppercase;color:#A8C8BC;margin-top:4px">'+lbl+'</div></div>'; }
-  return _RPT_secHead(6,'Métricas del tratamiento')
+  return _RPT_secHead(7,'Métricas del tratamiento')
     + '<div class="rc-avoid" style="background:#1F5C4D;color:#fff;border-radius:8px;padding:16px 18px;display:grid;grid-template-columns:repeat(4,1fr);gap:16px;-webkit-print-color-adjust:exact;print-color-adjust:exact">'
     + m((ini!=null?ini+'/10':'—'),'EVA 1ª sesión')
     + m((act!=null?act+'/10':'—'),'EVA última sesión')
@@ -17652,6 +17682,7 @@ async function RPT_pintarPestanaReporte(pid, filtroEpisodio){
       + _RPT_htmlValoracion(pCtx, sesionesFiltradas)
       + _RPT_secHead(4,'Evolución del dolor')
       + '<div class="rc-avoid" style="border:0.5px solid #E2E4E0;border-radius:6px;padding:14px"><div id="rpt-grafica-'+escapeAttr_(pid)+'">…</div></div>'
+      + _RPT_htmlLineaVisual(p, sesionesFiltradas)
       + _RPT_htmlSoap(sesionesFiltradas)
       + _RPT_htmlMetricas(pCtx, sesionesFiltradas)
       + _RPT_htmlFirmas(p)
