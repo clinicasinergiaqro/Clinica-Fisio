@@ -845,11 +845,24 @@ async function FST_guardarSesionFirestore(paciente, sesion, modo) {
     const pidInfo = await FST_resolverPidPaciente(paciente);
     if (!pidInfo || !pidInfo.ok || !pidInfo.pid) { console.warn('[FST] dual-write omitido — PID no resuelto:', pidInfo && pidInfo.reason); return { ok: false, reason: (pidInfo && pidInfo.reason) || 'PID_FAILED' }; }
     const pid = pidInfo.pid;
+    const _sesRef = window._fstDb.collection('pacientes').doc(pid).collection('sesiones').doc(sid);
+    // FIX create-sobre-existente (causa REAL del permission-denied perpetuo de la cola): si la nota YA
+    // existe en la nube, un payload 'nueva' trae campos SOLO-DE-CREACIÓN (createdAt/horaCreacion/
+    // totalSesiones) que Firestore, al ser el doc existente, evalúa como UPDATE → sesionUpdateOK los
+    // RECHAZA (permission-denied) para SIEMPRE. La identidad/token de la terapeuta está bien (lo confirmó
+    // el Diagnóstico: lectura de servidor OK). Se detecta la existencia y se escribe con el modo correcto:
+    // 'edicion' (sin campos solo-de-creación; los de metadata van con el MISMO valor → no cuentan como
+    // cambio → pasa sesionUpdateOK). Si el get() falla (red), se conserva el modo original.
+    let _modoReal = modo;
+    try{
+      const _ex = await _conTimeout(_sesRef.get(), 8000);
+      if (_ex && _ex.exists) _modoReal = 'edicion';
+    }catch(_ge){ /* red/timeout: usar el modo original */ }
     const pacPayload = FST_buildPacientePayload(paciente, sesion, pidInfo);
-    const sesPayload = FST_buildSesionPayload(sesion, modo);
+    const sesPayload = FST_buildSesionPayload(sesion, _modoReal);
     await window._fstDb.collection('pacientes').doc(pid).set(_sinUndefined(pacPayload), { merge: true });
-    await window._fstDb.collection('pacientes').doc(pid).collection('sesiones').doc(sid).set(_sinUndefined(sesPayload), { merge: true });
-    console.log('[FST] dual-write OK · modo=' + modo + ' · pid=' + pid + ' · sid=' + sid + ' · match=' + pidInfo.matchType);
+    await _sesRef.set(_sinUndefined(sesPayload), { merge: true });
+    console.log('[FST] dual-write OK · modo=' + _modoReal + '(orig ' + modo + ') · pid=' + pid + ' · sid=' + sid + ' · match=' + pidInfo.matchType);
     return { ok: true, pid: pid, sid: sid, matchType: pidInfo.matchType };
   } catch (e) {
     console.warn('[FST] dual-write error (no crítico):', e.message);
