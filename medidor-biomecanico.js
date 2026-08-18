@@ -633,6 +633,11 @@
       // Vista reconstrucción (esqueleto animado + trayectorias)
       + '<div class="bio-vista" id="bio-vista-recon" style="padding:8px">'
       +   '<div id="bio-recon-wrap" style="position:relative;width:100%;flex:1;min-height:0;display:flex;align-items:center;justify-content:center"><canvas id="bio-recon-canvas" style="border-radius:12px;max-width:100%;max-height:100%"></canvas></div>'
+      +   '<div style="display:flex;gap:6px;padding:2px 6px 4px;justify-content:center">'
+      +     '<button class="bio-tipo-btn on" id="bio-recon-m-tray" style="flex:0 1 auto;padding:8px 12px;font-size:12px">Trayectorias</button>'
+      +     '<button class="bio-tipo-btn" id="bio-recon-m-sacro" style="flex:0 1 auto;padding:8px 12px;font-size:12px">Sacro</button>'
+      +     '<button class="bio-tipo-btn" id="bio-recon-m-rod" style="flex:0 1 auto;padding:8px 12px;font-size:12px">Rodillas</button>'
+      +   '</div>'
       +   '<div id="bio-recon-info" style="text-align:center;color:#9BA3B5;font-size:12px;padding:5px">—</div>'
       +   '<div style="display:flex;gap:8px;align-items:center;padding:2px 6px">'
       +     '<button class="bio-b-sec" id="bio-recon-play" style="flex:0 0 auto;min-width:auto;padding:10px 14px">▶︎ Reproducir</button>'
@@ -662,6 +667,9 @@
     document.getElementById('bio-recon-slider').addEventListener('input', function(){ _reconStop(); if(RECON.paquete){ RECON.frame=Math.max(0,Math.min(RECON.paquete.n-1, parseInt(this.value,10)||0)); _reconDibujar(); } });
     document.getElementById('bio-recon-speed').addEventListener('click', function(){ RECON.speed = RECON.speed===1?0.5:(RECON.speed===0.5?2:1); this.textContent=RECON.speed+'×'; });
     document.getElementById('bio-recon-cerrar').addEventListener('click', function(){ _reconStop(); cerrarMedidor(); });
+    document.getElementById('bio-recon-m-tray').addEventListener('click', function(){ _reconModo('tray'); });
+    document.getElementById('bio-recon-m-sacro').addEventListener('click', function(){ _reconModo('sacro'); });
+    document.getElementById('bio-recon-m-rod').addEventListener('click', function(){ _reconModo('rodillas'); });
   }
 
   function mostrarVista(id){
@@ -1239,8 +1247,15 @@
     if(!accS || !accS.tray || !accS.trayN) return null;
     var sac=accS.tray.sacro||[], fondo=null, maxY=-1;
     for(var k=0;k<sac.length;k++){ if(sac[k] && sac[k][1]>maxY){ maxY=sac[k][1]; fondo=k; } }
+    // Escala vertical para gráficas en cm/%: yBase (de pie, p05 de sacroY) y hEst (px de estatura),
+    // en las MISMAS unidades ×1000 que puntos. estaturaCm si se capturó (para cm reales).
+    var sy=(accS.s.sacroY||[]).map(function(o){return o.v;}).sort(function(a,b){return a-b;});
+    var yBase = sy.length ? sy[Math.floor(0.05*(sy.length-1))]*1000 : null;
+    var hs=(accS.s.alturaPx||[]).map(function(o){return o.v;}).sort(function(a,b){return a-b;});
+    var hEst = hs.length ? (hs[Math.floor(0.90*(hs.length-1))]/0.88)*1000 : null;
     return { v:1, fps:(meta&&meta.calidad&&(meta.calidad.fpsPromedio||meta.calidad.fpsMuestreo))||12,
-      aspect:accS.aspect||0.5625, nReps:(res&&res.nReps)||0, fondo:fondo, n:accS.trayN, puntos:accS.tray };
+      aspect:accS.aspect||0.5625, nReps:(res&&res.nReps)||0, fondo:fondo, n:accS.trayN, puntos:accS.tray,
+      porRep:(res&&res.porRep)||[], escala:{ yBase:yBase, hEst:hEst, estaturaCm:(res&&res.calibracion&&res.calibracion.estaturaCm)||null } };
   }
   // Persiste el paquete: memoria (replay inmediato) + IndexedDB (offline, mismo dispositivo) +
   // Storage (viaja entre dispositivos). En la sesión solo queda el puntero.
@@ -1288,7 +1303,7 @@
     codoIzq:'#8A6D3B', codoDer:'#8A6D3B', munecaIzq:'#9B30FF', munecaDer:'#9AA000',
     caderaIzq:'#6E5AA8', caderaDer:'#6E5AA8', rodillaIzq:'#2E8B57', rodillaDer:'#3B6BC0',
     tobilloIzq:'#E23B3B', tobilloDer:'#20A040' };
-  var RECON={ paquete:null, frame:0, playing:false, raf:null, speed:1, last:0, box:null };
+  var RECON={ paquete:null, frame:0, playing:false, raf:null, speed:1, last:0, box:null, modo:'tray' };
 
   // Proyección: normaliza a espacio cuadrado (x·aspect, y), ajusta el bounding box de TODOS los
   // puntos al canvas con margen, preservando proporciones reales.
@@ -1303,7 +1318,89 @@
   }
   function _reconXY(pt, box){ if(!pt) return null; return { x:box.ox + box.s*(pt[0]/1000)*box.a, y:box.oy + box.s*(pt[1]/1000) }; }
 
+  // Despachador de dibujo por modo: trayectorias (monito) | sacro (cm) | rodillas (cm).
   function _reconDibujar(){
+    if(RECON.modo==='sacro') return _dibujarSacro();
+    if(RECON.modo==='rodillas') return _dibujarRodillas();
+    return _dibujarTray();
+  }
+  // Convierte una coord vertical ×1000 a cm (o % si no hay estatura) de descenso desde de pie.
+  function _descV(y, esc){ if(esc.yBase==null||!esc.hEst) return null; var f=(y-esc.yBase)/esc.hEst; return esc.estaturaCm?f*esc.estaturaCm:f*100; }
+  // Convierte una separación horizontal ×1000 (respecto al sacro) a cm (o %), usando el aspecto.
+  function _sepH(dx, esc, aspect){ if(!esc.hEst) return null; var f=dx*aspect/esc.hEst; return esc.estaturaCm?f*esc.estaturaCm:f*100; }
+  function _ejeChart(ctx,W,H,titulo,unidad){
+    ctx.clearRect(0,0,W,H); ctx.fillStyle='#0f1a2e'; ctx.fillRect(0,0,W,H);
+    ctx.fillStyle='#9BA3B5'; ctx.font='bold '+Math.max(11,Math.round(W*0.03))+'px -apple-system,Arial'; ctx.textAlign='center'; ctx.textBaseline='top';
+    ctx.fillText(titulo, W/2, 6);
+    ctx.font=Math.max(9,Math.round(W*0.02))+'px -apple-system,Arial'; ctx.textAlign='left'; ctx.fillText(unidad, 8, 8);
+  }
+  // Gráfica del DESCENSO DEL SACRO en cm por el tiempo, con el fondo de cada rep marcado.
+  function _dibujarSacro(){
+    var paq=RECON.paquete, cv=document.getElementById('bio-recon-canvas'); if(!paq||!cv) return;
+    var ctx=cv.getContext('2d'), W=cv.width, H=cv.height, esc=paq.escala||{};
+    var unidad=esc.estaturaCm?'cm':'%';
+    _ejeChart(ctx,W,H,'Descenso del sacro ('+unidad+')',unidad);
+    var sac=paq.puntos.sacro||[], serie=[];
+    for(var k=0;k<sac.length;k++){ var v=sac[k]?_descV(sac[k][1],esc):null; serie.push(v); }
+    var vals=serie.filter(function(x){return x!=null;}); if(!vals.length){ return; }
+    var vmax=Math.max.apply(null,vals), top=40, bot=H-46, L=42, R=W-14;
+    vmax=Math.max(vmax, esc.estaturaCm?20:10);
+    function X(i){ return L+(R-L)*(paq.n>1?i/(paq.n-1):0); }
+    function Y(v){ return top+(bot-top)*(v/vmax); }               // 0 arriba (de pie), max abajo (fondo)
+    // rejilla + eje 0
+    ctx.strokeStyle='rgba(255,255,255,.08)'; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(L,Y(0)); ctx.lineTo(R,Y(0)); ctx.stroke();
+    ctx.fillStyle='#6E7891'; ctx.font=Math.max(8,Math.round(W*0.018))+'px Arial'; ctx.textAlign='right'; ctx.textBaseline='middle';
+    ctx.fillText('0', L-4, Y(0)); ctx.fillText(Math.round(vmax)+unidad, L-4, Y(vmax));
+    // curva
+    ctx.strokeStyle='#4F9BFF'; ctx.lineWidth=Math.max(2,W*0.006); ctx.beginPath(); var st=false;
+    for(var i=0;i<serie.length;i++){ if(serie[i]==null){ st=false; continue; } var x=X(i),y=Y(serie[i]); if(!st){ctx.moveTo(x,y);st=true;}else ctx.lineTo(x,y); }
+    ctx.stroke();
+    // fondos de cada rep (rojo) + etiqueta de profundidad
+    ctx.textAlign='center'; ctx.textBaseline='top';
+    (paq.porRep||[]).forEach(function(rp){
+      var idx=null; for(var q=0;q<(paq.trayFrame?paq.trayFrame.length:0);q++){ if(paq.trayFrame[q]===rp.frameFondo){ idx=q; break; } }
+      if(idx==null && rp.frameFondo!=null && rp.frameFondo<serie.length) idx=rp.frameFondo;
+      if(idx==null || serie[idx]==null) return;
+      var x=X(idx), y=Y(serie[idx]);
+      ctx.fillStyle='#E23B3B'; ctx.beginPath(); ctx.arc(x,y,Math.max(3,W*0.01),0,7); ctx.fill();
+      var etq=esc.estaturaCm?(rp.descCm!=null?rp.descCm+' cm':''):(rp.descPct+'%');
+      ctx.fillStyle='#E8A0A0'; ctx.font=Math.max(8,Math.round(W*0.02))+'px Arial'; ctx.fillText(etq, x, y+6);
+    });
+    // cursor del frame actual
+    var cx=X(RECON.frame); ctx.strokeStyle='rgba(232,201,106,.8)'; ctx.lineWidth=1.5; ctx.beginPath(); ctx.moveTo(cx,top); ctx.lineTo(cx,bot); ctx.stroke();
+    var et=document.getElementById('bio-recon-info'); if(et) et.textContent='Fondo de cada repetición marcado en rojo'+(esc.estaturaCm?' (cm reales, ±10%)':' (% de estatura)');
+  }
+  // Gráfica de SEPARACIÓN de rodillas de la línea media (cm): azul=derecha (+), rojo=izquierda (−).
+  function _dibujarRodillas(){
+    var paq=RECON.paquete, cv=document.getElementById('bio-recon-canvas'); if(!paq||!cv) return;
+    var ctx=cv.getContext('2d'), W=cv.width, H=cv.height, esc=paq.escala||{}, asp=paq.aspect||0.5625;
+    var unidad=esc.estaturaCm?'cm':'%';
+    _ejeChart(ctx,W,H,'Rodillas vs línea media ('+unidad+')',unidad);
+    var sac=paq.puntos.sacro||[], ki=paq.puntos.rodillaIzq||[], kd=paq.puntos.rodillaDer||[];
+    var der=[],izq=[],all=[];
+    for(var k=0;k<paq.n;k++){
+      var mid=sac[k]?sac[k][0]:null;
+      var vd=(mid!=null&&kd[k])? Math.abs(_sepH(kd[k][0]-mid,esc,asp)) : null;   // derecha arriba (+)
+      var vi=(mid!=null&&ki[k])? -Math.abs(_sepH(ki[k][0]-mid,esc,asp)) : null;  // izquierda abajo (−)
+      der.push(vd); izq.push(vi); if(vd!=null)all.push(vd); if(vi!=null)all.push(vi);
+    }
+    if(!all.length){ return; }
+    var amp=Math.max.apply(null, all.map(Math.abs)); amp=Math.max(amp, esc.estaturaCm?20:10);
+    var top=40, bot=H-24, L=42, R=W-14, my=(top+bot)/2;
+    function X(i){ return L+(R-L)*(paq.n>1?i/(paq.n-1):0); }
+    function Y(v){ return my-(v/amp)*((bot-top)/2); }
+    // línea media (negra=0) + etiquetas
+    ctx.strokeStyle='#B9C2D6'; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(L,my); ctx.lineTo(R,my); ctx.stroke();
+    ctx.fillStyle='#6E7891'; ctx.font=Math.max(8,Math.round(W*0.018))+'px Arial'; ctx.textAlign='right'; ctx.textBaseline='middle';
+    ctx.fillText('+'+Math.round(amp), L-4, Y(amp)); ctx.fillText('0', L-4, my); ctx.fillText('-'+Math.round(amp), L-4, Y(-amp));
+    function linea(serie,color){ ctx.strokeStyle=color; ctx.lineWidth=Math.max(2,W*0.006); ctx.beginPath(); var st=false;
+      for(var i=0;i<serie.length;i++){ if(serie[i]==null){st=false;continue;} var x=X(i),y=Y(serie[i]); if(!st){ctx.moveTo(x,y);st=true;}else ctx.lineTo(x,y);} ctx.stroke(); }
+    linea(der,'#3B6BE0'); linea(izq,'#E23B3B');
+    var cx=X(RECON.frame); ctx.strokeStyle='rgba(232,201,106,.8)'; ctx.lineWidth=1.5; ctx.beginPath(); ctx.moveTo(cx,top); ctx.lineTo(cx,bot); ctx.stroke();
+    var et=document.getElementById('bio-recon-info'); if(et) et.textContent='🔵 rodilla derecha · 🔴 rodilla izquierda · línea = media. Más lejos de 0 = más abierta.';
+  }
+  function _dibujarTray(){
     var paq=RECON.paquete, cv=document.getElementById('bio-recon-canvas'); if(!paq||!cv) return;
     var ctx=cv.getContext('2d'), W=cv.width, H=cv.height;
     ctx.clearRect(0,0,W,H); ctx.fillStyle='#0f1a2e'; ctx.fillRect(0,0,W,H);
@@ -1356,12 +1453,24 @@
     RECON.playing=true; RECON.last=0; var b=document.getElementById('bio-recon-play'); if(b) b.textContent='⏸ Pausa';
     RECON.raf=requestAnimationFrame(_reconLoop);
   }
+  function _reconModo(m){
+    RECON.modo=m; _reconStop();
+    [['tray','tray'],['sacro','sacro'],['rod','rodillas']].forEach(function(par){
+      var b=document.getElementById('bio-recon-m-'+par[0]); if(b) b.classList.toggle('on', par[1]===m);
+    });
+    _reconSetCanvas();
+  }
   function _reconSetCanvas(){
     var wrap=document.getElementById('bio-recon-wrap'), cv=document.getElementById('bio-recon-canvas'); if(!wrap||!cv) return;
-    var paq=RECON.paquete, a=(paq&&paq.aspect)||0.5625;
-    var W=Math.max(240, Math.min(wrap.clientWidth||360, 520));
-    var H=Math.round(W/a); var maxH=(wrap.clientHeight||640);
-    if(H>maxH){ H=maxH; W=Math.round(H*a); }
+    var paq=RECON.paquete, W, H, maxH=(wrap.clientHeight||640);
+    if(RECON.modo==='tray'){                                   // monito: vertical según aspecto del video
+      var a=(paq&&paq.aspect)||0.5625;
+      W=Math.max(240, Math.min(wrap.clientWidth||360, 520));
+      H=Math.round(W/a); if(H>maxH){ H=maxH; W=Math.round(H*a); }
+    } else {                                                    // gráficas: apaisado
+      W=Math.max(240, Math.min(wrap.clientWidth||360, 560));
+      H=Math.min(maxH, Math.round(W*0.72));
+    }
     cv.width=W; cv.height=H;
     RECON.box=_reconCalcBox(paq, W, H);
     var sl=document.getElementById('bio-recon-slider'); if(sl){ sl.max=Math.max(0,paq.n-1); sl.value=RECON.frame; }
@@ -1378,7 +1487,7 @@
     var paq=await _cargarTray(sid, s);
     if(!paq || !paq.puntos || !paq.n){ if(info) info.textContent='⚠️ No hay trayectorias guardadas para esta toma (se grabó antes de esta versión, o no se pudieron recuperar).'; return; }
     RECON.paquete=paq; RECON.frame=0; RECON.speed=1; _reconStop();
-    _reconSetCanvas();
+    _reconModo('tray');                                        // arranca en Trayectorias (resetea botones)
     _reconPlay();
   }
 
