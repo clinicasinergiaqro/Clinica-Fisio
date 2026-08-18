@@ -3213,6 +3213,20 @@ function chipsHTML2(targetId, pares){
     `<button type="button" class="chip-quick" onclick="setCampoRapido('${targetId}',${JSON.stringify(par[1]).replace(/"/g,'&quot;')})">${par[0]}</button>`
   ).join('')+'</div>';
 }
+// ETAPA 4: chips que AGREGAN al campo (no reemplazan) — para tendencia y frecuencia/seguimiento,
+// donde el terapeuta ya escribió texto específico que no debe borrarse. Evita duplicar.
+function setCampoAppend(id, texto){
+  const el=document.getElementById(id); if(!el) return;
+  const cur=(el.value||'').trim();
+  if(cur && cur.indexOf(texto)>=0){ el.focus(); el.blur(); return; }
+  el.value = cur ? (cur.replace(/[.;]\s*$/,'')+'; '+texto) : texto;
+  el.dispatchEvent(new Event('input')); el.focus(); el.blur();
+}
+function chipsAppendHTML(targetId, opciones){
+  return '<div class="chip-row">'+opciones.map(o=>
+    `<button type="button" class="chip-quick" onclick="setCampoAppend('${targetId}',${JSON.stringify(o).replace(/"/g,'&quot;')})">${o}</button>`
+  ).join('')+'</div>';
+}
 function initials(n){return n.split(' ').slice(0,2).map(w=>w[0]).join('').toUpperCase()}
 // ── Modo oscuro (persiste en localStorage; no afecta PDFs ni vista pública) ──
 /* TODO (siguiente lote): Confirmación al salir sin guardar
@@ -10398,6 +10412,8 @@ function renderSOAPForm(){
         <div class="form-label">Cambios que refiere el paciente <span class="req">*</span></div>
         <div style="font-size:11px;color:var(--gray-400);font-weight:400;margin:-2px 0 5px;line-height:1.45">En palabras del paciente o escrito por ti · sé específico: qué mejoró, qué NO sintió, en qué actividad y en qué zona.</div>
         <textarea class="form-input" id="f-scambios" placeholder="Ej: Camina más sin dolor pero al subir escaleras aún molesta la rodilla derecha; no sintió cambio en la rigidez de la mañana."></textarea>
+        <div style="font-size:10.5px;color:var(--gray-400);margin:5px 0 2px">Tendencia (agrega, no borra lo escrito):</div>
+        ${chipsAppendHTML('f-scambios',['Ha mejorado','Igual','Ha empeorado','Fluctuante'])}
       </div>
       <div class="form-field">
         <div class="form-label">Actividad física ${_traerBtn('f-sactfisica')}</div>
@@ -10429,18 +10445,22 @@ function renderSOAPForm(){
     <div class="form-section-title" style="color:#E65100">A — Análisis</div>
     <div class="form-group">
       <div class="form-field">
-        <div class="form-label">Evolución <span class="req">*</span></div>
+        <div class="form-label">Progreso vs. objetivos <span class="req">*</span></div>
         <input class="form-input" type="text" id="f-aevolucion" placeholder="Ej: Semana 1, sesión 2. Respuesta inicial favorable.">
-        ${chipsHTML('f-aevolucion',['Mejoría progresiva','Sin cambios','Aumento de dolor','Recaída','Progresión de carga','Alta funcional','Disminución de dolor','Tolera mejor ejercicio'])}
+        ${chipsHTML('f-aevolucion',['En curso esperado','Más lento de lo esperado','Sin progreso','Objetivo alcanzado','Recaída','No valorable hoy'])}
       </div>
       <div class="form-field">
-        <div class="form-label">Respuesta al tratamiento <span class="req">*</span></div>
-        <textarea class="form-input" id="f-arespuesta" placeholder="Ej: Favorable. Reducción de dolor en reposo y a la palpación..."></textarea>
-        ${chipsHTML('f-arespuesta',['Tolera sesión sin complicaciones','Dolor disminuye post-intervención','Dolor se mantiene','Fatiga muscular esperada','Se educa en signos de alarma','Se ajusta carga por irritabilidad'])}
+        <div class="form-label">Respuesta inmediata a la sesión <span class="req">*</span></div>
+        <textarea class="form-input" id="f-arespuesta" placeholder="Ej: Mejoró tras la sesión. Reducción de dolor en reposo y a la palpación..."></textarea>
+        ${chipsHTML('f-arespuesta',['Mejoró','Sin cambio significativo','Aumento transitorio esperado','Empeoró','No evaluada'])}
       </div>
       <div class="form-field">
         <div class="form-label">Evolución / análisis rápido <span style="color:var(--gray-400);font-weight:400">(combina varias)</span></div>
         <div id="soap-evolucion-chips" style="display:flex;flex-wrap:wrap;gap:6px"></div>
+      </div>
+      <div class="form-field">
+        <div class="form-label">Decisión clínica <span style="color:var(--gray-400);font-weight:400">(agrega al análisis)</span></div>
+        ${chipsAppendHTML('f-aanalisis',['Progresar carga','Mantener','Reducir carga','Modificar plan','Revalorar','Referir'])}
       </div>
       <div class="form-field">
         <div class="form-label">Análisis clínico <span class="req">*</span></div>
@@ -10480,9 +10500,16 @@ function renderSOAPForm(){
         ${chipsHTML('f-pindicaciones',['Mantener ejercicios domiciliarios','Reposo relativo','Frío/calor en casa','Hidratación y descanso'])}
       </div>
       <div class="form-field">
-        <div class="form-label">Contraindicaciones vigentes</div>
+        <div class="form-label">Precauciones / restricciones vigentes</div>
         <textarea class="form-input" id="f-pcontra" placeholder="Ej: Sin impacto, sin carrera, sin sentadilla profunda. Sin AINEs."></textarea>
-        ${chipsHTML('f-pcontra',['Sin contraindicaciones vigentes','Sin impacto','Sin flexión lumbar','Sin carga en extremidad'])}
+        ${chipsHTML('f-pcontra',['Sin restricciones vigentes','Sin impacto','Sin flexión lumbar','Sin carga en extremidad'])}
+      </div>
+      <div class="form-field">
+        <div class="form-label">Frecuencia y seguimiento <span style="color:var(--gray-400);font-weight:400">(agrega a indicaciones)</span></div>
+        <div style="font-size:10.5px;color:var(--gray-400);margin:0 0 4px">Frecuencia:</div>
+        ${chipsAppendHTML('f-pindicaciones',['Frecuencia 1×/semana','Frecuencia 2×/semana','Frecuencia 3×/semana'])}
+        <div style="font-size:10.5px;color:var(--gray-400);margin:6px 0 4px">Seguimiento:</div>
+        ${chipsAppendHTML('f-pindicaciones',['Continuar plan','Revalorar','Referir','Alta'])}
       </div>
     </div>
   </div>
