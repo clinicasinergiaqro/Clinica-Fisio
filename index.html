@@ -10502,10 +10502,21 @@ function renderSOAPForm(){
         <textarea class="form-input" id="f-pcontra" placeholder="Ej: Sin impacto, sin carrera, sin sentadilla profunda. Sin AINEs."></textarea>
         ${chipsHTML('f-pcontra',['Sin restricciones vigentes','Sin impacto','Sin flexión lumbar','Sin carga en extremidad'])}
       </div>
-      <div class="form-field">
-        <div class="form-label">🎯 Plan para las próximas sesiones <span style="font-weight:400;color:var(--gray-400);font-size:11px">· qué sigue / qué se espera</span>${_traerBtn('f-objetivo-sesion')}</div>
-        <div style="font-size:11px;color:var(--gray-400);font-weight:400;margin:-2px 0 5px;line-height:1.45">Qué harás o esperas en las siguientes citas: progresión de carga, destete de muleta, retiro de tobillera, avanzar a ejercicio funcional, criterio de alta…</div>
-        <textarea class="form-input" id="f-objetivo-sesion" placeholder="Ej: Próxima cita: progresar carga a sentadilla parcial y destete de muleta. En 2-3 sesiones: retiro de tobillera si tolera marcha sin dolor."></textarea>
+      <div class="form-field" style="border-bottom:none">
+        <div style="border:2px solid #C9A84C;border-radius:14px;background:#FBF6E9;overflow:hidden">
+          <div style="background:#C9A84C;color:#3A2E08;padding:11px 14px;display:flex;align-items:center;gap:9px">
+            <span style="font-size:22px;line-height:1">🎯</span>
+            <div>
+              <div style="font-size:16.5px;font-weight:800;letter-spacing:.2px">Plan para las próximas sesiones</div>
+              <div style="font-size:11.5px;color:#6B5314;margin-top:1px">Qué sigue / qué se espera en las siguientes citas</div>
+            </div>
+          </div>
+          <div style="padding:13px 14px">
+            <div style="font-size:12px;color:#6B5314;margin-bottom:9px;line-height:1.45">Escribe qué harás o esperas: progresión de carga, destete de muleta, retiro de tobillera, avanzar a ejercicio funcional, criterio de alta… Así el que atienda la próxima cita sabe qué toca.</div>
+            <div style="display:flex;justify-content:flex-end;margin-bottom:6px">${_traerBtn('f-objetivo-sesion')}</div>
+            <textarea id="f-objetivo-sesion" placeholder="Ej: Próxima cita: progresar carga a sentadilla parcial y destete de muleta. En 2-3 sesiones: retiro de tobillera si tolera marcha sin dolor." style="width:100%;box-sizing:border-box;border:1.5px solid #E0CE90;border-radius:10px;padding:12px;font-size:15px;font-family:inherit;color:var(--gray-800);background:#fff;min-height:104px;line-height:1.5;resize:vertical;outline:none"></textarea>
+          </div>
+        </div>
       </div>
     </div>
   </div>
