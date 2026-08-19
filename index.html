@@ -15137,6 +15137,19 @@ function _hcChip(g,v,label,multi){
   var st=window._HC||{}; var on = multi ? (st[g]||[]).indexOf(v)!==-1 : st[g]===v;
   return '<button type="button" class="hc-chip'+(on?' on':'')+'" data-g="'+g+'" data-v="'+String(v).replace(/"/g,'&quot;')+'"'+(multi?' data-multi="1"':'')+' onclick="_hcTap(this)">'+escapeHTML(label)+'</button>';
 }
+// Re-marca visualmente TODOS los chips del motivo (zona, lado, irradiación, secundarias) según
+// window._HC. Necesario al PRECARGAR en edición: los chips de LADO se pintan inline una sola vez
+// (con _HC vacío) y _hcInit no los re-renderiza, así que sin esto se veían siempre sin seleccionar.
+function _hcRemarcarChips(){
+  var st=window._HC||{};
+  try{
+    Array.prototype.forEach.call(document.querySelectorAll('.hc-chip'), function(b){
+      var g=b.getAttribute('data-g'), v=b.getAttribute('data-v'), multi=b.getAttribute('data-multi')==='1';
+      var on = multi ? (Array.isArray(st[g]) && st[g].indexOf(v)!==-1) : (st[g]===v);
+      b.classList.toggle('on', !!on);
+    });
+  }catch(_e){}
+}
 function _hcTap(el){
   if(!window._HC) _hcReset();
   var g=el.getAttribute('data-g'), v=el.getAttribute('data-v'), multi=el.getAttribute('data-multi')==='1', st=window._HC;
@@ -15547,6 +15560,8 @@ function renderNuevoPaciente(){
       cargarBorradorNuevoSiExiste();
     }
     _hcInit();   // pinta los chips dinámicos del Motivo (zonas, irradiación según zona, otras zonas)
+    // EDICIÓN: re-marcar zona/lado/irradiación ya con _HC precargado (los de lado son inline).
+    if(_edP2 && typeof _hcRemarcarChips==='function') _hcRemarcarChips();
   },100);
 }
 // Precarga el formulario de nuevo paciente con los datos de un paciente existente (modo edición).
