@@ -6516,7 +6516,11 @@ async function _validarSesionRevision(path){
   }
 }
 function _computarRendimiento(eventos, diasISO, asigMap){
-  var diasDDMM={}; diasISO.forEach(function(i){ var k=_ddmmFromISO(i); if(k) diasDDMM[k]=true; });
+  // B1 (auditoría dashboard): el SCORE casaba la fecha de la nota en CRUDO (s.fecha contra claves
+  // DD/MM/YYYY) mientras el resto del dashboard usa fecha CANÓNICA (_diaCanon). Una nota válida en otro
+  // formato (migrada/editada/ISO) no entraba al promedio → Score "—" aunque el ✅ sí la contara. Se
+  // alinea a canónico para que el score sea consistente con la columna ✅.
+  var diasCanon={}; diasISO.forEach(function(i){ var c=_diaCanon(i); if(c) diasCanon[c]=true; });
   var stats={};
   Object.keys(TERAPEUTA_CAL2COD).forEach(function(n){ stats[n]={citas:0, notas:0, scoreSum:0, scoreN:0}; });
   var sinAsignar={};
@@ -6529,7 +6533,7 @@ function _computarRendimiento(eventos, diasISO, asigMap){
   });
   (Array.isArray(patientsDB)?patientsDB:[]).forEach(function(p){
     _soapVivas(p).forEach(function(s){   // [BORRADO-NOTAS] VISTA (rendimiento por terapeuta)
-      if(!s || !diasDDMM[s.fecha]) return;
+      if(!s || !diasCanon[_diaCanon(s.fecha)]) return;
       var cod=String(s.terapeuta||'').toUpperCase();
       for(var cal in TERAPEUTA_CAL2COD){
         if(TERAPEUTA_CAL2COD[cal]===cod){
