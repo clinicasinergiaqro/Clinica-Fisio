@@ -805,6 +805,20 @@ function FST_buildSesionPayload(sesion, modo) {
     ...(sesion.dictado != null ? { dictado: sesion.dictado } : {}),
     ...(sesion.dictadoUnico != null ? { dictadoUnico: sesion.dictadoUnico } : {}),
     ...(sesion.dictadoV2 != null ? { dictadoV2: sesion.dictadoV2 } : {}),
+    // AUDITORÍA B1: en pacientes históricos (mig_pac_) la subcolección ES el único almacén; estos 3
+    // se perdían al cerrar/editar porque no viajaban al payload. Condicionales (no escribir vacío).
+    // mediaObjetivo va SOLO por referencias (url/fbPath) vía _guardMediaArray → nunca base64 (límite 1MB/doc);
+    // el replay re-sube desde IDB con _reSubirMediaDesdeIDB, igual que sesion.media.
+    ...(Array.isArray(sesion.ejerciciosSesion) && sesion.ejerciciosSesion.length ? { ejerciciosSesion: sesion.ejerciciosSesion } : {}),
+    ...(Array.isArray(sesion.mediaObjetivo) && sesion.mediaObjetivo.length ? {
+      mediaObjetivo: _guardMediaArray(sesion.mediaObjetivo.map(m => ({
+        mediaId: (m && (m.mediaId || m.id)) || '', name: (m && m.name) || '', label: (m && m.label) || '',
+        type: (m && m.type) || '', fecha: (m && m.fecha) || '',
+        url: (m && m.url) || '', fbPath: (m && m.fbPath) || '',
+        data: (m && typeof m.data==='string') ? m.data : null
+      })), true)
+    } : {}),
+    ...(sesion.modalidadesDetalle && typeof sesion.modalidadesDetalle === 'object' && Object.keys(sesion.modalidadesDetalle).length ? { modalidadesDetalle: sesion.modalidadesDetalle } : {}),
     completa: !!sesion.completa, modoNota: sesion.modoNota || '',
     importado: false, formatoOriginal: 'soap', revisionPendiente: false,
     origen: 'app_live', creadoPor: sesion.terapeuta || 'APP',
@@ -11705,6 +11719,13 @@ async function guardarSOAP(){
           url:(m&&m.url)||'', fbPath:(m&&m.fbPath)||'',
           data:(m&&typeof m.data==='string')?m.data:null   // [LOOP-B #3] base64 fuente al guard (antes: null a ciegas)
         }; }), false) } : {}),   // permitirB64=FALSE: payloadH va a la cola de EDICIÓN (localStorage) → nunca base64; el replay re-sube desde IDB
+        // AUDITORÍA B1: ejercicios / foto-video de valoración / detalle por modalidad al editar histórica.
+        // editarSoapHistorico precarga estos 3 en los temps → datosNota los trae completos (sin wipe).
+        // Condicionales (no escribir vacío → merge conserva). mediaObjetivo por referencias vía _guardMediaArray
+        // (data:null; sube por url/fbPath). sesionUpdateOK ya los permite (reglas v13 publicadas).
+        ...(Array.isArray(datosNota.ejerciciosSesion)&&datosNota.ejerciciosSesion.length ? { ejerciciosSesion:datosNota.ejerciciosSesion } : {}),
+        ...(Array.isArray(datosNota.mediaObjetivo)&&datosNota.mediaObjetivo.length ? { mediaObjetivo:_guardMediaArray(datosNota.mediaObjetivo.map(function(m){ return Object.assign({},m); }), false) } : {}),
+        ...(datosNota.modalidadesDetalle&&typeof datosNota.modalidadesDetalle==='object'&&Object.keys(datosNota.modalidadesDetalle).length ? { modalidadesDetalle:datosNota.modalidadesDetalle } : {}),
         updatedAt:new Date().toISOString()
       };
       const cacheList=_fstSesionesCache[pidH];
