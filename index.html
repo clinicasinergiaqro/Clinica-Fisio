@@ -881,7 +881,7 @@ async function FST_guardarSesionFirestore(paciente, sesion, modo) {
     // IDB con url='' → al guardar la nota ONLINE el write tenía éxito y NUNCA se re-subía (nunca se
     // encolaba). Aquí, ANTES de construir el payload, se re-suben los pendientes desde IDB y se MUTA
     // sesion.media (agrega url/fbPath) → el doc lleva puntero durable y la nota en memoria queda sana.
-    try{ await _reSubirMediaDesdeIDB(pid, sesion.media); }catch(_rs){ console.warn('[FST] re-subida media online:', _rs&&_rs.message); }
+    try{ await _conTimeout(_reSubirMediaDesdeIDB(pid, sesion.media), 8000); }catch(_rs){ console.warn('[FST] re-subida media online:', _rs&&_rs.message); }
     const pacPayload = FST_buildPacientePayload(paciente, sesion, pidInfo);
     const sesPayload = FST_buildSesionPayload(sesion, _modoReal);
     await window._fstDb.collection('pacientes').doc(pid).set(_sinUndefined(pacPayload), { merge: true });
@@ -11758,7 +11758,10 @@ async function guardarSOAP(){
       // ANTES de armar payloadH (que hace _guardMediaArray con permitirB64=FALSE → una foto sin url se
       // volvería referencia muda irrecuperable en otro equipo). Muta _mediaH agregando url/fbPath. No-op
       // para los que ya tienen url. Best-effort: si falla, sigue el flujo (queda pendienteSubida + cola).
-      if(Array.isArray(_mediaH)&&_mediaH.length){ try{ await _reSubirMediaDesdeIDB(pidH, _mediaH); }catch(_rsh){ console.warn('[hist media online] re-subida:', _rsh&&_rsh.message); } }
+      // Con _conTimeout (8s): fbStorage.put() no tiene timeout propio; sin esto, red "online pero muerta"
+      // colgaba la edición ANTES de escribir/encolar (histórico = único almacén → edición perdida). Al
+      // vencer, la media queda pendienteSubida (se re-sube por cola) y el flujo sigue al write/encolar.
+      if(Array.isArray(_mediaH)&&_mediaH.length){ try{ await _conTimeout(_reSubirMediaDesdeIDB(pidH, _mediaH), 8000); }catch(_rsh){ console.warn('[hist media online] re-subida:', _rsh&&_rsh.message); } }
       // v12: NOM + atendidoPor + dictado al editar histórica. El form del histórico NO precarga
       // estos campos, así que se conserva lo de notaH cuando el form viene vacío (evita wipe). Todos
       // están en sesionUpdateOK. horaCreacion/totalSesiones NO se tocan (no en update; merge conserva).
