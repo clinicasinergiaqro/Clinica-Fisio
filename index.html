@@ -464,13 +464,16 @@ function FST_renderCard(s, pid){
         }).join('')
       + '</div></div>'
     : '';
+  // AUTO-REVISOR: badge de nota incompleta (solo notas estructuradas; el texto libre es otro flujo).
+  var _faltH=(!isTextoLibre)?_faltantesSoap(s):{aplica:false};
+  var _badgeIncH=(_faltH.aplica && _faltH.incompleta)?'<span style="background:#FDECEA;color:#C0392B;font-size:10px;font-weight:800;padding:2px 8px;border-radius:9px">⚠ Incompleta: '+escapeHTML(_faltantesSoapLabel(_faltH))+'</span>':'';
   return '<div class="soap-card" style="opacity:.92;border-left:3px solid var(--navy)">'
     + '<div class="soap-header" style="cursor:default"><div>'
     + '<div class="soap-sesion">Sesión ' + escapeHTML(_ns ? _ns.n : '—') + (_tEp ? ' <span style="font-size:10px;color:var(--gray-400);font-weight:400">· Episodio ' + escapeHTML((s.motivoIndex||0)+1) + '</span>' : '') + '</div>'
     // [NUM-SESIÓN] línea secundaria con la posición GLOBAL del expediente (solo pacientes con episodios)
     + (_tEp && _ns ? '<div style="font-size:10px;color:var(--gray-400);margin-top:1px">Sesión ' + escapeHTML(_ns.nGlobal) + ' del expediente</div>' : '')
     + '<div class="soap-meta">' + fecha + ' · <span style="font-weight:700;color:var(--navy)">' + terapeuta + '</span> · Semana ' + escapeHTML(semana) + '</div>'
-    + '</div><div style="display:flex;flex-wrap:wrap;gap:4px;align-items:center">' + FST_badgesSesion(s) + '</div></div>'
+    + '</div><div style="display:flex;flex-wrap:wrap;gap:4px;align-items:center">' + _badgeIncH + FST_badgesSesion(s) + '</div></div>'
     + '<div class="soap-body">'
     + (isTextoLibre
         ? '<div class="soap-section"><div class="soap-label"><span class="soap-s">\u{1F4DD} Nota importada — texto original</span></div><div class="soap-text" style="white-space:pre-wrap">' + texto + '</div></div>'
@@ -5617,9 +5620,11 @@ window._bannerPendExpandido=false;   // toggle "ver todos" del banner (persiste 
 function _renderBannerPendientes(r){
   var el=document.getElementById('banner-pend-personal');
   if(!el) return;
-  if(!r){ el.innerHTML=''; return; }
+  var extra='';   // AUTO-REVISOR: nudge "notas por completar" (se pinta SIEMPRE, aun estando al día en citas)
+  try{ extra=_htmlNotasPorCompletar(); }catch(_){}
+  if(!r){ el.innerHTML=extra; return; }
   if(!r.total){
-    el.innerHTML='<div style="margin-bottom:10px;padding:8px 12px;background:#ECFDF5;border-radius:10px;font-size:12px;font-weight:700;color:#065F46">✅ Estás al día — sin sesiones por documentar</div>';
+    el.innerHTML='<div style="margin-bottom:10px;padding:8px 12px;background:#ECFDF5;border-radius:10px;font-size:12px;font-weight:700;color:#065F46">✅ Estás al día — sin sesiones por documentar</div>'+extra;
     return;
   }
   // GUARDRAIL: solo la lista PROPIA (r.items ya viene filtrada a la terapeuta logueada).
@@ -5637,18 +5642,53 @@ function _renderBannerPendientes(r){
   el.innerHTML='<div style="margin-bottom:10px;padding:10px 12px;background:#FEF3C7;border-radius:10px">'
     +'<div style="font-size:13px;font-weight:800;color:#92400E">📋 Tienes '+r.total+' '+(r.total===1?'sesión':'sesiones')+' sin documentar</div>'
     +'<div style="font-size:10px;color:#92400E;margin:2px 0 4px">Citas del calendario sin nota SOAP del día (desde el '+_ddmmFromISO(APP_INICIO_OPERACION)+'). Se salda escribiendo la nota.</div>'
-    +lista+toggle+'</div>';
+    +lista+toggle+'</div>'+extra;
 }
 function _toggleBannerPendientes(){
   window._bannerPendExpandido=!window._bannerPendExpandido;
   if(window._bannerPendCache) _renderBannerPendientes(window._bannerPendCache);
+}
+// AUTO-REVISOR (nudge del fisio): notas PROPIAS (activos) de los últimos 60 días con secciones
+// obligatorias (S/A/P) sin llenar — existen pero están incompletas. Puro cliente, sobre patientsDB.
+function _notasPorCompletarDelTerapeuta(){
+  var out=[];
+  try{
+    var cod=String((currentUser&&currentUser.name)||'').toUpperCase();
+    if(!cod) return out;
+    var piso=new Date(); piso.setDate(piso.getDate()-60);
+    var pisoCanon=piso.getFullYear()+'-'+String(piso.getMonth()+1).padStart(2,'0')+'-'+String(piso.getDate()).padStart(2,'0');
+    (Array.isArray(patientsDB)?patientsDB:[]).forEach(function(p){
+      if(!p || typeof _soapVivas!=='function') return;
+      _soapVivas(p).forEach(function(s){
+        if(!s || String(s.terapeuta||'').toUpperCase()!==cod) return;   // solo MIS notas
+        var c=_diaCanon(s.fecha); if(!c || c<pisoCanon) return;          // dentro de la ventana
+        var f=_faltantesSoap(s); if(!(f.aplica && f.incompleta)) return;
+        out.push({ pid:p.id, name:p.name||'(sin nombre)', fecha:s.fecha||'', label:_faltantesSoapLabel(f) });
+      });
+    });
+  }catch(_){}
+  out.sort(function(a,b){ return String(b.fecha).localeCompare(String(a.fecha)); });
+  return out;
+}
+function _htmlNotasPorCompletar(){
+  var lista=_notasPorCompletarDelTerapeuta();
+  if(!lista.length) return '';
+  var vis=lista.slice(0,8);
+  var items=vis.map(function(x){
+    return '<div style="font-size:11px;color:#7A2E12;padding:2px 0">• <a data-pid="'+escapeAttr_(x.pid)+'" onclick="openExpediente(this.dataset.pid)" style="color:#B91C1C;font-weight:700;text-decoration:underline;cursor:pointer">'+escapeHTML(x.name)+'</a> — '+escapeHTML(x.fecha)+' <span style="color:#92400E">('+escapeHTML(x.label)+')</span></div>';
+  }).join('');
+  var mas=(lista.length>8)?('<div style="font-size:10px;color:#92400E;margin-top:3px">…y '+(lista.length-8)+' más</div>'):'';
+  return '<div style="margin-bottom:10px;padding:10px 12px;background:#FDECEA;border-radius:10px">'
+    +'<div style="font-size:13px;font-weight:800;color:#B91C1C">⚠ Tienes '+lista.length+' '+(lista.length===1?'nota':'notas')+' por completar</div>'
+    +'<div style="font-size:10px;color:#92400E;margin:2px 0 4px">Notas con secciones obligatorias (S/A/P) sin llenar. Toca el nombre para abrir el expediente y completarlas.</div>'
+    +items+mas+'</div>';
 }
 async function _montarBannerPendientes(){
   if(!document.getElementById('banner-pend-personal')) return;
   var r=null;
   try{ r=await _computarBannerPendientes(); }catch(_){ r=null; }
   if(!document.getElementById('banner-pend-personal')) return;   // el bloque pudo re-renderizarse durante el await
-  _renderBannerPendientes(r);
+  _renderBannerPendientes(r);   // incluye el nudge "notas por completar"
 }
 // ── LOOP S1+S2+S3: Dashboard de rendimiento de equipo (solo supervisor) ─────────────
 // S1: citas (Google Calendar vía leerAgenda) vs notas SOAP escritas, ventanas hoy/7días/mes.
@@ -5698,6 +5738,37 @@ function _scoreSoapCalidad(s){
   if(evaReal) pts+=15;
   if(Array.isArray(s.modalidades) && s.modalidades.length) pts+=10;
   return pts;
+}
+// AUTO-REVISOR de notas — misma lógica de "contenido real" que _scoreSoapCalidad (ignora
+// [pendiente]/pendiente/"no especificad"). Reglas calibradas con la decisión clínica: S, A y P son
+// OBLIGATORIAS; la O NO es obligatoria en seguimiento (aviso suave); EVA suave (solo notas nuevas la
+// exigen al guardar). NO aplica a notas importadas aún sin revisar (van por la cola de revisión) ni a
+// auto-generadas sin editar (valoración/descarga). Devuelve {aplica, incompleta, faltan[], leves[]}.
+function _llenoSoap(x){ var t=String(x||'').trim().toLowerCase(); return !!t && t!=='[pendiente]' && t!=='pendiente' && t.indexOf('no especificad')===-1; }
+function _faltantesSoap(s){
+  var out={ aplica:true, incompleta:false, faltan:[], leves:[] };
+  if(!s || typeof s!=='object'){ out.aplica=false; return out; }
+  if(s.importado && s.revisionPendiente){ out.aplica=false; return out; }   // cola de revisión (otro flujo)
+  var _auto=(s.modoNota==='valoracion'||s.modoNota==='descarga') && !(Array.isArray(s.historialEdiciones)&&s.historialEdiciones.length);
+  if(_auto){ out.aplica=false; return out; }
+  var so=s.s||{}, oo=s.o||{}, aa=s.a||{}, pp=s.p||{};
+  var sOK=_llenoSoap(so.dolor)||_llenoSoap(so.cambios)||_llenoSoap(so.actFisica);
+  var oOK=_llenoSoap(oo.rom)||_llenoSoap(oo.fuerza)||_llenoSoap(oo.hallazgos);
+  var aOK=_llenoSoap(aa.evolucion)||_llenoSoap(aa.respuesta)||_llenoSoap(aa.analisis);
+  var pOK=_llenoSoap(pp.tratamiento)||_llenoSoap(pp.indicaciones);
+  var evaOK=(s.evaI!=null && !isNaN(Number(s.evaI)) && !(Number(s.evaI)===5 && Number(s.evaF)===3));
+  if(!sOK) out.faltan.push('S'); if(!aOK) out.faltan.push('A'); if(!pOK) out.faltan.push('P');
+  if(!oOK) out.leves.push('O'); if(!evaOK) out.leves.push('EVA');
+  out.incompleta = out.faltan.length>0;   // solo S/A/P obligatorias marcan "incompleta"
+  return out;
+}
+// Etiqueta corta para el badge: "Incompleta: faltan A y P" (obligatorias) + "(revisar O)" suave.
+function _faltantesSoapLabel(f){
+  if(!f || !f.aplica) return '';
+  var partes=[];
+  if(f.faltan.length) partes.push('faltan '+f.faltan.join(' y '));
+  if(!f.faltan.length && f.leves.length) partes.push('revisar '+f.leves.join('/'));
+  return partes.join(' · ');
 }
 async function FST_leerAsignacionesAgenda(forzar){
   // PERF(e): cache de sesión — se lee de Firestore 1 vez por sesión de app; al asignar se
@@ -6522,7 +6593,7 @@ function _computarRendimiento(eventos, diasISO, asigMap){
   // alinea a canónico para que el score sea consistente con la columna ✅.
   var diasCanon={}; diasISO.forEach(function(i){ var c=_diaCanon(i); if(c) diasCanon[c]=true; });
   var stats={};
-  Object.keys(TERAPEUTA_CAL2COD).forEach(function(n){ stats[n]={citas:0, notas:0, scoreSum:0, scoreN:0}; });
+  Object.keys(TERAPEUTA_CAL2COD).forEach(function(n){ stats[n]={citas:0, notas:0, scoreSum:0, scoreN:0, incompletas:0}; });
   var sinAsignar={};
   (Array.isArray(eventos)?eventos:[]).forEach(function(ev){
     var ter=(Array.isArray(ev.terapeutas)&&ev.terapeutas.length)?ev.terapeutas[0]:'Sin asignar';
@@ -6543,6 +6614,8 @@ function _computarRendimiento(eventos, diasISO, asigMap){
           // la editó (historialEdiciones con entradas), entonces SÍ entra como cualquier nota.
           var _esAutoSinEditar = (s.modoNota==='valoracion'||s.modoNota==='descarga') && !(Array.isArray(s.historialEdiciones)&&s.historialEdiciones.length);
           if(!_esAutoSinEditar){ stats[cal].scoreSum+=_scoreSoapCalidad(s); stats[cal].scoreN++; }
+          // AUTO-REVISOR: contar notas incompletas (faltan S/A/P) de la ventana → "por completar".
+          var _fInc=_faltantesSoap(s); if(_fInc.aplica && _fInc.incompleta) stats[cal].incompletas++;
           break;
         }
       }
@@ -6565,7 +6638,7 @@ function _rendimientoHTML(datos, noId, ventana, etiqueta, aviso, refresco, tri){
       +'<td style="padding:6px 8px;text-align:center">'+t.citas+'</td>'
       +'<td style="padding:6px 8px;text-align:center;font-weight:700;color:#2E7D52">'+(t.conNota==null?'—':('✅ '+t.conNota))+'</td>'
       +'<td style="padding:6px 8px;text-align:center;font-weight:700;color:'+((t.sinNota>0)?'#B91C1C':'var(--gray-400)')+'">'+(t.sinNota==null?'—':(t.sinNota>0?('🔴 '+t.sinNota):'0'))+((t.enTiempo>0)?(' <span style="color:#0369A1;font-weight:700;white-space:nowrap" title="Citas de las últimas 24 h (o futuras) aún en tiempo de documentar — no cuentan como falta">⏳ '+t.enTiempo+'</span>'):'')+((t.noIdentificados>0)?(' <span style="color:#92400E;font-weight:700;white-space:nowrap">🔎 '+t.noIdentificados+'</span>'):'')+((t.tardias>0)?(' <span style="color:#B45309;font-weight:700;white-space:nowrap" title="Notas creadas más de 24 h después de la cita">⏱ '+t.tardias+'</span>'):'')+'</td>'
-      +'<td style="padding:6px 8px;text-align:center">'+(st.scoreN?Math.round(st.scoreSum/st.scoreN):'—')+'</td>'
+      +'<td style="padding:6px 8px;text-align:center">'+(st.scoreN?Math.round(st.scoreSum/st.scoreN):'—')+((st.incompletas>0)?(' <span style="color:#C0392B;font-weight:800;white-space:nowrap" title="Notas de la ventana con secciones obligatorias (S/A/P) por completar">⚠'+st.incompletas+'</span>'):'')+'</td>'
       +'<td style="padding:6px 8px;text-align:center"><button data-ter="'+escapeAttr_(n)+'" onclick="generarPDFRendimiento(this.dataset.ter)" title="PDF de desempeño de '+escapeAttr_(n)+'" style="background:none;border:none;font-size:15px;cursor:pointer;padding:2px 4px">📄</button></td></tr>';
   }).join('');
   // Bloques por terapeuta: pacientes con cita SIN nota → botón directo al expediente
@@ -8451,6 +8524,9 @@ function _renderSoapCard(s,p,readOnly){
   // Notas auto-generadas: badge para distinguirlas de las notas normales.
   if(s.modoNota==='valoracion') sesionLine+=` <span style="background:#EEF4FF;color:var(--navy);font-size:10px;font-weight:800;padding:2px 8px;border-radius:9px">📋 Valoración</span>`;
   if(s.modoNota==='descarga') sesionLine+=` <span style="background:#FFF8E6;color:#8A6D1A;font-size:10px;font-weight:800;padding:2px 8px;border-radius:9px">🙌 Descarga</span>`;
+  // AUTO-REVISOR: badge de nota incompleta (faltan secciones OBLIGATORIAS S/A/P con contenido real).
+  var _faltCard=_faltantesSoap(s);
+  if(_faltCard.aplica && _faltCard.incompleta) sesionLine+=` <span style="background:#FDECEA;color:#C0392B;font-size:10px;font-weight:800;padding:2px 8px;border-radius:9px">⚠ Incompleta: ${escapeHTML(_faltantesSoapLabel(_faltCard))}</span>`;
   var bodyHTML=(s.importado&&s.formatoOriginal==='texto_libre')
     ? `<div class="soap-section">
         <div class="soap-label"><span class="soap-s">📝 Nota importada — texto original</span>
