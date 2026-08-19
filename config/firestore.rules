@@ -77,6 +77,10 @@ service cloud.firestore {
         'indicacionesDomiciliarias','dictado','dictadoUnico','dictadoV2',
         'pacienteId','media','historialEdiciones',
         'motivoIndex','numEpisodio',
+        // AUDITORÍA B1: en notas de pacientes históricos (mig_pac_) la subcoleccion es el UNICO almacen.
+        // Estos 3 se perdian porque no viajaban al payload NI estaban aqui. mediaObjetivo va por
+        // referencias (url/fbPath), nunca base64, para no rebasar 1MB/doc.
+        'ejerciciosSesion','mediaObjetivo','modalidadesDetalle',
         'atendidoPor'
       ]);
     }
@@ -91,6 +95,7 @@ service cloud.firestore {
           'eventosAdversosSesion','cambiosPlan','criteriosProgreso',
           'indicacionesDomiciliarias','dictado','dictadoUnico','dictadoV2',
           'media','motivoIndex','numEpisodio',
+          'ejerciciosSesion','mediaObjetivo','modalidadesDetalle',
           'terapeutaEstado','terapeutaOriginal','motivosRevision',
           'imagenesPendientes','motivoImagenesPendientes','hashesImagenesPendientes',
           'textoOriginal','textoOriginalUrl',
