@@ -2090,15 +2090,36 @@ async function saveDB(k, v, opts){
     // Un paciente puede tener 100+ sesiones de años de tratamiento.
     // No hay límite. El POST maneja el volumen sin problema.
 
-    // F: si soap3 se acerca al límite de celda de Sheets (50000), NO arriesgar escritura
-    // que falle silenciosamente. Conservar local, encolar y alertar con claridad.
+    // AUDITORÍA payload-por-campos (RENDIMIENTO): si el guardado declaró camposHist (lista real de campos
+    // tocados), mandar a Sheets SOLO esos campos + los estructurales (id/_soloCampos/updatedAt). El backend
+    // (mergePacienteSeguro_ con _soloCampos) conserva POR COLUMNA lo no enviado, así que omitir lo no tocado
+    // es seguro. Baja el payload típico de ~50-100KB (dominado por soap+historialCambios) a <2KB. Los
+    // guardados SIN camposHist (o '*') siguen mandando el paciente COMPLETO (nuevo paciente, import, cola).
+    // SEGURIDAD: todo guardado que muta p.soap declara 'soap' (auditado); 'soap' arrastra soap2/soap3.
+    var _camposHist = opts && opts.camposHist;
+    var _recorta = Array.isArray(_camposHist) && _camposHist.length;
+    var _enviarSoap = !_recorta || _camposHist.indexOf('soap')!==-1;
+
+    // F: si soap3 se acerca al límite de celda de Sheets (50000), NO arriesgar escritura que falle
+    // silenciosamente. Conservar local, encolar y alertar. SOLO aplica si de verdad se manda soap (un
+    // guardado que no toca soap no debe bloquearse por el tamaño del soap de un expediente grande).
     if(window._soap3Riesgo){
-      window._soap3Riesgo = false;
-      encolarSync(p.id);
-      showToastCritico_('⚠️ Expediente muy grande — guardado localmente. Contacta al administrador.');
-      console.warn('[Sheets] soap3 cerca del límite de celda para paciente:', p.id);
-      errores++;
-      continue; // saltar el POST de este paciente; los datos locales están a salvo
+      window._soap3Riesgo = false;   // limpiar siempre (no filtrar el flag al siguiente paciente del lote)
+      if(_enviarSoap){
+        encolarSync(p.id);
+        showToastCritico_('⚠️ Expediente muy grande — guardado localmente. Contacta al administrador.');
+        console.warn('[Sheets] soap3 cerca del límite de celda para paciente:', p.id);
+        errores++;
+        continue; // saltar el POST de este paciente; los datos locales están a salvo
+      }
+    }
+
+    // Recorte del payload: conservar estructurales + los campos declarados ('soap' incluye los 3 chunks).
+    if(_recorta){
+      var _keep = { id:1, _soloCampos:1, updatedAt:1 };
+      _camposHist.forEach(function(k){ _keep[k]=1; });
+      if(_keep.soap){ _keep.soap2=1; _keep.soap3=1; }
+      Object.keys(pLimpio).forEach(function(k){ if(!_keep[k]) delete pLimpio[k]; });
     }
 
     let ok=false;
@@ -5535,8 +5556,14 @@ async function _computarBannerPendientes(){
   if(!miNombre) return null;   // usuario sin código de terapeuta conocido → sin banner
   var c=window._bannerPendCache;
   if(c && c.cod===cod && (Date.now()-c.ts)<REND_CACHE_TTL_MS) return c;
+  // RENDIMIENTO: ventana MÓVIL de 45 días en vez de "desde el 1-jul hasta hoy" (que crecía sin cota y
+  // se re-descargaba/procesaba en cada recálculo, castigando la pantalla de inicio en datos móviles).
+  // Una cita sin nota de hace >45 días ya no es un pendiente reciente accionable. El piso APP_INICIO
+  // sigue como tope duro inferior. Constante en fetch Y en el filtro de abajo (_pisoBanner).
+  var _hoyBanner=_hoyISOlocal();
+  var _pisoBanner=(function(){ try{ var d=new Date(_hoyBanner+'T12:00:00'); d.setDate(d.getDate()-45); var s=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); return s>APP_INICIO_OPERACION?s:APP_INICIO_OPERACION; }catch(_e){ return APP_INICIO_OPERACION; } })();
   var res=null;
-  try{ res=await FST_fetchAgendaRango(APP_INICIO_OPERACION, _hoyISOlocal()); }catch(_){ res=null; }
+  try{ res=await FST_fetchAgendaRango(_pisoBanner, _hoyBanner); }catch(_){ res=null; }
   if(!res||!res.ok) return null;   // sin agenda no se inventa nada (banner ausente)
   var eventos=Array.isArray(res.eventos)?res.eventos:[];
   var asigMap={};    try{ asigMap=await FST_leerAsignacionesAgenda(false); }catch(_){}
@@ -5554,7 +5581,7 @@ async function _computarBannerPendientes(){
     if(asignadas.indexOf(miNombre)===-1) return;
     var ddmm=_ddmmDeISOEvento(ev.inicio);
     var citaCanon=_diaCanon(ddmm);
-    if(!citaCanon || citaCanon<APP_INICIO_OPERACION) return;   // piso: lo migrado/previo no cuenta
+    if(!citaCanon || citaCanon<_pisoBanner) return;   // piso: ventana móvil de 45 días (y ≥ APP_INICIO)
     var _t=ev.inicio?new Date(ev.inicio).getTime():NaN;
     if(isFinite(_t) && _t>ahora) return;                       // cita futura: aún no es pendiente
     var r=(resueltos||{})[clave]||{pid:null,tipo:null};
@@ -12113,7 +12140,9 @@ async function guardarSOAP(){
       return;
     }
     _espejarSoapMediaAEstudios_(p, nuevaSOAP); // FIX SOAP-MEDIA (D)/I-B: espejo a Estudios — viaja en el MISMO saveDB de abajo
-    saveDB('pts',[p],{camposHist:['numSesionEpisodioActual','estudiosDocs','fechaActualizacion','ultimoUsuario']}).then(async res=>{
+    // AUDITORÍA payload-por-campos: esta nota NUEVA muta p.soap y p.sesiones → DEBEN declararse en
+    // camposHist, si no el recorte del payload (envío solo lo tocado) no la mandaría a Sheets.
+    saveDB('pts',[p],{camposHist:['soap','sesiones','numSesionEpisodioActual','estudiosDocs','fechaActualizacion','ultimoUsuario']}).then(async res=>{
       if(_esHistNueva){
         // Bug B fix — nota NUEVA de histórico: Firestore es el ÚNICO almacén. Await + encolar si falla
         // (NO fire-and-forget). Desacoplado de res.ok clínico: la nota se persiste aunque los campos clínicos fallen.
@@ -21724,7 +21753,8 @@ function mantenerComoTexto_(sid){
   if(!confirm('¿Marcar esta nota como revisada y mantenerla como texto libre?')) return;
   s.revisionPendiente=false; s.motivoRevision='';
   p.ultimoUsuario=currentUser.name; p.fechaActualizacion=todayFmt();
-  saveDB('pts',[p],{camposHist:['fechaActualizacion','ultimoUsuario']}).then(()=>showToast('✅ Nota marcada como revisada','success')).catch(()=>showToast('Guardado local','warning'));
+  // AUDITORÍA payload-por-campos: muta una nota de p.soap (revisionPendiente) → declarar 'soap'.
+  saveDB('pts',[p],{camposHist:['soap','fechaActualizacion','ultimoUsuario']}).then(()=>showToast('✅ Nota marcada como revisada','success')).catch(()=>showToast('Guardado local','warning'));
   renderExpediente('soap');
 }
 
