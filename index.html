@@ -1899,6 +1899,13 @@ async function saveDB(k, v, opts){
             pdfEnFirebase: c.pdfEnFirebase||false,
             tieneFirema: !!(c.firmaUrl||c.firma),
             tieneFoto: !!(c.fotoIdentidad),
+            // A1/A2 (auditoría): foto de identidad (URL de Storage) y flag de zonas secundarias — faltaban
+            // en el whitelist → se caían al viajar a Sheets. La foto se manda solo si es URL (no base64
+            // pesado, para no rebasar la celda). El base64 de respaldo se conserva local en patientsDB.
+            fotoIdentidad: (typeof c.fotoIdentidad==='string' && /^https?:/i.test(c.fotoIdentidad)) ? c.fotoIdentidad : null,
+            fotoIdentidadFbPath: c.fotoIdentidadFbPath||null,
+            fotoIdEnFirebase: c.fotoIdEnFirebase||false,
+            consentimientoSecundarias: c.consentimientoSecundarias||false,
             terapeuta: c.terapeuta||null,
             folio: c.folio||null,
             versionAviso: c.versionAviso||null,
@@ -1927,7 +1934,9 @@ async function saveDB(k, v, opts){
         const MAX_SOAP = 40000;
         const todosLosSoap = (Array.isArray(p.soap)?p.soap:[]).map(s=>({
           ...s, media:(s.media||[]).map(m=>({
-            id:m.id||'', name:m.name||'', label:m.label||'',
+            // B2 (auditoría): la media de sesión usa mediaId (no id). Sin copiarlo, un video offline
+            // (data:null, sin url) quedaba sin referencia al recargar en otro equipo → irrecuperable.
+            id:m.id||'', mediaId:m.mediaId||m.id||'', name:m.name||'', label:m.label||'',
             type:m.type||'', mimeType:m.mimeType||m.type||'',
             sizeBytes:m.sizeBytes||0,
             storageProvider:m.storageProvider||'',
@@ -2414,7 +2423,11 @@ function _encolarSoapActivo(pid, sesion, modo){
     var q=JSON.parse(localStorage.getItem('COLA_SOAP_ACT')||'[]');
     if(!Array.isArray(q)) q=[];
     var sid=String(sesion.id||'');
-    var sLimpia=Object.assign({}, sesion); delete sLimpia.media; // base64 nunca a localStorage (cuota)
+    // B3 (auditoría): antes se BORRABA media entera (delete) → el replay a Firestore escribía la sesión
+    // sin foto/video aunque ya tuviera url durable. Ahora se conservan las REFERENCIAS (sin base64, para
+    // no meter peso a localStorage), igual que la cola histórica; el drenado rescata el base64 desde IDB.
+    var sLimpia=Object.assign({}, sesion);
+    sLimpia.media=(Array.isArray(sesion.media)?sesion.media:[]).map(function(m){ return {mediaId:m.mediaId||m.id||'', name:m.name||'', label:m.label||'', type:m.type||'', fecha:m.fecha||'', url:m.url||'', fbPath:m.fbPath||'', data:null}; });
     var pac=(Array.isArray(patientsDB)?patientsDB:[]).find(function(x){ return x && x.id===pid; }) || {};
     // MODO: el replay debe usar el mismo modo con que se guardó. 'nueva' escribe createdAt/horaCreacion/
     // totalSesiones (crea el doc); 'edicion' NO (sesionUpdateOK los rechazaría sobre un doc existente).
@@ -2475,6 +2488,9 @@ async function drenarColaSoapActivo(){
             }
           }catch(_g){ /* fail-safe: sin confirmación → ruta normal de hoy */ }
         }
+        // B3 (auditoría): rescatar el base64 de fotos/video offline desde IndexedDB y subirlo a Storage
+        // (paridad con la cola histórica) — así el espejo Firestore recibe la media, no solo el texto.
+        try{ await _reSubirMediaDesdeIDB(it.pid||(pac&&pac.id), it.sesion && it.sesion.media); }catch(_rm){}
         var r=await _conTimeout(FST_guardarSesionFirestore(pac, it.sesion, _modoReplay), 10000);
         if(r && r.ok){ /* éxito → no se re-encola */ }
         else {
@@ -10830,7 +10846,11 @@ function aplicarBorradorSoap(d){
     if(Array.isArray(d.mods)){ tempMods=_migrarMods(d.mods); tempModDetalles=(d.modDetalles&&typeof d.modDetalles==='object')?Object.assign({},d.modDetalles):{}; _renderModGrid(); _renderModDetailCards(); }
     if(Array.isArray(d.ejSesion)){ tempEjerciciosSesion=d.ejSesion.map(function(x){return Object.assign({},x);}); if(typeof _renderEjSesion==='function') _renderEjSesion(); }
     if(Array.isArray(d.mediaObj)){ tempMediaObjetivo=d.mediaObj.map(function(x){return Object.assign({},x);}); if(typeof _renderMediaObjetivo==='function') _renderMediaObjetivo(); }
-    if(Array.isArray(d.evolMedia)){ tempEvolMedia=d.evolMedia.map(function(m){return Object.assign({},m);}); if(typeof _pintarSoapMediaPreview==='function') _pintarSoapMediaPreview(); }
+    if(Array.isArray(d.evolMedia)){ tempEvolMedia=d.evolMedia.map(function(m){return Object.assign({},m);}); if(typeof _pintarSoapMediaPreview==='function') _pintarSoapMediaPreview();
+      // A5 (auditoría): media offline (sin url, base64 en IndexedDB por mediaId) — rehidratar el base64
+      // desde IDB para que no quede referencia colgada al guardar sin conexión. Fire-and-forget.
+      try{ (async function(){ var _cambio=false; for(var _mi=0;_mi<tempEvolMedia.length;_mi++){ var _m=tempEvolMedia[_mi]; if(_m && !_m.url && !_m.data && _m.mediaId && typeof idbGet==='function'){ try{ var _b=await idbGet(_m.mediaId); if(_b){ _m.data=_b; _cambio=true; } }catch(_e){} } } if(_cambio && typeof _pintarSoapMediaPreview==='function') _pintarSoapMediaPreview(); })(); }catch(_e){}
+    }
     if(Array.isArray(d.atendido)){ tempAtendio=d.atendido.slice(); if(typeof _renderAtendioGrid==='function') _renderAtendioGrid(); }
     if(typeof d.motivoIndex==='number') tempMotivoIndex=d.motivoIndex;
     if(typeof d.modoNota==='string' && d.modoNota && typeof seleccionarModoNota==='function'){ try{ seleccionarModoNota(d.modoNota); }catch(_){} } // [BORRADOR-SOAP] restaurar modo clínico → re-muestra la sección opcional y su metadato
@@ -15001,6 +15021,17 @@ async function guardarConsentimiento(){
       return {url:await ref.getDownloadURL(), fbPath};
     }catch(e){ console.warn('subirFirma:',e.message); return null; }
   }
+  async function subirFoto(b64){
+    // A1 (auditoría): la foto de identidad (INE) se guardaba SOLO como base64 local y no viajaba a la
+    // nube (whitelist la omitía) → se perdía cross-device. Ahora sube a Storage como las firmas.
+    if(!b64) return null;
+    try{
+      const fbPath=`clinica/sinergia/${pid}/consentimientos/fotoId_${ts}.jpg`;
+      const ref=fbStorage.ref(fbPath);
+      await ref.put(b64toBlob(b64,'image/jpeg'),{contentType:'image/jpeg'});
+      return {url:await ref.getDownloadURL(), fbPath};
+    }catch(e){ console.warn('subirFoto:',e.message); return null; }
+  }
   async function subirPDF(buffer){
     try{
       const fbPath=`clinica/sinergia/${pid}/consentimientos/consentimiento_${fechaISO}_${ts}.pdf`;
@@ -15018,11 +15049,12 @@ async function guardarConsentimiento(){
     console.warn('jsPDF error:',e);
   }
 
-  const [firmaResult, firmaPSResult, firmaTutorResult, pdfResult] = await Promise.all([
+  const [firmaResult, firmaPSResult, firmaTutorResult, pdfResult, fotoIdResult] = await Promise.all([
     subirFirma(firmaB64,'firma'),
     subirFirma(firmaPSB64,'firmaPS'),
     subirFirma(firmaTutorB64,'firmaTutor'),
     pdfBuffer ? subirPDF(pdfBuffer) : Promise.resolve(null),
+    subirFoto(fotoIdData),
   ]);
 
   // ── Construir objeto del consentimiento y agregar al array ─────────────────
@@ -15053,9 +15085,11 @@ async function guardarConsentimiento(){
     // Flags de estado
     firmaEnFirebase: !!(firmaResult?.url),
     pdfEnFirebase:   !!(pdfResult?.url),
-    fotoIdentidad: fotoIdData||null,
+    fotoIdentidad: fotoIdResult?.url || fotoIdData || null,   // URL de Storage (viaja a la nube) o base64 de respaldo
+    fotoIdentidadFbPath: fotoIdResult?.fbPath || null,
+    fotoIdEnFirebase: !!(fotoIdResult?.url),
     tieneFirema: true,
-    tieneFoto: !!(fotoIdData),
+    tieneFoto: !!(fotoIdData || fotoIdResult?.url),
     terapeuta: currentUser.name,
   };
 
