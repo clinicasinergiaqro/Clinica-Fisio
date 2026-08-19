@@ -5556,12 +5556,12 @@ async function _computarBannerPendientes(){
   if(!miNombre) return null;   // usuario sin código de terapeuta conocido → sin banner
   var c=window._bannerPendCache;
   if(c && c.cod===cod && (Date.now()-c.ts)<REND_CACHE_TTL_MS) return c;
-  // RENDIMIENTO: ventana MÓVIL de 45 días en vez de "desde el 1-jul hasta hoy" (que crecía sin cota y
+  // RENDIMIENTO: ventana MÓVIL de 60 días en vez de "desde el 1-jul hasta hoy" (que crecía sin cota y
   // se re-descargaba/procesaba en cada recálculo, castigando la pantalla de inicio en datos móviles).
-  // Una cita sin nota de hace >45 días ya no es un pendiente reciente accionable. El piso APP_INICIO
+  // Una cita sin nota de hace >60 días ya no es un pendiente reciente accionable. El piso APP_INICIO
   // sigue como tope duro inferior. Constante en fetch Y en el filtro de abajo (_pisoBanner).
   var _hoyBanner=_hoyISOlocal();
-  var _pisoBanner=(function(){ try{ var d=new Date(_hoyBanner+'T12:00:00'); d.setDate(d.getDate()-45); var s=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); return s>APP_INICIO_OPERACION?s:APP_INICIO_OPERACION; }catch(_e){ return APP_INICIO_OPERACION; } })();
+  var _pisoBanner=(function(){ try{ var d=new Date(_hoyBanner+'T12:00:00'); d.setDate(d.getDate()-60); var s=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); return s>APP_INICIO_OPERACION?s:APP_INICIO_OPERACION; }catch(_e){ return APP_INICIO_OPERACION; } })();
   var res=null;
   try{ res=await FST_fetchAgendaRango(_pisoBanner, _hoyBanner); }catch(_){ res=null; }
   if(!res||!res.ok) return null;   // sin agenda no se inventa nada (banner ausente)
@@ -5581,7 +5581,7 @@ async function _computarBannerPendientes(){
     if(asignadas.indexOf(miNombre)===-1) return;
     var ddmm=_ddmmDeISOEvento(ev.inicio);
     var citaCanon=_diaCanon(ddmm);
-    if(!citaCanon || citaCanon<_pisoBanner) return;   // piso: ventana móvil de 45 días (y ≥ APP_INICIO)
+    if(!citaCanon || citaCanon<_pisoBanner) return;   // piso: ventana móvil de 60 días (y ≥ APP_INICIO)
     var _t=ev.inicio?new Date(ev.inicio).getTime():NaN;
     if(isFinite(_t) && _t>ahora) return;                       // cita futura: aún no es pendiente
     var r=(resueltos||{})[clave]||{pid:null,tipo:null};
@@ -5907,28 +5907,41 @@ async function _fetchUltimaSesionHistoricos(resueltos, forzar){
       var ok=await FST_init();
       if(ok && window._fstDb){
         var _porHacer = pendientes.slice();
+        // RENDIMIENTO: agrupar los N doc.get() de padres en consultas `where(documentId(),'in',[...])`
+        // de a 10 → de N idas y vueltas a ceil(N/10). Menos handshakes = menos exposición a cortes en
+        // datos móviles. Se preservan: reintentos (3× con backoff), desambiguación de homónimos
+        // (mapFechasCand), y la distinción CLAVE "doc inexistente = vacío legítimo" (simplemente no
+        // vuelve en el snapshot) vs "error de lectura del chunk = reintentar" (el chunk lanzó).
+        var _FPid = firebase.firestore.FieldPath.documentId();
         for(var _int=0; _int<3 && _porHacer.length; _int++){
           if(_int>0) await new Promise(function(r){ setTimeout(r, 600); });   // dar margen a que auth/reglas propaguen
-          var _fallaron = [];
-          await Promise.all(_porHacer.map(async function(x){
+          // pids únicos (una misma persona histórica puede casar dos nombres del calendario)
+          var _pidsUnicos=[], _vistoPid={};
+          _porHacer.forEach(function(x){ if(!_vistoPid[x.pid]){ _vistoPid[x.pid]=true; _pidsUnicos.push(x.pid); } });
+          var _byId={}, _pidFallo={}, _chunks=[];
+          for(var _ci=0; _ci<_pidsUnicos.length; _ci+=10) _chunks.push(_pidsUnicos.slice(_ci, _ci+10));
+          await Promise.all(_chunks.map(async function(_chunk){
             try{
-              var doc=await window._fstDb.collection('pacientes').doc(x.pid).get();
-              var _d=(doc.exists && (doc.data()||{}))||{};
-              var _ult=String(_d.ultimaSesionLive||'');
-              var _fs=Array.isArray(_d.fechasSesiones)?_d.fechasSesiones:[];
-              // BUG A — por-candidato (desambiguación de homónimos por la nota del día).
-              if(!cache.mapFechasCand[x.clave]) cache.mapFechasCand[x.clave]={};
-              cache.mapFechasCand[x.clave][x.pid]={fechas:_fs, ultima:_ult};
-              // PRINCIPAL: SOLO candidatos[0] siembra map/mapFechas (compat con consumidores actuales).
-              // Los homónimos extra NO pisan mapFechas → NO se vuelve unión (Opción A, nunca B).
-              if(x.pid===principalPid[x.clave]){ cache.map[x.clave]=_ult; cache.mapFechas[x.clave]=_fs; }
-            }catch(_e){
-              // [COLD-GUARD] CUALQUIER fallo de lectura (throw) → reintentar; JAMÁS concluir "sin nota"
-              // a ciegas por un error (Rev: un string de error no-transitorio sembraba falta silenciosa).
-              // Un doc que de verdad no existe NO lanza (doc.exists=false → {} → vacío legítimo, no cae aquí).
-              _fallaron.push(x);
+              var _snap=await window._fstDb.collection('pacientes').where(_FPid, 'in', _chunk).get();
+              _snap.forEach(function(doc){ _byId[doc.id]=(doc.data()||{}); });
+              // los pids del chunk que NO vuelven = doc inexistente = vacío legítimo (no es fallo)
+            }catch(_eq){
+              _chunk.forEach(function(pid){ _pidFallo[pid]=true; });   // el chunk entero falló → reintentar sus pids
             }
           }));
+          var _fallaron=[];
+          _porHacer.forEach(function(x){
+            if(_pidFallo[x.pid]){ _fallaron.push(x); return; }
+            var _d=_byId[x.pid]||{};   // ausente = doc no existe = vacío legítimo
+            var _ult=String(_d.ultimaSesionLive||'');
+            var _fs=Array.isArray(_d.fechasSesiones)?_d.fechasSesiones:[];
+            // BUG A — por-candidato (desambiguación de homónimos por la nota del día).
+            if(!cache.mapFechasCand[x.clave]) cache.mapFechasCand[x.clave]={};
+            cache.mapFechasCand[x.clave][x.pid]={fechas:_fs, ultima:_ult};
+            // PRINCIPAL: SOLO candidatos[0] siembra map/mapFechas (compat con consumidores actuales).
+            // Los homónimos extra NO pisan mapFechas → NO se vuelve unión (Opción A, nunca B).
+            if(x.pid===principalPid[x.clave]){ cache.map[x.clave]=_ult; cache.mapFechas[x.clave]=_fs; }
+          });
           _porHacer = _fallaron;
         }
         if(_porHacer.length){
