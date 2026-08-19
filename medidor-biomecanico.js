@@ -1743,6 +1743,88 @@
     doc.text('Página 1 de 1', W-M-52, fy+14);
     return doc;
   }
+  // Reporte PDF de SENTADILLA (frontal). imgs opcional: {tray, sacro, rodillas} dataURLs para la 2ª página.
+  function BIO_construirPDF_sent(s, p, jsPDFCtor, imgs){
+    jsPDFCtor = jsPDFCtor || (window.jspdf && window.jspdf.jsPDF) || window.jsPDF; imgs=imgs||{};
+    var doc=new jsPDFCtor({unit:'pt', format:'letter'});
+    var W=doc.internal.pageSize.getWidth(), H=doc.internal.pageSize.getHeight(), M=40;
+    var NAVY=[27,58,107], GOLD=[201,168,76], VERDE=[46,125,82], GRIS=[120,128,148];
+    try{ doc.setProperties({ title:'Sentadilla — '+((p&&p.name)||''), author:'Clínica Sinergia', subject:'Análisis de sentadilla (frontal)' }); }catch(e){}
+    function encab(sub){
+      doc.setFillColor(NAVY[0],NAVY[1],NAVY[2]); doc.rect(0,0,W,74,'F'); doc.setFillColor(GOLD[0],GOLD[1],GOLD[2]); doc.rect(0,74,W,4,'F');
+      var lg=(typeof window!=='undefined'&&window.BIO_LOGO_DATAURL)?window.BIO_LOGO_DATAURL:null; if(lg){ try{ doc.addImage(lg,'PNG',W-M-54,10,54,54); }catch(e){} }
+      doc.setTextColor(255,255,255); doc.setFont('helvetica','bold'); doc.setFontSize(21); doc.text('Clínica Sinergia',M,36);
+      doc.setFont('helvetica','normal'); doc.setFontSize(11); doc.setTextColor(GOLD[0],GOLD[1],GOLD[2]); doc.text(sub,M,56);
+    }
+    function pie(n,tot){ var fy=H-38; doc.setDrawColor(GOLD[0],GOLD[1],GOLD[2]); doc.setLineWidth(1.2); doc.line(M,fy,W-M,fy); doc.setLineWidth(1);
+      doc.setFontSize(8); doc.setTextColor(150,158,181); doc.text('Clínica Sinergia · '+fechaHoy()+(usuarioActual()?(' · '+usuarioActual()):''),M,fy+14); doc.text('Página '+n+' de '+tot,W-M-52,fy+14); }
+    var vf=(s.vistas&&s.vistas.frontal)||{}, nReps=vf.nReps||0, cal=s.calibracion||{};
+    var tieneVis=!!(imgs.tray||imgs.sacro||imgs.rodillas), tot=tieneVis?2:1;
+    encab('Análisis de sentadilla · Vista frontal');
+    var y=100; doc.setTextColor(NAVY[0],NAVY[1],NAVY[2]); doc.setFont('helvetica','bold'); doc.setFontSize(13);
+    doc.text('Reporte de sentadilla — valgo dinámico y descenso', M, y);
+    y+=14; var cardH=72; doc.setFillColor(247,248,250); doc.setDrawColor(221,225,234); doc.roundedRect(M,y,W-2*M,cardH,6,6,'FD');
+    var colA=M+16, colB=M+(W-2*M)/2+8, cy=y+22;
+    function campo(l,v,cx,vy){ doc.setFontSize(8); doc.setTextColor(150,158,181); doc.setFont('helvetica','bold'); doc.text(String(l).toUpperCase(),cx,vy);
+      doc.setFontSize(10.5); doc.setTextColor(45,51,68); doc.setFont('helvetica','normal'); doc.text(String(v==null||v===''?'—':v),cx,vy+14); }
+    campo('Paciente',(p&&p.name)||'—',colA,cy); campo('Edad · Sexo',(((p&&p.age!=null)?p.age+' años':'—')+((p&&p.sexo)?(' · '+p.sexo):'')),colB,cy);
+    campo('Fecha · Hora',(s.fecha||'—')+'   '+(s.horaCreacion||''),colA,cy+32); campo('Terapeuta',s.terapeuta||'—',colB,cy+32);
+    y+=cardH+16;
+    doc.setFont('helvetica','italic'); doc.setFontSize(8.5); doc.setTextColor(GRIS[0],GRIS[1],GRIS[2]);
+    var met='Análisis 2D de pose, vista frontal · '+(nReps===1?'1 repetición':nReps+' repeticiones')+'. FPPA a media bajada; desplazamiento medial (MKD) y separación en el fondo. '+(cal.estaturaCm?('Escala por estatura '+cal.estaturaCm+' cm (±10%).'):'Sin estatura: valores en % de estatura.');
+    var metL=doc.splitTextToSize(met,W-2*M); doc.text(metL,M,y); y+=metL.length*11+8;
+    var by={}; (s.medidas||[]).forEach(function(m){by[m.key]=m;});
+    function val(m){ if(!m||m.media==null) return '—'; if(m.unidad==='ratio') return m.media.toFixed(2); return _r1(m.media)+(m.unidad==='%'?'%':'°'); }
+    function extTxt(m,e){ if(!m||m.extremo==null) return ''; return e+' '+(m.unidad==='ratio'?m.extremo.toFixed(2):(_r1(m.extremo)+(m.unidad==='%'?'%':'°'))); }
+    var filas=[ {et:'Valgo dinámico FPPA',iz:by.fppa_izq,de:by.fppa_der,ref:'valgo <10°',e:'peor'},
+      {et:'Desplaz. medial MKD (fondo)',iz:by.mkd_izq,de:by.mkd_der,ref:'menor = mejor',e:'peor'},
+      {et:'Separación rodillas/tobillos',u:by.sep_rodillas,ref:'>= 0.90',e:'mín'},
+      {et:'Tronco lateral (fondo)',u:by.tronco_lateral,ref:'< 10°',e:'máx'},
+      {et:'Descenso del sacro',u:by.sacro_descenso,ref:'—',e:'máx'} ];
+    var cEt=M+6, cIz=M+206, cDe=M+300, cRef=M+400, rowH=24;
+    doc.setFillColor(NAVY[0],NAVY[1],NAVY[2]); doc.rect(M,y,W-2*M,20,'F');
+    doc.setTextColor(255,255,255); doc.setFont('helvetica','bold'); doc.setFontSize(9);
+    doc.text('Métrica',cEt,y+14); doc.text('Izquierda',cIz,y+14); doc.text('Derecha',cDe,y+14); doc.text('Referencia',cRef,y+14); y+=20;
+    doc.setFontSize(9.5);
+    filas.forEach(function(f,i){
+      if(i%2===1){ doc.setFillColor(245,247,250); doc.rect(M,y,W-2*M,rowH,'F'); }
+      doc.setFont('helvetica','bold'); doc.setTextColor(45,51,68); doc.text(f.et,cEt,y+15); doc.setFont('helvetica','normal');
+      function celda(m,cx){ var col=(m&&!m.confiable)?GRIS:VERDE; doc.setFont('helvetica','bold'); doc.setTextColor(col[0],col[1],col[2]); doc.text(val(m),cx,y+14); doc.setFont('helvetica','normal');
+        doc.setTextColor(GRIS[0],GRIS[1],GRIS[2]); doc.setFontSize(7.5); doc.text(extTxt(m,f.e),cx,y+21); if(m&&m.media!=null&&!m.confiable){ doc.setTextColor(180,83,9); doc.text('baja conf.',cx+40,y+21); } doc.setFontSize(9.5); }
+      if(f.u!==undefined) celda(f.u,cIz); else { celda(f.iz,cIz); celda(f.de,cDe); }
+      doc.setTextColor(GRIS[0],GRIS[1],GRIS[2]); doc.text(f.ref||'—',cRef,y+14);
+      doc.setDrawColor(230,233,239); doc.line(M,y+rowH,W-M,y+rowH); y+=rowH;
+    });
+    y+=16;
+    if((s.porRep||[]).length){
+      doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.setTextColor(NAVY[0],NAVY[1],NAVY[2]); doc.text('Descenso del sacro por repetición',M,y); y+=10;
+      var reps=s.porRep, chW=W-2*M, chH=86, byy=y, maxD=Math.max.apply(null,reps.map(function(r){return (cal.estaturaCm?r.descCm:r.descPct)||0;}))||1;
+      var slot=(chW-16)/reps.length, bw=Math.min(46,slot-10);
+      doc.setDrawColor(230,233,239); doc.line(M,byy+chH-12,W-M,byy+chH-12);
+      reps.forEach(function(r,i){ var d=(cal.estaturaCm?r.descCm:r.descPct)||0, bh=Math.max(2,(d/maxD)*(chH-20)), x=M+8+i*slot;
+        doc.setFillColor(NAVY[0],NAVY[1],NAVY[2]); doc.rect(x,byy+chH-12-bh,bw,bh,'F');
+        doc.setTextColor(45,51,68); doc.setFont('helvetica','bold'); doc.setFontSize(8); doc.text((cal.estaturaCm?(r.descCm+' cm'):(r.descPct+'%')),x,byy+chH-15-bh);
+        doc.setTextColor(GRIS[0],GRIS[1],GRIS[2]); doc.setFont('helvetica','normal'); doc.text('#'+r.n,x+bw/2-5,byy+chH); });
+      y+=chH+12;
+    }
+    doc.setFillColor(254,243,199); doc.setDrawColor(240,214,120); doc.roundedRect(M,y,W-2*M,72,6,6,'FD');
+    doc.setTextColor(120,90,20); doc.setFont('helvetica','bold'); doc.setFontSize(8.5); doc.text('Nota de interpretación',M+12,y+16);
+    doc.setFont('helvetica','normal'); doc.setTextColor(90,74,30);
+    var nota='FPPA = valgo dinámico de rodilla (hacia adentro); valores altos o asimétricos sugieren control deficiente. La abducción/valgo en plano frontal es lo más confiable de la cámara 2D. Cribado y seguimiento del paciente contra sí mismo con el mismo montaje; el cm es aproximado (±10%). No sustituye la evaluación clínica ni sistemas 3D (Kinect/optoelectrónicos).';
+    doc.text(doc.splitTextToSize(nota,W-2*M-24),M+12,y+30); y+=72;
+    pie(1,tot);
+    if(tieneVis){
+      doc.addPage(); encab('Reconstrucción y gráficas del movimiento'); var y2=100;
+      doc.setTextColor(NAVY[0],NAVY[1],NAVY[2]); doc.setFont('helvetica','bold'); doc.setFontSize(13); doc.text('Reconstrucción y gráficas',M,y2); y2+=18;
+      var iw=190, ih=Math.min(320, iw/0.5625);
+      if(imgs.tray){ doc.addImage(imgs.tray,'PNG',M,y2,iw,ih); doc.setFontSize(9); doc.setTextColor(GRIS[0],GRIS[1],GRIS[2]); doc.setFont('helvetica','normal'); doc.text('Trayectorias',M,y2+ih+12); }
+      var gx=M+iw+22, gw=W-M-gx, gh=Math.min(150, gw*0.62);
+      if(imgs.sacro){ doc.addImage(imgs.sacro,'PNG',gx,y2,gw,gh); doc.setTextColor(GRIS[0],GRIS[1],GRIS[2]); doc.text('Descenso del sacro (cm)',gx,y2+gh+11); }
+      if(imgs.rodillas){ doc.addImage(imgs.rodillas,'PNG',gx,y2+gh+24,gw,gh); doc.text('Rodillas vs línea media (cm)',gx,y2+gh+24+gh+11); }
+      pie(2,2);
+    }
+    return doc;
+  }
   async function BIO_pdf(sid){
     var p=(typeof currentPatient!=='undefined')?currentPatient:null; if(!p) return;
     var s=(p.biomecanica||[]).find(function(x){return x.id===sid;}); if(!s) return;
@@ -1792,5 +1874,6 @@
   window.BIO_eliminar = BIO_eliminar;
   window.BIO_reconstruccion = BIO_reconstruccion;
   window.BIO_construirPDF = BIO_construirPDF;   // para pruebas/render
+  window.BIO_construirPDF_sent = BIO_construirPDF_sent;
 
 })();
