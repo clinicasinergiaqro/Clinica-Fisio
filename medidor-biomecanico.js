@@ -35,14 +35,19 @@
     { key:'hombro_ext_izq',  grupo:'Hombro', mov:'Extensión', lado:'Izq', calc:'hombro', dir:'ext',  base0:true, vertice:11, hombro:11, codo:13 },
     { key:'hombro_ext_der',  grupo:'Hombro', mov:'Extensión', lado:'Der', calc:'hombro', dir:'ext',  base0:true, vertice:12, hombro:12, codo:14 },
     { key:'hombro_abd_izq',  grupo:'Hombro', mov:'Abducción', lado:'Izq', calc:'hombro', dir:'abd',  base0:true, vertice:11, hombro:11, codo:13 },
-    { key:'hombro_abd_der',  grupo:'Hombro', mov:'Abducción', lado:'Der', calc:'hombro', dir:'abd',  base0:true, vertice:12, hombro:12, codo:14 }
+    { key:'hombro_abd_der',  grupo:'Hombro', mov:'Abducción', lado:'Der', calc:'hombro', dir:'abd',  base0:true, vertice:12, hombro:12, codo:14 },
+    // Lateralización cervical (inclinación lateral del cuello): eje cabeza vs vertical, plano FRONTAL.
+    // dir: hacia qué lado se inclina la cabeza. base0: ROM desde 0° (neutro, cabeza recta). Ref AAOS 0–45°.
+    { key:'cuello_lat_izq',  grupo:'Cuello', mov:'Lateralización', lado:'Izq', calc:'cuello', dir:'izq', base0:true, vertice:0 },
+    { key:'cuello_lat_der',  grupo:'Cuello', mov:'Lateralización', lado:'Der', calc:'cuello', dir:'der', base0:true, vertice:0 }
   ];
   // Filas de la tabla (una por movimiento, con columnas Izq/Der).
   var FILAS = [
     { etq:'Codo · Flexo-ext.',  izq:'codo_flex_izq',   der:'codo_flex_der' },
     { etq:'Hombro · Flexión',   izq:'hombro_flex_izq', der:'hombro_flex_der' },
     { etq:'Hombro · Extensión', izq:'hombro_ext_izq',  der:'hombro_ext_der' },
-    { etq:'Hombro · Abducción', izq:'hombro_abd_izq',  der:'hombro_abd_der' }
+    { etq:'Hombro · Abducción', izq:'hombro_abd_izq',  der:'hombro_abd_der' },
+    { etq:'Cuello · Lateraliz.', izq:'cuello_lat_izq',  der:'cuello_lat_der' }
   ];
 
   // Segmentos a dibujar (esqueleto simple: torso + brazos + piernas).
@@ -198,6 +203,16 @@
           }
           val = 180 - interior; if(val<0) val=0; ok=true;
         }
+      } else if(m.calc==='cuello'){ // lateralización cervical: eje nariz→hombros vs vertical, en 2D (frontal)
+        if(_vis(lm,0)&&_vis(lm,11)&&_vis(lm,12)){
+          var mSx=(lm[11].x+lm[12].x)/2, mSy=(lm[11].y+lm[12].y)/2;
+          var hx=lm[0].x-mSx, hy=lm[0].y-mSy;                 // eje cabeza (nariz) respecto a mitad de hombros
+          if(Math.hypot(hx,hy)>1e-4){
+            var tilt=Math.atan2(hx, -hy)*180/Math.PI;          // 0=recto; + = hacia +x (hombro IZQ del paciente, imagen espejada)
+            var mag=Math.abs(tilt), ladoDir=(tilt>=0)?'izq':'der';
+            if(mag>=8 && ladoDir===m.dir){ val=mag; ok=true; } // <8° = zona neutra
+          }
+        }
       } else { // hombro: la métrica se llena solo si el brazo va en SU dirección (flex/ext/abd)
         var s=m.hombro, e=m.codo;
         if(marco && _vis(lm,s)&&_vis(lm,e)&&_vis(lm,11)&&_vis(lm,12)&&_vis(lm,23)&&_vis(lm,24) && world && world[s]&&world[e]){
@@ -314,9 +329,13 @@
   function finalizarMedidas(acc){
     return MEDIDAS.map(function(m){
       var s = acc && acc[m.key];
+      // margen de error honesto por métrica: los movimientos en el PLANO de la cámara (codo, abducción,
+      // cuello) son fiables en 2D (±5°); flexión/extensión de hombro van FUERA del plano de frente (±10°).
+      var margen = (m.calc==='hombro' && (m.dir==='flex'||m.dir==='ext')) ? 10 : 5;
       var base = { key:m.key, grupo:m.grupo, mov:m.mov, lado:m.lado,
                    media:null, mejor:null, de:null, reps:0, ext:null,
-                   min:null, max:null, rango:null, muestras:(s&&s.muestras)||0 };
+                   min:null, max:null, rango:null, muestras:(s&&s.muestras)||0,
+                   visPct:0, confiable:false, margen:margen };
       if(!s || s.muestras<6 || !s.serie || !s.serie.length) return base;   // <6 muestras = incidental
       var serie=_quitaChispazos(s.serie);               // quita glitches de 1 frame sin recortar picos reales
       var picos=_detPicos(serie, m.calc==='codo'?20:15, 8);
@@ -327,9 +346,11 @@
       if(m.calc==='codo'){                            // codo: extensión = mínimo robusto (0°=extendido)
         var ext=_percentil(serie, 0.05); if(ext<0) ext=0;
         base.ext=Math.round(ext); base.min=base.ext; base.max=base.media; base.rango=Math.round(base.media-base.ext);
-      } else {                                        // hombro: ROM desde 0° neutro
+      } else {                                        // hombro/cuello: ROM desde 0° neutro
         base.min=0; base.max=base.mejor; base.rango=base.media;
       }
+      base.visPct = (acc && acc._frame) ? Math.round(base.muestras/acc._frame*100) : 0;
+      base.confiable = (base.reps>=1 && base.muestras>=12);   // suficientes muestras y ≥1 repetición
       return base;
     });
   }
@@ -1066,11 +1087,13 @@
     gris = gris || '#9BA3B5';
     if(!m) return '<span style="color:'+gris+'">—</span>';
     if(m.media!=null){
+      var noConf = (m.confiable===false);                  // sesiones viejas: confiable undefined → se muestra normal
       var principal = (m.grupo==='Codo') ? (m.min+'°–'+m.max+'°') : (m.media+'°');
       var de = (m.de!=null) ? (' <span style="color:'+gris+'">±'+m.de+'°</span>') : '';
       var reps = m.reps ? (' · '+m.reps+(m.reps===1?' rep':' reps')) : '';
-      return '<b style="color:'+verde+'">'+principal+'</b>'+de
-           + '<span style="color:'+gris+';font-size:11px"> máx '+m.mejor+'°'+reps+'</span>';
+      var conf = noConf ? (' <span style="color:'+gris+';font-size:10px">⚠️ baja conf.</span>') : '';
+      return '<b style="color:'+(noConf?gris:verde)+'">'+principal+'</b>'+de
+           + '<span style="color:'+gris+';font-size:11px"> máx '+m.mejor+'°'+reps+'</span>'+conf;
     }
     if(m.reps==null && m.min!=null) return m.min+'°–'+m.max+'° <b style="color:'+verde+'">Δ'+m.rango+'°</b>';  // sesión vieja
     return '<span style="color:'+gris+'">—</span>';
@@ -1647,7 +1670,7 @@
   // ── PDF de una sesión (bajo demanda; sube a Storage y guarda la url) ───────
   // ROM normal de referencia (grados) por movimiento — guía clínica, no diagnóstico.
   function _refNormal(grupo, mov){
-    return ({ 'Codo·Flexión':145, 'Hombro·Flexión':180, 'Hombro·Extensión':60, 'Hombro·Abducción':180 })[grupo+'·'+mov] || null;
+    return ({ 'Codo·Flexión':145, 'Hombro·Flexión':180, 'Hombro·Extensión':60, 'Hombro·Abducción':180, 'Cuello·Lateralización':45 })[grupo+'·'+mov] || null;
   }
   // Construye el REPORTE PDF (función pura, sin subir): encabezado de clínica, tarjeta de paciente,
   // tabla con referencia normal y barra ROM, nota de interpretación y pie. Devuelve el doc jsPDF.
