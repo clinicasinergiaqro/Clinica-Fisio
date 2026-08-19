@@ -1869,6 +1869,10 @@ async function saveDB(k, v, opts){
       alergias: p.alergias||'',
       antecedentes: p.antecedentes||{},
       motivo: p.motivo||{},
+      // FIX PÉRDIDA DE MOTIVO: motivoHC (zona/lado/¿desde cuándo?/irradiación estructurados) FALTABA
+      // en el envío a Sheets → se guardaba local pero se perdía al recargar desde la nube. Al editar
+      // la valoración parecía "borrarse". Ahora viaja a Sheets como los demás objetos anidados.
+      motivoHC: p.motivoHC||{},
       valoracion: p.valoracion||{},
       dxFuncional: p.dxFuncional||{},
       planTto: p.planTto||{},
@@ -2977,6 +2981,9 @@ function sanearPaciente(p){
     historialCambios: toArr(p.historialCambios),
     antecedentes:   toObj(p.antecedentes)||Object.create(null),
     motivo:         toObj(p.motivo)||Object.create(null),
+    // FIX PÉRDIDA DE MOTIVO: motivoHC (zona/lado/¿desde cuándo?/irradiación) también hay que
+    // CONSERVARLO al cargar; sin esto la carga lo dropeaba aunque Sheets lo devolviera.
+    motivoHC:       toObj(p.motivoHC)||Object.create(null),
     valoracion:     toObj(p.valoracion)||Object.create(null),
     dxFuncional:    toObj(p.dxFuncional)||Object.create(null),
     planTto:        toObj(p.planTto)||Object.create(null),
