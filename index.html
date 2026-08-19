@@ -15565,7 +15565,7 @@ function renderNuevoPaciente(){
       </div>
     </div>
   </div>
-  <div style="font-size:11px;color:var(--gray-400);text-align:center;margin:4px 0">💾 Borrador local automático activado</div>
+  <div style="font-size:11px;color:var(--gray-400);text-align:center;margin:4px 0">💾 Borrador local automático activado <span id="_build_tag" style="color:var(--navy);font-weight:700"></span></div>
   <button class="btn-primary" id="btn-guardar-nuevo" onclick="guardarNuevoPaciente()">✅ Crear expediente</button>
   <button class="btn-secondary" onclick="descartarBorradorNuevo()">🗑️ Descartar borrador</button>
   <button class="btn-secondary" onclick="confirmarSalidaSiDirty(goBack)">Cancelar</button>
@@ -15586,7 +15586,18 @@ function renderNuevoPaciente(){
     _hcInit();   // pinta los chips dinámicos del Motivo (zonas, irradiación según zona, otras zonas)
     // EDICIÓN: re-marcar zona/lado/irradiación ya con _HC precargado (los de lado son inline).
     if(_edP2 && typeof _hcRemarcarChips==='function') _hcRemarcarChips();
+    if(typeof _mostrarBuildTag==='function') _mostrarBuildTag();
   },100);
+}
+// Muestra la versión REAL del service worker que controla la app (para verificar en campo que el
+// dispositivo ya tiene el último arreglo). Rellena cualquier #_build_tag.
+async function _mostrarBuildTag(){
+  try{
+    if(!('caches' in window)) return;
+    var keys=await caches.keys();
+    var v=(keys.find(function(k){return String(k).indexOf('sinergia-shell-')===0;})||'').replace('sinergia-shell-v1-','');
+    Array.prototype.forEach.call(document.querySelectorAll('#_build_tag'), function(el){ el.textContent=v?('· '+v):''; });
+  }catch(_){}
 }
 // Precarga el formulario de nuevo paciente con los datos de un paciente existente (modo edición).
 function _prefillNuevoDesdePaciente(p){
