@@ -15882,6 +15882,10 @@ function guardarNuevoPaciente(){
     }
     // valoración: preservar EVA existente si en edición no se tocó (quedó null)
     if(nuevo.valoracion && (nuevo.valoracion.eva==null||nuevo.valoracion.eva==='') && _ep.valoracion && _ep.valoracion.eva!=null){ nuevo.valoracion.eva=_ep.valoracion.eva; }
+    // Bug 4 (legacy): banderasRojas en texto libre (pacientes viejos) — el form la re-deriva de los
+    // checkboxes; si quedó vacía/"Ninguna" pero existía texto libre, conservar el existente.
+    if(nuevo.valoracion){ var _nbr=String(nuevo.valoracion.banderasRojas||'').trim(); var _obr=String((_ep.valoracion&&_ep.valoracion.banderasRojas)||'').trim();
+      if((!_nbr||_nbr==='Ninguna') && _obr && _obr!=='Ninguna') nuevo.valoracion.banderasRojas=_ep.valoracion.banderasRojas; }
     _ep.valoracion=Object.assign({}, _ep.valoracion||{}, nuevo.valoracion||{});
     // dxFuncional: preservar objetivosLP y dxClinico (no editables en este form).
     _ep.dxFuncional=Object.assign({}, _ep.dxFuncional||{}, {dxFuncional:nuevo.dxFuncional.dxFuncional, limitaciones:nuevo.dxFuncional.limitaciones, objetivosCP:nuevo.dxFuncional.objetivosCP, pronostico:nuevo.dxFuncional.pronostico});
@@ -16949,8 +16953,9 @@ const DRAFT_NUEVO='sinergia_borrador_nuevo_paciente';
 // Orden espejo del layout del REACOMODO (el borrador guarda/restaura por ID, así que borradores
 // previos siguen funcionando; un ID guardado que ya no existe en el form simplemente se ignora).
 // Fase 2: 'n-banderas' salió de la lista — el campo se eliminó del alta (duplicaba sc-bandera).
-const CAMPOS_NUEVO=['n-nombre','n-fechanac','n-edad','n-telefono','n-terapeuta','n-terapeuta-seguimiento','n-medico',
+const CAMPOS_NUEVO=['n-nombre','n-fechanac','n-edad','n-sexo','n-telefono','n-terapeuta','n-terapeuta-seguimiento','n-medico',
   'n-motivoconsulta','n-dxmedico','n-padecimiento','n-mecanismo','n-evolucion',
+  'hc-desde-texto','hc-zona-otra','hc-irrad-otra',
   'n-patologicos','sc-condiciones-obs','n-cirugias','n-medicamentos','n-alergias','n-deportivos','n-deporte-freq',
   'sc-implantes-detalle','sc-banderas-detalle','n-contra',
   'n-inflamacion','n-marcha','n-rom','n-fuerza','n-flex','n-pruebas','n-palpacion','n-estudios',
@@ -16968,6 +16973,12 @@ function guardarBorradorNuevo(){
     data._implantes=getChecks('sc-implante');
     data._condiciones=getChecks('sc-condicion');
     data._banderas=getChecks('sc-bandera');
+    // FIX (auditoría): el motivo estructurado (zona/lado/secundarias/irradiación) vive en window._HC,
+    // NO en un input → sin esto no se guardaba en el borrador y se perdía al cerrar/bloquear.
+    data._HC=(window._HC&&typeof window._HC==='object')?Object.assign({},window._HC):null;
+    // FIX (auditoría): casillas de consentimiento (no son inputs de texto).
+    var _ckv=function(id){ var el=document.getElementById(id); return !!(el&&el.checked); };
+    data._consents={datos:_ckv('n-consent-datos'),imagen:_ckv('n-consent-imagen'),wa:_ckv('n-consent-wa'),waRec:_ckv('n-wa-recordatorios'),waEj:_ckv('n-wa-ejercicios')};
     // FIX PÉRDIDA DE DATOS: los estudios escaneados y el media del "antes" viven en globals
     // (window._altaEstudios / _altaMediaAntes) y ANTES no se guardaban en el borrador → si el
     // iPad se bloqueaba o cerraba la página, se perdían aunque ya estuvieran subidos a Storage.
@@ -16980,7 +16991,8 @@ function guardarBorradorNuevo(){
     // estudios/media capturados. Así no se pierde nada a medio llenar aunque falte el nombre.
     var _algoTexto=CAMPOS_NUEVO.some(function(id){ return String(data[id]||'').trim(); });
     var _algoCheck=(Array.isArray(data._implantes)&&data._implantes.length)||(Array.isArray(data._condiciones)&&data._condiciones.length)||(Array.isArray(data._banderas)&&data._banderas.length);
-    if(!_algoTexto && data._nEvaVal==null && !_algoCheck && !data._altaEstudios.length && !data._altaMediaAntes.length) return;
+    var _algoHC=!!(data._HC&&(data._HC.zona||data._HC.lado||(Array.isArray(data._HC.sec)&&data._HC.sec.length)||data._HC.irrad));
+    if(!_algoTexto && data._nEvaVal==null && !_algoCheck && !_algoHC && !data._altaEstudios.length && !data._altaMediaAntes.length) return;
     localStorage.setItem(DRAFT_NUEVO,JSON.stringify({updatedAt:Date.now(),data}));
   }catch(e){ console.warn('borrador nuevo:',e); }
 }
@@ -16993,6 +17005,10 @@ function aplicarBorradorNuevo(data){
     if(data._implantes) setChecks('sc-implante',data._implantes);
     if(data._condiciones) setChecks('sc-condicion',data._condiciones);
     if(data._banderas) setChecks('sc-bandera',data._banderas);
+    // FIX (auditoría): restaurar el motivo estructurado (_HC) y re-marcar sus chips (zona/lado/irrad).
+    if(data._HC&&typeof data._HC==='object'){ window._HC=Object.assign({},data._HC); if(typeof _hcInit==='function') _hcInit(); if(typeof _hcRemarcarChips==='function') _hcRemarcarChips(); }
+    // FIX (auditoría): restaurar casillas de consentimiento.
+    if(data._consents){ var _sk=function(id,on){ var el=document.getElementById(id); if(el) el.checked=!!on; }; _sk('n-consent-datos',data._consents.datos); _sk('n-consent-imagen',data._consents.imagen); _sk('n-consent-wa',data._consents.wa); _sk('n-wa-recordatorios',data._consents.waRec); _sk('n-wa-ejercicios',data._consents.waEj); var _ws=document.getElementById('n-wa-sub'); if(_ws) _ws.style.display=data._consents.wa?'block':'none'; }
     // FIX PÉRDIDA DE DATOS: restaurar estudios/media del "antes" y el pid pre-generado.
     if(data._altaPid) window._altaPid=data._altaPid;
     if(Array.isArray(data._altaEstudios)) window._altaEstudios=data._altaEstudios.map(function(x){return Object.assign({},x);});
