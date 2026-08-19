@@ -567,39 +567,48 @@ async function FST_renderHistorialSoap(pid){
         new Promise((_, rej) => setTimeout(() => rej(new Error('tok-timeout')), 4000))
       ]);
     } catch(_e){}
-    let sesiones = await FST_fetchSesiones(pid);
-    // [SENTINEL] null = "no pude cargar" (sin db / timeout / error); array = "cargó" (aunque sea []).
-    // Reintento breve SOLO en ERROR (null): con el sentinel un [] es AUTORITATIVO (query OK, 0 docs) y
-    // NO se reintenta → el histórico con 0 sesiones pinta "Sin historial" al instante, sin 1.5s de más.
-    // El cold-token-vacío que antes justificaba reintentar-en-vacío ahora llega como null. Si el usuario
-    // cambia de paciente/tab, se aborta. (_fstHistWarm quedó obsoleto: el sentinel lo reemplaza.)
-    if (sesiones === null) {
-      for (let _i = 0; _i < 3 && sesiones === null; _i++) {
-        await new Promise(function(r){ setTimeout(r, 500); });
-        if (window._fstRenderInFlight !== pid) return;   // el usuario cambió de tab/paciente: abortar
-        sesiones = await FST_fetchSesiones(pid);
+    let sesiones;
+    // RENDIMIENTO: si el cache es RECIENTE (<TTL), usarlo sin re-leer la subcolección. Colapsa las 2-3
+    // rutas que releen el mismo pid en una apertura y evita re-leer al reabrir rápido. Fuera de la
+    // ventana (o sin cache) se lee de red como siempre.
+    var _cacheTsSes = _fstSesionesCacheTs[pid] || 0;
+    if (Array.isArray(_fstSesionesCache[pid]) && _fstSesionesCache[pid].length && (Date.now() - _cacheTsSes) < _FST_SES_TTL_MS) {
+      sesiones = _fstSesionesCache[pid];
+    } else {
+      sesiones = await FST_fetchSesiones(pid);
+      // [SENTINEL] null = "no pude cargar" (sin db / timeout / error); array = "cargó" (aunque sea []).
+      // Reintento breve SOLO en ERROR (null): con el sentinel un [] es AUTORITATIVO (query OK, 0 docs) y
+      // NO se reintenta → el histórico con 0 sesiones pinta "Sin historial" al instante, sin 1.5s de más.
+      // El cold-token-vacío que antes justificaba reintentar-en-vacío ahora llega como null. Si el usuario
+      // cambia de paciente/tab, se aborta. (_fstHistWarm quedó obsoleto: el sentinel lo reemplaza.)
+      if (sesiones === null) {
+        for (let _i = 0; _i < 3 && sesiones === null; _i++) {
+          await new Promise(function(r){ setTimeout(r, 500); });
+          if (window._fstRenderInFlight !== pid) return;   // el usuario cambió de tab/paciente: abortar
+          sesiones = await FST_fetchSesiones(pid);
+        }
       }
-    }
-    // [FIX-HANG-3] No clobberar cache bueno con []; [SENTINEL] y JAMÁS cachear el sentinel null.
-    if (Array.isArray(sesiones) && (sesiones.length || !(Array.isArray(_fstSesionesCache[pid]) && _fstSesionesCache[pid].length))) _fstSesionesCache[pid] = sesiones;
-    // [SENTINEL] Error de carga: cache-first; si no hay cache bueno, ERROR ACCIONABLE (no falso "Sin historial").
-    if (sesiones === null) {
-      const _cErr = _fstSesionesCache[pid];
-      if (Array.isArray(_cErr) && _cErr.length) { sesiones = _cErr; }   // usar cache bueno, seguir al render normal
-      else {
-        if (_sigoVigente()) _pintarHist('<div style="padding:12px 14px;font-size:12px;color:var(--red)">⚠ No se pudo cargar el historial (conexión). <button type="button" data-pid="'+escapeAttr_(pid)+'" onclick="FST_renderHistorialSoap(this.dataset.pid)" style="margin-left:8px;font-size:12px;font-weight:700;padding:5px 12px;border-radius:10px;border:1.5px solid var(--navy);background:white;color:var(--navy);cursor:pointer">Reintentar</button></div>');
-        return;
+      // [FIX-HANG-3] No clobberar cache bueno con []; [SENTINEL] y JAMÁS cachear el sentinel null.
+      if (Array.isArray(sesiones) && (sesiones.length || !(Array.isArray(_fstSesionesCache[pid]) && _fstSesionesCache[pid].length))) { _fstSesionesCache[pid] = sesiones; _fstSesionesCacheTs[pid] = Date.now(); }
+      // [SENTINEL] Error de carga: cache-first; si no hay cache bueno, ERROR ACCIONABLE (no falso "Sin historial").
+      if (sesiones === null) {
+        const _cErr = _fstSesionesCache[pid];
+        if (Array.isArray(_cErr) && _cErr.length) { sesiones = _cErr; }   // usar cache bueno, seguir al render normal
+        else {
+          if (_sigoVigente()) _pintarHist('<div style="padding:12px 14px;font-size:12px;color:var(--red)">⚠ No se pudo cargar el historial (conexión). <button type="button" data-pid="'+escapeAttr_(pid)+'" onclick="FST_renderHistorialSoap(this.dataset.pid)" style="margin-left:8px;font-size:12px;font-weight:700;padding:5px 12px;border-radius:10px;border:1.5px solid var(--navy);background:white;color:var(--navy);cursor:pointer">Reintentar</button></div>');
+          return;
+        }
       }
-    }
-    if (!sesiones.length) {
-      // [FIX-CACHE-FIRST] Si mi fetch vino vacío pero el cache tiene sesiones (otro render/prefetch),
-      // USARLAS y caer al render normal de abajo — NO retornar dejando el spinner pegado.
-      const _cFall = _fstSesionesCache[pid];
-      if (Array.isArray(_cFall) && _cFall.length) { sesiones = _cFall; }
-      else {
-        const galeriaSola = await FST_renderGaleriaHistorica(pid);
-        if (_sigoVigente()) _pintarHist(galeriaSola + '<div style="padding:10px 14px;font-size:12px;color:var(--gray-400)">Sin historial Firestore para este paciente.</div>');
-        return;
+      if (!sesiones.length) {
+        // [FIX-CACHE-FIRST] Si mi fetch vino vacío pero el cache tiene sesiones (otro render/prefetch),
+        // USARLAS y caer al render normal de abajo — NO retornar dejando el spinner pegado.
+        const _cFall = _fstSesionesCache[pid];
+        if (Array.isArray(_cFall) && _cFall.length) { sesiones = _cFall; }
+        else {
+          const galeriaSola = await FST_renderGaleriaHistorica(pid);
+          if (_sigoVigente()) _pintarHist(galeriaSola + '<div style="padding:10px 14px;font-size:12px;color:var(--gray-400)">Sin historial Firestore para este paciente.</div>');
+          return;
+        }
       }
     }
     const ids = new Set(); const dups = sesiones.filter(function(s){ if (ids.has(s.id)) return true; ids.add(s.id); return false; });
@@ -886,6 +895,10 @@ async function FST_guardarSesionFirestore(paciente, sesion, modo) {
     const sesPayload = FST_buildSesionPayload(sesion, _modoReal);
     await window._fstDb.collection('pacientes').doc(pid).set(_sinUndefined(pacPayload), { merge: true });
     await _sesRef.set(_sinUndefined(sesPayload), { merge: true });
+    // RENDIMIENTO/CORRECCIÓN: se agregó/editó una sesión → invalidar el ts del cache (TTL) de ESE pid
+    // para que el próximo render del historial re-lea y muestre la nota al instante (el cache en memoria
+    // puede no tener aún la sesión nueva). No borra el cache (cache-first sigue pintando sin spinner).
+    try{ if(typeof _fstSesionesCacheTs!=='undefined') _fstSesionesCacheTs[pid]=0; }catch(_){}
     console.log('[FST] dual-write OK · modo=' + _modoReal + '(orig ' + modo + ') · pid=' + pid + ' · sid=' + sid + ' · match=' + pidInfo.matchType);
     return { ok: true, pid: pid, sid: sid, matchType: pidInfo.matchType };
   } catch (e) {
@@ -1225,10 +1238,17 @@ body.modo-oscuro .topbar{background:#141824}
 .pub-dosis-lbl{font-size:9px;color:#9BA3B5;text-transform:uppercase;margin-top:2px;letter-spacing:.4px}
 .pub-warning{background:#FEF3C7;border:1px solid #F6C84B;border-radius:10px;padding:14px;margin-top:16px;font-size:13px;color:#92400E;line-height:1.6}
 </style>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<!-- RENDIMIENTO: pdf.js y jsPDF solo se usan al leer/exportar PDF (bajo demanda), NUNCA en el arranque.
+     `defer` deja que el parser siga al script principal de la app sin esperar su descarga; siguen
+     cacheados por el service worker para offline. -->
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script>
-  if(window.pdfjsLib){ pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'; }
+  // pdf.js ahora carga con `defer`: se configura su worker cuando ya está disponible. Los scripts
+  // `defer` se ejecutan ANTES de DOMContentLoaded, así que aquí window.pdfjsLib ya existe.
+  document.addEventListener('DOMContentLoaded', function(){
+    if(window.pdfjsLib){ pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'; }
+  });
 </script>
 </head>
 <body>
@@ -1525,6 +1545,12 @@ let editingSoapPid=null; // pid del paciente cuya nota histórica se edita
 let editingSoapEsHistorico=false; // true si la nota viene del historial Firestore (importado:true)
 let _editingSoapHistoricoNota=null; // snapshot completo de la nota histórica mientras se edita
 let _fstSesionesCache={}; // cache pid→[sesiones] para evitar re-fetch al ver historial
+// RENDIMIENTO: TTL del cache de sesiones. Antes el cache pintaba pero SIEMPRE se re-leía la subcolección
+// (y la misma apertura la leía hasta 2-3 veces por distintas rutas). Con un TTL corto, una reapertura o
+// re-render dentro de la ventana usa el cache sin re-leer. Los puntos de ESCRITURA de nota actualizan el
+// cache y su ts (ver guardado/edición), así que el dato pintado nunca queda viejo tras guardar.
+let _fstSesionesCacheTs={};        // pid → Date.now() de la última carga de red
+const _FST_SES_TTL_MS=90000;       // 90 s
 // Helper unificado de sesiones para vistas SÍNCRONAS (gráfica EVA, completitud, inactividad):
 //   activo (p-uuid) → p.soap ; histórico (mig_pac_) → _fstSesionesCache (sesiones de Firestore).
 // Histórico con el cache aún NO poblado → devuelve null (señal "cargando", NO [] silencioso).
@@ -1798,6 +1824,25 @@ function loadLocal(k){
   try{ const v=localStorage.getItem('sinergia_'+k); return v?JSON.parse(v):null; }
   catch(e){ return null; }
 }
+// RENDIMIENTO: el respaldo local de la base (saveLocal('pts',…)) serializa TODA la base a localStorage
+// de forma SÍNCRONA. Antes corría en CADA saveDB → micro-freeze al guardar una nota en el iPad. Se
+// coalescen las ráfagas en un solo volcado (~800ms de calma). La nube (Sheets/Firestore) es la fuente
+// de verdad y el respaldo local se rehidrata al recargar, así que no necesita ser síncrono por acción.
+// GARANTÍA: se vuelca de inmediato en cierre/bloqueo (visibilitychange/pagehide/freeze, ver
+// _flushBorradoresActivos) → nunca se pierde más que la última ráfaga sub-segundo, que además ya está
+// en la nube.
+var _ptsLocalDirty=false, _ptsLocalTimer=null;
+function _flushGuardadoLocalPts(){
+  if(!_ptsLocalDirty) return;
+  _ptsLocalDirty=false;
+  try{ clearTimeout(_ptsLocalTimer); }catch(_){} _ptsLocalTimer=null;
+  try{ saveLocal('pts', patientsDB); }catch(_){}
+}
+function _programarGuardadoLocalPts(){
+  _ptsLocalDirty=true;
+  try{ clearTimeout(_ptsLocalTimer); }catch(_){}
+  _ptsLocalTimer=setTimeout(_flushGuardadoLocalPts, 800);
+}
 
 // IndexedDB para media base64 (fotos, docs, firmas)
 let _idb=null;
@@ -1844,7 +1889,7 @@ async function saveDB(k, v, opts){
       if(idx>=0) patientsDB[idx]=mod;
       else patientsDB.push(mod);
     });
-    saveLocal('pts', patientsDB); // Guarda TODA la base con base64 completo
+    _programarGuardadoLocalPts(); // RENDIMIENTO: respaldo local coalescido (antes: saveLocal síncrono por cada saveDB)
   }
   if(!APPS_SCRIPT_URL) return {ok:false, error:'Sin URL de Apps Script configurada'};
 
@@ -4135,7 +4180,7 @@ function _watchdogDirtyAtorado(){
     if(!editando){ try{ limpiarDirty(); }catch(_){ _dirty=false; } }
   }catch(_e){}
 }
-try{ setInterval(_watchdogDirtyAtorado, 15000); }catch(_wd){}
+try{ setInterval(function(){ if(document.visibilityState==='hidden') return; _watchdogDirtyAtorado(); }, 30000); }catch(_wd){}   // RENDIMIENTO: 15s→30s y sin trabajo en 2º plano (batería/CPU del iPad)
 
 // GARANTÍA ANTI-PÉRDIDA: en iOS, al bloquear la pantalla, cambiar de app o cerrar la pestaña,
 // Safari dispara visibilitychange(hidden)/pagehide ANTES de descartar la página. Ahí volcamos de
@@ -4150,6 +4195,8 @@ function _flushBorradoresActivos(){
     else if(scr==='screen-nuevo-ejercicio'){ if(typeof guardarBorradorEjercicio==='function') guardarBorradorEjercicio(); }
     else if(scr==='screen-consent'){ if(typeof guardarBorradorConsent==='function') guardarBorradorConsent(); }
   }catch(_){}
+  // RENDIMIENTO: volcado síncrono del respaldo local coalescido antes de que la página se descarte.
+  try{ if(typeof _flushGuardadoLocalPts==='function') _flushGuardadoLocalPts(); }catch(_){}
 }
 try{
   document.addEventListener('visibilitychange', function(){ if(document.visibilityState==='hidden') _flushBorradoresActivos(); });
@@ -4303,7 +4350,7 @@ if ('serviceWorker' in navigator) {
     // Tic lento: [FIX-AUTOUPDATE p4] revisa estado y aplica si es seguro. Si quedó una
     // actualización pendiente y el usuario ya terminó (guardó / dejó de escribir), se aplica
     // sola sin que tenga que hacer nada.
-    setInterval(function(){ revisarCambioDeCaches(); aplicarActualizacionSiSegura(); }, 15000);
+    setInterval(function(){ if(document.visibilityState==='hidden') return; revisarCambioDeCaches(); aplicarActualizacionSiSegura(); }, 30000);   // RENDIMIENTO: 15s→30s y sin trabajo en 2º plano
   });
   function _registrarSW(){
     // updateViaCache:'none' — CLAVE para iOS: obliga a traer sw.js SIEMPRE de la red al revisar
@@ -5974,10 +6021,19 @@ async function _desmarcarNoAcudio(nombre, fecha){   // reversible: quita la marc
 // CAPA 3 — clave canónica de día (YYYY-MM-DD) desde CUALQUIER formato (ISO o DD/MM/YYYY), reusando
 // parseFechaClinicaSegura. Normaliza AMBOS lados de la comparación del dashboard → inmune al formato
 // mixto (migrados en ISO vs notas de la app en DD/MM). Devuelve '' si no parsea.
+// RENDIMIENTO: _diaCanon se llama en bucles grandes (triangulación citas↔notas, banner, pendientes),
+// reparsando las MISMAS fechas decenas de veces. Memo por string de entrada (fechas son pocas y
+// repetidas). Resultado idéntico; se limpia si crece mucho (cota defensiva, nunca en uso real).
+var _diaCanonMemo=Object.create(null), _diaCanonMemoN=0;
 function _diaCanon(f){
+  var k=(f==null)?'':String(f);
+  var hit=_diaCanonMemo[k];
+  if(hit!==undefined) return hit;
   var d=(typeof parseFechaClinicaSegura==='function')?parseFechaClinicaSegura(f):null;
-  if(!d) return '';
-  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  var out=d?(d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')):'';
+  if(_diaCanonMemoN>=5000){ _diaCanonMemo=Object.create(null); _diaCanonMemoN=0; }   // cota defensiva
+  _diaCanonMemo[k]=out; _diaCanonMemoN++;
+  return out;
 }
 function _triangularCitasNotas(eventos, resueltos, ultimaHist, asigMap, resueltas, fechasHist, candFechas, noAcudioMap){
   var porTer={};
@@ -8097,7 +8153,7 @@ function openExpediente(pid){
       .then(function(ses){
       // [FIX-HANG-3] No clobberar un cache bueno con [] (token frío en cold-resume).
       const _n = Array.isArray(ses)?ses:[];
-      if (_n.length || !(Array.isArray(_fstSesionesCache[pid]) && _fstSesionesCache[pid].length)) _fstSesionesCache[pid] = _n;
+      if (_n.length || !(Array.isArray(_fstSesionesCache[pid]) && _fstSesionesCache[pid].length)) { _fstSesionesCache[pid] = _n; _fstSesionesCacheTs[pid] = Date.now(); }   // RENDIMIENTO: sella ts → el render reusa este prefetch sin re-leer
       if(currentPatient && currentPatient.id===pid && document.getElementById('content-expediente')) renderExpediente(currentTab||'historia');
     }).catch(function(){});
   }
@@ -8318,7 +8374,7 @@ function actualizarFechasClinicas(paciente){
     var sesCached = (typeof _fstSesionesCache==='object' && _fstSesionesCache && Array.isArray(_fstSesionesCache[pid])) ? _fstSesionesCache[pid] : null;
     var pSes = sesCached
       ? Promise.resolve(sesCached)
-      : FST_fetchSesiones(pid).then(function(s){ var arr=Array.isArray(s)?s:[]; try{ _fstSesionesCache[pid]=arr; }catch(_){} return arr; });
+      : FST_fetchSesiones(pid).then(function(s){ var arr=Array.isArray(s)?s:[]; try{ _fstSesionesCache[pid]=arr; _fstSesionesCacheTs[pid]=Date.now(); }catch(_){} return arr; });
     pSes.then(function(sesFS){
       return obtenerResumenFechasClinicas(paciente, sesFS||[]);
     }).then(function(res2){
@@ -12282,6 +12338,7 @@ async function _guardarEdicionSoapHistorico(sid, pid, sesion){
   if(payload && payload.fecha){
     await window._fstDb.collection('pacientes').doc(pid).set({ fechasSesiones: firebase.firestore.FieldValue.arrayUnion((typeof _aISO==='function' && _aISO(payload.fecha)) || payload.fecha) }, { merge:true });
   }
+  try{ if(typeof _fstSesionesCacheTs!=='undefined') _fstSesionesCacheTs[pid]=0; }catch(_){}   // RENDIMIENTO: TTL invalida → próximo render re-lee la edición
   showToast('✅ Nota histórica actualizada en Firestore','success');
 }
 
