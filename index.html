@@ -6977,6 +6977,54 @@ async function mostrarRendimientoEquipo(ventana, forzar){
   var noAcudioMap=await FST_leerNoAcudio(!!forzar);   // [NO-ACUDIÓ] citas marcadas "no se presentó"
   var tri=_triangularCitasNotas(eventos, resueltos, ultimaHist, asigMap, resueltas, fechasHist, candFechas, noAcudioMap);
   tri._diasDDMM=dias.map(_ddmmFromISO);   // VISTA-SEMANAL: orden de columnas (lunes primero)
+  // ── [ÍNDICE-COJO GUARD · DASHBOARD] ─────────────────────────────────────────────────
+  // Los históricos se clasifican contra el índice fechasSesiones del doc padre, que puede quedar
+  // "cojo" (nota real sin su fecha en el índice) → 🔴 fantasma (mismo fallo que se corrigió en el
+  // banner). Confirmamos SOLO los históricos marcados SIN NOTA contra sus sesiones REALES (lectura
+  // autoritativa TTL-cacheada, a menudo ya tibia por el banner). Si la nota del día existe:
+  // inyectamos la fecha al índice EN MEMORIA (fechasHist comparte referencia con mapFechas → también
+  // sana el banner), reparamos el doc padre (arrayUnion idempotente) y RE-corremos la triangulación
+  // (recálculo limpio de TODOS los contadores, sin cirugía manual). Sin red no perdona nada.
+  try{
+    var _cojoPend={};   // pid → {clave, dias:{canon:true}}
+    Object.keys(tri).forEach(function(n){
+      if(n==='_porDia'||n==='_diasDDMM') return;
+      var arr=(tri[n]&&tri[n].sinNotaPacs)||[];
+      arr.forEach(function(x){
+        if(!x || x.tipo!=='historico' || !x.pid) return;
+        var cc=_diaCanon(x.fecha); if(!cc) return;
+        var e=_cojoPend[x.pid]||(_cojoPend[x.pid]={clave:_normPend(x.nombre||''), dias:{}});
+        e.dias[cc]=true;
+      });
+    });
+    var _pidsCojo=Object.keys(_cojoPend);
+    if(_pidsCojo.length && (await FST_init()) && window._fstDb){
+      var _huboCojo=false;
+      await Promise.all(_pidsCojo.map(async function(pid){
+        try{
+          var _ses=null, _tsC=(typeof _fstSesionesCacheTs!=='undefined'&&_fstSesionesCacheTs[pid])||0;
+          if(Array.isArray(_fstSesionesCache[pid]) && _fstSesionesCache[pid].length && (Date.now()-_tsC)<_FST_SES_TTL_MS){ _ses=_fstSesionesCache[pid]; }
+          else { _ses=await FST_fetchSesiones(pid); if(Array.isArray(_ses)){ _fstSesionesCache[pid]=_ses; _fstSesionesCacheTs[pid]=Date.now(); } }
+          if(!Array.isArray(_ses)) return;   // no pude confirmar → conservar el 🔴 (no perdonar a ciegas)
+          var _real={}; _ses.forEach(function(s){ var c=s&&_diaCanon(s.fecha||s.fechaHoraISO); if(c) _real[c]=true; });
+          var ent=_cojoPend[pid];
+          Object.keys(ent.dias).forEach(function(cc){
+            if(_real[cc]){
+              _huboCojo=true;
+              if(!Array.isArray(fechasHist[ent.clave])) fechasHist[ent.clave]=[];
+              if(fechasHist[ent.clave].indexOf(cc)===-1) fechasHist[ent.clave].push(cc);
+              try{ window._fstDb.collection('pacientes').doc(pid).set({ fechasSesiones: firebase.firestore.FieldValue.arrayUnion((typeof _aISO==='function' && _aISO(cc)) || cc) }, { merge:true }); }catch(_){}
+            }
+          });
+        }catch(_e){}
+      }));
+      if(_huboCojo){
+        window._bannerPendCache=null;   // el índice reparado también invalida el banner
+        tri=_triangularCitasNotas(eventos, resueltos, ultimaHist, asigMap, resueltas, fechasHist, candFechas, noAcudioMap);
+        tri._diasDDMM=dias.map(_ddmmFromISO);
+      }
+    }
+  }catch(_eCojoD){}
   _tm('triangulación históricos', tTri);
   var etiqueta=(dias.length>1)?(_ddmmFromISO(dias[0])+' — '+_ddmmFromISO(dias[dias.length-1])):'Hoy';
   if(ventana==='mesAnterior') etiqueta='Mes anterior · '+etiqueta;   // [MES-ANTERIOR] sin duda de qué mes se mira
