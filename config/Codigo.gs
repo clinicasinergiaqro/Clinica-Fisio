@@ -926,10 +926,26 @@ function mergePacienteSeguro_(actual, entrante) {
   actual = actual || {};
   entrante = entrante || {};
 
-  var entranteMasNuevo = esEntranteMasNuevo_(actual, entrante);
-  var base = entranteMasNuevo
-    ? JSON.parse(JSON.stringify(Object.assign({}, actual, entrante)))
-    : JSON.parse(JSON.stringify(Object.assign({}, entrante, actual)));
+  // AUDITORIA (anti-clobber cross-device): si el guardado declara _soloCampos (los campos TOP-LEVEL que
+  // ESE guardado realmente toco), se hace MERGE POR COLUMNA: se parte de ACTUAL (lo mas nuevo del Sheet)
+  // y se superponen UNICAMENTE esos campos desde entrante. Asi un guardado de SOAP/ejercicios desde una
+  // copia en memoria vieja NO revierte valoracion/motivo/dxFuncional/planTto/etc. que otro equipo acaba
+  // de escribir. Sin _soloCampos -> merge clasico "updatedAt mas nuevo gana" (guardado completo legitimo).
+  var solo = Array.isArray(entrante._soloCampos) ? entrante._soloCampos : null;
+  var base;
+  if (solo && solo.length) {
+    base = JSON.parse(JSON.stringify(actual || {}));
+    solo.forEach(function(campo){
+      // soap/soap2/soap3 y los arrays criticos se fusionan por id mas abajo (no reemplazar en bloque).
+      if (campo === 'soap' || campo === 'soap2' || campo === 'soap3') return;
+      if (entrante[campo] !== undefined) base[campo] = entrante[campo];
+    });
+  } else {
+    var entranteMasNuevo = esEntranteMasNuevo_(actual, entrante);
+    base = entranteMasNuevo
+      ? JSON.parse(JSON.stringify(Object.assign({}, actual, entrante)))
+      : JSON.parse(JSON.stringify(Object.assign({}, entrante, actual)));
+  }
 
   var soapActual = ensamblarSoap_(actual);
   var soapEntrante = ensamblarSoap_(entrante);
@@ -956,6 +972,7 @@ function mergePacienteSeguro_(actual, entrante) {
   var sesE = parseInt(entrante.sesiones || 0, 10);
   base.sesiones = Math.max(sesA, sesE);
 
+  if (base._soloCampos !== undefined) delete base._soloCampos; // señal transitoria, no se persiste
   return base;
 }
 

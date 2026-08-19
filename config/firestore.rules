@@ -117,6 +117,14 @@ service cloud.firestore {
         'pid','tipo','nombreOriginal','vinculadoPor','fecha','updatedAt'
       ]);
     }
+    // AUDITORIA: 'citasNoAcudio' no tenia match -> el marcador "no acudio" se rechazaba (permission-denied)
+    // y la cita seguia contando como falta. Dos escrituras: _marcarNoAcudio {fecha,claveNorm,motivo,
+    // marcadoPor,updatedAt} y _noAcudioCita que ademas manda {origen}. keys().hasOnly incluye los 6.
+    function citaNoAcudioOK() {
+      return request.resource.data.keys().hasOnly([
+        'fecha','claveNorm','motivo','marcadoPor','origen','updatedAt'
+      ]);
+    }
     match /pacientes/{pacienteId} {
       allow read: if isWriter();
       allow create: if isWriter();
@@ -167,6 +175,20 @@ service cloud.firestore {
       allow read: if isWriter();
       allow create, update: if isSupervisor() && citaVinculadaOK();
       allow delete: if isSupervisor();
+    }
+    // AUDITORIA: marcador de cobertura "no acudio". Cualquier terapeuta lo escribe/lee/borra (marca y
+    // desmarca la falta); NO es dato clinico (la inasistencia clinica se guarda aparte en el paciente).
+    match /citasNoAcudio/{citaId} {
+      allow read: if isWriter();
+      allow create, update: if isWriter() && citaNoAcudioOK();
+      allow delete: if isWriter();
+    }
+    // AUDITORIA: bitacora de auditoria de borrados (append-only). El front hace .add() en cada borrado
+    // logico; sin match se rechazaba y el rastro nunca se escribia. Crear cualquier writer; leer supervisor.
+    match /borrados_audit/{docId} {
+      allow read: if isSupervisor();
+      allow create: if isWriter();
+      allow update, delete: if false;
     }
     match /{path=**}/sesiones/{sesionId} {
       allow read: if isWriter();
