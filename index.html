@@ -15564,7 +15564,8 @@ function _prefillNuevoDesdePaciente(p){
   var _clean=function(x){ x=String(x==null?'':x); return (x==='Ninguno'||x==='Ninguna'||x==='No aplica'||x==='—'||x==='Pendiente')?'':x; };
   S('n-patologicos',_clean(a.patologicos)); S('n-cirugias',_clean(a.cirugias)); S('n-medicamentos',_clean(a.medicamentos));
   S('n-deportivos',_clean(a.deportivos)); S('n-deporte-freq',_clean(a.deporteFrecuencia));
-  S('n-alergias',_clean(p.alergias));
+  // Alergias es OBLIGATORIO: NO limpiar 'Ninguna'/'No' (blanquearlo bloquearía el guardado).
+  S('n-alergias', (p.alergias!=null&&String(p.alergias).trim())?p.alergias:'');
   // Motivo (relato + estructurado)
   S('n-padecimiento', hc.relato||m.padecimiento||'');
   S('n-motivoconsulta', p.motivoConsulta||'');
@@ -15639,28 +15640,34 @@ function guardarNuevoPaciente(){
     else if(padecimiento){ const _pl=String(padecimiento).split('\n')[0].trim(); motivoConsulta = _pl.length>90 ? (_pl.slice(0,90).replace(/\s+\S*$/,'')+'…') : _pl; }
   }
 
+  // MODO EDICIÓN: el expediente ya existe. Las validaciones de CREAR no deben bloquear (un paciente
+  // viejo puede no tener todos los campos estructurados). Se guarda lo que haya sin exigir completar.
+  var _esEdicion = !!window._nuevoEditPid;
   // Calcular edad: desde fechaNacimiento si existe, si no leer campo n-edad
   let edadFinal = null;
   if(fechaNacimiento){
     edadFinal = calcularEdadDesdeFechaNacimiento(formatearFechaNac(fechaNacimiento));
     if(edadFinal === null){
-      showToast('Fecha de nacimiento inválida o futura','error');return;
+      if(!_esEdicion){ showToast('Fecha de nacimiento inválida o futura','error');return; }
+      edadFinal = parseInt(document.getElementById('n-edad')?.value||0) || null;
     }
   } else {
     const edadManual = parseInt(document.getElementById('n-edad')?.value||0);
-    if(!edadManual||edadManual<0){ showToast('Ingresa la edad del paciente','error');return; }
-    edadFinal = edadManual;
+    if(!edadManual||edadManual<0){ if(!_esEdicion){ showToast('Ingresa la edad del paciente','error');return; } }
+    else edadFinal = edadManual;
   }
 
-  if(!nombre||!alergias||!padecimiento){
-    showToast('Faltan: nombre, alergias o el relato del motivo','error');return;
+  if(!_esEdicion){
+    if(!nombre||!alergias||!padecimiento){
+      showToast('Faltan: nombre, alergias o el relato del motivo','error');return;
+    }
+    if(!_hc.zona){
+      showToast('Falta: toca la ZONA principal del dolor','error');return;
+    }
+    if(!_hc.lado){ showToast('Falta: toca el LADO','error');return; }
+    if(!_hcDesdeTexto){ showToast('Falta: escribe ¿DESDE CUÁNDO? (tiempo de evolución)','error');return; }
+    if(!(document.getElementById('n-limitaciones')?.value||'').trim()){ showToast('Falta: LIMITACIONES funcionales / movimientos que generan dolor','error');return; }
   }
-  if(!_hc.zona){
-    showToast('Falta: toca la ZONA principal del dolor','error');return;
-  }
-  if(!_hc.lado){ showToast('Falta: toca el LADO','error');return; }
-  if(!_hcDesdeTexto){ showToast('Falta: escribe ¿DESDE CUÁNDO? (tiempo de evolución)','error');return; }
-  if(!(document.getElementById('n-limitaciones')?.value||'').trim()){ showToast('Falta: LIMITACIONES funcionales / movimientos que generan dolor','error');return; }
   // LOOP2.1: bloqueo real — sin consentimiento de datos NO se crea el expediente
   /* RIESGO RESIDUAL — Token de Apps Script expuesto en frontend.
      Migración a Firebase ID Token pendiente para sub-loop dedicado.
@@ -15682,7 +15689,7 @@ function guardarNuevoPaciente(){
   }
   // Campos opcionales con valor por defecto
   const dxmedicoFinal = dxmedico || 'No cuenta con diagnóstico médico referido';
-  if(_nEvaVal===null){ showToast('Falta: EVA inicial (toca un número)','error'); return; }
+  if(_nEvaVal===null && !_esEdicion){ showToast('Falta: EVA inicial (toca un número)','error'); return; }
   const evaVal=_nEvaVal;
   const nuevo={
     id:(window._altaPid||generarIdSeguro_('p')), name:nombre, age:edadFinal,
@@ -15783,8 +15790,18 @@ function guardarNuevoPaciente(){
     // Solo CLÍNICO. La identidad/generales (nombre, sexo, fecha nac., teléfono, médico, terapeuta)
     // se editan en "Editar datos" (ruta de sincronización propia): aquí NO se tocan para no revertir
     // el nombre en la nube. Tampoco se tocan notas (soap), sesiones, ejercicios ni consentimientos.
-    _ep.motivoConsulta=nuevo.motivoConsulta; _ep.dx=nuevo.dx; _ep.contraindicaciones=nuevo.contraindicaciones;
-    _ep.alergias=nuevo.alergias; _ep.antecedentes=nuevo.antecedentes; _ep.motivo=nuevo.motivo; _ep.motivoHC=nuevo.motivoHC;
+    // Fallback: nunca blanquear con vacío lo que ya existía (por si un campo quedó vacío en edición).
+    _ep.motivoConsulta=(nuevo.motivoConsulta&&String(nuevo.motivoConsulta).trim())?nuevo.motivoConsulta:(_ep.motivoConsulta||'');
+    _ep.dx=nuevo.dx||_ep.dx; _ep.contraindicaciones=nuevo.contraindicaciones||_ep.contraindicaciones;
+    _ep.alergias=(nuevo.alergias&&String(nuevo.alergias).trim())?nuevo.alergias:(_ep.alergias||'');
+    _ep.antecedentes=nuevo.antecedentes;
+    // motivo/motivoHC: solo sobrescribir si hay relato o zona; si no, PRESERVAR el existente
+    // (no perder el motivo estructurado de un paciente que se editó sin tocar el motivo).
+    if((nuevo.motivo&&String(nuevo.motivo.padecimiento||'').trim()) || (nuevo.motivoHC&&nuevo.motivoHC.zonaPrincipal)){
+      _ep.motivo=nuevo.motivo; _ep.motivoHC=nuevo.motivoHC;
+    }
+    // valoración: preservar EVA existente si en edición no se tocó (quedó null)
+    if(nuevo.valoracion && (nuevo.valoracion.eva==null||nuevo.valoracion.eva==='') && _ep.valoracion && _ep.valoracion.eva!=null){ nuevo.valoracion.eva=_ep.valoracion.eva; }
     _ep.valoracion=nuevo.valoracion; _ep.dxFuncional=nuevo.dxFuncional; _ep.planTto=nuevo.planTto;
     _ep.seguridadClinica=nuevo.seguridadClinica;
     _ep.estudiosDocs=(Array.isArray(window._altaEstudios)?window._altaEstudios.map(function(x){return Object.assign({},x);}):(_ep.estudiosDocs||[]));
