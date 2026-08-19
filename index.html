@@ -2811,6 +2811,7 @@ async function sincronizarPendientes(){
   drenarColaSoapActivo();    // FIX durabilidad SOAP activos — reintentar el dual-write de sesión a Firestore
   drenarColaHistDoc();       // LOOP C — drenar cambios de DOC de históricos pendientes (diffs filtrados del Loop B)
   drenarColaEtiqHist();      // CAPA 1 — drenar etiquetas/adiciones que quedaron pendientes offline (idempotentes)
+  drenarColaNoAcudio();      // AUDITORÍA (Jess) — reintentar "No acudió" que no persistió (antes se tragaba silencioso)
   const cola = getColaSync();
   if(cola.length===0){ actualizarIndicadorSync(); return; }
 
@@ -16461,10 +16462,11 @@ function _confirmarNoAcudio(pid){
 // Escribe/borra en citasNoAcudio (sistema del reporte de cobertura). A diferencia de _marcarNoAcudio
 // (supervisor-only, desde Rendimiento), este lo dispara el fisio desde el perfil; queda marcadoPor+origen.
 async function _noAcudioCita(nombre, ddmm, marcar){
+  var clave=null;
   try{
     if(typeof _normPend!=='function' || typeof _keyCitaResuelta!=='function') return;
-    var clave=_normPend(nombre); if(!clave||!ddmm) return;
-    var ok=await FST_init(); if(!ok||!window._fstDb) return;
+    clave=_normPend(nombre); if(!clave||!ddmm) return;
+    var ok=await FST_init(); if(!ok||!window._fstDb){ _encolarNoAcudio(clave,ddmm,marcar); showToast('⚠️ "No acudió" pendiente de subir — se reintentará','warning'); return; }
     var docId=clave+'__'+String(ddmm).replace(/\//g,'-');
     if(marcar){
       await window._fstDb.collection('citasNoAcudio').doc(docId).set({ fecha:ddmm, claveNorm:clave, motivo:'no_acudio', marcadoPor:(currentUser&&currentUser.name)||'', origen:'perfil', updatedAt:firebase.firestore.FieldValue.serverTimestamp() });
@@ -16473,7 +16475,56 @@ async function _noAcudioCita(nombre, ddmm, marcar){
       await window._fstDb.collection('citasNoAcudio').doc(docId).delete();
       try{ if(window._citasNoAcudioCache&&window._citasNoAcudioCache.map) delete window._citasNoAcudioCache.map[_keyCitaResuelta(clave,ddmm)]; }catch(_){}
     }
-  }catch(e){ console.warn('[no-acudio-cita]', e&&e.message); }
+    try{ _desencolarNoAcudio(clave,ddmm); }catch(_){}   // por si venía de la cola
+  }catch(e){
+    // AUDITORÍA (Jess): antes se tragaba en silencio (console.warn, sin cola, sin aviso) → si el write
+    // fallaba (p.ej. la colección citasNoAcudio SIN regla → rechazo total), el "No acudió" NUNCA persistía
+    // y la agenda seguía contando la falta como pendiente, sin que nadie se enterara. Jess es la que más
+    // usa "No acudió" → se le acumulaban. Ahora se ENCOLA para reintento y se AVISA.
+    console.warn('[no-acudio-cita]', e&&e.message);
+    try{ if(clave) _encolarNoAcudio(clave,ddmm,marcar); }catch(_){}
+    try{ if(typeof showToast==='function') showToast('⚠️ "No acudió" no se subió — pendiente, se reintentará al reconectar','warning'); }catch(_){}
+  }
+}
+// Cola durable para "No acudió" (antes: fire-and-forget con catch silencioso).
+function _encolarNoAcudio(clave, ddmm, marcar){
+  if(!clave||!ddmm) return;
+  try{
+    var q; try{ q=JSON.parse(localStorage.getItem('COLA_NOACUDIO')||'[]'); }catch(e){ q=[]; if(typeof _colaCorrupta==='function') _colaCorrupta('COLA_NOACUDIO',e); }
+    if(!Array.isArray(q)) q=[];
+    q=q.filter(function(x){ return !(x&&x.clave===clave&&x.ddmm===ddmm); });   // última operación gana (idempotente)
+    q.push({clave:clave, ddmm:ddmm, marcar:!!marcar, ts:Date.now()});
+    if(q.length>500) q=q.slice(q.length-500);
+    localStorage.setItem('COLA_NOACUDIO', JSON.stringify(q));
+  }catch(_){}
+}
+function _desencolarNoAcudio(clave, ddmm){
+  try{
+    var q; try{ q=JSON.parse(localStorage.getItem('COLA_NOACUDIO')||'[]'); }catch(e){ return; }
+    if(!Array.isArray(q)||!q.length) return;
+    var n=q.filter(function(x){ return !(x&&x.clave===clave&&x.ddmm===ddmm); });
+    if(n.length!==q.length) localStorage.setItem('COLA_NOACUDIO', JSON.stringify(n));
+  }catch(_){}
+}
+async function drenarColaNoAcudio(){
+  if(!navigator.onLine) return;
+  var q; try{ q=JSON.parse(localStorage.getItem('COLA_NOACUDIO')||'[]'); }catch(e){ q=[]; if(typeof _colaCorrupta==='function') _colaCorrupta('COLA_NOACUDIO',e); }
+  if(!Array.isArray(q)||!q.length) return;
+  var ok=await FST_init(); if(!ok||!window._fstDb) return;
+  var restantes=[];
+  for(var i=0;i<q.length;i++){
+    var it=q[i];
+    if(!it||!it.clave||!it.ddmm) continue;
+    try{
+      var docId=it.clave+'__'+String(it.ddmm).replace(/\//g,'-');
+      if(it.marcar){
+        await window._fstDb.collection('citasNoAcudio').doc(docId).set({ fecha:it.ddmm, claveNorm:it.clave, motivo:'no_acudio', marcadoPor:(currentUser&&currentUser.name)||'', origen:'perfil', updatedAt:firebase.firestore.FieldValue.serverTimestamp() });
+      } else {
+        await window._fstDb.collection('citasNoAcudio').doc(docId).delete();
+      }
+    }catch(e){ restantes.push(it); }   // sigue fallando → conservar para el próximo intento
+  }
+  try{ localStorage.setItem('COLA_NOACUDIO', JSON.stringify(restantes)); }catch(_){}
 }
 function deshacerNoAcudio(pid, iid){
   const p = currentPatient;
