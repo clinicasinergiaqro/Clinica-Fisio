@@ -10758,6 +10758,7 @@ function _soapFormTieneTexto(){
   // FIX PÉRDIDA DE DATOS: también cuenta como "hay algo que no perder" el media/ejercicios
   // capturados, el EVA tocado o las modalidades marcadas, aunque no se haya escrito texto.
   if(Array.isArray(tempMediaObjetivo)&&tempMediaObjetivo.length) return true;
+  if(Array.isArray(tempEvolMedia)&&tempEvolMedia.length) return true;
   if(Array.isArray(tempEjerciciosSesion)&&tempEjerciciosSesion.length) return true;
   if(typeof tempEvaI!=='undefined' && tempEvaI!=null) return true;
   if(typeof tempEvaF!=='undefined' && tempEvaF!=null) return true;
@@ -10776,6 +10777,9 @@ function guardarBorradorSoap(){
       mods:Array.isArray(tempMods)?tempMods.slice():[],modDetalles:Object.assign({},tempModDetalles),
       ejSesion:Array.isArray(tempEjerciciosSesion)?tempEjerciciosSesion.map(function(x){return Object.assign({},x);}):[],
       mediaObj:Array.isArray(tempMediaObjetivo)?tempMediaObjetivo.map(function(x){return Object.assign({},x);}):[],
+      // FIX PÉRDIDA: fotos/video de sesión (tempEvolMedia). Se guarda SIN el base64 pesado (data:null),
+      // solo la referencia (url/fbPath/mediaId) → la foto ya subió a Storage y se recupera igual.
+      evolMedia:Array.isArray(tempEvolMedia)?tempEvolMedia.map(function(m){return Object.assign({},m,{data:null});}):[],
       atendido:Array.isArray(tempAtendio)?tempAtendio.slice():[],
       motivoIndex:(typeof tempMotivoIndex==='number')?tempMotivoIndex:null };
     _purgarBorradoresSoapViejos();   // req #5: liberar espacio ANTES de escribir (purga >14 días)
@@ -10816,6 +10820,7 @@ function aplicarBorradorSoap(d){
     if(Array.isArray(d.mods)){ tempMods=_migrarMods(d.mods); tempModDetalles=(d.modDetalles&&typeof d.modDetalles==='object')?Object.assign({},d.modDetalles):{}; _renderModGrid(); _renderModDetailCards(); }
     if(Array.isArray(d.ejSesion)){ tempEjerciciosSesion=d.ejSesion.map(function(x){return Object.assign({},x);}); if(typeof _renderEjSesion==='function') _renderEjSesion(); }
     if(Array.isArray(d.mediaObj)){ tempMediaObjetivo=d.mediaObj.map(function(x){return Object.assign({},x);}); if(typeof _renderMediaObjetivo==='function') _renderMediaObjetivo(); }
+    if(Array.isArray(d.evolMedia)){ tempEvolMedia=d.evolMedia.map(function(m){return Object.assign({},m);}); if(typeof _pintarSoapMediaPreview==='function') _pintarSoapMediaPreview(); }
     if(Array.isArray(d.atendido)){ tempAtendio=d.atendido.slice(); if(typeof _renderAtendioGrid==='function') _renderAtendioGrid(); }
     if(typeof d.motivoIndex==='number') tempMotivoIndex=d.motivoIndex;
     if(typeof d.modoNota==='string' && d.modoNota && typeof seleccionarModoNota==='function'){ try{ seleccionarModoNota(d.modoNota); }catch(_){} } // [BORRADOR-SOAP] restaurar modo clínico → re-muestra la sección opcional y su metadato
@@ -12503,8 +12508,10 @@ async function handleSoapPhoto(ev,tipo){
   }
   ev.target.value='';
   _pintarSoapMediaPreview();
+  try{ if(typeof marcarDirty==='function') marcarDirty(); }catch(_){}
+  try{ if(typeof guardarBorradorSoap==='function') guardarBorradorSoap(); }catch(_){}
 }
-function removeSoapMedia(i){_soapMediaTocada=true;tempEvolMedia.splice(i,1);handleSoapPhoto({target:{files:[],value:''}},'_')} // FIX media-edición: marcar preview tocado (permite vaciar a propósito)
+function removeSoapMedia(i){_soapMediaTocada=true;tempEvolMedia.splice(i,1);_pintarSoapMediaPreview();try{ if(typeof guardarBorradorSoap==='function') guardarBorradorSoap(); }catch(_){}} // FIX media-edición: marcar preview tocado (permite vaciar a propósito)
 // FIX media-edición: preview de adjuntos SOAP reutilizable. Lo usan handleSoapPhoto y también
 // editarSOAP/editarSoapHistorico al precargar la media EXISTENTE de la nota (antes el form
 // arrancaba con tempEvolMedia=[] y al guardar borraba la media previa).
