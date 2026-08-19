@@ -5610,8 +5610,54 @@ async function _computarBannerPendientes(){
     // que corrijan la fecha en la nota); solo se diagnostica para no perseguir a ciegas.
     var notaCerca='', _mejor=99;
     fechasNotas.forEach(function(c){ var d=_difDiasCanon(c, citaCanon); if(d>0 && d<=2 && d<_mejor){ _mejor=d; notaCerca=c; } });
-    items.push({nombre:ev.paciente||'(sin nombre)', fecha:ddmm, notaCerca:(notaCerca?_ddmmFromISO(notaCerca):'')});
+    var _it={nombre:ev.paciente||'(sin nombre)', fecha:ddmm, notaCerca:(notaCerca?_ddmmFromISO(notaCerca):'')};
+    if(r.tipo==='historico' && r.pid){ _it._pidHist=r.pid; _it._claveHist=clave; _it._citaCanon=citaCanon; }   // [ÍNDICE-COJO] confirmar contra notas reales antes de rendir el pendiente
+    items.push(_it);
   });
+  // ── [ÍNDICE-COJO GUARD] ────────────────────────────────────────────────────────────
+  // Los históricos se evalúan contra el índice fechasSesiones del doc padre, NO contra las notas
+  // reales. Si ese índice quedó "cojo" (la nota existe en la subcolección pero su fecha nunca entró
+  // al índice — p.ej. una escritura de fechasSesiones tragada antes del fix de índice-vivo), la cita
+  // salía como "sin documentar" pese a tener su nota. Antes de rendir un pendiente HISTÓRICO,
+  // confirmamos contra las sesiones REALES (lectura autoritativa, TTL-cacheada). Si hay nota del día
+  // exacto: (1) NO es pendiente y (2) reparamos el índice (arrayUnion idempotente) para que se
+  // auto-sane para todas. Solo corre si hay pendientes históricos y hay red (si no, no perdona nada).
+  try{
+    var _histCand=items.filter(function(x){ return x._pidHist && x._citaCanon; });
+    if(_histCand.length && (await FST_init()) && window._fstDb){
+      var _pidsChk={};
+      _histCand.forEach(function(x){ _pidsChk[x._pidHist]=true; });
+      var _diasRealesPorPid={};
+      await Promise.all(Object.keys(_pidsChk).map(async function(pid){
+        try{
+          var _ses=null, _tsC=(typeof _fstSesionesCacheTs!=='undefined'&&_fstSesionesCacheTs[pid])||0;
+          if(Array.isArray(_fstSesionesCache[pid]) && _fstSesionesCache[pid].length && (Date.now()-_tsC)<_FST_SES_TTL_MS){ _ses=_fstSesionesCache[pid]; }
+          else { _ses=await FST_fetchSesiones(pid); if(Array.isArray(_ses)){ _fstSesionesCache[pid]=_ses; _fstSesionesCacheTs[pid]=Date.now(); } }
+          if(!Array.isArray(_ses)){ _diasRealesPorPid[pid]=null; return; }   // null = no pude confirmar → conservar el pendiente
+          var _dset={};
+          _ses.forEach(function(s){ var c=s&&_diaCanon(s.fecha||s.fechaHoraISO); if(c) _dset[c]=true; });
+          _diasRealesPorPid[pid]=_dset;
+        }catch(_e){ _diasRealesPorPid[pid]=null; }   // fallo de lectura → NO perdonar a ciegas
+      }));
+      var _repara={};   // pid → {isoDia:true} a unir al índice del padre
+      items=items.filter(function(x){
+        if(!(x._pidHist && x._citaCanon)) return true;
+        var _ds=_diasRealesPorPid[x._pidHist];
+        if(_ds && _ds[x._citaCanon]){
+          (_repara[x._pidHist]=_repara[x._pidHist]||{})[x._citaCanon]=true;
+          try{ var _mf=window._triUltimaHistCache&&window._triUltimaHistCache.mapFechas; if(_mf){ if(!Array.isArray(_mf[x._claveHist])) _mf[x._claveHist]=[]; if(_mf[x._claveHist].indexOf(x._citaCanon)===-1) _mf[x._claveHist].push(x._citaCanon); } }catch(_){}
+          return false;   // tiene nota REAL del día exacto → no es pendiente
+        }
+        return true;
+      });
+      Object.keys(_repara).forEach(function(pid){
+        Object.keys(_repara[pid]).forEach(function(iso){
+          try{ window._fstDb.collection('pacientes').doc(pid).set({ fechasSesiones: firebase.firestore.FieldValue.arrayUnion((typeof _aISO==='function' && _aISO(iso)) || iso) }, { merge:true }); }catch(_){}
+        });
+      });
+    }
+  }catch(_eCojo){}
+  items.forEach(function(x){ delete x._pidHist; delete x._citaCanon; delete x._claveHist; });   // limpiar campos internos antes de cachear/rendir
   var out={ts:Date.now(), cod:cod, total:items.length, items:items};
   window._bannerPendCache=out;
   return out;
