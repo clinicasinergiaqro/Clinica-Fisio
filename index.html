@@ -11598,6 +11598,26 @@ function _liberarGuardSOAP(){
   const btn = document.querySelector('[onclick="guardarSOAP()"]');
   if(btn){ btn.disabled = false; btn.style.opacity = ''; }
 }
+// AUDITORÍA (Jess) "avisar al guardar": la agenda marca la sesión como hecha SOLO si el día de la nota
+// coincide con el día de la cita. Al documentar atrasado, la nota queda fechada HOY y la agenda sigue
+// diciendo "debe". Esto busca en el cache de pendientes del terapeuta una cita SIN documentar del MISMO
+// paciente cercana (±7 días) a la fecha de la nota; si la nota no cae exacto en una cita pendiente,
+// devuelve el ddmm de la cita cercana para SUGERIRLO. Devuelve null si no hay dato (no molesta).
+function _sugerirFechaCitaPendiente(nombre, ddmmNota){
+  try{
+    var cache=window._bannerPendCache;
+    if(!cache || !Array.isArray(cache.items) || !cache.items.length) return null;
+    if(typeof _normPend!=='function' || typeof _diaCanon!=='function' || typeof _difDiasCanon!=='function') return null;
+    var claveP=_normPend(nombre||''); if(!claveP) return null;
+    var canonNota=_diaCanon(ddmmNota); if(!canonNota) return null;
+    var pend=cache.items.filter(function(x){ return x && _normPend(x.nombre)===claveP; });
+    if(!pend.length) return null;
+    if(pend.some(function(x){ return _diaCanon(x.fecha)===canonNota; })) return null;   // ya cae exacto → ok
+    var mejor=null, mejorD=99;
+    pend.forEach(function(x){ var c=_diaCanon(x.fecha); if(!c) return; var d=_difDiasCanon(c, canonNota); if(d>0 && d<=7 && d<mejorD){ mejorD=d; mejor=x.fecha; } });
+    return mejor;   // ddmm de la cita pendiente cercana, o null
+  }catch(_){ return null; }
+}
 async function guardarSOAP(){
   // H-02: anti-doble-toque
   if(_guardandoSOAP){ showToast('Guardado en curso, espera un momento…','warning'); return; }
@@ -11976,8 +11996,22 @@ async function guardarSOAP(){
     }
     const sesNum=_maxNum + 1;
     const semana=Math.ceil(sesNum/2);
+    // AUDITORÍA (Jess) "avisar al guardar": si la nota no cae en una cita pendiente de este paciente pero
+    // hay una cercana (±7 días), preguntar si la sesión fue el día de la cita y ofrecer corregir la fecha.
+    // Solo sugiere cuando hay dato en el cache de pendientes; si no, no molesta y guarda con la fecha puesta.
+    let _fechaNota=fechaConsultaFmt;
+    try{
+      var _sugCita=_sugerirFechaCitaPendiente(p.name, fechaConsultaFmt);
+      if(_sugCita && _sugCita!==fechaConsultaFmt){
+        if(confirm('La nota quedó fechada '+fechaConsultaFmt+', pero '+(p.name||'este paciente')+' tiene una cita SIN documentar del '+_sugCita+'.\n\n¿La sesión fue el '+_sugCita+' (día de la cita)?\n\nAceptar = usar '+_sugCita+'\nCancelar = dejar '+fechaConsultaFmt)){
+          _fechaNota=_sugCita;
+          var _fcEl=document.getElementById('f-fecha-consulta');
+          if(_fcEl && typeof _normalizarFechaParaInput==='function'){ var _iso=_normalizarFechaParaInput(_sugCita); if(_iso) _fcEl.value=_iso; }
+        }
+      }
+    }catch(_efn){ console.warn('[fecha-nota] sugerencia falló (no crítico):', _efn&&_efn.message); }
     const nuevaSOAP={
-      id:generarIdSeguro_('s'), num:sesNum, fecha:fechaConsultaFmt,
+      id:generarIdSeguro_('s'), num:sesNum, fecha:_fechaNota,
       horaCreacion:new Date().toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'}),
       fechaHoraISO: new Date().toISOString(), // NOM-024: timestamp ISO para trazabilidad
       terapeuta:ter,
