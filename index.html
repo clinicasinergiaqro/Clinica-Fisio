@@ -5931,6 +5931,40 @@ async function _resolverPacientesCalendario(eventos){
         _resCand.push({pid:_pidH, tipo:'historico'});
       }
     });
+    // ── FASE 1 MATCHING: recuperar 🔎 sin adjudicar a ciegas ──────────────────────────────────
+    // (a) ACTIVOS por TOKENS (hoy solo casaban EXACTO) → recupera apellido de más/menos u orden
+    //     invertido. (b) Nombre de UNA sola palabra (el scan de arriba solo corría con ≥2 tokens).
+    // Containment por TOKEN (no substring): cada palabra de la cita debe ser un token del expediente.
+    // La UNICIDAD decide abajo (1 → resuelve; >1 → ambiguo 🔎). Nunca adjudica entre homónimos.
+    // SEGURIDAD (sin regresiones): solo actúa cuando el match EXACTO no encontró NADA (_resCand vacío)
+    // → recupera 🔎 reales sin volver ambiguo un caso que hoy ya resuelve por nombre exacto.
+    if(!_resCand.length && tc.length>=1){
+      var _tokSet=function(nombre){ var nt=_normPend(nombre||'').split(' ').filter(Boolean); var s={}; nt.forEach(function(w){ s[w]=1; }); return {set:s, n:nt.length}; };
+      var _tokMatch=function(nombre){ var ts=_tokSet(nombre); if(!ts.n) return false; return tc.every(function(w){ return ts.set[w]===1; }); };
+      // (a) activos por tokens
+      (Array.isArray(patientsDB)?patientsDB:[]).forEach(function(p){
+        if(!p || (typeof _activoEliminado==='function' && _activoEliminado(p.id))) return;
+        var id=String(p.id||''); if(!id || _seen[id]) return;
+        if(_tokMatch(p.name) || _tokMatch(p.nombreNormalizado)){ _seen[id]=1; _resCand.push({pid:id, tipo:'activo', p:p}); }
+      });
+      // (b) históricos con nombre de UNA sola palabra (tc>=2 ya lo cubrió el scan de arriba)
+      if(tc.length===1){
+        for(var _j=0;_j<lista.length;_j++){
+          var _xh=lista[_j], _idh=String(_xh.id||''); if(!_idh || _seen[_idh]) continue;
+          if(_tokMatch(_xh.nombreNormalizado||_xh.name||'')){ _seen[_idh]=1;
+            if(_idh.indexOf('app_live_')===0){ var _ae=_espejoAActivo[_idh]; if(_ae) _resCand.push({pid:String(_ae.id||''), tipo:'activo', p:_ae}); }
+            else _resCand.push({pid:_idh, tipo:'historico'});
+          }
+        }
+      }
+    }
+    // Dedup por pid RESUELTO: un mismo activo puede llegar por espejo app_live_ Y por token → contarlo
+    // dos veces lo volvería falso-ambiguo. Un único pid real no debe generar 🔎.
+    if(_resCand.length>1){
+      var _vp={}, _ru=[];
+      _resCand.forEach(function(rc){ var k=String((rc&&rc.pid)||''); if(k && !_vp[k]){ _vp[k]=1; _ru.push(rc); } });
+      _resCand=_ru;
+    }
     if(!_resCand.length){ out[clave]={pid:null, tipo:null}; }
     else if(_resCand.length===1){ out[clave]=_resCand[0]; }
     else {
