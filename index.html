@@ -7235,8 +7235,72 @@ function _detHTMLAcciones(hayHallazgos){
     +((typeof esSupervisorUI==='function'&&esSupervisorUI())?('<button id="det-diag-exp" onclick="_detDiagnosticoExpediente()" style="font-size:13px;font-weight:800;border:none;border-radius:10px;padding:9px 16px;cursor:pointer;font-family:inherit;background:#EEF1F6;color:var(--navy)">🩺 Diagnóstico de expediente</button>'):'')
     +((typeof esSupervisorUI==='function'&&esSupervisorUI())?('<button id="det-retro-val" onclick="_retroValAbrir()" style="font-size:13px;font-weight:800;border:none;border-radius:10px;padding:9px 16px;cursor:pointer;font-family:inherit;background:#EEF1F6;color:var(--navy)">🗓️ Generar valoraciones faltantes</button>'):'')
     +((typeof esSupervisorUI==='function'&&esSupervisorUI())?('<button id="det-cur-nom" onclick="_curNombresAbrir()" style="font-size:13px;font-weight:800;border:none;border-radius:10px;padding:9px 16px;cursor:pointer;font-family:inherit;background:#EEF1F6;color:var(--navy)">🧹 Curación de nombres</button>'):'')
+    +((typeof esSupervisorUI==='function'&&esSupervisorUI())?('<button id="det-rep-cojos" onclick="_detRepararIndicesCojos()" style="font-size:13px;font-weight:800;border:none;border-radius:10px;padding:9px 16px;cursor:pointer;font-family:inherit;background:#EEF1F6;color:var(--navy)">🩹 Reparar índices de migrados</button>'):'')
     +'<button onclick="_detExportar()" style="font-size:13px;font-weight:800;border:none;border-radius:10px;padding:9px 16px;cursor:pointer;font-family:inherit;background:var(--gold);color:var(--navy-dark)">📤 Exportar este dispositivo</button>'
     +'</div>';
+}
+
+// ── REPARAR ÍNDICES COJOS DE MIGRADOS (supervisor) ─────────────────────────────────────
+// Barrida ÚNICA: recorre TODOS los históricos (mig_pac_) y rellena su índice fechasSesiones con
+// las fechas de sus notas REALES que le falten — lo mismo que el auto-sanado del banner/dashboard,
+// pero de golpe. SEGURO por diseño: solo ESCRIBE el índice de fechas (arrayUnion idempotente),
+// nunca toca notas ni datos clínicos ni borra nada, y solo suma fechas de notas que YA existen.
+// Lee el doc padre antes de escribir → solo toca los que de verdad están cojos (0 escrituras si
+// todo está completo) y reporta un conteo honesto.
+async function _detRepararIndicesCojos(){
+  if(!(typeof esSupervisorUI==='function' && esSupervisorUI())){ showToast('Solo supervisor','error'); return; }
+  if(!navigator.onLine){ showToast('Sin conexión — conéctate y reintenta','warning'); return; }
+  if(!confirm('Reparar el índice de fechas de TODOS los pacientes migrados.\n\nSolo AGREGA al índice las fechas de notas que YA existen (para que no salgan como "sin documentar"). No modifica ni borra ninguna nota — es seguro y se puede repetir.\n\n¿Continuar?')) return;
+  var btn=document.getElementById('det-rep-cojos');
+  var _restaurarBtn=function(){ var b=document.getElementById('det-rep-cojos'); if(b){ b.disabled=false; b.textContent='🩹 Reparar índices de migrados'; } };
+  if(btn){ btn.disabled=true; btn.textContent='Reparando…'; }
+  var cont=document.getElementById('det-resultados');
+  var _to=function(pr,ms){ return (typeof _conTimeout==='function')?_conTimeout(pr,ms):Promise.race([pr,new Promise(function(_,rej){ setTimeout(function(){ rej(new Error('timeout')); }, ms); })]); };
+  try{
+    if(!window._fstDb && typeof FST_init==='function') await FST_init();
+    if(!window._fstDb){ showToast('Sin conexión a la nube','error'); _restaurarBtn(); return; }
+    var lista=(typeof FST_cargarIndicePacientes==='function') ? (await FST_cargarIndicePacientes()) : null;
+    if(!Array.isArray(lista)){ showToast('No se pudo leer la lista de pacientes','error'); _restaurarBtn(); return; }
+    var migrados=lista.filter(function(p){ return p && p.id && String(p.id).indexOf('mig_pac_')===0; });
+    var total=migrados.length, cojos=0, fechasAdd=0, fallos=0;
+    if(!total){ if(cont){ cont.innerHTML=_detBloque('🩹 Reparación de índices de migrados','No hay pacientes migrados en la nube.','ok')+_detHTMLAcciones(false); } showToast('No hay migrados','success'); return; }
+    var _TANDA=8, _tandas=Math.ceil(total/_TANDA);
+    for(var _ti=0; _ti<_tandas; _ti++){
+      var _lote=migrados.slice(_ti*_TANDA, (_ti+1)*_TANDA);
+      var b0=document.getElementById('det-rep-cojos'); if(b0){ b0.textContent='Reparando… '+Math.min((_ti+1)*_TANDA,total)+'/'+total; }
+      await new Promise(function(r){ setTimeout(r,0); });
+      var _res=await Promise.all(_lote.map(async function(p){
+        var pid=String(p.id);
+        try{
+          var ses=await FST_fetchSesiones(pid);   // notas REALES (ya filtra eliminadas); null si no cargó
+          if(!Array.isArray(ses)) return {err:true};
+          var realCanon={}, rawPorCanon={};
+          ses.forEach(function(s){ var cc=s&&_diaCanon(s.fecha||s.fechaHoraISO); if(cc){ realCanon[cc]=true; if(!(cc in rawPorCanon)) rawPorCanon[cc]=((typeof _aISO==='function'&&_aISO(s.fecha))||s.fecha||cc); } });
+          if(!Object.keys(realCanon).length) return {ok:true, add:0};   // sin notas → nada que indexar
+          var snap=await _to(window._fstDb.collection('pacientes').doc(pid).get(), 8000);
+          var dd=(snap&&snap.exists)?(snap.data()||{}):{};
+          var idxCanon={}; (Array.isArray(dd.fechasSesiones)?dd.fechasSesiones:[]).forEach(function(f){ var c=_diaCanon(f); if(c) idxCanon[c]=true; });
+          var faltan=Object.keys(realCanon).filter(function(cc){ return !idxCanon[cc]; });
+          if(!faltan.length) return {ok:true, add:0};   // índice ya completo
+          var union=faltan.map(function(cc){ return rawPorCanon[cc]; });
+          await _to(window._fstDb.collection('pacientes').doc(pid).set({ fechasSesiones: firebase.firestore.FieldValue.arrayUnion.apply(null, union) }, { merge:true }), 8000);
+          return {ok:true, add:faltan.length, cojo:true};
+        }catch(_e){ return {err:true}; }
+      }));
+      _res.forEach(function(x){ if(x.err){ fallos++; } else if(x.cojo){ cojos++; fechasAdd+=x.add; } });
+    }
+    // invalidar caches para que banner/dashboard reflejen los índices reparados de inmediato
+    try{ window._bannerPendCache=null; if(window._triUltimaHistCache) window._triUltimaHistCache.ts=0; }catch(_){}
+    var msg = cojos>0
+      ? ('🩹 <b>'+cojos+'</b> índice'+(cojos!==1?'s':'')+' reparado'+(cojos!==1?'s':'')+' de '+total+' migrados · <b>+'+fechasAdd+'</b> fecha'+(fechasAdd!==1?'s':'')+' agregada'+(fechasAdd!==1?'s':'')+(fallos?(' · '+fallos+' no se pudieron leer (reintenta)'):''))
+      : ('✅ Todos los índices de migrados ya estaban completos ('+total+' revisados'+(fallos?(' · '+fallos+' no se pudieron leer'):'')+')');
+    if(cont){ cont.innerHTML=_detBloque('🩹 Reparación de índices de migrados', msg, (cojos>0)?'ok':(fallos?'warning':'ok'))+_detHTMLAcciones(false); }
+    showToast(cojos>0?('Listo — '+cojos+' reparado'+(cojos!==1?'s':'')):'Listo — todo estaba completo','success');
+  }catch(e){
+    showToast('⚠️ No se pudo completar: '+((e&&e.message)||''),'error'); _restaurarBtn();
+  }finally{
+    _restaurarBtn();
+  }
 }
 
 // ── RETROACTIVO: nota de valoración (sesión 1) para expedientes con historia y 0 sesiones ──────
