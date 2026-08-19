@@ -425,7 +425,7 @@
   }
 
   function nuevoAccSent(){
-    return { frames:0, framesValidos:0, _frame:0, aspect:null,
+    return { frames:0, framesValidos:0, _frame:0, aspect:null, _run:{},
       s:{ sacroY:[], sacroX:[], fppaIzq:[], fppaDer:[], mkdIzq:[], mkdDer:[], sepRatio:[], troncoLat:[], alturaPx:[] },
       visPiernas:0, visTronco:0, orientFrontalN:0, orientN:0,
       // Trayectorias ALINEADAS por frame (mismo índice k = mismo instante; null si el punto no se vio),
@@ -442,13 +442,20 @@
     if(f.troncoOK) acc.visTronco++;
     if(f.orientFrontal!=null){ acc.orientN++; if(f.orientFrontal) acc.orientFrontalN++; }
     var i=acc._frame, alguno=false;
+    // Histéresis de oclusión: exige 3 frames válidos SEGUIDOS por métrica de PROYECCIÓN (rodilla,
+    // tobillo, tronco) antes de aceptarla, para descartar el parpadeo de landmarks distales al entrar/
+    // salir de oclusión. El SACRO (punto medio de caderas, el más central y estable) y la ALTURA se
+    // dejan sin filtrar: son el eje de la detección de repeticiones y del escalado, y filtrarlos
+    // fragmentaría la segmentación en vez de mejorarla.
+    var R=acc._run;
+    function _g(k,ok){ R[k]=ok?((R[k]||0)+1):0; return ok && R[k]>=3; }
     if(f.sacro.ok){ _pushS(acc.s.sacroY,i,f.sacro.y); _pushS(acc.s.sacroX,i,f.sacro.x); alguno=true; }
-    if(f.fppaIzq.ok) _pushS(acc.s.fppaIzq,i,f.fppaIzq.val);
-    if(f.fppaDer.ok) _pushS(acc.s.fppaDer,i,f.fppaDer.val);
-    if(f.mkdIzq.ok) _pushS(acc.s.mkdIzq,i,f.mkdIzq.val);
-    if(f.mkdDer.ok) _pushS(acc.s.mkdDer,i,f.mkdDer.val);
-    if(f.sepRatio.ok) _pushS(acc.s.sepRatio,i,f.sepRatio.val);
-    if(f.troncoLat.ok) _pushS(acc.s.troncoLat,i,f.troncoLat.val);
+    if(_g('fppaIzq',f.fppaIzq.ok)) _pushS(acc.s.fppaIzq,i,f.fppaIzq.val);
+    if(_g('fppaDer',f.fppaDer.ok)) _pushS(acc.s.fppaDer,i,f.fppaDer.val);
+    if(_g('mkdIzq',f.mkdIzq.ok)) _pushS(acc.s.mkdIzq,i,f.mkdIzq.val);
+    if(_g('mkdDer',f.mkdDer.ok)) _pushS(acc.s.mkdDer,i,f.mkdDer.val);
+    if(_g('sepRatio',f.sepRatio.ok)) _pushS(acc.s.sepRatio,i,f.sepRatio.val);
+    if(_g('troncoLat',f.troncoLat.ok)) _pushS(acc.s.troncoLat,i,f.troncoLat.val);
     if(f.alturaPx!=null) _pushS(acc.s.alturaPx,i,f.alturaPx);
     if(f.midAnk && acc.anclas.length<4000) acc.anclas.push({x:f.midAnk.x,y:f.midAnk.y});
     if(alguno) acc.framesValidos++;
@@ -863,14 +870,31 @@
     }
     BIO.rafId = requestAnimationFrame(tick);
   }
+  // Orientación FRENTE vs PERFIL para el ROM de hombro (mismo criterio que la sentadilla: ancho
+  // proyectado de hombros/caderas contra el alto del tronco). De frente los hombros se ven anchos;
+  // de perfil se acortan. Histéresis para que el aviso no parpadee cerca del umbral.
+  function _orientRomFrontal(lm){
+    if(!(_vis(lm,11)&&_vis(lm,12)&&_vis(lm,23)&&_vis(lm,24))) return null;
+    var ancho=(Math.abs(lm[11].x-lm[12].x)+Math.abs(lm[23].x-lm[24].x))/2;
+    var alto=Math.abs((lm[11].y+lm[12].y)/2-(lm[23].y+lm[24].y)/2)||1e-6;
+    var r=ancho/alto, prev=BIO._orientRom;
+    var frontal=(prev===true)?(r>=0.38):(r>=0.45);   // banda de histéresis anti-parpadeo
+    BIO._orientRom=frontal;
+    return frontal;
+  }
   function actualizarGateGrabacion(lm){
     if(BIO.recording) return;
     var btn=document.getElementById('bio-btn-rec'); if(!btn) return;
     // Listo en cuanto se detecta el tronco (hombros + caderas). Los brazos se miden al moverlos.
     var ok = _vis(lm,11)&&_vis(lm,12)&&_vis(lm,23)&&_vis(lm,24);
     btn.disabled = !ok;
-    var estado=document.getElementById('bio-estado');
-    if(estado) estado.textContent = ok ? '✓ Detectado — graba y pide TODOS los movimientos' : 'Encuadra tronco y brazos (hombros y caderas)';
+    var estado=document.getElementById('bio-estado'); if(!estado) return;
+    if(!ok){ estado.textContent='Encuadra tronco y brazos (hombros y caderas)'; return; }
+    // Verificación ACTIVA de orientación: guía qué vista mide bien cada plano de hombro.
+    var fr=_orientRomFrontal(lm);
+    estado.textContent = (fr===false)
+      ? '✓ De PERFIL — flexión/extensión de hombro · para abducción y cuello, ponte de FRENTE'
+      : '✓ De FRENTE — abducción, codo y cuello · para flexión/extensión de hombro, ponte de PERFIL';
   }
   // Inicia la grabación del clip de cámara (MediaRecorder) en paralelo a la medición de ángulos.
   function iniciarGrabadorVideo(){
@@ -950,9 +974,19 @@
   }
   function pararCronometro(){ if(BIO.timerId){ clearInterval(BIO.timerId); BIO.timerId=null; } }
 
+  // Media móvil EXPONENCIAL solo para el número mostrado en el panel EN VIVO (anti-parpadeo).
+  // NO toca las series acumuladas ni lo que se guarda: es puramente visual. Se re-siembra al
+  // perder de vista el punto (ok=false) para no arrastrar un valor viejo cuando el brazo vuelve.
+  function _emaVivo(key, ok, raw){
+    var E=BIO.emaVivo || (BIO.emaVivo={});
+    if(!ok || raw==null){ delete E[key]; return null; }
+    E[key] = (E[key]==null) ? raw : (0.35*raw + 0.65*E[key]);   // α=0.35: suaviza sin arrastrar
+    return E[key];
+  }
   // Panel de ángulos en vivo (cámara).
   function pintarPanelVivo(ang){
     var panel=document.getElementById('bio-panel-vivo'); if(!panel) return;
+    BIO.emaVivo={};   // panel recreado → EMA en vivo fresca
     var filas = FILAS.map(function(f){
       var vi = valorVivoK(ang, f.izq), vd = valorVivoK(ang, f.der);
       return '<tr><td class="g">'+f.etq+'</td><td class="v" id="bv-'+f.izq+'">'+vi+'</td><td class="v" id="bv-'+f.der+'">'+vd+'</td></tr>';
@@ -973,7 +1007,8 @@
         td.textContent = (s && s.min!==null) ? (Math.round(s.min)+'–'+Math.round(s.max)) : '—';
       } else {
         var r=ang?ang[m.key]:null;
-        td.textContent = (r && r.ok) ? (Math.round(r.val)+'°') : '—';
+        var sm=_emaVivo(m.key, !!(r&&r.ok), (r&&r.ok)?r.val:null);   // suavizado visual (anti-parpadeo)
+        td.textContent = (sm!=null) ? (Math.round(sm)+'°') : '—';
       }
     });
   }
@@ -1190,6 +1225,7 @@
   // ── Sentadilla: panel vivo, esqueleto, gate, resumen y guardado ────────────
   function pintarPanelSent(f){
     var panel=document.getElementById('bio-panel-vivo'); if(!panel) return;
+    BIO.emaVivo={};   // panel recreado → EMA en vivo fresca
     panel.innerHTML = '<table><thead><tr><th>Sentadilla (frontal)</th><th style="text-align:right">Izq</th><th style="text-align:right">Der</th></tr></thead><tbody>'
       + '<tr><td class="g">Valgo FPPA</td><td class="v" id="bs-fppa-izq">—</td><td class="v" id="bs-fppa-der">—</td></tr>'
       + '<tr><td class="g">Separación rod./tob.</td><td class="v" id="bs-sep" colspan="2" style="text-align:right">—</td></tr>'
@@ -1200,10 +1236,14 @@
     if(!document.getElementById('bs-fppa-izq')){ pintarPanelSent(f); if(!document.getElementById('bs-fppa-izq')) return; }
     function pon(id,txt){ var el=document.getElementById(id); if(el) el.textContent=txt; }
     if(!f){ pon('bs-fppa-izq','—'); pon('bs-fppa-der','—'); pon('bs-sep','—'); pon('bs-tro','—'); return; }
-    pon('bs-fppa-izq', f.fppaIzq.ok ? (Math.round(f.fppaIzq.val)+'°') : '—');
-    pon('bs-fppa-der', f.fppaDer.ok ? (Math.round(f.fppaDer.val)+'°') : '—');
-    pon('bs-sep', f.sepRatio.ok ? f.sepRatio.val.toFixed(2) : '—');
-    pon('bs-tro', f.troncoLat.ok ? (Math.abs(Math.round(f.troncoLat.val))+'°') : '—');
+    var eFi=_emaVivo('s_fppaI', f.fppaIzq.ok, f.fppaIzq.ok?f.fppaIzq.val:null);       // suavizado visual
+    var eFd=_emaVivo('s_fppaD', f.fppaDer.ok, f.fppaDer.ok?f.fppaDer.val:null);
+    var eSe=_emaVivo('s_sep',   f.sepRatio.ok, f.sepRatio.ok?f.sepRatio.val:null);
+    var eTr=_emaVivo('s_tro',   f.troncoLat.ok, f.troncoLat.ok?f.troncoLat.val:null);
+    pon('bs-fppa-izq', eFi!=null ? (Math.round(eFi)+'°') : '—');
+    pon('bs-fppa-der', eFd!=null ? (Math.round(eFd)+'°') : '—');
+    pon('bs-sep', eSe!=null ? eSe.toFixed(2) : '—');
+    pon('bs-tro', eTr!=null ? (Math.abs(Math.round(eTr))+'°') : '—');
   }
   // Etiquetas vivas junto a cada rodilla (V + = valgo / − = varo), encima del esqueleto ya dibujado.
   function dibujarSentVivo(f){
@@ -1773,7 +1813,11 @@
     doc.setFont('helvetica','normal'); doc.setTextColor(90,74,30);
     var nota='ROM = media de los picos de cada repetición; ± indica la consistencia entre repeticiones (menor = más fiable). Estimado por pose con una sola cámara. Margen honesto: abducción, codo y cuello (en el plano de la cámara) ±5°; flexión y extensión de hombro (fuera del plano de frente) ±10° — para finura, capturar de PERFIL. Diferencias entre sesiones menores a ~8° pueden ser ruido. Cribado y seguimiento; no sustituye la goniometría manual.';
     doc.text(doc.splitTextToSize(nota, W-2*M-24), M+12, y+30);
-    y+=66;
+    y+=72;
+    // Referencias clínicas (fuentes reales)
+    doc.setFont('helvetica','italic'); doc.setFontSize(6.8); doc.setTextColor(150,158,181);
+    var refsR='Referencias: hombro flexión y abducción 0–180°, codo 0–145° (AAOS; Norkin & White, Measurement of Joint Motion, F.A. Davis, 5.ª ed., 2016; Neumann, Kinesiology of the Musculoskeletal System, Elsevier, 3.ª ed., 2017). Lateralización cervical 0–45° por lado (AAOS; Norkin & White, 2016; normas por edad con CROM: Youdas et al., Physical Therapy 1992;72(11):770–780).';
+    doc.text(doc.splitTextToSize(refsR, W-2*M), M, y);
     // Pie
     var fy=H-38;
     doc.setDrawColor(GOLD[0],GOLD[1],GOLD[2]); doc.setLineWidth(1.2); doc.line(M,fy,W-M,fy); doc.setLineWidth(1);
@@ -1850,7 +1894,10 @@
     doc.setTextColor(120,90,20); doc.setFont('helvetica','bold'); doc.setFontSize(8.5); doc.text('Nota de interpretación',M+12,y+16);
     doc.setFont('helvetica','normal'); doc.setTextColor(90,74,30);
     var nota='FPPA = valgo dinámico de rodilla (hacia adentro); valores altos o asimétricos sugieren control deficiente. La abducción/valgo en plano frontal es lo más confiable de la cámara 2D (FPPA: SEM ~3°, cambio mínimo detectable ~8°). La comparación VÁLIDA es el paciente contra sí mismo entre sesiones con el mismo montaje; NO se compara contra normas de sentadilla unipodal ni de laboratorio. El cm es aproximado (±10%). Cribado y seguimiento; no sustituye la evaluación clínica ni sistemas 3D (Kinect/optoelectrónicos).';
-    doc.text(doc.splitTextToSize(nota,W-2*M-24),M+12,y+30); y+=72;
+    doc.text(doc.splitTextToSize(nota,W-2*M-24),M+12,y+30); y+=78;
+    doc.setFont('helvetica','italic'); doc.setFontSize(6.8); doc.setTextColor(GRIS[0],GRIS[1],GRIS[2]);
+    var refsS='Referencias: FPPA — Willson & Davis, JOSPT 2008;38(10):606–615; fiabilidad Munro, Herrington & Carolan, J Sport Rehabil 2012;21(1):7–11, y Herrington & Alenezi, J Electromyogr Kinesiol 2017;34:80–85 (SEM ~2–3°, MDC ~7–9°). Valgo frontal 2D como cribado: McLean et al., Br J Sports Med 2005;39(6):355–362. Sin umbral normativo único — comparación intra-sujeto.';
+    doc.text(doc.splitTextToSize(refsS,W-2*M),M,y);
     pie(1,tot);
     if(tieneVis){
       doc.addPage(); encab('Reconstrucción y gráficas del movimiento'); var y2=100;
