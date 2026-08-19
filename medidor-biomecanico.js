@@ -229,7 +229,7 @@
   // ── Acumulador: mín/máx + SERIE por movimiento (para detectar repeticiones) ──
   function nuevoAcumulador(){
     var a = { framesValidos:0, _frame:0 };
-    MEDIDAS.forEach(function(m){ a[m.key] = { min:null, max:null, muestras:0, serie:[] }; });
+    MEDIDAS.forEach(function(m){ a[m.key] = { min:null, max:null, muestras:0, serie:[], _run:0 }; });
     return a;
   }
   function acumular(acc, ang){
@@ -237,10 +237,12 @@
     acc._frame++;                                   // índice monotónico de frame (separa repeticiones)
     var alguno=false;
     for(var i=0;i<MEDIDAS.length;i++){
-      var k=MEDIDAS[i].key, r=ang[k];
-      if(r && r.ok){
+      var k=MEDIDAS[i].key, r=ang[k], s=acc[k];
+      // Histéresis de oclusión: exige 3 frames válidos SEGUIDOS para aceptar muestras (descarta
+      // parpadeos de landmarks de mala calidad al entrar/salir de oclusión).
+      if(r && r.ok){ s._run=(s._run||0)+1; } else { if(s) s._run=0; }
+      if(r && r.ok && s._run>=3){
         alguno=true;
-        var s=acc[k];
         if(s.min===null || r.val<s.min) s.min=r.val;
         if(s.max===null || r.val>s.max) s.max=r.val;
         s.muestras++;
