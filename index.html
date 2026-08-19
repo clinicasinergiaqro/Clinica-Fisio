@@ -4087,6 +4087,7 @@ function _flushBorradoresActivos(){
     if(scr==='screen-soap'){ if(typeof guardarBorradorSoap==='function') guardarBorradorSoap(); }
     else if(scr==='screen-nuevo'){ if(typeof guardarBorradorNuevo==='function') guardarBorradorNuevo(); }
     else if(scr==='screen-editar-valoracion'){ if(typeof guardarBorradorValoracion==='function') guardarBorradorValoracion(); }
+    else if(scr==='screen-nuevo-ejercicio'){ if(typeof guardarBorradorEjercicio==='function') guardarBorradorEjercicio(); }
   }catch(_){}
 }
 try{
@@ -18674,6 +18675,11 @@ function renderNuevoEjercicioForm(){
   // restore temp media if editing
   if(ej.media) tempEjMedia = ej.media;
   else tempEjMedia = null;
+
+  // ANTI-PÉRDIDA: autosave del form + ofrecer recuperar un ejercicio a medio llenar de este mismo
+  // paciente/target (nuevo vs editar X). Se corre en microtarea para que el DOM ya esté montado.
+  try{ activarAutosaveEjercicio(); }catch(_){}
+  setTimeout(function(){ try{ cargarBorradorEjercicioSiExiste(); }catch(_){} }, 60);
 }
 
 function renderEjMediaPreview(media){
@@ -18778,6 +18784,9 @@ async function handleEjMedia(ev, tipo){
       showToast('✅ Archivo listo','success');
     }
     if(preview) preview.innerHTML = renderEjMediaPreview(tempEjMedia);
+    // ANTI-PÉRDIDA: la subida es async y el 'change' del input dispara el autosave ANTES de que
+    // tempEjMedia exista → volcar el borrador AQUÍ, ya con la referencia (url/fbPath) puesta.
+    try{ if(typeof guardarBorradorEjercicio==='function') guardarBorradorEjercicio(); }catch(_){}
   } catch(err){
     console.error('handleEjMedia:', err);
     showToast('No se pudo subir el archivo. Intenta de nuevo con conexión estable.','error');
@@ -18793,6 +18802,81 @@ function clearEjMedia(){
   tempEjMedia = null;
   const preview = document.getElementById('ej-media-preview');
   if(preview) preview.innerHTML = '';
+  try{ if(typeof guardarBorradorEjercicio==='function') guardarBorradorEjercicio(); }catch(_){}
+}
+
+// ── BORRADOR ANTI-PÉRDIDA del formulario de EJERCICIO (mismo patrón que Nuevo/SOAP) ──────
+// El ejercicio YA GUARDADO es durable (p.ejercicios → Sheets + Firestore + local con cola).
+// Esto cubre el hueco del ejercicio A MEDIO LLENAR: si el iPad se bloquea/cierra ANTES de dar
+// "Guardar", dosis/indicaciones/precauciones/fecha/terapeuta + la referencia del video/foto se
+// vuelcan a localStorage (en visibilitychange/pagehide/freeze) y se ofrecen al reabrir el form.
+const DRAFT_EJERCICIO='sinergia_borrador_ejercicio';
+function _borradorEjMediaLight(m){
+  if(!m||typeof m!=='object') return null;
+  // Solo referencias livianas (url/fbPath) — el binario ya vive en Storage. base64 SOLO si es
+  // imagen pequeña sin puntero, para no reventar la cuota de localStorage.
+  var out={ id:m.id||'', name:m.name||'', label:m.label||'', type:m.type||'', mimeType:m.mimeType||m.type||'',
+            sizeBytes:m.sizeBytes||0, storageProvider:m.storageProvider||'', fbPath:m.fbPath||'', url:m.url||'', data:null };
+  if(!out.url && !out.fbPath && typeof m.data==='string' && m.data.indexOf('data:image/')===0 && m.data.length<=200*1024) out.data=m.data;
+  return out;
+}
+function guardarBorradorEjercicio(){
+  try{
+    var scr=(document.querySelector('.screen.active')||{}).id||'';
+    if(scr!=='screen-nuevo-ejercicio') return;
+    if(!currentPatient||!currentPatient.id) return;
+    var v=function(id){ var el=document.getElementById(id); return el?el.value:''; };
+    var data={
+      dosis:v('ej-dosis'), indicaciones:v('ej-indicaciones'), precauciones:v('ej-precauciones'),
+      fecha:v('ej-fecha'), terapeuta:v('ej-terapeuta'),
+      media:_borradorEjMediaLight(tempEjMedia)
+    };
+    var editIdx=(currentEjercicio&&currentEjercicio._editIdx!==undefined)?currentEjercicio._editIdx:null;
+    // Guardar solo si hay ALGO a medio llenar (evita borradores vacíos que estorben al reabrir).
+    var _algo=String(data.dosis||'').trim()||String(data.indicaciones||'').trim()||String(data.precauciones||'').trim()||!!data.media;
+    if(!_algo) return;
+    localStorage.setItem(DRAFT_EJERCICIO,JSON.stringify({updatedAt:Date.now(),pid:currentPatient.id,editIdx:editIdx,data:data}));
+  }catch(e){ console.warn('borrador ejercicio:',e); }
+}
+function aplicarBorradorEjercicio(data){
+  try{
+    if(!data) return;
+    var set=function(id,val){ var el=document.getElementById(id); if(el&&val!=null) el.value=val; };
+    set('ej-dosis',data.dosis); set('ej-indicaciones',data.indicaciones); set('ej-precauciones',data.precauciones);
+    set('ej-fecha',data.fecha); set('ej-terapeuta',data.terapeuta);
+    if(data.media){ tempEjMedia=Object.assign({},data.media); var pv=document.getElementById('ej-media-preview'); if(pv) pv.innerHTML=renderEjMediaPreview(tempEjMedia); }
+  }catch(e){ console.warn('aplicar borrador ejercicio:',e); }
+}
+function cargarBorradorEjercicioSiExiste(){
+  try{
+    var raw=localStorage.getItem(DRAFT_EJERCICIO); if(!raw) return;
+    var draft=null; try{ draft=JSON.parse(raw); }catch(e){ return; }
+    if(!draft||!draft.data) return;
+    if(!currentPatient||draft.pid!==currentPatient.id) return;   // borrador de otro paciente: no tocar
+    var editActual=(currentEjercicio&&currentEjercicio._editIdx!==undefined)?currentEjercicio._editIdx:null;
+    var editDraft=(draft.editIdx==null?null:draft.editIdx);
+    if(editDraft!==editActual) return;   // corresponde a otro ejercicio/target (nuevo vs editar X)
+    var fecha=new Date(draft.updatedAt||Date.now()).toLocaleString('es-MX');
+    if(confirm('Hay un ejercicio a medio llenar sin guardar.\n\nÚltima edición: '+fecha+'\n\n¿Deseas recuperarlo?')){
+      aplicarBorradorEjercicio(draft.data); showToast('Borrador recuperado','success');
+    } else {
+      if(confirm('¿Deseas descartar este borrador?')){ localStorage.removeItem(DRAFT_EJERCICIO); showToast('Borrador descartado','warning'); }
+    }
+  }catch(e){ console.warn('cargar borrador ejercicio:',e); }
+}
+function borrarBorradorEjercicio(){ try{ localStorage.removeItem(DRAFT_EJERCICIO); }catch(e){} }
+var timerBorradorEj=null;
+function programarBorradorEjercicio(){ clearTimeout(timerBorradorEj); timerBorradorEj=setTimeout(function(){ guardarBorradorEjercicio(); },1200); }
+function activarAutosaveEjercicio(){
+  try{
+    var cont=document.getElementById('content-nuevo-ejercicio'); if(!cont) return;
+    cont.querySelectorAll('input,textarea,select').forEach(function(el){
+      el.removeEventListener('input',programarBorradorEjercicio);
+      el.removeEventListener('change',programarBorradorEjercicio);
+      el.addEventListener('input',programarBorradorEjercicio);
+      el.addEventListener('change',programarBorradorEjercicio);
+    });
+  }catch(e){ console.warn('autosave ejercicio:',e); }
 }
 
 // ── Chips y plantillas del formulario de ejercicio ──
@@ -18919,6 +19003,9 @@ function guardarEjercicio(continuar=false){
   // Actualizar en patientsDB y guardar solo este paciente
   const idxP = patientsDB.findIndex(x=>x.id===currentPatient.id);
   if(idxP>=0) patientsDB[idxP]=currentPatient;
+  // El ejercicio ya está en currentPatient.ejercicios (local) y se sincroniza vía saveDB/cola →
+  // el borrador a medio llenar dejó de ser necesario: limpiarlo para no reofrecerlo al reabrir.
+  try{ if(typeof borrarBorradorEjercicio==='function') borrarBorradorEjercicio(); }catch(_){}
   saveDB('pts', [currentPatient],{camposHist:['ejercicios']}).then(res => {
     if(res && res.ok){
       if(continuar){
