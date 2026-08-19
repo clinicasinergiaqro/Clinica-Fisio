@@ -15618,9 +15618,14 @@ function _prefillNuevoDesdePaciente(p){
   S('sc-implantes-detalle', sc.implantesDetalle||''); S('sc-condiciones-obs', sc.condicionesObs||''); S('sc-banderas-detalle', sc.banderasDetalle||'');
   // Consentimientos (solo reflejar; no se re-piden en edición)
   var _ck=function(id,on){ var el=document.getElementById(id); if(el) el.checked=!!on; };
+  var _cw=(p.consentimientoWhatsApp||{});
   _ck('n-consent-datos', p.consentimientoDatos&&p.consentimientoDatos.aceptado);
   _ck('n-consent-imagen', p.consentimientoImagen&&p.consentimientoImagen.aceptado);
-  _ck('n-consent-wa', p.consentimientoWhatsApp&&p.consentimientoWhatsApp.aceptado);
+  _ck('n-consent-wa', _cw.aceptado);
+  _ck('n-wa-recordatorios', _cw.aceptaRecordatorios);
+  _ck('n-wa-ejercicios', _cw.aceptaEjercicios);
+  // Campos SOLO de creación (generan la nota de valoración sesión 1): no aplican al editar → ocultar.
+  ['n-fecha-valoracion','n-ttohoy'].forEach(function(id){ var el=document.getElementById(id); var ff=(el&&el.closest)?el.closest('.form-field'):null; if(ff) ff.style.display='none'; });
   // Media y estudios ya precargados en globals: pintarlos
   if(typeof _renderMediaAntes==='function') _renderMediaAntes();
   if(typeof _renderEstudiosVal==='function') _renderEstudiosVal();
