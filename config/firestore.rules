@@ -37,7 +37,7 @@ service cloud.firestore {
     }
     function pacienteClinicoUpdateOK() {
       return request.resource.data.diff(resource.data).affectedKeys()
-        .hasOnly(['name','dx','motivoConsulta','motivo','valoracion',
+        .hasOnly(['name','dx','motivoConsulta','motivo','motivoHC','valoracion',
                   'dxFuncional','planTto','antecedentes','alergias',
                   'contraindicaciones','seguridadClinica',
                   'motivosAnteriores','motivoActualIndex','numSesionEpisodioActual',
