@@ -10565,6 +10565,39 @@ function seleccionarMotivoSesion(sel){
   var act=(sel==='actual')?document.getElementById('chip-motivo-actual'):document.getElementById('chip-motivo-'+sel);
   if(act){ act.style.background='var(--navy)'; act.style.color='white'; }
 }
+// UNIFICADO: switch "🆕 Motivo NUEVO" desde el SOAP. Prende/apaga el bloque, marca el flag y esconde el
+// selector de motivo previo (mutuamente excluyente: o eliges un episodio existente, o inicias uno nuevo).
+function _toggleNuevoMotivoSoap(){
+  var box=document.getElementById('nuevo-motivo-box'); var btn=document.getElementById('btn-nuevo-motivo-soap');
+  if(!box) return;
+  var on=(box.style.display==='none');
+  box.style.display=on?'block':'none';
+  window._soapNuevoMotivoOn=on;
+  if(btn){ btn.style.background=on?'var(--navy)':'transparent'; btn.style.color=on?'#fff':'var(--navy)'; btn.textContent=on?'🆕 MOTIVO NUEVO activo — toca para cancelar':'🆕 Esta sesión es un MOTIVO NUEVO'; }
+  var selM=document.getElementById('soap-selector-motivo'); if(selM) selM.style.display=on?'none':'';
+  try{ marcarDirty(); }catch(_){}
+}
+// Archiva el motivo actual (snapshot → motivosAnteriores, sube episodio, limpia el motivo) y deja el
+// motivo/dx NUEVOS puestos. NO guarda ni navega (guardarSOAP persiste). Mismo criterio que
+// abrirNuevoMotivoConsulta (backfill de sesiones pre-episodio incluido), sin el confirm ni el saveDB.
+function _archivarMotivoActual(p, nuevoMotivo, nuevoDx){
+  if(!p) return;
+  var _bk=0;
+  (Array.isArray(p.soap)?p.soap:[]).forEach(function(s){ if(s && typeof s.motivoIndex!=='number'){ s.motivoIndex=0; s.numEpisodio=++_bk; } });
+  var snap={ motivoConsulta:p.motivoConsulta||'', dx:p.dx||'', motivo:Object.assign({},p.motivo||{}), valoracion:Object.assign({},p.valoracion||{}),
+    dxFuncional:Object.assign({},p.dxFuncional||{}), planTto:Object.assign({},p.planTto||{}),
+    fechaInicio:p.fechaCreacion||p.date||'', fechaCierre:todayFmt(), creadoPor:p.creadoPor||'',
+    motivoIndex:p.motivoActualIndex||0,
+    numSesionesEpisodio:Array.isArray(p.soap)?_soapVivas(p).filter(function(s){return s.motivoIndex===(p.motivoActualIndex||0);}).length:0 };
+  if(!Array.isArray(p.motivosAnteriores)) p.motivosAnteriores=[];
+  p.motivosAnteriores.push(snap);
+  p.motivoActualIndex=(p.motivoActualIndex||0)+1;
+  p.numSesionEpisodioActual=0;
+  p.motivoConsulta=String(nuevoMotivo||''); p.dx=String(nuevoDx||'');
+  p.motivo={}; p.valoracion={}; p.dxFuncional={}; p.planTto={};
+  p.fechaCreacion=todayFmt();
+  try{ if(typeof borrarBorradorValoracion==='function') borrarBorradorValoracion(p.id); }catch(_){}
+}
 function renderSOAPForm(){
   const p=currentPatient;
   // FIX HEADER: total real PRIMERO (cache hidratado vía obtenerSesiones) — inmune al campo
@@ -10623,6 +10656,7 @@ function renderSOAPForm(){
   // Default: motivo actual (0 taps extra). En edición el motivo es fijo (no se renumera).
   const _tieneEps=Array.isArray(p.motivosAnteriores)&&p.motivosAnteriores.length>0;
   tempMotivoIndex=_tieneEps?(p.motivoActualIndex||0):null;
+  window._soapNuevoMotivoOn=false;   // reset del switch "motivo nuevo" al abrir el form
   let selectorMotivoHtml='';
   if(_tieneEps && !editingSoapId && !editingSoapEsHistorico){
     let chipsM=`<button type="button" class="chip-quick" id="chip-motivo-actual" onclick="seleccionarMotivoSesion('actual')" style="background:var(--navy);color:white">● ${escapeHTML(String(p.motivoConsulta||'Motivo actual').slice(0,26))} (actual)</button>`;
@@ -10630,9 +10664,24 @@ function renderSOAPForm(){
       chipsM+=`<button type="button" class="chip-quick" id="chip-motivo-${i}" onclick="seleccionarMotivoSesion(${i})">○ ${escapeHTML(String(m.motivoConsulta||('Motivo '+(i+1))).slice(0,26))} — cerrado ${escapeHTML(m.fechaCierre||'')}</button>`;
     });
     selectorMotivoHtml=`
-  <div class="form-section">
+  <div class="form-section" id="soap-selector-motivo">
     <div class="form-section-title">🗂️ Motivo de esta sesión</div>
     <div style="padding:0 14px 10px;display:flex;flex-wrap:wrap;gap:6px">${chipsM}</div>
+  </div>`;
+  }
+  // UNIFICADO: switch "🆕 Motivo NUEVO" dentro del SOAP (solo nota nueva, y solo si el paciente ya tiene
+  // un motivo documentado). Al prenderlo se captura el motivo+dx nuevos aquí mismo; al Guardar, la app
+  // archiva el episodio anterior y guarda esta nota como 1ª sesión del episodio nuevo — en un solo paso.
+  let nuevoMotivoHtml='';
+  if(!editingSoapId && !editingSoapEsHistorico && (String(p.motivoConsulta||'').trim() || (Array.isArray(p.soap)&&p.soap.length))){
+    nuevoMotivoHtml=`
+  <div class="form-section">
+    <div style="padding:0 14px 6px"><button type="button" id="btn-nuevo-motivo-soap" onclick="_toggleNuevoMotivoSoap()" style="width:100%;background:transparent;color:var(--navy);border:1.5px dashed var(--navy);border-radius:var(--radius);padding:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">🆕 Esta sesión es un MOTIVO NUEVO</button></div>
+    <div id="nuevo-motivo-box" style="display:none;padding:0 14px 10px">
+      <div style="font-size:11px;color:#8A6D1A;background:#FEF3C7;border-radius:8px;padding:7px 10px;margin-bottom:8px">El motivo actual quedará en el historial y esta nota inicia el episodio nuevo. Escribe el motivo y el diagnóstico nuevos.</div>
+      <div class="form-field"><div class="form-label">Nuevo motivo de consulta <span class="req">*</span></div><input class="form-input" type="text" id="nm-motivo" placeholder="Ej: Dolor lumbar agudo post-esfuerzo"></div>
+      <div class="form-field"><div class="form-label">Diagnóstico <span style="font-weight:400;color:var(--gray-400);font-size:11px">· médico o funcional</span></div><input class="form-input" type="text" id="nm-dx" placeholder="Ej: Lumbalgia mecánica"></div>
+    </div>
   </div>`;
   }
   // FIX HEADER (BUG 2): el topbar dice LO MISMO que el cuerpo — una sola fuente de verdad.
@@ -10688,7 +10737,7 @@ function renderSOAPForm(){
       })()}</div></div>
       <div class="form-field"><div class="form-label">Terapeuta</div><div style="font-size:15px;font-weight:700;color:var(--navy)">${ter}</div></div>
     </div>
-  </div>`+selectorMotivoHtml+`
+  </div>`+selectorMotivoHtml+nuevoMotivoHtml+`
 
   <!-- SPRINT3 L4A: dictado clínico SOAP — colapsado por default (ocupaba media pantalla
        aunque no se usara). La maquinaria de dictado NO cambia; solo se muestra al tocar. -->
@@ -11056,7 +11105,7 @@ function renderSOAPForm(){
 // localStorage del dispositivo — nada de nube, rules ni backend.
 // 1A: f-respuesta-tto y f-indicaciones-dom fuera de la lista (campos duplicados eliminados del
 // form; los borradores viejos que los traigan simplemente ignoran esos IDs al restaurar).
-const CAMPOS_SOAP_TEXTO=['f-sdolor','f-scambios','f-sactfisica','f-orom','f-ofuerza','f-ohallazgos','f-aevolucion','f-arespuesta','f-aanalisis','f-ptratamiento','f-pindicaciones','f-pcontra','f-objetivo-sesion','dictado-textarea','f-fecha-consulta','f-soap-terapeuta','f-soap-textoriginal'];
+const CAMPOS_SOAP_TEXTO=['f-sdolor','f-scambios','f-sactfisica','f-orom','f-ofuerza','f-ohallazgos','f-aevolucion','f-arespuesta','f-aanalisis','f-ptratamiento','f-pindicaciones','f-pcontra','f-objetivo-sesion','dictado-textarea','f-fecha-consulta','f-soap-terapeuta','f-soap-textoriginal','nm-motivo','nm-dx'];
 function _soapDraftKey(){
   var pid=(currentPatient&&currentPatient.id)?String(currentPatient.id):'';
   if(!pid) return '';
@@ -11093,6 +11142,7 @@ function guardarBorradorSoap(){
       // solo la referencia (url/fbPath/mediaId) → la foto ya subió a Storage y se recupera igual.
       evolMedia:Array.isArray(tempEvolMedia)?tempEvolMedia.map(function(m){return Object.assign({},m,{data:null});}):[],
       atendido:Array.isArray(tempAtendio)?tempAtendio.slice():[],
+      nuevoMotivoOn:!!window._soapNuevoMotivoOn,   // UNIFICADO: estado del switch "motivo nuevo"
       motivoIndex:(typeof tempMotivoIndex==='number')?tempMotivoIndex:null };
     _purgarBorradoresSoapViejos();   // req #5: liberar espacio ANTES de escribir (purga >14 días)
     var payload=JSON.stringify(data);
@@ -11127,6 +11177,9 @@ function aplicarBorradorSoap(d){
   try{
     if(!d||!d.campos) return;
     CAMPOS_SOAP_TEXTO.forEach(function(id){ if(d.campos[id]!==undefined){ var el=document.getElementById(id); if(el) el.value=d.campos[id]; } });
+    // UNIFICADO: si el borrador tenía el switch "motivo nuevo" prendido, reabrir el bloque (los valores
+    // nm-motivo/nm-dx ya se restauraron arriba; sólo falta hacerlo visible y marcar el flag).
+    try{ if(d.nuevoMotivoOn && !window._soapNuevoMotivoOn && typeof _toggleNuevoMotivoSoap==='function') _toggleNuevoMotivoSoap(); }catch(_){}
     if(typeof d.evaI==='number'){ _setEvaProg('i', d.evaI); }
     if(typeof d.evaF==='number' || d.evaF===null){ _setEvaProg('f', d.evaF); }
     if(Array.isArray(d.mods)){ tempMods=_migrarMods(d.mods); tempModDetalles=(d.modDetalles&&typeof d.modDetalles==='object')?Object.assign({},d.modDetalles):{}; _renderModGrid(); _renderModDetailCards(); }
@@ -12225,6 +12278,20 @@ async function guardarSOAP(){
         }
       }
     }catch(_efn){ console.warn('[fecha-nota] sugerencia falló (no crítico):', _efn&&_efn.message); }
+    // UNIFICADO (motivo nuevo desde el SOAP): si el switch está prendido, archivar el episodio anterior
+    // AQUÍ y dejar el motivo/dx nuevos puestos ANTES de crear la nota → esta nota queda como 1ª sesión
+    // del episodio nuevo. El motivo nuevo es obligatorio; el dx opcional. Todo se persiste en el MISMO
+    // saveDB de abajo (camposHist extendido).
+    var _esNuevoMotivoSave=false;
+    if(window._soapNuevoMotivoOn){
+      var _nmM=((document.getElementById('nm-motivo')||{}).value||'').trim();
+      var _nmD=((document.getElementById('nm-dx')||{}).value||'').trim();
+      if(!_nmM){ showToast('Escribe el nuevo motivo de consulta','error'); _liberarGuardSOAP(); return; }
+      _archivarMotivoActual(p, _nmM, _nmD);
+      tempMotivoIndex=p.motivoActualIndex||0;   // la nota entra al episodio NUEVO (1ª sesión)
+      _esNuevoMotivoSave=true;
+      window._soapNuevoMotivoOn=false;
+    }
     const nuevaSOAP={
       id:generarIdSeguro_('s'), num:sesNum, fecha:_fechaNota,
       horaCreacion:new Date().toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'}),
@@ -12269,7 +12336,9 @@ async function guardarSOAP(){
     _espejarSoapMediaAEstudios_(p, nuevaSOAP); // FIX SOAP-MEDIA (D)/I-B: espejo a Estudios — viaja en el MISMO saveDB de abajo
     // AUDITORÍA payload-por-campos: esta nota NUEVA muta p.soap y p.sesiones → DEBEN declararse en
     // camposHist, si no el recorte del payload (envío solo lo tocado) no la mandaría a Sheets.
-    saveDB('pts',[p],{camposHist:['soap','sesiones','numSesionEpisodioActual','estudiosDocs','fechaActualizacion','ultimoUsuario']}).then(async res=>{
+    var _camposSoapSave=['soap','sesiones','numSesionEpisodioActual','estudiosDocs','fechaActualizacion','ultimoUsuario'];
+    if(_esNuevoMotivoSave) _camposSoapSave=_camposSoapSave.concat(['motivosAnteriores','motivoActualIndex','motivoConsulta','dx','motivo','valoracion','dxFuncional','planTto','fechaCreacion']);
+    saveDB('pts',[p],{camposHist:_camposSoapSave}).then(async res=>{
       if(_esHistNueva){
         // Bug B fix — nota NUEVA de histórico: Firestore es el ÚNICO almacén. Await + encolar si falla
         // (NO fire-and-forget). Desacoplado de res.ok clínico: la nota se persiste aunque los campos clínicos fallen.
