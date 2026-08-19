@@ -1110,7 +1110,7 @@
     var hayDato = (medidas||[]).some(function(x){ return x && x.min!==null; });
     cont.innerHTML =
       '<h3>Resumen de la medición</h3>'
-      + '<div style="color:#9BA3B5;font-size:13px;margin-bottom:10px">'+fuenteTxt+' · '+meta.duracionSeg+' s · '+(meta.calidad.framesValidos||0)+' cuadros válidos · convención clínica (0° neutro)<br>ROM = <b style="color:#C9D2E8">media de los picos</b> de cada repetición · máx = mejor intento · ± = consistencia entre reps</div>'
+      + '<div style="color:#9BA3B5;font-size:13px;margin-bottom:10px">'+fuenteTxt+' · '+meta.duracionSeg+' s · '+(meta.calidad.framesValidos||0)+' cuadros válidos · convención clínica (0° neutro)<br>ROM = <b style="color:#C9D2E8">media de los picos</b> de cada repetición · máx = mejor intento · ± = consistencia entre reps<br><span style="color:#E8C96A">Margen 2D honesto:</span> abducción/codo/cuello ±5°, flexión/extensión de hombro ±10° (de frente van fuera de plano → para finura, de PERFIL). Diferencias entre sesiones &lt; ~8° pueden ser ruido.</div>'
       + '<table class="bio-tabla-res"><thead><tr><th>Movimiento</th><th>Izquierda</th><th>Derecha</th></tr></thead><tbody>'+filas+'</tbody></table>'
       + (hayDato ? '' : '<div style="color:#E8C96A;font-size:13px;margin-top:10px">⚠️ No se detectó tronco + brazos con suficiente visibilidad. Repite con hombros, codos y caderas en cuadro y buena luz.</div>')
       + '<div class="bio-acciones">'
@@ -1769,7 +1769,7 @@
     doc.setFillColor(254,243,199); doc.setDrawColor(240,214,120); doc.roundedRect(M,y,W-2*M,66,6,6,'FD');
     doc.setTextColor(120,90,20); doc.setFont('helvetica','bold'); doc.setFontSize(8.5); doc.text('Nota de interpretación', M+12, y+16);
     doc.setFont('helvetica','normal'); doc.setTextColor(90,74,30);
-    var nota='ROM = media de los picos de cada repetición; ± indica la consistencia entre repeticiones (menor = más fiable). Estimado por análisis de pose con una sola cámara: la abducción (plano frontal) es la más confiable; flexión y extensión (plano sagital) son aproximadas — para valores finos, capturar de perfil. Cribado y seguimiento; no sustituye la goniometría manual.';
+    var nota='ROM = media de los picos de cada repetición; ± indica la consistencia entre repeticiones (menor = más fiable). Estimado por pose con una sola cámara. Margen honesto: abducción, codo y cuello (en el plano de la cámara) ±5°; flexión y extensión de hombro (fuera del plano de frente) ±10° — para finura, capturar de PERFIL. Diferencias entre sesiones menores a ~8° pueden ser ruido. Cribado y seguimiento; no sustituye la goniometría manual.';
     doc.text(doc.splitTextToSize(nota, W-2*M-24), M+12, y+30);
     y+=66;
     // Pie
@@ -1847,7 +1847,7 @@
     doc.setFillColor(254,243,199); doc.setDrawColor(240,214,120); doc.roundedRect(M,y,W-2*M,72,6,6,'FD');
     doc.setTextColor(120,90,20); doc.setFont('helvetica','bold'); doc.setFontSize(8.5); doc.text('Nota de interpretación',M+12,y+16);
     doc.setFont('helvetica','normal'); doc.setTextColor(90,74,30);
-    var nota='FPPA = valgo dinámico de rodilla (hacia adentro); valores altos o asimétricos sugieren control deficiente. La abducción/valgo en plano frontal es lo más confiable de la cámara 2D. Cribado y seguimiento del paciente contra sí mismo con el mismo montaje; el cm es aproximado (±10%). No sustituye la evaluación clínica ni sistemas 3D (Kinect/optoelectrónicos).';
+    var nota='FPPA = valgo dinámico de rodilla (hacia adentro); valores altos o asimétricos sugieren control deficiente. La abducción/valgo en plano frontal es lo más confiable de la cámara 2D (FPPA: SEM ~3°, cambio mínimo detectable ~8°). La comparación VÁLIDA es el paciente contra sí mismo entre sesiones con el mismo montaje; NO se compara contra normas de sentadilla unipodal ni de laboratorio. El cm es aproximado (±10%). Cribado y seguimiento; no sustituye la evaluación clínica ni sistemas 3D (Kinect/optoelectrónicos).';
     doc.text(doc.splitTextToSize(nota,W-2*M-24),M+12,y+30); y+=72;
     pie(1,tot);
     if(tieneVis){
