@@ -1338,7 +1338,19 @@
     codoIzq:'#8A6D3B', codoDer:'#8A6D3B', munecaIzq:'#9B30FF', munecaDer:'#9AA000',
     caderaIzq:'#6E5AA8', caderaDer:'#6E5AA8', rodillaIzq:'#2E8B57', rodillaDer:'#3B6BC0',
     tobilloIzq:'#E23B3B', tobilloDer:'#20A040' };
-  var RECON={ paquete:null, frame:0, playing:false, raf:null, speed:1, last:0, box:null, modo:'tray' };
+  var RECON={ paquete:null, frame:0, playing:false, raf:null, speed:1, last:0, box:null, modo:'tray', _cvOverride:null };
+  function _reconCanvas(){ return RECON._cvOverride || document.getElementById('bio-recon-canvas'); }
+  // Render OFFSCREEN de un modo a un dataURL (para embeber en el PDF sin abrir el overlay).
+  function _reconImg(paq, modo, w, h, frame){
+    var cv=document.createElement('canvas'); cv.width=w; cv.height=h;
+    var sv={p:RECON.paquete,m:RECON.modo,f:RECON.frame,b:RECON.box,c:RECON._cvOverride};
+    RECON.paquete=paq; RECON.modo=modo; RECON.frame=frame||0; RECON._cvOverride=cv;
+    RECON.box=(modo==='tray')?_reconCalcBox(paq,w,h):null;
+    try{ _reconDibujar(); }catch(e){ console.warn('[BIO] recon img',e&&e.message); }
+    var url=''; try{ url=cv.toDataURL('image/png'); }catch(e){}
+    RECON.paquete=sv.p; RECON.modo=sv.m; RECON.frame=sv.f; RECON.box=sv.b; RECON._cvOverride=sv.c;
+    return url;
+  }
 
   // Proyección: normaliza a espacio cuadrado (x·aspect, y), ajusta el bounding box de TODOS los
   // puntos al canvas con margen, preservando proporciones reales.
@@ -1371,7 +1383,7 @@
   }
   // Gráfica del DESCENSO DEL SACRO en cm por el tiempo, con el fondo de cada rep marcado.
   function _dibujarSacro(){
-    var paq=RECON.paquete, cv=document.getElementById('bio-recon-canvas'); if(!paq||!cv) return;
+    var paq=RECON.paquete, cv=_reconCanvas(); if(!paq||!cv) return;
     var ctx=cv.getContext('2d'), W=cv.width, H=cv.height, esc=paq.escala||{};
     var unidad=esc.estaturaCm?'cm':'%';
     _ejeChart(ctx,W,H,'Descenso del sacro ('+unidad+')',unidad);
@@ -1408,7 +1420,7 @@
   }
   // Gráfica de SEPARACIÓN de rodillas de la línea media (cm): azul=derecha (+), rojo=izquierda (−).
   function _dibujarRodillas(){
-    var paq=RECON.paquete, cv=document.getElementById('bio-recon-canvas'); if(!paq||!cv) return;
+    var paq=RECON.paquete, cv=_reconCanvas(); if(!paq||!cv) return;
     var ctx=cv.getContext('2d'), W=cv.width, H=cv.height, esc=paq.escala||{}, asp=paq.aspect||0.5625;
     var unidad=esc.estaturaCm?'cm':'%';
     _ejeChart(ctx,W,H,'Rodillas vs línea media ('+unidad+')',unidad);
@@ -1436,7 +1448,7 @@
     var et=document.getElementById('bio-recon-info'); if(et) et.textContent='🔵 rodilla derecha · 🔴 rodilla izquierda · línea = media. Más lejos de 0 = más abierta.';
   }
   function _dibujarTray(){
-    var paq=RECON.paquete, cv=document.getElementById('bio-recon-canvas'); if(!paq||!cv) return;
+    var paq=RECON.paquete, cv=_reconCanvas(); if(!paq||!cv) return;
     var ctx=cv.getContext('2d'), W=cv.width, H=cv.height;
     ctx.clearRect(0,0,W,H); ctx.fillStyle='#0f1a2e'; ctx.fillRect(0,0,W,H);
     // cuadrícula ligera
@@ -1496,7 +1508,7 @@
     _reconSetCanvas();
   }
   function _reconSetCanvas(){
-    var wrap=document.getElementById('bio-recon-wrap'), cv=document.getElementById('bio-recon-canvas'); if(!wrap||!cv) return;
+    var wrap=document.getElementById('bio-recon-wrap'), cv=_reconCanvas(); if(!wrap||!cv) return;
     var paq=RECON.paquete, W, H, maxH=(wrap.clientHeight||640);
     if(RECON.modo==='tray'){                                   // monito: vertical según aspecto del video
       var a=(paq&&paq.aspect)||0.5625;
@@ -1588,7 +1600,9 @@
       +   ((s.trayectorias && s.trayectorias.estado && s.trayectorias.estado!=='nada')
           ? '<button data-sid="'+esc(s.id)+'" onclick="BIO_reconstruccion(this.dataset.sid)" style="background:var(--navy);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer">🎬 Reconstrucción</button>'
           : '<span style="color:var(--gray-400);font-size:11px">sin trayectorias</span>')
-      +   '<span style="color:var(--gray-400);font-size:11px">PDF: próxima subfase</span>'
+      +   ((s.reportePdf && s.reportePdf.url)
+          ? '<button data-url="'+esc(s.reportePdf.url)+'" onclick="window.open(this.dataset.url,\'_blank\')" style="background:var(--navy);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer">📄 Ver PDF</button>'
+          : '<button data-sid="'+esc(s.id)+'" onclick="BIO_pdf(this.dataset.sid)" style="background:var(--white);color:var(--navy);border:1.5px solid var(--gray-200);border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer">📄 Generar PDF</button>')
       +   videoBtn
       +   '<button data-sid="'+esc(s.id)+'" onclick="BIO_eliminar(this.dataset.sid)" style="background:var(--red-light);color:var(--red);border:1.5px solid #FCA5A5;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer">🗑️ Eliminar</button>'
       + '</div>'
@@ -1828,7 +1842,29 @@
   async function BIO_pdf(sid){
     var p=(typeof currentPatient!=='undefined')?currentPatient:null; if(!p) return;
     var s=(p.biomecanica||[]).find(function(x){return x.id===sid;}); if(!s) return;
-    if(s.tipo==='sentadilla'){ toast('El PDF de sentadilla llega en la siguiente versión','warning'); return; }
+    if(s.tipo==='sentadilla'){
+      if(s.reportePdf && s.reportePdf.url){ window.open(s.reportePdf.url,'_blank'); return; }
+      var jsC=(window.jspdf && window.jspdf.jsPDF) || window.jsPDF;
+      if(!jsC){ toast('jsPDF no disponible','error'); return; }
+      toast('Generando PDF…','');
+      try{
+        var paq=await _cargarTray(sid, s), im={};
+        if(paq && paq.puntos && paq.n){
+          var fnd=(s.trayectorias&&s.trayectorias.fondo!=null)?s.trayectorias.fondo:Math.floor(paq.n/2);
+          im.tray=_reconImg(paq,'tray',360,640,fnd); im.sacro=_reconImg(paq,'sacro',560,380,0); im.rodillas=_reconImg(paq,'rodillas',560,380,0);
+        }
+        var pd=BIO_construirPDF_sent(s, p, jsC, im), bl=pd.output('blob'), t2=Date.now();
+        if(typeof fbStorage!=='undefined' && fbStorage){
+          var sf='sentadilla_'+String(p.name||'paciente').replace(/[^\w]/g,'_')+'_'+t2+'.pdf', pt='clinica/sinergia/'+p.id+'/biomecanica/'+t2+'_'+sf, rf=fbStorage.ref(pt);
+          await rf.put(new File([bl],sf,{type:'application/pdf'}),{contentType:'application/pdf'});
+          var u2=await rf.getDownloadURL(); s.reportePdf={ url:u2, fbPath:pt, fecha:fechaHoy(), generadoPor:usuarioActual() };
+          if(typeof saveDB==='function'){ try{ await saveDB('pts',[p]); }catch(e){} }
+          if(typeof renderExpediente==='function') renderExpediente('biomecanica');
+          window.open(u2,'_blank'); toast('✅ PDF generado','success');
+        } else { pd.save('sentadilla_'+t2+'.pdf'); }
+      }catch(e){ console.error('[BIO] PDF sentadilla',e); toast('❌ No se pudo generar el PDF: '+(e.message||''),'error'); }
+      return;
+    }
     if(s.reportePdf && s.reportePdf.url){ window.open(s.reportePdf.url,'_blank'); return; }
     var jsPDFCtor=(window.jspdf && window.jspdf.jsPDF) || window.jsPDF;
     if(!jsPDFCtor){ toast('jsPDF no disponible','error'); return; }
