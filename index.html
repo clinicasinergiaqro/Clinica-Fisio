@@ -3665,6 +3665,9 @@ function goBack(){
   if(typeof consentStream!=='undefined'&&consentStream){ consentStream.getTracks().forEach(t=>t.stop()); consentStream=null; }
   const actual=screenStack[screenStack.length-1]||'';
   if(actual==='screen-nuevo-soap'||actual==='screen-soap'){ try{detenerCualquierDictadoSOAP();}catch(e){} }
+  // Al salir del formulario de nuevo/editar paciente, limpiar el flag de modo edición para que
+  // una creación posterior nunca entre en modo edición "fantasma".
+  if(actual==='screen-nuevo'){ window._nuevoEditPid=null; }
   screenStack.pop();
   const prev=screenStack[screenStack.length-1]||'screen-agenda';
   showScreen(prev,false);
@@ -15594,6 +15597,7 @@ function _prefillNuevoDesdePaciente(p){
   S('n-pronostico', dxf.pronostico&&dxf.pronostico!=='Pendiente'?dxf.pronostico:'');
   S('n-enfoque', plan.enfoqueTerapeutico&&plan.enfoqueTerapeutico!=='Pendiente'?plan.enfoqueTerapeutico:'');
   S('n-plancontra', plan.contraindicaciones&&plan.contraindicaciones!=='Ninguna'?plan.contraindicaciones:'');
+  S('n-contra', (p.contraindicaciones&&p.contraindicaciones!=='Ninguna')?p.contraindicaciones:'');
   // Seguridad clínica
   setChecks('sc-implante', sc.implantes||[]); setChecks('sc-condicion', sc.condiciones||[]); setChecks('sc-bandera', sc.banderasRojas||[]);
   S('sc-implantes-detalle', sc.implantesDetalle||''); S('sc-condiciones-obs', sc.condicionesObs||''); S('sc-banderas-detalle', sc.banderasDetalle||'');
@@ -15786,23 +15790,40 @@ function guardarNuevoPaciente(){
   // notas (soap), sesiones, ejercicios, consentimientos, id y fecha de creación.
   if(window._nuevoEditPid){
     var _ep=(typeof _resolverPaciente==='function')?_resolverPaciente(window._nuevoEditPid):null;
-    if(!_ep){ showToast('Paciente no encontrado','error'); return; }
-    // Solo CLÍNICO. La identidad/generales (nombre, sexo, fecha nac., teléfono, médico, terapeuta)
-    // se editan en "Editar datos" (ruta de sincronización propia): aquí NO se tocan para no revertir
-    // el nombre en la nube. Tampoco se tocan notas (soap), sesiones, ejercicios ni consentimientos.
-    // Fallback: nunca blanquear con vacío lo que ya existía (por si un campo quedó vacío en edición).
-    _ep.motivoConsulta=(nuevo.motivoConsulta&&String(nuevo.motivoConsulta).trim())?nuevo.motivoConsulta:(_ep.motivoConsulta||'');
-    _ep.dx=nuevo.dx||_ep.dx; _ep.contraindicaciones=nuevo.contraindicaciones||_ep.contraindicaciones;
-    _ep.alergias=(nuevo.alergias&&String(nuevo.alergias).trim())?nuevo.alergias:(_ep.alergias||'');
-    _ep.antecedentes=nuevo.antecedentes;
-    // motivo/motivoHC: solo sobrescribir si hay relato o zona; si no, PRESERVAR el existente
-    // (no perder el motivo estructurado de un paciente que se editó sin tocar el motivo).
+    if(!_ep){ window._nuevoEditPid=null; showToast('Paciente no encontrado','error'); return; }
+    var _clean0=function(nv,ov){ return (nv!=null&&String(nv).trim())?nv:(ov||''); };
+    // GENERALES (whitelisted en reglas: sexo, telefono, fechaNacimiento, age, medicoReferente,
+    // terapeuta): SÍ se guardan aquí (por saveDB). El NOMBRE va por su ruta de identidad propia
+    // (_persistirDatosPaciente) solo si cambió, para no revertirse en la nube.
+    _ep.sexo=(nuevo.sexo!=null?nuevo.sexo:_ep.sexo);
+    _ep.telefono=nuevo.telefono||_ep.telefono;
+    if(nuevo.fechaNacimiento) _ep.fechaNacimiento=nuevo.fechaNacimiento;
+    if(nuevo.age!=null) _ep.age=nuevo.age;
+    _ep.medicoReferente=(nuevo.medicoReferente!=null?nuevo.medicoReferente:_ep.medicoReferente);
+    if(nuevo.terapeuta) _ep.terapeuta=nuevo.terapeuta;
+    _ep.terapeutaSeguimiento=(nuevo.terapeutaSeguimiento!=null?nuevo.terapeutaSeguimiento:_ep.terapeutaSeguimiento);
+    var _nombreNuevo=nuevo.name, _nombreCambio=!!(_nombreNuevo && _nombreNuevo!==_ep.name);
+    if(_nombreCambio){ _ep.name=_nombreNuevo; if(typeof FST_normalizarNombreLive==='function') _ep.nombreNormalizado=FST_normalizarNombreLive(_nombreNuevo); }
+    // CLÍNICO. Fallback: nunca blanquear con vacío/default lo que ya existía. Objetos anidados se
+    // FUSIONAN (Object.assign) para no perder subcampos que este form no edita (mecanismo, evolucion,
+    // hallazgos, objetivosLP, dxClinico, frecuencia/sesiones y planes legacy).
+    _ep.motivoConsulta=_clean0(nuevo.motivoConsulta,_ep.motivoConsulta);
+    _ep.dx=nuevo.dx||_ep.dx;
+    _ep.contraindicaciones=(nuevo.contraindicaciones&&nuevo.contraindicaciones!=='Ninguna')?nuevo.contraindicaciones:(_ep.contraindicaciones||'Ninguna');
+    _ep.alergias=_clean0(nuevo.alergias,_ep.alergias);
+    _ep.antecedentes=Object.assign({}, _ep.antecedentes||{}, nuevo.antecedentes||{});
+    // motivo/motivoHC: solo si hay relato o zona; fusionar para conservar mecanismo/evolucion/hallazgos.
     if((nuevo.motivo&&String(nuevo.motivo.padecimiento||'').trim()) || (nuevo.motivoHC&&nuevo.motivoHC.zonaPrincipal)){
-      _ep.motivo=nuevo.motivo; _ep.motivoHC=nuevo.motivoHC;
+      _ep.motivo=Object.assign({}, _ep.motivo||{}, {dxMedico:nuevo.motivo.dxMedico, padecimiento:nuevo.motivo.padecimiento, estudios:nuevo.motivo.estudios});
+      _ep.motivoHC=nuevo.motivoHC;
     }
     // valoración: preservar EVA existente si en edición no se tocó (quedó null)
     if(nuevo.valoracion && (nuevo.valoracion.eva==null||nuevo.valoracion.eva==='') && _ep.valoracion && _ep.valoracion.eva!=null){ nuevo.valoracion.eva=_ep.valoracion.eva; }
-    _ep.valoracion=nuevo.valoracion; _ep.dxFuncional=nuevo.dxFuncional; _ep.planTto=nuevo.planTto;
+    _ep.valoracion=Object.assign({}, _ep.valoracion||{}, nuevo.valoracion||{});
+    // dxFuncional: preservar objetivosLP y dxClinico (no editables en este form).
+    _ep.dxFuncional=Object.assign({}, _ep.dxFuncional||{}, {dxFuncional:nuevo.dxFuncional.dxFuncional, limitaciones:nuevo.dxFuncional.limitaciones, objetivosCP:nuevo.dxFuncional.objetivosCP, pronostico:nuevo.dxFuncional.pronostico});
+    // planTto: solo enfoque y contraindicaciones; conservar frecuencia/sesiones/planes legacy.
+    _ep.planTto=Object.assign({}, _ep.planTto||{}, {enfoqueTerapeutico:nuevo.planTto.enfoqueTerapeutico, contraindicaciones:nuevo.planTto.contraindicaciones});
     _ep.seguridadClinica=nuevo.seguridadClinica;
     _ep.estudiosDocs=(Array.isArray(window._altaEstudios)?window._altaEstudios.map(function(x){return Object.assign({},x);}):(_ep.estudiosDocs||[]));
     _ep.fechaActualizacion=todayFmt(); _ep.ultimoUsuario=currentUser.name;
@@ -15816,10 +15837,14 @@ function guardarNuevoPaciente(){
       else showToast('⚠️ Guardado local, Sheets no confirmó. Revisa conexión.','warning');
       if(Array.isArray(_ep.estudiosDocs)&&_ep.estudiosDocs.length&&typeof _persistirEstudios==='function'){ try{ _persistirEstudios(_ep).catch(function(e){ console.warn('[edit-val] estudiosDocs:', e&&e.message); }); }catch(_e){} }
     }).catch(function(){ showToast('⚠️ Sin conexión — guardado local.','warning'); });
+    // NOMBRE por ruta de identidad (solo si cambió) para que no se revierta en la nube.
+    if(_nombreCambio && typeof _persistirDatosPaciente==='function'){
+      try{ _ep.updatedAt=Date.now(); _persistirDatosPaciente(_ep).then(function(){ if(typeof window._FST_invalidarIndicePacientes==='function') window._FST_invalidarIndicePacientes(); }).catch(function(e){ console.warn('[edit-val] identidad:', e&&e.message); }); }catch(_e){}
+    }
     currentPatient=_ep;
     setTimeout(function(){
       try{
-        screenStack = screenStack.filter(function(s){ return s!=='screen-nuevo'; });
+        screenStack = screenStack.filter(function(s){ return s!=='screen-nuevo' && s!=='screen-expediente'; });
         var _n=document.getElementById('exp-topbar-name'); if(_n) _n.textContent=String(_ep.name||'').split(' ').slice(0,2).join(' ');
         var _mt=document.getElementById('exp-topbar-meta'); if(_mt) _mt.textContent=(_ep.age!=null?(_ep.age+' años'):'')+(_ep.terapeuta?(' · '+_ep.terapeuta):'');
         var _av=document.getElementById('exp-avatar'); if(_av&&typeof initials==='function') _av.textContent=initials(_ep.name||'');
