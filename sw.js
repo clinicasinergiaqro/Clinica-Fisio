@@ -2,7 +2,7 @@
 // Service Worker — Clínica Sinergia (offline shell)
 // CAMBIAR la fecha de CACHE en cada deploy para forzar actualización
 // ═══════════════════════════════════════════════════════════
-const CACHE = 'sinergia-shell-v1-2026-08-19t';
+const CACHE = 'sinergia-shell-v1-2026-08-19u';
 const SHELL = [
   './',
   './index.html',
