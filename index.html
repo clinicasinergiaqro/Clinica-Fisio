@@ -2981,9 +2981,19 @@ function sanearPaciente(p){
     historialCambios: toArr(p.historialCambios),
     antecedentes:   toObj(p.antecedentes)||Object.create(null),
     motivo:         toObj(p.motivo)||Object.create(null),
-    // FIX PÉRDIDA DE MOTIVO: motivoHC (zona/lado/¿desde cuándo?/irradiación) también hay que
-    // CONSERVARLO al cargar; sin esto la carga lo dropeaba aunque Sheets lo devolviera.
-    motivoHC:       toObj(p.motivoHC)||Object.create(null),
+    // FIX PÉRDIDA DE MOTIVO: conservar motivoHC al cargar; y si viene VACÍO pero el bloque motivo
+    // trae el espejo (zonaPrincipal), RECONSTRUIRLO desde ahí (red de seguridad backend-independiente).
+    motivoHC: (function(){
+      var hc=toObj(p.motivoHC)||{}; var mo=toObj(p.motivo)||{};
+      if((!hc||!hc.zonaPrincipal) && mo.zonaPrincipal){
+        hc={ relato:mo.padecimiento||hc.relato||'', zonaPrincipal:mo.zonaPrincipal||null,
+             zonaPrincipalOtra:mo.zonaPrincipalOtra||null, lado:mo.lado||null,
+             zonasSecundarias:Array.isArray(mo.zonasSecundarias)?mo.zonasSecundarias:[],
+             desdeCuando:mo.desdeCuando||null, irradiacion:mo.irradiacion||null,
+             irradiacionOtra:mo.irradiacionOtra||null, version:1, reconstruido:true };
+      }
+      return hc||Object.create(null);
+    })(),
     valoracion:     toObj(p.valoracion)||Object.create(null),
     dxFuncional:    toObj(p.dxFuncional)||Object.create(null),
     planTto:        toObj(p.planTto)||Object.create(null),
@@ -15748,7 +15758,13 @@ function guardarNuevoPaciente(){
     antecedentes:{patologicos:v('n-patologicos','Ninguno'),deportivos:v('n-deportivos','Ninguno'),
       deporteFrecuencia:v('n-deporte-freq','No aplica'),cirugias:v('n-cirugias','Ninguna'),medicamentos:v('n-medicamentos','Ninguno')},
     motivo:{dxMedico:dxmedicoFinal, padecimiento, mecanismo:v('n-mecanismo','No especificado'),
-      evolucion:v('n-evolucion','No especificado'),estudios:v('n-estudios','Pendiente'),hallazgos:''},
+      evolucion:v('n-evolucion','No especificado'),estudios:v('n-estudios','Pendiente'),hallazgos:'',
+      // RED DE SEGURIDAD: espejo de la estructura del motivo DENTRO de motivo (que nunca se pierde en
+      // la nube). Si motivoHC llegara vacío al recargar, sanearPaciente lo reconstruye desde aquí.
+      zonaPrincipal:_hc.zona||null, zonaPrincipalOtra:(_hc.zona==='otra')?(_hcZonaOtra||null):null,
+      lado:_hc.lado||null, zonasSecundarias:Array.isArray(_hc.sec)?_hc.sec.slice():[],
+      desdeCuando:_hcDesdeTexto||null, irradiacion:_hc.irrad||null,
+      irradiacionOtra:(_hc.irrad==='Otra…')?(_hcIrradOtra||null):null},
     // Historia clínica híbrida (Fase 1): datos estructurados del motivo. El relato (padecimiento)
     // sigue siendo la fuente de verdad; esto solo agrega lo consultable/filtrable. Históricos: ausente.
     motivoHC:{
@@ -15848,7 +15864,9 @@ function guardarNuevoPaciente(){
     _ep.antecedentes=Object.assign({}, _ep.antecedentes||{}, nuevo.antecedentes||{});
     // motivo/motivoHC: solo si hay relato o zona; fusionar para conservar mecanismo/evolucion/hallazgos.
     if((nuevo.motivo&&String(nuevo.motivo.padecimiento||'').trim()) || (nuevo.motivoHC&&nuevo.motivoHC.zonaPrincipal)){
-      _ep.motivo=Object.assign({}, _ep.motivo||{}, {dxMedico:nuevo.motivo.dxMedico, padecimiento:nuevo.motivo.padecimiento, estudios:nuevo.motivo.estudios});
+      _ep.motivo=Object.assign({}, _ep.motivo||{}, {dxMedico:nuevo.motivo.dxMedico, padecimiento:nuevo.motivo.padecimiento, estudios:nuevo.motivo.estudios,
+        zonaPrincipal:nuevo.motivo.zonaPrincipal, zonaPrincipalOtra:nuevo.motivo.zonaPrincipalOtra, lado:nuevo.motivo.lado,
+        zonasSecundarias:nuevo.motivo.zonasSecundarias, desdeCuando:nuevo.motivo.desdeCuando, irradiacion:nuevo.motivo.irradiacion, irradiacionOtra:nuevo.motivo.irradiacionOtra});
       _ep.motivoHC=nuevo.motivoHC;
     }
     // valoración: preservar EVA existente si en edición no se tocó (quedó null)
