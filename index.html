@@ -821,12 +821,16 @@ function FST_buildSesionPayload(sesion, modo) {
     ...(sesion.modalidadesDetalle && typeof sesion.modalidadesDetalle === 'object' && Object.keys(sesion.modalidadesDetalle).length ? { modalidadesDetalle: sesion.modalidadesDetalle } : {}),
     completa: !!sesion.completa, modoNota: sesion.modoNota || '',
     importado: false, formatoOriginal: 'soap', revisionPendiente: false,
-    origen: 'app_live', creadoPor: sesion.terapeuta || 'APP',
+    origen: 'app_live',
     updatedAt: firebase.firestore.FieldValue.serverTimestamp()
   };
-  // horaCreacion/totalSesiones: metadatos de creación. Solo en 'nueva' — sesionUpdateOK NO los
-  // permite, y en una edición no cambian (merge conserva los del create).
+  // horaCreacion/totalSesiones/creadoPor: metadatos de creación. Solo en 'nueva' — sesionUpdateOK NO
+  // los permite. AUDITORÍA: creadoPor se emitía SIEMPRE; si al editar una nota activa se cambiaba el
+  // terapeuta, creadoPor cambiaba de valor → entraba en affectedKeys → sesionUpdateOK.hasOnly lo
+  // rechazaba y Firestore tumbaba TODO el dual-write (el espejo/Cola de Revisión se quedaba viejo).
+  // En una edición no cambia (merge conserva el del create), así que solo va en 'nueva'.
   if (modo === 'nueva') {
+    payload.creadoPor = sesion.terapeuta || 'APP';
     payload.createdAt = firebase.firestore.FieldValue.serverTimestamp();
     payload.horaCreacion = sesion.horaCreacion || '';
     if (sesion.totalSesiones != null) payload.totalSesiones = Number(sesion.totalSesiones);
@@ -872,6 +876,12 @@ async function FST_guardarSesionFirestore(paciente, sesion, modo) {
       const _ex = await _conTimeout(_sesRef.get(), 8000);
       if (_ex && _ex.exists) _modoReal = 'edicion';
     }catch(_ge){ /* red/timeout: usar el modo original */ }
+    // AUDITORÍA D1 (media online): _reSubirMediaDesdeIDB solo corría en el drenado de COLAS. Si al
+    // capturar la foto/video la subida a Storage falló transitoriamente (aun con red) el binario cayó a
+    // IDB con url='' → al guardar la nota ONLINE el write tenía éxito y NUNCA se re-subía (nunca se
+    // encolaba). Aquí, ANTES de construir el payload, se re-suben los pendientes desde IDB y se MUTA
+    // sesion.media (agrega url/fbPath) → el doc lleva puntero durable y la nota en memoria queda sana.
+    try{ await _reSubirMediaDesdeIDB(pid, sesion.media); }catch(_rs){ console.warn('[FST] re-subida media online:', _rs&&_rs.message); }
     const pacPayload = FST_buildPacientePayload(paciente, sesion, pidInfo);
     const sesPayload = FST_buildSesionPayload(sesion, _modoReal);
     await window._fstDb.collection('pacientes').doc(pid).set(_sinUndefined(pacPayload), { merge: true });
@@ -1872,6 +1882,11 @@ async function saveDB(k, v, opts){
     // Copia limpia SIN base64 para enviar a Sheets
     const pLimpio = {
       id: p.id,
+      // AUDITORÍA merge-backend: lista de campos TOP-LEVEL que ESTE guardado realmente tocó. El backend
+      // (mergePacienteSeguro_) la usa para SOLO superponer esos campos y NO reemplazar en bloque los
+      // objetos clínicos (valoracion/motivo/dxFuncional/planTto/…) desde una copia en memoria vieja de
+      // OTRO equipo → evita el clobber cross-device. Ausente/null → merge clásico (guardado completo).
+      _soloCampos: (opts && Array.isArray(opts.camposHist) && opts.camposHist.length) ? opts.camposHist.slice() : null,
       name: p.name,
       age: p.age,
       terapeuta: p.terapeuta,
@@ -1990,8 +2005,12 @@ async function saveDB(k, v, opts){
           data: (e.media.url ? null : ((e.media.data && String(e.media.data).startsWith('data:image/')) ? e.media.data : null))
         }:null
       })),
-      fotos: (Array.isArray(p.fotos)?p.fotos:[]).map(f=>({id:f.id||f.mediaId||'',patientId:f.patientId||'',patientName:f.patientName||'',categoria:f.categoria||'foto',name:f.name||'',originalFileName:f.originalFileName||f.name||'',safeFileName:f.safeFileName||'',label:f.label||'',type:f.type||'',mimeType:f.mimeType||f.type||'',kind:f.kind||'',sizeBytes:f.sizeBytes||0,storageProvider:f.url?'firebase':(f.storageProvider||''),fbPath:f.fbPath||'',url:f.url||'',mediaId:f.mediaId||'',subidoPor:f.subidoPor||'',uploadedBy:f.uploadedBy||f.subidoPor||'',fecha:f.fecha||'',fechaCreacion:f.fechaCreacion||f.fecha||'',isDeleted:f.isDeleted||false})),
-      docs: (Array.isArray(p.docs)?p.docs:[]).map(d=>({id:d.id||d.mediaId||'',patientId:d.patientId||'',patientName:d.patientName||'',categoria:d.categoria||'doc',name:d.name||'',originalFileName:d.originalFileName||d.name||'',safeFileName:d.safeFileName||'',label:d.label||'',type:d.type||'',mimeType:d.mimeType||d.type||'',kind:d.kind||'',sizeBytes:d.sizeBytes||0,storageProvider:d.url?'firebase':(d.storageProvider||''),fbPath:d.fbPath||'',url:d.url||'',mediaId:d.mediaId||'',subidoPor:d.subidoPor||'',uploadedBy:d.uploadedBy||d.subidoPor||'',fecha:d.fecha||'',fechaCreacion:d.fechaCreacion||d.fecha||'',isDeleted:d.isDeleted||false})),
+      // AUDITORÍA pLimpio: source/pages/scannerMeta (trazabilidad del escáner clínico) se caían al
+      // viajar a Sheets en activos → se pasan por referencia. `data`: base64 de respaldo SOLO si es
+      // imagen sin puntero (mismo criterio que ejercicios.media), para no perder el binario agregado
+      // offline al recargar en otro equipo; recuperable además por IDB (mediaId) en el mismo equipo.
+      fotos: (Array.isArray(p.fotos)?p.fotos:[]).map(f=>({id:f.id||f.mediaId||'',patientId:f.patientId||'',patientName:f.patientName||'',categoria:f.categoria||'foto',name:f.name||'',originalFileName:f.originalFileName||f.name||'',safeFileName:f.safeFileName||'',label:f.label||'',type:f.type||'',mimeType:f.mimeType||f.type||'',kind:f.kind||'',sizeBytes:f.sizeBytes||0,storageProvider:f.url?'firebase':(f.storageProvider||''),fbPath:f.fbPath||'',url:f.url||'',mediaId:f.mediaId||'',subidoPor:f.subidoPor||'',uploadedBy:f.uploadedBy||f.subidoPor||'',fecha:f.fecha||'',fechaCreacion:f.fechaCreacion||f.fecha||'',source:f.source||'',pages:(typeof f.pages==='number'?f.pages:null),scannerMeta:f.scannerMeta||null,data:(f.url?null:((f.data&&String(f.data).startsWith('data:image/'))?f.data:null)),isDeleted:f.isDeleted||false})),
+      docs: (Array.isArray(p.docs)?p.docs:[]).map(d=>({id:d.id||d.mediaId||'',patientId:d.patientId||'',patientName:d.patientName||'',categoria:d.categoria||'doc',name:d.name||'',originalFileName:d.originalFileName||d.name||'',safeFileName:d.safeFileName||'',label:d.label||'',type:d.type||'',mimeType:d.mimeType||d.type||'',kind:d.kind||'',sizeBytes:d.sizeBytes||0,storageProvider:d.url?'firebase':(d.storageProvider||''),fbPath:d.fbPath||'',url:d.url||'',mediaId:d.mediaId||'',subidoPor:d.subidoPor||'',uploadedBy:d.uploadedBy||d.subidoPor||'',fecha:d.fecha||'',fechaCreacion:d.fechaCreacion||d.fecha||'',source:d.source||'',pages:(typeof d.pages==='number'?d.pages:null),scannerMeta:d.scannerMeta||null,data:(d.url?null:((d.data&&String(d.data).startsWith('data:image/'))?d.data:null)),isDeleted:d.isDeleted||false})),
       ejerciciosToken: p.ejerciciosToken||'',
       ejerciciosLinkActivo: p.ejerciciosLinkActivo||false,
       creadoPor: p.creadoPor||'',
@@ -2232,6 +2251,25 @@ async function _persistirHistoricoFirestore(p, camposHist){
     outCl.fechaActualizacion = _ahoraTr.toLocaleDateString('es-MX')+' '+_ahoraTr.toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'});
     outCl.ultimosCampos = Object.keys(outCl).concat(Object.keys(outEj)).filter(function(k){ return ['updatedAt','ultimoUsuario','fechaActualizacion','ultimosCampos'].indexOf(k)===-1; });
 
+    // ── AUDITORÍA D2: guard de tamaño de DOCUMENTO (~1MB) ANTES de escribir ──
+    // El presupuesto _budCl solo acota el base64 de estudiosDocs/fotos/docs, pero reportesClinicosIA
+    // (texto IA que se acumula) e historialCambios (bitácora que crece) NO se contaban y van al MISMO
+    // doc → podían sumar >1MB → Firestore lo rechaza con invalid-argument, que se clasifica PERMANENTE
+    // y va a FALLIDOS sin reintento (el diff clínico no persiste). Aquí medimos el payload real y, si se
+    // acerca al límite, SOLTAMOS el base64 (a IDB+pendienteSubida vía permitirB64=false; el binario ya
+    // suele estar en Storage por url y el replay lo re-sube) — el texto clínico SÍ persiste. Degradar
+    // media es reversible; perder el diff clínico no.
+    try{
+      var _LIM_DOC = 950*1024;
+      var _tam = function(o){ try{ return JSON.stringify(_sinUndefined(o)||{}).length; }catch(_e){ return 0; } };
+      if(_tam(outCl)+_tam(outEj) > _LIM_DOC){
+        if(Array.isArray(outCl.estudiosDocs)) outCl.estudiosDocs = _guardMediaArray(outCl.estudiosDocs, false);
+        if(Array.isArray(outCl.fotos))        outCl.fotos        = _guardMediaArray(outCl.fotos, false);
+        if(Array.isArray(outCl.docs))         outCl.docs         = _guardMediaArray(outCl.docs, false);
+        console.warn('[saveDB hist] doc >'+Math.round(_LIM_DOC/1024)+'KB — base64 diferido a IDB (se re-sube por cola). Revisar tamaño de reportesClinicosIA/historialCambios en', p.id);
+      }
+    }catch(_td){ console.warn('[saveDB hist] guard tamaño falló (no crítico):', _td&&_td.message); }
+
     // ── Writes (1: ejercicios — whitelist propia, sin metadatos; 2: clínico — con rastro) ──
     // CAPA 3: sin conexión el SDK NO rechaza el set() (queda pendiente indefinidamente) → sin
     // _conTimeout el await se colgaba y la cola del Loop C nunca se activaba. Al timeout devolvemos
@@ -2335,12 +2373,28 @@ function _esErrorPermanenteHist(e){
   // Temporales (unavailable/deadline-exceeded/internal/aborted/red/timeout) → sí reintentan.
   return /permission-denied|permission_denied|insufficient permissions|invalid-argument|invalid_argument|not-found|failed-precondition|unauthenticated/i.test(s);
 }
+// AUDITORÍA D5: si el JSON de una cola queda corrupto, antes se hacía q=[] y return SIN reescribir →
+// los ítems quedaban atascados para siempre (nunca parseaban) de forma silenciosa. Ahora se preserva el
+// string crudo en una clave _CORRUPTO_<ts> (para inspección/recuperación manual), se limpia la clave viva
+// para que el drenado deje de reintentar en vacío, y se avisa.
+function _colaCorrupta(key, e){
+  try{ var raw=localStorage.getItem(key); if(raw){ localStorage.setItem(key+'_CORRUPTO_'+Date.now(), raw); localStorage.removeItem(key); } }catch(_){}
+  console.warn('[cola] JSON corrupto aislado en _CORRUPTO:', key, e && e.message);
+}
 function _persistirFallidosHist(items){
   try{
     var f = JSON.parse(localStorage.getItem('COLA_SYNC_HIST_FALLIDOS')||'[]');
     if(!Array.isArray(f)) f = [];
     f = f.concat(items);
-    if(f.length > 50) f = f.slice(f.length - 50); // cap de inspección
+    // AUDITORÍA D3: estas son NOTAS de pacientes históricos (mig_pac_) — Firestore es su ÚNICO almacén,
+    // así que un snapshot en fallidos puede ser la ÚNICA copia. El cap viejo de 50 con slice() DESCARTABA
+    // las más antiguas en silencio (un permission-denied masivo genera >50 fácil). Se sube el cap a 1000
+    // (snapshots pequeños) y, si aun así se rebasa, se AVISA fuerte en vez de perder callado.
+    if(f.length > 1000){
+      f = f.slice(f.length - 1000);
+      try{ if(typeof showToastCritico_==='function') showToastCritico_('⚠️ Hay >1000 notas históricas sin sincronizar en este equipo. Avisa a Carlos ANTES de cerrar la app para no perder ninguna.'); }catch(_){}
+      console.warn('[SOAP-hist] FALLIDOS >1000 — recortando; riesgo de pérdida en almacén único. Exportar/avisar.');
+    }
     localStorage.setItem('COLA_SYNC_HIST_FALLIDOS', JSON.stringify(f));
   }catch(e){ console.warn('[SOAP-hist] no se pudo guardar fallidos:', e && e.message); }
 }
@@ -2349,7 +2403,7 @@ const _MAX_INTENTOS_HIST = 5;
 async function drenarColaSoapHistorico(){
   if(_DRENANDO_HIST || !navigator.onLine) return; // guard: seguro de llamar desde 'online' y sincronizarPendientes sin carrera
   var q;
-  try{ q = JSON.parse(localStorage.getItem('COLA_SYNC_HIST')||'[]'); }catch(e){ q = []; }
+  try{ q = JSON.parse(localStorage.getItem('COLA_SYNC_HIST')||'[]'); }catch(e){ q = []; _colaCorrupta('COLA_SYNC_HIST',e); }
   if(!Array.isArray(q) || !q.length) return;
   _DRENANDO_HIST = true;
   var restantes = [], fallidos = [], ahora = Date.now();
@@ -2470,7 +2524,7 @@ let _DRENANDO_SOAP_ACT = false;
 async function drenarColaSoapActivo(){
   if(_DRENANDO_SOAP_ACT || !navigator.onLine) return;
   var q;
-  try{ q=JSON.parse(localStorage.getItem('COLA_SOAP_ACT')||'[]'); }catch(e){ q=[]; }
+  try{ q=JSON.parse(localStorage.getItem('COLA_SOAP_ACT')||'[]'); }catch(e){ q=[]; _colaCorrupta('COLA_SOAP_ACT',e); }
   if(!Array.isArray(q) || !q.length) return;
   _DRENANDO_SOAP_ACT=true;
   var restantes=[], fallidos=[], ahora=Date.now(), _permisoDenegado=false;
@@ -2645,7 +2699,7 @@ let _DRENANDO_HIST_DOC = false;
 async function drenarColaHistDoc(){
   if(_DRENANDO_HIST_DOC || !navigator.onLine) return;
   var q;
-  try{ q=JSON.parse(localStorage.getItem('COLA_SYNC_HIST_DOC')||'[]'); }catch(e){ q=[]; }
+  try{ q=JSON.parse(localStorage.getItem('COLA_SYNC_HIST_DOC')||'[]'); }catch(e){ q=[]; _colaCorrupta('COLA_SYNC_HIST_DOC',e); }
   if(!Array.isArray(q) || !q.length) return;
   _DRENANDO_HIST_DOC = true;
   var restantes=[], fallidos=[], ahora=Date.now();
@@ -4088,6 +4142,7 @@ function _flushBorradoresActivos(){
     else if(scr==='screen-nuevo'){ if(typeof guardarBorradorNuevo==='function') guardarBorradorNuevo(); }
     else if(scr==='screen-editar-valoracion'){ if(typeof guardarBorradorValoracion==='function') guardarBorradorValoracion(); }
     else if(scr==='screen-nuevo-ejercicio'){ if(typeof guardarBorradorEjercicio==='function') guardarBorradorEjercicio(); }
+    else if(scr==='screen-consent'){ if(typeof guardarBorradorConsent==='function') guardarBorradorConsent(); }
   }catch(_){}
 }
 try{
@@ -11220,9 +11275,13 @@ async function _capturarMediaObjetivo(ev){
   if(file.size>80*1024*1024){ showToast('Archivo muy pesado. Graba uno más corto.','error'); return; }
   if(String(file.type).indexOf('video/')===0 && !navigator.onLine){ showToast('Sin conexión — conéctate para subir videos','error'); return; }
   if(String(file.type).indexOf('image/')!==0 && String(file.type).indexOf('video/')!==0){ showToast('Solo foto o video','error'); return; }
+  var _pidMO=currentPatient.id;   // identidad al iniciar (la subida es async)
   showToast('☁️ Subiendo…','');
   try{
     var res=await subirMediaEjercicioAStorage(file);   // reutiliza la subida (guarda bajo /ejercicios pero sirve)
+    // FUGA ENTRE PACIENTES (auditoría): si cambiaste de paciente durante la subida, tempMediaObjetivo
+    // ya es el del OTRO → descartar para no adjuntar el registro visual de A a la nota de B.
+    if(!currentPatient || currentPatient.id!==_pidMO){ showToast('Cambiaste de paciente — no se adjuntó','warning'); return; }
     if(!Array.isArray(tempMediaObjetivo)) tempMediaObjetivo=[];
     var _inpEtq=document.getElementById('media-obj-etiqueta');
     var _etq=(_inpEtq&&_inpEtq.value?String(_inpEtq.value).trim():'').slice(0,60);
@@ -11286,9 +11345,13 @@ async function _capturarMediaAntes(ev){
   if(String(file.type).indexOf('image/')!==0 && String(file.type).indexOf('video/')!==0){ showToast('Solo foto o video','error'); return; }
   if(String(file.type).indexOf('video/')===0 && !navigator.onLine){ showToast('Sin conexión — conéctate para subir videos','error'); return; }
   if(!window._altaPid) window._altaPid=(typeof generarIdSeguro_==='function'?generarIdSeguro_('p'):('p'+Date.now()));
+  var _pidAntes=window._altaPid;   // identidad del alta al iniciar (la subida es async)
   showToast('☁️ Subiendo…','');
   try{
-    var res=await _subirMediaAntes(file, window._altaPid);
+    var res=await _subirMediaAntes(file, _pidAntes);
+    // FUGA ENTRE BORRADORES (auditoría): si se abrió otro Nuevo/Editar durante la subida, _altaPid ya
+    // cambió y _altaMediaAntes se vació → descartar para no meter el "antes" de un alta en otra.
+    if(window._altaPid!==_pidAntes){ showToast('Cambiaste de formulario — no se adjuntó','warning'); return; }
     if(!Array.isArray(window._altaMediaAntes)) window._altaMediaAntes=[];
     window._altaMediaAntes.push({ id:'ba'+Date.now(), type:file.type, url:res.url, fbPath:res.fbPath });
     _renderMediaAntes(); marcarDirty();
@@ -11324,16 +11387,20 @@ async function _capturarEstudioVal(ev){
   if(!window._altaPid) window._altaPid=(typeof generarIdSeguro_==='function'?generarIdSeguro_('p'):('p'+Date.now()));
   var interpEl=document.getElementById('n-estudio-val-interp');
   var interp=(interpEl&&interpEl.value?String(interpEl.value).trim():'');
+  var _pidEst=window._altaPid;   // identidad del alta al iniciar (la subida es async)
   showToast('☁️ Subiendo…','');
   try{
     var ts=Date.now();
     var safeName=String(file.name||'estudio').replace(/[^\w.\-]+/g,'_');
-    var fbPath='clinica/sinergia/'+window._altaPid+'/estudios/'+ts+'_'+safeName;
+    var fbPath='clinica/sinergia/'+_pidEst+'/estudios/'+ts+'_'+safeName;
     var ref=fbStorage.ref(fbPath);
     var url=await new Promise(function(resolve,reject){
       var task=ref.put(file,{ contentType:file.type||'application/octet-stream' });
       task.on('state_changed', null, function(err){ reject(err); }, async function(){ try{ resolve(await task.snapshot.ref.getDownloadURL()); }catch(e){ reject(e); } });
     });
+    // FUGA ENTRE BORRADORES (auditoría): si se abrió otro Nuevo/Editar durante la subida, _altaPid ya
+    // cambió y _altaEstudios se vació → descartar para no meter el estudio de un alta en otra.
+    if(window._altaPid!==_pidEst){ showToast('Cambiaste de formulario — el estudio no se adjuntó','warning'); return; }
     if(!Array.isArray(window._altaEstudios)) window._altaEstudios=[];
     var desc=(sel.clinico?sel.clinico+' · ':'')+String(file.name||'estudio').replace(/\.[^.]+$/,'');
     var item={ id:'est_'+ts+'_'+Math.random().toString(36).slice(2,6), tipo:sel.tipo||'imagen', tipoClinico:sel.clinico||'',
@@ -11687,6 +11754,11 @@ async function guardarSOAP(){
       var _mediaVaciadaAProposito = _soapMediaTocada && (!Array.isArray(datosNota.media)||!datosNota.media.length);
       var _mediaH=(Array.isArray(datosNota.media)&&datosNota.media.length)?datosNota.media
                  :(_mediaVaciadaAProposito?[]:((Array.isArray(notaH.media)&&notaH.media.length)?notaH.media:null));
+      // AUDITORÍA D1 (media online histórico): re-subir desde IDB los adjuntos que quedaron sin puntero
+      // ANTES de armar payloadH (que hace _guardMediaArray con permitirB64=FALSE → una foto sin url se
+      // volvería referencia muda irrecuperable en otro equipo). Muta _mediaH agregando url/fbPath. No-op
+      // para los que ya tienen url. Best-effort: si falla, sigue el flujo (queda pendienteSubida + cola).
+      if(Array.isArray(_mediaH)&&_mediaH.length){ try{ await _reSubirMediaDesdeIDB(pidH, _mediaH); }catch(_rsh){ console.warn('[hist media online] re-subida:', _rsh&&_rsh.message); } }
       // v12: NOM + atendidoPor + dictado al editar histórica. El form del histórico NO precarga
       // estos campos, así que se conserva lo de notaH cuando el form viene vacío (evita wipe). Todos
       // están en sesionUpdateOK. horaCreacion/totalSesiones NO se tocan (no en update; merge conserva).
@@ -11697,7 +11769,11 @@ async function guardarSOAP(){
       const payloadH={
         s:datosNota.s, o:datosNota.o, a:datosNota.a, p:datosNota.p,
         evaI:datosNota.evaI, evaF:datosNota.evaF,
-        modalidades:datosNota.modalidades||[], completa:true,
+        // AUDITORÍA: modalidades CONDICIONAL (igual que ejerciciosSesion/mediaObjetivo/modalidadesDetalle):
+        // set(merge) con [] borraría las modalidades previas si el prefill del editor viniera vacío. Con
+        // ítems se escriben; vacío → se omite y el merge conserva las de la nota.
+        ...(Array.isArray(datosNota.modalidades)&&datosNota.modalidades.length ? { modalidades:datosNota.modalidades } : {}),
+        completa:true,
         modoNota:datosNota.modoNota||notaH.modoNota||'',
         fecha:fechaH, terapeuta:terapeutaH,
         revisionPendiente:false,
@@ -12551,6 +12627,13 @@ async function handleSoapPhoto(ev,tipo){
         fbPath='';
         try{ await idbSet(mediaId, data); }catch(e2){ /* si IDB también falla, queda data en memoria */ }
       }
+    }
+    // FUGA ENTRE PACIENTES (auditoría): la subida es async. Si cambiaste de paciente mientras subía,
+    // `tempEvolMedia` ya es el del OTRO paciente (showNuevoSOAP/editarSOAP lo resetean por-paciente) →
+    // empujar aquí metería la foto de A en la nota de B (y de ahí a sus estudiosDocs). Se descarta.
+    if(!currentPatient || currentPatient.id!==pid){
+      showToast('Cambiaste de paciente — la foto no se adjuntó a esta nota','warning');
+      break;
     }
     tempEvolMedia.push({
       name:f.name, type:f.type, fecha:todayFmt(), label:f.name.replace(/\.[^.]+$/,''),
@@ -14598,7 +14681,73 @@ function renderConsentForm(){
       sigMain=initCanvas('sig-canvas','canvas-wrap');
     }
     // PS canvas init on demand when section opens
+    // AUDITORÍA C2: autosave + recuperar campos de texto/checkbox del consentimiento (bloqueo/cierre).
+    try{ activarAutosaveConsent(); }catch(_){}
+    cargarBorradorConsentSiExiste();
   },120);
+}
+
+// AUDITORÍA C2: borrador anti-pérdida del CONSENTIMIENTO. screen-consent estaba en _EDITOR_SCREENS
+// (bloquea el auto-refresh) pero NO tenía borrador ni entraba en _flushBorradoresActivos → los campos
+// de texto (contacto de emergencia, área a tratar, tutor, parentesco, tel) y el checkbox de punción se
+// perdían si el iPad se bloqueaba antes de recoger la firma. Las firmas (canvas) y la foto de cámara NO
+// se persisten (son evidencia al momento); esos se rehacen. Clave por-paciente.
+const DRAFT_CONSENT='sinergia_borrador_consent';
+var _CAMPOS_CONSENT=['con-nombre','con-fechanac','con-edad','con-tel','con-emergencia','con-area','con-tutor','con-parentesco'];
+function _draftKeyConsent(){ return DRAFT_CONSENT+'_'+String((currentPatient&&currentPatient.id)||''); }
+function guardarBorradorConsent(){
+  try{
+    var scr=(document.querySelector('.screen.active')||{}).id||'';
+    if(scr!=='screen-consent') return;
+    if(!currentPatient||!currentPatient.id) return;
+    var v=function(id){ var el=document.getElementById(id); return el?el.value:''; };
+    var ck=function(id){ var el=document.getElementById(id); return !!(el&&el.checked); };
+    var data={};
+    _CAMPOS_CONSENT.forEach(function(id){ data[id]=v(id); });
+    data._puncion=ck('con-puncion');
+    data._secundaria=ck('n-consent-secundaria');
+    // Guardar solo si el usuario escribió/marcó algo propio (no los prellenados nombre/fechanac/edad/area).
+    var _algo=String(data['con-emergencia']||'').trim()||String(data['con-tel']||'').trim()||String(data['con-tutor']||'').trim()||String(data['con-parentesco']||'').trim()||data._puncion||data._secundaria;
+    if(!_algo) return;
+    localStorage.setItem(_draftKeyConsent(),JSON.stringify({updatedAt:Date.now(),pid:currentPatient.id,data:data}));
+  }catch(e){ console.warn('borrador consent:',e); }
+}
+function aplicarBorradorConsent(data){
+  try{
+    if(!data) return;
+    var set=function(id,val){ var el=document.getElementById(id); if(el&&val!=null&&val!=='') el.value=val; };
+    _CAMPOS_CONSENT.forEach(function(id){ set(id,data[id]); });
+    var _sk=function(id,on){ var el=document.getElementById(id); if(el) el.checked=!!on; };
+    _sk('con-puncion',data._puncion); _sk('n-consent-secundaria',data._secundaria);
+  }catch(e){ console.warn('aplicar borrador consent:',e); }
+}
+function cargarBorradorConsentSiExiste(){
+  try{
+    if(!currentPatient||!currentPatient.id) return;
+    var raw=localStorage.getItem(_draftKeyConsent()); if(!raw) return;
+    var draft=null; try{ draft=JSON.parse(raw); }catch(e){ return; }
+    if(!draft||!draft.data||draft.pid!==currentPatient.id) return;
+    var fecha=new Date(draft.updatedAt||Date.now()).toLocaleString('es-MX');
+    if(confirm('Hay un consentimiento a medio llenar de este paciente.\n\nÚltima edición: '+fecha+'\n\n¿Deseas recuperar los datos escritos? (la firma y la foto se toman de nuevo)')){
+      aplicarBorradorConsent(draft.data); showToast('Datos recuperados','success');
+    } else {
+      if(confirm('¿Deseas descartar este borrador?')){ localStorage.removeItem(_draftKeyConsent()); showToast('Borrador descartado','warning'); }
+    }
+  }catch(e){ console.warn('cargar borrador consent:',e); }
+}
+function borrarBorradorConsent(){ try{ localStorage.removeItem(_draftKeyConsent()); }catch(e){} }
+var _timerBorradorConsent=null;
+function programarBorradorConsent(){ clearTimeout(_timerBorradorConsent); _timerBorradorConsent=setTimeout(function(){ guardarBorradorConsent(); },1200); }
+function activarAutosaveConsent(){
+  try{
+    var cont=document.getElementById('content-consent'); if(!cont) return;
+    cont.querySelectorAll('input,textarea,select').forEach(function(el){
+      el.removeEventListener('input',programarBorradorConsent);
+      el.removeEventListener('change',programarBorradorConsent);
+      el.addEventListener('input',programarBorradorConsent);
+      el.addEventListener('change',programarBorradorConsent);
+    });
+  }catch(e){ console.warn('autosave consent:',e); }
 }
 
 
@@ -15079,6 +15228,16 @@ async function guardarConsentimiento(){
     subirFoto(fotoIdData),
   ]);
 
+  // FUGA ENTRE PACIENTES (auditoría): la subida (PDF + 5 archivos, incl. foto de INE) tarda segundos.
+  // Si el usuario cambió de paciente durante ese await, `currentPatient` ya es OTRO → el push y el
+  // saveDB de abajo escribirían el consentimiento/firma/INE de A dentro del expediente de B (dato de
+  // identidad legal filtrado). Guard duro: si la identidad cambió, se descarta y se avisa repetir.
+  if(!currentPatient || currentPatient.id!==pid){
+    fotoIdData=null;
+    showToast('Cambiaste de paciente durante el guardado — el consentimiento NO se guardó, vuelve a firmarlo','error');
+    return;
+  }
+
   // ── Construir objeto del consentimiento y agregar al array ─────────────────
   const nuevoConsentimiento={
     firmado: true,
@@ -15118,6 +15277,7 @@ async function guardarConsentimiento(){
   if(!Array.isArray(currentPatient.consentimientos)) currentPatient.consentimientos=[];
   currentPatient.consentimientos.push(nuevoConsentimiento);
   fotoIdData=null;
+  try{ if(typeof borrarBorradorConsent==='function') borrarBorradorConsent(); }catch(_){}  // ya persistido → limpiar borrador
 
   // Historial de cambios
   const ahoraStr=fechaStr+' '+horaStr;
@@ -15642,6 +15802,8 @@ function renderNuevoPaciente(){
     _hcInit();   // pinta los chips dinámicos del Motivo (zonas, irradiación según zona, otras zonas)
     // EDICIÓN: re-marcar zona/lado/irradiación ya con _HC precargado (los de lado son inline).
     if(_edP2 && typeof _hcRemarcarChips==='function') _hcRemarcarChips();
+    // AUDITORÍA C1: tras el prefill, ofrecer recuperar una edición a medio hacer (bloqueo/cierre previo).
+    if(_edP2 && window._nuevoEditPid && typeof cargarBorradorEdicionValoracionSiExiste==='function') cargarBorradorEdicionValoracionSiExiste(window._nuevoEditPid);
     if(typeof _mostrarBuildTag==='function') _mostrarBuildTag();
   },100);
 }
@@ -15932,9 +16094,17 @@ function guardarNuevoPaciente(){
     // motivo/motivoHC: solo si hay relato o zona; fusionar para conservar mecanismo/evolucion/hallazgos.
     if((nuevo.motivo&&String(nuevo.motivo.padecimiento||'').trim()) || (nuevo.motivoHC&&nuevo.motivoHC.zonaPrincipal)){
       _ep.motivo=Object.assign({}, _ep.motivo||{}, {dxMedico:nuevo.motivo.dxMedico, padecimiento:nuevo.motivo.padecimiento, estudios:nuevo.motivo.estudios,
+        // AUDITORÍA: mecanismo/evolucion SÍ se editan en este form (prefill n-mecanismo/n-evolucion) pero
+        // no se incluían en el merge → la edición se descartaba en silencio. Se agregan.
+        mecanismo:nuevo.motivo.mecanismo, evolucion:nuevo.motivo.evolucion,
         zonaPrincipal:nuevo.motivo.zonaPrincipal, zonaPrincipalOtra:nuevo.motivo.zonaPrincipalOtra, lado:nuevo.motivo.lado,
         zonasSecundarias:nuevo.motivo.zonasSecundarias, desdeCuando:nuevo.motivo.desdeCuando, irradiacion:nuevo.motivo.irradiacion, irradiacionOtra:nuevo.motivo.irradiacionOtra});
-      _ep.motivoHC=nuevo.motivoHC;
+      // AUDITORÍA: fusionar motivoHC preservando la fecha de captura ORIGINAL del episodio (capturadoEn)
+      // y la versión; el nuevo.motivoHC las fija a HOY/1 siempre → sin esto se degradaba el metadato.
+      _ep.motivoHC=Object.assign({}, _ep.motivoHC||{}, nuevo.motivoHC||{}, {
+        capturadoEn:((_ep.motivoHC&&_ep.motivoHC.capturadoEn)||(nuevo.motivoHC&&nuevo.motivoHC.capturadoEn)||null),
+        version:((_ep.motivoHC&&_ep.motivoHC.version)||(nuevo.motivoHC&&nuevo.motivoHC.version)||1)
+      });
     }
     // valoración: preservar EVA existente si en edición no se tocó (quedó null)
     if(nuevo.valoracion && (nuevo.valoracion.eva==null||nuevo.valoracion.eva==='') && _ep.valoracion && _ep.valoracion.eva!=null){ nuevo.valoracion.eva=_ep.valoracion.eva; }
@@ -15955,7 +16125,13 @@ function guardarNuevoPaciente(){
     window._nuevoEditPid=null;
     borrarBorradorNuevoSiGuardado();
     if(typeof window._FST_invalidarVistaPacientes==='function') window._FST_invalidarVistaPacientes();
-    saveDB('pts',[_ep]).then(function(res){
+    // AUDITORÍA: declarar camposHist explícito. Sin esto, en un paciente HISTÓRICO (mig_pac_) saveDB
+    // escribía el bloque clínico COMPLETO (contrato incumplido) y podía pisar campos que otro equipo
+    // tocó (eventosAdversos/inasistencias/revaloraciones). Se declaran SOLO los campos que este form muta.
+    saveDB('pts',[_ep],{camposHist:['name','nombreNormalizado','motivoConsulta','dx','contraindicaciones',
+      'alergias','antecedentes','motivo','motivoHC','valoracion','dxFuncional','planTto','seguridadClinica',
+      'estudiosDocs','sexo','telefono','fechaNacimiento','age','medicoReferente','terapeuta',
+      'fechaActualizacion','ultimoUsuario','historialCambios']}).then(function(res){
       if(res&&res.ok) showToast('✅ Valoración actualizada','success');
       else showToast('⚠️ Guardado local, Sheets no confirmó. Revisa conexión.','warning');
       if(Array.isArray(_ep.estudiosDocs)&&_ep.estudiosDocs.length&&typeof _persistirEstudios==='function'){ try{ _persistirEstudios(_ep).catch(function(e){ console.warn('[edit-val] estudiosDocs:', e&&e.message); }); }catch(_e){} }
@@ -17018,10 +17194,14 @@ const CAMPOS_NUEVO=['n-nombre','n-fechanac','n-edad','n-sexo','n-telefono','n-te
   'n-dxfuncional','n-limitaciones','n-objcp','n-pronostico',
   'n-enfoque','n-plancontra','n-fecha-valoracion','n-ttohoy'];
 
+// AUDITORÍA C1: clave del borrador. En modo EDICIÓN de valoración (reusa la pantalla screen-nuevo con
+// window._nuevoEditPid) el borrador va a una clave POR-PACIENTE, para (a) proteger lo editado si el
+// iPad se bloquea/cierra —antes se abortaba y no se guardaba NADA— y (b) no contaminar el borrador de
+// "crear nuevo paciente". El de crear conserva su clave original.
+function _draftKeyNuevo(){
+  return window._nuevoEditPid ? (DRAFT_NUEVO+'_edit_'+String(window._nuevoEditPid)) : DRAFT_NUEVO;
+}
 function guardarBorradorNuevo(){
-  // En MODO EDICIÓN el formulario reusa la misma pantalla; NO se escribe el borrador de "crear"
-  // para no contaminarlo (mostraría datos de edición al dar de alta a otro paciente).
-  if(window._nuevoEditPid) return;
   try{
     const data={};
     CAMPOS_NUEVO.forEach(id=>{ data[id]=getVal(id); });
@@ -17049,7 +17229,8 @@ function guardarBorradorNuevo(){
     var _algoCheck=(Array.isArray(data._implantes)&&data._implantes.length)||(Array.isArray(data._condiciones)&&data._condiciones.length)||(Array.isArray(data._banderas)&&data._banderas.length);
     var _algoHC=!!(data._HC&&(data._HC.zona||data._HC.lado||(Array.isArray(data._HC.sec)&&data._HC.sec.length)||data._HC.irrad));
     if(!_algoTexto && data._nEvaVal==null && !_algoCheck && !_algoHC && !data._altaEstudios.length && !data._altaMediaAntes.length) return;
-    localStorage.setItem(DRAFT_NUEVO,JSON.stringify({updatedAt:Date.now(),data}));
+    data._editPid=window._nuevoEditPid||'';   // marca de a qué paciente pertenece (modo edición)
+    localStorage.setItem(_draftKeyNuevo(),JSON.stringify({updatedAt:Date.now(),data}));
   }catch(e){ console.warn('borrador nuevo:',e); }
 }
 
@@ -17093,7 +17274,26 @@ function descartarBorradorNuevo(){
   try{ localStorage.removeItem(DRAFT_NUEVO); showToast('Borrador descartado','warning'); }catch(e){}
 }
 function borrarBorradorNuevoSiGuardado(){
-  try{ localStorage.removeItem(DRAFT_NUEVO); }catch(e){}
+  // Limpia la clave ACTIVA (crear o edición-por-pid) para no reofrecer un borrador ya persistido.
+  try{ localStorage.removeItem(_draftKeyNuevo()); }catch(e){}
+}
+// AUDITORÍA C1: al reabrir "Editar valoración completa" de un paciente, ofrecer recuperar lo que quedó
+// a medio editar (si el iPad se bloqueó/cerró). Se llama DESPUÉS del prefill, para que el borrador (más
+// reciente) gane sobre los datos precargados. Solo aplica el borrador de ESTE pid.
+function cargarBorradorEdicionValoracionSiExiste(pid){
+  try{
+    if(!pid) return;
+    var raw=localStorage.getItem(DRAFT_NUEVO+'_edit_'+String(pid));
+    if(!raw) return;
+    var draft=null; try{ draft=JSON.parse(raw); }catch(e){ return; }
+    if(!draft||!draft.data) return;
+    var fecha=new Date(draft.updatedAt||Date.now()).toLocaleString('es-MX');
+    if(confirm('Hay una edición de valoración sin guardar de este paciente.\n\nÚltima edición: '+fecha+'\n\n¿Deseas recuperarla?')){
+      aplicarBorradorNuevo(draft.data); if(typeof updateSegSummary==='function')updateSegSummary(); showToast('Borrador recuperado','success');
+    } else {
+      if(confirm('¿Deseas descartar este borrador?')){ localStorage.removeItem(DRAFT_NUEVO+'_edit_'+String(pid)); showToast('Borrador descartado','warning'); }
+    }
+  }catch(e){ console.warn('cargar borrador edición:',e); }
 }
 
 let timerBorradorNuevo=null;
@@ -18748,12 +18948,14 @@ async function handleEjMedia(ev, tipo){
   if(btnGuardar) btnGuardar.disabled = true;
   if(preview) preview.innerHTML = '<div style="padding:12px;color:var(--gray-400)">⏳ Subiendo archivo a la nube...</div>';
 
+  const _pidEj = currentPatient && currentPatient.id;   // identidad al iniciar (la subida es async)
+  let _mediaEj = null;
   try{
     if(file.type.startsWith('video/')||file.type.startsWith('image/')){
       // Subir a Firebase Storage
       showToast('Subiendo archivo...','');
       const { url, fbPath } = await subirMediaEjercicioAStorage(file);
-      tempEjMedia = {
+      _mediaEj = {
         id: 'media_'+Date.now(),
         name: file.name,
         label: file.name.replace(/\.[^.]+$/,''),
@@ -18765,11 +18967,10 @@ async function handleEjMedia(ev, tipo){
         url,
         data: null
       };
-      showToast('✅ Archivo subido correctamente','success');
     } else {
       // Otros archivos: base64 como antes
       const data = await readFile(file);
-      tempEjMedia = {
+      _mediaEj = {
         id: 'media_'+Date.now(),
         name: file.name,
         label: file.name.replace(/\.[^.]+$/,''),
@@ -18781,8 +18982,15 @@ async function handleEjMedia(ev, tipo){
         url: '',
         data
       };
-      showToast('✅ Archivo listo','success');
     }
+    // FUGA ENTRE PACIENTES (auditoría): si cambiaste de paciente durante la subida, tempEjMedia ya es
+    // el del OTRO → asignar aquí metería el video/foto de A en el ejercicio de B (y en su link público).
+    if(!currentPatient || currentPatient.id!==_pidEj){
+      showToast('Cambiaste de paciente — la media no se adjuntó','warning');
+      return;
+    }
+    tempEjMedia = _mediaEj;
+    showToast('✅ Archivo subido correctamente','success');
     if(preview) preview.innerHTML = renderEjMediaPreview(tempEjMedia);
     // ANTI-PÉRDIDA: la subida es async y el 'change' del input dispara el autosave ANTES de que
     // tempEjMedia exista → volcar el borrador AQUÍ, ya con la referencia (url/fbPath) puesta.
