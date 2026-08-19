@@ -15553,7 +15553,10 @@ function _prefillNuevoDesdePaciente(p){
   var S=function(id,v){ setVal(id, (v==null?'':String(v))); };
   // Identificación / generales
   S('n-nombre',p.name); S('n-telefono',p.telefono); S('n-medico',p.medicoReferente);
-  S('n-fechanac',p.fechaNacimiento); S('n-edad',(p.age==null?'':p.age));
+  // La fecha de nacimiento puede venir en ISO (1979-02-16T06:00:00.000Z) o DD/MM/AAAA; normalizar a
+  // DD/MM/AAAA para que se vea bien y el cálculo de edad no bloquee el guardado.
+  var _fn=(typeof _formatFechaNac==='function')?_formatFechaNac(p.fechaNacimiento):(p.fechaNacimiento||'');
+  S('n-fechanac',_fn); S('n-edad',(p.age==null?'':p.age));
   var _sx=document.getElementById('n-sexo'); if(_sx&&p.sexo){ _sx.value=p.sexo; }
   var _ter=document.getElementById('n-terapeuta'); if(_ter&&p.terapeuta){ _ter.value=p.terapeuta; }
   var _terS=document.getElementById('n-terapeuta-seguimiento'); if(_terS){ _terS.value=p.terapeutaSeguimiento||''; }
