@@ -2425,9 +2425,11 @@ async function drenarColaSoapHistorico(){
           try{
             var _snapH=await _conTimeout(window._fstDb.collection('pacientes').doc(it.pid).collection('sesiones').doc(String(it.sesion.id)).get(), 10000);
             if(_snapH && _snapH.exists){
+              // AUDITORÍA índice-vivo: NO tragar el fallo de fechasSesiones. La agenda de históricos LEE
+              // este índice; si se traga, el badge queda en verde con la cita aún "pendiente" y nunca se
+              // reintenta. Si falla aquí, se propaga (catch _g → ruta normal de abajo → reintento del índice).
               if(it.sesion && it.sesion.fecha){
-                try{ await window._fstDb.collection('pacientes').doc(it.pid).set({ fechasSesiones: firebase.firestore.FieldValue.arrayUnion((typeof _aISO==='function' && _aISO(it.sesion.fecha)) || it.sesion.fecha) }, { merge:true }); }
-                catch(_fs2){ console.warn('[Capa3] fechasSesiones (fantasma) no se pudo escribir:', _fs2 && _fs2.message); }
+                await window._fstDb.collection('pacientes').doc(it.pid).set({ fechasSesiones: firebase.firestore.FieldValue.arrayUnion((typeof _aISO==='function' && _aISO(it.sesion.fecha)) || it.sesion.fecha) }, { merge:true });
               }
               console.log('[SOAP-hist] fantasma confirmado en nube · pid='+it.pid+' · sid='+it.sesion.id+' — se da por subida');
               continue;
@@ -2437,11 +2439,14 @@ async function drenarColaSoapHistorico(){
           var sesPayload = FST_buildSesionPayload(it.sesion, 'nueva');
           await window._fstDb.collection('pacientes').doc(it.pid).collection('sesiones').doc(String(it.sesion.id)).set(_sinUndefined(sesPayload), { merge:true });
           // CAPA 3 — sumar la fecha al set del doc padre (arrayUnion). Solo fechasSesiones (no toca
-          // updatedAt → no interfiere con la detección de conflictos por recencia). No crítico: si falla,
-          // la sesión ya quedó guardada; se reintenta con el item en el próximo drenado.
+          // updatedAt → no interfiere con la detección de conflictos por recencia). AUDITORÍA índice-vivo:
+          // ANTES esto iba en try/catch que SOLO avisaba y el ítem igual salía de la cola (el comentario
+          // decía "se reintenta" pero no ocurría) → la agenda de históricos se quedaba sin la fecha con el
+          // badge en verde. Ahora, si falla, se PROPAGA al catch de abajo → el ítem se reintenta con
+          // backoff (o va a FALLIDOS, visible). La sesión ya está escrita; el reintento cae en la rama
+          // "fantasma" (existe) y solo repara el índice, así que no re-sube nada dos veces.
           if(it.sesion && it.sesion.fecha){
-            try{ await window._fstDb.collection('pacientes').doc(it.pid).set({ fechasSesiones: firebase.firestore.FieldValue.arrayUnion((typeof _aISO==='function' && _aISO(it.sesion.fecha)) || it.sesion.fecha) }, { merge:true }); }
-            catch(_fs){ console.warn('[Capa3] fechasSesiones (replay nueva) no se pudo escribir:', _fs && _fs.message); }
+            await window._fstDb.collection('pacientes').doc(it.pid).set({ fechasSesiones: firebase.firestore.FieldValue.arrayUnion((typeof _aISO==='function' && _aISO(it.sesion.fecha)) || it.sesion.fecha) }, { merge:true });
           }
         } else {
           // [LOOP-B #2] simetría con la rama nueva: re-subir fotos que quedaron en IDB en una EDICIÓN
@@ -2761,12 +2766,12 @@ async function drenarColaHistDoc(){
 // pendientes (etiquetas/adiciones/doc) o writes buffered offline. Ahora cuenta TODAS las colas y,
 // sin conexión, NUNCA dice "todo guardado" (offline no se puede confirmar nada en la nube).
 function _contarColaLS(k){ try{ var q=JSON.parse(localStorage.getItem(k)||'[]'); return Array.isArray(q)?q.length:0; }catch(e){ return 0; } }
-function _totalPendientesSync(){ return getColaSync().length + _contarColaLS('COLA_ETIQ_HIST') + _contarColaLS('COLA_SYNC_HIST_DOC') + _contarColaLS('COLA_SYNC_HIST') + _contarColaLS('COLA_SOAP_ACT'); }
+function _totalPendientesSync(){ return getColaSync().length + _contarColaLS('COLA_ETIQ_HIST') + _contarColaLS('COLA_SYNC_HIST_DOC') + _contarColaLS('COLA_SYNC_HIST') + _contarColaLS('COLA_SOAP_ACT') + _contarColaLS('COLA_NOACUDIO'); }
 // [GRUPO-A #5] Función NUEVA y SEPARADA: cuenta las colas de FALLIDOS permanentes SOLO para el
 // indicador visual. NO se suma en _totalPendientesSync a propósito: esa función también gobierna
 // el guard del auto-update (aplicarActualizacionSiSegura y _recargarPorUpdate) y un fallido
 // permanente jamás drena → sumarlo ahí bloquearía la recarga automática PARA SIEMPRE.
-function _totalFallidosSync(){ return _contarColaLS('COLA_SOAP_ACT_FALLIDOS') + _contarColaLS('COLA_SYNC_HIST_FALLIDOS') + _contarColaLS('COLA_SYNC_HIST_DOC_FALLIDOS'); }
+function _totalFallidosSync(){ return _contarColaLS('COLA_SOAP_ACT_FALLIDOS') + _contarColaLS('COLA_SYNC_HIST_FALLIDOS') + _contarColaLS('COLA_SYNC_HIST_DOC_FALLIDOS') + _contarColaLS('COLA_NOACUDIO_FALLIDOS'); }
 function actualizarIndicadorSync(){
   const el = document.getElementById('sync-indicator');
   if(!el) return;
@@ -12270,10 +12275,12 @@ async function _guardarEdicionSoapHistorico(sid, pid, sesion){
   await window._fstDb.collection('pacientes').doc(pid).collection('sesiones').doc(sid).set(_sinUndefined(payload), { merge:true });
   // CAPA 3 — si la edición cambió la fecha, sumarla al set del doc padre. arrayUnion NO borra las
   // viejas (el dashboard solo pregunta "¿existe una sesión ese día?"; una fecha vieja de más no crea
-  // un falso ✅ mientras la sesión exista). Solo fechasSesiones (no toca updatedAt). No crítico.
+  // un falso ✅ mientras la sesión exista). Solo fechasSesiones (no toca updatedAt).
+  // AUDITORÍA índice-vivo: NO tragar el fallo. Esto es JUSTO lo que hace que, al CORREGIR la fecha de una
+  // nota histórica, la agenda la marque como hecha; si se traga, la corrección de fecha no surtiría efecto
+  // y el badge quedaría en verde. Si falla, se PROPAGA → el caller encola/reintenta (online y drenado).
   if(payload && payload.fecha){
-    try{ await window._fstDb.collection('pacientes').doc(pid).set({ fechasSesiones: firebase.firestore.FieldValue.arrayUnion((typeof _aISO==='function' && _aISO(payload.fecha)) || payload.fecha) }, { merge:true }); }
-    catch(_fs){ console.warn('[Capa3] fechasSesiones (edición hist) no se pudo escribir:', _fs && _fs.message); }
+    await window._fstDb.collection('pacientes').doc(pid).set({ fechasSesiones: firebase.firestore.FieldValue.arrayUnion((typeof _aISO==='function' && _aISO(payload.fecha)) || payload.fecha) }, { merge:true });
   }
   showToast('✅ Nota histórica actualizada en Firestore','success');
 }
@@ -16545,7 +16552,7 @@ async function drenarColaNoAcudio(){
   var q; try{ q=JSON.parse(localStorage.getItem('COLA_NOACUDIO')||'[]'); }catch(e){ q=[]; if(typeof _colaCorrupta==='function') _colaCorrupta('COLA_NOACUDIO',e); }
   if(!Array.isArray(q)||!q.length) return;
   var ok=await FST_init(); if(!ok||!window._fstDb) return;
-  var restantes=[];
+  var restantes=[], fallidos=[];
   for(var i=0;i<q.length;i++){
     var it=q[i];
     if(!it||!it.clave||!it.ddmm) continue;
@@ -16556,9 +16563,18 @@ async function drenarColaNoAcudio(){
       } else {
         await window._fstDb.collection('citasNoAcudio').doc(docId).delete();
       }
-    }catch(e){ restantes.push(it); }   // sigue fallando → conservar para el próximo intento
+    }catch(e){
+      // Tope de reintentos: tras 6 fallos va a FALLIDOS (visible en el badge) y sale de la cola viva, para
+      // NO bloquear el auto-update para siempre (mismo criterio que las otras colas).
+      var n=(Number(it.intentos)||0)+1;
+      if(n>=6){ fallidos.push(Object.assign({}, it, {intentos:n, error:String((e&&(e.code||e.message))||'error')})); }
+      else { restantes.push(Object.assign({}, it, {intentos:n})); }
+    }
   }
   try{ localStorage.setItem('COLA_NOACUDIO', JSON.stringify(restantes)); }catch(_){}
+  if(fallidos.length){
+    try{ var f=JSON.parse(localStorage.getItem('COLA_NOACUDIO_FALLIDOS')||'[]'); if(!Array.isArray(f)) f=[]; f=f.concat(fallidos); if(f.length>200) f=f.slice(f.length-200); localStorage.setItem('COLA_NOACUDIO_FALLIDOS', JSON.stringify(f)); }catch(_){}
+  }
 }
 function deshacerNoAcudio(pid, iid){
   const p = currentPatient;
