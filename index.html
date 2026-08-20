@@ -19024,7 +19024,7 @@ async function enviarEjerciciosWhatsApp(){
   var p=currentPatient; if(!p) return;
   var ejs=Array.isArray(p.ejercicios)?p.ejercicios:[];
   // PART 3: sin ejercicios PARA CASA → no mandar link vacío (los "solo consulta" no cuentan)
-  var ejsCasa=ejs.filter(function(e){ return e && (e.estado||'activo')==='activo' && e.paraCasa!==false; });
+  var ejsCasa=ejs.filter(function(e){ return e && (e.estado||'activo')==='activo' && e.paraCasa!==false && e.privado!==true; });
   if(!ejsCasa.length){ showToast('No hay ejercicios marcados como "Tarea para casa". Marca al menos uno antes de enviar.','warning'); return; }
   if(!p.ejerciciosToken){ p.ejerciciosToken=generateToken(); p.ejerciciosLinkActivo=true; }
   if(p.ejerciciosLinkActivo===false){ showToast('El link está desactivado. Actívalo primero (🔓).','warning'); return; }
@@ -19142,9 +19142,10 @@ function renderEjercicios(){
       const isVideo = ej.media && ej.media.type && ej.media.type.startsWith('video');
       const isImg = ej.media && ej.media.type && ej.media.type.startsWith('image');
       const srcEj = ej.media ? (ej.media.url || ej.media.data || '') : '';
-      const _pc = ej.paraCasa!==false; const _est = (ej.estado||'activo');
+      const _pc = ej.paraCasa!==false; const _est = (ej.estado||'activo'); const _priv = ej.privado===true;
       const _chip = (txt,fg,bg) => `<span style="font-size:11px;font-weight:700;border-radius:10px;padding:2px 9px;background:${bg};color:${fg}">${txt}</span>`;
-      const _statusChip = !_pc ? _chip('🏥 Solo consulta','#92400E','#FEF3C7') : (_est==='activo' ? _chip('🎯 En rutina','#2E7D52','#E8F5E9') : _chip('🕒 Anterior','#1B3A6B','#EEF4FB'));
+      const _statusChip = _priv ? _chip('🔒 Privado (solo clínica)','#B91C1C','#FEE2E2')
+        : (!_pc ? _chip('📚 En tu biblioteca','#5A6478','#EEF1F5') : (_est==='activo' ? _chip('🎯 En rutina','#2E7D52','#E8F5E9') : _chip('🕒 Anterior','#1B3A6B','#EEF4FB')));
       return `<div class="ejercicio-card">
         <div class="ejercicio-header">
           <div style="min-width:0;flex:1">
@@ -19181,17 +19182,25 @@ function renderEjercicios(){
           ${ej.precauciones?`<div style="font-size:13px;color:var(--red);margin-bottom:6px"><b>⚠ Precauciones:</b> ${ej.precauciones}</div>`:''}
           ${ej.observaciones?'':''}
 
-          ${(function(){ var _pc=ej.paraCasa!==false; return '<div style="margin-bottom:8px"><button onclick="_toggleEjParaCasa('+i+')" title="Toca para '+(_pc?'DEJAR de enviarlo':'ENVIARLO')+' al paciente" style="width:100%;padding:9px 12px;font-size:12.5px;font-weight:700;border-radius:12px;cursor:pointer;font-family:inherit;border:1.5px solid '+(_pc?'var(--green)':'#D0D5DD')+';background:'+(_pc?'#E8F5E9':'#F5F5F5')+';color:'+(_pc?'var(--green)':'var(--gray-600)')+';display:flex;align-items:center;justify-content:space-between;gap:8px">'
-            +'<span>'+(_pc?'📤 Se envía al paciente':'🏥 Solo en consulta — no se envía')+'</span>'
-            +'<span style="display:inline-flex;align-items:center;gap:6px;font-size:10.5px;font-weight:800;white-space:nowrap">'
-              +'<span style="opacity:.75">'+(_pc?'ON':'OFF')+'</span>'
-              +'<span style="width:40px;height:22px;border-radius:999px;background:'+(_pc?'var(--green)':'#C0C6D0')+';position:relative;display:inline-block;flex-shrink:0"><span style="position:absolute;top:2px;'+(_pc?'right:2px':'left:2px')+';width:18px;height:18px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.25)"></span></span>'
-            +'</span>'
-          +'</button></div>'; })()}
+          ${(function(){
+            if(_priv){
+              // PRIVADO: el paciente NO lo ve. Se oculta el switch (no aplica) y solo se ofrece volverlo visible.
+              return '<div style="margin-bottom:8px"><button onclick="_toggleEjPrivado('+i+')" style="width:100%;padding:9px 12px;font-size:12px;font-weight:700;border-radius:12px;cursor:pointer;font-family:inherit;border:1.5px solid #B91C1C;background:#FEE2E2;color:#B91C1C;display:flex;align-items:center;justify-content:center;gap:6px">🔒 Privado (solo clínica) — el paciente NO lo ve · toca para hacerlo visible</button></div>';
+            }
+            var _pc=ej.paraCasa!==false;
+            return '<div style="margin-bottom:8px"><button onclick="_toggleEjParaCasa('+i+')" title="Toca para '+(_pc?'sacarlo de la rutina':'ponerlo en la rutina')+'" style="width:100%;padding:9px 12px;font-size:12.5px;font-weight:700;border-radius:12px;cursor:pointer;font-family:inherit;border:1.5px solid '+(_pc?'var(--green)':'#D0D5DD')+';background:'+(_pc?'#E8F5E9':'#F5F5F5')+';color:'+(_pc?'var(--green)':'var(--gray-600)')+';display:flex;align-items:center;justify-content:space-between;gap:8px">'
+              +'<span>'+(_pc?'📤 Se envía al paciente':'📚 En su biblioteca (visible, no es tarea)')+'</span>'
+              +'<span style="display:inline-flex;align-items:center;gap:6px;font-size:10.5px;font-weight:800;white-space:nowrap">'
+                +'<span style="opacity:.75">'+(_pc?'ON':'OFF')+'</span>'
+                +'<span style="width:40px;height:22px;border-radius:999px;background:'+(_pc?'var(--green)':'#C0C6D0')+';position:relative;display:inline-block;flex-shrink:0"><span style="position:absolute;top:2px;'+(_pc?'right:2px':'left:2px')+';width:18px;height:18px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.25)"></span></span>'
+              +'</span>'
+            +'</button></div>'
+            +'<div style="margin-bottom:8px"><button onclick="_toggleEjPrivado('+i+')" style="width:100%;padding:7px 12px;font-size:11.5px;font-weight:700;border-radius:12px;cursor:pointer;font-family:inherit;border:1px solid #E5B4B4;background:#fff;color:#B91C1C;display:flex;align-items:center;justify-content:center;gap:6px">🔒 Marcar privado (ocultar al paciente)</button></div>';
+          })()}
 
-          <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px">
+          ${_priv?'':`<div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px">
             ${['activo','pausado','completado'].map(est=>`<button onclick="cambiarEstadoEjercicio(${i},'${est}')" style="padding:4px 10px;font-size:11px;font-weight:700;border-radius:12px;cursor:pointer;font-family:inherit;border:1.5px solid ${(ej.estado||'activo')===est?'var(--navy)':'#D0D5DD'};background:${(ej.estado||'activo')===est?'var(--navy)':'white'};color:${(ej.estado||'activo')===est?'white':'var(--gray-600)'}">${est==='activo'?'🎯 En rutina':est==='pausado'?'🕒 Anterior':'✅ Completado'}</button>`).join('')}
-          </div>
+          </div>`}
 
           <div class="ejercicio-actions">
             <button class="btn-edit-ex" onclick="editarEjercicio(${i})">✏️ Editar</button>
@@ -19353,7 +19362,21 @@ function _toggleEjParaCasa(idx){
   const idxP=patientsDB.findIndex(x=>x.id===p.id);
   if(idxP>=0) patientsDB[idxP]=p;
   saveDB('pts',[p],{camposHist:['ejercicios']}).then(function(res){
-    showToast(ej.paraCasa?'📤 Tarea para casa — se enviará al paciente':'🏥 Solo en consulta — no se envía','success');
+    showToast(ej.paraCasa?'📤 En la rutina — se enviará al paciente':'📚 En su biblioteca — visible, no es tarea','success');
+  }).catch(function(){ showToast('⚠️ Guardado local, pendiente de subir','warning'); });
+  renderEjercicios();
+}
+// PRIVADO (solo clínica): oculta el ejercicio del paciente por completo (no aparece en su link, ni en
+// rutina ni en biblioteca). Es un flag aparte del switch de envío.
+function _toggleEjPrivado(idx){
+  const p=currentPatient; if(!p||!Array.isArray(p.ejercicios)) return;
+  const ej=p.ejercicios[idx]; if(!ej) return;
+  ej.privado = (ej.privado!==true);
+  p.updatedAt=Date.now();
+  const idxP=patientsDB.findIndex(x=>x.id===p.id);
+  if(idxP>=0) patientsDB[idxP]=p;
+  saveDB('pts',[p],{camposHist:['ejercicios']}).then(function(){
+    showToast(ej.privado?'🔒 Privado — el paciente ya no lo ve':'🔓 Visible para el paciente','success');
   }).catch(function(){ showToast('⚠️ Guardado local, pendiente de subir','warning'); });
   renderEjercicios();
 }
@@ -20020,10 +20043,11 @@ function renderVistaPublica(p, opts={}){
   // (seleccionados ON: activo + para casa), "🕒 Tus ejercicios anteriores" (ON, ya no activos:
   // pausado/completado) y "📚 Más de tu biblioteca" (NO seleccionados: switch OFF / solo consulta), al
   // fondo. Antes los OFF se ocultaban; por pedido de Carlos ahora también se ven, hasta abajo.
-  const _paraCasa = (p.ejercicios || []).filter(e=>e.paraCasa!==false);
+  const _visibles = (p.ejercicios || []).filter(e=>e.privado!==true);          // 🔒 privados: NUNCA se muestran al paciente
+  const _paraCasa = _visibles.filter(e=>e.paraCasa!==false);
   const ejs = _paraCasa.filter(e=>(e.estado||'activo')==='activo');            // rutina de ahora (seleccionados ON)
   const ejsAnteriores = _paraCasa.filter(e=>(e.estado||'activo')!=='activo');  // anteriores (seleccionados ON, ya no activos)
-  const ejsOtros = (p.ejercicios || []).filter(e=>e.paraCasa===false);         // NO seleccionados (switch OFF) → biblioteca, al fondo
+  const ejsOtros = _visibles.filter(e=>e.paraCasa===false);                    // NO seleccionados (switch OFF) → biblioteca, al fondo
   const fechaPrograma = ejs.length ? ejs[ejs.length-1].fecha : (ejsAnteriores.length ? ejsAnteriores[ejsAnteriores.length-1].fecha : todayFmt());
 
   let html = previewTerapeuta ? `<div style="position:sticky;top:0;z-index:999;background:#122950;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;color:white">
