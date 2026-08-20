@@ -11590,7 +11590,7 @@ function _renderEjSesion(){
     var fila='<div onclick="_toggleEjSesion(\''+escapeAttr_(id)+'\')" style="display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid '+(sel?'var(--navy)':'var(--gray-200)')+';border-radius:10px;margin-bottom:6px;cursor:pointer;background:'+(sel?'#EEF4FB':'var(--card,#fff)')+'">'
       +_thumb
       +'<div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:600;color:var(--ink,#1F2937)">'+escapeHTML(nombre)+'</div>'+(_src?'<div style="font-size:10.5px;color:var(--gray-400);margin-top:1px">Toca el cuadro para ver en grande</div>':'')+'</div>'
-      +'<button type="button" onclick="event.stopPropagation();_borrarEjSesion(\''+escapeAttr_(id)+'\')" title="Eliminar ejercicio" style="background:none;border:none;color:#B91C1C;font-size:17px;cursor:pointer;padding:2px 6px;flex-shrink:0">🗑</button>'
+      +(sel?('<button type="button" onclick="event.stopPropagation();_borrarEjSesion(\''+escapeAttr_(id)+'\')" title="Quitar de hoy (no lo borra de la biblioteca)" style="background:none;border:none;color:var(--gray-400);font-size:16px;cursor:pointer;padding:2px 6px;flex-shrink:0">✕</button>'):'')
       +'<div style="width:22px;height:22px;border-radius:6px;border:2px solid '+(sel?'var(--navy)':'var(--gray-300)')+';background:'+(sel?'var(--navy)':'transparent')+';color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;flex-shrink:0">'+(sel?'✓':'')+'</div>'
       +'</div>';
     if(sel){
@@ -11625,23 +11625,16 @@ function _setEjSesionDosis(id, val){
   var it=(Array.isArray(tempEjerciciosSesion)?tempEjerciciosSesion:[]).find(function(x){return x&&String(x.id)===id;});
   if(it){ it.dosisSesion=val; marcarDirty(); }
 }
-// Borrar un ejercicio desde el bloque del SOAP (te equivocaste, quieres re-grabar…). Lo quita de la
-// sesión y del paciente (deja de acumularse en la lista). No toca Storage (el archivo huérfano es
-// inofensivo y borrarlo podría romper notas viejas que copiaron esa URL).
+// [BIBLIOTECA] El ✕ del bloque SOAP YA NO borra de la biblioteca del paciente (antes hacía splice de
+// p.ejercicios → se perdía para siempre). Ahora SOLO lo quita de "hoy" (deselecciona la sesión); el
+// ejercicio sigue guardado en la biblioteca y disponible para el paciente. Para borrarlo de verdad
+// (video incluido) se usa la pestaña Ejercicios → 🗑 (eliminarEjercicio). Así nunca se pierde un
+// ejercicio por sacarlo de la sesión de hoy.
 function _borrarEjSesion(id){
   id=String(id);
-  var p=currentPatient; if(!p) return;
-  if(!confirm('¿Eliminar este ejercicio y su video? Se quita del paciente y de esta sesión.')) return;
   if(Array.isArray(tempEjerciciosSesion)) tempEjerciciosSesion=tempEjerciciosSesion.filter(function(x){return !(x&&String(x.id)===id);});
-  if(Array.isArray(p.ejercicios)){
-    var idx=p.ejercicios.findIndex(function(e){return e&&String(e.id)===id;});
-    if(idx>=0){ p.ejercicios.splice(idx,1); p.updatedAt=Date.now();
-      var idxP=patientsDB.findIndex(function(x){return x.id===p.id;}); if(idxP>=0) patientsDB[idxP]=p;
-      try{ saveDB('pts',[p],{camposHist:['ejercicios']}); }catch(_){}
-    }
-  }
   _renderEjSesion(); marcarDirty();
-  showToast('🗑 Ejercicio eliminado','success');
+  showToast('Quitado de hoy — sigue guardado en la biblioteca','success');
 }
 
 // ── FASE 2: VALORACIÓN VISUAL (foto/video en el bloque O) ─────────────────────
@@ -19073,14 +19066,15 @@ function renderEjercicios(){
     // Update topbar count
     document.getElementById('ej-topbar-meta').textContent = `${ejs.length} ejercicio${ejs.length!==1?'s':''}`;
 
-    ejs.forEach((ej,i) => {
+    // Tarjeta reutilizable (i = índice REAL en currentPatient.ejercicios → los botones no se rompen al agrupar).
+    const _cardEj = (ej, i) => {
       const isVideo = ej.media && ej.media.type && ej.media.type.startsWith('video');
       const isImg = ej.media && ej.media.type && ej.media.type.startsWith('image');
       const srcEj = ej.media ? (ej.media.url || ej.media.data || '') : '';
-      html += `<div class="ejercicio-card">
+      return `<div class="ejercicio-card">
         <div class="ejercicio-header">
           <div>
-            <div class="ejercicio-nombre">${i+1}. ${ej.nombre}</div>
+            <div class="ejercicio-nombre">${ej.nombre}</div>
             <div class="ejercicio-meta">${ej.fecha} · ${ej.terapeuta}</div>
           </div>
           <div style="font-size:20px">${isVideo?'🎥':isImg?'🖼️':'📝'}</div>
@@ -19115,7 +19109,7 @@ function renderEjercicios(){
           ${(function(){ var _pc=ej.paraCasa!==false; return '<div style="margin-bottom:8px"><button onclick="_toggleEjParaCasa('+i+')" style="width:100%;padding:9px 12px;font-size:12.5px;font-weight:700;border-radius:12px;cursor:pointer;font-family:inherit;border:1.5px solid '+(_pc?'var(--green)':'#D0D5DD')+';background:'+(_pc?'#E8F5E9':'#F5F5F5')+';color:'+(_pc?'var(--green)':'var(--gray-600)')+';display:flex;align-items:center;justify-content:center;gap:6px">'+(_pc?'📤 Tarea para casa (se envía)':'🏥 Solo en consulta (no se envía)')+'</button></div>'; })()}
 
           <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px">
-            ${['activo','pausado','completado'].map(est=>`<button onclick="cambiarEstadoEjercicio(${i},'${est}')" style="padding:4px 10px;font-size:11px;font-weight:700;border-radius:12px;cursor:pointer;font-family:inherit;border:1.5px solid ${(ej.estado||'activo')===est?'var(--navy)':'#D0D5DD'};background:${(ej.estado||'activo')===est?'var(--navy)':'white'};color:${(ej.estado||'activo')===est?'white':'var(--gray-600)'}">${est.charAt(0).toUpperCase()+est.slice(1)}</button>`).join('')}
+            ${['activo','pausado','completado'].map(est=>`<button onclick="cambiarEstadoEjercicio(${i},'${est}')" style="padding:4px 10px;font-size:11px;font-weight:700;border-radius:12px;cursor:pointer;font-family:inherit;border:1.5px solid ${(ej.estado||'activo')===est?'var(--navy)':'#D0D5DD'};background:${(ej.estado||'activo')===est?'var(--navy)':'white'};color:${(ej.estado||'activo')===est?'white':'var(--gray-600)'}">${est==='activo'?'🎯 En rutina':est==='pausado'?'🕒 Anterior':'✅ Completado'}</button>`).join('')}
           </div>
 
           <div class="ejercicio-actions">
@@ -19127,7 +19121,21 @@ function renderEjercicios(){
           </div>
         </div>
       </div>`;
-    });
+    };
+
+    // AGRUPAR por lo que ve el paciente: rutina de ahora (activo+casa) · anteriores (casa, no activo) · solo consulta.
+    const _conIdx = ejs.map((ej,i)=>({ej,i}));
+    const _rutina = _conIdx.filter(x=>x.ej.paraCasa!==false && (x.ej.estado||'activo')==='activo');
+    const _anteriores = _conIdx.filter(x=>x.ej.paraCasa!==false && (x.ej.estado||'activo')!=='activo');
+    const _soloCons = _conIdx.filter(x=>x.ej.paraCasa===false);
+    const _secc = (emoji, titulo, sub, arr, color) => arr.length ? (
+      `<div style="display:flex;align-items:center;gap:8px;margin:16px 0 3px"><span style="font-size:13px;font-weight:800;color:${color}">${emoji} ${titulo}</span><span style="font-size:11px;font-weight:800;color:#fff;background:${color};border-radius:10px;padding:1px 8px">${arr.length}</span></div>`
+      + `<div style="font-size:11px;color:var(--gray-500);margin-bottom:8px">${sub}</div>`
+      + arr.map(x=>_cardEj(x.ej, x.i)).join('')
+    ) : '';
+    html += _secc('🎯','En la rutina de ahora','Se envían al paciente al mandar el link.', _rutina, '#2E7D52');
+    html += _secc('🕒','Anteriores del paciente','El paciente los conserva en su link como "anteriores", pero ya no son la rutina activa. Toca 🕒 Anterior en un ejercicio para moverlo aquí sin borrarlo.', _anteriores, '#1B3A6B');
+    html += _secc('🏥','Solo en consulta','No se envían al paciente (ni como anteriores).', _soloCons, '#92400E');
   }
 
   c.innerHTML = html;
@@ -19902,10 +19910,13 @@ function renderVistaPublica(p, opts={}){
   const previewTerapeuta = (typeof opts.previewTerapeuta==='boolean')
     ? opts.previewTerapeuta
     : esVistaPublicaPreviewTerapeuta();
-  // Solo activos y marcados "para casa" (paraCasa!==false; los sin marca = para casa, retrocompatible).
-  // Los de "solo consulta" (paraCasa===false) NO se muestran al paciente.
-  const ejs = (p.ejercicios || []).filter(e=>(e.estado||'activo')==='activo' && e.paraCasa!==false);
-  const fechaPrograma = ejs.length ? ejs[ejs.length-1].fecha : todayFmt();
+  // DOS ZONAS para el paciente: "Tu rutina de ahora" (se envía ahora: activo + para casa) y "Tus
+  // ejercicios anteriores" (para casa pero ya no activos: pausado/completado) → conserva los viejos y
+  // puede seguir haciéndolos. "Solo consulta" (paraCasa===false) NUNCA se muestra al paciente.
+  const _paraCasa = (p.ejercicios || []).filter(e=>e.paraCasa!==false);
+  const ejs = _paraCasa.filter(e=>(e.estado||'activo')==='activo');            // rutina de ahora
+  const ejsAnteriores = _paraCasa.filter(e=>(e.estado||'activo')!=='activo');  // anteriores (el paciente los conserva)
+  const fechaPrograma = ejs.length ? ejs[ejs.length-1].fecha : (ejsAnteriores.length ? ejsAnteriores[ejsAnteriores.length-1].fecha : todayFmt());
 
   let html = previewTerapeuta ? `<div style="position:sticky;top:0;z-index:999;background:#122950;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;color:white">
     <button onclick="salirVistaPaciente()" style="background:#C9A84C;color:#122950;border:none;border-radius:18px;padding:8px 14px;font-weight:800;cursor:pointer">← Volver a edición</button>
@@ -19919,16 +19930,14 @@ function renderVistaPublica(p, opts={}){
   </div>
   <div style="padding:16px;padding-bottom:40px">`;
 
-  if(!ejs.length){
-    html += `<div style="text-align:center;padding:40px;color:#9BA3B5">Sin ejercicios asignados aún.</div>`;
-  } else {
-    ejs.forEach((ej,i) => {
-      const src = ej.media?.url || ej.media?.data || '';
-      const isVideo = ej.media && ej.media.type && ej.media.type.startsWith('video');
-      const isImg = ej.media && ej.media.type && ej.media.type.startsWith('image');
-      html += `<div class="pub-card">
+  // Tarjeta reutilizable: misma plantilla para "rutina de ahora" y "anteriores".
+  const _pubCard = (ej, num) => {
+    const src = ej.media?.url || ej.media?.data || '';
+    const isVideo = ej.media && ej.media.type && ej.media.type.startsWith('video');
+    const isImg = ej.media && ej.media.type && ej.media.type.startsWith('image');
+    return `<div class="pub-card">
         <div class="pub-card-hdr">
-          <div class="pub-card-num">Ejercicio ${i+1}</div>
+          <div class="pub-card-num">Ejercicio ${num}</div>
           <div class="pub-card-nombre">${escapeHTML(ej.nombre)}</div>
           <div style="font-size:11px;color:rgba(255,255,255,.6);margin-top:2px">${escapeHTML(ej.terapeuta)} · ${escapeHTML(ej.fecha)}</div>
         </div>
@@ -19967,7 +19976,20 @@ function renderVistaPublica(p, opts={}){
           ${ej.observaciones?'':''}
         </div>
       </div>`;
-    });
+  };
+
+  if(!ejs.length && !ejsAnteriores.length){
+    html += `<div style="text-align:center;padding:40px;color:#9BA3B5">Sin ejercicios asignados aún.</div>`;
+  } else {
+    if(ejs.length){
+      html += `<div style="font-size:15px;font-weight:800;color:#122950;margin:2px 0 10px">🎯 Tu rutina de ahora</div>`;
+      ejs.forEach((ej,i) => { html += _pubCard(ej, i+1); });
+    }
+    if(ejsAnteriores.length){
+      html += `<div style="font-size:15px;font-weight:800;color:#122950;margin:26px 0 4px">🕒 Tus ejercicios anteriores</div>
+        <div style="font-size:12px;color:#6B7280;margin-bottom:10px">Los que trabajaste antes. Puedes seguir haciéndolos si tu terapeuta te lo indicó.</div>`;
+      ejsAnteriores.forEach((ej,i) => { html += _pubCard(ej, i+1); });
+    }
 
     // Warning message
     html += `<div class="pub-warning">
