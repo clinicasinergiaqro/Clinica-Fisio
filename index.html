@@ -19137,24 +19137,19 @@ function renderEjercicios(){
     var _numMap = (typeof _numeroSesionMap==='function') ? _numeroSesionMap(((typeof obtenerSesionesVisibles==='function')?obtenerSesionesVisibles(currentPatient):_sesLista)||[], _tEpEj) : {};
 
     // Tarjeta reutilizable (i = índice REAL en currentPatient.ejercicios → los botones no se rompen al agrupar).
-    // ses = sesión SOAP dueña (o null): pinta un chip clicable que lleva a esa nota.
-    const _cardEj = (ej, i, ses) => {
+    // La nota SOAP a la que pertenece va en el ENCABEZADO del grupo, no en la tarjeta.
+    const _cardEj = (ej, i) => {
       const isVideo = ej.media && ej.media.type && ej.media.type.startsWith('video');
       const isImg = ej.media && ej.media.type && ej.media.type.startsWith('image');
       const srcEj = ej.media ? (ej.media.url || ej.media.data || '') : '';
       const _pc = ej.paraCasa!==false; const _est = (ej.estado||'activo');
       const _chip = (txt,fg,bg) => `<span style="font-size:11px;font-weight:700;border-radius:10px;padding:2px 9px;background:${bg};color:${fg}">${txt}</span>`;
       const _statusChip = !_pc ? _chip('🏥 Solo consulta','#92400E','#FEF3C7') : (_est==='activo' ? _chip('🎯 En rutina','#2E7D52','#E8F5E9') : _chip('🕒 Anterior','#1B3A6B','#EEF4FB'));
-      const _nsN = ses ? ((_numMap[String(ses.id)]||{}).n) : null;
-      const _linkChip = ses
-        ? `<span onclick="_irAlSoapDeEjercicio('${escapeAttr_(String(ses.fecha||''))}')" style="font-size:11px;font-weight:700;border-radius:10px;padding:2px 9px;background:#EEF4FB;color:#1B3A6B;cursor:pointer;border:1px solid #C7D8EE">🩺 Nota del ${ses.fecha||'—'}${_nsN?(' · Sesión '+_nsN):''} →</span>`
-        : _chip('🗓️ Sin nota SOAP ese día','#5A6478','#EEF1F5');
       return `<div class="ejercicio-card">
         <div class="ejercicio-header">
           <div style="min-width:0;flex:1">
             <div class="ejercicio-nombre">${ej.nombre}</div>
             <div class="ejercicio-meta">📅 ${ej.fecha||'—'}${ej.terapeuta?(' · '+ej.terapeuta):''}</div>
-            <div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:5px">${_linkChip}</div>
           </div>
           <div style="font-size:20px">${isVideo?'🎥':isImg?'🖼️':'📝'}</div>
         </div>
@@ -19209,20 +19204,30 @@ function renderEjercicios(){
       </div>`;
     };
 
-    // AGRUPAR POR DÍA con encabezado de fecha. Día = fecha de la sesión SOAP dueña; si no hay (creado
-    // manualmente), la fecha del propio ejercicio. Más reciente arriba; "Sin fecha" al final.
+    // AGRUPAR POR NOTA SOAP: el encabezado del grupo ES la nota a la que pertenecen ("🩺 Nota del
+    // <fecha> · Sesión N →", clicable) y debajo van sus videos. Los ejercicios sin nota SOAP van a un
+    // grupo "🗓️ Sin nota SOAP · <fecha>". Más reciente arriba.
     const _grupos={}; const _orden=[];
     ejs.forEach((ej,i)=>{
-      const f=ej.fecha||'';   // día en que se GRABÓ el ejercicio (la nota a la que pertenece va en su chip)
-      const cn=((typeof _diaCanon==='function')?_diaCanon(f):'')||'';
-      if(!_grupos[cn]){ _grupos[cn]={label:f||'Sin fecha', items:[]}; _orden.push(cn); }
-      _grupos[cn].items.push({ej,i});
+      const s=_sesDe(ej);
+      let key, sortDay;
+      if(s){ key='ses:'+String(s.id); sortDay=((typeof _diaCanon==='function')?_diaCanon(s.fecha):'')||''; }
+      else { const cn=((typeof _diaCanon==='function')?_diaCanon(ej.fecha):'')||''; key='dia:'+cn; sortDay=cn; }
+      if(!_grupos[key]){ _grupos[key]={ses:s||null, dayLabel:(s?s.fecha:ej.fecha)||'Sin fecha', sortDay:sortDay||'', items:[] }; _orden.push(key); }
+      _grupos[key].items.push({ej,i});
     });
-    _orden.sort((a,b)=>{ if(a===b) return 0; if(a==='') return 1; if(b==='') return -1; return a<b?1:-1; });
-    _orden.forEach(cn=>{
-      const g=_grupos[cn];
-      html += `<div style="display:flex;align-items:center;gap:8px;margin:18px 0 8px;padding-bottom:4px;border-bottom:2px solid var(--gray-100)"><span style="font-size:14px;font-weight:800;color:var(--navy)">📅 ${g.label}</span><span style="font-size:11px;font-weight:800;color:#fff;background:var(--navy);border-radius:10px;padding:1px 8px">${g.items.length}</span></div>`;
-      g.items.forEach(x=>{ html += _cardEj(x.ej, x.i, _sesDe(x.ej)); });
+    _orden.sort((a,b)=>{ const da=_grupos[a].sortDay, db=_grupos[b].sortDay; if(da===db) return 0; if(!da) return 1; if(!db) return -1; return da<db?1:-1; });
+    _orden.forEach(key=>{
+      const g=_grupos[key];
+      let _hdr;
+      if(g.ses){
+        const _n=(_numMap[String(g.ses.id)]||{}).n;
+        _hdr = `<div onclick="_irAlSoapDeEjercicio('${escapeAttr_(String(g.ses.fecha||''))}')" style="display:flex;align-items:center;gap:8px;margin:18px 0 8px;padding:8px 10px;background:#EEF4FB;border:1px solid #C7D8EE;border-radius:12px;cursor:pointer"><span style="font-size:14px;font-weight:800;color:#1B3A6B">🩺 Nota del ${g.dayLabel}${_n?(' · Sesión '+_n):''} →</span><span style="font-size:11px;font-weight:800;color:#fff;background:#1B3A6B;border-radius:10px;padding:1px 8px">${g.items.length}</span></div>`;
+      } else {
+        _hdr = `<div style="display:flex;align-items:center;gap:8px;margin:18px 0 8px;padding-bottom:4px;border-bottom:2px solid var(--gray-100)"><span style="font-size:14px;font-weight:800;color:var(--gray-600)">🗓️ Sin nota SOAP · ${g.dayLabel}</span><span style="font-size:11px;font-weight:800;color:#fff;background:var(--gray-400);border-radius:10px;padding:1px 8px">${g.items.length}</span></div>`;
+      }
+      html += _hdr;
+      g.items.forEach(x=>{ html += _cardEj(x.ej, x.i); });
     });
   }
 
