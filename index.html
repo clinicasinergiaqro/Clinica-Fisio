@@ -11565,43 +11565,91 @@ function _ejAplicar(n){
 // esta sesión. Queda ligado a la nota (datosNota.ejerciciosSesion) → continuidad entre fisios.
 function _ejSesIcon(ej){ var t=(ej&&ej.media&&ej.media.type)||''; return t.indexOf('video')===0?'🎥':t.indexOf('image')===0?'🖼️':'📝'; }
 function _ejSesSeleccionado(id){ return (Array.isArray(tempEjerciciosSesion)?tempEjerciciosSesion:[]).some(function(x){return x&&String(x.id)===String(id);}); }
+// [SOAP-EJERCICIOS] El bloque de la nota muestra SOLO lo trabajado HOY (tempEjerciciosSesion), no toda
+// la biblioteca del paciente. Así una nota nueva arranca vacía y no se llena con los ejercicios pasados
+// cada vez (esos viven en la pestaña Ejercicios). Se agregan con "➕ Grabar / subir" (nuevo) o
+// "📚 De la biblioteca" (elegir de los que ya tiene, bajo demanda).
 function _renderEjSesion(){
   var wrap=document.getElementById('ej-sesion-wrap'); if(!wrap) return;
-  var p=currentPatient||{};
-  var ejs=Array.isArray(p.ejercicios)?p.ejercicios:[];
-  var head='<div style="font-size:12px;font-weight:800;color:var(--navy);margin-bottom:6px">🏋️ Ejercicios trabajados hoy <span style="font-weight:400;color:var(--gray-400)">(toca los que se hicieron en la sesión)</span></div>';
+  var sel=Array.isArray(tempEjerciciosSesion)?tempEjerciciosSesion:[];
+  var head='<div style="font-size:12px;font-weight:800;color:var(--navy);margin-bottom:6px">🏋️ Ejercicios trabajados hoy <span style="font-weight:400;color:var(--gray-400)">(los que se hicieron en esta sesión)</span></div>';
   var items;
-  if(!ejs.length){
-    items='<div style="font-size:12px;color:var(--gray-400);background:var(--gray-50);border:1px dashed var(--gray-300);border-radius:10px;padding:10px;margin-bottom:6px">Aún no hay ejercicios. Graba uno aquí mismo con el botón de abajo, o créalos en la pestaña <b>Ejercicios</b>.</div>';
+  if(!sel.length){
+    items='<div style="font-size:12px;color:var(--gray-400);background:var(--gray-50);border:1px dashed var(--gray-300);border-radius:10px;padding:10px;margin-bottom:6px">Aún no marcaste ejercicios de hoy. Graba uno nuevo o toca <b>📚 De la biblioteca</b> para elegir de los que ya tiene el paciente. Los anteriores viven en la pestaña <b>Ejercicios</b>.</div>';
   } else {
-  items=ejs.map(function(ej){
-    var id=String(ej.id||'');
-    var nombre=String(ej.nombre||ej.name||ej.label||'Ejercicio').trim();
-    var sel=_ejSesSeleccionado(id);
-    var dosisSel=(function(){ var it=(tempEjerciciosSesion||[]).find(function(x){return x&&String(x.id)===id;}); return it?(it.dosisSesion||''):(ej.dosis||''); })();
-    var _src=(ej.media&&(ej.media.url||ej.media.data))||'';
-    var _mt=(ej.media&&ej.media.type)||'';
+  items=sel.map(function(it){
+    var id=String(it.id||'');
+    var nombre=String(it.nombre||'Ejercicio').trim();
+    var dosisSel=String(it.dosisSesion||'');
+    var _src=(it.media&&(it.media.url||it.media.data))||'';
+    var _mt=(it.media&&it.media.type)||'';
     var _verArgs=JSON.stringify(_src).replace(/"/g,'&quot;')+','+JSON.stringify(_mt).replace(/"/g,'&quot;')+','+JSON.stringify(nombre).replace(/"/g,'&quot;');
     var _thumbInner;
-    if(_src && _mt.indexOf('video')===0){ _thumbInner='<video src="'+escapeAttr_(_src)+'" preload="metadata" muted playsinline style="width:100%;height:100%;object-fit:cover"></video><div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:17px;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.7)">▶</div>'; }
+    if(_src && _mt.indexOf('video')===0){ _thumbInner='<video src="'+escapeAttr_(_src)+'#t=0.1" preload="metadata" muted playsinline style="width:100%;height:100%;object-fit:cover"></video><div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:17px;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.7)">▶</div>'; }
     else if(_src && _mt.indexOf('image')===0){ _thumbInner='<img src="'+escapeAttr_(_src)+'" loading="lazy" style="width:100%;height:100%;object-fit:cover">'; }
-    else { _thumbInner='<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:20px">'+_ejSesIcon(ej)+'</div>'; }
+    else { _thumbInner='<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:20px">'+(_mt.indexOf('video')===0?'🎥':_mt.indexOf('image')===0?'🖼️':'📝')+'</div>'; }
     var _thumb='<div onclick="event.stopPropagation();'+(_src?('_verMediaSesion('+_verArgs+')'):'')+'" style="width:58px;height:58px;border-radius:9px;overflow:hidden;position:relative;flex-shrink:0;background:#0E1622;cursor:'+(_src?'pointer':'default')+'">'+_thumbInner+'</div>';
-    var fila='<div onclick="_toggleEjSesion(\''+escapeAttr_(id)+'\')" style="display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid '+(sel?'var(--navy)':'var(--gray-200)')+';border-radius:10px;margin-bottom:6px;cursor:pointer;background:'+(sel?'#EEF4FB':'var(--card,#fff)')+'">'
+    var fila='<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid var(--navy);border-radius:10px;margin-bottom:6px;background:#EEF4FB">'
       +_thumb
       +'<div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:600;color:var(--ink,#1F2937)">'+escapeHTML(nombre)+'</div>'+(_src?'<div style="font-size:10.5px;color:var(--gray-400);margin-top:1px">Toca el cuadro para ver en grande</div>':'')+'</div>'
-      +(sel?('<button type="button" onclick="event.stopPropagation();_borrarEjSesion(\''+escapeAttr_(id)+'\')" title="Quitar de hoy (no lo borra de la biblioteca)" style="background:none;border:none;color:var(--gray-400);font-size:16px;cursor:pointer;padding:2px 6px;flex-shrink:0">✕</button>'):'')
-      +'<div style="width:22px;height:22px;border-radius:6px;border:2px solid '+(sel?'var(--navy)':'var(--gray-300)')+';background:'+(sel?'var(--navy)':'transparent')+';color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;flex-shrink:0">'+(sel?'✓':'')+'</div>'
+      +'<button type="button" onclick="_borrarEjSesion(\''+escapeAttr_(id)+'\')" title="Quitar de hoy (no lo borra de la biblioteca)" style="background:none;border:none;color:var(--gray-400);font-size:16px;cursor:pointer;padding:2px 6px;flex-shrink:0">✕</button>'
       +'</div>';
-    if(sel){
-      fila+='<div style="margin:-2px 0 8px 39px"><input type="text" value="'+escapeAttr_(dosisSel)+'" onclick="event.stopPropagation()" oninput="_setEjSesionDosis(\''+escapeAttr_(id)+'\',this.value)" placeholder="Dosis de hoy (ej. 3×12 · 5 kg)" style="width:calc(100% - 39px);box-sizing:border-box;font-size:12.5px;padding:7px 10px;border:1px solid var(--gray-200);border-radius:8px;font-family:inherit"></div>';
-    }
+    fila+='<div style="margin:-2px 0 8px 39px"><input type="text" value="'+escapeAttr_(dosisSel)+'" oninput="_setEjSesionDosis(\''+escapeAttr_(id)+'\',this.value)" placeholder="Dosis de hoy (ej. 3×12 · 5 kg)" style="width:calc(100% - 39px);box-sizing:border-box;font-size:12.5px;padding:7px 10px;border:1px solid var(--gray-200);border-radius:8px;font-family:inherit"></div>';
     return fila;
   }).join('');
   }
   var _cap='<input type="file" id="ej-ses-capture" accept="image/*,video/*" style="display:none" onchange="_grabarEjSesion(event)">'
-    +'<button type="button" onclick="var i=document.getElementById(\'ej-ses-capture\');if(i)i.click()" style="width:100%;margin-top:4px;background:#F0F5FB;color:var(--navy);border:1.5px dashed var(--navy);border-radius:10px;padding:9px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit">➕ Grabar / subir ejercicio</button>';
+    +'<div style="display:flex;gap:6px;margin-top:4px">'
+    +'<button type="button" onclick="var i=document.getElementById(\'ej-ses-capture\');if(i)i.click()" style="flex:1;background:#F0F5FB;color:var(--navy);border:1.5px dashed var(--navy);border-radius:10px;padding:9px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit">➕ Grabar / subir</button>'
+    +'<button type="button" onclick="_abrirBibliotecaEjSesion()" style="flex:1;background:#fff;color:var(--navy);border:1.5px solid var(--navy);border-radius:10px;padding:9px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit">📚 De la biblioteca</button>'
+    +'</div>';
   wrap.innerHTML=head+items+_cap;
+}
+// Picker "elegir de la biblioteca": lista p.ejercicios con check para SUMAR a la sesión de hoy. No
+// borra nada; solo agrega/quita de tempEjerciciosSesion (reusa _toggleEjSesion). Bajo demanda para no
+// llenar la nota con los pasados.
+function _abrirBibliotecaEjSesion(){
+  var p=currentPatient||{};
+  var ejs=Array.isArray(p.ejercicios)?p.ejercicios:[];
+  var prev=document.querySelector('[data-ejbib]'); if(prev) prev.remove();
+  var ov=document.createElement('div');
+  ov.setAttribute('data-ejbib','1');
+  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:100001;display:flex;align-items:flex-end;justify-content:center';
+  var _cerrar=function(){ try{ ov.remove(); }catch(_){} _renderEjSesion(); };
+  ov.onclick=function(e){ if(e.target===ov) _cerrar(); };
+  window._ejBibCerrar=_cerrar;
+  var box=document.createElement('div');
+  box.style.cssText='background:#fff;border-radius:16px 16px 0 0;width:100%;max-width:560px;max-height:82vh;overflow:auto;padding:16px';
+  var lista;
+  if(!ejs.length){
+    lista='<div style="color:var(--gray-400);font-size:13px;padding:24px;text-align:center">La biblioteca del paciente está vacía. Graba uno con “➕ Grabar / subir”.</div>';
+  } else {
+    lista=ejs.map(function(ej){
+      var id=String(ej.id||''); var nombre=String(ej.nombre||ej.name||'Ejercicio').trim();
+      var s=_ejSesSeleccionado(id);
+      var _src=(ej.media&&(ej.media.url||ej.media.data))||''; var _mt=(ej.media&&ej.media.type)||'';
+      var _ti=(_src&&_mt.indexOf('video')===0)?'<video src="'+escapeAttr_(_src)+'#t=0.1" preload="metadata" muted playsinline style="width:100%;height:100%;object-fit:cover"></video>':(_src&&_mt.indexOf('image')===0)?'<img src="'+escapeAttr_(_src)+'" loading="lazy" style="width:100%;height:100%;object-fit:cover">':'<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:18px">'+(_mt.indexOf('video')===0?'🎥':_mt.indexOf('image')===0?'🖼️':'📝')+'</div>';
+      return '<div data-bibid="'+escapeAttr_(id)+'" onclick="_toggleEjSesion(\''+escapeAttr_(id)+'\');_bibRefrescar(this,\''+escapeAttr_(id)+'\')" style="display:flex;align-items:center;gap:10px;padding:8px;border:1px solid '+(s?'var(--navy)':'var(--gray-200)')+';border-radius:10px;margin-bottom:6px;cursor:pointer;background:'+(s?'#EEF4FB':'#fff')+'">'
+        +'<div style="width:48px;height:48px;border-radius:8px;overflow:hidden;background:#0E1622;flex-shrink:0">'+_ti+'</div>'
+        +'<div style="flex:1;min-width:0;font-size:13px;font-weight:600;color:#1F2937">'+escapeHTML(nombre)+'<div style="font-size:10.5px;color:var(--gray-400);font-weight:400">📅 '+escapeHTML(String(ej.fecha||'—'))+'</div></div>'
+        +'<div data-bibchk style="width:22px;height:22px;border-radius:6px;border:2px solid '+(s?'var(--navy)':'var(--gray-300)')+';background:'+(s?'var(--navy)':'transparent')+';color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;flex-shrink:0">'+(s?'✓':'')+'</div>'
+        +'</div>';
+    }).join('');
+  }
+  box.innerHTML='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><div style="font-size:15px;font-weight:800;color:var(--navy)">📚 Elegir de la biblioteca</div><button onclick="window._ejBibCerrar&&window._ejBibCerrar()" style="background:none;border:none;font-size:22px;color:var(--gray-400);cursor:pointer">×</button></div>'
+    +'<div style="font-size:11px;color:var(--gray-500);margin-bottom:10px">Marca los que se trabajaron hoy. No borra nada; solo los suma a la nota de hoy.</div>'
+    +lista
+    +'<button onclick="window._ejBibCerrar&&window._ejBibCerrar()" style="width:100%;margin-top:8px;background:var(--navy);color:#fff;border:none;border-radius:10px;padding:11px;font-size:14px;font-weight:800;cursor:pointer;font-family:inherit">Listo</button>';
+  ov.appendChild(box); document.body.appendChild(ov);
+}
+// Refresca visualmente una fila del picker tras el toggle (sin cerrar el modal).
+function _bibRefrescar(el, id){
+  if(!el) return;
+  var s=_ejSesSeleccionado(id);
+  el.style.borderColor=s?'var(--navy)':'var(--gray-200)';
+  el.style.background=s?'#EEF4FB':'#fff';
+  var chk=el.querySelector('[data-bibchk]');
+  if(chk){ chk.style.borderColor=s?'var(--navy)':'var(--gray-300)'; chk.style.background=s?'var(--navy)':'transparent'; chk.textContent=s?'✓':''; }
 }
 function _toggleEjSesion(id){
   id=String(id);
@@ -19075,7 +19123,7 @@ function renderEjercicios(){
         <div class="ejercicio-header">
           <div>
             <div class="ejercicio-nombre">${ej.nombre}</div>
-            <div class="ejercicio-meta">${ej.fecha} · ${ej.terapeuta}</div>
+            <div class="ejercicio-meta">📅 ${ej.fecha||'—'}${ej.terapeuta?(' · '+ej.terapeuta):''}${(ej.objetivo==='Registrado en sesión')?' · 🩺 de la nota SOAP':''}</div>
           </div>
           <div style="font-size:20px">${isVideo?'🎥':isImg?'🖼️':'📝'}</div>
         </div>
@@ -19084,7 +19132,7 @@ function renderEjercicios(){
             ${!srcEj
               ? `<div style="padding:20px;text-align:center;color:#9BA3B5">Video no disponible</div>`
               : isVideo
-                ? `<video src="${srcEj}" playsinline preload="metadata" style="width:100%;max-height:220px;object-fit:cover;border-radius:8px"></video>
+                ? `<video src="${srcEj}#t=0.1" playsinline preload="metadata" muted style="width:100%;max-height:220px;object-fit:cover;border-radius:8px"></video>
                    <div class="play-overlay">▶️</div>`
                 : isImg
                   ? `<img src="${srcEj}" loading="lazy" decoding="async" style="width:100%;max-height:220px;object-fit:cover;border-radius:8px">`
@@ -19946,7 +19994,7 @@ function renderVistaPublica(p, opts={}){
             ${!src
               ? `<p style="color:#9BA3B5;padding:20px">Video no disponible</p>`
               : isVideo
-                ? `<video src="${escapeAttr_(src)}" controls playsinline preload="metadata" style="width:100%;max-height:280px;object-fit:cover"></video>`
+                ? `<video src="${escapeAttr_(src)}#t=0.1" controls playsinline preload="metadata" style="width:100%;max-height:280px;object-fit:cover"></video>`
                 : isImg
                   ? `<img src="${escapeAttr_(src)}" loading="lazy" decoding="async" style="width:100%;max-height:280px;object-fit:cover">`
                   : `<div style="padding:20px;color:white;text-align:center">📎 ${escapeHTML(ej.media.label)}</div>`}
