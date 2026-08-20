@@ -10689,6 +10689,43 @@ function aplicarDictadoSOAP(modo){
   _dictadoSoapPreview=null;
 }
 
+// [CONEXIÓN #1] Hereda la SEGURIDAD CLÍNICA de la historia al SOAP: caja visible dentro del form con
+// alergias, contraindicaciones vigentes y banderas rojas, para que la terapeuta las tenga enfrente al
+// documentar y prescribir. Antes solo había un banner genérico "revisar contraindicaciones".
+function _segClinLleno(x){ var t=String(x==null?'':x).trim(); return t && !/^ningun[ao]s?$/i.test(t) && !/^\[?pendiente\]?$/i.test(t) && !/^no (evaluad|realizad|aplica)/i.test(t); }
+function _soapSeguridadHTML(p){
+  if(!p) return '';
+  var alergias=_segClinLleno(p.alergias)?String(p.alergias).trim():'';
+  var contra=(p.planTto&&_segClinLleno(p.planTto.contraindicaciones))?String(p.planTto.contraindicaciones).trim()
+            :(_segClinLleno(p.contraindicaciones)?String(p.contraindicaciones).trim():'');
+  var sc=p.seguridadClinica||{};
+  var banderas=Array.isArray(sc.banderasRojas)?sc.banderasRojas.filter(Boolean):[];
+  var precaucion=!!sc.tienePrecaucion;
+  if(!alergias && !contra && !banderas.length && !precaucion) return '';
+  var fila=function(ic,lbl,val,col){ return '<div style="display:flex;gap:7px;margin-top:5px;font-size:13px;line-height:1.45"><span style="font-weight:800;color:'+col+';flex:none;white-space:nowrap">'+ic+' '+lbl+':</span><span style="color:var(--gray-800)">'+escapeHTML(val)+'</span></div>'; };
+  var filas='';
+  if(alergias) filas+=fila('🚫','Alergias',alergias,'#B91C1C');
+  if(contra) filas+=fila('⛔','Contraindicaciones',contra,'#B45309');
+  if(banderas.length) filas+=fila('🚩','Banderas rojas',banderas.join(', '),'#B91C1C');
+  return '<div style="margin:0 14px 12px;background:#FEF2F2;border:1.5px solid #F4B4B0;border-left:5px solid #B91C1C;border-radius:12px;padding:11px 14px">'
+    +'<div style="font-size:12px;font-weight:800;color:#B91C1C;text-transform:uppercase;letter-spacing:.4px">⚠️ Seguridad clínica del paciente</div>'
+    +filas
+    +(precaucion?'<div style="font-size:11px;color:#8A6D1A;margin-top:7px">Revisa contraindicaciones antes de aplicar agentes físicos o técnicas invasivas, y antes de prescribir ejercicio.</div>':'')
+    +'</div>';
+}
+// [CONEXIÓN #1 y #2] Prellenado SOFT en NOTA NUEVA (solo si el campo está vacío; editable):
+//  #2 objetivoSesion ← objetivo funcional de la valoración (corto plazo; fallback largo plazo).
+//  #1 f-pcontra ← contraindicaciones del plan/historia (en vez de arrancar en [pendiente]).
+function _prellenarSoapNuevoDesdeExpediente(){
+  var p=currentPatient; if(!p) return;
+  var setSoft=function(id,val){ var el=document.getElementById(id); if(el && !String(el.value||'').trim() && val){ el.value=String(val).trim(); } };
+  var dxf=p.dxFuncional||{};
+  var obj=_segClinLleno(dxf.objetivosCP)?dxf.objetivosCP:(_segClinLleno(dxf.objetivosLP)?dxf.objetivosLP:'');
+  if(obj) setSoft('f-objetivo-sesion', obj);
+  var contra=(p.planTto&&_segClinLleno(p.planTto.contraindicaciones))?p.planTto.contraindicaciones
+            :(_segClinLleno(p.contraindicaciones)?p.contraindicaciones:'');
+  if(contra) setSoft('f-pcontra', contra);
+}
 function showNuevoSOAP(){
   if(!currentPatient) return;
   // reset dictado 2.2
@@ -10702,6 +10739,7 @@ function showNuevoSOAP(){
     `${currentPatient.name.split(' ')[0]} · Sesión ${sesNum}${totalTxt}`;
   screenStack.push('screen-soap');showScreen('screen-soap',false);
   renderSOAPForm();
+  _prellenarSoapNuevoDesdeExpediente();   // [CONEXIÓN #1 y #2] hereda objetivo de valoración + contraindicaciones
   setTimeout(renderEvolucionChips_,0);
 }
 
@@ -10811,9 +10849,7 @@ function renderSOAPForm(){
   });
 
   const c=document.getElementById('content-soap');
-  const alertaPrecaucion=(p.seguridadClinica&&p.seguridadClinica.tienePrecaucion)
-    ? `<div class="alerta-precaucion">⚠️ Precaución clínica — revisar contraindicaciones antes de aplicar agentes físicos o técnicas invasivas.</div>`
-    : '';
+  const alertaPrecaucion=_soapSeguridadHTML(p);   // [CONEXIÓN #1] caja de seguridad heredada de la historia
   // FIX CONTADOR: _sesTodas/totalPrevias ahora se calculan arriba, junto a sesNum (una sola fuente).
   // FASE B — selector de motivo (solo NOTA NUEVA y solo si el paciente tiene episodios).
   // Default: motivo actual (0 taps extra). En edición el motivo es fijo (no se renumera).
