@@ -19118,8 +19118,19 @@ function renderEjercicios(){
     // esa nota (_grabarEjSesion mete el MISMO id en p.ejercicios y en la sesión). Mapear ejId → sesión.
     var _sesLista = (typeof obtenerSesiones==='function') ? obtenerSesiones(currentPatient) : (currentPatient.soap||[]);
     if(!Array.isArray(_sesLista)) _sesLista=[];
-    var _sesDeEj={};
-    _sesLista.forEach(function(s){ (Array.isArray(s&&s.ejerciciosSesion)?s.ejerciciosSesion:[]).forEach(function(es){ if(es&&es.id!=null){ var k=String(es.id); if(!_sesDeEj[k]) _sesDeEj[k]=s; } }); });
+    var _sesDeEj={};   // por id (exacto: ejercicio grabado desde la nota)
+    var _sesPorDia={}; // por día (fallback: hay una nota SOAP de esa fecha)
+    _sesLista.forEach(function(s){
+      (Array.isArray(s&&s.ejerciciosSesion)?s.ejerciciosSesion:[]).forEach(function(es){ if(es&&es.id!=null){ var k=String(es.id); if(!_sesDeEj[k]) _sesDeEj[k]=s; } });
+      var _c=(typeof _diaCanon==='function')?_diaCanon(s&&s.fecha):''; if(_c && !_sesPorDia[_c]) _sesPorDia[_c]=s;
+    });
+    // Resolver la nota dueña: 1º por id (exacto), 2º por FECHA (si hay una nota SOAP ese día). Así los
+    // ejercicios subidos por "+ Agregar" o de antes del emparejamiento por id también quedan ligados.
+    var _sesDe = function(ej){
+      if(!ej) return null;
+      var byId=_sesDeEj[String(ej.id)]; if(byId) return byId;
+      var c=(typeof _diaCanon==='function')?_diaCanon(ej.fecha):''; return (c&&_sesPorDia[c])||null;
+    };
 
     // Tarjeta reutilizable (i = índice REAL en currentPatient.ejercicios → los botones no se rompen al agrupar).
     // ses = sesión SOAP dueña (o null): pinta un chip clicable que lleva a esa nota.
@@ -19132,7 +19143,7 @@ function renderEjercicios(){
       const _statusChip = !_pc ? _chip('🏥 Solo consulta','#92400E','#FEF3C7') : (_est==='activo' ? _chip('🎯 En rutina','#2E7D52','#E8F5E9') : _chip('🕒 Anterior','#1B3A6B','#EEF4FB'));
       const _linkChip = ses
         ? `<span onclick="_irAlSoapDeEjercicio('${escapeAttr_(String(ses.fecha||''))}')" style="font-size:11px;font-weight:700;border-radius:10px;padding:2px 9px;background:#EEF4FB;color:#1B3A6B;cursor:pointer;border:1px solid #C7D8EE">🩺 Nota del ${ses.fecha||'—'}${ses.num?(' · Ses. '+ses.num):''} →</span>`
-        : (ej.objetivo==='Registrado en sesión' ? _chip('🩺 de una nota SOAP','#5A6478','#EEF1F5') : _chip('✍️ Creado manual','#5A6478','#EEF1F5'));
+        : _chip('🗓️ Sin nota SOAP ese día','#5A6478','#EEF1F5');
       return `<div class="ejercicio-card">
         <div class="ejercicio-header">
           <div>
@@ -19169,7 +19180,13 @@ function renderEjercicios(){
           ${ej.precauciones?`<div style="font-size:13px;color:var(--red);margin-bottom:6px"><b>⚠ Precauciones:</b> ${ej.precauciones}</div>`:''}
           ${ej.observaciones?'':''}
 
-          ${(function(){ var _pc=ej.paraCasa!==false; return '<div style="margin-bottom:8px"><button onclick="_toggleEjParaCasa('+i+')" style="width:100%;padding:9px 12px;font-size:12.5px;font-weight:700;border-radius:12px;cursor:pointer;font-family:inherit;border:1.5px solid '+(_pc?'var(--green)':'#D0D5DD')+';background:'+(_pc?'#E8F5E9':'#F5F5F5')+';color:'+(_pc?'var(--green)':'var(--gray-600)')+';display:flex;align-items:center;justify-content:center;gap:6px">'+(_pc?'📤 Tarea para casa (se envía)':'🏥 Solo en consulta (no se envía)')+'</button></div>'; })()}
+          ${(function(){ var _pc=ej.paraCasa!==false; return '<div style="margin-bottom:8px"><button onclick="_toggleEjParaCasa('+i+')" title="Toca para '+(_pc?'DEJAR de enviarlo':'ENVIARLO')+' al paciente" style="width:100%;padding:9px 12px;font-size:12.5px;font-weight:700;border-radius:12px;cursor:pointer;font-family:inherit;border:1.5px solid '+(_pc?'var(--green)':'#D0D5DD')+';background:'+(_pc?'#E8F5E9':'#F5F5F5')+';color:'+(_pc?'var(--green)':'var(--gray-600)')+';display:flex;align-items:center;justify-content:space-between;gap:8px">'
+            +'<span>'+(_pc?'📤 Se envía al paciente':'🏥 Solo en consulta — no se envía')+'</span>'
+            +'<span style="display:inline-flex;align-items:center;gap:6px;font-size:10.5px;font-weight:800;white-space:nowrap">'
+              +'<span style="opacity:.75">'+(_pc?'ON':'OFF')+'</span>'
+              +'<span style="width:40px;height:22px;border-radius:999px;background:'+(_pc?'var(--green)':'#C0C6D0')+';position:relative;display:inline-block;flex-shrink:0"><span style="position:absolute;top:2px;'+(_pc?'right:2px':'left:2px')+';width:18px;height:18px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.25)"></span></span>'
+            +'</span>'
+          +'</button></div>'; })()}
 
           <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px">
             ${['activo','pausado','completado'].map(est=>`<button onclick="cambiarEstadoEjercicio(${i},'${est}')" style="padding:4px 10px;font-size:11px;font-weight:700;border-radius:12px;cursor:pointer;font-family:inherit;border:1.5px solid ${(ej.estado||'activo')===est?'var(--navy)':'#D0D5DD'};background:${(ej.estado||'activo')===est?'var(--navy)':'white'};color:${(ej.estado||'activo')===est?'white':'var(--gray-600)'}">${est==='activo'?'🎯 En rutina':est==='pausado'?'🕒 Anterior':'✅ Completado'}</button>`).join('')}
