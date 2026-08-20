@@ -19114,20 +19114,35 @@ function renderEjercicios(){
     // Update topbar count
     document.getElementById('ej-topbar-meta').textContent = `${ejs.length} ejercicio${ejs.length!==1?'s':''}`;
 
+    // LIGADO A SU SOAP: el ejercicio grabado en sesión comparte id con el item de ejerciciosSesion de
+    // esa nota (_grabarEjSesion mete el MISMO id en p.ejercicios y en la sesión). Mapear ejId → sesión.
+    var _sesLista = (typeof obtenerSesiones==='function') ? obtenerSesiones(currentPatient) : (currentPatient.soap||[]);
+    if(!Array.isArray(_sesLista)) _sesLista=[];
+    var _sesDeEj={};
+    _sesLista.forEach(function(s){ (Array.isArray(s&&s.ejerciciosSesion)?s.ejerciciosSesion:[]).forEach(function(es){ if(es&&es.id!=null){ var k=String(es.id); if(!_sesDeEj[k]) _sesDeEj[k]=s; } }); });
+
     // Tarjeta reutilizable (i = índice REAL en currentPatient.ejercicios → los botones no se rompen al agrupar).
-    const _cardEj = (ej, i) => {
+    // ses = sesión SOAP dueña (o null): pinta un chip clicable que lleva a esa nota.
+    const _cardEj = (ej, i, ses) => {
       const isVideo = ej.media && ej.media.type && ej.media.type.startsWith('video');
       const isImg = ej.media && ej.media.type && ej.media.type.startsWith('image');
       const srcEj = ej.media ? (ej.media.url || ej.media.data || '') : '';
+      const _pc = ej.paraCasa!==false; const _est = (ej.estado||'activo');
+      const _chip = (txt,fg,bg) => `<span style="font-size:11px;font-weight:700;border-radius:10px;padding:2px 9px;background:${bg};color:${fg}">${txt}</span>`;
+      const _statusChip = !_pc ? _chip('🏥 Solo consulta','#92400E','#FEF3C7') : (_est==='activo' ? _chip('🎯 En rutina','#2E7D52','#E8F5E9') : _chip('🕒 Anterior','#1B3A6B','#EEF4FB'));
+      const _linkChip = ses
+        ? `<span onclick="_irAlSoapDeEjercicio('${escapeAttr_(String(ses.fecha||''))}')" style="font-size:11px;font-weight:700;border-radius:10px;padding:2px 9px;background:#EEF4FB;color:#1B3A6B;cursor:pointer;border:1px solid #C7D8EE">🩺 Nota del ${ses.fecha||'—'}${ses.num?(' · Ses. '+ses.num):''} →</span>`
+        : (ej.objetivo==='Registrado en sesión' ? _chip('🩺 de una nota SOAP','#5A6478','#EEF1F5') : _chip('✍️ Creado manual','#5A6478','#EEF1F5'));
       return `<div class="ejercicio-card">
         <div class="ejercicio-header">
           <div>
             <div class="ejercicio-nombre">${ej.nombre}</div>
-            <div class="ejercicio-meta">📅 ${ej.fecha||'—'}${ej.terapeuta?(' · '+ej.terapeuta):''}${(ej.objetivo==='Registrado en sesión')?' · 🩺 de la nota SOAP':''}</div>
+            <div class="ejercicio-meta">📅 ${ej.fecha||'—'}${ej.terapeuta?(' · '+ej.terapeuta):''}</div>
           </div>
           <div style="font-size:20px">${isVideo?'🎥':isImg?'🖼️':'📝'}</div>
         </div>
         <div class="ejercicio-body">
+          <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px">${_statusChip}${_linkChip}</div>
           ${ej.media ? `<div class="ejercicio-media" onclick="verMediaEjercicio(${i})">
             ${!srcEj
               ? `<div style="padding:20px;text-align:center;color:#9BA3B5">Video no disponible</div>`
@@ -19171,22 +19186,38 @@ function renderEjercicios(){
       </div>`;
     };
 
-    // AGRUPAR por lo que ve el paciente: rutina de ahora (activo+casa) · anteriores (casa, no activo) · solo consulta.
-    const _conIdx = ejs.map((ej,i)=>({ej,i}));
-    const _rutina = _conIdx.filter(x=>x.ej.paraCasa!==false && (x.ej.estado||'activo')==='activo');
-    const _anteriores = _conIdx.filter(x=>x.ej.paraCasa!==false && (x.ej.estado||'activo')!=='activo');
-    const _soloCons = _conIdx.filter(x=>x.ej.paraCasa===false);
-    const _secc = (emoji, titulo, sub, arr, color) => arr.length ? (
-      `<div style="display:flex;align-items:center;gap:8px;margin:16px 0 3px"><span style="font-size:13px;font-weight:800;color:${color}">${emoji} ${titulo}</span><span style="font-size:11px;font-weight:800;color:#fff;background:${color};border-radius:10px;padding:1px 8px">${arr.length}</span></div>`
-      + `<div style="font-size:11px;color:var(--gray-500);margin-bottom:8px">${sub}</div>`
-      + arr.map(x=>_cardEj(x.ej, x.i)).join('')
-    ) : '';
-    html += _secc('🎯','En la rutina de ahora','Se envían al paciente al mandar el link.', _rutina, '#2E7D52');
-    html += _secc('🕒','Anteriores del paciente','El paciente los conserva en su link como "anteriores", pero ya no son la rutina activa. Toca 🕒 Anterior en un ejercicio para moverlo aquí sin borrarlo.', _anteriores, '#1B3A6B');
-    html += _secc('🏥','Solo en consulta','No se envían al paciente (ni como anteriores).', _soloCons, '#92400E');
+    // AGRUPAR POR DÍA con encabezado de fecha. Día = fecha de la sesión SOAP dueña; si no hay (creado
+    // manualmente), la fecha del propio ejercicio. Más reciente arriba; "Sin fecha" al final.
+    const _grupos={}; const _orden=[];
+    ejs.forEach((ej,i)=>{
+      const s=_sesDeEj[String(ej.id)];
+      const f=(s&&s.fecha)||ej.fecha||'';
+      const cn=((typeof _diaCanon==='function')?_diaCanon(f):'')||'';
+      if(!_grupos[cn]){ _grupos[cn]={label:f||'Sin fecha', items:[]}; _orden.push(cn); }
+      _grupos[cn].items.push({ej,i});
+    });
+    _orden.sort((a,b)=>{ if(a===b) return 0; if(a==='') return 1; if(b==='') return -1; return a<b?1:-1; });
+    _orden.forEach(cn=>{
+      const g=_grupos[cn];
+      html += `<div style="display:flex;align-items:center;gap:8px;margin:18px 0 8px;padding-bottom:4px;border-bottom:2px solid var(--gray-100)"><span style="font-size:14px;font-weight:800;color:var(--navy)">📅 ${g.label}</span><span style="font-size:11px;font-weight:800;color:#fff;background:var(--navy);border-radius:10px;padding:1px 8px">${g.items.length}</span></div>`;
+      g.items.forEach(x=>{ html += _cardEj(x.ej, x.i, _sesDeEj[String(x.ej.id)]||null); });
+    });
   }
 
   c.innerHTML = html;
+}
+// Ligado: desde la pestaña Ejercicios salta al expediente en la pestaña SOAP (el historial muestra la
+// nota de esa fecha). No abre una nota puntual (evita navegación frágil entre pantallas); lleva al
+// historial de notas, que ya trae la de ese día.
+function _irAlSoapDeEjercicio(fecha){
+  try{
+    if(Array.isArray(screenStack)) screenStack = screenStack.filter(function(s){ return s!=='screen-ejercicios'; });
+    if(!Array.isArray(screenStack)) screenStack=[];
+    if(screenStack[screenStack.length-1]!=='screen-expediente') screenStack.push('screen-expediente');
+    showScreen('screen-expediente', false);
+    if(typeof renderExpediente==='function') renderExpediente('soap');
+    if(fecha) showToast('Nota SOAP del '+fecha,'');
+  }catch(_e){}
 }
 
 function copyLink(url){
