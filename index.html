@@ -19151,14 +19151,15 @@ function renderEjercicios(){
         : _chip('🗓️ Sin nota SOAP ese día','#5A6478','#EEF1F5');
       return `<div class="ejercicio-card">
         <div class="ejercicio-header">
-          <div>
+          <div style="min-width:0;flex:1">
             <div class="ejercicio-nombre">${ej.nombre}</div>
             <div class="ejercicio-meta">📅 ${ej.fecha||'—'}${ej.terapeuta?(' · '+ej.terapeuta):''}</div>
+            <div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:5px">${_linkChip}</div>
           </div>
           <div style="font-size:20px">${isVideo?'🎥':isImg?'🖼️':'📝'}</div>
         </div>
         <div class="ejercicio-body">
-          <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px">${_statusChip}${_linkChip}</div>
+          <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px">${_statusChip}</div>
           ${ej.media ? `<div class="ejercicio-media" onclick="verMediaEjercicio(${i})">
             ${!srcEj
               ? `<div style="padding:20px;text-align:center;color:#9BA3B5">Video no disponible</div>`
