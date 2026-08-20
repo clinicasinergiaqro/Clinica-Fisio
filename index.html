@@ -20016,12 +20016,14 @@ function renderVistaPublica(p, opts={}){
   const previewTerapeuta = (typeof opts.previewTerapeuta==='boolean')
     ? opts.previewTerapeuta
     : esVistaPublicaPreviewTerapeuta();
-  // DOS ZONAS para el paciente: "Tu rutina de ahora" (se envía ahora: activo + para casa) y "Tus
-  // ejercicios anteriores" (para casa pero ya no activos: pausado/completado) → conserva los viejos y
-  // puede seguir haciéndolos. "Solo consulta" (paraCasa===false) NUNCA se muestra al paciente.
+  // BIBLIOTECA COMPLETA para el paciente, en 3 zonas por orden de prioridad: "🎯 Tu rutina de ahora"
+  // (seleccionados ON: activo + para casa), "🕒 Tus ejercicios anteriores" (ON, ya no activos:
+  // pausado/completado) y "📚 Más de tu biblioteca" (NO seleccionados: switch OFF / solo consulta), al
+  // fondo. Antes los OFF se ocultaban; por pedido de Carlos ahora también se ven, hasta abajo.
   const _paraCasa = (p.ejercicios || []).filter(e=>e.paraCasa!==false);
-  const ejs = _paraCasa.filter(e=>(e.estado||'activo')==='activo');            // rutina de ahora
-  const ejsAnteriores = _paraCasa.filter(e=>(e.estado||'activo')!=='activo');  // anteriores (el paciente los conserva)
+  const ejs = _paraCasa.filter(e=>(e.estado||'activo')==='activo');            // rutina de ahora (seleccionados ON)
+  const ejsAnteriores = _paraCasa.filter(e=>(e.estado||'activo')!=='activo');  // anteriores (seleccionados ON, ya no activos)
+  const ejsOtros = (p.ejercicios || []).filter(e=>e.paraCasa===false);         // NO seleccionados (switch OFF) → biblioteca, al fondo
   const fechaPrograma = ejs.length ? ejs[ejs.length-1].fecha : (ejsAnteriores.length ? ejsAnteriores[ejsAnteriores.length-1].fecha : todayFmt());
 
   let html = previewTerapeuta ? `<div style="position:sticky;top:0;z-index:999;background:#122950;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;color:white">
@@ -20084,7 +20086,7 @@ function renderVistaPublica(p, opts={}){
       </div>`;
   };
 
-  if(!ejs.length && !ejsAnteriores.length){
+  if(!ejs.length && !ejsAnteriores.length && !ejsOtros.length){
     html += `<div style="text-align:center;padding:40px;color:#9BA3B5">Sin ejercicios asignados aún.</div>`;
   } else {
     if(ejs.length){
@@ -20095,6 +20097,11 @@ function renderVistaPublica(p, opts={}){
       html += `<div style="font-size:15px;font-weight:800;color:#122950;margin:26px 0 4px">🕒 Tus ejercicios anteriores</div>
         <div style="font-size:12px;color:#6B7280;margin-bottom:10px">Los que trabajaste antes. Puedes seguir haciéndolos si tu terapeuta te lo indicó.</div>`;
       ejsAnteriores.forEach((ej,i) => { html += _pubCard(ej, i+1); });
+    }
+    if(ejsOtros.length){
+      html += `<div style="font-size:15px;font-weight:800;color:#122950;margin:26px 0 4px">📚 Más de tu biblioteca</div>
+        <div style="font-size:12px;color:#6B7280;margin-bottom:10px">Otros ejercicios que tienes grabados. No son parte de tu rutina de ahora, pero aquí los tienes por si tu terapeuta te los indica.</div>`;
+      ejsOtros.forEach((ej,i) => { html += _pubCard(ej, i+1); });
     }
 
     // Warning message
