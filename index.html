@@ -5602,6 +5602,10 @@ async function _computarBannerPendientes(){
     if(fechasNotas.indexOf(citaCanon)!==-1) return;   // tiene nota del día exacto
     var kMarca=_keyCitaResuelta(clave, ddmm);
     if((resueltas&&resueltas[kMarca])||(noAcudioMap&&noAcudioMap[kMarca])) return;   // el supervisor ya la sacó
+    // [NO-ACUDIÓ ROBUSTO · Jess] Fallback por el registro clínico del paciente (p.inasistencias), que sube
+    // por Sheets de forma confiable aunque el marcador citasNoAcudio de Firestore se haya quedado atorado.
+    // Solo activos (r.p cargado); en históricos el marcador Firestore + su cache es la vía.
+    if(r.tipo==='activo' && r.p && Array.isArray(r.p.inasistencias) && r.p.inasistencias.some(function(x){ return x && (_diaCanon(x.fecha)===citaCanon || _diaCanon(x.fechaISO)===citaCanon); })) return;
     var kv=clave+'|'+ddmm;
     if(vistos[kv]) return;
     vistos[kv]=true;
@@ -7465,14 +7469,29 @@ async function _detReconectarYSubir(){
     try{ if(typeof drenarColaSoapHistorico==='function') await drenarColaSoapHistorico(); }catch(_e){}
     await new Promise(function(r){ setTimeout(r, 1500); });
     try{ if(typeof drenarColaSoapHistorico==='function') await drenarColaSoapHistorico(); }catch(_e){}
-    // Resultado HONESTO: contar activos + históricos + FALLIDOS (no solo la cola activa) y el motivo real.
-    var restA=[], restF=[], restHV=[], restHF=[];
+    // [RESCATE NO-ACUDIÓ · Jess] Los marcadores "No acudió" que no persistieron dejaban la cita como
+    // pendiente FANTASMA (Jess es quien más los usa). Requeue de sus fallidos + drenar + invalidar caches
+    // del banner. drenarColaNoAcudio ya re-monta el banner al terminar.
+    try{
+      var fnA=JSON.parse(localStorage.getItem('COLA_NOACUDIO_FALLIDOS')||'[]'); if(!Array.isArray(fnA)) fnA=[];
+      if(fnA.length){
+        var vnA=JSON.parse(localStorage.getItem('COLA_NOACUDIO')||'[]'); if(!Array.isArray(vnA)) vnA=[];
+        fnA.forEach(function(it){ if(!it) return; var c=Object.assign({},it); delete c.error; delete c.intentos; vnA.push(c); });
+        localStorage.setItem('COLA_NOACUDIO', JSON.stringify(vnA));
+        localStorage.setItem('COLA_NOACUDIO_FALLIDOS','[]');
+      }
+    }catch(_e){}
+    try{ if(typeof drenarColaNoAcudio==='function') await drenarColaNoAcudio(); }catch(_e){}
+    try{ window._citasNoAcudioCache=null; window._citasResueltasCache=null; window._bannerPendCache=null; }catch(_e){}
+    // Resultado HONESTO: contar activos + históricos + no-acudió + FALLIDOS (no solo la cola activa) y el motivo real.
+    var restA=[], restF=[], restHV=[], restHF=[], restNA=[];
     try{ restA=JSON.parse(localStorage.getItem('COLA_SOAP_ACT')||'[]')||[]; }catch(_e){}
     try{ restF=JSON.parse(localStorage.getItem('COLA_SOAP_ACT_FALLIDOS')||'[]')||[]; }catch(_e){}
     try{ restHV=JSON.parse(localStorage.getItem('COLA_SYNC_HIST')||'[]')||[]; }catch(_e){}
     try{ restHF=(JSON.parse(localStorage.getItem('COLA_SYNC_HIST_FALLIDOS')||'[]')||[]).filter(function(it){ return it && it.tipo==='nueva'; }); }catch(_e){}
-    var totalRest=restA.length+restF.length+restHV.length+restHF.length;
-    var motivo=''; var _all=restA.concat(restF).concat(restHV).concat(restHF);
+    try{ restNA=(JSON.parse(localStorage.getItem('COLA_NOACUDIO')||'[]')||[]).concat(JSON.parse(localStorage.getItem('COLA_NOACUDIO_FALLIDOS')||'[]')||[]); }catch(_e){}
+    var totalRest=restA.length+restF.length+restHV.length+restHF.length+restNA.length;
+    var motivo=''; var _all=restA.concat(restF).concat(restHV).concat(restHF).concat(restNA);
     for(var i=0;i<_all.length;i++){ var mm=_all[i]&&(_all[i].ultimoError||_all[i].error); if(mm){ motivo=String(mm); break; } }
     set('🔧 Reconectar y subir', false);
     try{ actualizarIndicadorSync(); }catch(_e){}
@@ -17109,7 +17128,7 @@ async function drenarColaNoAcudio(){
   var q; try{ q=JSON.parse(localStorage.getItem('COLA_NOACUDIO')||'[]'); }catch(e){ q=[]; if(typeof _colaCorrupta==='function') _colaCorrupta('COLA_NOACUDIO',e); }
   if(!Array.isArray(q)||!q.length) return;
   var ok=await FST_init(); if(!ok||!window._fstDb) return;
-  var restantes=[], fallidos=[];
+  var restantes=[], fallidos=[], _exitos=0;
   for(var i=0;i<q.length;i++){
     var it=q[i];
     if(!it||!it.clave||!it.ddmm) continue;
@@ -17120,6 +17139,7 @@ async function drenarColaNoAcudio(){
       } else {
         await window._fstDb.collection('citasNoAcudio').doc(docId).delete();
       }
+      _exitos++;
     }catch(e){
       // Tope de reintentos: tras 6 fallos va a FALLIDOS (visible en el badge) y sale de la cola viva, para
       // NO bloquear el auto-update para siempre (mismo criterio que las otras colas).
@@ -17131,6 +17151,14 @@ async function drenarColaNoAcudio(){
   try{ localStorage.setItem('COLA_NOACUDIO', JSON.stringify(restantes)); }catch(_){}
   if(fallidos.length){
     try{ var f=JSON.parse(localStorage.getItem('COLA_NOACUDIO_FALLIDOS')||'[]'); if(!Array.isArray(f)) f=[]; f=f.concat(fallidos); if(f.length>200) f=f.slice(f.length-200); localStorage.setItem('COLA_NOACUDIO_FALLIDOS', JSON.stringify(f)); }catch(_){}
+  }
+  // [BANNER-REFRESH · Jess] Si algún "No acudió" SUBIÓ, el marcador ya está en Firestore pero el banner
+  // y el cache de citasNoAcudio seguían con la vista vieja → la cita se veía como pendiente FANTASMA aun
+  // habiéndola marcado. Invalidar caches y re-montar el banner para que el fantasma desaparezca solo.
+  if(_exitos){
+    try{ window._citasNoAcudioCache=null; }catch(_){}
+    try{ window._bannerPendCache=null; }catch(_){}
+    try{ if(typeof _montarBannerPendientes==='function') _montarBannerPendientes(); }catch(_){}
   }
 }
 function deshacerNoAcudio(pid, iid){
