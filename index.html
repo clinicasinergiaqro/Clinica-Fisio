@@ -7432,12 +7432,33 @@ async function _detReconectarYSubir(){
     try{ if(typeof drenarColaSoapActivo==='function') await drenarColaSoapActivo(); }catch(_e){}
     await new Promise(function(r){ setTimeout(r, 2500); });
     try{ if(typeof drenarColaSoapActivo==='function') await drenarColaSoapActivo(); }catch(_e){}
-    // Resultado HONESTO: contar activos + FALLIDOS (no solo la cola activa) y sacar el motivo real.
-    var restA=[], restF=[];
+    // [RESCATE HISTÓRICO] Antes esto solo rescataba activos (Sheets es su respaldo). Pero las notas de
+    // pacientes HISTÓRICOS viven SOLO en Firestore: si la sesión murió, quedaron en FALLIDOS sin red de
+    // respaldo (el caso real de Jess). Con la sesión ya reconectada, mover las NUEVAS de histórico a la
+    // cola viva y drenarlas — un solo botón repara TODO. Las ediciones (tipo!=='nueva') se dejan para
+    // revisión manual (terreno de conflicto cross-device), igual que "Verificar histórico en nube".
+    try{
+      var fH=JSON.parse(localStorage.getItem('COLA_SYNC_HIST_FALLIDOS')||'[]'); if(!Array.isArray(fH)) fH=[];
+      var nuevasH=fH.filter(function(it){ return it && it.tipo==='nueva'; });
+      var restoH=fH.filter(function(it){ return !(it && it.tipo==='nueva'); });
+      if(nuevasH.length){
+        var vivaH=JSON.parse(localStorage.getItem('COLA_SYNC_HIST')||'[]'); if(!Array.isArray(vivaH)) vivaH=[];
+        nuevasH.forEach(function(it){ var c=Object.assign({},it); delete c.error; delete c.falladoEn; delete c.intentos; delete c.proximoIntento; delete c.ultimoError; vivaH.push(c); });
+        localStorage.setItem('COLA_SYNC_HIST', JSON.stringify(vivaH));
+        localStorage.setItem('COLA_SYNC_HIST_FALLIDOS', JSON.stringify(restoH));
+      }
+    }catch(_e){}
+    try{ if(typeof drenarColaSoapHistorico==='function') await drenarColaSoapHistorico(); }catch(_e){}
+    await new Promise(function(r){ setTimeout(r, 1500); });
+    try{ if(typeof drenarColaSoapHistorico==='function') await drenarColaSoapHistorico(); }catch(_e){}
+    // Resultado HONESTO: contar activos + históricos + FALLIDOS (no solo la cola activa) y el motivo real.
+    var restA=[], restF=[], restHV=[], restHF=[];
     try{ restA=JSON.parse(localStorage.getItem('COLA_SOAP_ACT')||'[]')||[]; }catch(_e){}
     try{ restF=JSON.parse(localStorage.getItem('COLA_SOAP_ACT_FALLIDOS')||'[]')||[]; }catch(_e){}
-    var totalRest=restA.length+restF.length;
-    var motivo=''; var _all=restA.concat(restF);
+    try{ restHV=JSON.parse(localStorage.getItem('COLA_SYNC_HIST')||'[]')||[]; }catch(_e){}
+    try{ restHF=(JSON.parse(localStorage.getItem('COLA_SYNC_HIST_FALLIDOS')||'[]')||[]).filter(function(it){ return it && it.tipo==='nueva'; }); }catch(_e){}
+    var totalRest=restA.length+restF.length+restHV.length+restHF.length;
+    var motivo=''; var _all=restA.concat(restF).concat(restHV).concat(restHF);
     for(var i=0;i<_all.length;i++){ var mm=_all[i]&&(_all[i].ultimoError||_all[i].error); if(mm){ motivo=String(mm); break; } }
     set('🔧 Reconectar y subir', false);
     try{ actualizarIndicadorSync(); }catch(_e){}
