@@ -7384,6 +7384,20 @@ async function _diagnosticoEscritura(){
         out.push('LECTURA de servidor: ✅ OK (token autorizado)');
       } else { out.push('LECTURA de servidor: (sin conexión Firestore)'); }
     }catch(e){ out.push('LECTURA de servidor: ❌ ' + ((e&&(e.code||e.message))||'?')); }
+    // COLAS ATORADAS + su ERROR REAL. Clave: si la LECTURA pasa (token autorizado) pero las notas
+    // igual fallan, NO es identidad — es el contenido/regla de la escritura. Aquí sale el motivo exacto.
+    try{
+      var _q=function(k){ try{ var a=JSON.parse(localStorage.getItem(k)||'[]'); return Array.isArray(a)?a:[]; }catch(_e){ return []; } };
+      var _errs=function(a){ var m={}; a.forEach(function(it){ var e=it&&(it.ultimoError||it.error); if(e){ e=String(e).slice(0,90); m[e]=(m[e]||0)+1; } }); return Object.keys(m).map(function(k){ return m[k]+'× '+k; }); };
+      var hv=_q('COLA_SYNC_HIST'), hf=_q('COLA_SYNC_HIST_FALLIDOS'), av=_q('COLA_SOAP_ACT'), af=_q('COLA_SOAP_ACT_FALLIDOS');
+      out.push('');
+      out.push('— PENDIENTES EN ESTE EQUIPO —');
+      out.push('Histórico: ' + hv.length + ' en cola · ' + hf.length + ' fallidas');
+      out.push('Activos: ' + av.length + ' en cola · ' + af.length + ' fallidas');
+      var errs=_errs(hf).concat(_errs(af));
+      if(errs.length){ out.push('MOTIVO(S) REAL(ES):'); errs.slice(0,6).forEach(function(l){ out.push('  • ' + l); }); }
+      else if(hf.length||af.length){ out.push('(las fallidas no traen error guardado)'); }
+    }catch(_e){}
   }catch(e){ out.push('ERROR: ' + ((e&&e.message)||'?')); }
   var msg = '🩺 DIAGNÓSTICO DE ESCRITURA\n\n' + out.join('\n');
   try{ alert(msg); }catch(_){ try{ showToast(out.join(' · '),'info'); }catch(__){} }
