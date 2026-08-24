@@ -2,7 +2,7 @@
 // Service Worker — Clínica Sinergia (offline shell)
 // CAMBIAR la fecha de CACHE en cada deploy para forzar actualización
 // ═══════════════════════════════════════════════════════════
-const CACHE = 'sinergia-shell-v1-2026-08-19au';
+const CACHE = 'sinergia-shell-v1-2026-08-19av';
 const SHELL = [
   './',
   './index.html',
@@ -31,7 +31,12 @@ self.addEventListener('install', e => {
   self.skipWaiting();
   e.waitUntil((async () => {
     const c = await caches.open(CACHE);
-    try { await c.addAll(SHELL.filter(u => u !== './' && u !== './index.html')); } catch(_) {}
+    // RESILIENTE: cachear cada recurso INDIVIDUALMENTE (no addAll atómico). Si un CDN falla en una
+    // conexión mala durante la instalación, los demás IGUAL se guardan → la app queda utilizable sin
+    // conexión aunque un recurso no entrara (el que falte se re-cachea al primer uso exitoso).
+    const libs = SHELL.filter(u => u !== './' && u !== './index.html' && u !== './rutina.html');
+    await Promise.allSettled(libs.map(u => fetch(u, { cache:'no-store' }).then(r => { if (r && r.ok) return c.put(u, r.clone()); }).catch(()=>{})));
+    try { const rut = await fetch('./rutina.html?swfresh=' + Date.now(), { cache:'no-store' }); if (rut && rut.ok) await c.put('./rutina.html', rut.clone()); } catch(_) {}
     try {
       const fresh = await _fetchIndexFresco();
       if (fresh && fresh.ok) { await c.put('./index.html', fresh.clone()); await c.put('./', fresh.clone()); }
@@ -110,7 +115,11 @@ self.addEventListener('fetch', e => {
         }
         return resp;
       } catch (err) {
-        return (await caches.match('./')) || fetch(req);
+        // Último recurso: caché de index → './' → pantalla de "sin conexión" clara (nunca error en blanco).
+        const fb = (await caches.match('./index.html')) || (await caches.match('./'));
+        if (fb) return fb;
+        try { const net = await fetch(req); if (net) return net; } catch(_) {}
+        return new Response('<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><body style="font-family:-apple-system,system-ui,sans-serif;text-align:center;padding:52px 26px;color:#1B3A6B;background:#F4F6F9"><div style="font-size:46px;margin-bottom:10px">📶</div><h2 style="margin:0 0 8px">Sin conexión</h2><p style="color:#5A6478;line-height:1.5;max-width:32em;margin:0 auto">La app aún no está guardada en este equipo. Conéctate un momento a WiFi o datos para abrirla la primera vez; después abrirá sola, aun sin señal.</p></body>', { status:200, headers:{ 'Content-Type':'text/html; charset=utf-8' } });
       }
     })());
     return;
