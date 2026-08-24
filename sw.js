@@ -2,10 +2,11 @@
 // Service Worker — Clínica Sinergia (offline shell)
 // CAMBIAR la fecha de CACHE en cada deploy para forzar actualización
 // ═══════════════════════════════════════════════════════════
-const CACHE = 'sinergia-shell-v1-2026-08-19as';
+const CACHE = 'sinergia-shell-v1-2026-08-19at';
 const SHELL = [
   './',
   './index.html',
+  './rutina.html',
   'https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js',
   'https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js',
   'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js',
@@ -70,6 +71,21 @@ self.addEventListener('fetch', e => {
   // de la app aplica la versión nueva cuando sea seguro y la red lo permita. Sin copia (primera
   // instalación) sí vamos a la red con margen amplio.
   if (req.mode === 'navigate' || req.destination === 'document') {
+    // PÁGINA DEL PACIENTE (rutina.html): NO servir index.html en su lugar. Es una página ligera propia;
+    // stale-while-revalidate como el shell. Sin esto, el SW de un visitante devolvía la app pesada.
+    if (url.includes('rutina.html')) {
+      e.respondWith((async () => {
+        const cached = await caches.match('./rutina.html');
+        const fresh = fetch('./rutina.html?swfresh=' + Date.now(), { cache:'no-store' }).then(resp => {
+          if (resp && resp.ok) { const c = resp.clone(); caches.open(CACHE).then(cc => cc.put('./rutina.html', c)).catch(()=>{}); }
+          return resp;
+        }).catch(() => null);
+        if (cached) { fresh.catch(()=>{}); return cached; }
+        const net = await fresh;
+        return net || new Response('Sin conexión. Vuelve a intentar con señal.', {status:503, headers:{'Content-Type':'text/plain; charset=utf-8'}});
+      })());
+      return;
+    }
     e.respondWith((async () => {
       const cached = await caches.match('./index.html');
       if (cached) {

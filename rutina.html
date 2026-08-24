@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#122950">
+<title>Mi rutina de ejercicios · Clínica Sinergia</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  :root{--navy:#1B3A6B;--navy2:#122950;--gold:#C9A84C;--ink:#2D3344;--gray:#5A6478;--gray2:#9BA3B5;--bg:#F4F6F9;--card:#fff;--line:#E4E8EF}
+  html,body{background:var(--bg);color:var(--ink);font-family:-apple-system,'Segoe UI',system-ui,sans-serif;line-height:1.5;-webkit-text-size-adjust:100%}
+  .wrap{max-width:640px;margin:0 auto;min-height:100vh}
+  .pub-header{background:var(--navy2);color:#fff;text-align:center;padding:26px 18px 22px}
+  .pub-header .clin{font-size:11px;color:rgba(255,255,255,.6);text-transform:uppercase;letter-spacing:1px;font-weight:600}
+  .pub-header .nm{font-size:20px;font-weight:800;margin-top:6px}
+  .pub-header .fec{font-size:12px;color:rgba(255,255,255,.6);margin-top:4px}
+  .body{padding:16px 16px 44px}
+  .zt{font-size:15px;font-weight:800;color:var(--navy2);margin:10px 2px 4px}
+  .zt.mt{margin-top:26px}
+  .zsub{font-size:12px;color:var(--gray);margin:0 2px 10px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden;margin-bottom:14px;box-shadow:0 1px 3px rgba(21,33,52,.05)}
+  .chdr{background:var(--navy);color:#fff;padding:11px 14px}
+  .cnum{font-size:11px;font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:.5px}
+  .cnom{font-size:16px;font-weight:800;margin-top:1px}
+  .cmeta{font-size:11px;color:rgba(255,255,255,.6);margin-top:2px}
+  .cbody{padding:14px}
+  .media{border-radius:10px;overflow:hidden;margin-bottom:12px;background:#0E1622;display:flex;align-items:center;justify-content:center;min-height:200px}
+  .media video,.media img{width:100%;max-height:300px;object-fit:cover;display:block}
+  .nomedia{color:var(--gray2);padding:24px;font-size:13px}
+  .dosis{background:#F0F4FF;border-radius:9px;padding:10px 13px;margin-bottom:8px}
+  .dlbl{font-size:11px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px}
+  .dval{font-size:16px;font-weight:600}
+  .ind{background:#F0F4FF;border-radius:9px;padding:10px 13px;margin-bottom:8px}
+  .ind .l{font-size:11px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px}
+  .ind .t{font-size:13.5px;color:var(--ink)}
+  .prec{background:#FEF3C7;border-radius:9px;padding:10px 13px;margin-bottom:8px}
+  .prec .l{font-size:11px;font-weight:700;color:#B7791F;text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px}
+  .prec .t{font-size:13.5px;color:#92400E}
+  .warn{background:#FEF3C7;border:1px solid #F0D888;border-radius:12px;padding:13px 15px;font-size:13px;color:#8A6D1A;line-height:1.55;margin-top:6px}
+  .warn b{color:#6B5314}
+  .foot{text-align:center;margin-top:22px;font-size:12px;color:var(--gray2);line-height:1.6}
+  .state{text-align:center;padding:64px 26px}
+  .state .em{font-size:46px;margin-bottom:14px}
+  .state .t{font-size:18px;font-weight:800;color:var(--navy)}
+  .state .d{font-size:14px;color:var(--gray);margin-top:8px;line-height:1.55}
+  .btn{margin-top:18px;background:var(--navy);color:#fff;border:none;border-radius:12px;padding:13px 24px;font-size:15px;font-weight:800;cursor:pointer;font-family:inherit}
+  .banner-off{background:#FFF7E0;color:#8A6D1A;font-size:12px;text-align:center;padding:7px 12px;font-weight:600}
+  .spin{display:inline-block;width:34px;height:34px;border:3px solid #D8DEE9;border-top-color:var(--navy);border-radius:50%;animation:sp 1s linear infinite}
+  @keyframes sp{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+<div class="wrap" id="app">
+  <div class="state"><div class="spin"></div><div class="d" style="margin-top:16px">Cargando tu rutina…</div></div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+  var APPS_SCRIPT_URL='https://script.google.com/macros/s/AKfycbyM9yFDxmP-HWLyZg-v2-rfQXJlMyA_l0iozqYNkeIR-gKaZj3oEDhUrM2VBlGU0n3l/exec';
+  var app=document.getElementById('app');
+  var token=new URLSearchParams(location.search).get('ejercicios')||'';
+  var CK='PUB_EJ_'+token;
+
+  function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+  function hoyFmt(){ var d=new Date(); return String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0')+'/'+d.getFullYear(); }
+
+  function estado(){ return { spin:function(msg){ app.innerHTML='<div class="state"><div class="spin"></div><div class="d" style="margin-top:16px">'+esc(msg||'Cargando…')+'</div></div>'; },
+    error:function(sinRed){ app.innerHTML='<div class="state"><div class="em">'+(sinRed?'📶':'🔒')+'</div><div class="t">'+(sinRed?'Sin conexión':'Rutina no disponible')+'</div><div class="d">'+(sinRed?'No pudimos cargar tu rutina. Revisa tu internet o tus datos y vuelve a intentar. Si estás en datos móviles, prueba en un lugar con mejor señal.':'Este programa ya no está activo o el link es incorrecto. Contacta a tu terapeuta.')+'</div>'+(sinRed?'<button class="btn" onclick="location.reload()">🔄 Reintentar</button>':'')+'</div>'; },
+    desactivado:function(){ app.innerHTML='<div class="state"><div class="em">🔒</div><div class="t">Programa desactivado</div><div class="d">Contacta a tu terapeuta para más información.</div></div>'; } }; }
+  var UI=estado();
+
+  function tarjeta(ej, num){
+    var m=ej.media||null;
+    var src=m?(m.url||m.data||''):'';
+    var t=(m&&m.type)||'';
+    var isVid=t.indexOf('video')===0, isImg=t.indexOf('image')===0;
+    var media='';
+    if(m){
+      if(!src) media='<div class="media"><div class="nomedia">Video no disponible sin conexión</div></div>';
+      else if(isVid) media='<div class="media"><video src="'+esc(src)+'#t=0.1" controls playsinline preload="metadata"></video></div>';
+      else if(isImg) media='<div class="media"><img src="'+esc(src)+'" loading="lazy" alt=""></div>';
+      else media='<div class="media"><div class="nomedia">📎 '+esc(m.label||'Archivo')+'</div></div>';
+    }
+    var dosisTxt=ej.dosis||[ej.series,ej.repeticiones,ej.tiempo,ej.frecuencia,ej.duracion].filter(Boolean).join(' · ');
+    return '<div class="card"><div class="chdr"><div class="cnum">Ejercicio '+num+'</div><div class="cnom">'+esc(ej.nombre||ej.name||'Ejercicio')+'</div>'
+      +((ej.terapeuta||ej.fecha)?'<div class="cmeta">'+esc([ej.terapeuta,ej.fecha].filter(Boolean).join(' · '))+'</div>':'')+'</div>'
+      +'<div class="cbody">'+media
+      +(dosisTxt?'<div class="dosis"><div class="dlbl">Dosificación</div><div class="dval">'+esc(dosisTxt)+'</div></div>':'')
+      +(ej.indicaciones?'<div class="ind"><div class="l">Indicaciones</div><div class="t">'+esc(ej.indicaciones)+'</div></div>':'')
+      +(ej.precauciones?'<div class="prec"><div class="l">⚠ Precauciones</div><div class="t">'+esc(ej.precauciones)+'</div></div>':'')
+      +'</div></div>';
+  }
+
+  function render(d, offline){
+    var nombre=(d&&d.nombre)||'Paciente';
+    var items=(d&&Array.isArray(d.ejercicios))?d.ejercicios:[];
+    // Nunca mostrar privados (defensa extra; el backend no debería enviarlos).
+    var vis=items.filter(function(e){ return e && e.privado!==true; });
+    // Si el backend manda estado/paraCasa → 3 zonas; si no (payload actual), todo es "Tu rutina".
+    var tieneZonas=vis.some(function(e){ return e && (typeof e.paraCasa!=='undefined' || typeof e.estado!=='undefined'); });
+    var rutina=vis, anteriores=[], otros=[];
+    if(tieneZonas){
+      var casa=vis.filter(function(e){ return e.paraCasa!==false; });
+      rutina=casa.filter(function(e){ return (e.estado||'activo')==='activo'; });
+      anteriores=casa.filter(function(e){ return (e.estado||'activo')!=='activo'; });
+      otros=vis.filter(function(e){ return e.paraCasa===false; });
+    }
+    var fechaPrograma=(rutina[rutina.length-1]&&rutina[rutina.length-1].fecha)||(vis[vis.length-1]&&vis[vis.length-1].fecha)||hoyFmt();
+    var h='';
+    if(offline) h+='<div class="banner-off">📶 Sin conexión — mostrando tu última rutina guardada</div>';
+    h+='<div class="pub-header"><div style="font-size:34px;margin-bottom:6px">🫀</div><div class="clin">Clínica Sinergia · Fisioterapia y Rehabilitación</div><div class="nm">'+esc(nombre)+'</div><div class="fec">Programa de ejercicios · '+esc(fechaPrograma)+'</div></div>';
+    h+='<div class="body">';
+    if(!vis.length){ h+='<div class="state"><div class="em">🏃</div><div class="d">Aún no tienes ejercicios asignados.</div></div>'; }
+    else{
+      if(rutina.length){ h+='<div class="zt">🎯 Tu rutina de ahora</div>'; rutina.forEach(function(e,i){ h+=tarjeta(e,i+1); }); }
+      if(anteriores.length){ h+='<div class="zt mt">🕒 Tus ejercicios anteriores</div><div class="zsub">Los que trabajaste antes. Puedes seguir haciéndolos si tu terapeuta te lo indicó.</div>'; anteriores.forEach(function(e,i){ h+=tarjeta(e,i+1); }); }
+      if(otros.length){ h+='<div class="zt mt">📚 Más de tu biblioteca</div><div class="zsub">Otros ejercicios que tienes grabados.</div>'; otros.forEach(function(e,i){ h+=tarjeta(e,i+1); }); }
+      h+='<div class="warn"><b>⚠️ Aviso de seguridad</b><br>Realiza únicamente los ejercicios indicados por tu fisioterapeuta. Suspende si aparece dolor intenso, mareo, adormecimiento o aumento importante de síntomas. Ante cualquier duda contacta a tu terapeuta.</div>';
+    }
+    h+='<div class="foot">Clínica Sinergia · Fisioterapia y Rehabilitación<br>Juriquilla, Querétaro</div></div>';
+    app.innerHTML=h;
+  }
+
+  function fetchConTimeout(ms){
+    return Promise.race([
+      fetch(APPS_SCRIPT_URL+'?action=getEjerciciosPublicos&ejerciciosToken='+encodeURIComponent(token)).then(function(r){ return r.json(); }),
+      new Promise(function(_,rej){ setTimeout(function(){ rej(new Error('timeout')); }, ms); })
+    ]);
+  }
+
+  async function cargar(){
+    if(!token){ UI.error(false); return; }
+    // 1) CACHE-FIRST: si ya la abrió antes, mostrarla YA (funciona sin señal).
+    var cached=null;
+    try{ var raw=localStorage.getItem(CK); if(raw) cached=JSON.parse(raw); }catch(_){}
+    var pintado=false;
+    if(cached && cached.d && Array.isArray(cached.d.ejercicios)){ render(cached.d, true); pintado=true; }
+    // 2) Red con timeout + 1 reintento.
+    var d=null;
+    for(var i=0;i<2 && !d;i++){
+      if(i>0) await new Promise(function(r){ setTimeout(r,1200); });
+      try{ d=await fetchConTimeout(9000); }catch(_){}
+    }
+    if(d && (d.error||!d.ok)){ if(d.code===403){ UI.desactivado(); } else if(!pintado){ UI.error(false); } return; }
+    if(!d){ if(!pintado) UI.error(true); return; }
+    try{ localStorage.setItem(CK, JSON.stringify({ts:Date.now(), d:{nombre:d.nombre||'', ejercicios:d.ejercicios||[]}})); }catch(_){}
+    render(d, false);
+  }
+
+  cargar();
+})();
+</script>
+</body>
+</html>

@@ -19110,6 +19110,15 @@ function _modalCopiarTexto(texto){
   bClose.onclick=function(){ ov.remove(); };
   row.appendChild(bCopy); row.appendChild(bClose); box.appendChild(row); ov.appendChild(box); document.body.appendChild(ov);
 }
+// [LINK LIGERO] El link que se manda al paciente apunta a rutina.html (página mínima que abre en datos
+// móviles), NO a index.html (la app completa, pesada). Deriva la carpeta de la URL actual y le agrega
+// rutina.html?ejercicios=TOKEN. Los links viejos (a index.html?ejercicios=) siguen funcionando.
+function _rutinaLink(token){
+  var base=window.location.href.split('?')[0].split('#')[0];
+  if(base.indexOf('srcdoc')!==-1 || location.protocol==='about:') base='https://clinicasinergiaqro.github.io/Clinica-Fisio/';
+  var dir=base.replace(/[^/]*$/,'');   // carpeta: quita "index.html" o el segmento final
+  return dir+'rutina.html?ejercicios='+encodeURIComponent(token||'');
+}
 // PART 1 fix: valida que el token resuelve un doc en el backend ANTES de entregar el link.
 async function _validarLinkEjercicios(token){
   try{
@@ -19138,8 +19147,7 @@ async function enviarEjerciciosWhatsApp(){
     if(!v.ok && v.code===404){ showToast('⚠️ El link aún no sincroniza con la nube. Espera unos segundos y reintenta (revisa conexión).','warning'); return; }
   }
   // (v.code==='neterr' → no bloqueamos por fallo de red del validador; el link ya se guardó)
-  var base=window.location.href.split('?')[0].split('#')[0];
-  var link=base+'?ejercicios='+p.ejerciciosToken;
+  var link=_rutinaLink(p.ejerciciosToken);   // [LINK LIGERO] rutina.html (abre en datos móviles)
   var nombre=(p.name||'').split(' ').slice(0,2).join(' ');
   var msg='Hola '+nombre+', te compartimos el programa de ejercicios diseñado para ti por tu equipo de Clínica Sinergia. '
     +'Te pedimos realizarlo respetando la dosificación indicada en cada ejercicio para obtener el mejor resultado. '
@@ -19180,10 +19188,7 @@ function renderEjercicios(){
   const c = document.getElementById('content-ejercicios');
   const token = p.ejerciciosToken;
   const activo = p.ejerciciosLinkActivo !== false;
-  const base = window.location.href.includes('srcdoc') || window.location.protocol === 'about:' 
-    ? 'https://tuclínica.github.io/clinica' 
-    : window.location.href.split('?')[0].split('#')[0];
-  const linkUrl = `${base}?ejercicios=${token}`;
+  const linkUrl = _rutinaLink(token);   // [LINK LIGERO] rutina.html — abre en datos móviles
 
   let html = '';
 
