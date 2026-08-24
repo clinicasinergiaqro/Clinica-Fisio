@@ -4,6 +4,21 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Clínica Sinergia — Sistema Clínico</title>
+<!-- [LINK LIGERO] Redirección TEMPRANA: un link de paciente (?ejercicios=) se abre en la página ligera
+     rutina.html, que abre en datos móviles. Corre ANTES de descargar la app pesada (Firebase, etc.) y
+     aborta su carga con location.replace. Los links VIEJOS (index.html?ejercicios=) quedan cubiertos así,
+     sin reenviar nada. El preview del terapeuta apunta directo a rutina.html, no depende de esto. -->
+<script>
+(function(){
+  try{
+    var s = location.search || '';
+    if(/[?&]ejercicios=/.test(s) && location.pathname.indexOf('rutina.html')===-1){
+      var dir = location.pathname.replace(/[^/]*$/,'');
+      location.replace(dir + 'rutina.html' + s + (location.hash || ''));
+    }
+  }catch(_e){}
+})();
+</script>
 <!-- LOOP 1 — Preconnect: acelera descarga de CDN sin tocar el orden de carga -->
 <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
 <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
@@ -19442,8 +19457,7 @@ function verComoPaciente(){
     if(idxP>=0) patientsDB[idxP]=currentPatient;
     saveDB('pts',[currentPatient],{camposHist:['ejerciciosToken','ejerciciosLinkActivo']}).catch(()=>{});
   }
-  const base=window.location.href.split('?')[0].split('#')[0];
-  window.open(`${base}?ejercicios=${currentPatient.ejerciciosToken}`,'_blank');
+  window.open(_rutinaLink(currentPatient.ejerciciosToken),'_blank');   // [LINK LIGERO] preview = página real del paciente
 }
 
 // ── M1-C5: Estado del ejercicio ───────────────────────────────────────────

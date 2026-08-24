@@ -2,7 +2,7 @@
 // Service Worker — Clínica Sinergia (offline shell)
 // CAMBIAR la fecha de CACHE en cada deploy para forzar actualización
 // ═══════════════════════════════════════════════════════════
-const CACHE = 'sinergia-shell-v1-2026-08-19at';
+const CACHE = 'sinergia-shell-v1-2026-08-19au';
 const SHELL = [
   './',
   './index.html',
@@ -71,9 +71,10 @@ self.addEventListener('fetch', e => {
   // de la app aplica la versión nueva cuando sea seguro y la red lo permita. Sin copia (primera
   // instalación) sí vamos a la red con margen amplio.
   if (req.mode === 'navigate' || req.destination === 'document') {
-    // PÁGINA DEL PACIENTE (rutina.html): NO servir index.html en su lugar. Es una página ligera propia;
-    // stale-while-revalidate como el shell. Sin esto, el SW de un visitante devolvía la app pesada.
-    if (url.includes('rutina.html')) {
+    // PÁGINA DEL PACIENTE: rutina.html Y los links VIEJOS (index.html?ejercicios= / ?ejercicios=) se
+    // sirven como la página ligera, NO como la app pesada. Así hasta un link ya enviado abre en datos sin
+    // reenviar nada (en devices con el SW instalado; los que no, los cubre la redirección temprana del HTML).
+    if (url.includes('rutina.html') || /[?&]ejercicios=/.test(url)) {
       e.respondWith((async () => {
         const cached = await caches.match('./rutina.html');
         const fresh = fetch('./rutina.html?swfresh=' + Date.now(), { cache:'no-store' }).then(resp => {
