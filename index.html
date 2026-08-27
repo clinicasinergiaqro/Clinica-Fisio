@@ -8170,13 +8170,39 @@ async function _detDiagnosticoExpediente(){
       }catch(_er){ cuerpo='error de lectura: '+esc(_er&&_er.message); }
       H+=sec((did.indexOf('app_live_')===0?'🪞 ESPEJO ':'☁️ DOC ')+esc(did)+' <span style="font-weight:400;color:var(--gray-500)">(hallado por: '+esc(ids[did])+')</span>', cuerpo);
     }
+    // C.2) BÚSQUEDA AMPLIA POR PREFIJO (tolera apellido mal escrito): el censo exacto por
+    // nombreNormalizado no ve un doc/espejo escrito con OTRA ortografía. Un activo nuevo se espeja con
+    // hash(id LOCAL), así que si el expediente local ya no está en el cel su clave hash es incomputable
+    // y solo el match por nombre lo hallaría — y ese falla si el apellido difiere. Prefijo por los 2
+    // primeros tokens ("ana lilia …") lista candidatos con CUALQUIER apellido. Range de campo único →
+    // no requiere índice compuesto. SOLO lectura.
+    var _ampliaN=0, _ampliaHTML='';
+    try{
+      var _nn=(typeof FST_normalizarNombreLive==='function')?FST_normalizarNombreLive(nombre):clave;
+      var _toks=String(_nn||'').split(/\s+/).filter(Boolean);
+      var _pref=_toks.slice(0, _toks.length>=2?2:1).join(' ');
+      if(_pref){
+        var _snapP=await window._fstDb.collection('pacientes').orderBy('nombreNormalizado').startAt(_pref).endAt(_pref+'').limit(30).get();
+        var _rows=[];
+        _snapP.docs.forEach(function(dd){
+          var d=dd.data()||{};
+          var _tipo=(dd.id.indexOf('app_live_')===0)?'🪞 espejo':((dd.id.indexOf('mig_pac_')===0)?'📦 histórico':'☁️ real');
+          var _nS=Array.isArray(d.fechasSesiones)?d.fechasSesiones.length:0;
+          _rows.push('• <b>'+esc(d.name||'(sin nombre)')+'</b> — '+_tipo+(d.eliminado===true?' · <span style="color:#B91C1C">eliminado</span>':'')+' · '+_nS+' fecha(s)<br><span style="color:var(--gray-500);font-size:11px">'+esc(dd.id)+'</span>');
+        });
+        _ampliaN=_rows.length;
+        _ampliaHTML=_rows.length?_rows.join('<br>'):('sin coincidencias por prefijo "<b>'+esc(_pref)+'</b>" (probé apellido con cualquier ortografía)');
+      } else { _ampliaHTML='(nombre demasiado corto para búsqueda por prefijo)'; }
+    }catch(_ea){ _ampliaHTML='error: '+esc(_ea&&_ea.message); }
+    H+=sec('🔎 Búsqueda amplia (nombre parcial)', _ampliaHTML);
     // D) VEREDICTO
     var V=[];
     if(vinculMap&&vinculMap[clave]&&vinculMap[clave].pid) V.push('🧭 Hay VINCULACIÓN MANUAL activa hacia '+esc(vinculMap[clave].pid)+' — si ese pid no es el expediente con las notas, ESTA es la causa del pendiente falso (se corrige re-vinculando/borrando la vinculación, sin código).');
     if(notasReales>0&&idxCojo.length) V.push('🔧 ÍNDICE COJO: hay notas en el doc real pero a fechasSesiones le faltan '+esc(idxCojo.join(', '))+'.');
     if(notasReales===0&&notasEspejo>0) V.push('🪞 PID-SPLIT: las notas de la nube viven SOLO en espejo app_live_ y el doc real está vacío.');
     if(notasReales>0&&!idxCojo.length&&!(vinculMap&&vinculMap[clave])) V.push('✅ Nube consistente (notas en doc real, índice completo, sin vinculación) — si el banner aún marca pendiente, el problema está en otra capa (avísame).');
-    if(!keys.length) V.push('∅ No se encontró ningún doc en la nube por ninguna de las 4 vías.');
+    if(!keys.length) V.push('∅ No se encontró ningún doc en la nube por ninguna de las 4 vías (nombre exacto).');
+    if(_ampliaN>0) V.push('🔎 La Búsqueda amplia halló '+_ampliaN+' expediente(s) con nombre parecido — si el apellido quedó escrito distinto, la paciente es UNO de esos (revisa la lista de arriba por su nombre completo).');
     H+=sec('🩺 VEREDICTO', V.join('<br>')||'sin datos suficientes');
     H+=sec('ℹ️ Método', 'Censo por appSourceId + nombreNormalizado + espejos hash(id)/hash(nombre) + destino del resolvedor. SOLO lectura ('+keys.length+' doc(s), sin escrituras). La reparación es un paso aparte.');
   }catch(e){ H+=sec('❌ Error', esc(e&&e.message)); }
