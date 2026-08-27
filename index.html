@@ -2856,7 +2856,96 @@ function _totalPendientesSync(){ return getColaSync().length + _contarColaLS('CO
 // el guard del auto-update (aplicarActualizacionSiSegura y _recargarPorUpdate) y un fallido
 // permanente jamás drena → sumarlo ahí bloquearía la recarga automática PARA SIEMPRE.
 function _totalFallidosSync(){ return _contarColaLS('COLA_SOAP_ACT_FALLIDOS') + _contarColaLS('COLA_SYNC_HIST_FALLIDOS') + _contarColaLS('COLA_SYNC_HIST_DOC_FALLIDOS') + _contarColaLS('COLA_NOACUDIO_FALLIDOS'); }
+// ═══ SALUD DE SINCRONIZACIÓN DEL EQUIPO ═══════════════════════════════════════════════════════════
+// Cada dispositivo REPORTA a la nube (syncHealth/{deviceId}) cuántos datos tiene atorados y de qué
+// pacientes, para que el SUPERVISOR los vea TODOS desde un tablero sin tocar la app de nadie. Es la
+// respuesta a "se perdió un expediente en el cel de X": el tablero dice qué cel tiene qué atorado.
+// Requiere regla firestore.rules → match /syncHealth (publicar). Write best-effort: si falla, no pasa nada.
+function _deviceId(){
+  try{ var d=localStorage.getItem('sinergia_device_id'); if(d) return d;
+    d='dev_'+Math.random().toString(36).slice(2,10)+Math.random().toString(36).slice(2,6);
+    localStorage.setItem('sinergia_device_id', d); return d;
+  }catch(_){ return 'dev_temp'; }
+}
+function _nombrePacPorId(id){
+  id=String(id||''); if(!id) return '';
+  try{
+    var p=(Array.isArray(patientsDB)?patientsDB:[]).find(function(x){ return x && String(x.id)===id; });
+    if(p&&p.name) return p.name;
+    var li=(window._FST_listaPacientesPorId||{})[id]; if(li&&li.name) return li.name;
+    var idx=(Array.isArray(window._FST_indicePacientes)?window._FST_indicePacientes:[]).find(function(x){ return x&&String(x.id)===id; });
+    if(idx&&idx.name) return idx.name;
+  }catch(_){}
+  return '';
+}
+function _muestrasColasSync(max){
+  max=max||18; var out=[];
+  var _get=function(k){ try{ var a=JSON.parse(localStorage.getItem(k)||'[]'); return Array.isArray(a)?a:[]; }catch(_){ return []; } };
+  var push=function(q,label,error){ if(out.length<max) out.push({q:q, n:String(label||'(sin nombre)').slice(0,80), e:error?String(error).slice(0,70):''}); };
+  _get('COLA_SYNC').forEach(function(id){ push('expediente', _nombrePacPorId(id)||('id '+String(id).slice(0,8)), ''); });
+  ['COLA_SOAP_ACT','COLA_SOAP_ACT_FALLIDOS'].forEach(function(k){ var fal=k.indexOf('FALLIDOS')!==-1; _get(k).forEach(function(it){ if(!it) return; var nm=_nombrePacPorId(it.pid)||('id '+String(it.pid||'').slice(0,8)); var f=(it.sesion&&it.sesion.fecha)||''; push(fal?'nota fallida':'nota', nm+(f?(' · '+f):''), it.ultimoError||it.error); }); });
+  ['COLA_SYNC_HIST','COLA_SYNC_HIST_FALLIDOS'].forEach(function(k){ var fal=k.indexOf('FALLIDOS')!==-1; _get(k).forEach(function(it){ if(!it) return; var nm=_nombrePacPorId(it.pid)||('id '+String(it.pid||'').slice(0,8)); var f=(it.sesion&&it.sesion.fecha)||''; push(fal?'nota histórico fallida':'nota histórico', nm+(f?(' · '+f):''), it.error||it.ultimoError); }); });
+  ['COLA_SYNC_HIST_DOC','COLA_SYNC_HIST_DOC_FALLIDOS'].forEach(function(k){ var fal=k.indexOf('FALLIDOS')!==-1; _get(k).forEach(function(it){ if(!it) return; push(fal?'expediente hist. fallido':'expediente histórico', _nombrePacPorId(it.pid)||('id '+String(it.pid||'').slice(0,8)), it.error); }); });
+  ['COLA_NOACUDIO','COLA_NOACUDIO_FALLIDOS'].forEach(function(k){ var fal=k.indexOf('FALLIDOS')!==-1; _get(k).forEach(function(it){ if(!it) return; push(fal?'no acudió fallido':'no acudió', String(it.clave||'')+(it.ddmm?(' · '+it.ddmm):''), it.error); }); });
+  return out;
+}
+var _saludSyncUltimo=0, _saludSyncTimer=null;
+async function _reportarSaludSync(forzar){
+  try{
+    if(!navigator.onLine) return;
+    if(!(currentUser && (currentUser.email||currentUser.username))) return;
+    if(!forzar && (Date.now()-_saludSyncUltimo)<25000){ clearTimeout(_saludSyncTimer); _saludSyncTimer=setTimeout(function(){ _reportarSaludSync(true); }, 26000); return; }
+    _saludSyncUltimo=Date.now();
+    var ok=await FST_init(); if(!ok||!window._fstDb) return;
+    var pend={ COLA_SYNC:_contarColaLS('COLA_SYNC'), COLA_SOAP_ACT:_contarColaLS('COLA_SOAP_ACT'), COLA_SYNC_HIST:_contarColaLS('COLA_SYNC_HIST'), COLA_SYNC_HIST_DOC:_contarColaLS('COLA_SYNC_HIST_DOC'), COLA_ETIQ_HIST:_contarColaLS('COLA_ETIQ_HIST'), COLA_NOACUDIO:_contarColaLS('COLA_NOACUDIO') };
+    var fal={ COLA_SOAP_ACT_FALLIDOS:_contarColaLS('COLA_SOAP_ACT_FALLIDOS'), COLA_SYNC_HIST_FALLIDOS:_contarColaLS('COLA_SYNC_HIST_FALLIDOS'), COLA_SYNC_HIST_DOC_FALLIDOS:_contarColaLS('COLA_SYNC_HIST_DOC_FALLIDOS'), COLA_NOACUDIO_FALLIDOS:_contarColaLS('COLA_NOACUDIO_FALLIDOS') };
+    var totalPend=_totalPendientesSync(), totalFall=_totalFallidosSync();
+    var ver=''; try{ ver=((await caches.keys()).find(function(k){ return k.indexOf('sinergia-shell-')===0; }))||''; }catch(_){}
+    var docSalud={ deviceId:_deviceId(), terapeuta:String((currentUser&&currentUser.name)||''), correo:String((currentUser&&(currentUser.email||currentUser.username))||''),
+      versionApp:ver, pendientes:pend, fallidos:fal, totalPend:totalPend, totalFall:totalFall,
+      muestras:((totalPend+totalFall)>0?_muestrasColasSync(18):[]), updatedAt:firebase.firestore.FieldValue.serverTimestamp() };
+    await window._fstDb.collection('syncHealth').doc(_deviceId()).set(docSalud, {merge:true});
+  }catch(_e){ /* best-effort: si la regla no está publicada o no hay red, no pasa nada */ }
+}
+// TABLERO del supervisor: lee syncHealth de TODOS los dispositivos.
+async function _mostrarSaludSyncEquipo(){
+  if(!(typeof esSupervisorUI==='function'&&esSupervisorUI())){ showToast('Solo supervisor','error'); return; }
+  if(!navigator.onLine){ showToast('Sin conexión — el tablero lee la nube','warning'); return; }
+  var prev=document.querySelector('[data-saludsync]'); if(prev) prev.remove();
+  var ov=document.createElement('div'); ov.setAttribute('data-saludsync','1');
+  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:100002;display:flex;align-items:flex-start;justify-content:center;overflow:auto;padding:30px 12px';
+  ov.onclick=function(e){ if(e.target===ov) ov.remove(); };
+  var box=document.createElement('div'); box.style.cssText='background:#fff;border-radius:16px;width:100%;max-width:620px;padding:18px';
+  box.innerHTML='<div style="font-size:12px;color:var(--gray-400)">⏳ Leyendo el estado de cada dispositivo…</div>';
+  ov.appendChild(box); document.body.appendChild(ov);
+  try{
+    var ok=await FST_init(); if(!ok||!window._fstDb){ box.innerHTML='Sin conexión a la nube'; return; }
+    var snap=await window._fstDb.collection('syncHealth').get();
+    var devs=[]; snap.forEach(function(d){ devs.push(d.data()||{}); });
+    devs.sort(function(a,b){ var af=(a.totalFall||0), bf=(b.totalFall||0); if(af!==bf) return bf-af; return (b.totalPend||0)-(a.totalPend||0); });
+    var ahora=Date.now();
+    var _hace=function(ts){ try{ var t=(ts&&ts.toMillis)?ts.toMillis():((ts&&ts.seconds)?ts.seconds*1000:0); if(!t) return ''; var ms=ahora-t; if(ms<0) ms=0; var m=Math.round(ms/60000); if(m<1) return 'hace segundos'; if(m<60) return 'hace '+m+' min'; var h=Math.round(m/60); if(h<24) return 'hace '+h+' h'; return 'hace '+Math.round(h/24)+' d'; }catch(_){ return ''; } };
+    var filas=devs.map(function(v){
+      var tf=v.totalFall||0, tp=v.totalPend||0;
+      var color= tf>0?'#B91C1C':(tp>0?'#B45309':'#2E7D52');
+      var estado= tf>0?('🔴 '+tf+' rendida'+(tf!==1?'s':'')+(tp>0?(' · '+tp+' pend.'):'')) : (tp>0?('🟠 '+tp+' pendiente'+(tp!==1?'s':'')):'🟢 al día');
+      var mu=(Array.isArray(v.muestras)?v.muestras:[]);
+      var lista=mu.length?('<div style="margin-top:7px;display:flex;flex-direction:column;gap:3px">'+mu.map(function(m){ return '<div style="font-size:11.5px;color:#374151"><b>'+escapeHTML(m.n||'')+'</b> <span style="color:var(--gray-400)">· '+escapeHTML(m.q||'')+'</span>'+(m.e?(' <span style="color:#B91C1C">· '+escapeHTML(m.e)+'</span>'):'')+'</div>'; }).join('')+'</div>'):'';
+      return '<div style="border:1px solid var(--gray-200);border-left:4px solid '+color+';border-radius:12px;padding:11px 13px;margin-bottom:9px">'
+        +'<div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px"><div style="font-weight:800;color:var(--navy);font-size:14px">'+escapeHTML(v.terapeuta||v.correo||'(dispositivo)')+'</div><div style="font-size:12px;font-weight:800;color:'+color+';white-space:nowrap">'+estado+'</div></div>'
+        +'<div style="font-size:10.5px;color:var(--gray-400);margin-top:2px">'+escapeHTML(v.correo||'')+' · '+_hace(v.updatedAt)+(v.versionApp?(' · '+escapeHTML(String(v.versionApp).replace('sinergia-shell-',''))):'')+'</div>'
+        +lista
+        +((tp+tf)>0?'<div style="font-size:11px;color:var(--gray-500);margin-top:7px">→ Que esta persona abra <b>🔍 Revisión de este dispositivo</b> → <b>🔧 Reconectar y subir</b>.</div>':'')
+        +'</div>';
+    }).join('');
+    box.innerHTML='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px"><div style="font-size:16px;font-weight:800;color:var(--navy)">🛰️ Salud de sincronización del equipo</div><button onclick="var o=this.closest(\'[data-saludsync]\');if(o)o.remove()" style="background:none;border:none;font-size:22px;color:var(--gray-400);cursor:pointer">×</button></div>'
+      +'<div style="font-size:11.5px;color:var(--gray-500);margin-bottom:10px">Cada dispositivo reporta lo que tiene sin subir. 🔴 = notas/expedientes rendidos (avisar a esa persona), 🟠 = pendientes que se reintentan solos, 🟢 = al día.</div>'
+      +'<div style="margin-bottom:10px"><button onclick="_mostrarSaludSyncEquipo()" style="font-size:11px;font-weight:700;border:none;border-radius:10px;padding:6px 12px;cursor:pointer;font-family:inherit;background:#EEF1F6;color:var(--navy)">🔄 Actualizar</button></div>'
+      +(devs.length?filas:'<div style="color:var(--gray-400);padding:24px;text-align:center">Aún no hay reportes. Aparecerán cuando cada terapeuta abra la app (con esta versión) con internet.</div>');
+  }catch(e){ box.innerHTML='⚠️ No se pudo leer el tablero: '+((e&&e.message)||'')+'<div style="font-size:11px;color:var(--gray-500);margin-top:8px">¿Ya publicaste la regla <b>syncHealth</b> en Firestore?</div>'; }
+}
 function actualizarIndicadorSync(){
+  try{ _reportarSaludSync(); }catch(_){}   // [SALUD-SYNC] reporta el estado de este dispositivo (debounced)
   const el = document.getElementById('sync-indicator');
   if(!el) return;
   const sinNet = !navigator.onLine;
@@ -3919,6 +4008,7 @@ function entrarComo(perfil, email, silencioso){
   try{ if(typeof _FST_cargarNotasActivasEliminadas==='function') _FST_cargarNotasActivasEliminadas(); }catch(_e){}   // [BORRADO-NOTAS] carga el set de notas borradas tras login
   // Auto-sync: mostrar estado y sincronizar lo pendiente al abrir
   actualizarIndicadorSync();
+  try{ setTimeout(function(){ _reportarSaludSync(true); }, 3500); }catch(_){}   // [SALUD-SYNC] reporte inicial al tablero
   if(navigator.onLine) setTimeout(sincronizarPendientes, 1500);
   // C: precargar OpenCV en segundo plano (silencioso, no bloquea login ni agenda)
   try{
@@ -7251,6 +7341,7 @@ function _detHTMLAcciones(hayHallazgos){
     +'<button id="det-diag-escritura" onclick="_diagnosticoEscritura()" style="font-size:13px;font-weight:800;border:none;border-radius:10px;padding:9px 16px;cursor:pointer;font-family:inherit;background:#EEF1F6;color:var(--navy)">🩺 Diagnóstico de escritura</button>'
     +'<button id="det-rescatar" onclick="_detRescatar()" style="font-size:13px;font-weight:800;border:none;border-radius:10px;padding:9px 16px;cursor:pointer;font-family:inherit;background:'+(hayHallazgos?'#B91C1C':'#EEF1F6')+';color:'+(hayHallazgos?'#fff':'var(--gray-500)')+'">☁️ Rescatar (subir lo pendiente)</button>'
     +((function(){ try{ var _a=JSON.parse(localStorage.getItem('COLA_SYNC_HIST_FALLIDOS')||'[]'); return Array.isArray(_a)&&_a.some(function(it){ return it && it.tipo==='nueva'; }); }catch(e){ return false; } })()?('<button id="det-limpia-hist" onclick="_detLimpiarHistFallidos()" style="font-size:13px;font-weight:800;border:none;border-radius:10px;padding:9px 16px;cursor:pointer;font-family:inherit;background:#EEF1F6;color:var(--gray-500)">🔁 Verificar histórico en nube</button>'):'')
+    +((typeof esSupervisorUI==='function'&&esSupervisorUI())?('<button id="det-salud-sync" onclick="_mostrarSaludSyncEquipo()" style="font-size:13px;font-weight:800;border:none;border-radius:10px;padding:9px 16px;cursor:pointer;font-family:inherit;background:var(--navy);color:#fff">🛰️ Salud de sincronización del equipo</button>'):'')
     +((typeof esSupervisorUI==='function'&&esSupervisorUI())?('<button id="det-diag-exp" onclick="_detDiagnosticoExpediente()" style="font-size:13px;font-weight:800;border:none;border-radius:10px;padding:9px 16px;cursor:pointer;font-family:inherit;background:#EEF1F6;color:var(--navy)">🩺 Diagnóstico de expediente</button>'):'')
     +((typeof esSupervisorUI==='function'&&esSupervisorUI())?('<button id="det-retro-val" onclick="_retroValAbrir()" style="font-size:13px;font-weight:800;border:none;border-radius:10px;padding:9px 16px;cursor:pointer;font-family:inherit;background:#EEF1F6;color:var(--navy)">🗓️ Generar valoraciones faltantes</button>'):'')
     +((typeof esSupervisorUI==='function'&&esSupervisorUI())?('<button id="det-cur-nom" onclick="_curNombresAbrir()" style="font-size:13px;font-weight:800;border:none;border-radius:10px;padding:9px 16px;cursor:pointer;font-family:inherit;background:#EEF1F6;color:var(--navy)">🧹 Curación de nombres</button>'):'')
