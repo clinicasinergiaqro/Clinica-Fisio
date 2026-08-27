@@ -190,6 +190,20 @@ service cloud.firestore {
       allow create: if isWriter();
       allow update, delete: if false;
     }
+    // SALUD DE SINCRONIZACIÓN: cada dispositivo (writer) reporta su estado de colas para que el
+    // supervisor vea desde un tablero qué cel tiene datos atorados y de qué paciente. Un doc por
+    // dispositivo (syncHealth/{deviceId}). Escribe cualquier terapeuta SU propio reporte; lee el supervisor.
+    function saludSyncOK(){
+      return request.resource.data.keys().hasOnly([
+        'deviceId','terapeuta','correo','versionApp',
+        'pendientes','fallidos','totalPend','totalFall','muestras','updatedAt'
+      ]);
+    }
+    match /syncHealth/{docId} {
+      allow read: if isSupervisor();
+      allow create, update: if isWriter() && saludSyncOK();
+      allow delete: if isSupervisor();
+    }
     match /{path=**}/sesiones/{sesionId} {
       allow read: if isWriter();
     }
