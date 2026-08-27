@@ -2944,6 +2944,47 @@ async function _mostrarSaludSyncEquipo(){
       +(devs.length?filas:'<div style="color:var(--gray-400);padding:24px;text-align:center">Aún no hay reportes. Aparecerán cuando cada terapeuta abra la app (con esta versión) con internet.</div>');
   }catch(e){ box.innerHTML='⚠️ No se pudo leer el tablero: '+((e&&e.message)||'')+'<div style="font-size:11px;color:var(--gray-500);margin-top:8px">¿Ya publicaste la regla <b>syncHealth</b> en Firestore?</div>'; }
 }
+// [AUTO-RESCATE] Rescata TODO solo, sin que la terapeuta toque nada. Cuando la app abre/vuelve a foco
+// con sesión SANA, re-encola los FALLIDOS a las colas vivas y las drena. Antes esto SOLO pasaba tocando
+// "Reconectar y subir" a mano → si nadie lo tocaba, la nota se quedaba atorada (caso Jess/Dafne). Guardas:
+//  · throttle 25 min por sesión (los errores permanentes no giran en cada foco);
+//  · confirma con una LECTURA de servidor que la sesión está autorizada ANTES de reintentar (si la
+//    sesión está muerta, no reintenta en vano); · las ediciones de histórico (conflicto cross-device) se
+//    dejan para revisión manual, igual que el botón. El tablero se actualiza al terminar.
+async function _autoRescateFallidos(){
+  try{
+    if(!navigator.onLine) return;
+    if(!(currentUser && (currentUser.email||currentUser.username))) return;
+    if((_totalFallidosSync()||0)===0) return;   // nada rendido → nada que rescatar
+    var last=0; try{ last=Number(sessionStorage.getItem('_autoRescateTs')||0); }catch(_){}
+    if(Date.now()-last < 25*60*1000) return;    // throttle
+    var ok=await FST_init(); if(!ok||!window._fstDb) return;
+    try{ await window._fstDb.collection('pacientes').limit(1).get({source:'server'}); }
+    catch(_e){ return; }                         // lectura de servidor falla → sesión no autorizada → no reintentar en vano
+    try{ sessionStorage.setItem('_autoRescateTs', String(Date.now())); }catch(_){}
+    var mover=function(falK, vivaK, filtro){
+      try{
+        var f=JSON.parse(localStorage.getItem(falK)||'[]'); if(!Array.isArray(f)||!f.length) return;
+        var keep=[], move=[];
+        f.forEach(function(it){ if(filtro && !filtro(it)){ keep.push(it); } else { move.push(it); } });
+        if(!move.length) return;
+        var v=JSON.parse(localStorage.getItem(vivaK)||'[]'); if(!Array.isArray(v)) v=[];
+        move.forEach(function(it){ var c=Object.assign({},it); delete c.error; delete c.ultimoError; delete c.falladoEn; delete c.intentos; delete c.proximoIntento; v.push(c); });
+        localStorage.setItem(vivaK, JSON.stringify(v));
+        localStorage.setItem(falK, JSON.stringify(keep));
+      }catch(_){}
+    };
+    mover('COLA_SOAP_ACT_FALLIDOS','COLA_SOAP_ACT', null);
+    mover('COLA_SYNC_HIST_FALLIDOS','COLA_SYNC_HIST', function(it){ return it && it.tipo==='nueva'; });   // ediciones de histórico → manual
+    mover('COLA_NOACUDIO_FALLIDOS','COLA_NOACUDIO', null);
+    try{ if(typeof drenarColaSoapActivo==='function') await drenarColaSoapActivo(); }catch(_){}
+    try{ if(typeof drenarColaSoapHistorico==='function') await drenarColaSoapHistorico(); }catch(_){}
+    try{ if(typeof drenarColaNoAcudio==='function') await drenarColaNoAcudio(); }catch(_){}
+    try{ if(typeof sincronizarPendientes==='function') await sincronizarPendientes(); }catch(_){}
+    try{ actualizarIndicadorSync(); }catch(_){}
+    try{ _reportarSaludSync(true); }catch(_){}
+  }catch(_e){}
+}
 function actualizarIndicadorSync(){
   try{ _reportarSaludSync(); }catch(_){}   // [SALUD-SYNC] reporta el estado de este dispositivo (debounced)
   const el = document.getElementById('sync-indicator');
@@ -3041,6 +3082,7 @@ window.addEventListener('online', ()=>{
   setTimeout(drenarColaSoapActivo, 950);    // FIX durabilidad SOAP activos — reintentar dual-write de sesión al reconectar
   setTimeout(drenarColaHistDoc, 1000);      // LOOP C — reintentar cambios de doc de históricos al reconectar
   setTimeout(drenarColaEtiqHist, 1100);     // CAPA 1 — reintentar etiquetas/adiciones pendientes al reconectar
+  setTimeout(function(){ try{ _autoRescateFallidos(); }catch(_){} }, 2000);   // [AUTO-RESCATE] al recuperar conexión, sube lo rendido solo
 });
 window.addEventListener('offline', ()=>{ actualizarIndicadorSync(); });
 
@@ -4009,6 +4051,7 @@ function entrarComo(perfil, email, silencioso){
   // Auto-sync: mostrar estado y sincronizar lo pendiente al abrir
   actualizarIndicadorSync();
   try{ setTimeout(function(){ _reportarSaludSync(true); }, 3500); }catch(_){}   // [SALUD-SYNC] reporte inicial al tablero
+  try{ setTimeout(function(){ _autoRescateFallidos(); }, 6000); }catch(_){}     // [AUTO-RESCATE] sube lo rendido solo, sin tocar nada
   if(navigator.onLine) setTimeout(sincronizarPendientes, 1500);
   // C: precargar OpenCV en segundo plano (silencioso, no bloquea login ni agenda)
   try{
@@ -4126,6 +4169,7 @@ document.addEventListener('visibilitychange', function(){
     // tiene guard de en-curso y el borrado es por-confirmación (r.ok), nunca a ciegas.
     try{ if(typeof sincronizarPendientes==='function') sincronizarPendientes(); }catch(_){}
     try{ if(typeof drenarColaSoapActivo==='function') drenarColaSoapActivo(); }catch(_){}
+    try{ if(typeof _autoRescateFallidos==='function') _autoRescateFallidos(); }catch(_){}   // [AUTO-RESCATE] al volver a foco, sube lo rendido solo (throttle 25 min interno)
   }
 });
 
