@@ -10977,6 +10977,15 @@ function _toggleNuevoMotivoSoap(){
   var on=(box.style.display==='none');
   box.style.display=on?'block':'none';
   window._soapNuevoMotivoOn=on;
+  // MOTIVO NUEVO = primera nota del episodio → no hay contra qué comparar todavía. "Cambios que refiere
+  // el paciente" (S) y "Progreso vs. objetivos" (A) pasan a OPCIONALES: se oculta el asterisco y se
+  // muestra la nota. Al cancelar, vuelven a obligatorios. La validación de guardarSOAP lee el mismo flag.
+  try{
+    ['scambios','aevolucion'].forEach(function(f){
+      var rq=document.getElementById('req-'+f); if(rq) rq.style.display=on?'none':'';
+      var op=document.getElementById('opt-'+f); if(op) op.style.display=on?'inline':'none';
+    });
+  }catch(_){}
   if(btn){
     if(on){ btn.style.background='var(--navy)'; btn.style.color='#fff'; btn.style.border='2px solid var(--navy)'; btn.style.boxShadow='0 2px 10px rgba(27,58,107,.35)';
       btn.innerHTML='✅ MOTIVO NUEVO activo <span style="font-size:11px;font-weight:600;opacity:.85">· toca para cancelar</span>'; }
@@ -11216,7 +11225,7 @@ function renderSOAPForm(){
         <textarea class="form-input" id="f-sdolor" placeholder="Ej: 6/10 al bajar escaleras, 3/10 en reposo..."></textarea>
       </div>
       <div class="form-field">
-        <div class="form-label">Cambios que refiere el paciente <span class="req">*</span></div>
+        <div class="form-label">Cambios que refiere el paciente <span class="req" id="req-scambios">*</span><span id="opt-scambios" style="display:none;font-size:11px;font-weight:700;color:#8A6D1A"> · opcional (1ª nota del motivo nuevo)</span></div>
         <div style="font-size:11px;color:var(--gray-400);font-weight:400;margin:-2px 0 5px;line-height:1.45">En palabras del paciente o escrito por ti · sé específico: qué mejoró, qué NO sintió, en qué actividad y en qué zona.</div>
         <textarea class="form-input" id="f-scambios" placeholder="Ej: Camina más sin dolor pero al subir escaleras aún molesta la rodilla derecha; no sintió cambio en la rigidez de la mañana."></textarea>
         <div style="font-size:10.5px;color:var(--gray-400);margin:5px 0 2px">Tendencia (agrega, no borra lo escrito):</div>
@@ -11252,7 +11261,7 @@ function renderSOAPForm(){
     <div class="form-section-title" style="color:#E65100">A — Análisis</div>
     <div class="form-group">
       <div class="form-field">
-        <div class="form-label">Progreso vs. objetivos <span class="req">*</span></div>
+        <div class="form-label">Progreso vs. objetivos <span class="req" id="req-aevolucion">*</span><span id="opt-aevolucion" style="display:none;font-size:11px;font-weight:700;color:#8A6D1A"> · opcional (1ª nota del motivo nuevo)</span></div>
         <input class="form-input" type="text" id="f-aevolucion" placeholder="Ej: Semana 1, sesión 2. Respuesta inicial favorable.">
         ${chipsHTML('f-aevolucion',['En curso esperado','Más lento de lo esperado','Sin progreso','Objetivo alcanzado','Recaída','No valorable hoy'])}
       </div>
@@ -12347,11 +12356,13 @@ async function guardarSOAP(){
   const missing=[];
   if(!_esTextoLibreHist){
   if(!v('f-sdolor')) missing.push('Dolor (S)');
-  if(!v('f-scambios')) missing.push('Cambios (S)');
+  // MOTIVO NUEVO activo → "Cambios (S)" y "Progreso (A)" son opcionales (1ª nota del episodio, sin
+  // comparativa previa). Mismo flag que enciende _toggleNuevoMotivoSoap y que oculta sus asteriscos.
+  if(!window._soapNuevoMotivoOn && !v('f-scambios')) missing.push('Cambios (S)');
   // AUDITORÍA (2026-08): Hallazgos/pruebas NO obligatorio en seguimiento — no siempre se explora;
   // obligarlo hacía inventar o atorarse. Sigue capturándose cuando aplica. En valoración inicial
   // (form nuevo paciente) la exploración tiene su propia captura.
-  if(!v('f-aevolucion')) missing.push('Progreso (A)');
+  if(!window._soapNuevoMotivoOn && !v('f-aevolucion')) missing.push('Progreso (A)');
   if(!v('f-arespuesta')) missing.push('Respuesta (A)');
   if(!v('f-aanalisis')) missing.push('Análisis (A)');
   if(!v('f-pindicaciones')) missing.push('Indicaciones (P)');
