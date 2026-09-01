@@ -8192,22 +8192,33 @@ async function _detDiagnosticoExpediente(){
     // y solo el match por nombre lo hallaría — y ese falla si el apellido difiere. Prefijo por los 2
     // primeros tokens ("ana lilia …") lista candidatos con CUALQUIER apellido. Range de campo único →
     // no requiere índice compuesto. SOLO lectura.
-    var _ampliaN=0, _ampliaHTML='';
+    var _ampliaN=0, _ampliaHTML='', _ampliaPref='';
     try{
+      var _hiSent=String.fromCharCode(0xf8ff); // centinela alto → rango de prefijo [_pref, _pref+alto]
       var _nn=(typeof FST_normalizarNombreLive==='function')?FST_normalizarNombreLive(nombre):clave;
       var _toks=String(_nn||'').split(/\s+/).filter(Boolean);
-      var _pref=_toks.slice(0, _toks.length>=2?2:1).join(' ');
-      if(_pref){
-        var _snapP=await window._fstDb.collection('pacientes').orderBy('nombreNormalizado').startAt(_pref).endAt(_pref+'').limit(30).get();
-        var _rows=[];
+      // REINTENTO PROGRESIVO: 2 palabras ("ana lilia") → 1 palabra ("ana"). Si el 2º nombre o el
+      // apellido están mal escritos, el prefijo de 1 palabra IGUAL la atrapa (todo lo que empieza "ana").
+      var _intentos=[];
+      if(_toks.length>=2) _intentos.push(_toks.slice(0,2).join(' '));
+      if(_toks.length>=1) _intentos.push(_toks[0]);
+      var _rows=[];
+      for(var _pi=0; _pi<_intentos.length && !_rows.length; _pi++){
+        var _pref=_intentos[_pi]; if(!_pref) continue;
+        var _snapP=await window._fstDb.collection('pacientes').orderBy('nombreNormalizado').startAt(_pref).endAt(_pref+_hiSent).limit(60).get();
         _snapP.docs.forEach(function(dd){
           var d=dd.data()||{};
           var _tipo=(dd.id.indexOf('app_live_')===0)?'🪞 espejo':((dd.id.indexOf('mig_pac_')===0)?'📦 histórico':'☁️ real');
           var _nS=Array.isArray(d.fechasSesiones)?d.fechasSesiones.length:0;
           _rows.push('• <b>'+esc(d.name||'(sin nombre)')+'</b> — '+_tipo+(d.eliminado===true?' · <span style="color:#B91C1C">eliminado</span>':'')+' · '+_nS+' fecha(s)<br><span style="color:var(--gray-500);font-size:11px">'+esc(dd.id)+'</span>');
         });
-        _ampliaN=_rows.length;
-        _ampliaHTML=_rows.length?_rows.join('<br>'):('sin coincidencias por prefijo "<b>'+esc(_pref)+'</b>" (probé apellido con cualquier ortografía)');
+        if(_rows.length) _ampliaPref=_pref;
+      }
+      _ampliaN=_rows.length;
+      if(_rows.length){
+        _ampliaHTML='<div style="font-size:11px;color:var(--gray-500);margin-bottom:4px">Coincidencias que empiezan con "<b>'+esc(_ampliaPref)+'</b>" ('+_rows.length+'):</div>'+_rows.join('<br>');
+      } else if(_intentos.length){
+        _ampliaHTML='sin coincidencias en la nube ni siquiera por "<b>'+esc(_intentos[_intentos.length-1])+'</b>" (probé con cualquier ortografía del resto del nombre)';
       } else { _ampliaHTML='(nombre demasiado corto para búsqueda por prefijo)'; }
     }catch(_ea){ _ampliaHTML='error: '+esc(_ea&&_ea.message); }
     H+=sec('🔎 Búsqueda amplia (nombre parcial)', _ampliaHTML);
@@ -8219,6 +8230,7 @@ async function _detDiagnosticoExpediente(){
     if(notasReales>0&&!idxCojo.length&&!(vinculMap&&vinculMap[clave])) V.push('✅ Nube consistente (notas en doc real, índice completo, sin vinculación) — si el banner aún marca pendiente, el problema está en otra capa (avísame).');
     if(!keys.length) V.push('∅ No se encontró ningún doc en la nube por ninguna de las 4 vías (nombre exacto).');
     if(_ampliaN>0) V.push('🔎 La Búsqueda amplia halló '+_ampliaN+' expediente(s) con nombre parecido — si el apellido quedó escrito distinto, la paciente es UNO de esos (revisa la lista de arriba por su nombre completo).');
+    if(_ampliaN===0 && !keys.length) V.push('🚫 La nube NO tiene ningún expediente que empiece con ese nombre (probé nombre exacto y prefijo de 1 y 2 palabras). Conclusión: este expediente nunca llegó a subir — se creó en un dispositivo y se perdió antes de sincronizar (almacenamiento del cel limpiado). No es recuperable desde la nube. Si recuerdas OTRO nombre/ortografía con que pudo guardarse, búscalo; si no, hay que rehacerlo.');
     H+=sec('🩺 VEREDICTO', V.join('<br>')||'sin datos suficientes');
     H+=sec('ℹ️ Método', 'Censo por appSourceId + nombreNormalizado + espejos hash(id)/hash(nombre) + destino del resolvedor. SOLO lectura ('+keys.length+' doc(s), sin escrituras). La reparación es un paso aparte.');
   }catch(e){ H+=sec('❌ Error', esc(e&&e.message)); }
