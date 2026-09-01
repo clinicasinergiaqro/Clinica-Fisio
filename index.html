@@ -12047,7 +12047,7 @@ function _renderMediaObjetivo(){
     }).join('')+'</div>';
   }
   var cap='<input type="text" id="media-obj-etiqueta" placeholder="Etiqueta (ej: ROM rodilla D) — opcional" style="width:100%;box-sizing:border-box;border:1.5px solid var(--gray-200);border-radius:9px;padding:8px 10px;font-size:12px;font-family:inherit;margin-bottom:6px">'
-    +'<input type="file" id="media-obj-capture" accept="image/*,video/*" style="display:none" onchange="_capturarMediaObjetivo(event)">'
+    +'<input type="file" id="media-obj-capture" accept="image/*,video/*" multiple style="display:none" onchange="_capturarMediaObjetivo(event)">'
     +'<button type="button" onclick="var i=document.getElementById(\'media-obj-capture\');if(i)i.click()" style="width:100%;background:#F0F5FB;color:var(--navy);border:1.5px dashed var(--navy);border-radius:10px;padding:9px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit">📷 Agregar foto / video de valoración</button>'
     +'<div style="font-size:10.5px;color:var(--gray-400);margin-top:5px;line-height:1.4">La etiqueta amarra la foto/video a lo que mediste (ROM, marcha…) para el seguimiento por sesión.</div>';
   wrap.innerHTML=head+thumbs+cap;
@@ -12078,28 +12078,35 @@ function _renderSoapEstudios(){
   }).join('')+'</div>';
 }
 async function _capturarMediaObjetivo(ev){
-  var file=ev&&ev.target&&ev.target.files&&ev.target.files[0]; if(ev&&ev.target) ev.target.value='';
-  if(!file) return;
+  // MULTI: acepta una o VARIAS fotos/videos de un jalón. La etiqueta escrita (si hay) se aplica a TODO
+  // el lote (ej. "primeros pasos con bota"); luego se puede re-etiquetar cada uno. Sube secuencial con
+  // progreso y degrada archivo por archivo. Reutiliza la subida probada (subirMediaEjercicioAStorage).
+  var files=(ev&&ev.target&&ev.target.files)?Array.from(ev.target.files):[]; if(ev&&ev.target) ev.target.value='';
+  if(!files.length) return;
   if(!currentPatient||!currentPatient.id){ showToast('Sin paciente activo','error'); return; }
-  if(file.size>80*1024*1024){ showToast('Archivo muy pesado. Graba uno más corto.','error'); return; }
-  if(String(file.type).indexOf('video/')===0 && !navigator.onLine){ showToast('Sin conexión — conéctate para subir videos','error'); return; }
-  if(String(file.type).indexOf('image/')!==0 && String(file.type).indexOf('video/')!==0){ showToast('Solo foto o video','error'); return; }
+  if(files.some(function(f){return String(f.type).indexOf('video/')===0;}) && !navigator.onLine){ showToast('Sin conexión — conéctate para subir videos','error'); return; }
   var _pidMO=currentPatient.id;   // identidad al iniciar (la subida es async)
-  showToast('☁️ Subiendo…','');
-  try{
-    var res=await subirMediaEjercicioAStorage(file);   // reutiliza la subida (guarda bajo /ejercicios pero sirve)
-    // FUGA ENTRE PACIENTES (auditoría): si cambiaste de paciente durante la subida, tempMediaObjetivo
-    // ya es el del OTRO → descartar para no adjuntar el registro visual de A a la nota de B.
-    if(!currentPatient || currentPatient.id!==_pidMO){ showToast('Cambiaste de paciente — no se adjuntó','warning'); return; }
-    if(!Array.isArray(tempMediaObjetivo)) tempMediaObjetivo=[];
-    var _inpEtq=document.getElementById('media-obj-etiqueta');
-    var _etq=(_inpEtq&&_inpEtq.value?String(_inpEtq.value).trim():'').slice(0,60);
-    tempMediaObjetivo.push({ id:'mo'+Date.now(), type:file.type, url:res.url, fbPath:res.fbPath, etiqueta:_etq });
-    if(_inpEtq) _inpEtq.value='';
-    _renderMediaObjetivo(); marcarDirty();
-    try{ if(typeof guardarBorradorSoap==='function') guardarBorradorSoap(); }catch(_){}
-    showToast('✅ Registro visual agregado','success');
-  }catch(e){ console.warn('[media-obj]', e&&e.message); showToast('No se pudo subir: '+((e&&e.message)||'error'),'error'); }
+  if(!Array.isArray(tempMediaObjetivo)) tempMediaObjetivo=[];
+  var _inpEtq=document.getElementById('media-obj-etiqueta');
+  var _etq=(_inpEtq&&_inpEtq.value?String(_inpEtq.value).trim():'').slice(0,60);
+  var ok=0, fallo=0;
+  for(var i=0;i<files.length;i++){
+    var f=files[i];
+    if(f.size>80*1024*1024){ fallo++; showToast('“'+(f.name||'archivo')+'” muy pesado, se omitió','warning'); continue; }
+    if(String(f.type).indexOf('image/')!==0 && String(f.type).indexOf('video/')!==0){ fallo++; continue; }
+    showToast('☁️ Subiendo '+(i+1)+' de '+files.length+'…','');
+    try{
+      var res=await subirMediaEjercicioAStorage(f);   // reutiliza la subida (guarda bajo /ejercicios pero sirve)
+      // FUGA ENTRE PACIENTES (auditoría): si cambiaste de paciente durante la subida, descartar el resto.
+      if(!currentPatient || currentPatient.id!==_pidMO){ showToast('Cambiaste de paciente — no se adjuntó','warning'); break; }
+      tempMediaObjetivo.push({ id:'mo'+Date.now()+'_'+i, type:f.type, url:res.url, fbPath:res.fbPath, etiqueta:_etq });
+      ok++;
+    }catch(e){ console.warn('[media-obj]', e&&e.message); fallo++; }
+  }
+  if(_inpEtq) _inpEtq.value='';
+  _renderMediaObjetivo();
+  if(ok){ marcarDirty(); try{ if(typeof guardarBorradorSoap==='function') guardarBorradorSoap(); }catch(_){} showToast('✅ '+ok+' registro(s) visual(es) agregado(s)'+(fallo?(' · '+fallo+' con error'):''),'success'); }
+  else { showToast('No se pudo subir'+(fallo?(' ('+fallo+' con error)'):''),'error'); }
 }
 function _etiquetarMediaObjetivo(id){
   id=String(id);
