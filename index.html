@@ -11422,7 +11422,7 @@ function renderSOAPForm(){
   <div class="form-section">
     <div class="form-section-title">📷 Fotos de sesión</div>
     <input type="file" id="si-foto" accept="image/*" capture="environment" style="display:none" onchange="handleSoapPhoto(event,'foto')">
-    <input type="file" id="si-gal" accept="image/*" multiple style="display:none" onchange="handleSoapPhoto(event,'gal')">
+    <input type="file" id="si-gal" accept="image/*,video/*" multiple style="display:none" onchange="handleSoapPhoto(event,'gal')">
     <input type="file" id="si-doc" accept="*/*" multiple style="display:none" onchange="handleSoapPhoto(event,'doc')">
     <div class="media-btn-row">
       <button class="media-btn" onclick="document.getElementById('si-foto').click()"><span class="media-icon">📷</span>Foto</button>
@@ -19823,6 +19823,7 @@ function renderNuevoEjercicioForm(){
     <input type="file" id="ej-inp-video" accept="video/*" capture="environment" style="display:none" onchange="handleEjMedia(event,'video')">
     <input type="file" id="ej-inp-foto" accept="image/*" capture="environment" style="display:none" onchange="handleEjMedia(event,'foto')">
     <input type="file" id="ej-inp-galeria" accept="video/*,image/*" style="display:none" onchange="handleEjMedia(event,'galeria')">
+    <input type="file" id="ej-inp-multi" accept="video/*,image/*" multiple style="display:none" onchange="_subirVariosEjercicios(event)">
     <div id="ej-media-preview" style="margin-bottom:10px">
       ${ej.media ? renderEjMediaPreview(ej.media) : ''}
     </div>
@@ -19837,6 +19838,7 @@ function renderNuevoEjercicioForm(){
         <span class="media-icon">🖼️</span>Galería
       </button>
     </div>
+    ${(currentEjercicio && currentEjercicio._editIdx!==undefined) ? '' : `<div style="padding:0 14px 4px"><button type="button" onclick="document.getElementById('ej-inp-multi').click()" style="width:100%;background:#EEF4FB;color:var(--navy);border:1.5px dashed var(--navy);border-radius:var(--radius);padding:11px;font-size:13.5px;font-weight:800;cursor:pointer;font-family:inherit">📥 Subir varios videos de un jalón</button><div style="font-size:11px;color:var(--gray-400);margin-top:4px;line-height:1.4">Elige varios de la galería: crea un ejercicio por cada uno (con el nombre del archivo). Luego editas nombre y dosis de cada uno.</div></div>`}
   </div>
 
   <div class="form-section">
@@ -20055,6 +20057,62 @@ function clearEjMedia(){
   const preview = document.getElementById('ej-media-preview');
   if(preview) preview.innerHTML = '';
   try{ if(typeof guardarBorradorEjercicio==='function') guardarBorradorEjercicio(); }catch(_){}
+}
+
+// SUBIR VARIOS EJERCICIOS DE UN JALÓN: elige N videos/fotos de la galería → crea UN ejercicio por cada
+// archivo (nombre = nombre del archivo; dosis/indicaciones por definir, editables después). Cada subida
+// va a Firebase Storage con la misma ruta probada (subirMediaEjercicioAStorage). Persiste UNA sola vez
+// al final (saveDB camposHist:['ejercicios']). No toca el flujo de 1-por-1; es un camino aparte.
+async function _subirVariosEjercicios(ev){
+  const files = Array.from(ev.target.files||[]);
+  ev.target.value='';
+  if(!files.length) return;
+  if(!currentPatient){ showToast('No hay paciente activo','error'); return; }
+  // Videos requieren conexión (igual que handleEjMedia).
+  if(files.some(f=>f.type&&f.type.startsWith('video/')) && !navigator.onLine){
+    showToast('Sin conexión. Conéctate para subir videos.','error'); return;
+  }
+  const _pidEj = currentPatient.id;
+  const ter = (currentUser && currentUser.role==='terapeuta') ? currentUser.name : (currentPatient.terapeuta||'');
+  const preview = document.getElementById('ej-media-preview');
+  const btnGuardar = document.getElementById('btn-guardar-ej');
+  if(btnGuardar) btnGuardar.disabled = true;
+  if(!currentPatient.ejercicios) currentPatient.ejercicios = [];
+  let ok=0, fallo=0;
+  for(let i=0;i<files.length;i++){
+    const f=files[i];
+    if(preview) preview.innerHTML = '<div style="padding:12px;color:var(--gray-400)">⏳ Subiendo '+(i+1)+' de '+files.length+'…</div>';
+    if(f.size > 80*1024*1024){ fallo++; showToast('“'+(f.name||'archivo')+'” muy pesado, se omitió','warning'); continue; }
+    try{
+      let media=null;
+      if(f.type && (f.type.startsWith('video/')||f.type.startsWith('image/'))){
+        const { url, fbPath } = await subirMediaEjercicioAStorage(f);
+        media={ id:'media_'+Date.now()+'_'+i, name:f.name, label:(f.name||'').replace(/\.[^.]+$/,''), type:f.type, mimeType:f.type, sizeBytes:f.size, storageProvider:'firebase', fbPath, url, data:null };
+      } else { fallo++; continue; }
+      // Guard fuga entre pacientes (la subida es async).
+      if(!currentPatient || currentPatient.id!==_pidEj){ showToast('Cambiaste de paciente — se detuvo la subida','warning'); break; }
+      const nombre=(media.label||('Ejercicio '+todayFmt()));
+      currentPatient.ejercicios.push({
+        id:'ej'+Date.now()+'_'+i, nombre:nombre, name:nombre,
+        objetivo:'Ejercicio terapéutico indicado en plan de rehabilitación',
+        dosis:'Por definir', series:'', repeticiones:'', tiempo:'', frecuencia:'', duracion:'',
+        indicaciones:'Por definir', precauciones:'', observaciones:'',
+        fecha:todayFmt(), terapeuta:ter, estado:'activo', paraCasa:true, media:media
+      });
+      ok++;
+    }catch(err){ console.warn('[subir-varios-ej]', err&&err.message); fallo++; }
+  }
+  if(preview) preview.innerHTML='';
+  if(btnGuardar) btnGuardar.disabled = false;
+  if(!ok){ showToast('No se pudo subir ningún video'+(fallo?(' ('+fallo+' con error)'):''),'error'); return; }
+  const idxP = patientsDB.findIndex(x=>x.id===currentPatient.id);
+  if(idxP>=0) patientsDB[idxP]=currentPatient;
+  try{ if(typeof window._FST_invalidarVistaPacientes==='function') window._FST_invalidarVistaPacientes(); }catch(_){}
+  saveDB('pts', [currentPatient], {camposHist:['ejercicios']}).then(res=>{
+    showToast((res&&res.ok?'✅ ':'⚠️ ')+ok+' ejercicio'+(ok!==1?'s':'')+(res&&res.ok?' subido'+(ok!==1?'s':''):' guardados local')+(fallo?(' · '+fallo+' con error'):''), res&&res.ok?'success':'warning');
+    goBack();
+    setTimeout(()=>{ try{ renderEjercicios(); }catch(_){} }, 300);
+  }).catch(()=>{ showToast('⚠️ '+ok+' guardados local — se subirán al reconectar','warning'); goBack(); setTimeout(()=>{ try{ renderEjercicios(); }catch(_){} }, 300); });
 }
 
 // ── BORRADOR ANTI-PÉRDIDA del formulario de EJERCICIO (mismo patrón que Nuevo/SOAP) ──────
