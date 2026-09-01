@@ -9359,7 +9359,7 @@ function renderExpediente(tab='historia'){
   if(tab==='soap'){
     html+=generarGraficaEVA(p);
     // Botón "No acudió": registra inasistencia sin crear nota → silencia la alerta semanal esa semana.
-    html+=`<div style="text-align:right;margin:0 0 10px"><button data-pid="${escapeAttr_(p.id)}" onclick="marcarNoAcudio(this.dataset.pid)" style="background:#FFFBEB;border:1px solid #FDE68A;color:#92400E;border-radius:16px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer">🚫 No acudió</button></div>`;
+    html+=`<div style="display:flex;justify-content:flex-end;gap:6px;margin:0 0 10px;flex-wrap:wrap"><button data-pid="${escapeAttr_(p.id)}" onclick="verEvolucionVisual(this.dataset.pid)" style="background:#EEF4FB;border:1px solid #C7DBF0;color:var(--navy);border-radius:16px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer">📈 Evolución visual</button><button data-pid="${escapeAttr_(p.id)}" onclick="marcarNoAcudio(this.dataset.pid)" style="background:#FFFBEB;border:1px solid #FDE68A;color:#92400E;border-radius:16px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer">🚫 No acudió</button></div>`;
     if(Array.isArray(p.inasistencias)&&p.inasistencias.length){
       const _inas=p.inasistencias.slice().sort((a,b)=>String(b.fechaISO||'').localeCompare(String(a.fechaISO||'')));
       html+=`<div style="margin:0 0 12px;padding:8px 12px;background:#FFFBEB;border:1px solid #FDE68A;border-radius:10px">
@@ -12024,6 +12024,67 @@ function _borrarEjSesion(id){
 // ── FASE 2: VALORACIÓN VISUAL (foto/video en el bloque O) ─────────────────────
 // Documenta el movimiento de forma objetiva: foto para medir ángulo, video para biomecánica.
 // Se sube a Storage y queda ligado a la nota (datosNota.mediaObjetivo). Reutiliza el visor y la subida.
+// Etiquetas rápidas para el seguimiento visual por sesión. Tocas → llena el campo de etiqueta y ese
+// texto se aplica a la(s) foto(s)/video(s) que subas enseguida. Consistentes → alimentan la línea de
+// tiempo por etiqueta (verEvolucionVisual). Editable a mano si necesitas algo distinto.
+var _ETIQ_VALORACION=['🩹 Equimosis','⚕️ Cicatriz','💧 Inflamación','🦵 Marcha c/bota','👣 Apoyo inicial','📐 ROM','💪 Fuerza','🚶 Marcha'];
+function _setEtqObjetivo(txt){
+  var i=document.getElementById('media-obj-etiqueta'); if(!i) return;
+  i.value=String(txt||''); try{ i.focus(); }catch(_){}
+}
+// LÍNEA DE TIEMPO POR ETIQUETA: reúne TODAS las fotos/videos de valoración (mediaObjetivo) de todas las
+// sesiones del paciente, las agrupa por etiqueta y las muestra en fila por orden de fecha → se ve la
+// evolución de un vistazo (equimosis que baja, apoyo que mejora…). SOLO lectura.
+function verEvolucionVisual(pid){
+  var p=(typeof _resolverPaciente==='function')?_resolverPaciente(pid):null;
+  if(!p) p=(Array.isArray(patientsDB)?patientsDB:[]).find(function(x){return x&&x.id===pid;})||currentPatient;
+  if(!p){ showToast('Sin paciente','error'); return; }
+  var ses=(typeof obtenerSesionesVisibles==='function')?obtenerSesionesVisibles(p):((typeof obtenerSesiones==='function')?obtenerSesiones(p):(p.soap||[]));
+  if(ses===null){ showToast('Cargando historial… abre la pestaña SOAP y reintenta en unos segundos','warning'); return; }
+  ses=Array.isArray(ses)?ses:[];
+  var _iso=function(f){ if(!f) return ''; f=String(f); if(/^\d{4}-\d{2}-\d{2}/.test(f)) return f.slice(0,10); var pz=f.split('/'); return (pz.length===3)?(pz[2]+'-'+('0'+pz[1]).slice(-2)+'-'+('0'+pz[0]).slice(-2)):''; };
+  var esc=function(s){ return (typeof escapeHTML==='function')?escapeHTML(String(s==null?'':s)):String(s==null?'':s); };
+  var grupos={};
+  ses.forEach(function(s){
+    if(!s||!Array.isArray(s.mediaObjetivo)) return;
+    s.mediaObjetivo.forEach(function(m){
+      if(!m) return; var src=m.url||m.data||''; if(!src) return;
+      var etq=String(m.etiqueta||'').trim()||'(sin etiqueta)';
+      (grupos[etq]||(grupos[etq]=[])).push({ src:src, type:String(m.type||''), fecha:String(s.fecha||''), iso:_iso(s.fecha) });
+    });
+  });
+  var claves=Object.keys(grupos);
+  claves.forEach(function(k){ grupos[k].sort(function(a,b){ return String(a.iso).localeCompare(String(b.iso)); }); });
+  claves.sort(function(a,b){ if(a==='(sin etiqueta)') return 1; if(b==='(sin etiqueta)') return -1; return grupos[b].length-grupos[a].length; });
+  var cuerpo;
+  if(!claves.length){
+    cuerpo='<div style="padding:24px;text-align:center;color:var(--gray-400);font-size:13px">Aún no hay fotos/videos de valoración etiquetados.<br>En una nota SOAP, sección <b>O — Objetivo</b>, agrega foto/video y ponle etiqueta (equimosis, marcha…).</div>';
+  } else {
+    cuerpo=claves.map(function(k){
+      var items=grupos[k];
+      var row=items.map(function(it){
+        var verArgs=JSON.stringify(it.src).replace(/"/g,'&quot;')+','+JSON.stringify(it.type).replace(/"/g,'&quot;')+','+JSON.stringify(k+' · '+it.fecha).replace(/"/g,'&quot;');
+        var inner=(it.type.indexOf('video')===0)
+          ? '<video src="'+esc(it.src)+'" preload="metadata" muted playsinline style="width:100%;height:100%;object-fit:cover"></video><div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:20px;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.7)">▶</div>'
+          : '<img src="'+esc(it.src)+'" loading="lazy" style="width:100%;height:100%;object-fit:cover">';
+        return '<div style="flex:none;width:96px;display:flex;flex-direction:column;align-items:center">'
+          +'<div onclick="_verMediaSesion('+verArgs+')" style="width:96px;height:96px;border-radius:10px;overflow:hidden;position:relative;background:#0E1622;cursor:pointer">'+inner+'</div>'
+          +'<div style="font-size:10px;color:var(--gray-500);margin-top:3px;text-align:center">'+esc(it.fecha||'—')+'</div>'
+          +'</div>';
+      }).join('');
+      return '<div style="margin-bottom:16px">'
+        +'<div style="font-size:13px;font-weight:800;color:var(--navy);margin-bottom:6px">'+esc(k)+' <span style="font-weight:400;color:var(--gray-400)">· '+items.length+'</span></div>'
+        +'<div style="display:flex;gap:10px;overflow-x:auto;padding-bottom:6px;-webkit-overflow-scrolling:touch">'+row+'</div>'
+        +'</div>';
+    }).join('');
+  }
+  var prev=document.getElementById('evo-visual-ov'); if(prev) prev.remove();
+  var ov=document.createElement('div'); ov.id='evo-visual-ov';
+  ov.style.cssText='position:fixed;inset:0;background:rgba(18,41,80,.55);z-index:100001;display:flex;align-items:flex-start;justify-content:center;overflow:auto;padding:24px 10px';
+  ov.onclick=function(e){ if(e.target===ov) ov.remove(); };
+  ov.innerHTML='<div style="background:#fff;border-radius:16px;width:100%;max-width:640px;padding:16px"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px"><div style="font-size:16px;font-weight:800;color:var(--navy)">📈 Evolución visual — '+esc(p.name||'')+'</div><button onclick="var o=document.getElementById(\'evo-visual-ov\');if(o)o.remove()" style="background:none;border:none;font-size:22px;color:var(--gray-400);cursor:pointer">×</button></div><div style="font-size:11.5px;color:var(--gray-500);margin-bottom:12px">Fotos/videos de valoración agrupados por etiqueta, en orden de fecha. Toca uno para verlo grande.</div>'+cuerpo+'</div>';
+  document.body.appendChild(ov);
+}
 function _renderMediaObjetivo(){
   var wrap=document.getElementById('media-obj-wrap'); if(!wrap) return;
   var arr=Array.isArray(tempMediaObjetivo)?tempMediaObjetivo:[];
@@ -12046,7 +12107,11 @@ function _renderMediaObjetivo(){
         +'</div>';
     }).join('')+'</div>';
   }
-  var cap='<input type="text" id="media-obj-etiqueta" placeholder="Etiqueta (ej: ROM rodilla D) — opcional" style="width:100%;box-sizing:border-box;border:1.5px solid var(--gray-200);border-radius:9px;padding:8px 10px;font-size:12px;font-family:inherit;margin-bottom:6px">'
+  var _chips='<div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:6px">'+_ETIQ_VALORACION.map(function(e){
+      return '<button type="button" onclick="_setEtqObjetivo('+JSON.stringify(e).replace(/"/g,'&quot;')+')" style="font-size:11px;font-weight:700;border:1.5px solid var(--gray-200);background:#fff;color:var(--navy);border-radius:14px;padding:5px 10px;cursor:pointer;font-family:inherit">'+escapeHTML(e)+'</button>';
+    }).join('')+'</div>';
+  var cap=_chips
+    +'<input type="text" id="media-obj-etiqueta" placeholder="Etiqueta (toca un botón o escribe) — opcional" style="width:100%;box-sizing:border-box;border:1.5px solid var(--gray-200);border-radius:9px;padding:8px 10px;font-size:12px;font-family:inherit;margin-bottom:6px">'
     +'<input type="file" id="media-obj-capture" accept="image/*,video/*" multiple style="display:none" onchange="_capturarMediaObjetivo(event)">'
     +'<button type="button" onclick="var i=document.getElementById(\'media-obj-capture\');if(i)i.click()" style="width:100%;background:#F0F5FB;color:var(--navy);border:1.5px dashed var(--navy);border-radius:10px;padding:9px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit">📷 Agregar foto / video de valoración</button>'
     +'<div style="font-size:10.5px;color:var(--gray-400);margin-top:5px;line-height:1.4">La etiqueta amarra la foto/video a lo que mediste (ROM, marcha…) para el seguimiento por sesión.</div>';
