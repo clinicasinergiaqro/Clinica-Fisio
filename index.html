@@ -14117,36 +14117,47 @@ async function agregarEstudioLink(pid){
 }
 
 // Subida PROPIA (decisión #2): NO duplica en p.docs; registra en p.estudiosDocs[].
+// MULTI: acepta VARIOS archivos de un jalón (p.ej. varios PDFs). Pregunta la fecha UNA vez y la aplica
+// a todos, sube cada uno con progreso y persiste UNA sola vez al final. Degrada limpio archivo por archivo.
 function agregarEstudioArchivo(pid, tipo){
   var p = _resolverPaciente(pid);
   if (!p) return;
   var inp = document.createElement('input');
   inp.type = 'file';
+  inp.multiple = true;
   inp.accept = (tipo==='imagen') ? 'image/*' : '*/*';
   inp.onchange = async function(ev){
-    var f = ev.target.files && ev.target.files[0];
-    if (!f) return;
-    if (f.size > 15*1024*1024) { showToast('⚠️ '+f.name+' supera 15MB — omitido','error'); return; }
-    var fecha = await _pedirFechaEstudio();   // ISO aaaa-mm-dd (calendario nativo)
+    var files = Array.from(ev.target.files||[]);
+    if (!files.length) return;
+    var fecha = await _pedirFechaEstudio();   // ISO aaaa-mm-dd (una sola vez para todo el lote)
     if (!fecha) return;
+    if (!Array.isArray(p.estudiosDocs)) p.estudiosDocs = [];
+    var ok=0, fallo=0;
+    for (var i=0;i<files.length;i++){
+      var f=files[i];
+      if (f.size > 15*1024*1024) { fallo++; showToast('⚠️ '+(f.name||'archivo')+' supera 15MB — omitido','error'); continue; }
+      try {
+        showToast('☁️ Subiendo '+(i+1)+' de '+files.length+'…','');
+        var ts = Date.now();
+        var fbPath = 'clinica/sinergia/'+pid+'/estudios/'+ts+'_'+i+'_'+(f.name||'archivo').replace(/[^\w.\-]/g,'_');
+        var ref = fbStorage.ref(fbPath);
+        var url = await new Promise(function(resolve,reject){
+          var task = ref.put(f);
+          task.on('state_changed', null, function(err){ reject(err); }, async function(){ try{ resolve(await task.snapshot.ref.getDownloadURL()); }catch(e){ reject(e); } });
+        });
+        p.estudiosDocs.push({ id:'est_'+ts+'_'+i+'_'+Math.random().toString(36).slice(2,6), tipo:tipo, url:url, fbPath:fbPath, descripcion:(f.name||'').replace(/\.[^.]+$/,''), fechaEstudio:fecha, fechaAgregado:new Date().toLocaleDateString('es-MX'), agregadoPor:currentUser.name });
+        ok++;
+      } catch(e){ fallo++; console.warn('[estudio multi]', e&&e.message); }
+    }
+    if (!ok){ showToast('❌ No se subió ningún estudio'+(fallo?(' ('+fallo+' con error)'):''),'error'); return; }
     try {
-      showToast('☁️ Subiendo '+f.name+'…','');
-      var ts = Date.now();
-      var fbPath = 'clinica/sinergia/'+pid+'/estudios/'+ts+'_'+(f.name||'archivo').replace(/[^\w.\-]/g,'_');
-      var ref = fbStorage.ref(fbPath);
-      var url = await new Promise(function(resolve,reject){
-        var task = ref.put(f);
-        task.on('state_changed', null, function(err){ reject(err); }, async function(){ try{ resolve(await task.snapshot.ref.getDownloadURL()); }catch(e){ reject(e); } });
-      });
-      if (!Array.isArray(p.estudiosDocs)) p.estudiosDocs = [];
-      p.estudiosDocs.push({ id:'est_'+ts+'_'+Math.random().toString(36).slice(2,6), tipo:tipo, url:url, fbPath:fbPath, descripcion:(f.name||'').replace(/\.[^.]+$/,''), fechaEstudio:fecha, fechaAgregado:new Date().toLocaleDateString('es-MX'), agregadoPor:currentUser.name });
       var _re = await _persistirEstudios(p);
       if (window._estudiosCache) delete window._estudiosCache[pid];
-      if(_re && _re.pendiente) showToast('📴 Estudio guardado — se sincronizará al reconectar','warning');
-      else if(_re && _re.ok!==false) showToast('✅ Estudio agregado','success');
-      else showToast('⚠️ Estudio guardado local, la nube no confirmó — se reintentará','warning');
+      if(_re && _re.pendiente) showToast('📴 '+ok+' estudio(s) guardado(s) — se sincronizará al reconectar','warning');
+      else if(_re && _re.ok!==false) showToast('✅ '+ok+' estudio(s) agregado(s)'+(fallo?(' · '+fallo+' con error'):''),'success');
+      else showToast('⚠️ '+ok+' guardado(s) local, la nube no confirmó — se reintentará','warning');
       FST_renderEstudiosApartado(pid); if(typeof _renderSoapEstudios==='function') _renderSoapEstudios();
-    } catch(e){ showToast('❌ Error subiendo: '+e.message,'error'); }
+    } catch(e){ showToast('❌ Error: '+e.message,'error'); }
   };
   inp.click();
 }
