@@ -196,7 +196,10 @@ service cloud.firestore {
     function saludSyncOK(){
       return request.resource.data.keys().hasOnly([
         'deviceId','terapeuta','correo','versionApp',
-        'pendientes','fallidos','totalPend','totalFall','muestras','updatedAt'
+        'pendientes','fallidos','totalPend','totalFall','muestras','updatedAt',
+        // RESPALDO EN NUBE: expedientes activos creados en el cel que aún no confirman en la nube.
+        // El front reintenta el write SIN estos campos si la regla no se ha republicado (no rompe el tablero).
+        'sinRespaldo','sinRespaldoMuestras'
       ]);
     }
     match /syncHealth/{docId} {

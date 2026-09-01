@@ -2905,6 +2905,17 @@ function _muestrasColasSync(max){
   ['COLA_NOACUDIO','COLA_NOACUDIO_FALLIDOS'].forEach(function(k){ var fal=k.indexOf('FALLIDOS')!==-1; _get(k).forEach(function(it){ if(!it) return; push(fal?'no acudió fallido':'no acudió', String(it.clave||'')+(it.ddmm?(' · '+it.ddmm):''), it.error); }); });
   return out;
 }
+// ── RESPALDO EN NUBE (anti-pérdida de expediente nuevo) ────────────────────────────────────────────
+// Set de ids de pacientes ACTIVOS creados en ESTE cel que AÚN no se confirman en la nube (ni Sheets
+// ni espejo Firestore). Mientras un id esté aquí: la app pinta "⚠️ Sin respaldo en la nube" en ese
+// paciente y lo reporta al tablero del supervisor. Se limpia en cuanto saveDB confirma, el dual-write
+// del espejo confirma, o el paciente regresa desde la nube (loadFromCloud). Caso Ana Lilia: así ya no
+// se pierde en silencio — quien lo creó VE que falta subir y el supervisor lo ve desde su tablero.
+function _sinRespaldoGet(){ try{ var a=JSON.parse(localStorage.getItem('SIN_RESPALDO_NUBE')||'[]'); return Array.isArray(a)?a:[]; }catch(_){ return []; } }
+function _sinRespaldoSet(a){ try{ localStorage.setItem('SIN_RESPALDO_NUBE', JSON.stringify(Array.from(new Set(a||[])))); }catch(_){} }
+function _sinRespaldoAdd(id){ id=String(id||''); if(!id||id.indexOf('mig_pac_')===0) return; var a=_sinRespaldoGet(); if(a.indexOf(id)===-1){ a.push(id); _sinRespaldoSet(a); } }
+function _sinRespaldoDel(id){ id=String(id||''); if(!id) return; var a=_sinRespaldoGet(); var i=a.indexOf(id); if(i!==-1){ a.splice(i,1); _sinRespaldoSet(a); try{ actualizarIndicadorSync(); }catch(_){} } }
+function _sinRespaldoTiene(id){ return _sinRespaldoGet().indexOf(String(id||''))!==-1; }
 var _saludSyncUltimo=0, _saludSyncTimer=null;
 async function _reportarSaludSync(forzar){
   try{
@@ -2917,10 +2928,20 @@ async function _reportarSaludSync(forzar){
     var fal={ COLA_SOAP_ACT_FALLIDOS:_contarColaLS('COLA_SOAP_ACT_FALLIDOS'), COLA_SYNC_HIST_FALLIDOS:_contarColaLS('COLA_SYNC_HIST_FALLIDOS'), COLA_SYNC_HIST_DOC_FALLIDOS:_contarColaLS('COLA_SYNC_HIST_DOC_FALLIDOS'), COLA_NOACUDIO_FALLIDOS:_contarColaLS('COLA_NOACUDIO_FALLIDOS') };
     var totalPend=_totalPendientesSync(), totalFall=_totalFallidosSync();
     var ver=''; try{ ver=((await caches.keys()).find(function(k){ return k.indexOf('sinergia-shell-')===0; }))||''; }catch(_){}
+    // RESPALDO: expedientes ACTIVOS creados aquí que aún no confirman en la nube (nombres para el tablero).
+    var _sr=_sinRespaldoGet();
+    var _srMuestras=_sr.slice(0,18).map(function(id){ return {id:String(id).slice(0,10), n:(typeof _nombrePacPorId==='function'?(_nombrePacPorId(id)||''):'')}; });
     var docSalud={ deviceId:_deviceId(), terapeuta:String((currentUser&&currentUser.name)||''), correo:String((currentUser&&(currentUser.email||currentUser.username))||''),
       versionApp:ver, pendientes:pend, fallidos:fal, totalPend:totalPend, totalFall:totalFall,
       muestras:((totalPend+totalFall)>0?_muestrasColasSync(18):[]), updatedAt:firebase.firestore.FieldValue.serverTimestamp() };
-    await window._fstDb.collection('syncHealth').doc(_deviceId()).set(docSalud, {merge:true});
+    // Campos nuevos van en objeto aparte para poder reintentar SIN ellos si la regla aún no se republicó
+    // (hasOnly rechazaría el write entero → el tablero dejaría de actualizar). Degrada limpio.
+    var _extra={ sinRespaldo:_sr.length, sinRespaldoMuestras:_srMuestras };
+    try{
+      await window._fstDb.collection('syncHealth').doc(_deviceId()).set(Object.assign({}, docSalud, _extra), {merge:true});
+    }catch(_permerr){
+      try{ await window._fstDb.collection('syncHealth').doc(_deviceId()).set(docSalud, {merge:true}); }catch(_e2){}
+    }
   }catch(_e){ /* best-effort: si la regla no está publicada o no hay red, no pasa nada */ }
 }
 // TABLERO del supervisor: lee syncHealth de TODOS los dispositivos.
@@ -2941,15 +2962,20 @@ async function _mostrarSaludSyncEquipo(){
     devs.sort(function(a,b){ var af=(a.totalFall||0), bf=(b.totalFall||0); if(af!==bf) return bf-af; return (b.totalPend||0)-(a.totalPend||0); });
     var ahora=Date.now();
     var _hace=function(ts){ try{ var t=(ts&&ts.toMillis)?ts.toMillis():((ts&&ts.seconds)?ts.seconds*1000:0); if(!t) return ''; var ms=ahora-t; if(ms<0) ms=0; var m=Math.round(ms/60000); if(m<1) return 'hace segundos'; if(m<60) return 'hace '+m+' min'; var h=Math.round(m/60); if(h<24) return 'hace '+h+' h'; return 'hace '+Math.round(h/24)+' d'; }catch(_){ return ''; } };
+    devs.sort(function(a,b){ var as=(a.sinRespaldo||0), bs=(b.sinRespaldo||0); if(as!==bs) return bs-as; var af=(a.totalFall||0), bf=(b.totalFall||0); if(af!==bf) return bf-af; return (b.totalPend||0)-(a.totalPend||0); });
     var filas=devs.map(function(v){
-      var tf=v.totalFall||0, tp=v.totalPend||0;
-      var color= tf>0?'#B91C1C':(tp>0?'#B45309':'#2E7D52');
-      var estado= tf>0?('🔴 '+tf+' rendida'+(tf!==1?'s':'')+(tp>0?(' · '+tp+' pend.'):'')) : (tp>0?('🟠 '+tp+' pendiente'+(tp!==1?'s':'')):'🟢 al día');
+      var tf=v.totalFall||0, tp=v.totalPend||0, sr=v.sinRespaldo||0;
+      // Sin respaldo = lo MÁS grave (expediente que puede perderse del todo, caso Ana Lilia) → rojo fuerte.
+      var color= sr>0?'#7C2D12':(tf>0?'#B91C1C':(tp>0?'#B45309':'#2E7D52'));
+      var estado= sr>0?('🆘 '+sr+' SIN RESPALDO'+((tf+tp)>0?(' · +'+(tf+tp)+' sin subir'):'')) : (tf>0?('🔴 '+tf+' rendida'+(tf!==1?'s':'')+(tp>0?(' · '+tp+' pend.'):'')) : (tp>0?('🟠 '+tp+' pendiente'+(tp!==1?'s':'')):'🟢 al día'));
       var mu=(Array.isArray(v.muestras)?v.muestras:[]);
+      var srMu=(Array.isArray(v.sinRespaldoMuestras)?v.sinRespaldoMuestras:[]);
+      var listaSR=sr>0?('<div style="margin-top:7px;background:#FEF2F2;border:1px solid #FCA5A5;border-radius:8px;padding:7px 9px"><div style="font-size:11px;font-weight:800;color:#7C2D12">🆘 Expediente(s) que solo existen en este cel (aún NO en la nube):</div>'+(srMu.length?srMu.map(function(m){ return '<div style="font-size:11.5px;color:#7C2D12;margin-top:2px">• <b>'+escapeHTML(m.n||('id '+(m.id||'')))+'</b></div>'; }).join(''):'')+'<div style="font-size:10.5px;color:#991B1B;margin-top:4px">Que esta persona abra la app CON señal (WiFi/datos) para que suban. Si el cel se limpia antes, se pierden.</div></div>'):'';
       var lista=mu.length?('<div style="margin-top:7px;display:flex;flex-direction:column;gap:3px">'+mu.map(function(m){ return '<div style="font-size:11.5px;color:#374151"><b>'+escapeHTML(m.n||'')+'</b> <span style="color:var(--gray-400)">· '+escapeHTML(m.q||'')+'</span>'+(m.e?(' <span style="color:#B91C1C">· '+escapeHTML(m.e)+'</span>'):'')+'</div>'; }).join('')+'</div>'):'';
       return '<div style="border:1px solid var(--gray-200);border-left:4px solid '+color+';border-radius:12px;padding:11px 13px;margin-bottom:9px">'
         +'<div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px"><div style="font-weight:800;color:var(--navy);font-size:14px">'+escapeHTML(v.terapeuta||v.correo||'(dispositivo)')+'</div><div style="font-size:12px;font-weight:800;color:'+color+';white-space:nowrap">'+estado+'</div></div>'
         +'<div style="font-size:10.5px;color:var(--gray-400);margin-top:2px">'+escapeHTML(v.correo||'')+' · '+_hace(v.updatedAt)+(v.versionApp?(' · '+escapeHTML(String(v.versionApp).replace('sinergia-shell-',''))):'')+'</div>'
+        +listaSR
         +lista
         +((tp+tf)>0?'<div style="font-size:11px;color:var(--gray-500);margin-top:7px">→ Que esta persona abra <b>🔍 Revisión de este dispositivo</b> → <b>🔧 Reconectar y subir</b>.</div>':'')
         +'</div>';
@@ -3068,6 +3094,7 @@ async function sincronizarPendientes(){
       const res = await saveDB('pts', [p]); // saveDB ya reintenta 3 veces internamente
       if(res && res.ok){
         desencolarSync(id); // subió bien, sacar de la cola
+        if(typeof _sinRespaldoDel==='function') _sinRespaldoDel(id);   // [RESPALDO] confirmado en Sheets
       }
       // si no, se queda en la cola para el próximo intento
     }catch(e){
@@ -3197,6 +3224,7 @@ async function loadFromCloud(){
       // Bono: saveLocal (abajo) persiste el resultado filtrado → el localStorage contaminado de cada
       // dispositivo se auto-purga en su siguiente load, sin migración manual.
       var saneadosLimpios=saneados.filter(function(p){ return !_esPacienteTest(p) && String((p&&p.id)||'').indexOf('mig_pac_')!==0; });
+      try{ idsDeNube.forEach(function(id){ _sinRespaldoDel(id); }); }catch(_){}   // [RESPALDO] lo que ya está en la nube deja de estar "sin respaldo"
       saveLocal('pts',saneadosLimpios);
       try{ localStorage.setItem('sinergia_ultimaSyncOk', new Date().toLocaleString('es-MX')); }catch(e){}
       return saneadosLimpios;
@@ -8496,6 +8524,7 @@ function _pacCardHTML(p, q, abrirFn){
             <span>${Array.isArray(p.soap)?_soapVivas(p).length+' ses.':'— ses.'}</span>
           </div>
           <div class="patient-meta" style="margin-top:3px;font-size:11px;color:#5A6478;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:200px">${escapeHTML(typeof p.dx==='string'?p.dx.split(',')[0]:(p.dx?.dxClinico||p.dx?.dxMedico||'Sin diagnóstico'))}</div>
+          ${(typeof _sinRespaldoTiene==='function'&&_sinRespaldoTiene(p.id))?`<div style="margin-top:5px;font-size:10.5px;font-weight:800;color:#7C2D12;background:#FEF2F2;border:1px solid #FCA5A5;border-radius:8px;padding:4px 8px;display:inline-block">🆘 Sin respaldo en la nube — abre con señal</div>`:''}
           ${Array.isArray(p.etiquetas)&&p.etiquetas.length?`<div style="display:flex;flex-wrap:wrap;gap:3px;margin-top:4px">${p.etiquetas.slice(0,3).map(e=>`<span style="font-size:9px;font-weight:700;background:#E8EEF7;color:var(--navy);padding:2px 7px;border-radius:8px">${escapeHTML(e)}</span>`).join('')}</div>`:''}
           <button data-pid="${escapeAttr_(p.id)}" onclick="event.stopPropagation();nuevaSesionRapida(this.dataset.pid)" style="font-size:11px;padding:4px 10px;border-radius:12px;background:var(--navy);color:white;border:none;cursor:pointer;margin-top:6px;font-family:inherit;font-weight:700">➕ Sesión</button>
         </div>
@@ -16999,6 +17028,7 @@ function guardarNuevoPaciente(){
     return;
   }
   patientsDB.push(nuevo);
+  if(typeof _sinRespaldoAdd==='function') _sinRespaldoAdd(nuevo.id);   // [RESPALDO] nace "sin respaldo" hasta que la nube confirme
   // ── NOTA DE VALORACIÓN AUTO-GENERADA (sesión 1) ────────────────────────────
   // La primera consulta ES un SOAP: S←padecimiento, O←exploración, A←dx+EVA, P←plan+tratamiento
   // aplicado hoy. modoNota:'valoracion' la distingue (excluida del promedio de calidad salvo que
@@ -17041,6 +17071,7 @@ function guardarNuevoPaciente(){
       if(typeof FST_guardarSesionFirestore==='function'){
         FST_guardarSesionFirestore(nuevo, notaVal, 'nueva').then(function(r){
           if(!(r&&r.ok)) _encolarSoapActivo(nuevo.id, notaVal, 'nueva');
+          else if(typeof _sinRespaldoDel==='function'){ _sinRespaldoDel(nuevo.id); }   // [RESPALDO] espejo en la nube confirmado
         }).catch(function(){ _encolarSoapActivo(nuevo.id, notaVal, 'nueva'); });
       } else { _encolarSoapActivo(nuevo.id, notaVal, 'nueva'); }
     }catch(_e){ try{ _encolarSoapActivo(nuevo.id, notaVal, 'nueva'); }catch(_e2){} }
@@ -17053,9 +17084,10 @@ function guardarNuevoPaciente(){
   saveDB('pts', [nuevo]).then(res => {
     if(res && res.ok){
       borrarBorradorNuevoSiGuardado();
+      if(typeof _sinRespaldoDel==='function') _sinRespaldoDel(nuevo.id);   // [RESPALDO] Sheets confirmó → respaldado
       showToast('✅ Historia clínica guardada correctamente','success');
     } else {
-      showToast('⚠️ Paciente guardado local, pero Sheets no confirmó. Revisa conexión.','warning');
+      showToast('⚠️ Paciente guardado local SIN respaldo en la nube. Ábrelo con señal para que suba.','warning');
     }
     // ETAPA 2: los estudios capturados en la valoración van a su almacén propio en Firestore
     // (estudiosDocs; saveDB a Sheets no los lleva). Reutiliza la ruta probada _persistirEstudios,
