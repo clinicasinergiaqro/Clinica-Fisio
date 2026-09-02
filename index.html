@@ -12203,42 +12203,69 @@ async function _subirMediaAntes(file, pid){
   });
   return { url, fbPath };
 }
+function _setEtqAlta(txt){
+  var i=document.getElementById('n-media-obj-etiqueta'); if(!i) return;
+  i.value=String(txt||''); try{ i.focus(); }catch(_){}
+}
 function _renderMediaAntes(){
   var wrap=document.getElementById('n-media-antes-wrap'); if(!wrap) return;
   var arr=Array.isArray(window._altaMediaAntes)?window._altaMediaAntes:[];
   if(!arr.length){ wrap.innerHTML=''; return; }
   wrap.innerHTML='<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:6px">'+arr.map(function(m){
-    var id=String(m.id||''), src=m.url||'', t=String(m.type||'');
+    var id=String(m.id||''), src=m.url||'', t=String(m.type||''), etq=String(m.etiqueta||'');
     var inner=(t.indexOf('video')===0)
       ? '<video src="'+escapeAttr_(src)+'" preload="metadata" muted playsinline style="width:100%;height:100%;object-fit:cover"></video><div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:18px;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.7)">▶</div>'
       : '<img src="'+escapeAttr_(src)+'" loading="lazy" style="width:100%;height:100%;object-fit:cover">';
-    var verArgs=JSON.stringify(src).replace(/"/g,'&quot;')+','+JSON.stringify(t).replace(/"/g,'&quot;')+','+JSON.stringify('Antes · cómo llegó').replace(/"/g,'&quot;');
-    return '<div style="width:82px;height:82px;border-radius:10px;overflow:hidden;position:relative;background:#0E1622">'
+    var verArgs=JSON.stringify(src).replace(/"/g,'&quot;')+','+JSON.stringify(t).replace(/"/g,'&quot;')+','+JSON.stringify(etq||'Valoración inicial').replace(/"/g,'&quot;');
+    var capEtq='<div onclick="_etiquetarMediaAntes(\''+escapeAttr_(id)+'\')" style="font-size:9.5px;line-height:1.2;color:'+(etq?'var(--navy)':'var(--gray-400)')+';font-weight:'+(etq?'700':'400')+';margin-top:3px;max-width:82px;cursor:pointer;text-align:center" title="Toca para etiquetar">'+(etq?escapeHTML(etq):'🏷 etiquetar')+'</div>';
+    return '<div style="width:82px;display:flex;flex-direction:column;align-items:center">'
+      +'<div style="width:82px;height:82px;border-radius:10px;overflow:hidden;position:relative;background:#0E1622">'
       +'<div onclick="_verMediaSesion('+verArgs+')" style="position:absolute;inset:0;cursor:pointer">'+inner+'</div>'
-      +'<button type="button" onclick="_borrarMediaAntes(\''+escapeAttr_(id)+'\')" title="Eliminar" style="position:absolute;top:2px;right:2px;background:rgba(185,28,28,.92);border:none;border-radius:50%;width:22px;height:22px;color:#fff;font-size:12px;font-weight:800;cursor:pointer;line-height:1">✕</button>'
+      +'<button type="button" onclick="event.stopPropagation();_borrarMediaAntes(\''+escapeAttr_(id)+'\')" title="Eliminar" style="position:absolute;top:2px;right:2px;background:rgba(185,28,28,.92);border:none;border-radius:50%;width:22px;height:22px;color:#fff;font-size:12px;font-weight:800;cursor:pointer;line-height:1">✕</button>'
+      +'</div>'+capEtq
       +'</div>';
   }).join('')+'</div>';
 }
+// MULTI + ETIQUETA: sube una o varias fotos/videos de valoración inicial. La etiqueta escrita se aplica
+// a todo el lote. Estos registros van a valoracion.mediaBaseline Y a la nota de valoración (sesión 1),
+// así entran a la línea de tiempo por etiqueta (📈 Evolución visual) desde el inicio.
 async function _capturarMediaAntes(ev){
-  var file=ev&&ev.target&&ev.target.files&&ev.target.files[0]; if(ev&&ev.target) ev.target.value='';
-  if(!file) return;
-  if(file.size>80*1024*1024){ showToast('Archivo muy pesado. Graba uno más corto.','error'); return; }
-  if(String(file.type).indexOf('image/')!==0 && String(file.type).indexOf('video/')!==0){ showToast('Solo foto o video','error'); return; }
-  if(String(file.type).indexOf('video/')===0 && !navigator.onLine){ showToast('Sin conexión — conéctate para subir videos','error'); return; }
+  var files=(ev&&ev.target&&ev.target.files)?Array.from(ev.target.files):[]; if(ev&&ev.target) ev.target.value='';
+  if(!files.length) return;
+  if(files.some(function(f){return String(f.type).indexOf('video/')===0;}) && !navigator.onLine){ showToast('Sin conexión — conéctate para subir videos','error'); return; }
   if(!window._altaPid) window._altaPid=(typeof generarIdSeguro_==='function'?generarIdSeguro_('p'):('p'+Date.now()));
   var _pidAntes=window._altaPid;   // identidad del alta al iniciar (la subida es async)
-  showToast('☁️ Subiendo…','');
-  try{
-    var res=await _subirMediaAntes(file, _pidAntes);
-    // FUGA ENTRE BORRADORES (auditoría): si se abrió otro Nuevo/Editar durante la subida, _altaPid ya
-    // cambió y _altaMediaAntes se vació → descartar para no meter el "antes" de un alta en otra.
-    if(window._altaPid!==_pidAntes){ showToast('Cambiaste de formulario — no se adjuntó','warning'); return; }
-    if(!Array.isArray(window._altaMediaAntes)) window._altaMediaAntes=[];
-    window._altaMediaAntes.push({ id:'ba'+Date.now(), type:file.type, url:res.url, fbPath:res.fbPath });
-    _renderMediaAntes(); marcarDirty();
-    try{ if(typeof guardarBorradorNuevo==='function') guardarBorradorNuevo(); }catch(_){}
-    showToast('✅ Registro del "antes" agregado','success');
-  }catch(e){ console.warn('[media-antes]', e&&e.message); showToast('No se pudo subir: '+((e&&e.message)||'error'),'error'); }
+  var _inpEtq=document.getElementById('n-media-obj-etiqueta');
+  var _etq=(_inpEtq&&_inpEtq.value?String(_inpEtq.value).trim():'').slice(0,60);
+  if(!Array.isArray(window._altaMediaAntes)) window._altaMediaAntes=[];
+  var ok=0, fallo=0;
+  for(var i=0;i<files.length;i++){
+    var f=files[i];
+    if(f.size>80*1024*1024){ fallo++; showToast('“'+(f.name||'archivo')+'” muy pesado, se omitió','warning'); continue; }
+    if(String(f.type).indexOf('image/')!==0 && String(f.type).indexOf('video/')!==0){ fallo++; continue; }
+    showToast('☁️ Subiendo '+(i+1)+' de '+files.length+'…','');
+    try{
+      var res=await _subirMediaAntes(f, _pidAntes);
+      // FUGA ENTRE BORRADORES: si se abrió otro Nuevo/Editar durante la subida, descartar el resto.
+      if(window._altaPid!==_pidAntes){ showToast('Cambiaste de formulario — no se adjuntó','warning'); break; }
+      window._altaMediaAntes.push({ id:'ba'+Date.now()+'_'+i, type:f.type, url:res.url, fbPath:res.fbPath, etiqueta:_etq });
+      ok++;
+    }catch(e){ console.warn('[media-antes]', e&&e.message); fallo++; }
+  }
+  if(_inpEtq) _inpEtq.value='';
+  _renderMediaAntes();
+  if(ok){ marcarDirty(); try{ if(typeof guardarBorradorNuevo==='function') guardarBorradorNuevo(); }catch(_){} showToast('✅ '+ok+' registro(s) de valoración agregado(s)'+(fallo?(' · '+fallo+' con error'):''),'success'); }
+  else { showToast('No se pudo subir'+(fallo?(' ('+fallo+' con error)'):''),'error'); }
+}
+function _etiquetarMediaAntes(id){
+  id=String(id);
+  if(!Array.isArray(window._altaMediaAntes)) return;
+  var it=window._altaMediaAntes.find(function(x){return x&&String(x.id)===id;}); if(!it) return;
+  var val=prompt('Etiqueta de este registro (ej: Equimosis, Marcha c/bota, ROM):', String(it.etiqueta||''));
+  if(val===null) return;
+  it.etiqueta=String(val).trim().slice(0,60);
+  _renderMediaAntes(); marcarDirty();
+  try{ if(typeof guardarBorradorNuevo==='function') guardarBorradorNuevo(); }catch(_){}
 }
 function _borrarMediaAntes(id){
   id=String(id);
@@ -16631,10 +16658,13 @@ function renderNuevoPaciente(){
            escribiendo SIEMPRE (derivado de los checkboxes en guardarNuevoPaciente). -->
       <div class="form-field"><div class="form-label">Estudios de imagen y hallazgos</div><textarea class="form-input" id="n-estudios" placeholder="Ej: US tendón rotuliano — engrosamiento con áreas hipoecoicas"></textarea></div>
       <div class="form-field">
-        <div class="form-label">📷 Foto / video del antes <span style="font-weight:400;color:var(--gray-400);font-size:11px">· cómo llegó (línea base para comparar evolución)</span></div>
-        <input type="file" id="n-media-antes-capture" accept="image/*,video/*" style="display:none" onchange="_capturarMediaAntes(event)">
+        <div class="form-label">📐 Foto / video de valoración <span style="font-weight:400;color:var(--gray-400);font-size:11px">· línea base y seguimiento (equimosis, marcha…)</span></div>
+        <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:6px">${_ETIQ_VALORACION.map(function(e){ return '<button type="button" onclick="_setEtqAlta('+JSON.stringify(e).replace(/"/g,'&quot;')+')" style="font-size:11px;font-weight:700;border:1.5px solid var(--gray-200);background:#fff;color:var(--navy);border-radius:14px;padding:5px 10px;cursor:pointer;font-family:inherit">'+e+'</button>'; }).join('')}</div>
+        <input type="text" id="n-media-obj-etiqueta" placeholder="Etiqueta (toca un botón o escribe) — opcional" style="width:100%;box-sizing:border-box;border:1.5px solid var(--gray-200);border-radius:9px;padding:8px 10px;font-size:12px;font-family:inherit;margin-bottom:6px">
+        <input type="file" id="n-media-antes-capture" accept="image/*,video/*" multiple style="display:none" onchange="_capturarMediaAntes(event)">
         <div id="n-media-antes-wrap"></div>
-        <button type="button" onclick="var i=document.getElementById('n-media-antes-capture');if(i)i.click()" style="width:100%;background:#F0F5FB;color:var(--navy);border:1.5px dashed var(--navy);border-radius:10px;padding:10px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit">📷 Agregar foto / video del antes</button>
+        <button type="button" onclick="var i=document.getElementById('n-media-antes-capture');if(i)i.click()" style="width:100%;background:#F0F5FB;color:var(--navy);border:1.5px dashed var(--navy);border-radius:10px;padding:10px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit">📷 Agregar foto / video de valoración</button>
+        <div style="font-size:10.5px;color:var(--gray-400);margin-top:5px;line-height:1.4">La etiqueta amarra la foto/video a lo que mediste; aparece en 📈 Evolución visual desde la 1ª sesión.</div>
       </div>
     </div>
   </div>
@@ -17144,6 +17174,9 @@ function guardarNuevoPaciente(){
           contraindicaciones:nuevo.planTto.contraindicaciones },
       evaI:evaVal, evaF:null, modalidades:[],
       completa:true, modoNota:'valoracion', revisionPendiente:false,
+      // SEGUIMIENTO VISUAL: la foto/video de valoración inicial (con etiqueta) entra a la nota #1 →
+      // aparece en 📈 Evolución visual desde la sesión 1. Solo referencias (url/fbPath), nunca base64.
+      mediaObjetivo:(Array.isArray(window._altaMediaAntes)?window._altaMediaAntes.map(function(m){ return { id:m.id||('mo'+Date.now()), type:m.type||'', url:m.url||'', fbPath:m.fbPath||'', etiqueta:m.etiqueta||'' }; }):[]),
       atendidoPor:[nuevo.terapeuta], creadoPor:currentUser.name
     };
     nuevo.soap.push(notaVal);
