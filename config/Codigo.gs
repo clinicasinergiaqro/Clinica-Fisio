@@ -1052,15 +1052,31 @@ function testScript() {
 
 // ── LOOP G — AGENDA (solo LECTURA del Google Calendar de la clínica) ──
 // CRÍTICO: JD antes de J, y CM antes de C, para que el parser los detecte primero.
+// El match es por TOKEN EXACTO (mayúsculas normalizadas), así que además de la inicial corta se
+// aceptan ALIAS: el nombre completo ('DULCE') y el código de la app ('DUL') → así aunque escriban
+// "Dulce Juan" o "Dul Juan" en el calendario, la cita igual se le asigna bien. Sin ambigüedad: todos
+// son tokens exactos, no prefijos.
 var AGENDA_INICIALES = [
-  { ini: 'CM', terapeuta: 'Camila'  },
-  { ini: 'Z',  terapeuta: 'Zara'    },
-  { ini: 'DU', terapeuta: 'Dulce'   },  // DU antes de D (D sola es Dafne)
-  { ini: 'D',  terapeuta: 'Dafne'   },
-  { ini: 'G',  terapeuta: 'Goretti' },
-  { ini: 'C',  terapeuta: 'Carlos'  },
-  { ini: 'JD', terapeuta: 'Jess'    },  // JD antes de J (misma Jess, inicial larga primero)
-  { ini: 'J',  terapeuta: 'Jess'    }
+  { ini: 'CM',      terapeuta: 'Camila'  },
+  { ini: 'Z',       terapeuta: 'Zara'    },
+  { ini: 'DU',      terapeuta: 'Dulce'   },  // DU antes de D (D sola es Dafne)
+  { ini: 'D',       terapeuta: 'Dafne'   },
+  { ini: 'G',       terapeuta: 'Goretti' },
+  { ini: 'C',       terapeuta: 'Carlos'  },
+  { ini: 'JD',      terapeuta: 'Jess'    },  // JD antes de J (misma Jess, inicial larga primero)
+  { ini: 'J',       terapeuta: 'Jess'    },
+  // ALIAS por nombre completo y código de la app (token exacto):
+  { ini: 'DULCE',   terapeuta: 'Dulce'   },
+  { ini: 'DUL',     terapeuta: 'Dulce'   },
+  { ini: 'DAFNE',   terapeuta: 'Dafne'   },
+  { ini: 'DAF',     terapeuta: 'Dafne'   },
+  { ini: 'ZARA',    terapeuta: 'Zara'    },
+  { ini: 'CAMILA',  terapeuta: 'Camila'  },
+  { ini: 'CAMI',    terapeuta: 'Camila'  },
+  { ini: 'CARLOS',  terapeuta: 'Carlos'  },
+  { ini: 'GORETTI', terapeuta: 'Goretti' },
+  { ini: 'GORE',    terapeuta: 'Goretti' },
+  { ini: 'JESS',    terapeuta: 'Jess'    }
 ];
 
 function parsearTituloAgenda_(titulo) {
