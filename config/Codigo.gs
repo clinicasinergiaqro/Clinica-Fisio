@@ -1099,7 +1099,11 @@ function parsearTituloAgenda_(titulo) {
     break;
   }
   var paciente = palabras.slice(i).join(' ').trim();
-  if (terapeutas.length === 0 && !esNuevo) return { omitir: true };
+  // ANTES: las citas SIN inicial ni "px" se DESCARTABAN (omitir:true) → desaparecían del tablero, el
+  // supervisor no las veía ni las podía asignar. AHORA sí llegan, como "sin asignar", para que aparezcan
+  // en "⚠️ Sin asignar" y se asignen a mano (o se auto-asignen a quien hizo la nota). Solo se omite un
+  // evento con TÍTULO VACÍO (bloqueos/recordatorios sin nombre), que no es una cita.
+  if (!String(titulo || '').trim()) return { omitir: true };
   var sinAsignar = (terapeutas.length === 0);
   return {
     omitir: false,
