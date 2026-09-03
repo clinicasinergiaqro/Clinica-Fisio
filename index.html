@@ -9527,6 +9527,9 @@ function renderExpediente(tab='historia'){
   // Prompt B v2: fechas clínicas en tab Historia (render local inmediato + enriquecido Firestore).
   if (tab==='historia') setTimeout(function(){ actualizarFechasClinicas(p); }, 0);
   if (tab==='estudios' && typeof FST_renderEstudiosApartado === 'function') setTimeout(function(){ FST_renderEstudiosApartado(p.id); }, 0);
+  // RESCATE: si hay fotos/documentos que solo viven en ESTE cel (subida a Storage falló), re-subirlos a
+  // la nube en 2º plano → dejan de salir "no disponible" en otros dispositivos. Si sube algo, re-render.
+  if (tab==='estudios') setTimeout(function(){ if(typeof _reSubirFotosLocales==='function') _reSubirFotosLocales(p).then(function(n){ if(n>0){ showToast('☁️ '+n+' archivo(s) que faltaba(n) ya subió(eron) a la nube','success'); try{ renderExpediente('estudios'); }catch(_){} } }); }, 400);
   // IC v3.0 · Slice 2 — reporte clínico base (JS puro, sin API)
   if (tab==='reporte' && typeof RPT_pintarPestanaReporte === 'function') setTimeout(function(){ RPT_pintarPestanaReporte(p.id); }, 0);
 }
@@ -15178,6 +15181,49 @@ async function restaurarMedia(p){
   // FA-prev: restaurar media dentro de cada SOAP (mismo criterio: url→no toca; mediaId→idbGet)
   if(Array.isArray(p.soap)){ for(const s of p.soap){ if(s && Array.isArray(s.media)) await restaurarArr(s.media); } }
 }
+
+// RESCATE de fotos/documentos que quedaron SOLO en este dispositivo (subida a Storage falló → fallback
+// IndexedDB, sin url). Al sincronizar a Sheets se les quita el base64 → en OTRO dispositivo salen como
+// "Archivo no disponible". Aquí, en el cel que SÍ tiene el binario (IDB), se re-suben a Firebase Storage,
+// se les pone url/fbPath y se guarda → quedan visibles desde cualquier dispositivo. Corre solo, en 2º
+// plano, al abrir el expediente. Idempotente: los que ya tienen url se saltan.
+async function _reSubirFotosLocales(p){
+  try{
+    if(!p || !navigator.onLine) return 0;
+    if(typeof fbStorage==='undefined' || !fbStorage) return 0;
+    var subidas=0;
+    async function procesar(arr, tipo){
+      if(!Array.isArray(arr)) return;
+      for(var i=0;i<arr.length;i++){
+        var it=arr[i];
+        if(!it || it.url) continue;                         // ya está en la nube
+        var data=it.data;
+        if(!data && it.mediaId){ try{ data=await idbGet(it.mediaId); }catch(_){} }
+        if(!data || String(data).indexOf('data:')!==0) continue;   // no hay binario local que subir
+        try{
+          var blob=await (await fetch(data)).blob();
+          var ts=Date.now();
+          var safe=String(it.name||it.label||'archivo').replace(/[^\w.\-]/g,'_');
+          var fbPath='clinica/sinergia/'+p.id+'/'+(tipo||'foto')+'/'+ts+'_'+safe;
+          var ref=fbStorage.ref(fbPath);
+          await ref.put(blob,{contentType:it.type||it.mimeType||blob.type||'application/octet-stream'});
+          var url=await ref.getDownloadURL();
+          it.url=url; it.fbPath=fbPath; it.storageProvider='firebase'; it.data=null;
+          // reflejar en estudiosDocs la MISMA media (por mediaId) para que también se vea allí
+          if(Array.isArray(p.estudiosDocs)){ p.estudiosDocs.forEach(function(e){ if(e && e.mediaId && it.mediaId && e.mediaId===it.mediaId && !e.url){ e.url=url; e.fbPath=fbPath; } }); }
+          subidas++;
+        }catch(_e){ console.warn('[re-subir foto]', _e&&_e.message); }
+      }
+    }
+    await procesar(p.fotos,'foto');
+    await procesar(p.docs,'doc');
+    if(subidas>0){
+      try{ await saveDB('pts',[p],{camposHist:['fotos','docs','estudiosDocs']}); }catch(_){}
+      try{ if(window._estudiosCache) delete window._estudiosCache[p.id]; }catch(_){}
+    }
+    return subidas;
+  }catch(_e){ return 0; }
+}
 async function deleteMedia(pid,tipo,i){
   const p=_resolverPaciente(pid);if(!p)return;   // 04h: cae a currentPatient para históricos (mismo bug que handleMedia)
   const arr = tipo==='foto'?p.fotos:p.docs;
@@ -15274,7 +15320,7 @@ async function previewMedia(pid,tipo,i){
     if(d) item.data=d;
   }
   const srcFinal = item.data;
-  if(!srcFinal){ showToast('Archivo no disponible — fue subido desde otro dispositivo','error'); return; }
+  if(!srcFinal){ var _quien=(item.subidoPor||item.uploadedBy||''); showToast('Aún no está en la nube — que '+(_quien?_quien+' abra':'quien lo subió abra')+' este expediente (pestaña Estudios) con señal y sube solo','warning'); return; }
 
   // Detección de tipo para archivos locales
   const nombre=(item.name||item.label||'').toLowerCase();
