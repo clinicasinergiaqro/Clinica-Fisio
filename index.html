@@ -6432,6 +6432,22 @@ function _triangularCitasNotas(eventos, resueltos, ultimaHist, asigMap, resuelta
     var ter=(Array.isArray(ev.terapeutas)&&ev.terapeutas.length)?ev.terapeutas[0]:'Sin asignar';
     var clave=_normPend(ev.paciente||'');
     if(ter==='Sin asignar' && asigMap && asigMap[clave]) ter=asigMap[clave];
+    // AUTO-ASIGNACIÓN INTELIGENTE: si la cita quedó SIN inicial en el calendario, atribuirla a QUIEN
+    // HIZO LA NOTA ese día (dato sellado desde su cuenta — más confiable que la inicial). Así el
+    // supervisor deja de andar preguntando "¿quién vio a este paciente?". Solo activos con nota ese
+    // día; si no hay nota, se queda en "Sin asignar" / por identificar (revisión humana).
+    if(ter==='Sin asignar'){
+      try{
+        var _r0=(resueltos||{})[clave]||{};
+        var _cc0=_diaCanon(_ddmmDeISOEvento(ev.inicio));
+        var _sm0=(_r0.tipo==='activo'&&_r0.p)?_soapVivas(_r0.p).find(function(s){ return s && _cc0 && _diaCanon(s.fecha)===_cc0; }):null;
+        if(_sm0){
+          var _aut=(Array.isArray(_sm0.atendidoPor)&&_sm0.atendidoPor.length)?_sm0.atendidoPor[0]:(_sm0.creadoPor||_sm0.terapeuta||'');
+          var _autCod=String(TERAPEUTA_CAL2COD[String(_aut||'').trim()]||String(_aut||'').trim().toUpperCase());
+          for(var _cal in TERAPEUTA_CAL2COD){ if(TERAPEUTA_CAL2COD[_cal]===_autCod){ ter=_cal; break; } }
+        }
+      }catch(_eAA){}
+    }
     if(!porTer[ter]) return;   // "Sin asignar" conserva su bloque de chips propio
     var ddmm=_ddmmDeISOEvento(ev.inicio);
     var r=(resueltos||{})[clave]||{pid:null,tipo:null};
@@ -6876,6 +6892,25 @@ function _computarRendimiento(eventos, diasISO, asigMap){
     var ter=(Array.isArray(ev.terapeutas)&&ev.terapeutas.length)?ev.terapeutas[0]:'Sin asignar';
     var clave=_normPend(ev.paciente||'');
     if(ter==='Sin asignar' && asigMap && asigMap[clave]) ter=asigMap[clave];
+    // AUTO-ASIGNACIÓN INTELIGENTE (mismo criterio que la triangulación): cita sin inicial → al autor
+    // de la nota SOAP de ese día (activos). Consistente con la columna CITAS y la cobertura.
+    if(ter==='Sin asignar'){
+      try{
+        var _cc0=_diaCanon(_ddmmDeISOEvento(ev.inicio));
+        if(_cc0){
+          for(var _pi=0;_pi<(Array.isArray(patientsDB)?patientsDB.length:0);_pi++){
+            var _pp=patientsDB[_pi]; if(!_pp || _normPend(_pp.name||'')!==clave) continue;
+            var _sm0=_soapVivas(_pp).find(function(s){ return s && _diaCanon(s.fecha)===_cc0; });
+            if(_sm0){
+              var _aut=(Array.isArray(_sm0.atendidoPor)&&_sm0.atendidoPor.length)?_sm0.atendidoPor[0]:(_sm0.creadoPor||_sm0.terapeuta||'');
+              var _autCod=String(TERAPEUTA_CAL2COD[String(_aut||'').trim()]||String(_aut||'').trim().toUpperCase());
+              for(var _cal in TERAPEUTA_CAL2COD){ if(TERAPEUTA_CAL2COD[_cal]===_autCod){ ter=_cal; break; } }
+            }
+            break;
+          }
+        }
+      }catch(_eAA2){}
+    }
     if(stats[ter]){ stats[ter].citas++; }
     else { var nm=ev.paciente||'(sin nombre)'; sinAsignar[nm]=(sinAsignar[nm]||0)+1; }
   });
