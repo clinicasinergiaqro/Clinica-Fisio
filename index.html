@@ -503,7 +503,7 @@ function FST_renderCard(s, pid){
     + '<div class="soap-sesion">Sesión ' + escapeHTML(_ns ? _ns.n : '—') + (_tEp ? ' <span style="font-size:10px;color:var(--gray-400);font-weight:400">· Episodio ' + escapeHTML((s.motivoIndex||0)+1) + '</span>' : '') + '</div>'
     // [NUM-SESIÓN] línea secundaria con la posición GLOBAL del expediente (solo pacientes con episodios)
     + (_tEp && _ns ? '<div style="font-size:10px;color:var(--gray-400);margin-top:1px">Sesión ' + escapeHTML(_ns.nGlobal) + ' del expediente</div>' : '')
-    + '<div class="soap-meta">' + fecha + ' · ' + autorHTML + ' · Semana ' + escapeHTML(semana) + '</div>'
+    + '<div class="soap-meta">' + fecha + (s.horaCreacion?(' · '+escapeHTML(s.horaCreacion)):'') + ' · ' + autorHTML + ' · Semana ' + escapeHTML(semana) + '</div>'
     + '</div><div style="display:flex;flex-wrap:wrap;gap:4px;align-items:center">' + _badgeIncH + FST_badgesSesion(s) + '</div></div>'
     + '<div class="soap-body">'
     + (isTextoLibre
