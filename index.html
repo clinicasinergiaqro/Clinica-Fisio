@@ -18894,18 +18894,52 @@ function _RPT_htmlFranjaPaciente(p, sesiones){
     + '</div>';
 }
 // Encabezado de sección numerado (badge cuadrado + título mayúsculas + hairline).
-// Imprimir / Guardar PDF del reporte. Sin guard de rol — disponible para todas las terapeutas.
-function RPT_imprimirReporte(pid){
-  var prev=document.title;
-  var p=(typeof _resolverPaciente==='function')?_resolverPaciente(pid):((typeof currentPatient!=='undefined')?currentPatient:null);
-  var nombre=(p&&p.name)?String(p.name).trim().replace(/\s+/g,'_').replace(/[^0-9A-Za-zÁÉÍÓÚÜáéíóúüÑñ_-]/g,''):'Paciente';
-  var f=new Date();
-  var fecha=f.getFullYear()+'-'+('0'+(f.getMonth()+1)).slice(-2)+'-'+('0'+f.getDate()).slice(-2);
-  document.title='Reporte_'+nombre+'_'+fecha;
-  var restaurar=function(){ document.title=prev; try{ window.removeEventListener('afterprint',restaurar); }catch(e){} };
-  try{ window.addEventListener('afterprint',restaurar); }catch(e){}
-  setTimeout(restaurar, 4000); // respaldo si afterprint no dispara (algunos iOS)
-  window.print();
+// GUARDAR PDF del reporte. Antes usaba window.print() → en iPhone/PWA la hoja nativa NO ofrece claro
+// "Guardar como PDF" (solo Imprimir) y a veces ni abre. Ahora genera un PDF REAL (html2canvas + jsPDF,
+// multipágina) y lo entrega por la hoja de compartir (iOS → "Guardar en Archivos") con fallback a
+// descarga directa. Sin guard de rol — disponible para todas las terapeutas.
+async function RPT_imprimirReporte(pid){
+  var jsPDF=(window.jspdf && window.jspdf.jsPDF)||window.jsPDF;
+  var cont=document.querySelector('#rpt-root .rpt-container');
+  if(!cont){ showToast('Abre la pestaña Reporte primero','warning'); return; }
+  if(!jsPDF){ showToast('jsPDF no disponible — abre con señal','error'); return; }
+  showToast('⏳ Generando PDF…','');
+  // html2canvas bajo demanda (cdnjs; el service worker lo cachea tras el primer uso).
+  if(!window.html2canvas){
+    try{ await new Promise(function(res,rej){ var s=document.createElement('script'); s.src='https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js'; s.onload=res; s.onerror=rej; document.head.appendChild(s); }); }catch(_){}
+  }
+  if(!window.html2canvas){ showToast('Sin conexión para preparar el PDF — conéctate un momento','error'); return; }
+  try{
+    var canvas=await window.html2canvas(cont,{ scale:2, backgroundColor:'#ffffff', useCORS:true,
+      ignoreElements:function(el){ return el && el.classList && el.classList.contains('no-print'); } });
+    var img=canvas.toDataURL('image/jpeg',0.92);
+    var doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
+    var pw=210, ph=297, m=8, iw=pw-m*2;
+    var ih=canvas.height*iw/canvas.width;   // alto de la imagen escalada al ancho útil
+    var pageContent=ph-m*2;
+    if(ih<=pageContent){
+      doc.addImage(img,'JPEG',m,m,iw,ih,'','FAST');
+    } else {
+      var sy=0, restante=ih;
+      while(restante>0){
+        doc.addImage(img,'JPEG', m, m - sy, iw, ih, '', 'FAST');   // desplaza la imagen; la página recorta
+        restante-=pageContent; sy+=pageContent;
+        if(restante>0) doc.addPage();
+      }
+    }
+    var p=(typeof _resolverPaciente==='function')?_resolverPaciente(pid):currentPatient;
+    var nombre=(p&&p.name)?String(p.name).trim().replace(/\s+/g,'_').replace(/[^0-9A-Za-zÁÉÍÓÚÜáéíóúüÑñ_-]/g,''):'Paciente';
+    var f=new Date(); var fecha=f.getFullYear()+'-'+('0'+(f.getMonth()+1)).slice(-2)+'-'+('0'+f.getDate()).slice(-2);
+    var arch='Reporte_'+nombre+'_'+fecha+'.pdf';
+    var blob=doc.output('blob');
+    var file=new File([blob], arch, {type:'application/pdf'});
+    if(navigator.canShare && navigator.canShare({files:[file]})){
+      try{ await navigator.share({files:[file], title:arch, text:'Reporte clínico'}); showToast('✅ Elige "Guardar en Archivos"','success'); return; }
+      catch(e){ if(e && e.name==='AbortError') return; }
+    }
+    try{ doc.save(arch); showToast('✅ PDF generado','success'); }
+    catch(e2){ var url=URL.createObjectURL(blob); window.open(url,'_blank'); setTimeout(function(){ URL.revokeObjectURL(url); },60000); }
+  }catch(err){ console.warn('[RPT pdf]', err&&err.message); showToast('No se pudo generar el PDF: '+((err&&err.message)||''),'error'); }
 }
 function _RPT_secHead(n, titulo){
   return '<div class="rc-sec-head" style="display:flex;align-items:center;gap:8px;margin:18px 0 8px">'
@@ -19473,7 +19507,7 @@ async function RPT_pintarPestanaReporte(pid, filtroEpisodio){
     }
     root.innerHTML='<div class="rpt-container">'
       + _RPT_css()
-      + '<div class="no-print" style="display:flex;justify-content:flex-end;margin-bottom:10px"><button onclick="RPT_imprimirReporte(\''+escapeAttr_(pid)+'\')" style="background:#2E3192;color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:6px">🖨️ Imprimir / Guardar PDF</button></div>'
+      + '<div class="no-print" style="display:flex;justify-content:flex-end;margin-bottom:10px"><button onclick="RPT_imprimirReporte(\''+escapeAttr_(pid)+'\')" style="background:#2E3192;color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:6px">📄 Guardar / compartir PDF</button></div>'
       + selectorHTML
       // FASE C: título imprimible con el episodio seleccionado
       + (_filt.etiqueta?'<div class="rc-avoid" style="font-size:14px;font-weight:800;color:#1B3A6B;margin:0 0 8px;padding:6px 0;border-bottom:2px solid #1B3A6B">📄 Reporte del '+escapeHTML(_filt.etiqueta)+'</div>':'')
