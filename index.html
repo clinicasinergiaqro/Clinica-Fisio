@@ -7128,9 +7128,11 @@ function _rendimientoHTML(datos, noId, ventana, etiqueta, aviso, refresco, tri){
   var chipSA=nombresSA.map(function(nm){
     return '<button data-nombre="'+escapeAttr_(nm)+'" data-v="'+escapeAttr_(ventana)+'" onclick="_abrirModalAsignacion(this.dataset.nombre,this.dataset.v)" style="font-size:11px;font-weight:700;border:1px dashed #92400E;border-radius:10px;padding:4px 10px;margin:2px;cursor:pointer;background:#FFFBEB;color:#92400E">'+escapeHTML(nm)+(datos.sinAsignar[nm]>1?(' ×'+datos.sinAsignar[nm]):'')+'</button>';
   }).join('');
+  // [SIN-INICIAL VISIBLE] apartado promovido: antes vivía hasta el FONDO del tablero y el supervisor
+  // no lo veía. Ahora es una tarjeta ámbar justo debajo de la tabla; vacío = confirmación verde.
   var filaSA=nombresSA.length
-    ? '<div style="margin-top:12px"><div style="font-size:12px;font-weight:800;color:#92400E">⚠️ Sin asignar ('+nombresSA.length+') — toca un nombre para asignar terapeuta</div><div style="margin-top:4px">'+chipSA+'</div></div>'
-    : '';
+    ? '<div style="margin-top:12px;background:#FFFBEB;border:1px solid #F59E0B;border-radius:12px;padding:10px 12px"><div style="font-size:12.5px;font-weight:800;color:#92400E">⚠️ Citas sin inicial / sin asignar ('+nombresSA.length+') — toca un nombre y asígnale terapeuta</div><div style="font-size:10.5px;color:#92400E;margin-top:2px">Al asignar, la cita cuenta en los números de ese terapeuta (y queda guardado para futuras citas del mismo nombre).</div><div style="margin-top:6px">'+chipSA+'</div></div>'
+    : '<div style="margin-top:12px;font-size:11.5px;font-weight:700;color:#2E7D52">✅ Sin pendientes de asignar: todas las citas de la ventana tienen terapeuta</div>';
   var noIdU={}; (Array.isArray(noId)?noId:[]).forEach(function(x){ if(x && !x.asignado) noIdU[x.nombre]=true; });
   var nombresNI=Object.keys(noIdU);
   var chipNI=nombresNI.map(function(nm){
@@ -7153,13 +7155,13 @@ function _rendimientoHTML(datos, noId, ventana, etiqueta, aviso, refresco, tri){
     +'<thead><tr style="border-bottom:2px solid var(--gray-200);color:var(--gray-600);font-size:11px;text-transform:uppercase">'
     +'<th style="padding:6px 8px;text-align:left">Terapeuta</th><th style="padding:6px 8px">Citas</th><th style="padding:6px 8px">✅ Nota</th><th style="padding:6px 8px">🔴 Sin</th><th style="padding:6px 8px">Score</th><th style="padding:6px 8px">📄</th></tr></thead>'
     +'<tbody>'+filas+'</tbody></table></div>'
+    +filaSA+bloqueNI
     +seccionSinNota
     +seccionEnTiempo
     +seccionNoAcudio
     +seccionRevisar
     +seccionAutoria
     +seccionTardias
-    +filaSA+bloqueNI
     +lineaPiso
     +'<div style="font-size:10px;color:var(--gray-400);margin-top:10px">✅/🔴 por PACIENTE y día: nota fechada el día exacto de la cita, sin importar qué terapeuta la escribió (activos por expediente; históricos por ultimaSesionLive). ✅ incluye citas resueltas a mano con ✓. ⏳ = cita de las últimas 24 h (o futura) aún en tiempo de documentar — no es falta ni entra a cobertura. Solo se evalúan citas desde el '+_ddmmFromISO(APP_INICIO_OPERACION)+' (inicio de operación de la app). Score = calidad promedio de nota (0-100) de pacientes activos.</div>';
 }
