@@ -530,25 +530,40 @@ async function FST_renderGaleriaHistorica(pid){
     ]);
     const data = snap.data() || {};
     if (!_fstDocVivo(data)) return '';   // [BORRADO] sin galería de un paciente tombstoneado
-    const fotos = (data.fotosHistoricas || []).filter(function(f){ return f && f.url; });
-    if (!fotos.length) return '';
+    // [FIX SOAP-GALERÍA] Antes esta galería del historial SOLO mostraba las imágenes de MIGRACIÓN
+    // (fotosHistoricas) → una receta subida aparecía en la pestaña Estudios pero NO en el historial.
+    // Ahora combina: fotosHistoricas (migración) + estudiosDocs subidos con url → ambos se ven aquí
+    // como thumbnails, igual que la imagen histórica. Dedup por url (una receta espejada en las dos
+    // listas no se duplica). El 🏷️ (clasificar) solo aplica a las de migración.
     const tipoPorUrl = {};
     (Array.isArray(data.estudiosDocs)?data.estudiosDocs:[]).forEach(function(e){ if(e&&e.url&&e.tipo) tipoPorUrl[e.url]=e.tipo; });
-    const thumbs = fotos.map(function(f){
-      const u = escapeAttr_(f.url);
-      const tp = tipoPorUrl[f.url];
+    const vistos = {};
+    const items = [];
+    (Array.isArray(data.fotosHistoricas)?data.fotosHistoricas:[]).forEach(function(f){
+      if(!f||!f.url||vistos[f.url]) return; vistos[f.url]=1; items.push({url:f.url, esHist:true});
+    });
+    (Array.isArray(data.estudiosDocs)?data.estudiosDocs:[]).forEach(function(e){
+      if(!e||!e.url||vistos[e.url]) return; vistos[e.url]=1; items.push({url:e.url, esHist:false, tipo:e.tipo});
+    });
+    if (!items.length) return '';
+    const thumbs = items.map(function(it){
+      const u = escapeAttr_(it.url);
+      const tp = it.tipo || tipoPorUrl[it.url];
       const t = tp ? (ESTUDIO_TIPOS[tp]||{icono:'📎',label:tp}) : null;
       const etiqueta = t ? '<div class="media-label" style="background:rgba(13,27,62,.82)">'+t.icono+' '+t.label+'</div>' : '';
+      const esImg = it.esHist || tp==='imagen' || /\.(jpg|jpeg|png|gif|webp|heic|bmp)(\?|$)/i.test(it.url);
+      const cuerpo = esImg
+        ? '<img loading="lazy" src="'+u+'" alt="estudio" onerror="this.parentNode.parentNode.style.display=\'none\'" style="width:100%;height:100%;object-fit:cover;display:block">'
+        : '<div style="width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:26px;background:#F0F2F7">📄<div style="font-size:9px;color:#5A6478;font-weight:700">ABRIR</div></div>';
+      const btnClas = it.esHist
+        ? '<button data-pid="'+escapeAttr_(pid)+'" data-url="'+u+'" onclick="event.preventDefault();event.stopPropagation();clasificarImagenHistorica(this.dataset.pid,this.dataset.url)" style="position:absolute;top:4px;right:4px;background:rgba(255,255,255,.92);border:1px solid var(--gray-200);border-radius:8px;font-size:13px;line-height:1;padding:4px 7px;cursor:pointer;z-index:2" title="Clasificar">🏷️</button>'
+        : '';
       return '<div class="media-thumb">'
-        + '<a href="'+u+'" target="_blank" rel="noopener" style="display:block;width:100%;height:100%">'
-        + '<img loading="lazy" src="'+u+'" alt="histórica" onerror="this.parentNode.parentNode.style.display=\'none\'" style="width:100%;height:100%;object-fit:cover;display:block"></a>'
-        + '<button data-pid="'+escapeAttr_(pid)+'" data-url="'+u+'" onclick="event.preventDefault();event.stopPropagation();clasificarImagenHistorica(this.dataset.pid,this.dataset.url)" style="position:absolute;top:4px;right:4px;background:rgba(255,255,255,.92);border:1px solid var(--gray-200);border-radius:8px;font-size:13px;line-height:1;padding:4px 7px;cursor:pointer;z-index:2" title="Clasificar">🏷️</button>'
-        + etiqueta
-        + '</div>';
+        + '<a href="'+u+'" target="_blank" rel="noopener" style="display:block;width:100%;height:100%">'+cuerpo+'</a>'
+        + btnClas + etiqueta + '</div>';
     }).join('');
     return '<div style="margin:14px 0 6px;padding:0 14px">'
-      + '<div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.7px;color:var(--gray-400)">\u{1F4F7} Imágenes históricas del expediente (' + fotos.length + ')</div>'
-      + '<div style="font-size:10px;color:var(--gray-400);margin:2px 0 4px">sesión no especificada</div>'
+      + '<div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.7px;color:var(--gray-400)">\u{1F4F7} Imágenes y estudios del expediente (' + items.length + ')</div>'
       + '<div class="media-grid">' + thumbs + '</div></div>';
   } catch (e) {
     console.warn('[FST] galería histórica error:', e.message);
