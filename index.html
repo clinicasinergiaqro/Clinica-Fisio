@@ -1769,11 +1769,21 @@ async function callAppsScriptPrivado(action, payload={}, opts={}){
     return {ok:false, error:'RED_ERROR', msg:'Reconectando sesión…', transitorio:true};
   }
   try{
-    const r = await fetch(APPS_SCRIPT_URL, {
-      method:'POST',
-      headers:{'Content-Type':'text/plain;charset=utf-8'},
-      body: JSON.stringify({action, ...payload, idToken})
-    });
+    // [PERF-TIMEOUT] En datos móviles un fetch a Apps Script puede quedarse COLGADO sin resolver
+    // nunca → pantallas en "Calculando…" / "Cargando…" eternas. Corte a los 45 s (las lecturas
+    // legítimas más largas —agenda de un mes— tardan mucho menos): cae al catch como RED_ERROR
+    // y los SWR sirven lo último cacheado en lugar de congelar la UI.
+    const _ctrlAS = (typeof AbortController!=='undefined') ? new AbortController() : null;
+    const _toAS = _ctrlAS ? setTimeout(function(){ try{ _ctrlAS.abort(); }catch(_){} }, 45000) : null;
+    let r;
+    try{
+      r = await fetch(APPS_SCRIPT_URL, {
+        method:'POST',
+        headers:{'Content-Type':'text/plain;charset=utf-8'},
+        body: JSON.stringify({action, ...payload, idToken}),
+        signal: _ctrlAS ? _ctrlAS.signal : undefined
+      });
+    } finally { if(_toAS) clearTimeout(_toAS); }
     const data = await r.json();
     // [AUTH-REFRESH b/c] El backend rechaza un token vencido con {ok:false, error:'Token …', code:401}.
     // Antes ese 401 caía en reintento ciego SIN banner (loadFromCloud solo mira AUTH_REQUIRED). Ahora:
@@ -4990,6 +5000,17 @@ async function FST_montarAgendaCalendar(rango){
   // [BANNER] pendientes personales del terapeuta logueado — no bloqueante, cache 5 min
   setTimeout(function(){ try{ _montarBannerPendientes(); }catch(_){} }, 0);
   const reqId = (window._agendaCalReq = (window._agendaCalReq||0) + 1);
+  // [PERF-AGENDA] SWR persistente: la agenda es la PANTALLA INICIAL y no tenía cache — cada apertura
+  // de la app (iOS mata la PWA seguido) esperaba a Apps Script en blanco, y un fallo de red dejaba
+  // "No se pudo cargar" aun teniendo datos de hace minutos. Ahora: pintar AL INSTANTE lo último visto
+  // de ESTE rango (guardado en localStorage, válido solo el mismo día) y refrescar en 2º plano.
+  var _agCached = _agCacheGet(rango);
+  var _listEl0 = document.getElementById('agenda-cal-list');
+  if(_agCached && _listEl0){
+    _agendaPintarEventos(_listEl0, _agCached.eventos, rango);
+    var _agMins = Math.max(0, Math.round((Date.now()-_agCached.ts)/60000));
+    _listEl0.insertAdjacentHTML('afterbegin','<div id="agenda-swr-nota" style="font-size:10.5px;color:#1B3A6B;background:#EEF4FB;border:1px solid #C7DBF0;border-radius:8px;padding:4px 8px;margin-bottom:6px;font-weight:700">🔄 Actualizando… (mostrando lo de '+(_agMins<1?'hace un momento':('hace '+_agMins+' min'))+')</div>');
+  }
   let res;
   try{ res = await FST_fetchAgendaCalendar(rango); }
   catch(e){ res = {ok:false, error:'RED_ERROR', msg:e&&e.message}; }
@@ -4997,10 +5018,22 @@ async function FST_montarAgendaCalendar(rango){
   const listEl = document.getElementById('agenda-cal-list');
   if(!listEl) return;
   if(!res || !res.ok){
+    if(_agCached){
+      // Falla la red pero HAY datos del mismo día: conservarlos con aviso, NO borrar la lista.
+      var _notaSWR = document.getElementById('agenda-swr-nota');
+      var _avisoOff = '<div style="font-size:10.5px;color:#92400E;background:#FEF3C7;border:1px solid #F59E0B;border-radius:8px;padding:4px 8px;margin-bottom:6px;font-weight:700">⚠️ Sin conexión con la agenda — mostrando lo último cargado'+(res&&res.error==='AUTH_REQUIRED'?' (sesión expirada)':'')+'.</div>';
+      if(_notaSWR) _notaSWR.outerHTML = _avisoOff; else listEl.insertAdjacentHTML('afterbegin', _avisoOff);
+      return;
+    }
     listEl.innerHTML = '<div style="font-size:12px;color:var(--red);padding:6px 0">⚠️ No se pudo cargar la agenda'+(res&&res.error==='AUTH_REQUIRED'?' (sesión expirada)':'')+'.</div>';
     return;
   }
   const evs = Array.isArray(res.eventos) ? res.eventos : [];
+  _agCacheSet(rango, evs);
+  _agendaPintarEventos(listEl, evs, rango);
+}
+// [PERF-AGENDA] render puro de la lista (sin red): lo usan tanto el cache como la respuesta fresca.
+function _agendaPintarEventos(listEl, evs, rango){
   if(!evs.length){
     var _vac = (rango==='dia')
       ? 'Sin citas programadas hoy en Google Calendar. Las citas se gestionan en Google Calendar y aquí solo se visualizan.'
@@ -5050,6 +5083,21 @@ async function FST_montarAgendaCalendar(rango){
     listEl.innerHTML = htmlSem;
     setTimeout(_marcarCitasSinExpediente, 0);             // FLUJO-AGENDA: también en Semana/Próxima
   }
+}
+// [PERF-AGENDA] cache persistente por rango. Válido SOLO el mismo día calendario: los rangos son
+// relativos ("hoy"/"mañana") y un cache de ayer mostraría citas del día equivocado. try/catch en
+// todo: localStorage puede fallar (modo privado, cuota) y la agenda debe funcionar igual sin cache.
+function _agCacheGet(rango){
+  try{
+    var raw = localStorage.getItem('agCacheV1_'+rango);
+    if(!raw) return null;
+    var o = JSON.parse(raw);
+    if(!o || !Array.isArray(o.eventos) || o.hoyISO !== _hoyISOlocal()) return null;
+    return o;
+  }catch(_){ return null; }
+}
+function _agCacheSet(rango, eventos){
+  try{ localStorage.setItem('agCacheV1_'+rango, JSON.stringify({ts:Date.now(), hoyISO:_hoyISOlocal(), eventos:eventos})); }catch(_){}
 }
 // ── G-3: agrupación por día para vista semana/próxima (reusa funciones G-2) ──
 // Fecha local YYYY-MM-DD de un evento (para agrupar por día sin desfase de zona).
@@ -7118,6 +7166,33 @@ function _rendimientoHTML(datos, noId, ventana, etiqueta, aviso, refresco, tri){
 // PERF: caches en memoria del dashboard. La lógica de cálculo NO cambia — solo se evita red repetida.
 var REND_CACHE_TTL_MS=5*60*1000;
 window._rendCacheVentanas={};      // (a) por ventana: {ts, eventos, dias, aviso} — respuesta de agenda (Apps Script)
+// [PERF-DISCO] El cache SWR de HTML vive en memoria y iOS mata la PWA seguido → cada reapertura era
+// arranque en frío con "Calculando…" en blanco varios segundos. Espejo en localStorage (válido solo
+// el MISMO día): al reabrir la app, Rendimiento pinta al instante lo último calculado y refresca en
+// 2º plano. Se limita el tamaño por ventana para no reventar la cuota de localStorage.
+function _rendPersistSet(){
+  try{
+    var vs = window._rendHTMLCache || {};
+    var out = {hoyISO:_hoyISOlocal(), ventanas:{}};
+    Object.keys(vs).forEach(function(k){
+      var e = vs[k];
+      if(!e || !e.html || e.html.length > 500000) return;
+      var it = {ts:e.ts, html:e.html};
+      try{ if(e.snap) it.snap = JSON.parse(JSON.stringify(e.snap)); }catch(_s){}
+      out.ventanas[k] = it;
+    });
+    localStorage.setItem('rendHTMLCacheV1', JSON.stringify(out));
+  }catch(_){}
+}
+function _rendPersistGet(ventana){
+  try{
+    var raw = localStorage.getItem('rendHTMLCacheV1');
+    if(!raw) return null;
+    var o = JSON.parse(raw);
+    if(!o || o.hoyISO !== _hoyISOlocal() || !o.ventanas) return null;
+    return o.ventanas[ventana] || null;
+  }catch(_){ return null; }
+}
 window._idxHistRendCache=null;     // {ts, arr} — tokens de nombres de históricos (lectura completa de 'pacientes', ~2400 docs)
 async function _rendIdxHist(forzar){
   var c=window._idxHistRendCache;
@@ -7160,6 +7235,11 @@ async function mostrarRendimientoEquipo(ventana, forzar){
   // el cálculo fresco reemplaza el contenido al terminar. snap restaura _rendUltimo para que el 📄
   // PDF por fila use los MISMOS números que se están viendo.
   window._rendHTMLCache = window._rendHTMLCache || {};
+  // [PERF-DISCO] tras un arranque en frío la memoria viene vacía: rehidratar desde localStorage.
+  if(!window._rendHTMLCache[ventana]){
+    var _persV = _rendPersistGet(ventana);
+    if(_persV) window._rendHTMLCache[ventana] = _persV;
+  }
   var _swr = window._rendHTMLCache[ventana];
   if(!forzar && _swr && _swr.html){
     var _minsSWR = Math.max(0, Math.round((Date.now()-_swr.ts)/60000));
@@ -7303,7 +7383,7 @@ async function mostrarRendimientoEquipo(ventana, forzar){
       : '');
   card.innerHTML=_bannerAct+_rendimientoHTML(datos, noId, ventana, etiqueta, aviso, {desdeCache:desdeCache, ts:cacheTs}, tri);
   // [PERF-SWR] guardar lo recién pintado: la próxima apertura/cambio a esta ventana pinta al instante.
-  try{ window._rendHTMLCache[ventana]={ts:Date.now(), html:card.innerHTML, snap:window._rendUltimo}; }catch(_){}
+  try{ window._rendHTMLCache[ventana]={ts:Date.now(), html:card.innerHTML, snap:window._rendUltimo}; _rendPersistSet(); }catch(_){}
   _tm('total'+(desdeCache?' (desde cache)':''), t0);
 }
 // ── PDF DE DESEMPEÑO POR TERAPEUTA (4º pilar del "control total") ───────────────
