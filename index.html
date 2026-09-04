@@ -11255,10 +11255,15 @@ function renderSOAPForm(){
   // Terapeuta de la nota = quien está llenando la nota, no el terapeuta asignado
   const ter=currentUser.name;
   // F3: quién atendió la sesión (default: el terapeuta de la nota; en edición, lo guardado)
+  // [ATENDIÓ-DEFAULT] currentUser.name es el CÓDIGO ('CAMI','JESS','DAF'…) y la grilla pinta nombres
+  // de calendario ('Camila','Jess','Dafne'…) → el default [ter] no casaba con ninguna casilla y la
+  // nota abría SIN nadie pre-marcado. Normalizar código→nombre (misma fuente que la grilla), también
+  // lo guardado en edición (notas viejas guardaron códigos).
+  var _aCal=function(x){ x=String(x||''); return (typeof TERAPEUTA_COD2CAL!=='undefined'&&TERAPEUTA_COD2CAL[x])||x; };
   if(editingSoapId && Array.isArray(p.soap)){
     var _naAt=p.soap.find(function(s){return s.id===editingSoapId;});
-    tempAtendio=(_naAt && Array.isArray(_naAt.atendidoPor) && _naAt.atendidoPor.length)?_naAt.atendidoPor.slice():[ter];
-  } else { tempAtendio=[ter]; }
+    tempAtendio=(_naAt && Array.isArray(_naAt.atendidoPor) && _naAt.atendidoPor.length)?_naAt.atendidoPor.map(_aCal):[_aCal(ter)];
+  } else { tempAtendio=[_aCal(ter)]; }
   var atendioHtml=_listaTerapeutasAtienden().map(function(t){
     var chk=tempAtendio.indexOf(t)>=0;
     return '<div class="checkbox-item '+(chk?'checked':'')+'" onclick="toggleAtendio(\''+t+'\')"><div class="cb-box">'+(chk?'✓':'')+'</div><div class="cb-label">'+t+'</div></div>';
@@ -11832,7 +11837,8 @@ function aplicarBorradorSoap(d){
       // desde IDB para que no quede referencia colgada al guardar sin conexión. Fire-and-forget.
       try{ (async function(){ var _cambio=false; for(var _mi=0;_mi<tempEvolMedia.length;_mi++){ var _m=tempEvolMedia[_mi]; if(_m && !_m.url && !_m.data && _m.mediaId && typeof idbGet==='function'){ try{ var _b=await idbGet(_m.mediaId); if(_b){ _m.data=_b; _cambio=true; } }catch(_e){} } } if(_cambio && typeof _pintarSoapMediaPreview==='function') _pintarSoapMediaPreview(); })(); }catch(_e){}
     }
-    if(Array.isArray(d.atendido)){ tempAtendio=d.atendido.slice(); if(typeof _renderAtendioGrid==='function') _renderAtendioGrid(); }
+    // [ATENDIÓ-DEFAULT] un borrador con atendido VACÍO no pisa el pre-marcado del terapeuta logueado.
+    if(Array.isArray(d.atendido)&&d.atendido.length){ tempAtendio=d.atendido.slice(); if(typeof _renderAtendioGrid==='function') _renderAtendioGrid(); }
     if(typeof d.motivoIndex==='number') tempMotivoIndex=d.motivoIndex;
     if(typeof d.modoNota==='string' && d.modoNota && typeof seleccionarModoNota==='function'){ try{ seleccionarModoNota(d.modoNota); }catch(_){} } // [BORRADOR-SOAP] restaurar modo clínico → re-muestra la sección opcional y su metadato
     marcarDirty();
@@ -12692,6 +12698,8 @@ async function guardarSOAP(){
   if(!v('f-aanalisis')) missing.push('Análisis (A)');
   if(!v('f-pindicaciones')) missing.push('Indicaciones (P)');
   if(tempMods.length===0) missing.push('Modalidades');
+  // [ATENDIÓ-OBLIGATORIO] toda nota debe decir quién atendió: sin al menos una casilla no se guarda.
+  if(!Array.isArray(tempAtendio)||!tempAtendio.length) missing.push('¿Quién atendió? (marca al menos uno)');
   }
   // 1A: EVA obligatorio por TOQUE (única modificación a la validación de guardarSOAP — 2 checks
   // aditivos en la misma lista `missing`; la persistencia no se toca). Antes los sliders traían
