@@ -7154,6 +7154,18 @@ async function mostrarRendimientoEquipo(ventana, forzar){
   ov.innerHTML='<div style="background:#fff;border-radius:16px;width:100%;max-width:640px;padding:18px"><div style="font-size:12px;color:var(--gray-400)">⏳ Calculando rendimiento…</div></div>';
   document.body.appendChild(ov);
   var card=ov.firstChild;
+  // [PERF-SWR] Pintar AL INSTANTE lo último calculado de ESTA ventana (aunque tenga minutos) y
+  // refrescar en 2º plano. Antes: "Calculando…" en blanco varios segundos cada vez que se abría o
+  // se cambiaba de pestaña (hoy/semana/mes). Ahora el cambio de pestaña ya visitada es inmediato;
+  // el cálculo fresco reemplaza el contenido al terminar. snap restaura _rendUltimo para que el 📄
+  // PDF por fila use los MISMOS números que se están viendo.
+  window._rendHTMLCache = window._rendHTMLCache || {};
+  var _swr = window._rendHTMLCache[ventana];
+  if(!forzar && _swr && _swr.html){
+    var _minsSWR = Math.max(0, Math.round((Date.now()-_swr.ts)/60000));
+    if(_swr.snap) window._rendUltimo = _swr.snap;
+    card.innerHTML = '<div style="background:#EEF4FB;border:1px solid #C7DBF0;color:#1B3A6B;border-radius:10px;padding:7px 12px;margin-bottom:10px;font-size:11.5px;font-weight:700">🔄 Actualizando en segundo plano… (mostrando lo último calculado, '+(_minsSWR<1?'hace un momento':('hace '+_minsSWR+' min'))+')</div>'+_swr.html;
+  }
   var _now=function(){ return (window.performance&&performance.now)?performance.now():Date.now(); };
   var _tm=function(fase,ini){ try{ console.debug('[Rendimiento][perf] '+fase+': '+Math.round(_now()-ini)+' ms'); }catch(_){} };
   var t0=_now();
@@ -7167,7 +7179,13 @@ async function mostrarRendimientoEquipo(ventana, forzar){
     // PERF(c): agenda + pacientes + asignaciones + índice de históricos EN PARALELO (antes: 4 esperas secuenciales).
     var tRed=_now();
     var pAgenda=FST_fetchAgendaRango(dias[0], dias[dias.length-1]).catch(function(){ return null; });
+    // [PERF] loadFromCloud relee TODOS los pacientes de Sheets (3-8 s de Apps Script). Si patientsDB
+    // YA está cargado en memoria, NO bloquear el tablero con eso: se refresca en 2º plano y el
+    // próximo cálculo usa lo nuevo. Solo se espera cuando patientsDB viene vacío (arranque en frío,
+    // donde sin pacientes los números de activos serían falsos).
+    var _tienePacMem = Array.isArray(patientsDB) && patientsDB.length>0;
     var pPac=loadFromCloud().catch(function(){ return null; });
+    if(_tienePacMem){ pPac.then(function(dPacBG){ if(Array.isArray(dPacBG)&&dPacBG.length) patientsDB=dPacBG; }); }
     var pAsig=FST_leerAsignacionesAgenda(!!forzar);
     var pHist=_rendIdxHist(!!forzar);
     var res=await pAgenda;
@@ -7180,11 +7198,16 @@ async function mostrarRendimientoEquipo(ventana, forzar){
       try{ res=await FST_fetchAgendaCalendar('dia'); dias=[_hoyISOlocal()]; if(ventana!=='hoy') aviso='No se pudo leer el rango — mostrando solo HOY.'; }catch(e2){ res=null; }
     }
     if(!res||!res.ok){
+      // [PERF-SWR] si ya se pintó lo último calculado, NO borrarlo con un error: conservar y avisar.
+      if(_swr && _swr.html){
+        card.innerHTML='<div style="background:#FEF3C7;border:1px solid #F59E0B;color:#92400E;border-radius:10px;padding:7px 12px;margin-bottom:10px;font-size:11.5px;font-weight:700">⚠️ No se pudo actualizar la agenda — mostrando lo último calculado. Reintenta con 🔄.</div>'+_swr.html;
+        return;
+      }
       card.innerHTML='<div style="color:var(--red);font-size:13px">⚠️ No se pudo leer la agenda.</div>'
         +'<div style="text-align:right;margin-top:12px"><button onclick="this.closest(\'[data-rendov]\').remove()" style="padding:8px 14px;border:none;border-radius:10px;background:var(--navy);color:#fff;font-weight:700;cursor:pointer">Cerrar</button></div>';
       return;
     }
-    var dPac=await pPac; if(Array.isArray(dPac)&&dPac.length) patientsDB=dPac;
+    if(!_tienePacMem){ var dPac=await pPac; if(Array.isArray(dPac)&&dPac.length) patientsDB=dPac; }   // [PERF] solo bloquear en frío
     await pAsig; await pHist;   // corrían en paralelo con la agenda; a esta altura ya casi siempre resolvieron
     _tm('red (4 fuentes en paralelo)', tRed);
     eventos=res.eventos||[];
@@ -7279,6 +7302,8 @@ async function mostrarRendimientoEquipo(ventana, forzar){
       ? '<div style="background:#FDECEA;border:2px solid #C0392B;color:#8a2114;border-radius:10px;padding:10px 12px;margin-bottom:10px;font-size:13px;font-weight:700">⚠️ El historial de la nube aún se estaba cargando (arranque en frío) — algunos pacientes podrían salir como falta sin serlo. Toca 🔄 Actualizar en unos segundos. El PDF está deshabilitado en este estado.</div>'
       : '');
   card.innerHTML=_bannerAct+_rendimientoHTML(datos, noId, ventana, etiqueta, aviso, {desdeCache:desdeCache, ts:cacheTs}, tri);
+  // [PERF-SWR] guardar lo recién pintado: la próxima apertura/cambio a esta ventana pinta al instante.
+  try{ window._rendHTMLCache[ventana]={ts:Date.now(), html:card.innerHTML, snap:window._rendUltimo}; }catch(_){}
   _tm('total'+(desdeCache?' (desde cache)':''), t0);
 }
 // ── PDF DE DESEMPEÑO POR TERAPEUTA (4º pilar del "control total") ───────────────
