@@ -170,7 +170,10 @@ function doGet(e) {
             let ejercicios = [];
             try { ejercicios = JSON.parse(dataP[r][idxEjercicios] || '[]'); } catch(err) { ejercicios = []; }
             const ejerciciosPublicos = ejercicios
-              .filter(ej => (ej.estado || 'activo') === 'activo')
+              // PRIVACIDAD: el paciente SOLO ve ejercicios activos, de tarea para casa y NO privados.
+              // Antes solo se filtraba por estado 'activo' → un ejercicio marcado 🔒 privado (o "solo
+              // consulta", paraCasa:false) seguía llegando al paciente. Alineado con el filtro del front.
+              .filter(ej => ej && (ej.estado || 'activo') === 'activo' && ej.privado !== true && ej.paraCasa !== false)
               .map(ej => ({
                 nombre: ej.nombre || ej.name || '',
                 dosis: ej.dosis || '',
@@ -263,7 +266,8 @@ function doGet(e) {
               if (!Array.isArray(ejerciciosFS)) ejerciciosFS = [];
               const nombreFS = ('name' in docFields) ? (_fsVal(docFields.name) || '') : '';
               const ejerciciosPublicosFS = ejerciciosFS
-                .filter(ej => ej && (ej.estado || 'activo') === 'activo')
+                // PRIVACIDAD (mismo criterio que el Sheet): activo + para casa + NO privado.
+                .filter(ej => ej && (ej.estado || 'activo') === 'activo' && ej.privado !== true && ej.paraCasa !== false)
                 .map(ej => ({
                   nombre: ej.nombre || ej.name || '',
                   dosis: ej.dosis || '',
