@@ -43,7 +43,11 @@ const HEADERS = [
   'sexo',
   'altaClinica','revaloraciones','eventosAdversos',
   'motivoActualIndex','numSesionEpisodioActual','fechaInicio',
-  'revalSolicitada'
+  'revalSolicitada',
+  // FIX PÉRDIDA DE DATOS: 'inasistencias' ("No acudió") y 'motivoHC' se escribían desde el front pero
+  // NO existían como columna → el backend los descartaba y se perdían al recargar (solo activos; los
+  // históricos ya iban por Firestore). Agregar la columna hace que persistan en el Sheet.
+  'inasistencias','motivoHC'
 ];
 
 // ── SPRINT TOKEN PASO 1: validación de Firebase ID Token ──
@@ -109,7 +113,8 @@ function leerPacientes(ss){
     'planTto','consentimiento','soap','soap2','soap3','ejercicios','fotos','docs','historialCambios',
     'consentimientos','seguridadClinica','motivosAnteriores','etiquetas',
     'consentimientoDatos','consentimientoImagen','consentimientoWhatsApp',
-    'altaClinica','revaloraciones','eventosAdversos','revalSolicitada'];
+    'altaClinica','revaloraciones','eventosAdversos','revalSolicitada',
+    'inasistencias','motivoHC'];
   return data
     .filter(row => row[0] !== '')
     .map(row => {
@@ -959,7 +964,7 @@ function mergePacienteSeguro_(actual, entrante) {
   base.soap2 = chunks.soap2;
   base.soap3 = chunks.soap3;
 
-  var arraysCriticos = ['fotos','docs','ejercicios','consentimientos','revaloraciones','eventosAdversos','motivosAnteriores'];
+  var arraysCriticos = ['fotos','docs','ejercicios','consentimientos','revaloraciones','eventosAdversos','motivosAnteriores','inasistencias'];
   arraysCriticos.forEach(function(campo) {
     base[campo] = mergeArraysPorId_(parseSafeGS_(actual[campo]), parseSafeGS_(entrante[campo]), 'id');
   });

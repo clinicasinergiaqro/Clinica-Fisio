@@ -543,7 +543,7 @@ async function FST_renderGaleriaHistorica(pid){
       if(!f||!f.url||vistos[f.url]) return; vistos[f.url]=1; items.push({url:f.url, esHist:true});
     });
     (Array.isArray(data.estudiosDocs)?data.estudiosDocs:[]).forEach(function(e){
-      if(!e||!e.url||vistos[e.url]) return; vistos[e.url]=1; items.push({url:e.url, esHist:false, tipo:e.tipo});
+      if(!e||e.eliminado===true||!e.url||vistos[e.url]) return; vistos[e.url]=1; items.push({url:e.url, esHist:false, tipo:e.tipo});   // [TOMBSTONE] ocultar borrados
     });
     if (!items.length) return '';
     const thumbs = items.map(function(it){
@@ -11277,7 +11277,11 @@ function renderSOAPForm(){
   // nota abría SIN nadie pre-marcado. Normalizar código→nombre (misma fuente que la grilla), también
   // lo guardado en edición (notas viejas guardaron códigos).
   var _aCal=function(x){ x=String(x||''); return (typeof TERAPEUTA_COD2CAL!=='undefined'&&TERAPEUTA_COD2CAL[x])||x; };
-  if(editingSoapId && Array.isArray(p.soap)){
+  if(editingSoapEsHistorico && _editingSoapHistoricoNota){
+    // [ATENDIÓ-HISTÓRICO] las notas de mig_pac_ NO viven en p.soap → el default caía al editor y
+    // pisaba quién atendió realmente. Precargar desde la nota histórica en cache.
+    tempAtendio=(Array.isArray(_editingSoapHistoricoNota.atendidoPor)&&_editingSoapHistoricoNota.atendidoPor.length)?_editingSoapHistoricoNota.atendidoPor.map(_aCal):[_aCal(ter)];
+  } else if(editingSoapId && Array.isArray(p.soap)){
     var _naAt=p.soap.find(function(s){return s.id===editingSoapId;});
     tempAtendio=(_naAt && Array.isArray(_naAt.atendidoPor) && _naAt.atendidoPor.length)?_naAt.atendidoPor.map(_aCal):[_aCal(ter)];
   } else { tempAtendio=[_aCal(ter)]; }
@@ -12813,6 +12817,12 @@ async function guardarSOAP(){
     if(editingSoapEsHistorico){
       const notaH=_editingSoapHistoricoNota;
       const sidH=editingSoapId, pidH=editingSoapPid;
+      // [FIX EDICIÓN-HISTÓRICA] destino del write = doc-id CRUDO (_docId), NO el campo `id`. En notas
+      // migradas ambos DIFIEREN; escribir a .doc(id) apuntaba a un doc inexistente → set(merge) lo
+      // trataba como CREATE, que las reglas rechazan (textoOriginal no está en sesionCreateOK) → la
+      // edición iba a FALLIDOS y se perdía, mientras el original quedaba intacto. Igual criterio que
+      // el borrado (que ya usa _docId). sidH se conserva SOLO para casar la nota en el cache (por id).
+      const docIdH=(notaH && notaH._docId) || sidH;
       const terapeutaH=v('f-soap-terapeuta')||notaH.terapeuta||'';
       const fechaH=fechaConsultaFmt;
       const snH={
@@ -12926,13 +12936,13 @@ async function guardarSOAP(){
       // FIX 2 — offline: Firestore NO rechaza sin conexión (deja el write pendiente/colgado) → el catch
       // nunca dispararía. Detectar offline y encolar directo. Online: intentar con timeout de 10s.
       if(!navigator.onLine){
-        _encolarSoapHistorico(sidH,pidH,payloadH);
+        _encolarSoapHistorico(docIdH,pidH,payloadH);
         showToast('📴 Sin conexión — nota histórica respaldada en este equipo. Se sincronizará al reconectar.','warning');
       } else {
         try{
-          await _conTimeout(_guardarEdicionSoapHistorico(sidH,pidH,payloadH), 10000);
+          await _conTimeout(_guardarEdicionSoapHistorico(docIdH,pidH,payloadH), 10000);
         }catch(err){
-          _encolarSoapHistorico(sidH,pidH,payloadH);
+          _encolarSoapHistorico(docIdH,pidH,payloadH);
           showToastCritico_('⚠️ Nota histórica NO guardada en la nube — respaldada en este equipo. Se reintentará al reconectar.');
           console.warn('[SOAP-hist] guardado falló, encolado:', err && err.message);
         }
@@ -13005,7 +13015,10 @@ async function guardarSOAP(){
     p.ultimoUsuario=ter;
     tempEvolMedia=[];
     _espejarSoapMediaAEstudios_(p, p.soap[idx]); // FIX media-edición: espejar a Estudios también al editar (idempotente; propaga a FS por la fusión de la pestaña Estudios, igual que la nota nueva)
-    saveDB('pts',[p]).then(async res=>{
+    // [ANTI-CLOBBER] declarar camposHist en la EDICIÓN igual que en la nota nueva. Sin esto saveDB
+    // mandaba el paciente COMPLETO (merge clásico) y, entre dispositivos, podía revertir objetos
+    // clínicos (valoracion/planTto/motivo/dxFuncional/…) con una copia vieja en memoria de este equipo.
+    saveDB('pts',[p],{camposHist:['soap','estudiosDocs','fechaActualizacion','ultimoUsuario']}).then(async res=>{
       showToast(res?.ok?'✅ Nota SOAP actualizada':'⚠️ Actualizada local, Sheets pendiente',res?.ok?'success':'warning');
       // DUAL-WRITE DURABLE de la EDICIÓN (igual que la nota nueva, PR #76): NO gated en Sheets, awaited,
       // y si falla se encola el SNAPSHOT con modo 'edicion' (antes: fire-and-forget + .catch(()=>{}) que
@@ -14016,12 +14029,17 @@ function _resolverPaciente(pid){
 // Clave por id → url → fbPath → descripcion|fecha; el LOCAL gana en empate (conserva
 // reclasificaciones/resúmenes locales). Sin id ni claves → se incluye (no se pierde). Unión pura.
 function _fusionarEstudiosDocs(local, remoto){
-  var out=[], vistos={};
+  var byKey={}, order=[];
   function key(e){ return String((e&&e.id) || (e&&e.url) || (e&&e.fbPath) || ((e&&e.descripcion||'')+'|'+(e&&e.fechaEstudio||'')) || ''); }
   (Array.isArray(local)?local:[]).concat(Array.isArray(remoto)?remoto:[]).forEach(function(e){
-    if(!e) return; var k=key(e); if(!k){ out.push(e); return; } if(vistos[k]) return; vistos[k]=1; out.push(e);
+    if(!e) return; var k=key(e);
+    if(!k){ order.push(e); return; }   // sin clave: no se puede dedup, se conserva
+    if(byKey[k]===undefined){ byKey[k]=e; order.push(k); }
+    // [TOMBSTONE] un borrado (eliminado:true) en cualquiera de las copias GANA → el borrado se propaga
+    // y un estudio eliminado no puede "revivir" por tener una copia viva en otro equipo.
+    else if(e.eliminado===true && byKey[k].eliminado!==true){ byKey[k]=e; }
   });
-  return out;
+  return order.map(function(x){ return (typeof x==='string')?byKey[x]:x; });
 }
 // Espejo DURABLE a Firestore de un campo array que vive SOLO en Firestore (estudiosDocs/
 // reportesClinicosIA) para pacientes ACTIVOS. _sinUndefined (Firestore rechaza undefined y explota el
@@ -14246,7 +14264,7 @@ async function FST_renderEstudiosApartado(pid){
         }
       } catch(e){ console.warn('[estudios-sync] carga estudiosDocs · pid='+pid+':', e&&e.message); }
     }
-    var manuales = (Array.isArray(p.estudiosDocs) ? p.estudiosDocs : []).map(function(e){ return Object.assign({ origen:'manual' }, e); });
+    var manuales = (Array.isArray(p.estudiosDocs) ? p.estudiosDocs : []).filter(function(e){ return e && e.eliminado!==true; }).map(function(e){ return Object.assign({ origen:'manual' }, e); });   // [TOMBSTONE] ocultar borrados
     var enNota = await _FST_extraerEstudiosDeNotas(p);
     var todos = manuales.concat(enNota);
     todos.sort(function(a,b){ return _aISO(b.fechaEstudio).localeCompare(_aISO(a.fechaEstudio)); });
@@ -15101,7 +15119,11 @@ async function borrarEstudio(pid, eid){
   // Mover el archivo a borrados/ ANTES de quitar la referencia (ambos o ninguno)
   var movido = await _moverArchivoABorrados(est.fbPath, {tipo:'estudio', pid:pid, tipoDoc:est.tipo||null, id:est.id});
   if (!movido){ showToast('❌ No se pudo mover el archivo a la papelera. No se eliminó; reintenta.','error'); return; }
-  p.estudiosDocs = p.estudiosDocs.filter(function(e){ return String(e.id)!==String(eid); });
+  // [FIX RESURRECCIÓN] TOMBSTONE en vez de quitar del array. Antes el filter dejaba el array SIN el
+  // estudio; en otro equipo que aún lo tenía, la unión (fusión) al abrir Estudios lo REVIVÍA y lo
+  // re-escribía a la nube para todos (con url ya movida = referencia rota). Marcar eliminado:true y
+  // persistirlo hace que el borrado VIAJE: la fusión lo respeta y el render lo oculta.
+  p.estudiosDocs = p.estudiosDocs.map(function(e){ return String(e.id)===String(eid) ? Object.assign({}, e, {eliminado:true, eliminadoPor:currentUser.name, eliminadoFecha:new Date().toISOString()}) : e; });
   try { await _persistirEstudios(p); if (window._estudiosCache) delete window._estudiosCache[pid]; showToast('🗑️ Estudio movido a la papelera','success'); FST_renderEstudiosApartado(pid); if(typeof _renderSoapEstudios==='function') _renderSoapEstudios(); }
   catch(e){ showToast('⚠️ Archivo movido, pero no se pudo guardar el índice: '+e.message,'error'); }
 }
@@ -15139,7 +15161,9 @@ async function clasificarImagenHistorica(pid, url){
     try {
       var dsnap = await window._fstDb.collection('pacientes').doc(pid).get();
       var fe = (dsnap.data()||{}).estudiosDocs;
-      if (Array.isArray(fe)) p.estudiosDocs = fe;
+      // [ANTI-CLOBBER] unir (no pisar) el array local con la nube: un estudio local aún no sincronizado
+      // no se pierde al reclasificar una imagen histórica.
+      if (Array.isArray(fe)) p.estudiosDocs = _fusionarEstudiosDocs(Array.isArray(p.estudiosDocs)?p.estudiosDocs:[], fe);
     } catch(e){ console.warn('[hist→estudio] hidratar:', e.message); showToast('No se pudo leer el expediente','error'); return; }
   }
   if (!Array.isArray(p.estudiosDocs)) p.estudiosDocs = [];
@@ -17328,7 +17352,7 @@ function guardarNuevoPaciente(){
     // tocó (eventosAdversos/inasistencias/revaloraciones). Se declaran SOLO los campos que este form muta.
     saveDB('pts',[_ep],{camposHist:['name','nombreNormalizado','motivoConsulta','dx','contraindicaciones',
       'alergias','antecedentes','motivo','motivoHC','valoracion','dxFuncional','planTto','seguridadClinica',
-      'estudiosDocs','sexo','telefono','fechaNacimiento','age','medicoReferente','terapeuta',
+      'estudiosDocs','sexo','telefono','fechaNacimiento','age','medicoReferente','terapeuta','terapeutaSeguimiento',
       'fechaActualizacion','ultimoUsuario','historialCambios']}).then(function(res){
       if(res&&res.ok) showToast('✅ Valoración actualizada','success');
       else showToast('⚠️ Guardado local, Sheets no confirmó. Revisa conexión.','warning');
