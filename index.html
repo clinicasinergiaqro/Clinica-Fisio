@@ -2821,7 +2821,9 @@ function _persistirFallidosHistDoc(items){
     var f=JSON.parse(localStorage.getItem('COLA_SYNC_HIST_DOC_FALLIDOS')||'[]');
     if(!Array.isArray(f)) f=[];
     f=f.concat(items);
-    if(f.length>50) f=f.slice(f.length-50); // cap de inspección
+    // [FIX #3] Antes el cap era 50 y recortaba en SILENCIO los más viejos. Para un histórico Firestore
+    // es el ÚNICO almacén → cada diff recortado = dato clínico perdido. Cap alto (1000) + aviso fuerte.
+    if(f.length>1000){ f=f.slice(f.length-1000); try{ showToastCritico_('⚠️ Muchos cambios de expediente sin subir. Conéctate a WiFi para no perder datos.'); }catch(_){} }
     localStorage.setItem('COLA_SYNC_HIST_DOC_FALLIDOS', JSON.stringify(f));
   }catch(e){ console.warn('[hist-doc] no se pudo guardar fallidos:', e && e.message); }
 }
@@ -3044,8 +3046,12 @@ async function _autoRescateFallidos(){
     mover('COLA_SOAP_ACT_FALLIDOS','COLA_SOAP_ACT', null);
     mover('COLA_SYNC_HIST_FALLIDOS','COLA_SYNC_HIST', function(it){ return it && it.tipo==='nueva'; });   // ediciones de histórico → manual
     mover('COLA_NOACUDIO_FALLIDOS','COLA_NOACUDIO', null);
+    // [FIX #3] Los diffs clínicos del DOC histórico (mig_pac_) fallidos tampoco se re-drenaban solos.
+    // Reencolar todos MENOS los de identidad y los que el usuario canceló a propósito (conflicto).
+    mover('COLA_SYNC_HIST_DOC_FALLIDOS','COLA_SYNC_HIST_DOC', function(it){ return it && it.tipo!=='identidad' && !(it.error && /conflicto|cancelad/i.test(String(it.error||''))); });
     try{ if(typeof drenarColaSoapActivo==='function') await drenarColaSoapActivo(); }catch(_){}
     try{ if(typeof drenarColaSoapHistorico==='function') await drenarColaSoapHistorico(); }catch(_){}
+    try{ if(typeof drenarColaHistDoc==='function') await drenarColaHistDoc(); }catch(_){}
     try{ if(typeof drenarColaNoAcudio==='function') await drenarColaNoAcudio(); }catch(_){}
     try{ if(typeof sincronizarPendientes==='function') await sincronizarPendientes(); }catch(_){}
     try{ actualizarIndicadorSync(); }catch(_){}
@@ -12330,13 +12336,18 @@ async function _capturarMediaObjetivo(ev){
     if(f.size>80*1024*1024){ fallo++; showToast('“'+(f.name||'archivo')+'” muy pesado, se omitió','warning'); continue; }
     if(String(f.type).indexOf('image/')!==0 && String(f.type).indexOf('video/')!==0){ fallo++; continue; }
     showToast('☁️ Subiendo '+(i+1)+' de '+files.length+'…','');
-    try{
-      var res=await subirMediaEjercicioAStorage(f);   // reutiliza la subida (guarda bajo /ejercicios pero sirve)
-      // FUGA ENTRE PACIENTES (auditoría): si cambiaste de paciente durante la subida, descartar el resto.
-      if(!currentPatient || currentPatient.id!==_pidMO){ showToast('Cambiaste de paciente — no se adjuntó','warning'); break; }
-      tempMediaObjetivo.push({ id:'mo'+Date.now()+'_'+i, type:f.type, url:res.url, fbPath:res.fbPath, etiqueta:_etq });
-      ok++;
-    }catch(e){ console.warn('[media-obj]', e&&e.message); fallo++; }
+    // [REINTENTO #2] mala señal: hasta 3 intentos con espera creciente antes de darse por vencido.
+    // Antes un solo fallo transitorio perdía la foto/video de valoración sin respaldo.
+    var res=null, _try=0;
+    while(_try<3 && !res){
+      _try++;
+      try{ res=await subirMediaEjercicioAStorage(f); }
+      catch(e){ console.warn('[media-obj] intento '+_try, e&&e.message); if(_try<3){ showToast('Reintentando ('+_try+'/3)…',''); await new Promise(function(r){ setTimeout(r,_try*1500); }); } }
+    }
+    // FUGA ENTRE PACIENTES (auditoría): si cambiaste de paciente durante la subida, descartar el resto.
+    if(!currentPatient || currentPatient.id!==_pidMO){ showToast('Cambiaste de paciente — no se adjuntó','warning'); break; }
+    if(res){ tempMediaObjetivo.push({ id:'mo'+Date.now()+'_'+i, type:f.type, url:res.url, fbPath:res.fbPath, etiqueta:_etq }); ok++; }
+    else { fallo++; }
   }
   if(_inpEtq) _inpEtq.value='';
   _renderMediaObjetivo();
@@ -12414,13 +12425,17 @@ async function _capturarMediaAntes(ev){
     if(f.size>80*1024*1024){ fallo++; showToast('“'+(f.name||'archivo')+'” muy pesado, se omitió','warning'); continue; }
     if(String(f.type).indexOf('image/')!==0 && String(f.type).indexOf('video/')!==0){ fallo++; continue; }
     showToast('☁️ Subiendo '+(i+1)+' de '+files.length+'…','');
-    try{
-      var res=await _subirMediaAntes(f, _pidAntes);
-      // FUGA ENTRE BORRADORES: si se abrió otro Nuevo/Editar durante la subida, descartar el resto.
-      if(window._altaPid!==_pidAntes){ showToast('Cambiaste de formulario — no se adjuntó','warning'); break; }
-      window._altaMediaAntes.push({ id:'ba'+Date.now()+'_'+i, type:f.type, url:res.url, fbPath:res.fbPath, etiqueta:_etq });
-      ok++;
-    }catch(e){ console.warn('[media-antes]', e&&e.message); fallo++; }
+    // [REINTENTO #2] mala señal: hasta 3 intentos con espera creciente antes de rendirse.
+    var res=null, _try=0;
+    while(_try<3 && !res){
+      _try++;
+      try{ res=await _subirMediaAntes(f, _pidAntes); }
+      catch(e){ console.warn('[media-antes] intento '+_try, e&&e.message); if(_try<3){ showToast('Reintentando ('+_try+'/3)…',''); await new Promise(function(r){ setTimeout(r,_try*1500); }); } }
+    }
+    // FUGA ENTRE BORRADORES: si se abrió otro Nuevo/Editar durante la subida, descartar el resto.
+    if(window._altaPid!==_pidAntes){ showToast('Cambiaste de formulario — no se adjuntó','warning'); break; }
+    if(res){ window._altaMediaAntes.push({ id:'ba'+Date.now()+'_'+i, type:f.type, url:res.url, fbPath:res.fbPath, etiqueta:_etq }); ok++; }
+    else { fallo++; }
   }
   if(_inpEtq) _inpEtq.value='';
   _renderMediaAntes();
@@ -14433,7 +14448,23 @@ function agregarEstudioArchivo(pid, tipo){
         });
         p.estudiosDocs.push({ id:'est_'+ts+'_'+i+'_'+Math.random().toString(36).slice(2,6), tipo:tipo, url:url, fbPath:fbPath, descripcion:(f.name||'').replace(/\.[^.]+$/,''), fechaEstudio:fecha, fechaAgregado:new Date().toLocaleDateString('es-MX'), agregadoPor:currentUser.name });
         ok++;
-      } catch(e){ fallo++; console.warn('[estudio multi]', e&&e.message); }
+      } catch(e){
+        // [FALLBACK-IDB #2] La subida a Storage falló (red mala). ANTES: fallo++ y el archivo se
+        // PERDÍA. Ahora se guarda el binario en IndexedDB y se registra la referencia SIN url
+        // (mediaId + pendienteSubida). Se refleja en p.docs para que _reSubirFotosLocales lo re-suba
+        // al abrir Estudios con señal y espeje la url en estudiosDocs (mismo camino que el botón "Archivo").
+        try{
+          var _ts2=Date.now();
+          var _data=await readFile(f);
+          var _mid='m_'+pid+'_'+_ts2+'_'+i+'_'+Math.random().toString(36).slice(2,7);
+          await idbSet(_mid,_data);
+          var _kind=((f.type&&f.type.indexOf('image')===0)||/\.(jpg|jpeg|png|gif|webp|heic|bmp)$/i.test(f.name||''))?'imagen':'doc';
+          if(!Array.isArray(p.docs)) p.docs=[];
+          p.docs.push({ name:f.name, mediaId:_mid, data:_data, type:f.type, kind:_kind, fecha:new Date().toLocaleDateString('es-MX'), label:(f.name||'archivo').replace(/\.[^.]+$/,''), subidoPor:currentUser.name });
+          p.estudiosDocs.push({ id:'est_'+_ts2+'_'+i+'_'+Math.random().toString(36).slice(2,6), tipo:tipo, mediaId:_mid, descripcion:(f.name||'').replace(/\.[^.]+$/,''), fechaEstudio:fecha, fechaAgregado:new Date().toLocaleDateString('es-MX'), agregadoPor:currentUser.name, pendienteSubida:true });
+          ok++;
+        }catch(e2){ fallo++; console.warn('[estudio multi]', e&&e.message, e2&&e2.message); }
+      }
     }
     if (!ok){ showToast('❌ No se subió ningún estudio'+(fallo?(' ('+fallo+' con error)'):''),'error'); return; }
     try {

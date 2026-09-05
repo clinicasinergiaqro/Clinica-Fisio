@@ -78,7 +78,11 @@
     var media='';
     if(m){
       if(!src) media='<div class="media"><div class="nomedia">Video no disponible sin conexión</div></div>';
-      else if(isVid) media='<div class="media"><video src="'+esc(src)+'#t=0.1" controls playsinline preload="metadata"></video></div>';
+      // [POSTER] Antes se veía NEGRO al abrir (iOS/WhatsApp no pinta el 1er frame con #t=0.1, y a
+      // veces el segundo 0.1 del video es negro). Ahora: preload="metadata" + muted + salto a #t=0.5
+      // (fotograma más probable con imagen) + onloadeddata que fuerza el seek → se ve un cuadro del
+      // ejercicio en vez de negro. Sigue con controles para reproducir.
+      else if(isVid) media='<div class="media"><video src="'+esc(src)+'#t=0.5" controls muted playsinline preload="metadata" onloadedmetadata="try{if(this.currentTime<0.3)this.currentTime=0.5;}catch(e){}"></video></div>';
       else if(isImg) media='<div class="media"><img src="'+esc(src)+'" loading="lazy" alt=""></div>';
       else media='<div class="media"><div class="nomedia">📎 '+esc(m.label||'Archivo')+'</div></div>';
     }
