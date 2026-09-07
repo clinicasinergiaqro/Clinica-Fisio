@@ -12794,22 +12794,36 @@ async function guardarSOAP(){
   if(typeof _updateModAutoTto==='function') _updateModAutoTto();
   const v=(id)=>document.getElementById(id)?.value.trim()||'';
   const _esTextoLibreHist=editingSoapEsHistorico&&_editingSoapHistoricoNota?.formatoOriginal==='texto_libre';
+  // [FIX JESS/DESKTOP] SALVAVIDAS: si el panel de IA está con contenido en el preview (ia-prev-*) pero
+  // los campos reales del form (f-*) están vacíos, es que se pulsó "Guardar" sin "Usar este SOAP".
+  // Aplicar la IA automáticamente antes de validar → deja de marcar "Faltan" cuando el texto SÍ existe
+  // en el preview. Solo actúa si hay algo en el preview y el form correspondiente está vacío.
+  try{
+    var _iaPrev=document.getElementById('ia-prev-sdolor');
+    if(_iaPrev && typeof usarSoapIA==='function'){
+      var _prevTieneAlgo=['ia-prev-sdolor','ia-prev-aevolucion','ia-prev-arespuesta','ia-prev-aanalisis','ia-prev-pindicaciones']
+        .some(function(id){ var e=document.getElementById(id); return e && String(e.value||'').trim() && String(e.value||'').trim()!=='[pendiente]'; });
+      var _formVacio = !v('f-sdolor') && !v('f-aevolucion') && !v('f-arespuesta') && !v('f-aanalisis');
+      if(_prevTieneAlgo && _formVacio){ usarSoapIA(); }
+    }
+  }catch(_ia){}
   const missing=[];
+  var _push=function(l,id){ missing.push({l:l, id:id||null}); };
   if(!_esTextoLibreHist){
-  if(!v('f-sdolor')) missing.push('Dolor (S)');
+  if(!v('f-sdolor')) _push('Dolor (S)','f-sdolor');
   // MOTIVO NUEVO activo → "Cambios (S)" y "Progreso (A)" son opcionales (1ª nota del episodio, sin
   // comparativa previa). Mismo flag que enciende _toggleNuevoMotivoSoap y que oculta sus asteriscos.
-  if(!window._soapNuevoMotivoOn && !v('f-scambios')) missing.push('Cambios (S)');
+  if(!window._soapNuevoMotivoOn && !v('f-scambios')) _push('Cambios (S)','f-scambios');
   // AUDITORÍA (2026-08): Hallazgos/pruebas NO obligatorio en seguimiento — no siempre se explora;
   // obligarlo hacía inventar o atorarse. Sigue capturándose cuando aplica. En valoración inicial
   // (form nuevo paciente) la exploración tiene su propia captura.
-  if(!window._soapNuevoMotivoOn && !v('f-aevolucion')) missing.push('Progreso (A)');
-  if(!v('f-arespuesta')) missing.push('Respuesta (A)');
-  if(!v('f-aanalisis')) missing.push('Análisis (A)');
-  if(!v('f-pindicaciones')) missing.push('Indicaciones (P)');
-  if(tempMods.length===0) missing.push('Modalidades');
+  if(!window._soapNuevoMotivoOn && !v('f-aevolucion')) _push('Progreso (A)','f-aevolucion');
+  if(!v('f-arespuesta')) _push('Respuesta (A)','f-arespuesta');
+  if(!v('f-aanalisis')) _push('Análisis (A)','f-aanalisis');
+  if(!v('f-pindicaciones')) _push('Indicaciones (P)','f-pindicaciones');
+  if(tempMods.length===0) _push('Modalidades',null);
   // [ATENDIÓ-OBLIGATORIO] toda nota debe decir quién atendió: sin al menos una casilla no se guarda.
-  if(!Array.isArray(tempAtendio)||!tempAtendio.length) missing.push('¿Quién atendió? (marca al menos uno)');
+  if(!Array.isArray(tempAtendio)||!tempAtendio.length) _push('¿Quién atendió? (marca al menos uno)',null);
   }
   // 1A: EVA obligatorio por TOQUE (única modificación a la validación de guardarSOAP — 2 checks
   // aditivos en la misma lista `missing`; la persistencia no se toca). Antes los sliders traían
@@ -12820,10 +12834,29 @@ async function guardarSOAP(){
   // precargan null (jamás undefined — L10508/L10591) y NO se exige inventar un EVA retroactivo:
   // ninguna nota existente se vuelve ineditable por esta validación.
   if(!_esTextoLibreHist && !editingSoapId){
-    if(tempEvaI==null) missing.push('EVA inicio (toca el número)');
-    if(typeof tempEvaF==='undefined') missing.push('EVA final (número o "No evaluado")');
+    if(tempEvaI==null) _push('EVA inicio (toca el número)','n-eva-row');
+    if(typeof tempEvaF==='undefined') _push('EVA final (número o "No evaluado")',null);
   }
-  if(missing.length){showToast(`Faltan: ${missing.slice(0,2).join(', ')}${missing.length>2?'...':''}`, 'error');_liberarGuardSOAP();return;}
+  if(missing.length){
+    // [FIX JESS] En vez de un aviso vago, DESPLAZAR a y RESALTAR en rojo el primer campo que falta, y
+    // listar TODOS los faltantes. Así se ve EXACTAMENTE cuál está vacío (evita el "pero si lo llené").
+    var _labels=missing.map(function(m){return m.l;});
+    var _primerCampo=null;
+    for(var _i=0;_i<missing.length;_i++){ if(missing[_i].id){ var _el=document.getElementById(missing[_i].id); if(_el){ _primerCampo=_el; break; } } }
+    if(_primerCampo){
+      try{
+        _primerCampo.scrollIntoView({behavior:'smooth', block:'center'});
+        var _prevOutline=_primerCampo.style.boxShadow, _prevBorder=_primerCampo.style.border;
+        _primerCampo.style.boxShadow='0 0 0 3px #C0392B'; _primerCampo.style.border='1.5px solid #C0392B';
+        try{ _primerCampo.focus({preventScroll:true}); }catch(_f){ try{ _primerCampo.focus(); }catch(_){} }
+        var _quitar=function(){ _primerCampo.style.boxShadow=_prevOutline||''; _primerCampo.style.border=_prevBorder||''; _primerCampo.removeEventListener('input',_quitar); };
+        _primerCampo.addEventListener('input',_quitar,{once:true});
+        setTimeout(_quitar, 6000);
+      }catch(_s){}
+    }
+    showToast('Faltan: '+_labels.slice(0,3).join(', ')+(_labels.length>3?(' y '+(_labels.length-3)+' más'):'')+(_primerCampo?' — te llevé al primero (en rojo)':''), 'error');
+    _liberarGuardSOAP();return;
+  }
 
   const p=currentPatient;
   if(!p){ showToast('No hay paciente activo — recarga la app e intenta de nuevo','error'); _liberarGuardSOAP(); return; } // guard: sin esto un currentPatient nulo lanzaba y dejaba _guardandoSOAP=true (botón bloqueado hasta recargar)
