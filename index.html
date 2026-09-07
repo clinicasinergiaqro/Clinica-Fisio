@@ -2827,6 +2827,29 @@ function _persistirFallidosHistDoc(items){
     localStorage.setItem('COLA_SYNC_HIST_DOC_FALLIDOS', JSON.stringify(f));
   }catch(e){ console.warn('[hist-doc] no se pudo guardar fallidos:', e && e.message); }
 }
+// [FIX HIST-MEDIA] Re-sube a Storage la media (fotos/docs/estudiosDocs) de un diff de doc histórico
+// que quedó como base64 en IDB (subida original falló → encolada). Antes el replay de la cola escribía
+// la referencia MUDA (sin url) → en otro equipo quedaba irrecuperable. Muta `campos` fijando url/fbPath.
+async function _reSubirMediaDocDesdeIDB(pid, campos){
+  try{
+    if(!campos || typeof fbStorage==='undefined' || !fbStorage) return;
+    var proc=async function(arr, tipo){
+      if(!Array.isArray(arr)) return;
+      for(var i=0;i<arr.length;i++){ var it=arr[i]; if(!it||it.url||!it.mediaId) continue;
+        var data=it.data; if(!data){ try{ data=await idbGet(it.mediaId); }catch(_){} }
+        if(!data||String(data).indexOf('data:')!==0) continue;
+        try{
+          var blob=await (await fetch(data)).blob();
+          var safe=String(it.name||it.label||it.descripcion||'archivo').replace(/[^\w.\-]/g,'_');
+          var fbP='clinica/sinergia/'+pid+'/'+(tipo||'doc')+'/'+Date.now()+'_'+safe;
+          await fbStorage.ref(fbP).put(blob,{contentType:it.type||it.mimeType||blob.type||'application/octet-stream'});
+          it.url=await fbStorage.ref(fbP).getDownloadURL(); it.fbPath=fbP; it.data=null; if(it.pendienteSubida) delete it.pendienteSubida;
+        }catch(_e){ console.warn('[hist-doc media]', _e&&_e.message); }
+      }
+    };
+    await proc(campos.fotos,'foto'); await proc(campos.docs,'doc'); await proc(campos.estudiosDocs,'estudios');
+  }catch(_){}
+}
 let _DRENANDO_HIST_DOC = false;
 async function drenarColaHistDoc(){
   if(_DRENANDO_HIST_DOC || !navigator.onLine) return;
@@ -2857,6 +2880,9 @@ async function drenarColaHistDoc(){
           // recencia de arriba ya protege de pisar un cambio más nuevo.
           await _escribirIdentidadFirestore(it.pid, it.campos||{});
         } else {
+          // [FIX HIST-MEDIA] antes de reescribir, re-subir a Storage la media que quedó en IDB
+          // (base64 sin url) → la referencia deja de ser muda y se ve/abre en cualquier equipo.
+          try{ await _reSubirMediaDocDesdeIDB(it.pid, it.campos||{}); }catch(_rm){}
           // Reintento por el MISMO camino del Loop B (filtro + rastro v14 + _sinUndefined).
           var pseudo = Object.assign({id: it.pid}, it.campos);
           var r = await _persistirHistoricoFirestore(pseudo, Object.keys(it.campos));
@@ -12386,7 +12412,12 @@ async function _capturarMediaObjetivo(ev){
     // FUGA ENTRE PACIENTES (auditoría): si cambiaste de paciente durante la subida, descartar el resto.
     if(!currentPatient || currentPatient.id!==_pidMO){ showToast('Cambiaste de paciente — no se adjuntó','warning'); break; }
     if(res){ tempMediaObjetivo.push({ id:'mo'+Date.now()+'_'+i, type:f.type, url:res.url, fbPath:res.fbPath, etiqueta:_etq }); ok++; }
-    else { fallo++; }
+    else {
+      // [FALLBACK-IDB] tras 3 intentos fallidos NO perder la captura: guardar el binario en IDB con
+      // mediaId + pendienteSubida; _reSubirMediaDesdeIDB la re-sube al guardar la nota o al reconectar.
+      try{ var _d=await readFile(f); var _mid='mo_'+_pidMO+'_'+Date.now()+'_'+i+'_'+Math.random().toString(36).slice(2,6); await idbSet(_mid,_d); tempMediaObjetivo.push({ id:_mid, mediaId:_mid, type:f.type, etiqueta:_etq, pendienteSubida:true }); ok++; }
+      catch(_e){ fallo++; }
+    }
   }
   if(_inpEtq) _inpEtq.value='';
   _renderMediaObjetivo();
@@ -12474,7 +12505,11 @@ async function _capturarMediaAntes(ev){
     // FUGA ENTRE BORRADORES: si se abrió otro Nuevo/Editar durante la subida, descartar el resto.
     if(window._altaPid!==_pidAntes){ showToast('Cambiaste de formulario — no se adjuntó','warning'); break; }
     if(res){ window._altaMediaAntes.push({ id:'ba'+Date.now()+'_'+i, type:f.type, url:res.url, fbPath:res.fbPath, etiqueta:_etq }); ok++; }
-    else { fallo++; }
+    else {
+      // [FALLBACK-IDB] no perder la foto/video de valoración: binario a IDB + mediaId + pendienteSubida.
+      try{ var _d2=await readFile(f); var _mid2='ba_'+_pidAntes+'_'+Date.now()+'_'+i+'_'+Math.random().toString(36).slice(2,6); await idbSet(_mid2,_d2); window._altaMediaAntes.push({ id:_mid2, mediaId:_mid2, type:f.type, etiqueta:_etq, pendienteSubida:true }); ok++; }
+      catch(_e){ fallo++; }
+    }
   }
   if(_inpEtq) _inpEtq.value='';
   _renderMediaAntes();
@@ -12797,6 +12832,9 @@ async function guardarSOAP(){
   var _draftKeySoap=_soapDraftKey(); // [BORRADOR-SOAP] capturar la key AHORA (editingSoapId aún válido); se limpia tras el commit
   clearTimeout(_timerBorradorSoap); // [BORRADOR-SOAP] cancelar autosave pendiente → evita que el borrador resucite tras guardar (nota fantasma/duplicada)
   limpiarDirty(); // pasó validación: los cambios se persistirán
+  // [FIX MEDIA-OBJ] re-subir a Storage cualquier foto/video de valoración que quedó pendiente en IDB
+  // (subida falló durante la captura) ANTES de armar la nota, para que persista con url y se vea/abra.
+  try{ if(navigator.onLine && Array.isArray(tempMediaObjetivo) && tempMediaObjetivo.some(function(m){return m&&!m.url&&m.mediaId;}) && typeof _reSubirMediaDesdeIDB==='function'){ await _reSubirMediaDesdeIDB(currentPatient.id, tempMediaObjetivo); } }catch(_rmo){}
   const datosNota={
     s:{dolor:v('f-sdolor'), cambios:v('f-scambios'), actFisica:v('f-sactfisica')},
     o:{rom:v('f-orom')||'[pendiente]', fuerza:v('f-ofuerza')||'[pendiente]', hallazgos:v('f-ohallazgos')},
@@ -12960,7 +12998,10 @@ async function guardarSOAP(){
           type:(m&&m.type)||'', fecha:(m&&m.fecha)||'',
           url:(m&&m.url)||'', fbPath:(m&&m.fbPath)||'',
           data:(m&&typeof m.data==='string')?m.data:null   // [LOOP-B #3] base64 fuente al guard (antes: null a ciegas)
-        }; }), false) } : {}),   // permitirB64=FALSE: payloadH va a la cola de EDICIÓN (localStorage) → nunca base64; el replay re-sube desde IDB
+        }; }), true) } : {}),   // [FIX] permitirB64=TRUE (igual que FST_buildSesionPayload): al editar una nota
+        // histórica en OTRO equipo, una foto que vivía como base64 en Firestore (sin url ni binario local)
+        // NO debe anularse — con false el set(merge) borraba su data y la foto quedaba invisible en todos
+        // los equipos. Con true se conserva (≤150KB por el guard); las grandes ya viajan por url.
         // AUDITORÍA B1: ejercicios / foto-video de valoración / detalle por modalidad al editar histórica.
         // editarSoapHistorico precarga estos 3 en los temps → datosNota los trae completos (sin wipe).
         // Condicionales (no escribir vacío → merge conserva). mediaObjetivo por referencias vía _guardMediaArray
