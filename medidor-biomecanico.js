@@ -80,7 +80,8 @@
     cancelVideo:false,
     acc:null,                // acumulador de mín/máx (ROM)
     accS:null,               // acumulador de sentadilla (Fase 2)
-    tipoMedicion:'rom',      // 'rom' | 'sent' (sentadilla frontal); se recuerda entre aperturas
+    accM:null,               // acumulador de marcha (Fase 3A)
+    tipoMedicion:'rom',      // 'rom' | 'sent' (sentadilla frontal) | 'marcha'; se recuerda entre aperturas
     framesTotales:0,
     tStart:0,                // Date.now() al iniciar grabación
     rafId:null, timerId:null, sending:false
@@ -531,10 +532,201 @@
   }
   // ═════════════ fin núcleo sentadilla ═════════════
 
+  // ═════════════ FASE 3A — MARCHA (análisis SAGITAL, vista de PERFIL) ═════════════
+  // Cribado 2D: parámetros temporales + cinemática sagital. Eventos del paso por el método de
+  // COORDENADAS de Zeni et al. (Gait Posture 2008): contacto de talón = pie en su punto más
+  // ADELANTADO respecto al sacro; despegue = punto más ATRASADO. Límites honestos: una sola
+  // cámara ve un plano (sin rotaciones, sin cinética, sin EMG); el tobillo es el menos fiable.
+  function calcularMarchaSagital(lm){
+    if(!lm) return null;
+    function vis(i){ return _vis(lm,i); }
+    var out={ ok:false,
+      hipIzq:{val:null,ok:false}, hipDer:{val:null,ok:false},
+      rodIzq:{val:null,ok:false}, rodDer:{val:null,ok:false},
+      tobIzq:{val:null,ok:false}, tobDer:{val:null,ok:false},
+      footIzq:{val:null,ok:false}, footDer:{val:null,ok:false},
+      noseRel:null, sacroX:null, alturaPx:null, orientPerfil:null, p:{} };
+    var midHip=(vis(23)&&vis(24))?{x:(lm[23].x+lm[24].x)/2,y:(lm[23].y+lm[24].y)/2}:null;
+    var midSh =(vis(11)&&vis(12))?{x:(lm[11].x+lm[12].x)/2,y:(lm[11].y+lm[12].y)/2}:null;
+    if(!midHip) return out;
+    out.sacroX=midHip.x;
+    // Orientación: de PERFIL los hombros/caderas se ven ESTRECHOS (ancho/alto pequeño). Inverso al frontal.
+    if(midSh){ var ancho=(Math.abs(lm[11].x-lm[12].x)+Math.abs(lm[23].x-lm[24].x))/2, alto=Math.abs(midSh.y-midHip.y)||1e-6; out.orientPerfil=(ancho/alto)<0.35; }
+    if(vis(0)) out.noseRel=lm[0].x-midHip.x;                 // nariz vs sacro → dirección de marcha
+    // Cadera flexo-ext = ángulo SIGNADO muslo vs eje del tronco (ROM usa max−min → el signo no importa).
+    function hipAng(hip,knee){ if(!midSh) return null;
+      var tdx=hip.x-midSh.x, tdy=hip.y-midSh.y, thx=knee.x-hip.x, thy=knee.y-hip.y;
+      var cross=tdx*thy-tdy*thx, dot=tdx*thx+tdy*thy; return Math.atan2(cross,dot)*180/Math.PI; }
+    if(vis(23)&&vis(25)){ var hI=hipAng(lm[23],lm[25]); if(hI!=null) out.hipIzq={val:hI,ok:true}; }
+    if(vis(24)&&vis(26)){ var hD=hipAng(lm[24],lm[26]); if(hD!=null) out.hipDer={val:hD,ok:true}; }
+    if(vis(23)&&vis(25)&&vis(27)) out.rodIzq={val:180-_ang2D(lm[23],lm[25],lm[27]), ok:true};   // rodilla flex-ext
+    if(vis(24)&&vis(26)&&vis(28)) out.rodDer={val:180-_ang2D(lm[24],lm[26],lm[28]), ok:true};
+    if(vis(25)&&vis(27)&&vis(31)) out.tobIzq={val:_ang2D(lm[25],lm[27],lm[31]), ok:true};        // tobillo (interior pantorrilla-pie)
+    if(vis(26)&&vis(28)&&vis(32)) out.tobDer={val:_ang2D(lm[26],lm[28],lm[32]), ok:true};
+    if(vis(27)) out.footIzq={val:lm[27].x-midHip.x, ok:true};   // pos AP del pie vs sacro (eventos)
+    if(vis(28)) out.footDer={val:lm[28].x-midHip.x, ok:true};
+    if(vis(0)&&(vis(27)||vis(28))){ var ay=vis(27)?lm[27].y:lm[28].y; out.alturaPx=Math.abs(ay-lm[0].y); }
+    out.ok=!!(out.rodIzq.ok||out.rodDer.ok);
+    out.p={ nariz:vis(0)?lm[0]:null, sacro:midHip, hombroIzq:vis(11)?lm[11]:null, hombroDer:vis(12)?lm[12]:null,
+      caderaIzq:vis(23)?lm[23]:null, caderaDer:vis(24)?lm[24]:null, rodillaIzq:vis(25)?lm[25]:null, rodillaDer:vis(26)?lm[26]:null,
+      tobilloIzq:vis(27)?lm[27]:null, tobilloDer:vis(28)?lm[28]:null };
+    return out;
+  }
+  function nuevoAccMarcha(){
+    return { frames:0, framesValidos:0, _frame:0, _run:{}, orientN:0, orientPerfilN:0,
+      s:{ hipI:[],hipD:[],rodI:[],rodD:[],tobI:[],tobD:[], footI:[],footD:[], altura:[], nose:[] },
+      tray:{ nariz:[],sacro:[],hombroIzq:[],hombroDer:[],caderaIzq:[],caderaDer:[],rodillaIzq:[],rodillaDer:[],tobilloIzq:[],tobilloDer:[] },
+      trayFrame:[], trayN:0 };
+  }
+  function acumularMarcha(acc,f,tSec){
+    if(!acc||!f) return;
+    acc._frame++; acc.frames++;
+    if(tSec==null) tSec=acc._frame/(FPS_CAMARA||20);
+    if(f.orientPerfil!=null){ acc.orientN++; if(f.orientPerfil) acc.orientPerfilN++; }
+    var i=acc._frame, R=acc._run, alguno=false;
+    function g(k,ok){ R[k]=ok?((R[k]||0)+1):0; return ok&&R[k]>=3; }   // histéresis de oclusión (ángulos)
+    function push(arr,v){ if(arr.length<6000) arr.push({i:i,t:tSec,v:v}); }
+    if(g('hipI',f.hipIzq.ok)) push(acc.s.hipI,f.hipIzq.val);
+    if(g('hipD',f.hipDer.ok)) push(acc.s.hipD,f.hipDer.val);
+    if(g('rodI',f.rodIzq.ok)){ push(acc.s.rodI,f.rodIzq.val); alguno=true; }
+    if(g('rodD',f.rodDer.ok)){ push(acc.s.rodD,f.rodDer.val); alguno=true; }
+    if(g('tobI',f.tobIzq.ok)) push(acc.s.tobI,f.tobIzq.val);
+    if(g('tobD',f.tobDer.ok)) push(acc.s.tobD,f.tobDer.val);
+    // pies y nariz SIN histéresis: son la señal de eventos/dirección, deben quedar continuos
+    if(f.footIzq.ok) push(acc.s.footI,f.footIzq.val);
+    if(f.footDer.ok) push(acc.s.footD,f.footDer.val);
+    if(f.noseRel!=null) push(acc.s.nose,f.noseRel);
+    if(f.alturaPx!=null) push(acc.s.altura,f.alturaPx);
+    if(alguno) acc.framesValidos++;
+    if(acc.trayN<5400){ var T=acc.tray,P=f.p||{}; for(var k in T){ var pt=P[k]; T[k].push(pt?[Math.round(pt.x*1000),Math.round(pt.y*1000)]:null); } acc.trayFrame.push(i); acc.trayN++; }
+  }
+  // Eventos del paso en una serie de posición AP del pie ORIENTADA (+ = adelante). Máquina de estados
+  // con banda muerta: HS = máximo de cada excursión adelante; TO = mínimo de cada excursión atrás.
+  function _eventosPie(serie){
+    var out={hs:[],to:[]};
+    if(!serie || serie.length<8) return out;
+    var v=serie.map(function(s){return s.v;}).slice().sort(function(a,b){return a-b;}), n=v.length;
+    var lo=v[Math.floor(0.05*(n-1))], hi=v[Math.floor(0.95*(n-1))], rng=hi-lo;
+    if(rng<=1e-6) return out;
+    var mid=(lo+hi)/2, band=0.20*rng, hiTh=mid+band, loTh=mid-band;
+    var mode=null, maxV=-Infinity,maxK=-1, minV=Infinity,minK=-1;
+    for(var k=0;k<serie.length;k++){
+      var x=serie[k].v;
+      if(x>=hiTh){
+        if(mode==='down' && minK>=0){ out.to.push({i:serie[minK].i,t:serie[minK].t}); }
+        if(mode!=='up'){ mode='up'; maxV=-Infinity; maxK=-1; }
+        if(x>maxV){ maxV=x; maxK=k; }
+      } else if(x<=loTh){
+        if(mode==='up' && maxK>=0){ out.hs.push({i:serie[maxK].i,t:serie[maxK].t}); }
+        if(mode!=='down'){ mode='down'; minV=Infinity; minK=-1; }
+        if(x<minV){ minV=x; minK=k; }
+      } else {
+        if(mode==='up' && x>maxV){ maxV=x; maxK=k; }
+        if(mode==='down' && x<minV){ minV=x; minK=k; }
+      }
+    }
+    if(mode==='up' && maxK>=0) out.hs.push({i:serie[maxK].i,t:serie[maxK].t});
+    else if(mode==='down' && minK>=0) out.to.push({i:serie[minK].i,t:serie[minK].t});
+    return out;
+  }
+  function finalizarMarcha(acc, estaturaCm, treadmillKmh){
+    var out={ nCiclos:0, cadencia:null, velocidad:null, walkDir:1,
+      temporal:{izq:null,der:null}, espacial:{}, sagital:{}, simetria:{}, medidas:[],
+      calidad:{framesValidos:(acc&&acc.framesValidos)||0},
+      calibracion:{estaturaCm:estaturaCm||null, treadmillKmh:treadmillKmh||null} };
+    if(!acc) return out;
+    var visPct=acc.frames?Math.round(acc.framesValidos/acc.frames*100):0;
+    var orientOK=acc.orientN?((acc.orientPerfilN/acc.orientN)>=0.6):null;
+    out.calidad={ framesValidos:acc.framesValidos, frames:acc.frames, visPct:visPct, orientPerfilOK:orientOK };
+    var med=_mediana(acc.s.nose.map(function(s){return s.v;}));
+    out.walkDir=(med!=null && med<0)?-1:1;
+    // _medFilt5 devuelve {i,v} (pierde t) → suavizamos v pero conservamos el t original de cada muestra.
+    function orient(serie){ var m=_medFilt5(serie); return serie.map(function(s,k){ return {i:s.i, t:s.t, v:(m[k]?m[k].v:s.v)*out.walkDir}; }); }
+    var fI=orient(acc.s.footI), fD=orient(acc.s.footD);
+    var evI=_eventosPie(fI), evD=_eventosPie(fD);
+    function temporal(ev){
+      var hs=ev.hs, to=ev.to; if(hs.length<2) return null;
+      var strides=[], stances=[];
+      for(var i=0;i<hs.length-1;i++){
+        var t0=hs[i].t, t1=hs[i+1].t, stride=t1-t0, toA=null;
+        for(var j=0;j<to.length;j++){ if(to[j].t>t0 && to[j].t<t1){ toA=to[j].t; break; } }
+        if(stride>0.4 && stride<2.5){ strides.push(stride); if(toA!=null) stances.push(toA-t0); }
+      }
+      if(!strides.length) return null;
+      var strideT=_media(strides), stanceT=stances.length?_media(stances):null;
+      var stancePct=(stanceT!=null&&strideT)?stanceT/strideT*100:null;
+      return { nCiclos:strides.length, strideT:strideT, stanceT:stanceT,
+        swingT:(stanceT!=null)?strideT-stanceT:null, stancePct:stancePct, swingPct:(stancePct!=null)?100-stancePct:null };
+    }
+    var tI=temporal(evI), tD=temporal(evD);
+    out.temporal.izq=tI; out.temporal.der=tD;
+    out.nCiclos=Math.max(tI?tI.nCiclos:0, tD?tD.nCiclos:0);
+    var allHS=evI.hs.map(function(e){return e.t;}).concat(evD.hs.map(function(e){return e.t;})).sort(function(a,b){return a-b;});
+    if(allHS.length>=2){ var span=allHS[allHS.length-1]-allHS[0]; if(span>0) out.cadencia=Math.round((allHS.length-1)/span*60); }
+    // Doble apoyo %: solape de los intervalos de apoyo (HS→siguiente TO) de ambos pies.
+    function stances(ev){ var o=[]; for(var i=0;i<ev.hs.length;i++){ var h=ev.hs[i].t, toA=null; for(var j=0;j<ev.to.length;j++){ if(ev.to[j].t>h){ toA=ev.to[j].t; break; } } if(toA!=null && (toA-h)>0.15 && (toA-h)<1.6) o.push([h,toA]); } return o; }
+    var stI=stances(evI), stD=stances(evD), overlap=0;
+    stI.forEach(function(a){ stD.forEach(function(b){ var l=Math.max(a[0],b[0]), r=Math.min(a[1],b[1]); if(r>l) overlap+=r-l; }); });
+    if(allHS.length>=2){ var sp=allHS[allHS.length-1]-allHS[0]; out.espacial.dobleApoyoPct=(sp>0)?Math.round(overlap/sp*100):null; }
+    // Calibración px→m (proxy nariz→tobillo ≈ 88% de la estatura, como en sentadilla).
+    var altSorted=acc.s.altura.map(function(s){return s.v;}).sort(function(a,b){return a-b;});
+    var hPx=altSorted.length?altSorted[Math.floor(0.90*(altSorted.length-1))]:null, hFull=hPx?hPx/0.88:null;
+    var pxToM=(estaturaCm&&hFull)?(estaturaCm/100)/hFull:null;
+    function nearestV(serie,t){ var best=null,bd=1e9; for(var k=0;k<serie.length;k++){ var d=Math.abs(serie[k].t-t); if(d<bd){bd=d;best=serie[k].v;} } return best; }
+    var stepPx=[]; allHS.forEach(function(t){ var a=nearestV(fI,t), b=nearestV(fD,t); if(a!=null&&b!=null) stepPx.push(Math.abs(a-b)); });
+    var stepLenPx=stepPx.length?_media(stepPx):null;
+    out.espacial.stepLenM=(stepLenPx!=null&&pxToM)?_r2(stepLenPx*pxToM):null;
+    if(treadmillKmh){ out.velocidad=_r2(treadmillKmh/3.6); }
+    else if(out.espacial.stepLenM!=null && out.cadencia){ out.velocidad=_r2(out.espacial.stepLenM*(out.cadencia/60)); }
+    function romPorCiclo(serie, ev){
+      if(!serie||serie.length<3) return {rom:null,peak:null,n:0};
+      if(!ev.hs||ev.hs.length<2){ var vv=serie.map(function(s){return s.v;}); return {rom:_r1(Math.max.apply(null,vv)-Math.min.apply(null,vv)), peak:_r1(Math.max.apply(null,vv)), n:0}; }
+      var roms=[],peaks=[];
+      for(var i=0;i<ev.hs.length-1;i++){ var a=ev.hs[i].t,b=ev.hs[i+1].t, seg=serie.filter(function(s){return s.t>=a&&s.t<=b;}).map(function(s){return s.v;});
+        if(seg.length>=3){ roms.push(Math.max.apply(null,seg)-Math.min.apply(null,seg)); peaks.push(Math.max.apply(null,seg)); } }
+      if(!roms.length) return {rom:null,peak:null,n:0};
+      return { rom:_r1(_media(roms)), peak:_r1(_media(peaks)), n:roms.length };
+    }
+    var rodI=romPorCiclo(acc.s.rodI,evI), rodD=romPorCiclo(acc.s.rodD,evD);
+    var hipI=romPorCiclo(acc.s.hipI,evI), hipD=romPorCiclo(acc.s.hipD,evD);
+    var tobI=romPorCiclo(acc.s.tobI,evI), tobD=romPorCiclo(acc.s.tobD,evD);
+    out.sagital={ rodIzqPeak:rodI.peak, rodDerPeak:rodD.peak, rodIzqROM:rodI.rom, rodDerROM:rodD.rom,
+      hipIzqROM:hipI.rom, hipDerROM:hipD.rom, tobIzqROM:tobI.rom, tobDerROM:tobD.rom };
+    function sim(a,b){ if(a==null||b==null) return null; var m=(Math.abs(a)+Math.abs(b))/2; if(m<1e-6) return 100; return Math.max(0,Math.round(100-Math.abs(a-b)/m*100)); }
+    out.simetria={ stancePct:sim(tI&&tI.stancePct,tD&&tD.stancePct), rodPeak:sim(rodI.peak,rodD.peak),
+      hipROM:sim(hipI.rom,hipD.rom), strideT:sim(tI&&tI.strideT,tD&&tD.strideT) };
+    var nMin=Math.min(tI?tI.nCiclos:0, tD?tD.nCiclos:0);
+    function med2(key,grupo,mov,lado,unidad,valor,nCic){ out.medidas.push({ key:key,grupo:grupo,mov:mov,lado:lado,vista:'sagital',unidad:unidad,
+      valor:(valor==null?null:_r1(valor)), confiable:!!(valor!=null && nCic>=2 && orientOK!==false && visPct>=50), nCiclos:nCic }); }
+    med2('cadencia','Temporal','Cadencia','—','pasos/min', out.cadencia, out.nCiclos);
+    med2('doble_apoyo','Temporal','Doble apoyo','—','%', out.espacial.dobleApoyoPct, out.nCiclos);
+    med2('stance_izq','Temporal','Fase de apoyo','Izq','%', tI&&tI.stancePct, tI?tI.nCiclos:0);
+    med2('stance_der','Temporal','Fase de apoyo','Der','%', tD&&tD.stancePct, tD?tD.nCiclos:0);
+    med2('paso_long','Espacial','Longitud de paso','—','m', out.espacial.stepLenM, out.nCiclos);
+    med2('rod_pico_izq','Rodilla','Flexión pico','Izq','°', rodI.peak, rodI.n);
+    med2('rod_pico_der','Rodilla','Flexión pico','Der','°', rodD.peak, rodD.n);
+    med2('cadera_rom_izq','Cadera','ROM flexo-ext','Izq','°', hipI.rom, hipI.n);
+    med2('cadera_rom_der','Cadera','ROM flexo-ext','Der','°', hipD.rom, hipD.n);
+    med2('tobillo_rom_izq','Tobillo','ROM (menos fiable)','Izq','°', tobI.rom, tobI.n);
+    med2('tobillo_rom_der','Tobillo','ROM (menos fiable)','Der','°', tobD.rom, tobD.n);
+    return out;
+  }
+  // ═════════════ fin núcleo marcha ═════════════
+
   // ── Callback único de resultados de MediaPipe ──────────────────────────────
   function onResults(res){
     var lm = res && res.poseLandmarks;
     var world = res && res.poseWorldLandmarks;
+    if(BIO.tipoMedicion==='marcha'){
+      var fm = lm ? calcularMarchaSagital(lm) : null;
+      if(fm && (BIO.recording || BIO.procesandoVideo)){
+        var tSec=(BIO.modo==='video' && BIO.srcEl) ? (BIO.srcEl.currentTime||0) : ((Date.now()-BIO.tStart)/1000);
+        acumularMarcha(BIO.accM, fm, tSec);
+      }
+      if(BIO.canvas && BIO.srcEl) dibujar(lm, null);
+      if(BIO.modo==='camara'){ actualizarPanelMarcha(fm); actualizarGateMarcha(lm, fm); }
+      return;
+    }
     if(BIO.tipoMedicion==='sent'){
       var f = lm ? calcularSentFrontal(lm) : null;
       if(f && (BIO.recording || BIO.procesandoVideo)){
@@ -615,8 +807,8 @@
       '.bio-modo-btn{width:100%;max-width:360px;border:none;border-radius:16px;padding:20px;font-size:17px;font-weight:800;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px}',
       '.bio-modo-cam{background:#C9A84C;color:#122950}',
       '.bio-modo-vid{background:rgba(255,255,255,.1);color:#fff;border:1.5px solid rgba(255,255,255,.25)}',
-      '.bio-tipo-row{display:flex;gap:8px;width:100%;max-width:360px}',
-      '.bio-tipo-btn{flex:1;border:1.5px solid rgba(255,255,255,.25);background:rgba(255,255,255,.06);color:#9BA3B5;border-radius:12px;padding:11px 8px;font-size:14px;font-weight:800;cursor:pointer;font-family:inherit}',
+      '.bio-tipo-row{display:flex;gap:8px;width:100%;max-width:360px;flex-wrap:wrap}',
+      '.bio-tipo-btn{flex:1 1 28%;min-width:92px;border:1.5px solid rgba(255,255,255,.25);background:rgba(255,255,255,.06);color:#9BA3B5;border-radius:12px;padding:11px 6px;font-size:13px;font-weight:800;cursor:pointer;font-family:inherit}',
       '.bio-tipo-btn.on{background:#1d3b6e;color:#fff;border-color:#C9A84C}',
       '.bio-canvas-wrap{position:relative;width:100%;flex:1;min-height:0;background:#000;display:flex;align-items:center;justify-content:center;overflow:hidden}',
       '#bio-cam-src{position:absolute;left:0;top:0;width:100%;height:100%;object-fit:contain;background:#000}',
@@ -662,8 +854,9 @@
       + '<div class="bio-vista bio-inicio on" id="bio-vista-inicio">'
       +   '<div style="font-size:40px" id="bio-ini-icono">🦴</div>'
       +   '<div class="bio-tipo-row">'
-      +     '<button class="bio-tipo-btn on" id="bio-tipo-rom">🦴 ROM brazos</button>'
+      +     '<button class="bio-tipo-btn on" id="bio-tipo-rom">🦴 ROM</button>'
       +     '<button class="bio-tipo-btn" id="bio-tipo-sent">🏋️ Sentadilla</button>'
+      +     '<button class="bio-tipo-btn" id="bio-tipo-marcha">🚶 Marcha</button>'
       +   '</div>'
       +   '<p id="bio-ini-desc">Mide los rangos articulares de codo y hombro. Elige cómo capturar el movimiento.</p>'
       +   '<div id="bio-est-wrap" style="display:none;width:100%;max-width:360px">'
@@ -719,6 +912,7 @@
     document.getElementById('bio-cerrar').addEventListener('click', cerrarMedidor);
     document.getElementById('bio-tipo-rom').addEventListener('click', function(){ aplicarTipoMedicion('rom'); });
     document.getElementById('bio-tipo-sent').addEventListener('click', function(){ aplicarTipoMedicion('sent'); });
+    document.getElementById('bio-tipo-marcha').addEventListener('click', function(){ aplicarTipoMedicion('marcha'); });
     document.getElementById('bio-go-cam').addEventListener('click', iniciarCamara);
     document.getElementById('bio-go-vid').addEventListener('click', function(){ document.getElementById('bio-file').click(); });
     document.getElementById('bio-file').addEventListener('change', function(ev){
@@ -753,26 +947,30 @@
     // Precargar estatura desde la última sentadilla guardada de ESTE paciente (si la hubo).
     var est=document.getElementById('bio-estatura');
     if(est){
-      var ult=(currentPatient.biomecanica||[]).slice().reverse().find(function(s){ return s && s.tipo==='sentadilla' && s.calibracion && s.calibracion.estaturaCm; });
+      var ult=(currentPatient.biomecanica||[]).slice().reverse().find(function(s){ return s && (s.tipo==='sentadilla'||s.tipo==='marcha') && s.calibracion && s.calibracion.estaturaCm; });
       est.value = ult ? ult.calibracion.estaturaCm : '';
     }
     mostrarVista('bio-vista-inicio');
     document.getElementById('bio-overlay').style.display='flex';
   }
-  // Selector de tipo de medición en la vista de inicio (ROM de brazos vs sentadilla frontal).
+  // Selector de tipo de medición: ROM de brazos · sentadilla frontal · marcha sagital.
   function aplicarTipoMedicion(t){
-    BIO.tipoMedicion = (t==='sent') ? 'sent' : 'rom';
-    var bR=document.getElementById('bio-tipo-rom'), bS=document.getElementById('bio-tipo-sent');
+    BIO.tipoMedicion = (t==='sent'||t==='marcha') ? t : 'rom';
+    var bR=document.getElementById('bio-tipo-rom'), bS=document.getElementById('bio-tipo-sent'), bM=document.getElementById('bio-tipo-marcha');
     if(bR) bR.classList.toggle('on', BIO.tipoMedicion==='rom');
     if(bS) bS.classList.toggle('on', BIO.tipoMedicion==='sent');
-    var ic=document.getElementById('bio-ini-icono'); if(ic) ic.textContent = BIO.tipoMedicion==='sent' ? '🏋️' : '🦴';
-    var ew=document.getElementById('bio-est-wrap'); if(ew) ew.style.display = BIO.tipoMedicion==='sent' ? 'block' : 'none';
+    if(bM) bM.classList.toggle('on', BIO.tipoMedicion==='marcha');
+    var ic=document.getElementById('bio-ini-icono'); if(ic) ic.textContent = BIO.tipoMedicion==='sent' ? '🏋️' : (BIO.tipoMedicion==='marcha' ? '🚶' : '🦴');
+    // estatura: sentadilla y marcha la usan (calibración a cm); ROM no.
+    var ew=document.getElementById('bio-est-wrap'); if(ew) ew.style.display = (BIO.tipoMedicion==='sent'||BIO.tipoMedicion==='marcha') ? 'block' : 'none';
     var de=document.getElementById('bio-ini-desc');
     if(de) de.textContent = BIO.tipoMedicion==='sent'
       ? 'Análisis FRONTAL de sentadilla: valgo dinámico (FPPA), desplazamiento medial de rodilla, separación y descenso. Paciente DE FRENTE, cuerpo completo, 3 a 5 sentadillas.'
-      : 'Mide los rangos articulares de codo y hombro. Elige cómo capturar el movimiento.';
+      : (BIO.tipoMedicion==='marcha'
+        ? 'Análisis de MARCHA de PERFIL (lado): tiempos del paso, cadencia, fases de apoyo/balanceo y ángulos sagitales de cadera/rodilla/tobillo, con simetría izq/der. Ideal en caminadora o 2–3 pasadas cruzando el cuadro.'
+        : 'Mide los rangos articulares de codo y hombro. Elige cómo capturar el movimiento.');
     var tt=document.querySelector('#bio-overlay .bio-top b');
-    if(tt) tt.textContent = BIO.tipoMedicion==='sent' ? '🏋️ Sentadilla — análisis frontal' : '🦴 Medición biomecánica — ROM';
+    if(tt) tt.textContent = BIO.tipoMedicion==='sent' ? '🏋️ Sentadilla — análisis frontal' : (BIO.tipoMedicion==='marcha' ? '🚶 Marcha — análisis sagital' : '🦴 Medición biomecánica — ROM');
   }
   function _leerEstatura(){
     var el=document.getElementById('bio-estatura'); var v=el?parseFloat(el.value):NaN;
@@ -780,7 +978,7 @@
   }
   function resetEstado(){
     BIO.modo=null; BIO.recording=false; BIO.procesandoVideo=false; BIO.cancelVideo=false; BIO.finalizando=false;
-    BIO.acc=null; BIO.accS=null; BIO.framesTotales=0; BIO.srcEl=null; BIO.sending=false;
+    BIO.acc=null; BIO.accS=null; BIO.accM=null; BIO.framesTotales=0; BIO.srcEl=null; BIO.sending=false;
     BIO.facing='environment';           // cada medición arranca con la cámara TRASERA
     detenerGrabadorVideo(); BIO.pendingVideo=null;
     detenerLoopCamara(); pararCronometro();
@@ -824,7 +1022,7 @@
     estado.textContent = (BIO.tipoMedicion==='sent')
       ? 'Paciente DE FRENTE, cuerpo completo (caderas, rodillas y tobillos en cuadro)'
       : 'Coloca al paciente de cuerpo completo en el encuadre';
-    BIO.acc=null; BIO.accS=null; BIO.framesTotales=0;
+    BIO.acc=null; BIO.accS=null; BIO.accM=null; BIO.framesTotales=0;
     loopCamara();
     _vigilarArranqueCamara();   // avisa/reintenta si el video no entrega imagen
   }
@@ -957,7 +1155,9 @@
     var fb=document.getElementById('bio-btn-flip');
     var btnRec=document.getElementById('bio-btn-rec');
     if(!BIO.recording){
-      if(BIO.tipoMedicion==='sent'){ BIO.accS=nuevoAccSent(); } else { BIO.acc = nuevoAcumulador(); }
+      if(BIO.tipoMedicion==='sent'){ BIO.accS=nuevoAccSent(); }
+      else if(BIO.tipoMedicion==='marcha'){ BIO.accM=nuevoAccMarcha(); }
+      else { BIO.acc = nuevoAcumulador(); }
       BIO.framesTotales=0; BIO.tStart=Date.now();
       BIO.pendingVideo=null; iniciarGrabadorVideo();     // graba el clip de cámara en paralelo
       BIO.recording=true;
@@ -980,6 +1180,12 @@
         mostrarResumenSent(resS, {
           fuente:'camara', duracionSeg:dur,
           calidad:{ fpsPromedio:fps, framesTotales:BIO.framesTotales, framesValidos:(BIO.accS?BIO.accS.framesValidos:0) }
+        });
+      } else if(BIO.tipoMedicion==='marcha'){
+        var resM = finalizarMarcha(BIO.accM, _leerEstatura(), null);
+        mostrarResumenMarcha(resM, {
+          fuente:'camara', duracionSeg:dur,
+          calidad:{ fpsPromedio:fps, framesTotales:BIO.framesTotales, framesValidos:(BIO.accM?BIO.accM.framesValidos:0) }
         });
       } else {
         var artic = finalizarMedidas(BIO.acc);
@@ -1086,7 +1292,9 @@
     var dur = (isFinite(v.duration) && v.duration>0) ? v.duration : 0;
     if(!dur){ URL.revokeObjectURL(url); limpiarVideoSrc(v); txt.textContent='⚠️ Video sin duración legible.'; return; }
 
-    if(BIO.tipoMedicion==='sent'){ BIO.accS=nuevoAccSent(); } else { BIO.acc = nuevoAcumulador(); }
+    if(BIO.tipoMedicion==='sent'){ BIO.accS=nuevoAccSent(); }
+    else if(BIO.tipoMedicion==='marcha'){ BIO.accM=nuevoAccMarcha(); }
+    else { BIO.acc = nuevoAcumulador(); }
     BIO.framesTotales=0;
     BIO.procesandoVideo=true; BIO.cancelVideo=false;
     txt.textContent='0%';
@@ -1145,6 +1353,12 @@
       mostrarResumenSent(resS, {
         fuente:'video', duracionSeg:Math.round(dur),
         calidad:{ fpsMuestreo:FPS_VIDEO, framesTotales:BIO.framesTotales, framesValidos:(BIO.accS?BIO.accS.framesValidos:0) }
+      });
+    } else if(BIO.tipoMedicion==='marcha'){
+      var resM=finalizarMarcha(BIO.accM, _leerEstatura(), null);
+      mostrarResumenMarcha(resM, {
+        fuente:'video', duracionSeg:Math.round(dur),
+        calidad:{ fpsMuestreo:FPS_VIDEO, framesTotales:BIO.framesTotales, framesValidos:(BIO.accM?BIO.accM.framesValidos:0) }
       });
     } else {
       var artic=finalizarMedidas(BIO.acc);
@@ -1377,6 +1591,92 @@
     if(btn) btn.textContent='⏳ Guardando…';
     await _persistirTray(p, sesion, _paqueteTray(BIO.accS, meta, res));
     await _persistirSesion(p, sesion, btn, 'Sentadilla frontal ('+meta.fuente+')');
+  }
+
+  // ── Marcha: panel vivo, gate (guía de PERFIL), resumen y guardado ──────────
+  function pintarPanelMarcha(f){
+    var panel=document.getElementById('bio-panel-vivo'); if(!panel) return;
+    BIO.emaVivo={};
+    panel.innerHTML = '<table><thead><tr><th>Marcha (perfil)</th><th style="text-align:right">Izq</th><th style="text-align:right">Der</th></tr></thead><tbody>'
+      + '<tr><td class="g">Rodilla flex</td><td class="v" id="bm-rod-i">—</td><td class="v" id="bm-rod-d">—</td></tr>'
+      + '<tr><td class="g">Cadera</td><td class="v" id="bm-cad-i">—</td><td class="v" id="bm-cad-d">—</td></tr>'
+      + '</tbody></table>';
+  }
+  function actualizarPanelMarcha(f){
+    if(!document.getElementById('bm-rod-i')){ pintarPanelMarcha(f); if(!document.getElementById('bm-rod-i')) return; }
+    function pon(id,t){ var el=document.getElementById(id); if(el) el.textContent=t; }
+    if(!f){ pon('bm-rod-i','—'); pon('bm-rod-d','—'); pon('bm-cad-i','—'); pon('bm-cad-d','—'); return; }
+    var eRi=_emaVivo('m_rodI',f.rodIzq.ok,f.rodIzq.ok?f.rodIzq.val:null), eRd=_emaVivo('m_rodD',f.rodDer.ok,f.rodDer.ok?f.rodDer.val:null);
+    var eCi=_emaVivo('m_hipI',f.hipIzq.ok,f.hipIzq.ok?f.hipIzq.val:null), eCd=_emaVivo('m_hipD',f.hipDer.ok,f.hipDer.ok?f.hipDer.val:null);
+    pon('bm-rod-i', eRi!=null?(Math.round(eRi)+'°'):'—'); pon('bm-rod-d', eRd!=null?(Math.round(eRd)+'°'):'—');
+    pon('bm-cad-i', eCi!=null?(Math.round(eCi)+'°'):'—'); pon('bm-cad-d', eCd!=null?(Math.round(eCd)+'°'):'—');
+  }
+  function actualizarGateMarcha(lm, f){
+    if(BIO.recording) return;
+    var btn=document.getElementById('bio-btn-rec'); if(!btn) return;
+    var ok = !!(f && (f.rodIzq.ok||f.rodDer.ok) && _vis(lm,23)&&_vis(lm,24)&&_vis(lm,27)&&_vis(lm,28));
+    btn.disabled=!ok;
+    var estado=document.getElementById('bio-estado'); if(!estado) return;
+    if(!ok){ estado.textContent='Encuadra el cuerpo COMPLETO de PERFIL (cadera, rodilla y tobillo en cuadro)'; return; }
+    if(f.orientPerfil===false){ estado.textContent='⚠️ Parece DE FRENTE — la marcha se graba DE PERFIL (de lado a la cámara)'; return; }
+    estado.textContent='✓ Listo — DE PERFIL, pide que camine 8–10 pasos (ideal en caminadora)';
+  }
+  function mostrarResumenMarcha(res, meta){
+    detenerCamaraStream(); detenerLoopCamara();
+    var cont=document.getElementById('bio-vista-resumen');
+    var by={}; (res.medidas||[]).forEach(function(m){ by[m.key]=m; });
+    function fmt(m){ if(!m || m.valor==null) return '<span style="color:#9BA3B5">—</span>';
+      var u=(m.unidad==='m')?' m':(m.unidad==='%'?'%':(m.unidad==='pasos/min'?'':'°'));
+      var conf=m.confiable?'':' <span style="color:#E8C96A;font-size:11px">⚠️ baja conf.</span>';
+      return '<b style="color:#3DDC97">'+m.valor+u+'</b>'+conf; }
+    function simTxt(v){ if(v==null) return '—'; var c=(v>=90)?'#3DDC97':(v>=80?'#E8C96A':'#E8836A'); return '<b style="color:'+c+'">'+v+'%</b>'; }
+    var q=res.calidad||{}, avisos=[];
+    if(res.calidad && res.calidad.orientPerfilOK===false) avisos.push('⚠️ La toma no se vio DE PERFIL — la marcha se mide de lado; repite con el paciente de perfil a la cámara.');
+    if(!res.nCiclos) avisos.push('⚠️ No se detectaron ciclos de marcha completos. Repite DE PERFIL, con el cuerpo completo en cuadro y 8–10 pasos (o en caminadora).');
+    if(res.nCiclos && q.framesValidos!=null && q.framesValidos<20) avisos.push('⚠️ Pocos cuadros válidos ('+q.framesValidos+'). Repite con mejor luz y el cuerpo completo en cuadro.');
+    var vel=(res.velocidad!=null)?(res.velocidad+' m/s'):'—';
+    cont.innerHTML =
+      '<h3>Resumen — Marcha (análisis sagital)</h3>'
+      + '<div style="color:#9BA3B5;font-size:13px;margin-bottom:10px">'+(meta.fuente==='camara'?'📷 Cámara en vivo':'📁 Video')+' · '+meta.duracionSeg+' s · '
+      +   res.nCiclos+' ciclo'+(res.nCiclos===1?'':'s')+' · cadencia '+(res.cadencia!=null?res.cadencia+' pasos/min':'—')+' · velocidad '+vel+'<br>'
+      +   '<span style="color:#E8C96A">Cribado 2D de perfil:</span> tiempos y sagital son lo fiable; el tobillo es aproximado; sin rotaciones ni cinética. Compara al paciente consigo mismo.</div>'
+      + '<table class="bio-tabla-res"><thead><tr><th>Métrica</th><th>Izquierda</th><th>Derecha</th></tr></thead><tbody>'
+      + '<tr><td class="g">Fase de apoyo</td><td>'+fmt(by['stance_izq'])+'</td><td>'+fmt(by['stance_der'])+'</td></tr>'
+      + '<tr><td class="g">Doble apoyo</td><td colspan="2">'+fmt(by['doble_apoyo'])+'</td></tr>'
+      + '<tr><td class="g">Longitud de paso</td><td colspan="2">'+fmt(by['paso_long'])+'</td></tr>'
+      + '<tr><td class="g">Rodilla · flexión pico</td><td>'+fmt(by['rod_pico_izq'])+'</td><td>'+fmt(by['rod_pico_der'])+'</td></tr>'
+      + '<tr><td class="g">Cadera · ROM flexo-ext</td><td>'+fmt(by['cadera_rom_izq'])+'</td><td>'+fmt(by['cadera_rom_der'])+'</td></tr>'
+      + '<tr><td class="g">Tobillo · ROM</td><td>'+fmt(by['tobillo_rom_izq'])+'</td><td>'+fmt(by['tobillo_rom_der'])+'</td></tr>'
+      + '</tbody></table>'
+      + '<div style="color:#C9D2E8;font-size:13px;margin-top:10px">Simetría izq/der — Rodilla '+simTxt(res.simetria&&res.simetria.rodPeak)+' · Cadera '+simTxt(res.simetria&&res.simetria.hipROM)+' · Apoyo '+simTxt(res.simetria&&res.simetria.stancePct)+' <span style="color:#9BA3B5">(100% = simétrico)</span></div>'
+      + (avisos.length?('<div style="color:#E8C96A;font-size:13px;margin-top:10px">'+avisos.join('<br>')+'</div>'):'')
+      + '<div class="bio-acciones">'
+      +   '<button class="bio-b-sec" id="bio-res-repetir">🔄 Repetir</button>'
+      +   (res.nCiclos ? '<button class="bio-b-save" id="bio-res-guardar">💾 Guardar en expediente</button>' : '')
+      + '</div>';
+    mostrarVista('bio-vista-resumen');
+    document.getElementById('bio-res-repetir').addEventListener('click', function(){ resetEstado(); mostrarVista('bio-vista-inicio'); });
+    var g=document.getElementById('bio-res-guardar');
+    if(g) g.addEventListener('click', function(){ guardarSesionMarcha(res, meta); });
+  }
+  async function guardarSesionMarcha(res, meta){
+    var p = (typeof currentPatient!=='undefined') ? currentPatient : null;
+    if(!p){ toast('Sin paciente activo','error'); return; }
+    var btn=document.getElementById('bio-res-guardar'); if(btn){ btn.disabled=true; btn.textContent='⏳ Guardando…'; }
+    var sesion = {
+      id:'bm_'+p.id+'_'+Date.now(),
+      tipo:'marcha',
+      fuente:meta.fuente,
+      fecha:fechaHoy(), horaCreacion:horaAhora(), fechaHoraISO:new Date().toISOString(),
+      terapeuta:usuarioActual(), convencion:'clinica',
+      duracionSeg:meta.duracionSeg||0,
+      nCiclos:res.nCiclos, cadencia:res.cadencia, velocidad:res.velocidad,
+      temporal:res.temporal, espacial:res.espacial, sagital:res.sagital, simetria:res.simetria,
+      medidas:res.medidas, calibracion:res.calibracion, calidad:meta.calidad||{},
+      reportePdf:null, video:null, eliminado:false
+    };
+    sesion.video = await _subirVideoSesion(p, meta, btn, 'marcha');
+    await _persistirSesion(p, sesion, btn, 'Marcha sagital ('+meta.fuente+')');
   }
 
   // ═════════════ RECONSTRUCCIÓN VISUAL (esqueleto + trayectorias) ═════════════
@@ -1712,6 +2012,43 @@
       + '</div>'
       + '</div>';
   }
+  function tarjetaMarchaHTML(s){
+    var by={}; (s.medidas||[]).forEach(function(m){ by[m.key]=m; });
+    function fmtM(m){ if(!m||m.valor==null) return '<span style="color:var(--gray-400)">—</span>';
+      var u=(m.unidad==='m')?' m':(m.unidad==='%'?'%':(m.unidad==='pasos/min'?'':'°'));
+      var conf=m.confiable?'':' <span style="color:#B45309;font-size:11px">⚠️</span>';
+      return '<b style="color:var(--green)">'+m.valor+u+'</b>'+conf; }
+    function fila(etq, izq, der){
+      return '<div class="field-row"><div class="field-label">'+etq+'</div><div class="field-value" style="display:flex;gap:14px;flex-wrap:wrap">'
+        + (der!==undefined
+            ? '<span><b style="color:var(--gray-400);font-weight:600">Izq</b> '+izq+'</span><span><b style="color:var(--gray-400);font-weight:600">Der</b> '+der+'</span>'
+            : '<span>'+izq+'</span>')
+        + '</div></div>'; }
+    function simTxt(v){ if(v==null) return '—'; var c=(v>=90)?'var(--green)':(v>=80?'#B45309':'var(--red)'); return '<b style="color:'+c+'">'+v+'%</b>'; }
+    var fuente=s.fuente==='video'?'📁 Video':'📷 Cámara', sm=s.simetria||{}, q=s.calidad||{}, avisos=[];
+    if(q.orientPerfilOK===false) avisos.push('toma no de perfil');
+    var velTxt=(s.velocidad!=null)?(s.velocidad+' m/s'):'—', cadTxt=(s.cadencia!=null)?(s.cadencia+' pasos/min'):'—';
+    var videoBtn = (s.video && s.video.url)
+      ? '<button data-url="'+esc(s.video.url)+'" onclick="window.open(this.dataset.url,\'_blank\')" style="background:var(--green);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer">▶️ Ver video</button>'
+      : '';
+    return '<div class="section-card" style="margin-bottom:10px">'
+      + '<div class="section-title" style="display:flex;align-items:center;justify-content:space-between">'
+      +   '<span>🚶 Marcha · '+esc(s.fecha)+' '+esc(s.horaCreacion||'')+'</span>'
+      +   '<span style="font-weight:600;text-transform:none;letter-spacing:0;color:var(--gray-400)">'+fuente+'</span>'
+      + '</div>'
+      + '<div class="field-row"><div class="field-label">Terapeuta</div><div class="field-value">'+esc(s.terapeuta||'—')+' · '+(s.duracionSeg||0)+' s · '+(s.nCiclos||0)+' ciclo'+((s.nCiclos===1)?'':'s')+' (vista sagital)'+(avisos.length?(' · <span style="color:#B45309">⚠️ '+esc(avisos.join(', '))+'</span>'):'')+'</div></div>'
+      + fila('Cadencia · velocidad', cadTxt+' · '+velTxt)
+      + fila('Fase de apoyo', fmtM(by['stance_izq']), fmtM(by['stance_der']))
+      + fila('Rodilla · flexión pico', fmtM(by['rod_pico_izq']), fmtM(by['rod_pico_der']))
+      + fila('Cadera · ROM', fmtM(by['cadera_rom_izq']), fmtM(by['cadera_rom_der']))
+      + fila('Tobillo · ROM', fmtM(by['tobillo_rom_izq']), fmtM(by['tobillo_rom_der']))
+      + fila('Simetría rod/cadera/apoyo', simTxt(sm.rodPeak)+' / '+simTxt(sm.hipROM)+' / '+simTxt(sm.stancePct))
+      + '<div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;padding:10px 14px;align-items:center">'
+      +   videoBtn
+      +   '<button data-sid="'+esc(s.id)+'" onclick="BIO_eliminar(this.dataset.sid)" style="background:var(--red-light);color:var(--red);border:1.5px solid #FCA5A5;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer">🗑️ Eliminar</button>'
+      + '</div>'
+      + '</div>';
+  }
   function renderPestana(p){
     var lista = Array.isArray(p.biomecanica) ? p.biomecanica.filter(function(s){ return s && !s.eliminado; }) : [];
     var html = ''
@@ -1723,6 +2060,7 @@
     var orden = lista.slice().reverse(); // más reciente primero
     html += orden.map(function(s){
       if(s.tipo==='sentadilla') return tarjetaSentHTML(s);
+      if(s.tipo==='marcha') return tarjetaMarchaHTML(s);
       var fuente = s.fuente==='video' ? '📁 Video' : '📷 Cámara';
       var filas = filasSesionHTML(s);
       var pdfBtn = (s.reportePdf && s.reportePdf.url)
