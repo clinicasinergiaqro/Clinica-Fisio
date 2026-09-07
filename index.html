@@ -3201,7 +3201,10 @@ async function loadFromCloud(){
           // de merge (una firma creada offline MÁS NUEVA ya gana entera vía PIEZA 4 y no llega aquí).
           if(Array.isArray(pSano.consentimientos) && pSano.consentimientos.length){
             if(Array.isArray(pLocal.consentimientos)&&pLocal.consentimientos.length){
-              pSano.consentimientos = pLocal.consentimientos;
+              // [FIX #4] UNIÓN (no reemplazo): antes pSano.consentimientos = pLocal → un consentimiento
+              // firmado en OTRO equipo (en la nube, no en local) quedaba oculto en este iPad. Ahora se
+              // fusionan por folio; se conserva la copia con base64 local para no perder firma/INE sin subir.
+              pSano.consentimientos = _fusionarConsentimientos(pLocal.consentimientos, pSano.consentimientos);
             } else if(pLocal.consentimiento?.firma){
               // compatibilidad con objeto viejo
               pSano.consentimiento = {...(pSano.consentimiento||{}), firma:pLocal.consentimiento.firma, fotoIdentidad:pLocal.consentimiento.fotoIdentidad};
@@ -9688,7 +9691,7 @@ function renderExpediente(tab='historia'){
   if (tab==='soap' && typeof FST_renderHistorialSoap === 'function') setTimeout(function(){ FST_renderHistorialSoap(p.id); }, 0);
   if (tab==='soap') setTimeout(function(){ if(typeof _detectarFugaNotas==='function') _detectarFugaNotas(); }, 0);   // [BORRADO-NOTAS] detector dev de fugas tras render del historial
   // Prompt B v2: fechas clínicas en tab Historia (render local inmediato + enriquecido Firestore).
-  if (tab==='historia') setTimeout(function(){ actualizarFechasClinicas(p); }, 0);
+  if (tab==='historia') setTimeout(function(){ actualizarFechasClinicas(p); if(typeof _reSubirConsentimientosLocales==='function'){ _reSubirConsentimientosLocales(p).then(function(n){ if(n>0) showToast('☁️ '+n+' documento(s) de consentimiento subido(s) a la nube','success'); }); } }, 0);
   if (tab==='estudios' && typeof FST_renderEstudiosApartado === 'function') setTimeout(function(){ FST_renderEstudiosApartado(p.id); }, 0);
   // RESCATE: si hay fotos/documentos que solo viven en ESTE cel (subida a Storage falló), re-subirlos a
   // la nube en 2º plano → dejan de salir "no disponible" en otros dispositivos. Si sube algo, re-render.
@@ -14056,6 +14059,22 @@ function _fusionarEstudiosDocs(local, remoto){
   });
   return order.map(function(x){ return (typeof x==='string')?byKey[x]:x; });
 }
+// [FIX #4] Unión de consentimientos local + nube (dedup por folio, o fecha+hora+nombre). Un
+// consentimiento firmado en OTRO equipo (presente en la nube pero no en local) ya NO queda oculto
+// al reemplazar el array por el local. Cuando la misma llave está en ambos, se prefiere la copia que
+// aún trae base64 (firma/INE) para no perder el binario que todavía no subió a Storage.
+function _fusionarConsentimientos(local, nube){
+  var byKey={}, order=[];
+  function key(c){ return String((c&&c.folio) || ((c&&c.fecha||'')+'|'+(c&&c.hora||'')+'|'+(c&&c.nombre||'')) || ''); }
+  function tieneB64(c){ return !!(c && ((typeof c.firmaUrl==='string'&&c.firmaUrl.indexOf('data:')===0) || (typeof c.fotoIdentidad==='string'&&c.fotoIdentidad.indexOf('data:')===0))); }
+  (Array.isArray(nube)?nube:[]).concat(Array.isArray(local)?local:[]).forEach(function(c){
+    if(!c) return; var k=key(c);
+    if(!k){ order.push(c); return; }
+    if(byKey[k]===undefined){ byKey[k]=c; order.push(k); }
+    else if(tieneB64(c) && !tieneB64(byKey[k])){ byKey[k]=c; }   // conservar la copia con el binario local
+  });
+  return order.map(function(x){ return (typeof x==='string')?byKey[x]:x; });
+}
 // Espejo DURABLE a Firestore de un campo array que vive SOLO en Firestore (estudiosDocs/
 // reportesClinicosIA) para pacientes ACTIVOS. _sinUndefined (Firestore rechaza undefined y explota el
 // write ENTERO — el resumenIA viene de la IA y puede traer undefined anidado) + _conTimeout (offline el
@@ -15442,6 +15461,41 @@ async function _reSubirFotosLocales(p){
       try{ await saveDB('pts',[p],{camposHist:['fotos','docs','estudiosDocs']}); }catch(_){}
       try{ if(window._estudiosCache) delete window._estudiosCache[p.id]; }catch(_){}
     }
+    return subidas;
+  }catch(_e){ return 0; }
+}
+// [FIX #1] RESCATE de consentimientos: la foto del INE y la firma que quedaron en base64 (la subida a
+// Storage falló con mala señal) NO viajan a Sheets (la foto la bloquea el filtro https; la firma sí
+// va como base64 pero es frágil) → se pierden en OTRO dispositivo. Aquí, en el equipo que SÍ tiene el
+// binario, se re-suben a Storage y se les pone url/fbPath. Corre en 2º plano al abrir Historia.
+async function _reSubirConsentimientosLocales(p){
+  try{
+    if(!p || !navigator.onLine) return 0;
+    if(typeof fbStorage==='undefined' || !fbStorage) return 0;
+    if(!Array.isArray(p.consentimientos) || !p.consentimientos.length) return 0;
+    var subidas=0;
+    for(var i=0;i<p.consentimientos.length;i++){
+      var c=p.consentimientos[i]; if(!c) continue;
+      // Foto de identidad (INE) en base64 sin fbPath → subir
+      if(typeof c.fotoIdentidad==='string' && c.fotoIdentidad.indexOf('data:')===0 && !c.fotoIdentidadFbPath){
+        try{
+          var fp='clinica/sinergia/'+p.id+'/consentimientos/fotoId_'+Date.now()+'_'+i+'.jpg';
+          var bl=await (await fetch(c.fotoIdentidad)).blob();
+          await fbStorage.ref(fp).put(bl,{contentType:bl.type||'image/jpeg'});
+          c.fotoIdentidad=await fbStorage.ref(fp).getDownloadURL(); c.fotoIdentidadFbPath=fp; c.fotoIdEnFirebase=true; subidas++;
+        }catch(_e){ console.warn('[re-subir INE]', _e&&_e.message); }
+      }
+      // Firma del paciente en base64 sin fbPath → subir
+      if(typeof c.firmaUrl==='string' && c.firmaUrl.indexOf('data:')===0 && !c.firmaFbPath){
+        try{
+          var fp2='clinica/sinergia/'+p.id+'/consentimientos/firma_'+Date.now()+'_'+i+'.png';
+          var bl2=await (await fetch(c.firmaUrl)).blob();
+          await fbStorage.ref(fp2).put(bl2,{contentType:bl2.type||'image/png'});
+          c.firmaUrl=await fbStorage.ref(fp2).getDownloadURL(); c.firmaFbPath=fp2; c.firmaEnFirebase=true; subidas++;
+        }catch(_e){ console.warn('[re-subir firma]', _e&&_e.message); }
+      }
+    }
+    if(subidas>0){ try{ await saveDB('pts',[p],{camposHist:['consentimientos']}); }catch(_){} }
     return subidas;
   }catch(_e){ return 0; }
 }
