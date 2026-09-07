@@ -540,10 +540,10 @@ async function FST_renderGaleriaHistorica(pid){
     const vistos = {};
     const items = [];
     (Array.isArray(data.fotosHistoricas)?data.fotosHistoricas:[]).forEach(function(f){
-      if(!f||!f.url||vistos[f.url]) return; vistos[f.url]=1; items.push({url:f.url, esHist:true});
+      if(!f||!f.url||vistos[f.url]) return; vistos[f.url]=1; items.push({url:f.url, fbPath:f.fbPath||'', esHist:true});
     });
     (Array.isArray(data.estudiosDocs)?data.estudiosDocs:[]).forEach(function(e){
-      if(!e||e.eliminado===true||!e.url||vistos[e.url]) return; vistos[e.url]=1; items.push({url:e.url, esHist:false, tipo:e.tipo});   // [TOMBSTONE] ocultar borrados
+      if(!e||e.eliminado===true||!e.url||vistos[e.url]) return; vistos[e.url]=1; items.push({url:e.url, fbPath:e.fbPath||'', esHist:false, tipo:e.tipo});   // [TOMBSTONE] ocultar borrados
     });
     if (!items.length) return '';
     const thumbs = items.map(function(it){
@@ -553,7 +553,7 @@ async function FST_renderGaleriaHistorica(pid){
       const etiqueta = t ? '<div class="media-label" style="background:rgba(13,27,62,.82)">'+t.icono+' '+t.label+'</div>' : '';
       const esImg = it.esHist || tp==='imagen' || /\.(jpg|jpeg|png|gif|webp|heic|bmp)(\?|$)/i.test(it.url);
       const cuerpo = esImg
-        ? '<img loading="lazy" src="'+u+'" alt="estudio" onerror="this.parentNode.parentNode.style.display=\'none\'" style="width:100%;height:100%;object-fit:cover;display:block">'
+        ? '<img loading="lazy" src="'+u+'" alt="estudio" data-fb="'+escapeAttr_(it.fbPath||'')+'" onerror="_imgErrGaleria(this)" style="width:100%;height:100%;object-fit:cover;display:block">'
         : '<div style="width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:26px;background:#F0F2F7">📄<div style="font-size:9px;color:#5A6478;font-weight:700">ABRIR</div></div>';
       const btnClas = it.esHist
         ? '<button data-pid="'+escapeAttr_(pid)+'" data-url="'+u+'" onclick="event.preventDefault();event.stopPropagation();clasificarImagenHistorica(this.dataset.pid,this.dataset.url)" style="position:absolute;top:4px;right:4px;background:rgba(255,255,255,.92);border:1px solid var(--gray-200);border-radius:8px;font-size:13px;line-height:1;padding:4px 7px;cursor:pointer;z-index:2" title="Clasificar">🏷️</button>'
@@ -3188,10 +3188,33 @@ async function loadFromCloud(){
             encolarSync(pLocal.id);
             return pLocal;
           }
-          // Sheets gana (comportamiento normal): preservar base64 que no viaja a Sheets
-          if(Array.isArray(pLocal.fotos)&&pLocal.fotos.some(f=>f.data)) pSano.fotos = pLocal.fotos;
-          if(Array.isArray(pLocal.docs)&&pLocal.docs.some(d=>d.data)) pSano.docs = pLocal.docs;
-          if(Array.isArray(pLocal.estudiosDocs)&&pLocal.estudiosDocs.length&&!Array.isArray(pSano.estudiosDocs)) pSano.estudiosDocs = pLocal.estudiosDocs;
+          // [FIX CLOBBER MEDIA] Antes solo se conservaba lo local si ALGÚN ítem tenía base64 (f.data).
+          // Una foto SUBIDA a Storage (url, sin data) cuyo saveDB a Sheets aún no llegaba se PERDÍA al
+          // ganar la nube (síntoma "subí una foto y desapareció"). Ahora se UNEN: se conservan las
+          // fotos/docs locales ausentes de la nube que tengan binario local sin subir (data/mediaId),
+          // y —SOLO si el paciente tiene cambios pendientes en cola (no sincronizados)— también las
+          // url-only. Así no se resucita una foto borrada en otro equipo (ese caso NO deja al paciente
+          // en COLA_SYNC en este iPad). Mismo espíritu que el CLOBBER-FIX de SOAP.
+          var _pendMedia = (typeof getColaSync==='function') && getColaSync().indexOf(pSano.id)>=0;
+          var _unirMediaLocal=function(local, nube){
+            local=Array.isArray(local)?local:[]; nube=Array.isArray(nube)?nube:[];
+            if(!local.length) return nube;
+            var kk=function(it){ return String((it&&(it.mediaId||it.id||it.fbPath||it.url))||''); };
+            var setN={}; nube.forEach(function(it){ var k=kk(it); if(k) setN[k]=1; });
+            var extra=local.filter(function(it){ if(!it) return false; var k=kk(it); if(k&&setN[k]) return false;
+              var binLocal=(typeof it.data==='string'&&it.data.indexOf('data:')===0)||(it.mediaId&&!it.url);
+              if(binLocal) return true;                 // binario local sin subir → nunca perder
+              if(_pendMedia&&(it.url||it.fbPath)) return true;  // subida OK pero Sheets no llegó (paciente en cola)
+              return false;
+            });
+            return extra.length ? nube.concat(extra) : nube;
+          };
+          var _nFotos0=(Array.isArray(pSano.fotos)?pSano.fotos.length:0), _nDocs0=(Array.isArray(pSano.docs)?pSano.docs.length:0);
+          pSano.fotos = _unirMediaLocal(pLocal.fotos, pSano.fotos);
+          pSano.docs  = _unirMediaLocal(pLocal.docs,  pSano.docs);
+          // estudiosDocs (Firestore-only para activos; en Sheets casi siempre viene vacío) → unión que respeta tombstones.
+          if(Array.isArray(pLocal.estudiosDocs)&&pLocal.estudiosDocs.length) pSano.estudiosDocs = _fusionarEstudiosDocs(pLocal.estudiosDocs, Array.isArray(pSano.estudiosDocs)?pSano.estudiosDocs:[]);
+          if((pSano.fotos.length>_nFotos0)||(pSano.docs.length>_nDocs0)){ try{ encolarSync(pSano.id); }catch(_){} }
           // Preservar consentimientos locales (el array incluye las firmas base64 que no van a Sheets).
           // SELF-HEALING ACOTADO (limpieza cross-device): esta rama ya es "Sheets gana" (la nube ganó
           // por recencia, PIEZA 4 arriba). Si la nube AFIRMA que hay consentimiento(s) → conservar lo
@@ -10353,9 +10376,22 @@ async function FST_hidratarCamposClinicos(p, id) {
     if (d.numSesionEpisodioActual != null) p.numSesionEpisodioActual = d.numSesionEpisodioActual; // number (0 válido)
     // fix (d)+(e) — leer de vuelta la media que Write 2 persiste (estudiosDocs=v4; fotos/docs=v5).
     // Sin esto, la galería de un histórico se veía pero desaparecía al reabrir. Guard estricto: no clobberear con vacío.
-    if (Array.isArray(d.estudiosDocs) && d.estudiosDocs.length) p.estudiosDocs = d.estudiosDocs;
-    if (Array.isArray(d.fotos) && d.fotos.length)               p.fotos = d.fotos;
-    if (Array.isArray(d.docs)  && d.docs.length)                p.docs  = d.docs;
+    // [FIX HIST-MEDIA] Antes REEMPLAZABA con la nube (p.fotos = d.fotos). En un histórico, si se acababa
+    // de agregar una foto cuyo write a Firestore aún estaba en cola (COLA_SYNC_HIST_DOC), reabrir el
+    // expediente la BORRABA de la vista. Ahora se UNE: la nube manda para lo sincronizado, pero se
+    // conservan los ítems locales PENDIENTES (con binario local sin subir o pendienteSubida) que la
+    // nube todavía no tiene. Respeta tombstones (eliminado).
+    var _unirHistMedia=function(local, nube){
+      local=Array.isArray(local)?local:[]; nube=Array.isArray(nube)?nube:[];
+      var kk=function(it){ return String((it&&(it.mediaId||it.id||it.fbPath||it.url))||''); };
+      var setN={}; nube.forEach(function(it){ var k=kk(it); if(k) setN[k]=1; });
+      var pend=local.filter(function(it){ if(!it||it.eliminado===true) return false; var k=kk(it); if(k&&setN[k]) return false;
+        return (it.pendienteSubida===true)||(typeof it.data==='string'&&it.data.indexOf('data:')===0)||(it.mediaId&&!it.url); });
+      return pend.length ? nube.concat(pend) : nube;
+    };
+    if (Array.isArray(d.estudiosDocs) && d.estudiosDocs.length) p.estudiosDocs = _fusionarEstudiosDocs(Array.isArray(p.estudiosDocs)?p.estudiosDocs:[], d.estudiosDocs);
+    if (Array.isArray(d.fotos) && d.fotos.length)               p.fotos = _unirHistMedia(p.fotos, d.fotos);
+    if (Array.isArray(d.docs)  && d.docs.length)                p.docs  = _unirHistMedia(p.docs, d.docs);
 
     // Fase 2b — SIMETRÍA escribe→lee. outCl (v12) escribe 11 campos de paciente, pero solo
     // etiquetas (índice 5368) y age (parcial, 5509) se leían de vuelta → los otros 9 se guardaban
@@ -15174,7 +15210,17 @@ async function borrarEstudio(pid, eid){
   // re-escribía a la nube para todos (con url ya movida = referencia rota). Marcar eliminado:true y
   // persistirlo hace que el borrado VIAJE: la fusión lo respeta y el render lo oculta.
   p.estudiosDocs = p.estudiosDocs.map(function(e){ return String(e.id)===String(eid) ? Object.assign({}, e, {eliminado:true, eliminadoPor:currentUser.name, eliminadoFecha:new Date().toISOString()}) : e; });
-  try { await _persistirEstudios(p); if (window._estudiosCache) delete window._estudiosCache[pid]; showToast('🗑️ Estudio movido a la papelera','success'); FST_renderEstudiosApartado(pid); if(typeof _renderSoapEstudios==='function') _renderSoapEstudios(); }
+  // [FIX REF-GEMELA] La MISMA foto/doc vive también en p.fotos/p.docs (mismo mediaId/fbPath) porque
+  // handleMedia crea DOS referencias al mismo binario. Al mover el binario a la papelera hay que
+  // quitar TAMBIÉN la gemela; si no, quedaría en "Fotos clínicas" con la url muerta ("no abre").
+  var _mid=est.mediaId, _fp=est.fbPath, _quitados=0;
+  var _quitarGemela=function(arr){ if(!Array.isArray(arr)) return; for(var i=arr.length-1;i>=0;i--){ var it=arr[i]; if(!it) continue; if((_mid&&it.mediaId===_mid)||(_fp&&it.fbPath&&it.fbPath===_fp)){ arr.splice(i,1); _quitados++; } } };
+  _quitarGemela(p.fotos); _quitarGemela(p.docs);
+  try {
+    await _persistirEstudios(p);
+    if(_quitados>0){ try{ await saveDB('pts',[p],{camposHist:['fotos','docs']}); }catch(_g){} }
+    if (window._estudiosCache) delete window._estudiosCache[pid]; showToast('🗑️ Estudio movido a la papelera','success'); FST_renderEstudiosApartado(pid); if(typeof _renderSoapEstudios==='function') _renderSoapEstudios(); if(typeof renderExpediente==='function' && String(currentTab||'')==='estudios') try{ renderExpediente('estudios'); }catch(_r){}
+  }
   catch(e){ showToast('⚠️ Archivo movido, pero no se pudo guardar el índice: '+e.message,'error'); }
 }
 
@@ -15382,6 +15428,12 @@ async function handleMedia(ev,tipo,pid){
         const entry={name:f.name,data,mediaId,type:f.type,kind,fecha:ahoraStr,label:f.name.replace(/\.[^.]+$/,''),subidoPor:currentUser.name};
         if(tipo==='foto'||tipo==='galeria') p.fotos.push(entry);
         else p.docs.push(entry);
+        // [FIX GALERÍA-HIST] espejar también a estudiosDocs (con mediaId, sin url) igual que la rama de
+        // éxito. Sin esto, en un histórico la foto subida offline NO aparecía en la galería del historial
+        // (que lee estudiosDocs) aunque _reSubirFotosLocales luego la subiera. Al re-subir, la url se
+        // espeja por mediaId a esta entrada.
+        if(!Array.isArray(p.estudiosDocs)) p.estudiosDocs=[];
+        p.estudiosDocs.push({ id:'est_'+Date.now()+'_'+Math.random().toString(36).slice(2,6), tipo:(kind==='imagen'?'imagen':'doc'), mediaId:mediaId, descripcion:(f.name||'').replace(/\.[^.]+$/,''), fechaEstudio:new Date().toISOString().slice(0,10), fechaAgregado:new Date().toLocaleDateString('es-MX'), agregadoPor:currentUser.name, origen:'soap', pendienteSubida:true });
         agregados++;
       }catch(e2){ showToast(`❌ Error guardando ${f.name}`,'error'); }
     }
@@ -15509,8 +15561,16 @@ async function deleteMedia(pid,tipo,i){
   const movido = await _moverArchivoABorrados(item.fbPath, {tipo:tipo, pid:pid, id:item.mediaId||null});
   if(!movido){ showToast('❌ No se pudo mover el archivo a la papelera. No se eliminó; reintenta.','error'); return; }
   if(item.mediaId){ try{ await idbSet(item.mediaId,null); }catch(e){} } // limpiar de IndexedDB
+  // [FIX REF-GEMELA] la MISMA foto/doc también está espejada en p.estudiosDocs (mismo mediaId/fbPath).
+  // Tombstonearla ahí también, o quedaría en "Estudios" con la url muerta ("no abre") y la unión la
+  // re-propagaría rota a todos los equipos.
+  var _dmid=item.mediaId, _dfp=item.fbPath, _tombEst=0;
+  if(Array.isArray(p.estudiosDocs)){
+    p.estudiosDocs=p.estudiosDocs.map(function(e){ if(e && ((_dmid&&e.mediaId===_dmid)||(_dfp&&e.fbPath&&e.fbPath===_dfp)) && e.eliminado!==true){ _tombEst++; return Object.assign({},e,{eliminado:true, eliminadoPor:currentUser.name, eliminadoFecha:new Date().toISOString()}); } return e; });
+  }
   if(tipo==='foto'&&Array.isArray(p.fotos))p.fotos.splice(i,1);
   else if(Array.isArray(p.docs))p.docs.splice(i,1);
+  if(_tombEst>0){ try{ if(window._estudiosCache) delete window._estudiosCache[pid]; _persistirEstudios(p).catch(function(){}); }catch(_){} }
   if(!Array.isArray(p.historialCambios)) p.historialCambios=[];
   const ahoraStr=new Date().toLocaleDateString('es-MX')+' '+new Date().toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'});
   p.historialCambios.push({usuario:currentUser.name,seccion:'archivos',fecha:ahoraStr,accion:`Movió a papelera ${tipo==='foto'?'una foto':'un documento'}`,antes:'archivo presente',despues:'en papelera'});
@@ -15527,6 +15587,33 @@ async function deleteMedia(pid,tipo,i){
     showToast('⚠️ Archivo movido; índice guardado solo en este equipo.','warning');
     renderExpediente('estudios');
   });
+}
+// [RECUPERACIÓN url rota] Si una imagen no carga (url con token caducado/regenerado) pero el archivo
+// SIGUE en Storage, saca una URL fresca desde su fbPath y reintenta. Recupera fotos que "ya no abrían"
+// sin haberse borrado. Un solo intento (data-fbtried) para no hacer bucle si el archivo sí se movió.
+async function _imgFallbackFbPath(img){
+  try{
+    if(!img || img.dataset._fbtried) return;
+    img.dataset._fbtried='1';
+    var fp=img.getAttribute('data-fb')||'';
+    if(!fp || typeof fbStorage==='undefined' || !fbStorage) return;
+    var u=await fbStorage.ref(fp).getDownloadURL();
+    if(u) img.src=u;
+  }catch(_){}
+}
+// Galería del historial: si el thumbnail no carga, intenta URL fresca por fbPath; si tampoco, muestra
+// un placeholder "no cargó" en vez de OCULTAR el recuadro (antes desaparecía en silencio y parecía perdida).
+async function _imgErrGaleria(img){
+  try{
+    if(!img) return;
+    var fp=img.getAttribute('data-fb')||'';
+    if(fp && !img.dataset._fbtried && typeof fbStorage!=='undefined' && fbStorage){
+      img.dataset._fbtried='1';
+      try{ var u=await fbStorage.ref(fp).getDownloadURL(); if(u){ img.src=u; return; } }catch(_){}
+    }
+    var box=img.parentNode;
+    if(box){ box.innerHTML='<div style="width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:22px;background:#F0F2F7;color:#9BA3B5">🖼️<div style="font-size:8px;font-weight:700">no cargó</div></div>'; }
+  }catch(_){}
 }
 async function previewMedia(pid,tipo,i){
   const p=_resolverPaciente(pid);if(!p)return;   // 04h: cae a currentPatient para históricos (la grilla de Fotos clínicas se pinta para mig_pac_)
@@ -15553,7 +15640,7 @@ async function previewMedia(pid,tipo,i){
             <button id="btn-cerrar-preview" style="background:rgba(255,255,255,.2);color:#fff;border:none;width:38px;height:38px;border-radius:50%;font-size:20px;cursor:pointer">×</button>
           </div>
         </div>
-        <img src="${item.url}" style="max-width:94%;max-height:84vh;object-fit:contain;border-radius:8px;margin-top:56px">`;
+        <img src="${item.url}" data-fb="${escapeAttr_(item.fbPath||'')}" onerror="_imgFallbackFbPath(this)" style="max-width:94%;max-height:84vh;object-fit:contain;border-radius:8px;margin-top:56px">`;
       document.body.appendChild(overlay);
       document.getElementById('btn-cerrar-preview').onclick=cerrar;
       overlay.onclick=(e)=>{if(e.target===overlay)cerrar();};
