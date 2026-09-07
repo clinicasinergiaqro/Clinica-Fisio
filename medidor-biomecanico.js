@@ -801,7 +801,7 @@
     try{ if(BIO.stream){ BIO.stream.getTracks().forEach(function(t){ t.stop(); }); BIO.stream=null; } }catch(e){}
     if(BIO.video && BIO.video.srcObject){ BIO.video.srcObject=null; }
   }
-  function detenerLoopCamara(){ if(BIO.rafId){ cancelAnimationFrame(BIO.rafId); BIO.rafId=null; } }
+  function detenerLoopCamara(){ if(BIO.rafId){ cancelAnimationFrame(BIO.rafId); BIO.rafId=null; } if(BIO._arranqueIv){ clearInterval(BIO._arranqueIv); BIO._arranqueIv=null; } BIO.sending=false; }
   function limpiarVideoSrc(v){ try{ if(v){ v.pause(); v.onclick=null; v.removeAttribute('src'); try{ v.srcObject=null; }catch(_e){} v.load(); } }catch(e){} }
 
   // ── MODO A: cámara en vivo ─────────────────────────────────────────────────
@@ -826,6 +826,7 @@
       : 'Coloca al paciente de cuerpo completo en el encuadre';
     BIO.acc=null; BIO.accS=null; BIO.framesTotales=0;
     loopCamara();
+    _vigilarArranqueCamara();   // avisa/reintenta si el video no entrega imagen
   }
   // Abre (o reabre) el stream con la cámara indicada. Reutiliza el <video> y el loop.
   async function abrirStreamCamara(facing){
@@ -863,12 +864,37 @@
       BIO.rafId = requestAnimationFrame(tick);
       if(ts - last < intervalo) return;
       last = ts;
-      if(BIO.sending || !BIO.pose || !BIO.video || BIO.video.videoWidth===0) return;
-      BIO.sending = true;
+      // WATCHDOG: si un send() de MediaPipe se quedó COLGADO (Safari iOS bajo presión de memoria/GPU),
+      // BIO.sending se quedaría en true para siempre y el muestreo se congelaría a media grabación
+      // (síntoma: "no graba / se queda pegado / 0 cuadros"). Si lleva >2.5 s sin resolver, lo liberamos
+      // y dejamos que el SIGUIENTE tick envíe un frame fresco (sin enviar dos a la vez).
+      if(BIO.sending){
+        if(BIO._sendAt && (Date.now()-BIO._sendAt)>2500){ BIO.sending=false; BIO._sendStuck=(BIO._sendStuck||0)+1; }
+        return;
+      }
+      // Si el <video> se pausó (iOS al volver de segundo plano / bloqueo de pantalla), reintenta.
+      if(BIO.video && BIO.video.paused){ try{ BIO.video.play(); }catch(_){} }
+      if(!BIO.pose || !BIO.video || BIO.video.videoWidth===0) return;
+      BIO.sending = true; BIO._sendAt = Date.now();
       BIO.framesTotales++;
       BIO.pose.send({ image: BIO.video }).then(function(){ BIO.sending=false; }).catch(function(){ BIO.sending=false; });
     }
     BIO.rafId = requestAnimationFrame(tick);
+  }
+  // Vigilancia de ARRANQUE de cámara: si el <video> no entrega imagen (videoWidth 0) en unos segundos,
+  // reintenta reproducir y avisa con claridad (en iOS el permiso puede quedar a medias o el stream mudo).
+  function _vigilarArranqueCamara(){
+    clearInterval(BIO._arranqueIv);
+    var intentos=0;
+    BIO._arranqueIv=setInterval(function(){
+      if(BIO.modo!=='camara'){ clearInterval(BIO._arranqueIv); return; }
+      if(BIO.video && BIO.video.videoWidth>0){ clearInterval(BIO._arranqueIv); return; }   // ya hay imagen
+      intentos++;
+      if(BIO.video){ try{ BIO.video.play(); }catch(_){} }                                   // reintenta arrancar
+      var estado=document.getElementById('bio-estado');
+      if(intentos>=4 && estado && !BIO.recording){ estado.textContent='⚠️ La cámara no envía imagen. Cierra y vuelve a abrir, o usa "📁 Subir video".'; }
+      if(intentos>=10){ clearInterval(BIO._arranqueIv); }
+    },1000);
   }
   // Orientación FRENTE vs PERFIL para el ROM de hombro (mismo criterio que la sentadilla: ancho
   // proyectado de hombros/caderas contra el alto del tronco). De frente los hombros se ven anchos;
@@ -970,6 +996,15 @@
       var s=Math.round((Date.now()-BIO.tStart)/1000);
       var mm=String(Math.floor(s/60)).padStart(2,'0'), ss=String(s%60).padStart(2,'0');
       if(el) el.textContent=mm+':'+ss;
+      // Indicador VIVO de captura: cuántos cuadros VÁLIDOS lleva → el usuario VE que sí está grabando
+      // (y si se queda en 0, el mensaje dice qué corregir en vez de dejarlo a ciegas).
+      if(BIO.recording){
+        var acc=(BIO.tipoMedicion==='sent')?BIO.accS:BIO.acc, fv=acc?acc.framesValidos:0;
+        var estado=document.getElementById('bio-estado');
+        if(estado){ estado.textContent = fv>0
+          ? ('● Grabando · '+fv+' cuadros capturados')
+          : '● Grabando · buscando al paciente… acércalo y mejora la luz'; }
+      }
     },500);
   }
   function pararCronometro(){ if(BIO.timerId){ clearInterval(BIO.timerId); BIO.timerId=null; } }
@@ -1080,8 +1115,10 @@
         if(terminado) return;
         if(BIO.cancelVideo){ terminar(); return; }
         var t = v.currentTime || 0;
+        // Mismo watchdog que en vivo: libera un send() colgado para no congelar el muestreo del video.
+        if(BIO.sending && BIO._sendAt && (Date.now()-BIO._sendAt)>2500){ BIO.sending=false; }
         if(!BIO.sending && BIO.pose && v.videoWidth>0 && (t - lastSample) >= minGap){
-          lastSample = t; BIO.sending = true; BIO.framesTotales++;
+          lastSample = t; BIO.sending = true; BIO._sendAt = Date.now(); BIO.framesTotales++;
           BIO.pose.send({ image:v }).then(function(){ BIO.sending=false; }).catch(function(){ BIO.sending=false; });
         }
         var pct = Math.min(99, Math.round((t/dur)*100));
@@ -1150,6 +1187,7 @@
       + '<div style="color:#9BA3B5;font-size:13px;margin-bottom:10px">'+fuenteTxt+' · '+meta.duracionSeg+' s · '+(meta.calidad.framesValidos||0)+' cuadros válidos · convención clínica (0° neutro)<br>ROM = <b style="color:#C9D2E8">media de los picos</b> de cada repetición · máx = mejor intento · ± = consistencia entre reps<br><span style="color:#E8C96A">Margen 2D honesto:</span> abducción/codo/cuello ±5°, flexión/extensión de hombro ±10° (de frente van fuera de plano → para finura, de PERFIL). Diferencias entre sesiones &lt; ~8° pueden ser ruido.</div>'
       + '<table class="bio-tabla-res"><thead><tr><th>Movimiento</th><th>Izquierda</th><th>Derecha</th></tr></thead><tbody>'+filas+'</tbody></table>'
       + (hayDato ? '' : '<div style="color:#E8C96A;font-size:13px;margin-top:10px">⚠️ No se detectó tronco + brazos con suficiente visibilidad. Repite con hombros, codos y caderas en cuadro y buena luz.</div>')
+      + ((hayDato && (meta.calidad.framesValidos||0)<20) ? '<div style="color:#E8C96A;font-size:12px;margin-top:8px">⚠️ Pocos cuadros válidos ('+(meta.calidad.framesValidos||0)+'). La medición puede ser inestable: repite con el paciente más cerca, buena luz y movimientos algo más lentos.</div>' : '')
       + '<div class="bio-acciones">'
       +   '<button class="bio-b-sec" id="bio-res-repetir">🔄 Repetir</button>'
       +   (hayDato ? '<button class="bio-b-save" id="bio-res-guardar">💾 Guardar en expediente</button>' : '')
@@ -1290,6 +1328,7 @@
     if(q.orientacionOK===false) avisos.push('⚠️ La toma no se vio de FRENTE — el valgo frontal no es interpretable; repite con el paciente de frente.');
     if(q.camaraMovida) avisos.push('⚠️ La cámara o el paciente se desplazaron durante la toma — medidas marcadas como no confiables.');
     if(!res.nReps) avisos.push('⚠️ No se detectaron sentadillas completas (descenso mínimo '+SENT_MIN_DESC+'% de la estatura). Repite con sentadillas más profundas o el cuerpo completo en cuadro.');
+    if(res.nReps && q.framesValidos!=null && q.framesValidos<20) avisos.push('⚠️ Pocos cuadros válidos ('+q.framesValidos+'). La medición puede ser inestable: repite con el cuerpo completo en cuadro, buena luz y bajadas algo más lentas.');
     var desc=by['sacro_descenso'], cmTxt='';
     if(desc && desc.media!=null && res.calibracion && res.calibracion.estaturaCm){
       cmTxt=' <span style="color:#9BA3B5;font-size:11px">≈ '+_r1(desc.media*res.calibracion.estaturaCm/100)+' cm (±10%)</span>';
