@@ -3610,7 +3610,9 @@ function limpiarTextoClinico(valor, fallback=''){
 // Botón rápido: llena o reemplaza el campo objetivo
 function setCampoRapido(id, texto){
   const el=document.getElementById(id);
-  if(el){ el.value=texto; el.focus(); el.blur(); }
+  if(el){ el.value=texto; try{ el.dispatchEvent(new Event('input',{bubbles:true})); }catch(_){} el.focus(); el.blur(); }
+  // [FIX] dispatch 'input': sin esto los chips (Progreso/Respuesta en SOAP) no activaban el autosave del
+  // borrador (se perdía el valor al recargar), ni marcaban dirty, ni limpiaban el resaltado rojo del campo.
 }
 
 var _segOpen=false;
@@ -12796,15 +12798,19 @@ async function guardarSOAP(){
   const _esTextoLibreHist=editingSoapEsHistorico&&_editingSoapHistoricoNota?.formatoOriginal==='texto_libre';
   // [FIX JESS/DESKTOP] SALVAVIDAS: si el panel de IA está con contenido en el preview (ia-prev-*) pero
   // los campos reales del form (f-*) están vacíos, es que se pulsó "Guardar" sin "Usar este SOAP".
-  // Aplicar la IA automáticamente antes de validar → deja de marcar "Faltan" cuando el texto SÍ existe
-  // en el preview. Solo actúa si hay algo en el preview y el form correspondiente está vacío.
+  // [FIX JESS/DESKTOP v2] MERGE preview→form POR CAMPO: rellena SOLO los f-* que estén VACÍOS con el
+  // texto de su preview (ia-prev-*). Antes exigía el form COMPLETAMENTE vacío para auto-aplicar; pero
+  // Jess suele llenar 1-2 campos en el form y redactar Dolor/Progreso en el preview de IA, y pulsar
+  // "Guardar" (visible en laptop) sin "Usar este SOAP" → el auto-aplicado no disparaba y Dolor/Progreso
+  // se validaban vacíos aunque su texto estuviera EN PANTALLA. Ahora se copian sin pisar lo ya escrito.
   try{
-    var _iaPrev=document.getElementById('ia-prev-sdolor');
-    if(_iaPrev && typeof usarSoapIA==='function'){
-      var _prevTieneAlgo=['ia-prev-sdolor','ia-prev-aevolucion','ia-prev-arespuesta','ia-prev-aanalisis','ia-prev-pindicaciones']
-        .some(function(id){ var e=document.getElementById(id); return e && String(e.value||'').trim() && String(e.value||'').trim()!=='[pendiente]'; });
-      var _formVacio = !v('f-sdolor') && !v('f-aevolucion') && !v('f-arespuesta') && !v('f-aanalisis');
-      if(_prevTieneAlgo && _formVacio){ usarSoapIA(); }
+    if(document.getElementById('ia-prev-sdolor')){
+      [['ia-prev-sdolor','f-sdolor'],['ia-prev-scambios','f-scambios'],['ia-prev-sactfisica','f-sactfisica'],['ia-prev-orom','f-orom'],['ia-prev-ofuerza','f-ofuerza'],['ia-prev-ohallazgos','f-ohallazgos'],['ia-prev-aevolucion','f-aevolucion'],['ia-prev-arespuesta','f-arespuesta'],['ia-prev-aanalisis','f-aanalisis'],['ia-prev-ptratamiento','f-ptratamiento'],['ia-prev-pindicaciones','f-pindicaciones'],['ia-prev-pcontra','f-pcontra']].forEach(function(par){
+        var src=document.getElementById(par[0]), dst=document.getElementById(par[1]);
+        if(!src||!dst) return;
+        var sv=String(src.value||'').trim(), dv=String(dst.value||'').trim();
+        if(sv && sv!=='[pendiente]' && (!dv || dv==='[pendiente]')){ dst.value=src.value; }
+      });
     }
   }catch(_ia){}
   const missing=[];
@@ -13779,7 +13785,10 @@ function usarSoapIA(){
     const src=document.getElementById(srcId);
     const dst=document.getElementById(dstId);
     if(src&&dst){
-      dst.value=src.value||'';
+      // [FIX] NO pisar lo ya escrito con un preview vacío (modo Rápido no rellena todos los ia-prev-*).
+      // Antes dst.value=src.value borraba, p.ej., un "Cambios" tecleado si la IA no lo trajo → "Faltan".
+      var _sv=String(src.value||'').trim();
+      if(_sv && _sv!=='[pendiente]') dst.value=src.value;
       // Resaltar con clase si es [pendiente] o vacío
       const v=(dst.value||'').trim();
       if(!v||v==='[pendiente]'){
