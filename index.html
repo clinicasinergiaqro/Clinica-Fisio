@@ -12674,32 +12674,64 @@ async function _capturarEstudioVal(ev){
   var interpEl=document.getElementById('n-estudio-val-interp');
   var interp=(interpEl&&interpEl.value?String(interpEl.value).trim():'');
   var _pidEst=window._altaPid;   // identidad del alta al iniciar (la subida es async)
+  var ts=Date.now();
+  var desc=(sel.clinico?sel.clinico+' · ':'')+String(file.name||'estudio').replace(/\.[^.]+$/,'');
+  function _baseItem(){
+    var it={ id:'est_'+ts+'_'+Math.random().toString(36).slice(2,6), tipo:sel.tipo||'imagen', tipoClinico:sel.clinico||'',
+      type:file.type||'', descripcion:desc, name:(file.name||'estudio'),
+      fechaEstudio:(typeof _isoMasDias==='function'?_isoMasDias(0):''), fechaAgregado:new Date().toLocaleDateString('es-MX'),
+      agregadoPor:(currentUser&&currentUser.name)||'' };
+    if(interp){ it.resumenManual={ texto:interp.slice(0,600), autor:(currentUser&&currentUser.name)||'', fecha:new Date().toISOString() }; }
+    return it;
+  }
+  // [ESTUDIO-ALTA-NO-SE-PIERDE] Contador de subidas en vuelo: guardarNuevoPaciente NO deja crear el
+  // expediente mientras haya una subida en curso (evita la carrera que dejaba el estudio fuera).
+  window._altaEstudiosEnVuelo=(window._altaEstudiosEnVuelo||0)+1;
   showToast('☁️ Subiendo…','');
   try{
-    var ts=Date.now();
     var safeName=String(file.name||'estudio').replace(/[^\w.\-]+/g,'_');
     var fbPath='clinica/sinergia/'+_pidEst+'/estudios/'+ts+'_'+safeName;
-    var ref=fbStorage.ref(fbPath);
-    var url=await new Promise(function(resolve,reject){
-      var task=ref.put(file,{ contentType:file.type||'application/octet-stream' });
-      task.on('state_changed', null, function(err){ reject(err); }, async function(){ try{ resolve(await task.snapshot.ref.getDownloadURL()); }catch(e){ reject(e); } });
-    });
+    // [REINTENTO] mala señal: hasta 3 intentos con espera creciente antes de rendirse (igual que la
+    // foto de valoración _capturarMediaAntes). Antes: 1 intento y si fallaba se PERDÍA el estudio.
+    var url=null, _try=0;
+    while(_try<3 && !url){
+      _try++;
+      try{
+        var ref=fbStorage.ref(fbPath);
+        url=await new Promise(function(resolve,reject){
+          var task=ref.put(file,{ contentType:file.type||'application/octet-stream' });
+          task.on('state_changed', null, function(err){ reject(err); }, async function(){ try{ resolve(await task.snapshot.ref.getDownloadURL()); }catch(e){ reject(e); } });
+        });
+      }catch(e){ console.warn('[estudio-val] intento '+_try, e&&e.message); if(_try<3){ showToast('Reintentando ('+_try+'/3)…',''); await new Promise(function(r){ setTimeout(r,_try*1500); }); } }
+    }
     // FUGA ENTRE BORRADORES (auditoría): si se abrió otro Nuevo/Editar durante la subida, _altaPid ya
     // cambió y _altaEstudios se vació → descartar para no meter el estudio de un alta en otra.
     if(window._altaPid!==_pidEst){ showToast('Cambiaste de formulario — el estudio no se adjuntó','warning'); return; }
     if(!Array.isArray(window._altaEstudios)) window._altaEstudios=[];
-    var desc=(sel.clinico?sel.clinico+' · ':'')+String(file.name||'estudio').replace(/\.[^.]+$/,'');
-    var item={ id:'est_'+ts+'_'+Math.random().toString(36).slice(2,6), tipo:sel.tipo||'imagen', tipoClinico:sel.clinico||'',
-      url:url, fbPath:fbPath, type:file.type||'', descripcion:desc,
-      fechaEstudio:(typeof _isoMasDias==='function'?_isoMasDias(0):''), fechaAgregado:new Date().toLocaleDateString('es-MX'),
-      agregadoPor:(currentUser&&currentUser.name)||'' };
-    if(interp){ item.resumenManual={ texto:interp.slice(0,600), autor:(currentUser&&currentUser.name)||'', fecha:new Date().toISOString() }; }
-    window._altaEstudios.push(item);
+    var item=_baseItem();
+    if(url){
+      item.url=url; item.fbPath=fbPath;
+      window._altaEstudios.push(item);
+    } else {
+      // [FALLBACK-IDB] La subida falló tras 3 intentos (mala señal). NO perder el estudio: binario a
+      // IndexedDB + mediaId + pendienteSubida. Se re-sube solo al reconectar o abrir Estudios
+      // (_reSubirFotosLocales procesa estudiosDocs). MISMA red de seguridad que la foto de valoración
+      // y la pestaña Estudios — antes esta ruta era la ÚNICA sin respaldo.
+      try{
+        var _data=await readFile(file);
+        var _mid='estv_'+_pidEst+'_'+ts+'_'+Math.random().toString(36).slice(2,7);
+        await idbSet(_mid,_data);
+        item.mediaId=_mid; item.pendienteSubida=true;
+        window._altaEstudios.push(item);
+        showToast('📴 Estudio guardado en el equipo — se subirá solo al reconectar','warning');
+      }catch(_e){ showToast('No se pudo guardar el estudio: '+((_e&&_e.message)||'error'),'error'); return; }
+    }
     if(interpEl) interpEl.value='';
     _renderEstudiosVal(); marcarDirty();
     try{ if(typeof guardarBorradorNuevo==='function') guardarBorradorNuevo(); }catch(_){}
-    showToast('✅ Estudio agregado','success');
-  }catch(e){ console.warn('[estudio-val]', e&&e.message); showToast('No se pudo subir: '+((e&&e.message)||'error'),'error'); }
+    if(url) showToast('✅ Estudio agregado','success');
+  }catch(e){ console.warn('[estudio-val]', e&&e.message); showToast('No se pudo agregar: '+((e&&e.message)||'error'),'error'); }
+  finally{ window._altaEstudiosEnVuelo=Math.max(0,(window._altaEstudiosEnVuelo||1)-1); }
 }
 function _renderEstudiosVal(){
   var wrap=document.getElementById('n-estudios-val-wrap'); if(!wrap) return;
@@ -15709,6 +15741,9 @@ async function _reSubirFotosLocales(p){
     }
     await procesar(p.fotos,'foto');
     await procesar(p.docs,'doc');
+    // [ESTUDIO-ALTA-NO-SE-PIERDE] También re-sube estudios pendientes (mediaId en IDB, sin url) —
+    // p.ej. el estudio capturado en el alta cuando la señal falló. procesar() les pone url/fbPath.
+    await procesar(p.estudiosDocs,'estudios');
     if(subidas>0){
       try{ await saveDB('pts',[p],{camposHist:['fotos','docs','estudiosDocs']}); }catch(_){}
       try{ if(window._estudiosCache) delete window._estudiosCache[p.id]; }catch(_){}
@@ -17039,6 +17074,7 @@ function renderNuevoPaciente(){
   _nEvaVal=null;
   _hcReset();
   window._altaEstudioTipo=null;
+  window._altaEstudiosEnVuelo=0;   // [ESTUDIO-ALTA-NO-SE-PIERDE] reset del contador de subidas en vuelo
   var _edP=(window._nuevoEditPid&&typeof _resolverPaciente==='function')?_resolverPaciente(window._nuevoEditPid):null;
   if(_edP){
     // MODO EDICIÓN: reusar el id real del paciente y precargar su media/estudios existentes
@@ -17492,6 +17528,9 @@ function buscarPacientesSimilares(nombre){
 }
 
 function guardarNuevoPaciente(){
+  // [ESTUDIO-ALTA-NO-SE-PIERDE] No crear el expediente mientras un estudio sigue subiendo: si no,
+  // window._altaEstudios todavía no lo contiene y el alta se guardaría sin él (carrera de tiempos).
+  if((window._altaEstudiosEnVuelo||0)>0){ try{ showToast('⏳ Un estudio se está subiendo — espera un momento y vuelve a guardar','warning'); }catch(_){} return; }
   const v=(id,def='')=>document.getElementById(id)?.value.trim()||def;
   const nombre=v('n-nombre'), alergias=v('n-alergias');
   const dxmedico=v('n-dxmedico'), padecimiento=v('n-padecimiento');
@@ -17818,6 +17857,11 @@ function guardarNuevoPaciente(){
     // ya con el paciente creado. Fail-safe: cualquier error solo se registra, no rompe el alta.
     if(Array.isArray(nuevo.estudiosDocs) && nuevo.estudiosDocs.length && typeof _persistirEstudios==='function'){
       try{ _persistirEstudios(nuevo).catch(function(e){ console.warn('[ALTA] estudiosDocs no persistió:', e&&e.message); }); }catch(_e){}
+    }
+    // [ESTUDIO-ALTA-NO-SE-PIERDE] Si algún estudio quedó pendiente (subida falló → IDB), intenta
+    // re-subirlo YA (si hay señal) sin esperar a que abran la pestaña Estudios; espeja la url y re-persiste.
+    if(Array.isArray(nuevo.estudiosDocs) && nuevo.estudiosDocs.some(function(e){return e&&e.pendienteSubida;}) && typeof _reSubirFotosLocales==='function'){
+      try{ _reSubirFotosLocales(nuevo).then(function(n){ if(n>0 && typeof _persistirEstudios==='function'){ try{ _persistirEstudios(nuevo).catch(function(){}); }catch(_e){} } }).catch(function(){}); }catch(_e){}
     }
   }).catch(() => {
     showToast('⚠️ Sin conexión — paciente guardado solo en este equipo.','warning');
