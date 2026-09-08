@@ -7231,6 +7231,7 @@ function _rendimientoHTML(datos, noId, ventana, etiqueta, aviso, refresco, tri){
     +'<th style="padding:6px 8px;text-align:left">Terapeuta</th><th style="padding:6px 8px">Citas</th><th style="padding:6px 8px">✅ Nota</th><th style="padding:6px 8px">🔴 Sin</th><th style="padding:6px 8px">Score</th><th style="padding:6px 8px">📄</th></tr></thead>'
     +'<tbody>'+filas+'</tbody></table></div>'
     +filaSA+bloqueNI
+    +_auditoriaHistoriasHTML()
     +seccionSinNota
     +seccionEnTiempo
     +seccionNoAcudio
@@ -7239,6 +7240,108 @@ function _rendimientoHTML(datos, noId, ventana, etiqueta, aviso, refresco, tri){
     +seccionTardias
     +lineaPiso
     +'<div style="font-size:10px;color:var(--gray-400);margin-top:10px">✅/🔴 por PACIENTE y día: nota fechada el día exacto de la cita, sin importar qué terapeuta la escribió (activos por expediente; históricos por ultimaSesionLive). ✅ incluye citas resueltas a mano con ✓. ⏳ = cita de las últimas 24 h (o futura) aún en tiempo de documentar — no es falta ni entra a cobertura. Solo se evalúan citas desde el '+_ddmmFromISO(APP_INICIO_OPERACION)+' (inicio de operación de la app). Score = calidad promedio de nota (0-100) de pacientes activos.</div>';
+}
+// ── AUDITORÍA DE HISTORIAS CLÍNICAS (retroalimentación a fisioterapeutas) ─────────────────────
+// Recorre los pacientes ACTIVOS (patientsDB, con campos clínicos completos en memoria), agrupa por
+// terapeuta y reporta qué campos clave de la historia clínica faltan por llenar. Criterios alineados
+// con renderIndicadorCompletitud + _motivoVigenteDe (episodio vigente). Todo síncrono.
+function _auditHistChecks(p){
+  var mv = (typeof _motivoVigenteDe==='function') ? _motivoVigenteDe(p) : {motivoConsulta:(p&&p.motivoConsulta)||'', valoracion:(p&&p.valoracion)||{}, dxFuncional:(p&&p.dxFuncional)||{}};
+  function _txt(v){ var s=String(v==null?'':v).trim().toLowerCase(); if(!s) return false; return ['pendiente','[pendiente]','no especificado','no evaluado','no evaluada','sin diagnóstico','sin diagnostico','—','-','n/a','na','.'].indexOf(s)<0; }
+  function _no(v){ return String(v==null?'':v).trim().length>0; }
+  var ant = (p.antecedentes && typeof p.antecedentes==='object') ? p.antecedentes : {};
+  var antLleno = _no(ant.patologicos)||_no(ant.deportivos)||_no(ant.cirugias)||_no(ant.medicamentos)||_no(ant.deporteFrecuencia);
+  var seg = p.seguridadClinica||{};
+  var segCap = !!(Array.isArray(seg.implantes)||Array.isArray(seg.condiciones));
+  var sexoOk = !!(p.sexo && ['','no especificado','pendiente'].indexOf(String(p.sexo).trim().toLowerCase())<0);
+  var nacOk  = _no(p.fechaNacimiento) || Number(p.age)>0;
+  var datosOk= !!(p.consentimientoDatos && p.consentimientoDatos.aceptado);
+  var valOk  = !!((mv.valoracion && _txt(mv.valoracion.rom)) || (mv.dxFuncional && _txt(mv.dxFuncional.dxFuncional)));
+  var firmaOk= (typeof tieneConsentimientoFirmado==='function') ? tieneConsentimientoFirmado(p) : false;
+  var telOk  = _no(p.telefono);
+  return {
+    core: [   // definen "historia completa"
+      {k:'Motivo',       ok:_txt(mv.motivoConsulta||p.motivoConsulta)},
+      {k:'Sexo',         ok:sexoOk},
+      {k:'Nacimiento',   ok:nacOk},
+      {k:'Antecedentes', ok:antLleno},
+      {k:'Seguridad',    ok:segCap},
+      {k:'Datos pers.',  ok:datosOk}
+    ],
+    extra: [  // se muestran pero no penalizan el conteo de "completa"
+      {k:'Valoración',       ok:valOk},
+      {k:'Consent. firmado', ok:firmaOk},
+      {k:'Teléfono',         ok:telOk}
+    ]
+  };
+}
+// Color del terapeuta tolerante: p.terapeuta suele venir como código (CARLOS, CAMI, DAF…) y
+// AGENDA_COLORES está en Título (Carlos, Camila, Dafne…). Match por igualdad/prefijo case-insensitive.
+function _audColorTer(nm){
+  if(typeof AGENDA_COLORES==='undefined' || !nm) return '#94A3B8';
+  if(AGENDA_COLORES[nm]) return AGENDA_COLORES[nm];
+  var low=String(nm).trim().toLowerCase(), keys=Object.keys(AGENDA_COLORES);
+  for(var i=0;i<keys.length;i++){ var k=keys[i].toLowerCase(); if(k===low || low.indexOf(k)===0 || k.indexOf(low)===0) return AGENDA_COLORES[keys[i]]; }
+  return '#94A3B8';
+}
+function _auditoriaHistoriasHTML(){
+  try{
+    if(!Array.isArray(patientsDB)) return '';
+    var activos = patientsDB.filter(function(p){
+      if(!p||!p.id) return false;
+      if(typeof _activoEliminado==='function' && _activoEliminado(p.id)) return false;
+      if(window._FST_pidsEliminados && window._FST_pidsEliminados.has(String(p.id))) return false;
+      if(String(p.name||'').indexOf('TEST_QA_')===0) return false;
+      return true;
+    });
+    if(!activos.length) return '';
+    var porTer={}, faltaCount={}, totalCompletas=0;
+    activos.forEach(function(p){
+      var r=_auditHistChecks(p);
+      var coreFalta=r.core.filter(function(c){return !c.ok;}).map(function(c){return c.k;});
+      var extraFalta=r.extra.filter(function(c){return !c.ok;}).map(function(c){return c.k;});
+      if(!coreFalta.length) totalCompletas++;
+      coreFalta.forEach(function(k){ faltaCount[k]=(faltaCount[k]||0)+1; });
+      extraFalta.forEach(function(k){ faltaCount[k]=(faltaCount[k]||0)+1; });
+      var nm=String(p.terapeuta||'').trim()||'Sin terapeuta';
+      if(!porTer[nm]) porTer[nm]={tot:0, inc:[]};
+      porTer[nm].tot++;
+      if(coreFalta.length||extraFalta.length) porTer[nm].inc.push({p:p, core:coreFalta, extra:extraFalta});
+    });
+    var Y=activos.length, X=totalCompletas, Z=Math.round(X/Y*100);
+    var uid='audhist-'+Date.now().toString(36);
+    var agg=Object.keys(faltaCount).sort(function(a,b){return faltaCount[b]-faltaCount[a];})
+      .map(function(k){ return '<span style="display:inline-block;background:#EEF2F6;color:#334155;border-radius:8px;padding:2px 8px;font-size:11px;font-weight:700;margin:2px 4px 2px 0">'+escapeHTML(k)+' · '+faltaCount[k]+'</span>'; }).join('');
+    var terClave=Object.keys(porTer).sort(function(a,b){ return porTer[b].inc.length-porTer[a].inc.length; });
+    var bloques=terClave.map(function(nm){
+      var d=porTer[nm];
+      var color=_audColorTer(nm);
+      if(!d.inc.length){
+        return '<div style="border-left:4px solid '+color+';padding-left:8px;margin-top:8px"><div style="font-size:12.5px;font-weight:800;color:var(--navy)">'+escapeHTML(nm)+' — ✅ '+d.tot+'/'+d.tot+' completas</div></div>';
+      }
+      var filas=d.inc.map(function(it){
+        var chipsCore=it.core.map(function(k){ return '<span style="display:inline-block;background:#FEE2E2;color:#991B1B;border-radius:7px;padding:1px 7px;font-size:10.5px;font-weight:700;margin:2px 3px 0 0">'+escapeHTML(k)+'</span>'; }).join('');
+        var chipsExtra=it.extra.map(function(k){ return '<span style="display:inline-block;background:#FEF3C7;color:#92400E;border-radius:7px;padding:1px 7px;font-size:10.5px;font-weight:700;margin:2px 3px 0 0">'+escapeHTML(k)+'</span>'; }).join('');
+        return '<div style="margin:6px 0;padding-bottom:6px;border-bottom:1px solid var(--gray-100)">'
+          +'<button onclick="_abrirExpedienteDesdeRendimiento(\''+escapeAttr_(String(it.p.id))+'\')" style="background:none;border:none;padding:0;color:var(--navy);font-weight:700;font-size:12.5px;text-decoration:underline;cursor:pointer;font-family:inherit">'+escapeHTML(it.p.name||'(sin nombre)')+'</button>'
+          +'<div style="margin-top:2px">'+chipsCore+chipsExtra+'</div></div>';
+      }).join('');
+      return '<div style="border-left:4px solid '+color+';padding-left:8px;margin-top:10px">'
+        +'<div style="font-size:12.5px;font-weight:800;color:var(--navy)">'+escapeHTML(nm)+' — '+d.inc.length+' incompleta'+(d.inc.length!==1?'s':'')+' de '+d.tot+'</div>'
+        +filas+'</div>';
+    }).join('');
+    var colorPct=(Z>=80?'#166534':(Z>=50?'#92400E':'#991B1B'));
+    return '<div style="margin-top:14px;background:#fff;border:1px solid var(--gray-200);border-radius:12px;padding:12px">'
+      +'<div onclick="var b=document.getElementById(\''+uid+'\');if(b){var op=b.style.display!==\'none\';b.style.display=op?\'none\':\'block\';var c=this.querySelector(\'.aud-caret\');if(c)c.textContent=op?\'▾ ver detalle\':\'▴ ocultar\';}" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:8px">'
+      +'<div style="font-size:14px;font-weight:800;color:var(--navy)">🩺 Auditoría de historias clínicas</div>'
+      +'<div style="font-size:12px;font-weight:800;color:'+colorPct+'">'+X+'/'+Y+' completas · '+Z+'%<span class="aud-caret" style="color:var(--gray-400);font-weight:600;margin-left:6px">▾ ver detalle</span></div>'
+      +'</div>'
+      +'<div id="'+uid+'" style="display:none;margin-top:10px">'
+      +(agg?('<div style="font-size:11px;color:var(--gray-500);font-weight:700;margin-bottom:4px">Lo que más falta (todo el equipo)</div><div style="margin-bottom:8px">'+agg+'</div>'):'')
+      +'<div style="font-size:10.5px;color:var(--gray-400);margin-bottom:6px">🔴 campos base de la historia (definen “completa”) · 🟡 valoración / consentimiento firmado / teléfono. Toca un nombre para abrir su expediente. Solo pacientes activos.</div>'
+      +bloques
+      +'</div></div>';
+  }catch(e){ console.warn('[AUDIT-HIST] no se pudo construir:', e && e.message); return ''; }
 }
 // PERF: caches en memoria del dashboard. La lógica de cálculo NO cambia — solo se evita red repetida.
 var REND_CACHE_TTL_MS=5*60*1000;
