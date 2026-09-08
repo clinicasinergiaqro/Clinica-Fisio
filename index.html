@@ -8794,6 +8794,37 @@ function _pacHistoricosHint(){
 }
 // [TASK1-LAZY] La terapeuta pide traer históricos: fija el flag de sesión y repinta (dispara la carga).
 function _pacIncluirHistoricos(){ window._pacQuiereHistoricos=true; try{ renderPacientesLista(); }catch(_e){} }
+// [BUSQUEDA-SIEMPRE-APARECE] Revalidación del índice disparada por una BÚSQUEDA activa.
+// Problema resuelto (caso Cris Vallejo): el índice de pacientes se sirve desde cache (memoria/
+// sessionStorage) y el SWR normal solo lo revalida a los 30 min. Un paciente creado en OTRO
+// dispositivo hace pocos minutos NO estaba en ese cache → "no aparece"; solo cerrar/reabrir la app
+// (que borra memoria+sessionStorage y fuerza lectura completa) lo hacía aparecer.
+// Aquí: mientras la terapeuta BUSCA, si los DATOS del índice ya envejecieron (>60s), forzamos una
+// lectura FRESCA de Firestore en 2º plano (throttle 15s para no martillar). Al llegar, invalidamos
+// la vista fusionada y repintamos → el paciente aparece sin cerrar/reabrir. Cubre tanto búsquedas
+// con 0 resultados como aquellas donde otros pacientes ya salían pero el buscado faltaba.
+function _pacRevalidarSiBuscaViejo(){
+  try{
+    if(window._FST_buscandoNube) return;                                   // ya hay una relectura en vuelo
+    var edad = Date.now() - (window._FST_indiceDatosTs || 0);
+    if(edad < 60000) return;                                               // índice fresco (<60s): no re-leer
+    if((Date.now() - (window._FST_ultimaNubeTs || 0)) < 15000) return;     // throttle anti-martilleo (15s)
+    if(typeof FST_refrescarIndiceEnSegundoPlano !== 'function') return;
+    window._FST_ultimaNubeTs = Date.now();
+    window._FST_buscandoNube = true;
+    Promise.resolve(FST_refrescarIndiceEnSegundoPlano(true)).catch(function(){}).then(function(){
+      window._FST_buscandoNube = false;
+      var sp=document.getElementById('screen-pacientes');
+      if(sp && sp.classList.contains('active')){
+        // Invalida la vista fusionada para que se reconstruya con el índice fresco y repinta
+        // SIEMPRE (haya cambiado o no el conjunto): así "Buscando en la nube…" se resuelve a
+        // resultados reales o a un "Sin resultados" honesto (el paciente de verdad no existe).
+        try{ if(typeof window._FST_invalidarVistaPacientes==='function') window._FST_invalidarVistaPacientes(); }catch(_e){}
+        try{ renderPacientesLista(); }catch(_e){}
+      }
+    });
+  }catch(_e){}
+}
 function renderPacientesLista(fuenteLista){
   const cont=document.getElementById('pac-lista'); if(!cont) return;
   if(!currentUser){ cont.innerHTML=''; return; }
@@ -8827,12 +8858,21 @@ function renderPacientesLista(fuenteLista){
   const _cargandoHist = !!window._FST_listaCargando;
   const _qActivo = String(q||'').trim().length>0;
   const _baseEsFusion = FST_LISTA_ACTIVA && baseLista===window._FST_listaPacientesActual;
+  // [BUSQUEDA-SIEMPRE-APARECE] Al BUSCAR a alguien, revalida el índice contra Firestore si ya
+  // envejeció (>60s), aunque falten para los 30 min del SWR. Sin esto un paciente creado en OTRO
+  // dispositivo hace minutos NO aparecía hasta cerrar/reabrir la app (caso Cris Vallejo). Cuando la
+  // relectura llega, invalida la vista y repinta → el paciente aparece solo. Throttle 15s anti-martilleo.
+  if(_qActivo && FST_LISTA_ACTIVA){ _pacRevalidarSiBuscaViejo(); }
   let html;
   if(!list.length){
     // [TASK1-LAZY] NUNCA "sin resultados" mientras el índice carga con búsqueda activa: sería un
     // vacío-mentiroso (la terapeuta concluiría que el paciente no existe). Estado explícito.
     if(_cargandoHist && _qActivo){
       html=`<div class="empty-state"><div class="emoji">⏳</div><p>Buscando también en históricos…</p></div>`;
+    } else if(_qActivo && window._FST_buscandoNube){
+      // [BUSQUEDA-SIEMPRE-APARECE] Relectura fresca del índice en vuelo: no afirmar "sin resultados"
+      // hasta que Firestore conteste (el paciente puede venir de otro dispositivo).
+      html=`<div class="empty-state"><div class="emoji">☁️</div><p>Buscando en la nube…</p></div>`;
     } else {
       html=`<div class="empty-state"><div class="emoji">🔍</div><p>${q?`Sin resultados para "${escapeHTML(q)}"`:'Sin pacientes aún.'}</p></div>`;
     }
