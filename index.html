@@ -10457,16 +10457,24 @@ async function FST_abrirPacienteDesdeLista(pid) {
       if (!p) { console.warn('[FST-LISTA] paciente no encontrado en vista tras cargar índice:', id); return; }
     }
 
-    // M-2: hidratar campos clínicos completos desde Firestore antes de abrir.
-    // El índice solo trae 10 campos de lista; antecedentes/motivo/valoracion/
-    // dxFuncional/planTto/alergias viven en el doc completo y nunca se leían.
+    // [ABRE-SIEMPRE] ANTES esperábamos a FST_hidratarCamposClinicos (un doc.get() SIN timeout) antes
+    // de abrir → en el socket "zombie" de iOS ese get se COLGABA y el expediente NUNCA abría por más
+    // clics que dieras (había que cambiar de pestaña para reciclar la conexión). Ahora se ABRE YA con
+    // los datos del índice (name/age/terapeuta/dx) y los campos clínicos completos (motivo/valoracion/
+    // antecedentes/…) se hidratan en 2º plano y repintan al llegar. currentPatient conserva la
+    // referencia a `p` aunque se retire de patientsDB, así el repintado posterior sí lo ve.
+    patientsDB.push(p);
+    try {
+      openExpediente(id); // flujo real, sin replicar nada — SÍNCRONO, no cuelga
+    } finally {
+      const idx = patientsDB.indexOf(p); // por referencia exacta, no por índice precalculado
+      if (idx !== -1) patientsDB.splice(idx, 1);
+    }
+    // Hidratación clínica en 2º plano (con timeout interno): si la nube cuelga, el expediente YA está
+    // abierto; cuando llegan los campos, se repinta la pestaña vigente.
     FST_hidratarCamposClinicos(p, id).finally(() => {
-      patientsDB.push(p);
-      try {
-        openExpediente(id); // flujo real, sin replicar nada
-      } finally {
-        const idx = patientsDB.indexOf(p); // por referencia exacta, no por índice precalculado
-        if (idx !== -1) patientsDB.splice(idx, 1);
+      if (currentPatient && String(currentPatient.id) === id && document.getElementById('content-expediente')) {
+        try { renderExpediente(currentTab || 'historia'); } catch(_e) {}
       }
     });
 
@@ -10486,7 +10494,13 @@ async function FST_hidratarCamposClinicos(p, id) {
     }
     if (!window._fstDb) return;
 
-    const snap = await window._fstDb.collection('pacientes').doc(id).get();
+    // [ABRE-SIEMPRE] Timeout: en el socket zombie de iOS un doc.get() puede colgarse sin resolver ni
+    // rechazar. Con la carrera contra un timeout, la promesa SIEMPRE termina → el .finally() que
+    // repinta corre igual (el expediente ya se abrió con los datos del índice).
+    const snap = await Promise.race([
+      window._fstDb.collection('pacientes').doc(id).get(),
+      new Promise((_, rej) => setTimeout(() => rej(new Error('timeout-hidratar')), 6000))
+    ]);
     if (!snap.exists) return;
     const d = snap.data() || {};
     if (!_fstDocVivo(d)) return;   // [BORRADO] no hidratar (ni abrir) un paciente tombstoneado
