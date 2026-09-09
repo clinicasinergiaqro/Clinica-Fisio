@@ -1,0 +1,36 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    // FIX IDENTIDAD (case-insensitive): igual que en firestore.rules, la comparacion `in` / `==` es
+    // SENSIBLE a mayusculas y el token conserva el casing de creacion en Firebase Auth. Sin .lower(),
+    // una cuenta con alguna mayuscula quedaba fuera SOLO para esa persona -> Storage rechazaba TODAS
+    // sus subidas (fotos/recetas/estudios) en silencio. .lower() lo vuelve robusto. Ademas faltaba
+    // Dulce en la lista (no podia subir archivos). Mantener sincronizada con isWriter de firestore.rules.
+    function isWriter() {
+      return request.auth != null
+        && request.auth.token.email.lower() in [
+          'lftaranda@gmail.com',
+          'gutierrezgarciazaray96@gmail.com',
+          'camislerma26@gmail.com',
+          'agoretti.mr@gmail.com',
+          'dafnend26@gmail.com',
+          'jriveare2000@hotmail.com',
+          'dulcesalazar_1799@hotmail.com'
+        ];
+    }
+    function isSupervisor() {
+      return request.auth != null
+        && request.auth.token.email.lower() == 'lftaranda@gmail.com';
+    }
+    match /borrados/{allPaths=**} {
+      allow write: if isSupervisor();
+      allow read:  if false;
+    }
+    match /clinica/sinergia/{allPaths=**} {
+      allow read, write: if isWriter();
+    }
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
