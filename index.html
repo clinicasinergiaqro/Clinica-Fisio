@@ -1951,6 +1951,11 @@ async function idbGet(key){
 // saveDB — Guarda en Sheets usando POST (sin límite de URL)
 // Elimina campos base64 antes de enviar. Base64 se mantiene en memoria local.
 async function saveDB(k, v, opts){
+  // BLINDAJE ANTI-SOBRESCRITURA (clobber): capturar QUÉ pacientes YA existían ANTES de esta operación.
+  // Un alta nueva todavía NO está en patientsDB aquí (saveDB la agrega abajo), así que el guard de más
+  // abajo se aplica SOLO a pacientes preexistentes (ediciones/sync), nunca a un alta — un alta con
+  // clínicos vacíos es legítima; una copia vieja que pisa a un existente con vacíos, no.
+  var _preexistentes = new Set((Array.isArray(patientsDB)?patientsDB:[]).map(function(x){ return x && x.id; }));
   // Fusionar los pacientes modificados en la base completa (preserva base64 local)
   if(k==='pts'){
     const lista = Array.isArray(v) ? v : [];
@@ -2196,6 +2201,28 @@ async function saveDB(k, v, opts){
       Object.keys(pLimpio).forEach(function(k){ if(!_keep[k]) delete pLimpio[k]; });
     }
 
+    // ── BLINDAJE ANTI-SOBRESCRITURA (clobber cross-device) ───────────────────────────
+    // Hallazgo de auditoría: un guardado COMPLETO (sin camposHist) manda el paciente entero con
+    // _soloCampos:null → el backend PISA todas las columnas. Si este equipo trae una copia vieja/en
+    // blanco en memoria (por PIEZA 4 que conserva y re-encola la local, o por agregar un estudio /
+    // editar datos / generar reporte IA / drenar la cola con un objeto viejo), la historia clínica
+    // de la nube se borra con ese vacío → sale "en blanco" en los demás equipos. Sin candado de
+    // recencia en el camino de Sheets, esto es una fuga silenciosa para CUALQUIER terapeuta.
+    // Blindaje: en un guardado COMPLETO de un paciente que YA EXISTÍA, nunca dejar que un objeto
+    // clínico VACÍO pise el de la nube. Se excluye del _soloCampos (el merge del backend conserva lo
+    // no enviado). Solo excluye lo VERDADERAMENTE vacío ({} / '' en todas sus hojas); una edición
+    // real (con contenido) SÍ se escribe. No aplica a altas nuevas (no preexistentes) ni a guardados
+    // ya recortados por camposHist (esos ya son quirúrgicos). Un número (EVA 0) cuenta como dato.
+    if(!_recorta && _preexistentes.has(p.id)){
+      var _CLIN = ['antecedentes','motivo','motivoHC','valoracion','dxFuncional','planTto','seguridadClinica'];
+      var _vaciosClin = _CLIN.filter(function(kk){ return Object.prototype.hasOwnProperty.call(pLimpio,kk) && _clinicoVacio(pLimpio[kk]); });
+      if(_vaciosClin.length){
+        var _colsGuardar = Object.keys(pLimpio).filter(function(kk){ return kk!=='_soloCampos' && _vaciosClin.indexOf(kk)===-1; });
+        pLimpio._soloCampos = _colsGuardar;   // el backend preserva las columnas clínicas vacías excluidas
+        console.warn('[anti-clobber] guardado completo de '+p.id+' — NO se pisan clínicos vacíos:', _vaciosClin.join(','));
+      }
+    }
+
     let ok=false;
     for(let intento=1; intento<=3; intento++){
       try{
@@ -2238,6 +2265,21 @@ async function saveDB(k, v, opts){
 // error se traga, el dato se pierde en silencio. Este helper elimina recursivamente las claves
 // con valor undefined antes de escribir. Preserva Date y los sentinels de Firestore
 // (serverTimestamp/FieldValue): solo recorre arrays y objetos PLANOS (constructor Object).
+// ANTI-CLOBBER: ¿un campo clínico está VERDADERAMENTE vacío? (null/undefined, string en blanco,
+// objeto/array cuyas hojas son TODAS vacías). Un número —EVA 0, edad— cuenta como dato, NO vacío.
+// Conservador a propósito: si tiene cualquier contenido real, devuelve false y ese campo SÍ se escribe.
+function _clinicoVacio(v){
+  if(v==null) return true;
+  if(typeof v==='number') return false;                 // 0 es dato
+  if(typeof v==='boolean') return v===false;            // false ~ sin marcar
+  if(typeof v==='string') return v.trim()==='';
+  if(Array.isArray(v)) return v.every(_clinicoVacio);
+  if(typeof v==='object'){
+    for(var k in v){ if(Object.prototype.hasOwnProperty.call(v,k) && !_clinicoVacio(v[k])) return false; }
+    return true;
+  }
+  return false;
+}
 function _sinUndefined(v){
   if(Array.isArray(v)) return v.map(function(x){ return _sinUndefined(x); });
   if(v && typeof v==='object' && (v.constructor===Object || v.constructor===undefined)){
