@@ -1811,6 +1811,21 @@ async function callAppsScriptPrivado(action, payload={}, opts={}){
       return {ok:false, error:'RED_ERROR', msg:'Verificación temporalmente no disponible', transitorio:true};
     }
     if(data && data.code===401){
+      // ── DISCRIMINADOR DE AUTORIZACIÓN (fuga de datos silenciosa · caso Jess) ──────────────
+      // Un 401 por "No autorizado" (el correo NO está dado de alta en el backend desplegado) NO se
+      // cura reintentando ni re-logueando: el token está VIVO y es válido, pero el SERVIDOR no
+      // reconoce ese correo. Antes caía en el retry y luego en RED_ERROR "transitorio" → los datos
+      // se guardaban SOLO en local y se reintentaban para siempre SIN avisar (toast amarillo "Sheets
+      // no confirmó", indistinguible de mala señal). Resultado: todo lo que la terapeuta llenaba se
+      // atoraba invisible en su equipo y en la nube salía en blanco. Ahora se detecta por el texto
+      // del error y se avisa FUERTE, con el correo exacto, para que se corrija de inmediato.
+      var _errBk = String((data && data.error) || '');
+      if(/no\s*autoriz/i.test(_errBk)){
+        var _mailNA = (_errBk.split(':')[1] || '').trim()
+          || ((typeof currentUser!=='undefined' && currentUser && currentUser.email) || '');
+        if(!opts.noBanner){ try{ if(typeof _mostrarBannerNoAutorizado==='function') _mostrarBannerNoAutorizado(_mailNA, _errBk); }catch(_){} }
+        return {ok:false, error:'NO_AUTORIZADO', detalle:_errBk, email:_mailNA};
+      }
       if(!opts._retry){
         _idTokenCache = null;   // invalida el cache para que el retry pida token nuevo
         return await callAppsScriptPrivado(action, payload, Object.assign({}, opts, {forceRefresh:true, _retry:true}));
@@ -4710,6 +4725,30 @@ function _mostrarBannerSesionCaducada(){
   if(btn) btn.onclick=function(){ try{ _ocultarBannerSesionCaducada(); }catch(_){} try{ doLogout(); }catch(_e){ try{ showScreen('screen-login',false); }catch(__){} } };
 }
 function _ocultarBannerSesionCaducada(){ var b=document.getElementById('sesion-caducada-banner'); if(b) b.remove(); }
+// ── CORREO NO AUTORIZADO EN EL BACKEND (durable) ─────────────────────────────────
+// Cuando el SERVIDOR (Apps Script) rechaza el correo con "No autorizado" —está vivo el token pero
+// ese correo no quedó dado de alta en el backend desplegado (o quedó con otra escritura)— TODO lo
+// que se guarde se queda solo en este equipo y en la nube sale en blanco. En vez de un toast
+// amarillo confundible con mala señal, se muestra un banner ROJO imposible de ignorar, con el correo
+// exacto, para que Carlos lo autorice/redespliegue. Los datos NO se pierden: quedan en cola local y
+// suben solos en cuanto el correo quede autorizado.
+function _mostrarBannerNoAutorizado(email, detalle){
+  if(document.getElementById('no-autorizado-banner')) return;
+  var b=document.createElement('div');
+  b.id='no-autorizado-banner';
+  b.style.cssText='position:fixed;left:0;right:0;bottom:0;z-index:100002;background:#7F1D1D;color:#fff;'
+    +'padding:12px 16px;padding-bottom:calc(12px + env(safe-area-inset-bottom,0px));display:flex;align-items:center;'
+    +'gap:12px;font-family:inherit;font-size:13.5px;box-shadow:0 -2px 12px rgba(0,0,0,.35)';
+  var _m = email ? (' (' + String(email) + ')') : '';
+  b.innerHTML='<span style="flex:1;line-height:1.4">🚫 <b>Tu correo'+_m+' no está autorizado en el servidor.</b> '
+    +'Tus datos NO se están guardando en la nube — quedan solo en este equipo. Toma captura y avísale a Carlos.</span>'
+    +'<button id="no-autorizado-btn" style="background:#fff;color:#7F1D1D;border:none;border-radius:10px;'
+    +'padding:9px 16px;font-weight:800;font-family:inherit;cursor:pointer;white-space:nowrap">Entendido</button>';
+  document.body.appendChild(b);
+  var btn=document.getElementById('no-autorizado-btn');
+  if(btn) btn.onclick=function(){ var x=document.getElementById('no-autorizado-banner'); if(x) x.remove(); };
+}
+function _ocultarBannerNoAutorizado(){ var b=document.getElementById('no-autorizado-banner'); if(b) b.remove(); }
 async function doLogout(){
   registrarAcceso('LOGOUT');
   try{ _detenerAutoLogout(); }catch(e){} // detener timer de inactividad
@@ -7906,6 +7945,23 @@ async function _diagnosticoEscritura(){
         out.push('LECTURA de servidor: ✅ OK (token autorizado)');
       } else { out.push('LECTURA de servidor: (sin conexión Firestore)'); }
     }catch(e){ out.push('LECTURA de servidor: ❌ ' + ((e&&(e.code||e.message))||'?')); }
+    // AUTORIZACIÓN EN EL BACKEND DE SHEETS (donde viven los pacientes ACTIVOS, no Firestore). Esta es
+    // la prueba que faltaba para el caso Jess: la lectura de Firestore puede pasar (reglas con .lower())
+    // mientras Apps Script RECHAZA el correo (no dado de alta en el backend desplegado) → todo activo
+    // se atora invisible. Se usa validarPermisoExportacion (liviana): si el token NO está autorizado
+    // devuelve NO_AUTORIZADO; si SÍ lo está devuelve ok (supervisor) o SIN_PERMISO (terapeuta) — ambos
+    // significan "correo autorizado". noBanner: es diagnóstico, no debe disparar el banner rojo.
+    try{
+      if(typeof callAppsScriptPrivado==='function'){
+        var _pa = await callAppsScriptPrivado('validarPermisoExportacion', {}, {noBanner:true});
+        if(_pa && _pa.ok){ out.push('ESCRITURA en Sheets: ✅ correo AUTORIZADO (supervisor)'); }
+        else if(_pa && _pa.error==='SIN_PERMISO'){ out.push('ESCRITURA en Sheets: ✅ correo AUTORIZADO (terapeuta)'); }
+        else if(_pa && _pa.error==='NO_AUTORIZADO'){ out.push('ESCRITURA en Sheets: ❌ CORREO NO AUTORIZADO EN EL SERVIDOR' + (_pa.email?(' — '+_pa.email):'') + '  ⟵ ESTA ES LA CAUSA'); }
+        else if(_pa && _pa.error==='AUTH_REQUIRED'){ out.push('ESCRITURA en Sheets: ❌ sesión no válida (AUTH_REQUIRED)'); }
+        else if(_pa && (_pa.error==='RED_ERROR'||_pa.transitorio)){ out.push('ESCRITURA en Sheets: (sin red / verificador ocupado — reintenta)'); }
+        else { out.push('ESCRITURA en Sheets: ' + JSON.stringify(_pa).slice(0,80)); }
+      }
+    }catch(e){ out.push('ESCRITURA en Sheets: ❌ ' + ((e&&(e.code||e.message))||'?')); }
     // COLAS ATORADAS + su ERROR REAL. Clave: si la LECTURA pasa (token autorizado) pero las notas
     // igual fallan, NO es identidad — es el contenido/regla de la escritura. Aquí sale el motivo exacto.
     try{
