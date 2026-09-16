@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net472</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <LangVersion>7.3</LangVersion>
+    <AssemblyName>MedidorSinergia3D</AssemblyName>
+    <RootNamespace>MedidorSinergia3D</RootNamespace>
+    <!-- Kinect v2 requiere arquitectura fija (no AnyCPU). x64 en laptops modernas. -->
+    <Platforms>x64</Platforms>
+    <PlatformTarget>x64</PlatformTarget>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- El SDK 2.0 de Kinect fija la variable de entorno KINECTSDK20_DIR al instalarse
+         (normalmente C:\Program Files\Microsoft SDKs\Kinect\v2.0_1409\). -->
+    <Reference Include="Microsoft.Kinect">
+      <HintPath>$(KINECTSDK20_DIR)Assemblies\Microsoft.Kinect.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
+  </ItemGroup>
+
+</Project>
