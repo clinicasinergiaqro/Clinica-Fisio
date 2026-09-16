@@ -18368,6 +18368,54 @@ function guardarAntecedentesCompleto(){
   }).catch(()=>{ showToast('⚠️ Sin conexión — guardado local','warning'); renderExpediente('historia'); });
 }
 
+// ── COACH DE ANAMNESIS (gratis, en el momento) ──────────────────────────────────
+// Al escribir el motivo, evalúa 7 ejes de un buen interrogatorio y avisa qué falta.
+// SOLO lee lo que la fisio está escribiendo; no guarda ni cambia datos (cero riesgo).
+// Refuerza los ejes que la auditoría clínica halló flojos: cómo es el dolor, qué lo
+// agrava/alivia, contexto (deporte/casa/trabajo) e irradiación. Detección por palabras
+// clave (primer filtro gratis); el botón ✨ IA (opcional, backend) llega en otra fase.
+var _COACH_ANAM_EJES = [
+  {lab:'Dónde duele', rx:/hombro|rodilla|tobillo|pie|cadera|espalda|columna|lumbar|cervical|dorsal|cuello|mano|mu[ñn]eca|codo|brazo|pierna|muslo|gemelo|pantorrilla|cabeza|mand[íi]bula|atm|dedo|tal[óo]n|planta|gl[úu]teo|ingle|isquio|cu[áa]driceps|tend[óo]n|menisco|ligamento|esc[áa]pula|antebrazo|clav[íi]cula|sacro|coxis|espinilla|lado (derech|izquierd)|derech|izquierd/i, hint:'en qué parte y de qué lado'},
+  {lab:'Cómo es el dolor', rx:/punzante|ard(or|e)|quem|opres|sordo|agud|corriente|hormigue|adormec|rigidez|tir[óo]n|lat(e|i)|pulsa|calambre|piquete|molest|puntada/i, hint:'punzante, ardoroso, sordo, tipo corriente…'},
+  {lab:'Mecanismo / cómo empezó', rx:/ca[íi]d|cay[óo]|golpe|torci|esguince|trauma|accidente|sobreuso|sobrecarga|repetiti|insidios|gradual|s[úu]bito|levant|carg|qx|cirug|posquir|fractura|jugando|entren|esfuerzo|mal movimiento|de la nada|inversi[óo]n|forzad|distensi|desgarr|contusi|luxaci|latigazo|mal gesto/i, hint:'trauma, sobreuso, cirugía, apareció solo…'},
+  {lab:'Desde cuándo', rx:/hace |d[íi]as|semana|mes(es)?|a[ñn]o|ayer|desde|cr[óo]nic|agud|reciente|evoluci/i, hint:'hace cuánto; ¿va y viene o constante?'},
+  {lab:'Qué lo agrava / alivia', rx:/agrav|empeora|al mover|al hacer|al realizar|flexi|extensi|rotaci|carg|corr(e|er)|camin|subir|bajar|escalera|salt|agach|sentad|alivia|mejora|reposo|esfuerzo|ma[ñn]ana|noche|nocturno|al tocar/i, hint:'qué movimiento o momento lo empeora/mejora'},
+  {lab:'Contexto (deporte/casa/trabajo)', rx:/deport|entren|f[úu]tbol|correr|gym|gimnasio|nataci|pilates|crossfit|trabaj|labor|oficina|computad|escritorio|casa|hogar|dormir|sue[ñn]o|manej|cargar|beb[ée]|hij[oa]|avdh|actividad|cotidian|escuela|vida diaria/i, hint:'cómo le afecta en deporte, casa o trabajo'},
+  {lab:'Irradiación / otros síntomas', rx:/irradia|se corre|hacia|baja por|sube por|hormigue|adormec|corriente|ci[áa]tic|parestesia|inflam|edema|chasquid|inestab|entumec/i, hint:'¿se corre a otro lado?, hormigueo, inflamación…'},
+];
+function _coachAnamEval(txt){
+  var s=String(txt||'').toLowerCase();
+  return _COACH_ANAM_EJES.map(function(e){ return {lab:e.lab, hint:e.hint, ok:e.rx.test(s)}; });
+}
+function _coachAnamHTMLFromText(txt){
+  var ejes=_coachAnamEval(txt);
+  var ok=ejes.filter(function(e){return e.ok;}).length, tot=ejes.length;
+  var pct=Math.round(100*ok/tot);
+  var color = ok>=6 ? '#2E7D52' : (ok>=4 ? '#B4780E' : '#B91C1C');
+  var rows=ejes.map(function(e){
+    var c=e.ok?'#2E7D52':'#B4780E';
+    return '<div style="display:flex;gap:8px;align-items:flex-start;padding:3px 0;font-size:12.5px;line-height:1.35">'
+      +'<span style="color:'+c+';font-weight:800;flex:0 0 auto">'+(e.ok?'✓':'○')+'</span>'
+      +'<span style="color:#1B2A44">'+e.lab
+      +(e.ok?'':' <span style="color:#8A93A6;font-weight:400">— '+e.hint+'</span>')+'</span></div>';
+  }).join('');
+  var faltan=ejes.filter(function(e){return !e.ok;});
+  var tip = faltan.length
+    ? '<div style="margin-top:8px;font-size:12px;color:#5A6478">💡 Falta: '+faltan.slice(0,3).map(function(e){return e.lab.toLowerCase();}).join(', ')+'.</div>'
+    : '<div style="margin-top:8px;font-size:12px;color:#2E7D52;font-weight:700">¡Anamnesis completa! 👏</div>';
+  return '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">'
+      +'<b style="font-size:12.5px;color:#1B3A6B">📋 Calidad de la anamnesis</b>'
+      +'<span style="font-weight:800;font-size:12.5px;color:'+color+'">'+ok+'/'+tot+' ejes</span></div>'
+    +'<div style="height:8px;background:#E7ECF3;border-radius:6px;overflow:hidden;margin-bottom:8px">'
+      +'<span style="display:block;height:100%;border-radius:6px;width:'+pct+'%;background:'+color+'"></span></div>'
+    +rows+tip;
+}
+function _coachAnamRender(){
+  var el=document.getElementById('coach-anamnesis'); if(!el) return;
+  function val(id){ var n=document.getElementById(id); return n?n.value:''; }
+  var txt=[val('ed-padecimiento'),val('ed-mecanismo'),val('ed-evolucion'),val('ed-estudios'),val('ed-dxmedico')].join(' ');
+  try{ el.innerHTML=_coachAnamHTMLFromText(txt); }catch(_){}
+}
 function editarHistoria(seccion){
   const p = currentPatient;
   const c = document.getElementById('content-expediente');
@@ -18448,11 +18496,12 @@ function editarHistoria(seccion){
     <div class="form-section">
       <div class="form-section-title">💬 Motivo de consulta</div>
       <div class="form-group">
-        <div class="form-field"><div class="form-label">Diagnóstico médico <span class="req">*</span></div><input class="form-input" type="text" id="ed-dxmedico" value="${escapeAttr_(p.motivo?.dxMedico||'')}"></div>
-        <div class="form-field"><div class="form-label">Padecimiento actual</div><textarea class="form-input" id="ed-padecimiento" style="min-height:80px">${escapeHTML(p.motivo?.padecimiento||'')}</textarea></div>
-        <div class="form-field"><div class="form-label">Mecanismo de lesión</div><input class="form-input" type="text" id="ed-mecanismo" value="${escapeAttr_(p.motivo?.mecanismo||'')}"></div>
-        <div class="form-field"><div class="form-label">Tiempo de evolución</div><input class="form-input" type="text" id="ed-evolucion" value="${escapeAttr_(p.motivo?.evolucion||'')}"></div>
-        <div class="form-field"><div class="form-label">Estudios de imagen y hallazgos</div><textarea class="form-input" id="ed-estudios" style="min-height:80px">${escapeHTML((p.motivo?.estudios||'')+(p.motivo?.hallazgos?' — '+p.motivo.hallazgos:''))}</textarea></div>
+        <div class="form-field"><div class="form-label">Diagnóstico médico <span class="req">*</span></div><input class="form-input" type="text" id="ed-dxmedico" oninput="_coachAnamRender()" value="${escapeAttr_(p.motivo?.dxMedico||'')}"></div>
+        <div class="form-field"><div class="form-label">Padecimiento actual</div><textarea class="form-input" id="ed-padecimiento" oninput="_coachAnamRender()" style="min-height:80px">${escapeHTML(p.motivo?.padecimiento||'')}</textarea></div>
+        <div class="form-field"><div class="form-label">Mecanismo de lesión</div><input class="form-input" type="text" id="ed-mecanismo" oninput="_coachAnamRender()" value="${escapeAttr_(p.motivo?.mecanismo||'')}"></div>
+        <div class="form-field"><div class="form-label">Tiempo de evolución</div><input class="form-input" type="text" id="ed-evolucion" oninput="_coachAnamRender()" value="${escapeAttr_(p.motivo?.evolucion||'')}"></div>
+        <div class="form-field"><div class="form-label">Estudios de imagen y hallazgos</div><textarea class="form-input" id="ed-estudios" oninput="_coachAnamRender()" style="min-height:80px">${escapeHTML((p.motivo?.estudios||'')+(p.motivo?.hallazgos?' — '+p.motivo.hallazgos:''))}</textarea></div>
+        <div id="coach-anamnesis" style="margin-top:4px;border:1px solid #E2E7EF;border-radius:12px;padding:12px 14px;background:#F7F9FC">${_coachAnamHTMLFromText((p.motivo?.padecimiento||'')+' '+(p.motivo?.mecanismo||'')+' '+(p.motivo?.evolucion||'')+' '+(p.motivo?.estudios||'')+' '+(p.motivo?.dxMedico||''))}</div>
       </div>
     </div>`;
   }
