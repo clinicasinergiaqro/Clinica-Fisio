@@ -28,12 +28,12 @@ Hacerlo POR FASES y PROBANDO cada una (una migración a las prisas ya rompió la
 - Fase 3: Firestore principal; Sheets pasa a respaldo/export.
 Probar en el equipo de Jess antes de confiar cada fase.
 
-## Otras áreas de mejora pendientes (no urgentes)
-- Endurecer la cola de activos `COLA_SYNC` como la de históricos (tope, detección de error permanente, aislamiento de corrupción). Alto valor, bajo riesgo.
-- Respaldo local en IndexedDB (hoy solo `localStorage`, que iOS puede desalojar).
-- Lista maestra ÚNICA de correos autorizados (hoy duplicada en front, firestore.rules, storage.rules y `ROLES_BACKEND`) + checklist de despliegue (backend Apps Script y reglas se publican a mano → se desfasan).
-- Alerta proactiva cuando un equipo tiene datos atorados > X horas (tablero de salud de sync ya existe).
-- Actualización del PWA en iOS ("no se puede actualizar"): indicador de versión visible + mecanismo de refresh más confiable.
+## Otras áreas de mejora pendientes (orden sugerido)
+1. **Endurecer la cola de activos `COLA_SYNC`** como la de históricos (tope, detección de error permanente, aislamiento de corrupción). Alto valor, bajo riesgo. Hacer JUNTO con la Fase 1 del #3 (ambas son de guardado).
+2. **Respaldo local en IndexedDB** (hoy solo `localStorage`, que iOS puede desalojar).
+3. **Lista maestra ÚNICA de correos + checklist de despliegue** (hoy el correo autorizado está en 4 lados: front `ROLES_POR_CORREO`, `config/firestore.rules`, `config/storage.rules`, `Codigo.gs ROLES_BACKEND`; backend y reglas se publican a mano → se desfasan). → checklist en `docs/CHECKLIST_DESPLIEGUE.md`.
+4. **Alerta proactiva** cuando un equipo tiene datos atorados > X horas (tablero de salud de sync ya existe).
+5. **Actualización del PWA en iOS** ("no se puede actualizar"): indicador de versión visible + refresh más confiable. Toca el service worker → hacerla como pieza propia.
 
 ## Respaldos (estado: COMPLETO — 2026-09-16)
 - Sheets: `respaldoDiarioPacientes` (Apps Script, 03:00) → JSON diario en Drive `Respaldos_Clinica` (retención 180) + copia externa por correo a lftaranda.
