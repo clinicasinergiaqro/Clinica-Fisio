@@ -2487,8 +2487,11 @@ function loadDB(k){return loadLocal(k);}
 let SYNC_EN_CURSO = false;
 
 function getColaSync(){
-  try{ return JSON.parse(localStorage.getItem('COLA_SYNC')||'[]'); }
-  catch(e){ return []; }
+  // BLINDAJE (aislar corrupción): si el JSON de la cola queda corrupto, antes se devolvía []
+  // en silencio → los ids atorados se perdían sin rastro. Ahora se preserva el crudo en una
+  // clave _CORRUPTO_ (como las colas de históricos) para inspección/recuperación, y se avisa.
+  try{ var a = JSON.parse(localStorage.getItem('COLA_SYNC')||'[]'); return Array.isArray(a) ? a : []; }
+  catch(e){ try{ if(typeof _colaCorrupta==='function') _colaCorrupta('COLA_SYNC', e); }catch(_){} return []; }
 }
 function setColaSync(arr){
   try{ localStorage.setItem('COLA_SYNC', JSON.stringify(arr||[])); }catch(e){}
@@ -2498,6 +2501,14 @@ function encolarSync(id){
   if(!id) return;
   const cola = getColaSync();
   if(!cola.includes(id)){ cola.push(id); setColaSync(cola); }
+  // BLINDAJE (cola anormalmente grande): si se acumulan muchos cambios sin subir, es señal de un
+  // problema sistémico (p.ej. el backend rechaza a esta cuenta y NADA sube), no de mala señal
+  // pasajera. Avisar FUERTE en vez de acumular en silencio. Se dispara a los 300 y luego cada 100.
+  try{
+    if(cola.length===300 || (cola.length>300 && cola.length%100===0)){
+      if(typeof showToastCritico_==='function') showToastCritico_('⚠️ '+cola.length+' cambios sin subir en este equipo. Algo impide guardar en la nube — avísale a Carlos y NO limpies ni reinstales la app.');
+    }
+  }catch(_){}
   try{ clearTimeout(window._toastColaSyncTimer);
     window._toastColaSyncTimer=setTimeout(()=>{ const n=getColaSync().length;
       if(n>0) showToast(`📴 ${n} cambio${n!==1?'s':''} pendiente${n!==1?'s':''} de sincronizar`,'warning'); },300);
@@ -3221,11 +3232,20 @@ async function sincronizarPendientes(){
   const restante = getColaSync();
   if(restante.length>0){
     // Quedaron pendientes: avisar y reintentar en 30s
+    window._syncFallosSeguidos = (window._syncFallosSeguidos||0) + 1;
     const el = document.getElementById('sync-indicator');
     if(el){ el.className='sync-indicator err'; el.textContent=`⚠️ ${restante.length} sin sincronizar — reintentando…`; el.style.display='block'; }
+    // BLINDAJE (no fallar en silencio): si tras VARIOS intentos seguidos la cola NO baja, ya no es
+    // "mala señal pasajera" — casi seguro el servidor rechaza a esta cuenta. Escalar de la barrita
+    // discreta a un aviso FUERTE. No cambia qué se reintenta (los datos siguen a salvo y reintentando);
+    // solo lo vuelve visible. Se dispara al 5º fallo seguido y luego se recuerda cada ~10 min.
+    if(window._syncFallosSeguidos===5 || (window._syncFallosSeguidos>5 && window._syncFallosSeguidos%20===0)){
+      try{ if(typeof showToastCritico_==='function') showToastCritico_('🚨 Tus cambios llevan rato sin subir a la nube ('+restante.length+' pendientes). Abre la lupa 🔎 → "Diagnóstico de escritura" o avísale a Carlos. NO limpies ni reinstales la app.'); }catch(_){}
+    }
     clearTimeout(window._syncRetryTimer);
     window._syncRetryTimer = setTimeout(sincronizarPendientes, 30000);
   } else {
+    window._syncFallosSeguidos = 0;   // la cola bajó a 0 → reiniciar el contador de fallos seguidos
     try{ localStorage.setItem('sinergia_ultimaSyncOk', new Date().toLocaleString('es-MX')); }catch(e){}
     actualizarIndicadorSync();
   }
