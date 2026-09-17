@@ -1231,7 +1231,7 @@ select.form-input{font-size:14px}
 .sup-row:last-child{border-bottom:none}
 
 /* TOAST */
-.toast{position:fixed;bottom:90px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--gray-800);color:var(--white);padding:12px 20px;border-radius:20px;font-size:13px;font-weight:600;opacity:0;transition:all .3s;z-index:200;white-space:nowrap;pointer-events:none}
+.toast{position:fixed;bottom:90px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--gray-800);color:var(--white);padding:12px 20px;border-radius:20px;font-size:13px;font-weight:600;opacity:0;transition:all .3s;z-index:200;white-space:normal;max-width:min(92vw,520px);width:max-content;text-align:center;line-height:1.4;pointer-events:none}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 .toast.success{background:var(--green)}
 .toast.warning{background:#b45309;color:#fff}
@@ -9024,6 +9024,8 @@ function _pacHistoricosHint(){
 }
 // [TASK1-LAZY] La terapeuta pide traer históricos: fija el flag de sesión y repinta (dispara la carga).
 function _pacIncluirHistoricos(){ window._pacQuiereHistoricos=true; try{ renderPacientesLista(); }catch(_e){} }
+// CONEXIÓN CLAUDE — alterna el filtro "solo expedientes con sugerencia" desde el banner verde.
+function _toggleSoloSug(){ window._pacSoloSug=!window._pacSoloSug; renderPacientesLista(); }
 function renderPacientesLista(fuenteLista){
   const cont=document.getElementById('pac-lista'); if(!cont) return;
   if(!currentUser){ cont.innerHTML=''; return; }
@@ -9052,6 +9054,10 @@ function renderPacientesLista(fuenteLista){
   if(filtro==='hoy') list=list.filter(p=>p.date===todayISO);
   if(filtro==='precaucion') list=list.filter(p=>p.seguridadClinica?.tienePrecaucion);
   if(filtro==='sin-soap'){ const _hoyC=_diaCanon(todayFmt()); list=list.filter(p=>{ const s=_soapVivas(p); return !s.some(x=>{const c=x&&_diaCanon(x.fecha);return c&&c===_hoyC;}); }); } // [GRUPO-A #12] día canónico + [BORRADO-NOTAS] VISTA
+  // CONEXIÓN CLAUDE — "solo con sugerencia": _nSug se cuenta ANTES de filtrar; el banner (clicable) lo activa.
+  const _tieneSug=p=>p&&typeof p.sugerenciaIA==='string'&&p.sugerenciaIA.trim();
+  const _nSug=list.filter(_tieneSug).length;
+  if(window._pacSoloSug) list=list.filter(_tieneSug);
 
   // [TASK1-LAZY] Estado de la carga del índice y si la base mostrada YA es la vista fusionada (con históricos).
   const _cargandoHist = !!window._FST_listaCargando;
@@ -9059,6 +9065,11 @@ function renderPacientesLista(fuenteLista){
   const _baseEsFusion = FST_LISTA_ACTIVA && baseLista===window._FST_listaPacientesActual;
   let html;
   if(!list.length){
+    // CONEXIÓN CLAUDE — vacío con el filtro "solo sugerencia" activo: dar salida clara.
+    if(window._pacSoloSug){
+      html=`<div class="empty-state"><div class="emoji">💡</div><p>No hay expedientes con sugerencia aquí.</p><button onclick="_toggleSoloSug()" class="chip-quick" style="margin-top:10px;padding:9px 14px;font-weight:700">✕ Quitar filtro</button></div>`;
+      cont.innerHTML=html; _pacSyncChips(); return;
+    }
     // [TASK1-LAZY] NUNCA "sin resultados" mientras el índice carga con búsqueda activa: sería un
     // vacío-mentiroso (la terapeuta concluiría que el paciente no existe). Estado explícito.
     if(_cargandoHist && _qActivo){
@@ -9075,10 +9086,10 @@ function renderPacientesLista(fuenteLista){
       ? `Pacientes de la clínica (${list.length})`
       : `${list.length} paciente${list.length!==1?'s':''} activo${list.length!==1?'s':''}`;
     html=`<div style="font-size:11px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:.7px;margin-bottom:8px">${_encabezado}</div>`;
-    // CONEXIÓN CLAUDE — contador de sugerencias pendientes (💡) sobre la lista mostrada.
-    const _nSug=list.filter(p=>p&&typeof p.sugerenciaIA==='string'&&p.sugerenciaIA.trim()).length;
-    if(_nSug>0){
-      html+=`<div style="margin-bottom:10px;padding:8px 11px;background:#EAF5EE;border:1px solid #BFE0CC;border-radius:10px;font-size:12px;font-weight:700;color:#1E6B45">💡 ${_nSug} expediente${_nSug!==1?'s':''} con sugerencia por revisar</div>`;
+    // CONEXIÓN CLAUDE — banner CLICABLE: filtra la lista a solo expedientes con sugerencia (toggle).
+    if(_nSug>0 || window._pacSoloSug){
+      const _on=!!window._pacSoloSug;
+      html+=`<button onclick="_toggleSoloSug()" style="width:100%;text-align:left;margin-bottom:10px;padding:9px 12px;border-radius:10px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;border:1px solid ${_on?'#2E7D52':'#BFE0CC'};background:${_on?'#2E7D52':'#EAF5EE'};color:${_on?'#fff':'#1E6B45'}">💡 ${_nSug} expediente${_nSug!==1?'s':''} con sugerencia por revisar ${_on?'· ✕ quitar filtro':'· toca para ver solo estos'}</button>`;
     }
     // [TASK1-LAZY] Acción para traer históricos bajo demanda. El número SOLO si viene del caché
     // (sessionStorage) y CON su edad; si no hay caché, sin cifra — no fabricar un número indefendible.
