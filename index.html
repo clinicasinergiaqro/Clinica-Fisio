@@ -2163,6 +2163,9 @@ async function saveDB(k, v, opts){
       inasistencias: Array.isArray(p.inasistencias)?p.inasistencias:[],
       consentimientoImagen: p.consentimientoImagen||{aceptado:false,fecha:null,hora:null,alcance:'',observaciones:''},
       consentimientoWhatsApp: p.consentimientoWhatsApp||{aceptado:false,fecha:null,hora:null,telefono:'',aceptaRecordatorios:false,aceptaEjercicios:false,observaciones:''},
+      // CONEXIÓN CLAUDE: sugerencia de mejora de la anamnesis (columna sugerenciaIA del Sheet). Viaja de
+      // ida y vuelta para que persista y para que "Descartar"/"Aplicar" puedan limpiarla (texto '').
+      sugerenciaIA: (typeof p.sugerenciaIA==='string' ? p.sugerenciaIA : ''),
     };
 
     // HISTORIAL CLÍNICO COMPLETO — nunca se trunca.
@@ -8951,6 +8954,11 @@ function _pacCardHTML(p, q, abrirFn){
   const soapAtrasado=!String(p.name||'').startsWith('TEST_QA_')&&necesitaAlertaSoapSemanal(p)&&_soapVivas(p).length>0;
   const esMio=p.terapeuta===currentUser.name;
   const badge=inc?`<span class="badge badge-alert" style="font-size:10px">⚠</span>`:!hasConsent?`<span class="badge badge-pending" style="font-size:10px">📋</span>`:soapAtrasado?`<span class="badge badge-alert" style="font-size:9px;background:#FEF3C7;color:#92400E">⚠️ +7d</span>`:'';
+  // CONEXIÓN CLAUDE — marca persistente en la lista: 💡 sugerencia por revisar (o ⚠️ recapturar).
+  const _sugTxt=(typeof p.sugerenciaIA==='string')?p.sugerenciaIA.trim():'';
+  const _sugChip=_sugTxt?(_sugTxt.indexOf('RECAPTURAR')>=0
+    ? `<div style="margin-top:5px;font-size:10.5px;font-weight:800;color:#8A5A08;background:#FDF4E3;border:1px solid #F0D9AB;border-radius:8px;padding:4px 8px;display:inline-block">⚠️ Recapturar anamnesis</div>`
+    : `<div style="margin-top:5px;font-size:10.5px;font-weight:800;color:#1E6B45;background:#EAF5EE;border:1px solid #BFE0CC;border-radius:8px;padding:4px 8px;display:inline-block">💡 Sugerencia por revisar</div>`):'';
   return `<div class="patient-card" data-pid="${escapeAttr_(p.id)}" onclick="${abrirFn}(this.dataset.pid)">
         <div class="patient-avatar">${initials(p.name)}</div>
         <div class="patient-info">
@@ -8964,6 +8972,7 @@ function _pacCardHTML(p, q, abrirFn){
           <div class="patient-meta" style="margin-top:3px;font-size:11px;color:#5A6478;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:200px">${escapeHTML(typeof p.dx==='string'?p.dx.split(',')[0]:(p.dx?.dxClinico||p.dx?.dxMedico||'Sin diagnóstico'))}</div>
           ${(typeof _sinRespaldoTiene==='function'&&_sinRespaldoTiene(p.id))?`<div style="margin-top:5px;font-size:10.5px;font-weight:800;color:#7C2D12;background:#FEF2F2;border:1px solid #FCA5A5;border-radius:8px;padding:4px 8px;display:inline-block">🆘 Sin respaldo en la nube — abre con señal</div>`:''}
           ${Array.isArray(p.etiquetas)&&p.etiquetas.length?`<div style="display:flex;flex-wrap:wrap;gap:3px;margin-top:4px">${p.etiquetas.slice(0,3).map(e=>`<span style="font-size:9px;font-weight:700;background:#E8EEF7;color:var(--navy);padding:2px 7px;border-radius:8px">${escapeHTML(e)}</span>`).join('')}</div>`:''}
+          ${_sugChip}
           <button data-pid="${escapeAttr_(p.id)}" onclick="event.stopPropagation();nuevaSesionRapida(this.dataset.pid)" style="font-size:11px;padding:4px 10px;border-radius:12px;background:var(--navy);color:white;border:none;cursor:pointer;margin-top:6px;font-family:inherit;font-weight:700">➕ Sesión</button>
         </div>
         ${badge}
@@ -9066,6 +9075,11 @@ function renderPacientesLista(fuenteLista){
       ? `Pacientes de la clínica (${list.length})`
       : `${list.length} paciente${list.length!==1?'s':''} activo${list.length!==1?'s':''}`;
     html=`<div style="font-size:11px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:.7px;margin-bottom:8px">${_encabezado}</div>`;
+    // CONEXIÓN CLAUDE — contador de sugerencias pendientes (💡) sobre la lista mostrada.
+    const _nSug=list.filter(p=>p&&typeof p.sugerenciaIA==='string'&&p.sugerenciaIA.trim()).length;
+    if(_nSug>0){
+      html+=`<div style="margin-bottom:10px;padding:8px 11px;background:#EAF5EE;border:1px solid #BFE0CC;border-radius:10px;font-size:12px;font-weight:700;color:#1E6B45">💡 ${_nSug} expediente${_nSug!==1?'s':''} con sugerencia por revisar</div>`;
+    }
     // [TASK1-LAZY] Acción para traer históricos bajo demanda. El número SOLO si viene del caché
     // (sessionStorage) y CON su edad; si no hay caché, sin cifra — no fabricar un número indefendible.
     if(FST_LISTA_ACTIVA && !_baseEsFusion && !_cargandoHist){
@@ -18416,6 +18430,42 @@ function _coachAnamRender(){
   var txt=[val('ed-padecimiento'),val('ed-mecanismo'),val('ed-evolucion'),val('ed-estudios'),val('ed-dxmedico')].join(' ');
   try{ el.innerHTML=_coachAnamHTMLFromText(txt); }catch(_){}
 }
+// ── CONEXIÓN CLAUDE — cajita de sugerencia dentro del editor de Motivo ──
+// Muestra p.sugerenciaIA (💡 sugerencia o ⚠️ recapturar) como PROPUESTA para revisar. Nunca escribe
+// solo: "Aplicar" copia el cuerpo al Padecimiento (el fisio lo edita y da Guardar cambios); "Descartar"
+// limpia la sugerencia. La marca persiste en el expediente hasta que la apliquen o descarten.
+function _sugBoxHTML(p){
+  var s=(p&&typeof p.sugerenciaIA==='string')?p.sugerenciaIA.trim():'';
+  if(!s) return '';
+  var rec=s.indexOf('RECAPTURAR')>=0;
+  var col=rec?'#B4780E':'#2E7D52', bg=rec?'#FDF4E3':'#EEF7F1', ln=rec?'#F0D9AB':'#C4E2CE';
+  var ttl=rec?'⚠️ Recapturar (sugerido por Claude)':'💡 Sugerencia de Claude';
+  return '<div id="sug-box" style="margin-top:10px;border:1px solid '+ln+';background:'+bg+';border-radius:12px;padding:12px 14px">'
+    +'<div style="display:flex;align-items:center;gap:7px;margin-bottom:6px"><span style="font-size:13px;font-weight:700;color:'+col+'">'+ttl+'</span>'
+    +'<span style="margin-left:auto;font-size:11px;color:#5A6478">para revisar</span></div>'
+    +'<div style="font-size:13px;line-height:1.55;white-space:pre-wrap;color:#1B3A6B">'+escapeHTML(s)+'</div>'
+    +'<div style="display:flex;gap:8px;margin-top:11px;flex-wrap:wrap">'
+    +(rec?'':'<button onclick="_sugAplicar()" style="background:'+col+';color:#fff;border:none;border-radius:9px;padding:8px 13px;font-weight:700;font-size:13px;cursor:pointer;font-family:inherit">✓ Aplicar al padecimiento</button>')
+    +'<button onclick="_sugDescartar()" style="background:transparent;border:1px solid #D6DEEA;color:#5A6478;border-radius:9px;padding:8px 13px;font-size:13px;cursor:pointer;font-family:inherit">Descartar</button>'
+    +'</div></div>';
+}
+function _sugAplicar(){
+  var p=currentPatient; if(!p) return;
+  var s=(typeof p.sugerenciaIA==='string')?p.sugerenciaIA.trim():''; if(!s) return;
+  var cuerpo=s.replace(/\n?— Texto original:[\s\S]*$/,'').trim();   // quitar la cola (ya es lo que escribió el fisio)
+  var ta=document.getElementById('ed-padecimiento');
+  if(ta){ var act=ta.value.trim(); ta.value=act?(act+'\n\n'+cuerpo):cuerpo; try{ _coachAnamRender(); }catch(_){} }
+  p._sugAplicada=true;   // se limpia sugerenciaIA al dar "Guardar cambios" del motivo
+  var box=document.getElementById('sug-box'); if(box) box.remove();
+  showToast('Copiada al padecimiento — edítala y dale “Guardar cambios”','success');
+}
+function _sugDescartar(){
+  var p=currentPatient; if(!p) return;
+  p.sugerenciaIA=''; delete p._sugAplicada;
+  var box=document.getElementById('sug-box'); if(box) box.remove();
+  try{ saveDB('pts',[p],{camposHist:['sugerenciaIA']}); }catch(_){}
+  showToast('Sugerencia descartada','');
+}
 function editarHistoria(seccion){
   const p = currentPatient;
   const c = document.getElementById('content-expediente');
@@ -18502,6 +18552,7 @@ function editarHistoria(seccion){
         <div class="form-field"><div class="form-label">Tiempo de evolución</div><input class="form-input" type="text" id="ed-evolucion" oninput="_coachAnamRender()" value="${escapeAttr_(p.motivo?.evolucion||'')}"></div>
         <div class="form-field"><div class="form-label">Estudios de imagen y hallazgos</div><textarea class="form-input" id="ed-estudios" oninput="_coachAnamRender()" style="min-height:80px">${escapeHTML((p.motivo?.estudios||'')+(p.motivo?.hallazgos?' — '+p.motivo.hallazgos:''))}</textarea></div>
         <div id="coach-anamnesis" style="margin-top:4px;border:1px solid #E2E7EF;border-radius:12px;padding:12px 14px;background:#F7F9FC">${_coachAnamHTMLFromText((p.motivo?.padecimiento||'')+' '+(p.motivo?.mecanismo||'')+' '+(p.motivo?.evolucion||'')+' '+(p.motivo?.estudios||'')+' '+(p.motivo?.dxMedico||''))}</div>
+        ${_sugBoxHTML(p)}
       </div>
     </div>`;
   }
@@ -18679,6 +18730,8 @@ function guardarEdicionHistoria(seccion, tabRetorno){
     dxfuncional:['dxFuncional','planTto']
   };
   var _camposHistSec = (_camposSec[seccion]||[]).concat(['fechaActualizacion','ultimoUsuario','historialCambios']);
+  // CONEXIÓN CLAUDE: si aplicaron la sugerencia al padecimiento, se consume (limpia) al guardar el motivo.
+  if(p._sugAplicada){ p.sugerenciaIA=''; delete p._sugAplicada; if(_camposHistSec.indexOf('sugerenciaIA')===-1) _camposHistSec.push('sugerenciaIA'); }
   saveDB('pts', [p], {camposHist:_camposHistSec}).then(res => {
     if(res && res.ok){
       showToast('✅ Cambios guardados — ' + fechaHora, 'success');
