@@ -18469,7 +18469,7 @@ function _sugBoxHTML(p){
   if(!s) return '';
   var rec=s.indexOf('RECAPTURAR')>=0;
   var col=rec?'#B4780E':'#2E7D52', bg=rec?'#FDF4E3':'#EEF7F1', ln=rec?'#F0D9AB':'#C4E2CE';
-  var ttl=rec?'⚠️ Recapturar (sugerido por Claude)':'💡 Sugerencia de Claude';
+  var ttl=rec?'⚠️ Recapturar (sugerido por Carlos)':'💡 Sugerencia de Carlos';
   return '<div id="sug-box" style="margin-top:10px;border:1px solid '+ln+';background:'+bg+';border-radius:12px;padding:12px 14px">'
     +'<div style="display:flex;align-items:center;gap:7px;margin-bottom:6px"><span style="font-size:13px;font-weight:700;color:'+col+'">'+ttl+'</span>'
     +'<span style="margin-left:auto;font-size:11px;color:#5A6478">para revisar</span></div>'
@@ -18502,7 +18502,7 @@ function _sugBoxHTMLRead(p){
   if(!s) return '';
   var rec=s.indexOf('RECAPTURAR')>=0;
   var col=rec?'#B4780E':'#1E6B45', bg=rec?'#FDF4E3':'#EEF7F1', ln=rec?'#F0D9AB':'#C4E2CE';
-  var ttl=rec?'⚠️ Recapturar anamnesis (Claude)':'💡 Sugerencia de Claude para la anamnesis';
+  var ttl=rec?'⚠️ Recapturar anamnesis (Carlos)':'💡 Sugerencia de Carlos para la anamnesis';
   return '<div class="section-card" style="border:1.5px solid '+ln+';background:'+bg+';margin-bottom:12px">'
     +'<div style="padding:12px 14px">'
     +'<div style="display:flex;align-items:center;gap:7px;margin-bottom:7px"><span style="font-size:14px;font-weight:800;color:'+col+'">'+ttl+'</span><span style="margin-left:auto;font-size:11px;color:#5A6478">para revisar</span></div>'
