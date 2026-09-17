@@ -9663,6 +9663,8 @@ function renderExpediente(tab='historia'){
         <button onclick="abrirNuevoMotivoConsulta()" style="width:100%;background:transparent;color:var(--navy);border:1.5px solid var(--navy);border-radius:var(--radius);padding:11px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">➕ Nuevo motivo de consulta</button>
       </div>
     </div>`;
+    // CONEXIÓN CLAUDE — sugerencia VISIBLE en Historia, justo bajo el motivo activo.
+    html+=_sugBoxHTMLRead(p);
     if(Array.isArray(p.motivosAnteriores)&&p.motivosAnteriores.length>0){
       const _epSoaps=_soapVivas(p);   // [BORRADO-NOTAS] VISTA (conteo de sesiones por episodio)
       html+=`
@@ -18493,6 +18495,22 @@ function _sugDescartar(){
   var box=document.getElementById('sug-box'); if(box) box.remove();
   try{ saveDB('pts',[p],{camposHist:['sugerenciaIA']}); }catch(_){}
   showToast('Sugerencia descartada','');
+}
+// Versión VISIBLE en la pestaña Historia (no en el editor): muestra la sugerencia y lleva a completarla.
+function _sugBoxHTMLRead(p){
+  var s=(p&&typeof p.sugerenciaIA==='string')?p.sugerenciaIA.trim():'';
+  if(!s) return '';
+  var rec=s.indexOf('RECAPTURAR')>=0;
+  var col=rec?'#B4780E':'#1E6B45', bg=rec?'#FDF4E3':'#EEF7F1', ln=rec?'#F0D9AB':'#C4E2CE';
+  var ttl=rec?'⚠️ Recapturar anamnesis (Claude)':'💡 Sugerencia de Claude para la anamnesis';
+  return '<div class="section-card" style="border:1.5px solid '+ln+';background:'+bg+';margin-bottom:12px">'
+    +'<div style="padding:12px 14px">'
+    +'<div style="display:flex;align-items:center;gap:7px;margin-bottom:7px"><span style="font-size:14px;font-weight:800;color:'+col+'">'+ttl+'</span><span style="margin-left:auto;font-size:11px;color:#5A6478">para revisar</span></div>'
+    +'<div style="font-size:13.5px;line-height:1.55;white-space:pre-wrap;color:#1B3A6B">'+escapeHTML(s)+'</div>'
+    +'<div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">'
+    +'<button onclick="editarHistoria(\'motivo\')" style="flex:1;min-width:160px;background:'+(rec?'#B4780E':'#1B3A6B')+';color:#fff;border:none;border-radius:12px;padding:11px;font-weight:800;font-size:14px;cursor:pointer;font-family:inherit">✏️ Completar anamnesis</button>'
+    +'<button onclick="_sugDescartar()" style="background:transparent;border:1.5px solid #D6DEEA;color:#5A6478;border-radius:12px;padding:11px 16px;font-size:14px;cursor:pointer;font-family:inherit">Descartar</button>'
+    +'</div></div></div>';
 }
 function editarHistoria(seccion){
   const p = currentPatient;
