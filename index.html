@@ -4854,7 +4854,7 @@ function renderAgenda(){
     <div class="session-count">Google Calendar</div></div>`;
   // CONEXIÓN CLAUDE — aviso PROMINENTE al abrir la app: expedientes con sugerencia por revisar.
   // Cuenta sobre TODOS los activos (no solo los de hoy) para que no se les olvide; toca → lista filtrada.
-  const _nSugAg=(Array.isArray(patientsDB)?patientsDB:[]).filter(p=>p&&!_activoEliminado(p.id)&&typeof p.sugerenciaIA==='string'&&p.sugerenciaIA.trim()).length;
+  const _nSugAg=(Array.isArray(patientsDB)?patientsDB:[]).filter(p=>p&&!_activoEliminado(p.id)&&_sugVisiblePara(p)).length;
   if(_nSugAg>0){
     html+=`<div onclick="_irASugerencias()" style="margin-bottom:12px;padding:15px 16px;border-radius:16px;background:linear-gradient(135deg,#EAF5EE,#DCF0E3);border:1.5px solid #BFE0CC;cursor:pointer;display:flex;align-items:center;gap:13px;box-shadow:0 2px 10px rgba(46,125,82,.12)">
       <div style="font-size:30px;line-height:1">💡</div>
@@ -8972,7 +8972,7 @@ function _pacCardHTML(p, q, abrirFn){
   const esMio=p.terapeuta===currentUser.name;
   const badge=inc?`<span class="badge badge-alert" style="font-size:10px">⚠</span>`:!hasConsent?`<span class="badge badge-pending" style="font-size:10px">📋</span>`:soapAtrasado?`<span class="badge badge-alert" style="font-size:9px;background:#FEF3C7;color:#92400E">⚠️ +7d</span>`:'';
   // CONEXIÓN CLAUDE — marca persistente en la lista: 💡 sugerencia por revisar (o ⚠️ recapturar).
-  const _sugTxt=(typeof p.sugerenciaIA==='string')?p.sugerenciaIA.trim():'';
+  const _sugTxt=_sugVisiblePara(p)?p.sugerenciaIA.trim():'';
   const _sugChip=_sugTxt?(_sugTxt.indexOf('RECAPTURAR')>=0
     ? `<div style="margin-top:5px;font-size:10.5px;font-weight:800;color:#8A5A08;background:#FDF4E3;border:1px solid #F0D9AB;border-radius:8px;padding:4px 8px;display:inline-block">⚠️ Recapturar anamnesis</div>`
     : `<div style="margin-top:5px;font-size:10.5px;font-weight:800;color:#1E6B45;background:#EAF5EE;border:1px solid #BFE0CC;border-radius:8px;padding:4px 8px;display:inline-block">💡 Sugerencia por revisar</div>`):'';
@@ -9072,7 +9072,7 @@ function renderPacientesLista(fuenteLista){
   if(filtro==='precaucion') list=list.filter(p=>p.seguridadClinica?.tienePrecaucion);
   if(filtro==='sin-soap'){ const _hoyC=_diaCanon(todayFmt()); list=list.filter(p=>{ const s=_soapVivas(p); return !s.some(x=>{const c=x&&_diaCanon(x.fecha);return c&&c===_hoyC;}); }); } // [GRUPO-A #12] día canónico + [BORRADO-NOTAS] VISTA
   // CONEXIÓN CLAUDE — "solo con sugerencia": _nSug se cuenta ANTES de filtrar; el banner (clicable) lo activa.
-  const _tieneSug=p=>p&&typeof p.sugerenciaIA==='string'&&p.sugerenciaIA.trim();
+  const _tieneSug=p=>_sugVisiblePara(p);
   const _nSug=list.filter(_tieneSug).length;
   if(window._pacSoloSug) list=list.filter(_tieneSug);
 
@@ -18471,11 +18471,24 @@ function _coachAnamRender(){
   }catch(_){}
   try{ el.innerHTML=_coachAnamHTMLFromText(txt); }catch(_){}
 }
+// CONEXIÓN CLAUDE — ¿la sugerencia de ESTE paciente es visible para quien entró?
+// Regla: el supervisor ve TODAS; cada fisio ve SOLO las de sus pacientes (titular o de seguimiento).
+// Requiere además que el paciente tenga sugerencia (sugerenciaIA con texto).
+function _sugVisiblePara(p){
+  try{
+    if(!p || typeof p.sugerenciaIA!=='string' || !p.sugerenciaIA.trim()) return false;
+    var esSup = (typeof esSupervisorUI==='function' && esSupervisorUI()) || (currentUser && currentUser.role==='supervisor');
+    if(esSup) return true;
+    var yo = currentUser && currentUser.name;
+    return !!yo && (p.terapeuta===yo || p.terapeutaSeguimiento===yo);
+  }catch(_){ return false; }
+}
 // ── CONEXIÓN CLAUDE — cajita de sugerencia dentro del editor de Motivo ──
 // Muestra p.sugerenciaIA (💡 sugerencia o ⚠️ recapturar) como PROPUESTA para revisar. Nunca escribe
 // solo: "Aplicar" copia el cuerpo al Padecimiento (el fisio lo edita y da Guardar cambios); "Descartar"
 // limpia la sugerencia. La marca persiste en el expediente hasta que la apliquen o descarten.
 function _sugBoxHTML(p){
+  if(!_sugVisiblePara(p)) return '';
   var s=(p&&typeof p.sugerenciaIA==='string')?p.sugerenciaIA.trim():'';
   if(!s) return '';
   var rec=s.indexOf('RECAPTURAR')>=0;
@@ -18511,6 +18524,7 @@ function _sugDescartar(){
 }
 // Versión VISIBLE en la pestaña Historia (no en el editor): muestra la sugerencia y lleva a completarla.
 function _sugBoxHTMLRead(p){
+  if(!_sugVisiblePara(p)) return '';
   var s=(p&&typeof p.sugerenciaIA==='string')?p.sugerenciaIA.trim():'';
   if(!s) return '';
   var rec=s.indexOf('RECAPTURAR')>=0;
