@@ -18458,6 +18458,17 @@ function _coachAnamRender(){
   var el=document.getElementById('coach-anamnesis'); if(!el) return;
   function val(id){ var n=document.getElementById(id); return n?n.value:''; }
   var txt=[val('ed-padecimiento'),val('ed-mecanismo'),val('ed-evolucion'),val('ed-estudios'),val('ed-dxmedico')].join(' ');
+  // CAMBIO CHICO: el medidor también cuenta los campos ESTRUCTURADOS ya capturados (motivoHC: zona/
+  // lado/desde cuándo/irradiación) — sin crear nada nuevo. Así, si el fisio ya los llenó en la
+  // valoración completa, el 0/7 sube solo (antes solo leía el texto libre y quedaba en 0 injustamente).
+  try{
+    var p=currentPatient||{};
+    var hc=(p.motivoHC&&p.motivoHC.zonaPrincipal)?p.motivoHC:(p.motivo&&p.motivo.zonaPrincipal?p.motivo:(p.motivoHC||{}));
+    var zonaLbl=(typeof _hcLabelZona==='function'&&hc.zonaPrincipal)?_hcLabelZona(hc.zonaPrincipal):(hc.zonaPrincipal||'');
+    var extra=[zonaLbl, hc.zonaPrincipalOtra||'', hc.lado||'', hc.desdeCuando||'', hc.irradiacion||'', hc.irradiacionOtra||'',
+      (Array.isArray(hc.zonasSecundarias)?hc.zonasSecundarias.join(' '):'')].join(' ');
+    if(extra.trim()) txt+=' '+extra;
+  }catch(_){}
   try{ el.innerHTML=_coachAnamHTMLFromText(txt); }catch(_){}
 }
 // ── CONEXIÓN CLAUDE — cajita de sugerencia dentro del editor de Motivo ──
@@ -18475,19 +18486,21 @@ function _sugBoxHTML(p){
     +'<span style="margin-left:auto;font-size:11px;color:#5A6478">para revisar</span></div>'
     +'<div style="font-size:13px;line-height:1.55;white-space:pre-wrap;color:#1B3A6B">'+escapeHTML(s)+'</div>'
     +'<div style="display:flex;gap:8px;margin-top:11px;flex-wrap:wrap">'
-    +(rec?'':'<button onclick="_sugAplicar()" style="background:'+col+';color:#fff;border:none;border-radius:9px;padding:8px 13px;font-weight:700;font-size:13px;cursor:pointer;font-family:inherit">✓ Aplicar al padecimiento</button>')
+    +(rec?'':'<button onclick="_sugAplicar()" style="background:'+col+';color:#fff;border:none;border-radius:9px;padding:8px 13px;font-weight:700;font-size:13px;cursor:pointer;font-family:inherit">✓ Ordenar y aplicar al motivo</button>')
     +'<button onclick="_sugDescartar()" style="background:transparent;border:1px solid #D6DEEA;color:#5A6478;border-radius:9px;padding:8px 13px;font-size:13px;cursor:pointer;font-family:inherit">Descartar</button>'
     +'</div></div>';
 }
 function _sugAplicar(){
   var p=currentPatient; if(!p) return;
   var s=(typeof p.sugerenciaIA==='string')?p.sugerenciaIA.trim():''; if(!s) return;
-  var cuerpo=s.replace(/\n?— Texto original:[\s\S]*$/,'').trim();   // quitar la cola (ya es lo que escribió el fisio)
+  // REEMPLAZAR el motivo con la versión ORDENADA por ejes: se quita solo la línea de encabezado
+  // ("💡 Sugerencia..."); se conservan los ejes y el "— Texto original" (para no perder el relato).
+  var cuerpo=s.replace(/^\s*💡[^\n]*\n?/,'').trim();
   var ta=document.getElementById('ed-padecimiento');
-  if(ta){ var act=ta.value.trim(); ta.value=act?(act+'\n\n'+cuerpo):cuerpo; try{ _coachAnamRender(); }catch(_){} }
+  if(ta){ ta.value=cuerpo; try{ _coachAnamRender(); }catch(_){} }
   p._sugAplicada=true;   // se limpia sugerenciaIA al dar "Guardar cambios" del motivo
   var box=document.getElementById('sug-box'); if(box) box.remove();
-  showToast('Copiada al padecimiento — edítala y dale “Guardar cambios”','success');
+  showToast('Motivo reemplazado con la versión ordenada — revisa los [por confirmar] y guarda','success');
 }
 function _sugDescartar(){
   var p=currentPatient; if(!p) return;
