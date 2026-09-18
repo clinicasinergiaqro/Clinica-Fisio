@@ -3436,6 +3436,69 @@ async function loadFromCloud(){
   }catch(e){console.error('loadFromCloud error:',e);return null;}
 }
 
+// ════════════════════════════════════════════════════════════════════════════
+// FASE 2 MIGRACIÓN — RECUPERACIÓN DE LECTURA desde Firestore.
+// Si un ACTIVO llega del Sheet con los campos clínicos VACÍOS (la falla "no carga"/fuga:
+// la fila existe pero sin historia), lo rehidrata desde Firestore .doc(p.id) —el mismo doc
+// que la Fase 1 mantiene al día—. NO toca loadFromCloud (la lectura del Sheet queda igual):
+// corre en 2º plano DESPUÉS de cargar, es ADITIVO y usa el hidratador probado
+// (FST_hidratarCamposClinicos) con guards estrictos → NUNCA pisa dato local con vacío.
+// Acotado: solo toca los VACÍOS (raro en operación normal), con concurrencia y tope, salta
+// migrados/test/tombstones, y recuerda por sesión los ids que no tenían nada en FS para no
+// re-consultarlos. Si recupera algo, re-guarda local y repinta. Falla/offline → no pasa nada.
+// ════════════════════════════════════════════════════════════════════════════
+var _fase2Corriendo=false;
+window._fase2SinDatoFS = window._fase2SinDatoFS || {};   // ids ya consultados sin dato útil en FS (por sesión)
+function _clinicoVacioActivo(p){
+  if(!p||!p.id) return false;
+  if(String(p.id).indexOf('mig_pac_')===0) return false;               // históricos: rama propia
+  if(typeof _esPacienteTest==='function' && _esPacienteTest(p)) return false;
+  if(typeof _activoEliminado==='function' && _activoEliminado(p.id)) return false;
+  var mot=p.motivo||{}, mhc=p.motivoHC||{}, val=p.valoracion||{}, dxf=p.dxFuncional||{};
+  var _t=function(x){ return String(x==null?'':x).trim(); };
+  var tieneMotivo = _t(mot.padecimiento) || _t(mhc.relato) || _t(p.motivoConsulta);
+  var tieneDx     = _t(p.dx) && !/^sin diagn/i.test(_t(p.dx));
+  var tieneVal    = (val && val.eva!=null && _t(val.eva)!=='') || _t(val.rom) || _t(dxf.dxFuncional);
+  // "vacío" = SIN motivo Y SIN dx Y SIN valoración (los 3 núcleos de la historia). Conservador:
+  // con cualquiera de los tres, NO se toca (no hay nada que recuperar).
+  return !tieneMotivo && !tieneDx && !tieneVal;
+}
+async function _recuperarClinicosVaciosFS(){
+  try{
+    if(_fase2Corriendo) return;
+    if(!navigator.onLine) return;
+    var arr=Array.isArray(patientsDB)?patientsDB:[];
+    var vacios=arr.filter(function(p){ return _clinicoVacioActivo(p) && !window._fase2SinDatoFS[p.id]; });
+    if(!vacios.length) return;
+    _fase2Corriendo=true;
+    if(!window._fstDb && typeof FST_init==='function'){ try{ await FST_init(); }catch(_){} }
+    if(!window._fstDb){ _fase2Corriendo=false; return; }   // sin nube → se reintenta en la próxima carga/refresco
+    var objetivo=vacios.slice(0,250), recuperados=0, _TANDA=6;
+    for(var i=0;i<objetivo.length;i+=_TANDA){
+      var lote=objetivo.slice(i,i+_TANDA);
+      var res=await Promise.all(lote.map(async function(p){
+        var antes=JSON.stringify([p.motivo,p.motivoHC,p.dx,p.valoracion]);
+        try{ await FST_hidratarCamposClinicos(p, p.id); }catch(_){ return false; }
+        var cambio = JSON.stringify([p.motivo,p.motivoHC,p.dx,p.valoracion])!==antes;
+        if(!cambio){ try{ window._fase2SinDatoFS[p.id]=1; }catch(_){} }   // FS no tenía nada útil → no reintentar esta sesión
+        return cambio;
+      }));
+      res.forEach(function(x){ if(x) recuperados++; });
+      await new Promise(function(r){ setTimeout(r,120); });   // respiro entre tandas
+    }
+    if(recuperados>0){
+      try{ saveLocal('pts', patientsDB); }catch(_){}
+      try{ if(typeof window._FST_invalidarVistaPacientes==='function') window._FST_invalidarVistaPacientes(); }catch(_){}
+      try{ renderAgenda(); }catch(_){}
+      try{ renderPacientes(); }catch(_){}
+      try{ if(currentPatient && document.getElementById('content-expediente')) renderExpediente(currentTab||'historia'); }catch(_){}
+      try{ showToast('🛟 '+recuperados+' expediente'+(recuperados!==1?'s':'')+' recuperado'+(recuperados!==1?'s':'')+' de la nube','success'); }catch(_){}
+      console.warn('[FASE 2] '+recuperados+' activo(s) rehidratado(s) desde Firestore');
+    }
+  }catch(e){ console.warn('[FASE 2] recuperación no crítica:', e&&e.message); }
+  finally{ _fase2Corriendo=false; }
+}
+
 // Sanear paciente al leer desde Sheets — corrige tipos, arrays vs objetos
 // ── FECHA DE NACIMIENTO Y EDAD AUTOMÁTICA ──────────────────────────────────
 function calcularEdadDesdeFechaNacimiento(fechaNac){
@@ -4294,6 +4357,7 @@ function entrarComo(perfil, email, silencioso){
     if(d&&d.length>0){ patientsDB=d; if(typeof window._FST_invalidarVistaPacientes==='function') window._FST_invalidarVistaPacientes(); } // Fase 5: refresco Sheets → invalidar vista fusionada
     try{ renderAgenda(); }catch(e){ console.error('renderAgenda error:',e); }
     try{ renderPacientes(); }catch(e){ console.error('renderPacientes error:',e); }
+    try{ if(typeof _recuperarClinicosVaciosFS==='function') setTimeout(_recuperarClinicosVaciosFS, 800); }catch(_){}  // FASE 2: recuperar activos con clínicos vacíos desde Firestore (2º plano, no bloquea)
   }).catch(e=>{ console.error('loadFromCloud error:',e); });
   try{ if(typeof _FST_cargarActivosEliminados==='function') _FST_cargarActivosEliminados(); }catch(_e){}   // [BORRADO-ACTIVOS] A1: carga el set tras login (SWR; re-render al llegar)
   try{ if(typeof _FST_cargarNotasActivasEliminadas==='function') _FST_cargarNotasActivasEliminadas(); }catch(_e){}   // [BORRADO-NOTAS] carga el set de notas borradas tras login
@@ -8985,6 +9049,7 @@ async function refrescarPacientesDesdeNube(opts){
         var q = (document.getElementById('buscador-pacientes')||{}).value || '';
         try{ renderPacientes(q); }catch(e){ console.warn('[refrescarPacientes] re-render', e); }
       }
+      try{ if(typeof _recuperarClinicosVaciosFS==='function') _recuperarClinicosVaciosFS(); }catch(_){}  // FASE 2: reintenta recuperación en refresco (p. ej. quien entró offline)
     }
   }catch(e){
     console.warn('[refrescarPacientes] fallo no crítico:', e && e.message);
