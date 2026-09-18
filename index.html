@@ -7983,6 +7983,7 @@ function _detHTMLAcciones(hayHallazgos){
     +((typeof esSupervisorUI==='function'&&esSupervisorUI())?('<button id="det-rep-cojos" onclick="_detRepararIndicesCojos()" style="font-size:13px;font-weight:800;border:none;border-radius:10px;padding:9px 16px;cursor:pointer;font-family:inherit;background:#EEF1F6;color:var(--navy)">🩹 Reparar índices de migrados</button>'):'')
     +((typeof esSupervisorUI==='function'&&esSupervisorUI())?('<button id="det-espejo-fs" onclick="_detEspejarHistoriaFS()" style="font-size:13px;font-weight:800;border:none;border-radius:10px;padding:9px 16px;cursor:pointer;font-family:inherit;background:#0E7490;color:#fff">☁️ Espejar historia a Firestore</button>'):'')
     +((typeof esSupervisorUI==='function'&&esSupervisorUI())?('<button id="det-espejo-id" onclick="_detEspejarIdentidadFS()" style="font-size:13px;font-weight:800;border:none;border-radius:10px;padding:9px 16px;cursor:pointer;font-family:inherit;background:#0E7490;color:#fff">👤 Espejar identidad a Firestore</button>'):'')
+    +((typeof esSupervisorUI==='function'&&esSupervisorUI())?('<button id="det-fase3b" onclick="_toggleFase3bActivos()" style="font-size:13px;font-weight:800;border:none;border-radius:10px;padding:9px 16px;cursor:pointer;font-family:inherit;background:'+((typeof _fase3bActivo==='function'&&_fase3bActivo())?'#6D28D9':'#EEF1F6')+';color:'+((typeof _fase3bActivo==='function'&&_fase3bActivo())?'#fff':'var(--navy)')+'">🧪 Activos-FS: '+((typeof _fase3bActivo==='function'&&_fase3bActivo())?'ON':'OFF')+'</button>'):'')
     +'<button onclick="_detExportar()" style="font-size:13px;font-weight:800;border:none;border-radius:10px;padding:9px 16px;cursor:pointer;font-family:inherit;background:var(--gold);color:var(--navy-dark)">📤 Exportar este dispositivo</button>'
     +'</div>';
 }
@@ -9252,6 +9253,61 @@ function _pacHistoricosHint(){
 function _pacIncluirHistoricos(){ window._pacQuiereHistoricos=true; try{ renderPacientesLista(); }catch(_e){} }
 // CONEXIÓN CLAUDE — alterna el filtro "solo expedientes con sugerencia" desde el banner verde.
 function _toggleSoloSug(){ window._pacSoloSug=!window._pacSoloSug; renderPacientesLista(); }
+// ════════════════════════════════════════════════════════════════════════════
+// FASE 3b (detrás de FLAG, OFF por defecto) — RESPALDO DE LISTA desde Firestore.
+// Si un ACTIVO existe en Firestore (doc .doc(p.id), firestore_live) pero se cayó del Sheet (fuga),
+// se suma a la lista para que NUNCA desaparezca un paciente por un hueco del Sheet. Reglas de oro:
+//   • SOLO activos con id real (p...); NUNCA históricos (mig_pac_) ni el espejo de sesiones (app_live_).
+//   • NO bloquea: usa el índice en CACHÉ; si no hay caché, dispara su carga en 2º plano y repinta.
+//   • Respeta AMBOS tombstones (_fstPidVivo + _activoEliminado) y la disciplina SENTINEL (nunca vacía).
+//   • Flag OFF (producción) → no-op absoluto (0 lecturas, 0 cambios).
+// Es el primer paso seguro de la lectura FS-primario: "Sheet manda, Firestore rellena huecos".
+// ════════════════════════════════════════════════════════════════════════════
+function _fase3bActivo(){ try{ return localStorage.getItem('sinergia_fst_activos_primario')==='1'; }catch(_){ return false; } }
+function _fase3bListaConRespaldoFS(base){
+  try{
+    if(!_fase3bActivo()) return base;
+    var arr = Array.isArray(base)?base:[];
+    var idx = (Array.isArray(window._FST_indicePacientes)&&window._FST_indicePacientes.length) ? window._FST_indicePacientes : null;
+    if(!idx){ try{ var raw=sessionStorage.getItem('FST_indice_v1'); var pp=raw&&JSON.parse(raw); if(pp&&Array.isArray(pp.pacientes)&&pp.pacientes.length) idx=pp.pacientes; }catch(_){} }
+    if(!idx || !idx.length){
+      // sin índice aún → cargarlo en 2º plano (una vez) y devolver la base tal cual (SENTINEL: nunca vaciar)
+      if(!window._FST_listaCargando && typeof FST_obtenerListaParaRender==='function'){
+        window._FST_listaCargando=true;
+        FST_obtenerListaParaRender().then(function(){ window._FST_listaCargando=false; try{ renderPacientesLista(); }catch(_){} }).catch(function(){ window._FST_listaCargando=false; });
+      }
+      return arr;
+    }
+    var _nk=function(x){ return (typeof FST_normalizarBusqueda==='function')?FST_normalizarBusqueda((x&&(x.nombreNormalizado||x.name))||''):''; };
+    var vId={}, vNk={};
+    arr.forEach(function(p){ if(!p) return; var id=String((p.id||p.fstPid)||'').trim(); if(id) vId[id]=1; var nk=_nk(p); if(nk) vNk[nk]=1; });
+    var extra=[], vistoExtra={};
+    idx.forEach(function(p){
+      if(!p || p._origenLista!=='firestore_live') return;                 // SOLO activos vivos, nunca históricos
+      var idReal=String((p.fstPid||p.id)||'').trim();
+      if(!idReal || idReal.indexOf('app_live_')===0 || idReal.indexOf('mig_pac_')===0) return; // solo el doc .doc(p.id) (id real, abrible)
+      if(vId[idReal]) return;                                             // ya lo trae el Sheet
+      var nk=_nk(p); if(nk && vNk[nk]) return;                            // mismo nombre ya presente
+      if(vistoExtra[idReal]) return; vistoExtra[idReal]=1;                // dedup interno
+      if(typeof _fstPidVivo==='function' && !_fstPidVivo(idReal)) return; // tombstone históricos-style
+      if(typeof _activoEliminado==='function' && _activoEliminado(idReal)) return; // tombstone activos
+      if(!String(p.name||'').trim()) return;                             // sin nombre no se muestra
+      extra.push(Object.assign({}, p, { id:idReal, fstPid:idReal, _origenLista:'firestore_respaldo' }));
+    });
+    if(!extra.length) return arr;
+    console.warn('[FASE 3b] '+extra.length+' activo(s) de respaldo desde Firestore (no estaban en el Sheet)');
+    return arr.concat(extra);
+  }catch(e){ console.warn('[FASE 3b] respaldo lista no crítico:', e&&e.message); return base; }
+}
+// Interruptor de supervisor (por equipo): enciende/apaga el respaldo de lista desde Firestore.
+function _toggleFase3bActivos(){
+  if(!(typeof esSupervisorUI==='function' && esSupervisorUI())){ showToast('Solo supervisor','error'); return; }
+  var on = !_fase3bActivo();
+  try{ localStorage.setItem('sinergia_fst_activos_primario', on?'1':'0'); }catch(_){}
+  try{ if(typeof window._FST_invalidarVistaPacientes==='function') window._FST_invalidarVistaPacientes(); }catch(_){}
+  showToast(on?'🧪 Respaldo de lista desde Firestore ACTIVADO (solo este equipo)':'Respaldo de lista desde Firestore desactivado','success');
+  try{ renderPacientesLista(); }catch(_){}
+}
 function renderPacientesLista(fuenteLista){
   const cont=document.getElementById('pac-lista'); if(!cont) return;
   if(!currentUser){ cont.innerHTML=''; return; }
@@ -9276,6 +9332,7 @@ function renderPacientesLista(fuenteLista){
       }
     } else { baseLista=patientsDB||[]; }   // [TASK1-LAZY] activos only, sin cargar índice
   } else { baseLista=patientsDB||[]; }
+  baseLista=_fase3bListaConRespaldoFS(baseLista);   // FASE 3b (flag OFF por defecto → no-op): rellena activos caídos del Sheet
   let list=FST_filtrarLista(baseLista, q);   // ya viene RANKEADA (empieza-por > contiene > dx/terapeuta)
   if(filtro==='hoy') list=list.filter(p=>p.date===todayISO);
   if(filtro==='precaucion') list=list.filter(p=>p.seguridadClinica?.tienePrecaucion);
