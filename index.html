@@ -9305,27 +9305,31 @@ function _toggleFase3bActivos(){
   var on = !_fase3bActivo();
   try{ localStorage.setItem('sinergia_fst_activos_primario', on?'1':'0'); }catch(_){}
   try{ if(typeof window._FST_invalidarVistaPacientes==='function') window._FST_invalidarVistaPacientes(); }catch(_){}
-  // FEEDBACK VISIBLE: cambiar el botón en el acto (antes se quedaba en "OFF" y parecía que no picaba).
-  var b=document.getElementById('det-fase3b');
-  if(b){ b.textContent='🧪 Activos-FS: '+(on?'ON':'OFF'); b.style.background=on?'#6D28D9':'#EEF1F6'; b.style.color=on?'#fff':'var(--navy)'; }
   try{ renderPacientesLista(); }catch(_){}
   // Contar cuántos activos SOLO están en Firestore (respaldo real). En operación normal es 0
   // (todos en el Sheet) → eso es señal de que está bien, no de que falló.
-  var nExtra=0;
+  var nExtra=0, hayIndice=false;
   try{
     var idx=(Array.isArray(window._FST_indicePacientes)&&window._FST_indicePacientes.length)?window._FST_indicePacientes:null;
-    if(on && idx){
+    if(idx){ hayIndice=true;
       var vId={}; (Array.isArray(patientsDB)?patientsDB:[]).forEach(function(p){ if(p&&p.id) vId[String(p.id)]=1; });
       idx.forEach(function(p){ if(p&&p._origenLista==='firestore_live'){ var idR=String((p.fstPid||p.id)||''); if(idR&&idR.indexOf('app_live_')!==0&&idR.indexOf('mig_pac_')!==0&&!vId[idR]&&String(p.name||'').trim()) nExtra++; } });
     }
   }catch(_){}
-  if(on){
-    showToast(nExtra>0
-      ? ('🧪 Respaldo FS ON (este equipo) · '+nExtra+' paciente'+(nExtra!==1?'s':'')+' recuperado'+(nExtra!==1?'s':'')+' de la nube')
-      : '🧪 Respaldo FS ON (este equipo) · 0 de respaldo = todos tus activos ya están en el Sheet (correcto)','success');
+  // FEEDBACK DENTRO DEL PANEL (el toast queda TAPADO por el modal de la lupa, z-index alto → no se ve).
+  var msg = on
+    ? (nExtra>0
+        ? ('<b>ENCENDIDO</b> en este equipo. Firestore recuperó <b>'+nExtra+'</b> paciente'+(nExtra!==1?'s':'')+' que no estaban en el Sheet.')
+        : ('<b>ENCENDIDO</b> en este equipo.'+(hayIndice?' <b>0</b> de respaldo = todos tus activos ya están en el Sheet (correcto: no falta nadie).':' Cargando índice de la nube… vuelve a tocar en unos segundos para ver el conteo.')))
+    : '<b>APAGADO</b> en este equipo. La lista vuelve a leerse solo del Sheet, como siempre.';
+  var cont=document.getElementById('det-resultados');
+  if(cont && typeof _detBloque==='function' && typeof _detHTMLAcciones==='function'){
+    cont.innerHTML=_detBloque('🧪 Respaldo de lista desde Firestore', msg, on?'ok':'info')+_detHTMLAcciones(false);
   } else {
-    showToast('Respaldo FS apagado en este equipo','success');
+    var b=document.getElementById('det-fase3b');
+    if(b){ b.textContent='🧪 Activos-FS: '+(on?'ON':'OFF'); b.style.background=on?'#6D28D9':'#EEF1F6'; b.style.color=on?'#fff':'var(--navy)'; }
   }
+  try{ showToast(on?'🧪 Respaldo FS ON (este equipo)':'Respaldo FS apagado','success'); }catch(_){}
 }
 function renderPacientesLista(fuenteLista){
   const cont=document.getElementById('pac-lista'); if(!cont) return;
