@@ -50,8 +50,8 @@ service cloud.firestore {
                   // (le pegaba a quien usa "No acudio", p.ej. Jess: 30 cambios atorados).
                   'inasistencias',
                   'telefono','fechaNacimiento','medicoReferente','age',
-                  'fechaCreacion','fechaInicio',
-                  'nombreNormalizado','terapeuta',
+                  'fechaCreacion','fechaInicio','date',
+                  'nombreNormalizado','terapeuta','terapeutaSeguimiento',
                   'updatedAt','ultimoUsuario','fechaActualizacion','ultimosCampos']);
     }
     // Borrado LOGICO: solo el flag y su metadata. Cubre marcar Y restaurar.
