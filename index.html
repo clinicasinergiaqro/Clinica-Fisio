@@ -4370,6 +4370,23 @@ function entrarComo(perfil, email, silencioso){
     try{ renderAgenda(); }catch(e){ console.error('renderAgenda error:',e); }
     try{ renderPacientes(); }catch(e){ console.error('renderPacientes error:',e); }
     try{ if(typeof _recuperarClinicosVaciosFS==='function'){ if('requestIdleCallback' in window) requestIdleCallback(_recuperarClinicosVaciosFS,{timeout:5000}); else setTimeout(_recuperarClinicosVaciosFS,1200); } }catch(_){}  // FASE 2: recuperar activos vacíos desde Firestore en tiempo IDLE (nunca compite con el primer pintado)
+    // FASE 3b PASO 3 (flag ON): si el Sheet no respondió (d vacío/null) y NO hay copia local → levantar
+    // la lista de activos desde Firestore para que la app funcione igual. Solo actúa en ese hueco.
+    try{
+      if(typeof _fase3bActivo==='function' && _fase3bActivo() && (!d || !d.length) && (!Array.isArray(patientsDB) || !patientsDB.length)){
+        (typeof FST_cargarIndicePacientes==='function' ? FST_cargarIndicePacientes() : Promise.resolve(null))
+          .then(function(){
+            if(Array.isArray(patientsDB) && patientsDB.length) return;   // el Sheet/local llegó mientras tanto
+            var act=_fase3bActivosDesdeFS();
+            if(!act.length) return;
+            patientsDB=act;
+            try{ if(typeof window._FST_invalidarVistaPacientes==='function') window._FST_invalidarVistaPacientes(); }catch(_){}
+            try{ renderAgenda(); }catch(_){}
+            try{ renderPacientes(); }catch(_){}
+            try{ showToast('🛟 Lista cargada desde Firestore ('+act.length+' activos) — el Sheet no respondió','warning'); }catch(_){}
+          }).catch(function(){});
+      }
+    }catch(_){}
   }).catch(e=>{ console.error('loadFromCloud error:',e); });
   try{ if(typeof _FST_cargarActivosEliminados==='function') _FST_cargarActivosEliminados(); }catch(_e){}   // [BORRADO-ACTIVOS] A1: carga el set tras login (SWR; re-render al llegar)
   try{ if(typeof _FST_cargarNotasActivasEliminadas==='function') _FST_cargarNotasActivasEliminadas(); }catch(_e){}   // [BORRADO-NOTAS] carga el set de notas borradas tras login
@@ -9308,6 +9325,30 @@ function _fase3bListaConRespaldoFS(base){
     console.warn('[FASE 3b] '+extra.length+' activo(s) de respaldo desde Firestore (no estaban en el Sheet)');
     return arr.concat(extra);
   }catch(e){ console.warn('[FASE 3b] respaldo lista no crítico:', e&&e.message); return base; }
+}
+// FASE 3b PASO 3 — FS-PRIMARIO REAL (fallback de arranque): construye la lista de ACTIVOS desde el
+// índice de Firestore (firestore_live, id real p...) como objetos de paciente utilizables. Se usa
+// SOLO cuando el Sheet no dio nada (caído) y no hay copia local → así la app entera (agenda +
+// pacientes) funciona desde Firestore, no solo la lista. Cada objeto abre e hidrata su clínica al
+// abrirlo (openExpediente + Fase 2). Respeta ambos tombstones. Flag OFF → nunca se llama.
+function _fase3bActivosDesdeFS(){
+  try{
+    var idx=(Array.isArray(window._FST_indicePacientes)&&window._FST_indicePacientes.length)?window._FST_indicePacientes:null;
+    if(!idx){ try{ var raw=sessionStorage.getItem('FST_indice_v1'); var pp=raw&&JSON.parse(raw); if(pp&&Array.isArray(pp.pacientes)&&pp.pacientes.length) idx=pp.pacientes; }catch(_){} }
+    if(!idx || !idx.length) return [];
+    var out=[], visto={};
+    idx.forEach(function(p){
+      if(!p || p._origenLista!=='firestore_live') return;
+      var idReal=String((p.fstPid||p.id)||'').trim();
+      if(!idReal || idReal.indexOf('app_live_')===0 || idReal.indexOf('mig_pac_')===0) return;
+      if(visto[idReal]) return; visto[idReal]=1;
+      if(typeof _fstPidVivo==='function' && !_fstPidVivo(idReal)) return;
+      if(typeof _activoEliminado==='function' && _activoEliminado(idReal)) return;
+      if(!String(p.name||'').trim()) return;
+      out.push(Object.assign({}, p, { id:idReal, fstPid:idReal, _origenLista:'firestore_respaldo' }));
+    });
+    return out;
+  }catch(e){ console.warn('[FASE 3b p3] no crítico:', e&&e.message); return []; }
 }
 // Interruptor de supervisor (por equipo): enciende/apaga el respaldo de lista desde Firestore.
 function _toggleFase3bActivos(){
