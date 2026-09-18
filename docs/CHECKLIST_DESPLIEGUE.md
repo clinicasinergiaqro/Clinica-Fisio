@@ -1,56 +1,83 @@
 # Checklist de despliegue — Clínica Sinergia
 
-Backend (Apps Script) y reglas (Firestore/Storage) se publican **a mano**. Un push a
-GitHub NO los actualiza. Esta lista evita que se desfasen (fue la causa raíz del caso
-Jess: el correo estaba bien en el código pero el backend en vivo era una versión vieja,
-y las reglas de Storage no tenían `.lower()` ni a Dulce).
+> **Por qué existe:** el correo autorizado de cada fisio vive en **4 lugares** distintos.
+> Si se agrega/quita a alguien y se olvida uno de los 4, se produce una **fuga** (el caso
+> Jess: Firestore la autorizaba pero el Sheets desplegado no). Este documento es la **fuente
+> única de la verdad**: antes de tocar permisos, actualiza los 4 y despliega cada uno.
 
-## LISTA MAESTRA DE CORREOS AUTORIZADOS
-El mismo correo debe estar EN LOS 4 LADOS (en minúsculas). Si agregas/quitas a alguien,
-actualiza los cuatro y publica cada uno:
+---
 
-| # | Lugar | Archivo / dónde | Cómo se activa |
-|---|-------|-----------------|----------------|
-| 1 | Frontend (UX) | `index.html` → `ROLES_POR_CORREO` | se despliega con Pages (push a `main`) |
-| 2 | Reglas Firestore | `config/firestore.rules` → `isWriter()` (con `.lower()`) | **Publicar en consola Firebase** |
-| 3 | Reglas Storage | `config/storage.rules` → `isWriter()` (con `.lower()`) | **Publicar en consola Firebase** |
-| 4 | Backend Sheets | `Codigo.gs` → `ROLES_BACKEND` (lo normaliza con `.toLowerCase()`) | **Re-desplegar Apps Script** |
+## 1. Roster autorizado (fuente única)
 
-Correos autorizados actuales (7): lftaranda (supervisor), gutierrezgarciazaray96 (Zara),
-camislerma26 (Camila), agoretti.mr (Gore), dafnend26 (Daf), jriveare2000 (Jess),
-dulcesalazar_1799 (Dulce).
+| Nombre | Inicial | Correo | Rol |
+|---|---|---|---|
+| Carlos (supervisor) | CG / CARLOS | `lftaranda@gmail.com` | supervisor |
+| Daf | DA / DAF | `dafnend26@gmail.com` | fisioterapeuta |
+| Zara | ZA / ZARA | `gutierrezgarciazaray96@gmail.com` | fisioterapeuta |
+| Camila | CA / CAMI | `camislerma26@gmail.com` | fisioterapeuta |
+| Gore | GO / GORE | `agoretti.mr@gmail.com` | fisioterapeuta |
+| Jess | JE / JESS | `jriveare2000@hotmail.com` | fisioterapeuta |
+| Dulce | DU / DUL | `dulcesalazar_1799@hotmail.com` | fisioterapeuta |
 
-## CUANDO CAMBIES UN PERMISO (alta/baja de terapeuta)
-1. Edita el correo en los **4 lugares** de la tabla (mismo correo, minúsculas).
-2. Publica reglas **Firestore** (consola Firebase → Firestore → Reglas → Publicar).
-3. Publica reglas **Storage** (consola Firebase → Storage → Reglas → Publicar).
-4. Re-despliega **Apps Script** (ver abajo).
-5. Push del `index.html` a `main` (Pages).
-6. Verifica con la persona: que **guarde en verde** y que al reabrir **persista**.
+- El **supervisor** (único que borra/administra) es SOLO `lftaranda@gmail.com`.
+- Los correos van **en minúsculas**; las reglas comparan con `.lower()`, así que un correo
+  con mayúsculas (p. ej. `Jriveare2000@hotmail.com`) igual entra, pero **guárdalos en minúsculas**.
+- Última auditoría de consistencia: **2026-09-18 → los 4 lugares coinciden (sin desfase).**
 
-## RE-DESPLEGAR APPS SCRIPT (backend Sheets)
-1. script.google.com (cuenta clinicasinergiaqro) → proyecto de la clínica.
-2. Asegúrate de que el código del editor sea el actual (ROLES_BACKEND + `.toLowerCase()`).
-3. "Implementar" → "Administrar implementaciones".
-4. En la implementación ACTIVA (Aplicación web, tipo web app), toca el lápiz (Editar).
-5. En "Versión" elige "Nueva versión" → "Implementar".
-6. REGLA DE ORO: nunca "Nueva implementación" (cambia la URL y rompe la app). La URL
-   debe seguir siendo la de `APPS_SCRIPT_URL` en `index.html`.
+---
 
-## DEPLOY DEL FRONTEND (index.html / sw.js)
-- Pages publica desde `main`. Cada deploy incluye bump de cache en `sw.js`
-  (`sinergia-shell-v1-<fecha><letra>`; mismo día → siguiente letra).
-- Validar sintaxis de `index.html`: extraer los `<script>` inline y validarlos con `vm.Script`
-  (no `node --check`; no es .js).
+## 2. Los 4 lugares donde vive cada correo
 
-## DIAGNÓSTICO RÁPIDO (si alguien reporta que "no se guarda")
-En SU equipo: lupa 🔎 (arriba) → "🩺 Diagnóstico de escritura". Leer:
-- `token.email` → el correo REAL de su cuenta (debe empatar con la lista maestra).
-- `LECTURA de servidor` (Firestore) y `ESCRITURA en Sheets` (backend) → ✅ / ❌.
-Si "ESCRITURA en Sheets ❌ NO AUTORIZADO" → falta re-desplegar el backend o el correo no empata.
+1. **Front (app)** — `index.html`, `const ROLES_POR_CORREO` (~L4330).
+   - Solo UX (nombre/inicial); NO es la autoridad de permisos. Se despliega con GitHub Pages (main).
+2. **Reglas de Firestore** — `config/firestore.rules`, función `isWriter()` (lista de correos) y
+   `isSupervisor()` (solo `lftaranda`). **Autoridad real** de lectura/escritura de datos.
+3. **Reglas de Storage** — `config/storage.rules`, misma lista de correos + supervisor.
+   **Autoridad real** de fotos/estudios/archivos.
+4. **Backend** — `config/Codigo.gs`, `const ROLES_BACKEND` (~L18): correo → rol. Autoriza el Apps Script.
 
-## RESPALDOS (estado: completo)
-- Sheets: `respaldoDiarioPacientes` (03:00) → JSON diario en Drive `Respaldos_Clinica`
-  (retención 180) + copia por correo a lftaranda.
-- Firestore: PITR 7 días + copias diaria/semanal 98 días.
-- Storage: versionado de objetos (3 versiones / 30 días) + soft delete 7 días.
+> Los 3 backends (2, 3, 4) DEBEN tener exactamente los mismos 7 correos. El front (1) los mismos,
+> más nombre/inicial.
+
+---
+
+## 3. Checklist para AGREGAR o QUITAR un fisio
+
+Marca cada casilla; no deploys a medias.
+
+- [ ] **1. Front** — editar `ROLES_POR_CORREO` en `index.html` (agregar/quitar la línea `_R(...)`
+      con correo, nombre, rol e inicial). Bump de cache en `sw.js` (esquema `v1-<fecha><letra>`).
+- [ ] **2. Firestore rules** — editar la lista de `isWriter()` en `config/firestore.rules`.
+- [ ] **3. Storage rules** — editar la MISMA lista en `config/storage.rules`.
+- [ ] **4. Backend** — editar `ROLES_BACKEND` en `config/Codigo.gs`.
+- [ ] **5. Commit + merge a `main`** (los 4 archivos juntos, en el mismo PR).
+
+### Desplegar cada backend (el repo NO los publica solo)
+
+- [ ] **6. Firestore rules → producción:** consola Firebase → proyecto `clinicasinergia-ec2cf` →
+      Firestore → Rules → pegar `config/firestore.rules` → **Publicar**.
+      (Link: https://console.firebase.google.com/project/clinicasinergia-ec2cf/firestore/rules)
+- [ ] **7. Storage rules → producción:** consola Firebase → Storage → Rules → pegar
+      `config/storage.rules` → **Publicar**.
+- [ ] **8. Backend Apps Script → producción:** editor de Apps Script → pegar `config/Codigo.gs` →
+      **Implementar → Administrar implementaciones → editar (lápiz) → Nueva versión → Implementar**
+      (la URL `/exec` NO cambia).
+- [ ] **9. Front (app):** con el merge a `main`, GitHub Pages publica solo. En el iPad del nuevo
+      fisio: cerrar/abrir la app o "🔄 Forzar actualización".
+
+### Verificar (que no quedó desfasado)
+
+- [ ] **10.** El fisio nuevo **inicia sesión** y ve SUS pacientes.
+- [ ] **11.** Guarda un cambio y sube (no queda "pendiente" atorado).
+- [ ] **12.** Sube una **foto** (prueba Storage rules).
+- [ ] Si algo falla con "permiso insuficiente" → falta uno de los 4 pasos de despliegue. Revisa cuál.
+
+---
+
+## 4. Notas
+
+- **Nunca** quites a `lftaranda@gmail.com` de ninguna lista (es el supervisor).
+- Al quitar a un fisio, sus pacientes NO se borran; solo deja de tener acceso. Reasigna el
+  `terapeuta` de sus pacientes si hace falta (Editar datos / supervisor).
+- Este checklist cubre la RAÍZ de las fugas históricas. Mantenerlo al día = no más “no carga”
+  por permisos desfasados.
