@@ -41,7 +41,7 @@ Probar en el equipo de Jess antes de confiar cada fase.
 ## Otras áreas de mejora pendientes (orden sugerido)
 1. **Endurecer la cola de activos `COLA_SYNC`** como la de históricos (tope, detección de error permanente, aislamiento de corrupción). Alto valor, bajo riesgo. Hacer JUNTO con la Fase 1 del #3 (ambas son de guardado).
 2. **Respaldo local en IndexedDB** (hoy solo `localStorage`, que iOS puede desalojar).
-3. **Lista maestra ÚNICA de correos + checklist de despliegue** (hoy el correo autorizado está en 4 lados: front `ROLES_POR_CORREO`, `config/firestore.rules`, `config/storage.rules`, `Codigo.gs ROLES_BACKEND`; backend y reglas se publican a mano → se desfasan). → checklist en `docs/CHECKLIST_DESPLIEGUE.md`.
+3. **Lista maestra ÚNICA de correos + checklist de despliegue** — HECHO (2026-09-18, `docs/CHECKLIST_DESPLIEGUE.md`). Auditoría: los 4 lugares (front `ROLES_POR_CORREO` ~L4330, `config/firestore.rules` isWriter, `config/storage.rules`, `Codigo.gs ROLES_BACKEND` ~L18) COINCIDEN hoy (mismos 7 correos, sin desfase). El checklist tiene el roster único + los pasos para agregar/quitar fisio tocando los 4 + desplegar cada backend a mano. Mantener al día ante cambios de personal.
 4. **Alerta proactiva** cuando un equipo tiene datos atorados > X horas (tablero de salud de sync ya existe).
 5. **Actualización del PWA en iOS** ("no se puede actualizar"): indicador de versión visible + refresh más confiable. Toca el service worker → hacerla como pieza propia.
 
