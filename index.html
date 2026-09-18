@@ -2296,7 +2296,7 @@ function _mirrorHistoriaActivoFS(p, camposHist){
       .then(function(r){
         if(!(r && r.ok)){
           try{ _encolarHistDoc(p, Array.isArray(camposHist)&&camposHist.length ? camposHist
-              : ['dx','motivo','motivoHC','motivoConsulta','valoracion','dxFuncional','planTto','antecedentes','contraindicaciones','alergias','seguridadClinica','motivosAnteriores','sugerenciaIA']); }catch(_){}
+              : ['dx','motivo','motivoHC','motivoConsulta','valoracion','dxFuncional','planTto','antecedentes','contraindicaciones','alergias','seguridadClinica','motivosAnteriores','sugerenciaIA'], /*silencioso*/true); }catch(_){}
         }
       })
       .catch(function(e){ console.warn('[espejo FS activo] no crítico:', e&&e.message); });
@@ -2874,7 +2874,7 @@ function _stripB64Profundo(v){
   }
   return v;
 }
-function _encolarHistDoc(p, camposHist){
+function _encolarHistDoc(p, camposHist, _silencioso){
   // Solo se encola con lista declarada (Loop B): sin lista no hay diff seguro que reintentar
   // (re-escribir el bloque completo desde una cola sería el clobber diferido que B eliminó).
   if(!p || !p.id || !Array.isArray(camposHist) || !camposHist.length) return false;
@@ -2894,7 +2894,9 @@ function _encolarHistDoc(p, camposHist){
     q=q.filter(function(it){ return !(it && it.pid===p.id && it.tipo!=='identidad'); });
     q.push({pid:p.id, campos:campos, ts:Date.now(), intentos:0});
     localStorage.setItem('COLA_SYNC_HIST_DOC', JSON.stringify(q));
-    try{ showToast('📴 Cambio de expediente histórico pendiente — se reintentará solo','warning'); }catch(_){}
+    // FASE 1: el espejo de activos es silencioso (el Sheet YA guardó) → su fallo se encola SIN
+    // molestar al usuario con un toast de "pendiente" en cada guardado si Firestore está caído un rato.
+    if(!_silencioso){ try{ showToast('📴 Cambio de expediente histórico pendiente — se reintentará solo','warning'); }catch(_){} }
     return true;
   }catch(e){ console.warn('[hist-doc] no se pudo encolar:', e && e.message); return false; }
 }
@@ -4357,7 +4359,7 @@ function entrarComo(perfil, email, silencioso){
     if(d&&d.length>0){ patientsDB=d; if(typeof window._FST_invalidarVistaPacientes==='function') window._FST_invalidarVistaPacientes(); } // Fase 5: refresco Sheets → invalidar vista fusionada
     try{ renderAgenda(); }catch(e){ console.error('renderAgenda error:',e); }
     try{ renderPacientes(); }catch(e){ console.error('renderPacientes error:',e); }
-    try{ if(typeof _recuperarClinicosVaciosFS==='function') setTimeout(_recuperarClinicosVaciosFS, 800); }catch(_){}  // FASE 2: recuperar activos con clínicos vacíos desde Firestore (2º plano, no bloquea)
+    try{ if(typeof _recuperarClinicosVaciosFS==='function'){ if('requestIdleCallback' in window) requestIdleCallback(_recuperarClinicosVaciosFS,{timeout:5000}); else setTimeout(_recuperarClinicosVaciosFS,1200); } }catch(_){}  // FASE 2: recuperar activos vacíos desde Firestore en tiempo IDLE (nunca compite con el primer pintado)
   }).catch(e=>{ console.error('loadFromCloud error:',e); });
   try{ if(typeof _FST_cargarActivosEliminados==='function') _FST_cargarActivosEliminados(); }catch(_e){}   // [BORRADO-ACTIVOS] A1: carga el set tras login (SWR; re-render al llegar)
   try{ if(typeof _FST_cargarNotasActivasEliminadas==='function') _FST_cargarNotasActivasEliminadas(); }catch(_e){}   // [BORRADO-NOTAS] carga el set de notas borradas tras login
@@ -9392,6 +9394,24 @@ function openExpediente(pid){
       if (_n.length || !(Array.isArray(_fstSesionesCache[pid]) && _fstSesionesCache[pid].length)) { _fstSesionesCache[pid] = _n; _fstSesionesCacheTs[pid] = Date.now(); }   // RENDIMIENTO: sella ts → el render reusa este prefetch sin re-leer
       if(currentPatient && currentPatient.id===pid && document.getElementById('content-expediente')) renderExpediente(currentTab||'historia');
     }).catch(function(){});
+  }
+  // FASE 2 (recuperación PUNTUAL, la más rápida): activo abierto con los clínicos vacíos (caso
+  // "no carga"/fuga) → un solo doc.get a Firestore, EXACTAMENTE cuando el usuario lo necesita.
+  // Cero trabajo en operación normal (el guard descarta lo que sí tiene historia). Hidrata en
+  // memoria y repinta al llegar; no re-serializa todo el DB (el barrido en bloque persiste aparte).
+  else if(typeof _clinicoVacioActivo==='function' && _clinicoVacioActivo(currentPatient)
+          && !(window._fase2SinDatoFS||{})[pid] && navigator.onLine){
+    (function(pRef){
+      var _antes=JSON.stringify([pRef.motivo,pRef.motivoHC,pRef.dx,pRef.valoracion]);
+      (window._fstDb ? Promise.resolve(true) : (typeof FST_init==='function'?FST_init().catch(function(){return false;}):Promise.resolve(false)))
+        .then(function(){ if(!window._fstDb || typeof FST_hidratarCamposClinicos!=='function') return; return FST_hidratarCamposClinicos(pRef, pid); })
+        .then(function(){
+          if(JSON.stringify([pRef.motivo,pRef.motivoHC,pRef.dx,pRef.valoracion])!==_antes){
+            try{ saveLocal('pts', patientsDB); }catch(_){}   // recuperado: persiste una vez (evento raro)
+            if(currentPatient===pRef && document.getElementById('content-expediente')){ try{ renderExpediente(currentTab||'historia'); }catch(_){} }
+          } else { try{ (window._fase2SinDatoFS=window._fase2SinDatoFS||{})[pid]=1; }catch(_){} }   // FS no tenía nada → no reintentar esta sesión
+        }).catch(function(){});
+    })(currentPatient);
   }
 }
 
