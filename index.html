@@ -2915,6 +2915,16 @@ function _payloadIdentidadHist(p){
     ultimoUsuario: (currentUser && currentUser.name) || ''
   };
 }
+// FASE 3b: identidad de ACTIVOS = la de históricos + terapeutaSeguimiento y date (rules ya lo permiten),
+// para que el índice pinte la tarjeta completa cuando el activo venga de la nube. terapeutaSeguimiento
+// solo si es un nombre real (no el sentinel basura 'T00:').
+function _payloadIdentidadActivo(p){
+  var base=_payloadIdentidadHist(p);
+  var ts=p && p.terapeutaSeguimiento;
+  if(typeof ts==='string' && ts.trim() && ts.indexOf('T00:')===-1) base.terapeutaSeguimiento=ts.trim();
+  if(p && p.date) base.date=p.date;
+  return base;
+}
 async function _escribirIdentidadFirestore(pid, campos){
   var payload = Object.assign({}, campos, { updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
   return await _conTimeout(window._fstDb.collection('pacientes').doc(pid).set(_sinUndefined(payload), { merge:true }), 8000);
@@ -8136,8 +8146,8 @@ async function _detEspejarIdentidadFS(){
       var b0=document.getElementById('det-espejo-id'); if(b0){ b0.textContent='Espejando… '+Math.min((_ti+1)*_TANDA,total)+'/'+total; }
       await new Promise(function(r){ setTimeout(r,0); });
       var _res=await Promise.all(_lote.map(async function(p){
-        try{ await _escribirIdentidadFirestore(p.id, _payloadIdentidadHist(p)); return true; }
-        catch(_e){ try{ _encolarIdentidadHist(p.id, _payloadIdentidadHist(p)); }catch(_){} return false; }
+        try{ await _escribirIdentidadFirestore(p.id, _payloadIdentidadActivo(p)); return true; }
+        catch(_e){ try{ _encolarIdentidadHist(p.id, _payloadIdentidadActivo(p)); }catch(_){} return false; }
       }));
       _res.forEach(function(x){ if(x) okN++; else fallos++; });
       await new Promise(function(r){ setTimeout(r,120); });   // respiro entre tandas
@@ -10587,6 +10597,8 @@ async function FST_refrescarIndiceEnSegundoPlano(forzar) {
         name            : d.name            || '',
         age             : d.age             || '',
         terapeuta       : d.terapeuta       || d.terapeutaActual || '',
+        terapeutaSeguimiento: d.terapeutaSeguimiento || '',   // FASE 3b: tarjeta completa desde el índice
+        date            : d.date            || '',
         fechaNac        : d.fechaNac        || '',
         creadoPor       : d.creadoPor       || '',
         nombreNormalizado: d.nombreNormalizado || FST_normalizarBusqueda(d.name || ''),
@@ -10747,6 +10759,8 @@ async function FST_cargarIndicePacientes() {
           name            : d.name            || '',
           age             : d.age             || '',
           terapeuta       : d.terapeuta       || d.terapeutaActual || '',
+          terapeutaSeguimiento: d.terapeutaSeguimiento || '',   // FASE 3b: tarjeta completa desde el índice
+          date            : d.date            || '',
           fechaNac        : d.fechaNac        || '',
           creadoPor       : d.creadoPor       || '',
           nombreNormalizado: d.nombreNormalizado || FST_normalizarBusqueda(d.name || ''),
@@ -14856,7 +14870,7 @@ async function _persistirDatosPaciente(p){
     // identidad (edición explícita de datos) → sin riesgo del snapshot viejo del bulk. Aditivo y
     // fire-and-forget; falla/offline → cola durable de identidad (se reintenta sola). NO toca el Sheet.
     try{
-      var _idc = _payloadIdentidadHist(p);
+      var _idc = _payloadIdentidadActivo(p);
       (window._fstDb ? Promise.resolve(true) : (typeof FST_init==='function'?FST_init().catch(function(){return false;}):Promise.resolve(false)))
         .then(function(ok){ if(ok && window._fstDb) return _escribirIdentidadFirestore(p.id, _idc); throw new Error('sin-fs'); })
         .catch(function(){ try{ _encolarIdentidadHist(p.id, _idc); }catch(_){} });
