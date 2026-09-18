@@ -9290,7 +9290,10 @@ function _toggleSoloSug(){ window._pacSoloSug=!window._pacSoloSug; renderPacient
 //   • Flag OFF (producción) → no-op absoluto (0 lecturas, 0 cambios).
 // Es el primer paso seguro de la lectura FS-primario: "Sheet manda, Firestore rellena huecos".
 // ════════════════════════════════════════════════════════════════════════════
-function _fase3bActivo(){ try{ return localStorage.getItem('sinergia_fst_activos_primario')==='1'; }catch(_){ return false; } }
+// FASE 3c-a: red de seguridad Firestore ENCENDIDA para toda la clínica por defecto (2026-09-18).
+// Con el Sheet aún de principal es casi no-op (solo arma respaldo: nadie desaparece + arranque si el
+// Sheet cae). Un equipo puede apagarla con el botón 🧪 (guarda '0'); default = ON.
+function _fase3bActivo(){ try{ return localStorage.getItem('sinergia_fst_activos_primario')!=='0'; }catch(_){ return true; } }
 function _fase3bListaConRespaldoFS(base){
   try{
     if(!_fase3bActivo()) return base;
