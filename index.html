@@ -18427,9 +18427,19 @@ var _COACH_ANAM_EJES = [
   {lab:'Contexto (deporte/casa/trabajo)', rx:/deport|atleta|entren|f[úu]t?bol|b[áa]squet|b[ée]isbol|volei|voleibol|tenis|p[áa]del|correr|running|marat[óo]n|nataci|nadar|ciclis|bici|gym|gimnasio|pesas|levantamiento|crossfit|pilates|yoga|baile|danza|trabaj|labor|oficina|computad|escritorio|jornada|casa|hogar|dom[ée]stic|limpieza|cocina|jard[íi]n|dormir|sue[ñn]o|manej|conduc|cargar (peso|despensa|bolsa|al beb)|beb[ée]|hij[oa]|amamant|lactancia|cuidar|estudi|escuela|clase|avdh?|actividad(es)? (de la vida|cotidian|diaria)|vida diaria|sedentari/i, hint:'cómo le afecta en deporte, casa o trabajo'},
   {lab:'Irradiación / otros síntomas', rx:/irradia|se corre|se extiende|se propaga|hacia (el|la|los|las|abajo|arriba)|baja por|sube por|corre hacia|dolor referido|refiere a|ci[áa]tic|radicul|parestesia|hormigue|adormec|entumec|acorchad|corriente|debilidad|p[ée]rdida de (fuerza|sensib)|inflam|edema|hinchaz|chasquid|tronido|crepit|clic|se traba|se zafa|bloqueo|inestab|mareo|n[áa]usea|fiebre/i, hint:'¿se corre a otro lado?, hormigueo, inflamación…'},
 ];
+// CONEXIÓN CLAUDE — en QUÉ campo se llena cada eje (para que la guía diga dónde escribirlo).
+var _COACH_CAMPO = {
+  'Dónde duele':'Padecimiento actual',
+  'Cómo es el dolor':'Padecimiento actual',
+  'Mecanismo / cómo empezó':'Mecanismo de lesión',
+  'Desde cuándo':'Tiempo de evolución',
+  'Qué lo agrava / alivia':'Padecimiento actual',
+  'Contexto (deporte/casa/trabajo)':'Padecimiento actual',
+  'Irradiación / otros síntomas':'Padecimiento actual'
+};
 function _coachAnamEval(txt){
   var s=String(txt||'').toLowerCase();
-  return _COACH_ANAM_EJES.map(function(e){ return {lab:e.lab, hint:e.hint, ok:e.rx.test(s)}; });
+  return _COACH_ANAM_EJES.map(function(e){ return {lab:e.lab, hint:e.hint, ok:e.rx.test(s), campo:_COACH_CAMPO[e.lab]||'Padecimiento actual'}; });
 }
 function _coachAnamHTMLFromText(txt){
   var ejes=_coachAnamEval(txt);
@@ -18441,11 +18451,11 @@ function _coachAnamHTMLFromText(txt){
     return '<div style="display:flex;gap:8px;align-items:flex-start;padding:3px 0;font-size:12.5px;line-height:1.35">'
       +'<span style="color:'+c+';font-weight:800;flex:0 0 auto">'+(e.ok?'✓':'○')+'</span>'
       +'<span style="color:#1B2A44">'+e.lab
-      +(e.ok?'':' <span style="color:#8A93A6;font-weight:400">— '+e.hint+'</span>')+'</span></div>';
+      +(e.ok?'':' <span style="color:#8A93A6;font-weight:400">— anótalo en «<b style="color:#1B3A6B;font-weight:700">'+e.campo+'</b>»: '+e.hint+'</span>')+'</span></div>';
   }).join('');
   var faltan=ejes.filter(function(e){return !e.ok;});
   var tip = faltan.length
-    ? '<div style="margin-top:8px;font-size:12px;color:#5A6478">💡 Falta: '+faltan.slice(0,3).map(function(e){return e.lab.toLowerCase();}).join(', ')+'.</div>'
+    ? '<div style="margin-top:8px;font-size:12px;color:#5A6478">💡 Escribe lo que falta en los campos de arriba (ej.: «'+(faltan[0].campo)+'»). Faltan: '+faltan.slice(0,3).map(function(e){return e.lab.toLowerCase();}).join(', ')+'.</div>'
     : '<div style="margin-top:8px;font-size:12px;color:#2E7D52;font-weight:700">¡Anamnesis completa! 👏</div>';
   return '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">'
       +'<b style="font-size:12.5px;color:#1B3A6B">📋 Calidad de la anamnesis</b>'
