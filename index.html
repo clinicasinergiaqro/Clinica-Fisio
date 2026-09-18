@@ -3440,7 +3440,14 @@ async function loadFromCloud(){
       // dispositivo se auto-purga en su siguiente load, sin migración manual.
       var saneadosLimpios=saneados.filter(function(p){ return !_esPacienteTest(p) && String((p&&p.id)||'').indexOf('mig_pac_')!==0; });
       try{ idsDeNube.forEach(function(id){ _sinRespaldoDel(id); }); }catch(_){}   // [RESPALDO] lo que ya está en la nube deja de estar "sin respaldo"
-      saveLocal('pts',saneadosLimpios);
+      // RENDIMIENTO: el saveLocal serializa TODO patientsDB (stringify pesado) y corre tras cada sync
+      // (login + cada refresco de Pacientes). Se DIFIERE a tiempo idle para no atorar el hilo justo
+      // después del sync; patientsDB en memoria ya queda al día (el caller lo asigna). Es solo caché
+      // offline: si la app se cierra antes del flush, se re-guarda en el próximo load (la nube ya tiene todo).
+      try{
+        if('requestIdleCallback' in window) requestIdleCallback(function(){ try{ saveLocal('pts',saneadosLimpios); }catch(_){} }, {timeout:4000});
+        else setTimeout(function(){ try{ saveLocal('pts',saneadosLimpios); }catch(_){} }, 0);
+      }catch(_){ try{ saveLocal('pts',saneadosLimpios); }catch(__){} }
       try{ localStorage.setItem('sinergia_ultimaSyncOk', new Date().toLocaleString('es-MX')); }catch(e){}
       return saneadosLimpios;
     }
@@ -4368,7 +4375,10 @@ function entrarComo(perfil, email, silencioso){
   loadFromCloud().then(d=>{
     if(d&&d.length>0){ patientsDB=d; if(typeof window._FST_invalidarVistaPacientes==='function') window._FST_invalidarVistaPacientes(); } // Fase 5: refresco Sheets → invalidar vista fusionada
     try{ renderAgenda(); }catch(e){ console.error('renderAgenda error:',e); }
-    try{ renderPacientes(); }catch(e){ console.error('renderPacientes error:',e); }
+    // RENDIMIENTO: al arrancar el usuario está en AGENDA; Pacientes se re-pinta solo al navegar
+    // (showPacientes). Construirlo aquí (shell + 40 tarjetas) compite con el primer pintado. Se
+    // difiere a tiempo idle como pre-calentamiento, sin frenar la agenda.
+    try{ if('requestIdleCallback' in window) requestIdleCallback(function(){ try{ renderPacientes(); }catch(_){} }, {timeout:4000}); else setTimeout(function(){ try{ renderPacientes(); }catch(_){} }, 800); }catch(e){ try{ renderPacientes(); }catch(_){} }
     try{ if(typeof _recuperarClinicosVaciosFS==='function'){ if('requestIdleCallback' in window) requestIdleCallback(_recuperarClinicosVaciosFS,{timeout:5000}); else setTimeout(_recuperarClinicosVaciosFS,1200); } }catch(_){}  // FASE 2: recuperar activos vacíos desde Firestore en tiempo IDLE (nunca compite con el primer pintado)
     // FASE 3b PASO 3 (flag ON): si el Sheet no respondió (d vacío/null) y NO hay copia local → levantar
     // la lista de activos desde Firestore para que la app funcione igual. Solo actúa en ese hueco.
@@ -9204,8 +9214,9 @@ function _resaltarNombre(nombre, qRaw){
 // Tarjeta de paciente — fuente ÚNICA (usada por la lista y por "Ver más").
 function _pacCardHTML(p, q, abrirFn){
   const hasConsent=tieneConsentimientoFirmado(p);   // [LOOP-D D1-a] helper único (array+legacy, exige firma real)
-  const inc=_soapVivas(p).some(s=>!s.completa);   // [BORRADO-NOTAS] VISTA
-  const soapAtrasado=!String(p.name||'').startsWith('TEST_QA_')&&necesitaAlertaSoapSemanal(p)&&_soapVivas(p).length>0;
+  const _vivas=_soapVivas(p);   // RENDIMIENTO: una sola vez por tarjeta (antes se llamaba 3× y cada una copiaba el array)
+  const inc=_vivas.some(s=>!s.completa);   // [BORRADO-NOTAS] VISTA
+  const soapAtrasado=!String(p.name||'').startsWith('TEST_QA_')&&necesitaAlertaSoapSemanal(p)&&_vivas.length>0;
   const esMio=p.terapeuta===currentUser.name;
   const badge=inc?`<span class="badge badge-alert" style="font-size:10px">⚠</span>`:!hasConsent?`<span class="badge badge-pending" style="font-size:10px">📋</span>`:soapAtrasado?`<span class="badge badge-alert" style="font-size:9px;background:#FEF3C7;color:#92400E">⚠️ +7d</span>`:'';
   // CONEXIÓN CLAUDE — marca persistente en la lista: 💡 sugerencia por revisar (o ⚠️ recapturar).
@@ -9221,7 +9232,7 @@ function _pacCardHTML(p, q, abrirFn){
             <span>👤 ${escapeHTML(p.age)}a</span>
             <span style="${!esMio?'color:var(--gold);font-weight:700':''}">🩺 ${escapeHTML(p.terapeuta)}</span>
             ${(typeof p.terapeutaSeguimiento==='string'&&p.terapeutaSeguimiento&&!p.terapeutaSeguimiento.includes('T00:'))?`<span style="color:var(--green);font-size:10px">→ ${escapeHTML(p.terapeutaSeguimiento)}</span>`:''}
-            <span>${Array.isArray(p.soap)?_soapVivas(p).length+' ses.':'— ses.'}</span>
+            <span>${Array.isArray(p.soap)?_vivas.length+' ses.':'— ses.'}</span>
           </div>
           <div class="patient-meta" style="margin-top:3px;font-size:11px;color:#5A6478;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:200px">${escapeHTML(typeof p.dx==='string'?p.dx.split(',')[0]:(p.dx?.dxClinico||p.dx?.dxMedico||'Sin diagnóstico'))}</div>
           ${(typeof _sinRespaldoTiene==='function'&&_sinRespaldoTiene(p.id))?`<div style="margin-top:5px;font-size:10.5px;font-weight:800;color:#7C2D12;background:#FEF2F2;border:1px solid #FCA5A5;border-radius:8px;padding:4px 8px;display:inline-block">🆘 Sin respaldo en la nube — abre con señal</div>`:''}
@@ -11136,17 +11147,26 @@ function FST_filtrarLista(arr, q) {
   const conRank = [];
   for (let idx = 0; idx < lista.length; idx++) {
     const p = lista[idx];
-    const dx = typeof p.dx === 'string'
-      ? p.dx
-      : (p.dx?.dxClinico || p.dx?.dxMedico || '');
-
-    const nombreN = FST_normalizarBusqueda((p.name || '') + ' ' + (p.nombreNormalizado || ''));
-    const texto = FST_normalizarBusqueda(
-      (p.name || '') + ' ' +
-      dx + ' ' +
-      (p.terapeuta || '') + ' ' +
-      (p.nombreNormalizado || '')
-    );
+    // RENDIMIENTO: cachear el blob de búsqueda por paciente (invalida con updatedAt). Antes se
+    // normalizaba (toLowerCase+NFD+regex) DOS veces por paciente en CADA tecla → con históricos
+    // incluidos eran ~5,000 normalizaciones por pulsación. Ahora se calcula una vez y se reusa.
+    let nombreN, texto;
+    const _ver = (p && p.updatedAt != null) ? p.updatedAt : '_';
+    if (p && p._fbAt === _ver && typeof p._fbNom === 'string') {
+      nombreN = p._fbNom; texto = p._fbTxt;
+    } else {
+      const dx = typeof p.dx === 'string'
+        ? p.dx
+        : (p.dx?.dxClinico || p.dx?.dxMedico || '');
+      nombreN = FST_normalizarBusqueda((p.name || '') + ' ' + (p.nombreNormalizado || ''));
+      texto = FST_normalizarBusqueda(
+        (p.name || '') + ' ' +
+        dx + ' ' +
+        (p.terapeuta || '') + ' ' +
+        (p.nombreNormalizado || '')
+      );
+      try { p._fbNom = nombreN; p._fbTxt = texto; p._fbAt = _ver; } catch (_) {}
+    }
 
     if (!palabras.every(w => texto.includes(w))) continue;   // I-F: TODAS las palabras
 
