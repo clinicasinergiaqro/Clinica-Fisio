@@ -23,8 +23,10 @@
 ## PRIORIDAD — Migrar pacientes ACTIVOS a Firestore (agendado: fin de semana)
 Motivo: hoy el expediente vive partido en dos backends (Sheets = historia de activos; Firestore = SOAP/históricos/live), cada uno con su propia lista de permisos desplegada a mano. Ese diseño es la RAÍZ de las fugas (caso Jess: Firestore la autorizaba pero el Sheets desplegado no; Storage sin `.lower()` y sin Dulce; clobber cross-device; límites de celda/lock de Sheets). Unificar en Firestore cierra la clase entera de problema.
 Hacerlo POR FASES y PROBANDO cada una (una migración a las prisas ya rompió la lectura antes → "no carga"):
-- Fase 1 (segura, aditiva): en cada guardado de activo, espejar la historia a Firestore en tiempo real (patrón `_espejarCampoFirestore`), SIN tocar la lectura → cero riesgo. Resolver bien el pid (id local vs pid Firestore, `FST_resolverPidPaciente`).
-- Fase 2: leer de Firestore cuando el Sheet venga vacío (recuperación).
+- **Fase 1 (DESPLEGADA 2026-09-18, rollout=['JESS'] en PR #346):** en cada guardado de activo, tras el POST OK al Sheet, `saveDB` llama `_mirrorHistoriaActivoFS(p, opts.camposHist)` que reusa `_persistirHistoricoFirestore(p, camposHist, /*silencioso*/true)` escribiendo a `.doc(p.id)`. Aditivo/fire-and-forget; falla → `_encolarHistDoc` (COLA_SYNC_HIST_DOC). Flag `MIRROR_FS_ROLLOUT` (poner `null` para toda la clínica al validar). Se cubrió el gap de `motivoHC`. NO toca la lectura.
+  - CLAVE (diagnóstico Sheet↔FS del 09-18): la historia va a `.doc(p.id)` DIRECTO (igual que estudios/reportes/`FST_hidratarCamposClinicos`), NO al pid de sesiones. `FST_resolverPidPaciente` es SOLO para SOAP/live (devuelve `app_live_<hash>`, distinto de p.id) → NO usarlo para el espejo de historia. Reglas: `pacienteClinicoUpdateOK` ya cubre los campos; no se tocó `firestore.rules`.
+  - Diagnóstico 09-18: 260 activos; 256/260 con doc en FS pero DESACTUALIZADO (Sheet siempre más nuevo) y solo 41 con motivo → no había espejo real. Falta: verificar que un guardado de Jess llega a FS; luego BACKFILL (subir la historia actual de todos sin esperar re-guardado; botón supervisor) y ampliar rollout a null.
+- Fase 2: leer de Firestore cuando el Sheet venga vacío (recuperación) — `FST_hidratarCamposClinicos` ya lee `.doc(p.id)`; enganchar en `loadFromCloud` cuando el activo venga con clínicos vacíos.
 - Fase 3: Firestore principal; Sheets pasa a respaldo/export.
 Probar en el equipo de Jess antes de confiar cada fase.
 
