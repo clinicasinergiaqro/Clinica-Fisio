@@ -2258,12 +2258,49 @@ async function saveDB(k, v, opts){
       if(intento<3) await new Promise(r=>setTimeout(r,1000));
     }
 
-    if(ok){ guardados++; desencolarSync(p.id); }
+    if(ok){ guardados++; desencolarSync(p.id);
+      // FASE 1 (migración) — ESPEJO EN VIVO: además del Sheet, escribir la historia del activo a
+      // Firestore (.doc(p.id)). Aditivo y fire-and-forget: el Sheet YA guardó; si el espejo falla,
+      // no afecta el guardado. Rollout controlado (empieza con el equipo de Jess).
+      try{ _mirrorHistoriaActivoFS(p, opts && opts.camposHist); }catch(_){}
+    }
     else { errores++; encolarSync(p.id); }
   }
 
   if(errores===0) return {ok:true, guardados};
   return {ok:false, pendiente:_pendienteHist, error:`${errores} de ${lista.length} pacientes no se guardaron`, guardados};
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// FASE 1 MIGRACIÓN — Espejo en vivo de la HISTORIA de activos a Firestore.
+// Reusa _persistirHistoricoFirestore (probado) escribiendo a .doc(p.id) — el mismo
+// doc que ya usan estudios/reportes/hidratación. Es ADITIVO: corre después de que el
+// Sheet guardó OK, en 2º plano; si falla, se encola (COLA_SYNC_HIST_DOC) y reintenta.
+// No toca la lectura (el Sheet sigue mandando) → cero riesgo para la app.
+// ROLLOUT: MIRROR_FS_ROLLOUT = lista de terapeutas a los que aplica (prueba con Jess).
+//   Poner null para activarlo en TODA la clínica cuando esté validado.
+// ════════════════════════════════════════════════════════════════════════════
+var MIRROR_FS_ROLLOUT = ['JESS'];
+function _mirrorHistoriaActivoFS(p, camposHist){
+  try{
+    if(!p || !p.id) return;
+    if(String(p.id).indexOf('mig_pac_')===0) return;   // históricos ya se persisten por su propia rama
+    if(typeof _esPacienteTest==='function' && _esPacienteTest(p)) return;
+    if(Array.isArray(MIRROR_FS_ROLLOUT) && MIRROR_FS_ROLLOUT.length){
+      var t=p.terapeuta||'', ts=p.terapeutaSeguimiento||'';
+      if(MIRROR_FS_ROLLOUT.indexOf(t)===-1 && MIRROR_FS_ROLLOUT.indexOf(ts)===-1) return;
+    }
+    // fire-and-forget: silencioso=true → sin popup de conflicto (el dato recién guardado manda);
+    // merge por campo (camposHist) → no pisa lo no tocado. Falla/offline → cola durable.
+    Promise.resolve().then(function(){ return _persistirHistoricoFirestore(p, camposHist, true); })
+      .then(function(r){
+        if(!(r && r.ok)){
+          try{ _encolarHistDoc(p, Array.isArray(camposHist)&&camposHist.length ? camposHist
+              : ['dx','motivo','motivoHC','motivoConsulta','valoracion','dxFuncional','planTto','antecedentes','contraindicaciones','alergias','seguridadClinica','motivosAnteriores','sugerenciaIA']); }catch(_){}
+        }
+      })
+      .catch(function(e){ console.warn('[espejo FS activo] no crítico:', e&&e.message); });
+  }catch(_){}
 }
 // FUGA-HISTÓRICOS: Firestore RECHAZA cualquier set() que contenga un valor `undefined` a
 // CUALQUIER profundidad y explota el write ENTERO (permission NO tiene nada que ver). Si el
@@ -2308,7 +2345,7 @@ function _sinUndefined(v){
 // Con lista → se escribe SOLO eso (con merge, lo no enviado se conserva en el doc y no se puede
 // pisar). '*' → bloque completo INTENCIONAL (importación masiva). Sin declarar → bloque completo
 // como siempre + console.warn (contrato: todo caller nuevo debe declarar sus campos).
-async function _persistirHistoricoFirestore(p, camposHist){
+async function _persistirHistoricoFirestore(p, camposHist, _espejoSilencioso){
   try{
     var ok = (typeof FST_init==='function') ? await FST_init() : false;
     if(!ok || !window._fstDb){ console.warn('[saveDB] Firestore no disponible; histórico no persistido:', p.id); return {ok:false, error:'firestore-no-disponible'}; }
@@ -2342,6 +2379,7 @@ async function _persistirHistoricoFirestore(p, camposHist){
     if(p.dx!=null)                       outCl.dx = p.dx;
     if(p.motivoConsulta!=null)           outCl.motivoConsulta = p.motivoConsulta;
     if(p.motivo!=null)                   outCl.motivo = p.motivo;
+    if(p.motivoHC!=null)                 outCl.motivoHC = p.motivoHC;   // FASE 1: faltaba espejar el motivo estructurado (zona/lado/irradiación)
     if(p.valoracion!=null)               outCl.valoracion = p.valoracion;
     if(p.dxFuncional!=null)              outCl.dxFuncional = p.dxFuncional;
     if(p.planTto!=null)                  outCl.planTto = p.planTto;
@@ -2401,7 +2439,7 @@ async function _persistirHistoricoFirestore(p, camposHist){
     // de escribir, listando los campos propios y (si el doc trae ultimosCampos) los del otro.
     // Sin baseline (p._updatedAtNube ausente: sesión vieja) o sin red → no hay chequeo (sin falsos positivos).
     try{
-      if(navigator.onLine && p._updatedAtNube != null){
+      if(navigator.onLine && p._updatedAtNube != null && !_espejoSilencioso){
         // CAPA 3: _conTimeout para que un get() colgado (online pero red muerta) no bloquee — al
         // timeout el catch(_c) de abajo sigue al write, que a su vez hará timeout y encolará.
         var _docPre = await _conTimeout(ref.get(), 8000);
