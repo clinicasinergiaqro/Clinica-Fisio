@@ -46,6 +46,11 @@ Probar en el equipo de Jess antes de confiar cada fase.
 4. **Alerta proactiva** cuando un equipo tiene datos atorados > X horas (tablero de salud de sync ya existe).
 5. **Actualización del PWA en iOS** ("no se puede actualizar"): indicador de versión visible + refresh más confiable. Toca el service worker → hacerla como pieza propia.
 
+## Rendimiento (auditoría 2026-09-18, PR #369)
+Ya optimizado de antes: búsqueda con debounce 180ms (`_pacInput`), lista paginada LOTE=40 + IntersectionObserver (`verMasPacientes_`/`_autoVerMasPacientes_`), índice FST throttled (30min/12h), `saveLocal('pts')` coalescido en write path (`_programarGuardadoLocalPts`), `_diaCanon` memoizado, refresco Pacientes throttle 30s.
+- HECHO (PR #369): (1) `FST_filtrarLista` cachea blob de búsqueda por paciente (`p._fbNom/_fbTxt/_fbAt`, invalida con updatedAt) → no re-normaliza ~5k veces por tecla; (2) `loadFromCloud` difiere el `saveLocal(pts)` a `requestIdleCallback`; (3) `entrarComo` difiere el `renderPacientes()` del boot a idle; (4) `_pacCardHTML` calcula `_soapVivas` 1 vez.
+- PENDIENTE opcional (bajo/medio riesgo, perfilar primero): sanitizar patientsDB una sola vez (no en cada `renderAgenda` L4968), cachear `FST_firmaPatientsDBLocal`, batch de `encolarSync` en el loop de `loadFromCloud` (O(N²) en retorno-de-offline), carga lazy de `firestore-compat` (head L36), single-pass de contadores en `renderAgenda`.
+
 ## Respaldos (estado: COMPLETO — 2026-09-16)
 - Sheets: `respaldoDiarioPacientes` (Apps Script, 03:00) → JSON diario en Drive `Respaldos_Clinica` (retención 180) + copia externa por correo a lftaranda.
 - Firestore: PITR 7 días + copias diaria/semanal 98 días (consola).
