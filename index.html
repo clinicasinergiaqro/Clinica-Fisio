@@ -23889,26 +23889,45 @@ function renderSupervision(){
     // terapeuta (agrupa por p.terapeuta, no por autor de cada nota) → bajaba por notas ajenas
     // (p.ej. una importada sin revisar de otro autor sobre su paciente). Sus dos componentes ya
     // se muestran como filas (Notas SOAP · Importadas sin revisar). Leyenda al pie del panel.
+    // LIMPIEZA FUERTE: la tarjeta muestra SOLO lo accionable (activos, notas SOAP y las alertas que
+    // estén >0). Lo que está en 0, más las cifras informativas, se esconde en "Ver todas las cifras".
+    const _rowAlerta=(label,val,icon,color)=> val>0
+      ? `<div class="sup-row"><div style="font-size:13px;color:var(--gray-600)">${label}</div><div style="font-weight:700;color:${color}">${icon} ${val}</div></div>`
+      : '';
+    const _alertas=[
+      _rowAlerta('Importadas sin revisar', inc, '⚠', 'var(--red)'),
+      _rowAlerta('Sin consentimiento', sinConsent, '📋', 'var(--amber)'),
+      _rowAlerta('Sin consent. de datos', sinDatos, '🔒', 'var(--amber)'),
+      _rowAlerta('Con eventos adversos', conEventos, '⚠️', 'var(--red)'),
+      _rowAlerta('Inactivos sin alta', inactivosSinAlta, '💤', 'var(--amber)'),
+      _rowAlerta('Sin sexo', sinSexo, '⚧', 'var(--amber)'),
+      _rowAlerta('Sin revaloración', sinRevaloracion, '📈', 'var(--amber)')
+    ].join('');
+    const _incompl=pts.filter(p=>_soapVivas(p).some(s=>!s.completa)).map(p=>`<div data-pid="${escapeAttr_(p.id)}" onclick="openExpediente(this.dataset.pid)" style="padding:8px 14px;font-size:12px;color:var(--red);font-weight:600;cursor:pointer;background:var(--red-light)">⚠ ${escapeHTML(p.name)} →</div>`).join('');
+    const _rowFull=(label,val,icon,color)=>`<div class="sup-row"><div style="font-size:13px;color:var(--gray-600)">${label}</div><div style="font-weight:700;color:${color}">${val>0?`${icon} ${val}`:'✅ 0'}</div></div>`;
     html+=`<div class="section-card" style="margin-bottom:12px">
       <div class="section-title">🩺 ${ter}</div>
       <div class="sup-row"><div style="font-size:13px;color:var(--gray-600)">Pacientes activos</div><div style="font-weight:700">${pts.length}</div></div>
       <div class="sup-row"><div style="font-size:13px;color:var(--gray-600)">Notas SOAP</div><div style="font-weight:700">${totalSOAP}</div></div>
-      <div class="sup-row"><div style="font-size:13px;color:var(--gray-600)">Importadas sin revisar</div><div style="font-weight:700;color:${inc>0?'var(--red)':'var(--green)'}">${inc>0?`⚠ ${inc}`:'✅ 0'}</div></div>
-      <div class="sup-row"><div style="font-size:13px;color:var(--gray-600)">Sin consentimiento</div><div style="font-weight:700;color:${sinConsent>0?'var(--amber)':'var(--green)'}">${sinConsent>0?`📋 ${sinConsent}`:'✅ 0'}</div></div>
-      <div class="sup-row"><div style="font-size:13px;color:var(--gray-600)">Sin consent. de datos</div><div style="font-weight:700;color:${sinDatos>0?'var(--amber)':'var(--green)'}">${sinDatos>0?`🔒 ${sinDatos}`:'✅ 0'}</div></div>
-      <div class="sup-row"><div style="font-size:13px;color:var(--gray-600)">Sin sexo</div><div style="font-weight:700;color:${sinSexo>0?'var(--amber)':'var(--green)'}">${sinSexo>0?`⚧ ${sinSexo}`:'✅ 0'}</div></div>
-      <div class="sup-row"><div style="font-size:13px;color:var(--gray-600)">Sin revaloración</div><div style="font-weight:700;color:${sinRevaloracion>0?'var(--amber)':'var(--green)'}">${sinRevaloracion>0?`📈 ${sinRevaloracion}`:'✅ 0'}</div></div>
-      <div class="sup-row"><div style="font-size:13px;color:var(--gray-600)">Con alta clínica</div><div style="font-weight:700;color:var(--navy)">🏁 ${conAlta}</div></div>
-      <div class="sup-row"><div style="font-size:13px;color:var(--gray-600)">Con eventos adversos</div><div style="font-weight:700;color:${conEventos>0?'var(--red)':'var(--green)'}">${conEventos>0?`⚠️ ${conEventos}`:'✅ 0'}</div></div>
-      <div class="sup-row"><div style="font-size:13px;color:var(--gray-600)">Inactivos sin alta</div><div style="font-weight:700;color:${inactivosSinAlta>0?'var(--amber)':'var(--green)'}">${inactivosSinAlta>0?`💤 ${inactivosSinAlta}`:'✅ 0'}</div></div>
-      ${pts.filter(p=>_soapVivas(p).some(s=>!s.completa)).map(p=>`<div data-pid="${escapeAttr_(p.id)}" onclick="openExpediente(this.dataset.pid)" style="padding:8px 14px;font-size:12px;color:var(--red);font-weight:600;cursor:pointer;background:var(--red-light)">⚠ ${escapeHTML(p.name)} →</div>`).join('')}
+      ${_alertas || '<div style="padding:6px 14px 8px;font-size:12.5px;color:var(--green);font-weight:700">✅ Sin pendientes</div>'}
+      ${_incompl}
+      <details style="margin:2px 14px 8px"><summary style="cursor:pointer;font-size:12px;font-weight:700;color:var(--navy);padding:4px 0">Ver todas las cifras</summary><div style="margin-top:2px">
+        ${_rowFull('Importadas sin revisar', inc, '⚠', 'var(--red)')}
+        ${_rowFull('Sin consentimiento', sinConsent, '📋', 'var(--amber)')}
+        ${_rowFull('Sin consent. de datos', sinDatos, '🔒', 'var(--amber)')}
+        ${_rowFull('Sin sexo', sinSexo, '⚧', 'var(--amber)')}
+        ${_rowFull('Sin revaloración', sinRevaloracion, '📈', 'var(--amber)')}
+        <div class="sup-row"><div style="font-size:13px;color:var(--gray-600)">Con alta clínica</div><div style="font-weight:700;color:var(--navy)">🏁 ${conAlta}</div></div>
+        ${_rowFull('Con eventos adversos', conEventos, '⚠️', 'var(--red)')}
+        ${_rowFull('Inactivos sin alta', inactivosSinAlta, '💤', 'var(--amber)')}
+      </div></details>
     </div>`;
   });
 
   // [LOOP-D B6] Una frase por cifra — leyenda VISIBLE (iPad no tiene hover: leyenda, no tooltip).
   // Criterio de aceptación del loop: si un número no admite su frase, se elimina (así cayó el %).
-  html+=`<div class="section-card" style="margin-bottom:12px">
-    <div class="section-title">ℹ️ Qué mide cada cifra</div>
+  html+=`<details class="section-card" style="margin-bottom:12px">
+    <summary class="section-title" style="cursor:pointer">ℹ️ Qué mide cada cifra</summary>
     <div style="padding:8px 14px 12px;font-size:11.5px;line-height:1.7;color:var(--gray-600)">
       <b>Pacientes activos</b>: pacientes asignados al terapeuta (campo terapeuta), sin contar borrados.<br>
       <b>Notas SOAP</b>: notas vivas (no borradas) de esos pacientes, las haya escrito quien sea.<br>
@@ -23920,7 +23939,7 @@ function renderSupervision(){
       <b>Cobertura</b> (Rendimiento): notas hechas ÷ citas identificadas de la ventana; sin identificar, en tiempo (24 h), no acudió y pre-inicio quedan fuera del denominador.<br>
       <span style="color:var(--gray-400)">El % por terapeuta se retiró: mezclaba notas de varios autores bajo un solo nombre y podía bajar por notas ajenas. Sus componentes se muestran por separado.</span>
     </div>
-  </div>`;
+  </details>`;
 
   // ── Pacientes sin actividad reciente ─────────────────────────────────────
   let diasInactividad=30;
@@ -23932,27 +23951,8 @@ function renderSupervision(){
     <div id="lista-inactividad" style="padding:0 14px 12px"></div>
   </div>`;
 
-  // ── SOAP pendiente semanal (M2-D) ────────────────────────────────────────
-  const conSoapAtrasado=patientsDB.filter(p=>!_activoEliminado(p.id)&&!String(p.name||'').startsWith('TEST_QA_')&&necesitaAlertaSoapSemanal(p)&&_soapVivas(p).length>0)   // [BORRADO-ACTIVOS] D2
-    .sort((a,b)=>diasDesdeUltimoSoap(b)-diasDesdeUltimoSoap(a));
-  html+=`<div class="section-card" style="margin-bottom:12px">
-    <div class="section-title">📅 SOAP pendiente semanal</div>
-    <div style="padding:0 14px 12px">
-      ${conSoapAtrasado.length===0
-        ? `<div style="padding:12px 0;font-size:13px;color:var(--green);font-weight:600">✅ Todos al día con su SOAP semanal</div>`
-        : conSoapAtrasado.map(p=>{
-            const ult=obtenerUltimaFechaSoap(p);
-            const dias=diasDesdeUltimoSoap(p);
-            return `<div style="padding:10px 0;border-bottom:1px solid var(--gray-100)">
-              <div style="font-size:14px;font-weight:600;color:var(--navy)">${escapeHTML(p.name)}</div>
-              <div style="font-size:12px;color:var(--gray-400)">🩺 ${p.terapeuta} · Última sesión: ${ult||'—'} · ${dias} días sin SOAP</div>
-              <div style="display:flex;gap:6px;margin-top:6px">
-                <button data-pid="${escapeAttr_(p.id)}" onclick="openExpediente(this.dataset.pid)" class="chip-quick">Ver expediente</button>
-              </div>
-            </div>`;
-          }).join('')}
-    </div>
-  </div>`;
+  // [LIMPIEZA FUERTE 2026-09-19] "📅 SOAP pendiente semanal" se retiró: se traslapaba con
+  // "😴 Pacientes sin actividad reciente" (ambas = quién lleva días sin nota). Se deja una sola.
 
   c.innerHTML=html;
   filtrarInactividad(diasInactividad);
