@@ -69,6 +69,14 @@ Las notas importadas quedaron con `TERAPEUTA_NO_RECONOCIDO` porque su terapeuta 
 - El mapa (1,116) NO va en el repo (público = fuga PHI): se le pasa a Carlos como archivo y se pega una vez. La conexión Apps Script (`claudeFsMerge`) está limitada a `pacientes/{id}` + whitelist → NO puede tocar sesiones ni desde Claude; por eso es botón cliente (auth supervisor).
 - RESUELTO 2026-09-19: Carlos pegó el mapa y Previsualizó → **0 notas 2026+ con `TERAPEUTA_NO_RECONOCIDO`** (las notas de 2026 se escriben in-app con terapeuta ya reconocido; el flag es artefacto de la migración de históricos 2023-2025). El Excel solo cubre 2026, así que no aplica a las viejas. DECISIÓN de Carlos: dejar el pilón viejo (2023-2025) OCULTO por el piso de fecha (opción "dejarlo así"); NO vaciarlo (sería suposición sobre notas que no va a revisar). El botón queda para uso futuro si algún día aparecen TNR de 2026+. No se escribió nada.
 
+## Pestaña Supervisión — limpieza fuerte (HECHA, PR #377)
+Decisión de Carlos ("simplificar", limpieza fuerte). `renderSupervision` (~L23858):
+- Tarjeta por terapeuta: muestra SIEMPRE Pacientes activos + Notas SOAP, y SOLO las alertas >0 (Importadas sin revisar, Sin consentimiento, Sin consent. datos, Con eventos adversos, Inactivos sin alta, Sin sexo, Sin revaloración) vía `_rowAlerta`. Sin alertas → "✅ Sin pendientes". Las cifras en 0 + "Con alta clínica" (informativa) se esconden en un `<details>` "Ver todas las cifras" (`_rowFull`). La lista clicable de notas incompletas se conserva.
+- La leyenda "ℹ️ Qué mide cada cifra" ahora es `<details>` colapsado.
+- Se retiró la sección "📅 SOAP pendiente semanal" (se traslapaba con "😴 Pacientes sin actividad reciente"; queda una sola). La función `necesitaAlertaSoapSemanal` puede quedar sin uso aquí (no se borró, sin riesgo).
+- NO se tocaron los botones de arriba (Exportar CSV, Preparar offline, Aviso privacidad, Abrir importador, Limpiar consentimientos prueba) ni el recuadro de estado offline ni la franja de aviso legal.
+- OBSERVADO (no cambiado): la franja "avisoLegalRevisado: false" sigue pendiente (aviso de privacidad sin revisar por abogado LFPDPPP); y en la tarjeta de Carlos "Sin consentimiento" = todos sus pacientes (revisar si el flujo de consentimiento se está usando).
+
 ## Respaldos (estado: COMPLETO — 2026-09-16)
 - Sheets: `respaldoDiarioPacientes` (Apps Script, 03:00) → JSON diario en Drive `Respaldos_Clinica` (retención 180) + copia externa por correo a lftaranda.
 - Firestore: PITR 7 días + copias diaria/semanal 98 días (consola).
