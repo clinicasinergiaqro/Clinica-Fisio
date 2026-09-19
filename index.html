@@ -23943,10 +23943,12 @@ function renderSupervision(){
 
   // ── Pacientes sin actividad reciente ─────────────────────────────────────
   let diasInactividad=30;
+  const _cntInact=d=>patientsDB.filter(p=>!_activoEliminado(p.id)&&diasDesdeUltimoSoap(p)>d).length;
   html+=`<div class="section-card" style="margin-bottom:12px">
     <div class="section-title">😴 Pacientes sin actividad reciente</div>
-    <div style="padding:10px 14px 4px;display:flex;gap:6px">
-      ${[15,30,60,90].map(d=>`<button onclick="filtrarInactividad(${d})" id="btn-inact-${d}" class="chip-quick${d===30?' chip-active':''}" style="${d===30?'background:var(--navy);color:white;':''}">Últimos ${d} días</button>`).join('')}
+    <div style="padding:2px 14px 0;font-size:11.5px;color:var(--gray-400)">Sin nota desde hace más de… (toca para filtrar; el número es cuántos hay)</div>
+    <div style="padding:8px 14px 4px;display:flex;gap:6px;flex-wrap:wrap">
+      ${[15,30,60,90].map(d=>`<button onclick="filtrarInactividad(${d})" id="btn-inact-${d}" class="chip-quick${d===30?' chip-active':''}" style="${d===30?'background:var(--navy);color:white;':''}">+${d}d (${_cntInact(d)})</button>`).join('')}
     </div>
     <div id="lista-inactividad" style="padding:0 14px 12px"></div>
   </div>`;
