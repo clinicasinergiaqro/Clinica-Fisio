@@ -7091,9 +7091,29 @@ function _toggleMenuMasSup(btn){
 function _montarBadgeColaRevision(){
   if(!esSupervisorUI()) return;
   var c=window._colaRevisionCache;
-  if(c && Array.isArray(c.items)){ _pintarBadgeColaRevision(c.items.length); return; }
-  var run=function(){ _fetchColaRevision(false).then(function(res){ _pintarBadgeColaRevision((res&&res.items)?res.items.length:0); }).catch(function(){}); };
+  if(c && Array.isArray(c.items)){ _pintarBadgeColaRevision(_colaRevItemsVisibles(c.items).length); return; }
+  var run=function(){ _fetchColaRevision(false).then(function(res){ _pintarBadgeColaRevision(_colaRevItemsVisibles((res&&res.items)||[]).length); }).catch(function(){}); };
   if('requestIdleCallback' in window) requestIdleCallback(run, {timeout:4000}); else setTimeout(run, 1200);
+}
+// PISO DE FECHA de la Cola de revisión: por defecto SOLO se muestra lo del 2026 en adelante. La
+// migración dejó ~2 mil flags de notas de 2023-2025 que Carlos no va a revisar ("ya son tan viejas
+// que no me acordaré"). No se borran: quedan ocultas y accesibles con el toggle 🕰️. Regla:
+//  · con fecha parseable → visible SOLO si es >= 2026-01-01.
+//  · sin fecha parseable → SE CONSERVA (puede ser reciente; ocultarla enterraría un SIN_FECHA actual).
+var COLA_REV_PISO_ISO='2026-01-01';
+function _colaRevItemsVisibles(items){
+  if(!Array.isArray(items)) return [];
+  if(window._colaRevVerViejos) return items;
+  return items.filter(function(it){
+    var iso=_fechaAInputISO(it&&it.fecha);   // 'YYYY-MM-DD' o '' si no parsea
+    if(!iso) return true;                     // sin fecha → conservar
+    return iso>=COLA_REV_PISO_ISO;            // con fecha → solo 2026+
+  });
+}
+function _toggleColaRevViejos(){
+  window._colaRevVerViejos=!window._colaRevVerViejos;
+  if(document.querySelector('[data-colarev]')) mostrarColaRevision(false, window._colaRevFiltro||null);
+  try{ if(window._colaRevisionCache) _pintarBadgeColaRevision(_colaRevItemsVisibles(window._colaRevisionCache.items).length); }catch(_){}
 }
 async function _fetchColaRevision(forzar){
   if(!forzar && window._colaRevisionCache && Array.isArray(window._colaRevisionCache.items)) return window._colaRevisionCache;
@@ -7112,10 +7132,14 @@ async function _fetchColaRevision(forzar){
   });
   items.sort(function(a,b){ return a.nombre.localeCompare(b.nombre,'es') || (a.num-b.num); });
   window._colaRevisionCache={ts:Date.now(), items:items};
-  try{ _pintarBadgeColaRevision(items.length); }catch(_){}   // mantener el badge de la barra al día tras cualquier relectura/validación
+  try{ _pintarBadgeColaRevision(_colaRevItemsVisibles(items).length); }catch(_){}   // badge = solo lo visible (2026+); mantener al día tras cada relectura/validación
   return window._colaRevisionCache;
 }
 function _colaRevisionHTML(items, filtro, desdeCache){
+  // PISO DE FECHA: por defecto solo 2026+ (las viejas de la migración quedan ocultas, no borradas).
+  var _todos=Array.isArray(items)?items:[];
+  items=_colaRevItemsVisibles(_todos);
+  var _ocultas=_todos.length-items.length;
   var conteos={};
   items.forEach(function(it){ it.motivos.forEach(function(m){ conteos[m]=(conteos[m]||0)+1; }); });
   var chipTodas='<button onclick="mostrarColaRevision(false, null)" style="font-size:11px;font-weight:700;border:none;border-radius:10px;padding:5px 10px;margin:2px;cursor:pointer;font-family:inherit;'+(!filtro?'background:var(--navy);color:#fff':'background:#EEF1F6;color:var(--navy)')+'">Todas ('+items.length+')</button>';
@@ -7184,6 +7208,7 @@ function _colaRevisionHTML(items, filtro, desdeCache){
     +'<button onclick="this.closest(\'[data-colarev]\').remove()" style="background:none;border:none;font-size:22px;color:var(--gray-400);cursor:pointer">×</button></div>'
     +'<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:4px">'
     +'<button onclick="mostrarColaRevision(true, window._colaRevFiltro||null)" style="font-size:11px;font-weight:700;border:none;border-radius:10px;padding:5px 10px;cursor:pointer;font-family:inherit;background:#EEF1F6;color:var(--navy)">🔄 Actualizar</button>'
+    +'<button onclick="_toggleColaRevViejos()" style="font-size:11px;font-weight:700;border:none;border-radius:10px;padding:5px 10px;cursor:pointer;font-family:inherit;background:'+(window._colaRevVerViejos?'#FDE8E8;color:#B91C1C':'#EEF1F6;color:var(--navy)')+'">'+(window._colaRevVerViejos?'🕰️ Viendo todas — volver a solo 2026+':'📅 Solo 2026 en adelante'+(_ocultas>0?(' ('+_ocultas+' anteriores ocultas)'):''))+'</button>'
     +(desdeCache?'<span style="font-size:10px;color:var(--gray-400)">cache de sesión</span>':'')
     +'</div>'
     +'<div style="margin-bottom:6px">'+chipTodas+chips+'</div>'
@@ -7227,7 +7252,8 @@ async function _validarGrupoRevision(motivo){
   var cache=window._colaRevisionCache;
   if(!cache||!Array.isArray(cache.items)) return;
   var filtro=window._colaRevFiltro||null;
-  var visibles=filtro?cache.items.filter(function(it){ return it.motivos.indexOf(filtro)!==-1; }):cache.items;
+  var base=_colaRevItemsVisibles(cache.items);   // respeta el piso 2026+ / toggle: no valida las viejas ocultas
+  var visibles=filtro?base.filter(function(it){ return it.motivos.indexOf(filtro)!==-1; }):base;
   var grupo=visibles.filter(function(it){ return (filtro||it.motivos[0]||'OTRO')===motivo; });
   if(!grupo.length) return;
   if(!confirm('¿Marcar como VALIDADAS las '+grupo.length+' sesiones de "'+(MOTIVO_LABELS[motivo]||motivo)+'"? Se quita el flag de revisión de todas (los datos quedan como están).')) return;
@@ -7256,7 +7282,7 @@ async function _validarCaducadasRevision(){
   var cache=window._colaRevisionCache;
   if(!cache||!Array.isArray(cache.items)) return;
   var hoyISO=_hoyISOlocal();
-  var cad=cache.items.filter(function(it){
+  var cad=_colaRevItemsVisibles(cache.items).filter(function(it){   // respeta el piso 2026+ / toggle
     if(it.motivos.indexOf('FECHA_FUTURA')===-1) return false;
     var iso=_fechaAInputISO(it.fecha);
     return !!iso && iso<=hoyISO;   // ESTRICTO: sin fecha parseable o > hoy → fuera del lote
