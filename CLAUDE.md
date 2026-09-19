@@ -51,6 +51,16 @@ Ya optimizado de antes: búsqueda con debounce 180ms (`_pacInput`), lista pagina
 - HECHO (PR #369): (1) `FST_filtrarLista` cachea blob de búsqueda por paciente (`p._fbNom/_fbTxt/_fbAt`, invalida con updatedAt) → no re-normaliza ~5k veces por tecla; (2) `loadFromCloud` difiere el `saveLocal(pts)` a `requestIdleCallback`; (3) `entrarComo` difiere el `renderPacientes()` del boot a idle; (4) `_pacCardHTML` calcula `_soapVivas` 1 vez.
 - PENDIENTE opcional (bajo/medio riesgo, perfilar primero): sanitizar patientsDB una sola vez (no en cada `renderAgenda` L4968), cachear `FST_firmaPatientsDBLocal`, batch de `encolarSync` en el loop de `loadFromCloud` (O(N²) en retorno-de-offline), carga lazy de `firestore-compat` (head L36), single-pass de contadores en `renderAgenda`.
 
+## Barra de supervisor — consolidación (auditoría 2026-09-19)
+Auditoría de los 7 botones de la barra de agenda + su contenido. Plan de 4 etapas; Carlos pidió 1 y 2.
+- **Etapa 1 (HECHA, PR #371):** las 6 herramientas de migración de una-sola-vez (generar valoraciones, curación de nombres, reparar índices, ☁️ espejar historia, 👤 espejar identidad, 🧪 Activos-FS ON/OFF) pasan a un `<details>` plegado **"🧰 Migración (archivo)"** dentro del panel de diagnóstico (`_detHTMLAcciones`, solo supervisor). Se quitó el botón DUPLICADO "🔎 Detección de datos" de la barra (ya se abre por el 🔎 del encabezado). "🧹 Limpiar pruebas" se movió del modal de Revalorar a ese archivo.
+- **Etapa 2 (HECHA, PR #371):** contadores reales/coherentes.
+  - `_countRevaloraciones` (badge "🔄 Revalorar (N)") cuenta SOLO accionable (`tipo==='manual'||'eva'`) y excluye `_activoEliminado`. La 🚩 vigilancia (`_vigilanciaClinica`: banderas/comorbilidades/contraindicaciones) es permanente → ya NO cuenta (antes atoraba el badge en crónicos).
+  - `mostrarRevaloraciones` partido en dos: accionables arriba (= el badge) + `<details>` "🚩 Vigilancia clínica (N)". Se quitó de las tarjetas el botón destructivo "🗑️ Mover a papelera" (queda en el expediente).
+  - "🔍 Cola de revisión" gana badge `(N)` (`_montarBadgeColaRevision`/`_pintarBadgeColaRevision`): pinta al instante desde `window._colaRevisionCache` o la calienta en idle; se refresca en cada relectura de `_fetchColaRevision`. NO se oculta el botón (el conteo es collectionGroup async, no se sabe al pintar).
+- **Etapa 3 (PENDIENTE, no pedida):** fusionar "📋 Sin documentar" dentro de "📊 Rendimiento" + limpiar secciones muertas.
+- **Etapa 4 (PENDIENTE, no pedida):** menú "⚙️ Más" para agrupar lo de baja frecuencia.
+
 ## Respaldos (estado: COMPLETO — 2026-09-16)
 - Sheets: `respaldoDiarioPacientes` (Apps Script, 03:00) → JSON diario en Drive `Respaldos_Clinica` (retención 180) + copia externa por correo a lftaranda.
 - Firestore: PITR 7 días + copias diaria/semanal 98 días (consola).
