@@ -5328,7 +5328,7 @@ async function FST_montarAgendaCalendar(rango){
     + '<div style="font-size:13px;font-weight:700;color:var(--navy);margin-bottom:8px">📅 Agenda del calendario</div>'
     + '<div style="font-size:10px;color:var(--gray-400);margin:-4px 0 8px">Sincronizado desde Google Calendar · Solo lectura</div>'
     + '<div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap">'+btn('dia','Hoy')+btn('manana','Mañana')+btn('pasado','Pasado')+btn('semana','Semana')+btn('semanaSiguiente','Próxima')+'</div>'
-    + (esSupervisorUI()?'<div style="margin-bottom:10px;display:flex;gap:6px;flex-wrap:wrap"><button onclick="mostrarPendientesSOAP()" style="font-size:12px;font-weight:700;border:none;border-radius:10px;padding:6px 12px;cursor:pointer;font-family:inherit;background:#FEF3C7;color:#92400E">📋 Sin documentar</button><button onclick="mostrarRendimientoEquipo(\'hoy\')" style="font-size:12px;font-weight:700;border:none;border-radius:10px;padding:6px 12px;cursor:pointer;font-family:inherit;background:#E8F5EE;color:#2E7D52">📊 Rendimiento</button><button id="btn-colarev" onclick="mostrarColaRevision()" style="font-size:12px;font-weight:700;border:none;border-radius:10px;padding:6px 12px;cursor:pointer;font-family:inherit;background:#FDE8E8;color:#B91C1C">🔍 Cola de revisión<span id="colarev-badge"></span></button><button onclick="mostrarRevaloraciones()" style="font-size:12px;font-weight:700;border:none;border-radius:10px;padding:6px 12px;cursor:pointer;font-family:inherit;background:#E0E7FF;color:#3730A3">🔄 Revalorar'+((typeof _countRevaloraciones==="function"&&_countRevaloraciones()>0)?(" ("+_countRevaloraciones()+")"):"")+'</button><button onclick="toggleVistaTerapeuta()" style="font-size:12px;font-weight:700;border:none;border-radius:10px;padding:6px 12px;cursor:pointer;font-family:inherit;background:#EEF1F6;color:var(--navy)">👁️ Ver como terapeuta</button>'+(_puedeBorrar()?'<button onclick="abrirPapelera()" style="font-size:12px;font-weight:700;border:none;border-radius:10px;padding:6px 12px;cursor:pointer;font-family:inherit;background:#F1F5F9;color:#334155">🗑️ Papelera</button>':'')+'</div>':'')
+    + (esSupervisorUI()?'<div style="margin-bottom:10px;display:flex;gap:6px;flex-wrap:wrap;align-items:center"><button onclick="mostrarRendimientoEquipo(\'hoy\')" style="font-size:12px;font-weight:700;border:none;border-radius:10px;padding:6px 12px;cursor:pointer;font-family:inherit;background:#E8F5EE;color:#2E7D52">📊 Rendimiento</button><button id="btn-colarev" onclick="mostrarColaRevision()" style="font-size:12px;font-weight:700;border:none;border-radius:10px;padding:6px 12px;cursor:pointer;font-family:inherit;background:#FDE8E8;color:#B91C1C">🔍 Cola de revisión<span id="colarev-badge"></span></button><button onclick="mostrarRevaloraciones()" style="font-size:12px;font-weight:700;border:none;border-radius:10px;padding:6px 12px;cursor:pointer;font-family:inherit;background:#E0E7FF;color:#3730A3">🔄 Revalorar'+((typeof _countRevaloraciones==="function"&&_countRevaloraciones()>0)?(" ("+_countRevaloraciones()+")"):"")+'</button><span style="position:relative;display:inline-block"><button onclick="_toggleMenuMasSup(this)" style="font-size:12px;font-weight:700;border:none;border-radius:10px;padding:6px 12px;cursor:pointer;font-family:inherit;background:#EEF1F6;color:var(--navy)">⚙️ Más ▾</button><div id="menu-mas-sup" style="display:none;position:absolute;right:0;top:112%;z-index:40;background:#fff;border:1px solid var(--gray-200);border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,.14);padding:6px;min-width:200px"><button onclick="document.getElementById(\'menu-mas-sup\').style.display=\'none\';toggleVistaTerapeuta()" style="display:block;width:100%;text-align:left;font-size:12px;font-weight:700;border:none;border-radius:8px;padding:9px 10px;cursor:pointer;font-family:inherit;background:#F7F9FC;color:var(--navy)">👁️ Ver como terapeuta</button>'+(_puedeBorrar()?'<button onclick="document.getElementById(\'menu-mas-sup\').style.display=\'none\';abrirPapelera()" style="display:block;width:100%;text-align:left;font-size:12px;font-weight:700;border:none;border-radius:8px;padding:9px 10px;margin-top:4px;cursor:pointer;font-family:inherit;background:#F7F9FC;color:#334155">🗑️ Papelera</button>':'')+'</div></span></div>':'')
     + '<div id="banner-pend-personal"></div>'
     + '<div id="agenda-cal-list"><div style="font-size:12px;color:var(--gray-400);padding:6px 0">⏳ Cargando agenda…</div></div>'
     + '</div></div>';
@@ -7076,6 +7076,18 @@ function _pintarBadgeColaRevision(n){
   var b=document.getElementById('colarev-badge'); if(!b) return;
   b.textContent = (n>0) ? (' ('+n+')') : '';
 }
+// Menú "⚙️ Más" de la barra de supervisor (Etapa 4): agrupa lo de baja frecuencia (ver como
+// terapeuta, papelera). Toggle simple con cierre al tocar fuera. El id es único y el toolbar se
+// re-pinta cerrado en cada renderAgenda, así que no queda abierto entre pantallas.
+function _toggleMenuMasSup(btn){
+  var m=document.getElementById('menu-mas-sup'); if(!m) return;
+  var abrir=(m.style.display==='none'||!m.style.display);
+  m.style.display=abrir?'block':'none';
+  if(abrir){
+    var cerrar=function(e){ if(!m.contains(e.target) && e.target!==btn && !btn.contains(e.target)){ m.style.display='none'; document.removeEventListener('click',cerrar,true); } };
+    setTimeout(function(){ document.addEventListener('click',cerrar,true); },0);
+  }
+}
 function _montarBadgeColaRevision(){
   if(!esSupervisorUI()) return;
   var c=window._colaRevisionCache;
@@ -7525,6 +7537,7 @@ function _rendimientoHTML(datos, noId, ventana, etiqueta, aviso, refresco, tri){
     +'<button onclick="this.closest(\'[data-rendov]\').remove()" style="background:none;border:none;font-size:22px;color:var(--gray-400);cursor:pointer">×</button></div>'
     +'<div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap;align-items:center">'+btnV('hoy','Hoy')+btnV('semana','Esta semana')+btnV('7dias','7 días')+btnV('mes','Mes')+btnV('mesAnterior','Mes anterior')
     +'<button onclick="mostrarRendimientoEquipo(\''+ventana+'\', true)" style="font-size:11px;font-weight:700;border:none;border-radius:10px;padding:5px 10px;cursor:pointer;font-family:inherit;background:#EEF1F6;color:var(--navy)">🔄 Actualizar</button>'
+    +'<button onclick="mostrarPendientesSOAP()" style="font-size:11px;font-weight:700;border:none;border-radius:10px;padding:5px 10px;cursor:pointer;font-family:inherit;background:#FEF3C7;color:#92400E" title="Lista simple, cruzando terapeutas, con los nombres por identificar">📋 Sin documentar (lista)</button>'
     +((refresco&&refresco.desdeCache)?('<span style="font-size:10px;color:var(--gray-400)">cache · hace '+Math.max(1,Math.round((Date.now()-(refresco.ts||Date.now()))/1000))+' s</span>'):'')
     +'</div>'
     +'<div style="font-size:12px;color:var(--gray-500);margin-bottom:8px">'+escapeHTML(etiqueta)+' · Citas de Google Calendar vs notas SOAP (activos + históricos)</div>'
