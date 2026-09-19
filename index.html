@@ -8114,6 +8114,7 @@ function _detHTMLAcciones(hayHallazgos){
       + '<button id="det-espejo-id" onclick="_detEspejarIdentidadFS()" style="font-size:13px;font-weight:800;border:none;border-radius:10px;padding:9px 16px;cursor:pointer;font-family:inherit;background:#0E7490;color:#fff">👤 Espejar identidad a Firestore</button>'
       + '<button id="det-fase3b" onclick="_toggleFase3bActivos()" style="font-size:13px;font-weight:800;border:none;border-radius:10px;padding:9px 16px;cursor:pointer;font-family:inherit;background:'+((typeof _fase3bActivo==='function'&&_fase3bActivo())?'#6D28D9':'#EEF1F6')+';color:'+((typeof _fase3bActivo==='function'&&_fase3bActivo())?'#fff':'var(--navy)')+'">🧪 Activos-FS: '+((typeof _fase3bActivo==='function'&&_fase3bActivo())?'ON':'OFF')+'</button>'
       + '<button id="det-limpia-test" onclick="_limpiarTodosLosTest()" style="font-size:13px;font-weight:800;border:none;border-radius:10px;padding:9px 16px;cursor:pointer;font-family:inherit;background:#FEE2E2;color:#B91C1C">🧹 Limpiar pruebas</button>'
+      + '<button id="det-atr-ter" onclick="_detAtribuirTerapeutaExcel()" style="font-size:13px;font-weight:800;border:none;border-radius:10px;padding:9px 16px;cursor:pointer;font-family:inherit;background:#0E7490;color:#fff">🩺 Terapeutas del Excel → Cola</button>'
       + '</div></details>';
   }
   return html;
@@ -8284,6 +8285,111 @@ async function _detEspejarIdentidadFS(){
   }
 }
 
+// ── ATRIBUIR TERAPEUTA A LA COLA DESDE EL EXCEL DE RECEPCIÓN (supervisor) ──────────────────────
+// Las notas importadas quedaron con "TERAPEUTA_NO_RECONOCIDO" porque su terapeuta venía vacío. El
+// Excel de recepción (abril-septiembre 2026) SÍ trae quién atendió a cada paciente. Este tool toma
+// un mapa pegado "paciente|TERAPEUTA" (nombre ya normalizado igual que _normPend) y llena el campo
+// terapeuta de las notas 2026+ marcadas así; las que no estén en el Excel quedan "Desconocido"
+// (decisión de Carlos: nunca se sabrá, salvo revisar sus calendarios). Quita SOLO el motivo
+// TERAPEUTA_NO_RECONOCIDO; si la nota tenía otro motivo (fecha, etc.) sigue en la cola por ese.
+// Reglas ya lo permiten (sesionUpdateOK: terapeuta/motivosRevision/revisionPendiente). Idempotente.
+function _detParseMapaTer(txt){
+  var map={};
+  String(txt||'').split(/\r?\n/).forEach(function(ln){
+    ln=ln.trim(); if(!ln) return;
+    var i=ln.lastIndexOf('|'); if(i<0) return;
+    var nom=ln.slice(0,i).trim(); var ter=ln.slice(i+1).trim().toUpperCase();
+    if(nom && ter) map[nom]=ter;
+  });
+  return map;
+}
+function _detColaObjetivoTNR(cache){
+  // Notas marcadas "Terapeuta no reconocido", solo 2026+ (o sin fecha parseable), respetando el piso.
+  var floor=function(it){ var iso=_fechaAInputISO(it&&it.fecha); return !iso || iso>=COLA_REV_PISO_ISO; };
+  return (cache&&Array.isArray(cache.items)?cache.items:[]).filter(function(it){
+    return it.motivos && it.motivos.indexOf('TERAPEUTA_NO_RECONOCIDO')!==-1 && floor(it);
+  });
+}
+function _detAtribuirTerapeutaExcel(){
+  if(!(typeof esSupervisorUI==='function' && esSupervisorUI())){ showToast('Solo supervisor','error'); return; }
+  var cont=document.getElementById('det-resultados'); if(!cont) return;
+  var html=''
+    +'<div style="font-size:12px;color:#334155;margin-bottom:6px">Pega el mapa <b>paciente|TERAPEUTA</b> (una línea por paciente; el nombre va como lo normaliza la app). Llena el terapeuta de las notas <b>2026+</b> marcadas <b>“Terapeuta no reconocido”</b>. Las que no estén en el Excel quedan <b>Desconocido</b>. Quita solo ese motivo (si la nota tiene otro, sigue en la cola por ese).</div>'
+    +'<textarea id="det-atr-map" rows="4" placeholder="juan perez|ZARA&#10;maria lopez|CAMI&#10;..." style="width:100%;box-sizing:border-box;border:1px solid var(--gray-200);border-radius:8px;padding:8px;font-family:monospace;font-size:11px"></textarea>'
+    +'<div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">'
+    +'<button onclick="_detAtrPreview()" style="font-size:13px;font-weight:800;border:none;border-radius:10px;padding:9px 16px;cursor:pointer;font-family:inherit;background:var(--navy);color:#fff">🔎 Previsualizar</button>'
+    +'</div><div id="det-atr-out" style="margin-top:8px"></div>';
+  cont.innerHTML=_detBloque('🩺 Terapeutas del Excel → Cola de revisión', html, 'info')+_detHTMLAcciones(false);
+}
+async function _detAtrPreview(){
+  if(!(typeof esSupervisorUI==='function' && esSupervisorUI())){ showToast('Solo supervisor','error'); return; }
+  var out=document.getElementById('det-atr-out'), ta=document.getElementById('det-atr-map');
+  var map=_detParseMapaTer(ta&&ta.value);
+  if(!Object.keys(map).length){ if(out) out.innerHTML='<div style="font-size:12px;color:#B91C1C">Pega primero el mapa (líneas paciente|TERAPEUTA).</div>'; return; }
+  if(out) out.innerHTML='<div style="font-size:12px;color:var(--gray-500)">⏳ Leyendo la cola…</div>';
+  var cache; try{ cache=await _fetchColaRevision(false); }catch(e){ if(out) out.innerHTML='<div style="font-size:12px;color:#B91C1C">No se pudo leer la cola: '+escapeHTML((e&&e.message)||'')+'</div>'; return; }
+  var obj=_detColaObjetivoTNR(cache);
+  var porTer={}, desco=[], multiMotivo=0;
+  obj.forEach(function(it){
+    var ter=map[_normPend(it.nombre)]||'';
+    if(ter) porTer[ter]=(porTer[ter]||0)+1; else desco.push(it.nombre||'(sin nombre)');
+    if(it.motivos.filter(function(m){return m!=='TERAPEUTA_NO_RECONOCIDO';}).length>0) multiMotivo++;
+  });
+  var ident=obj.length-desco.length;
+  var repar=Object.keys(porTer).sort().map(function(k){return escapeHTML(k)+': '+porTer[k];}).join(' · ');
+  var h='<div style="font-size:12px;color:#334155">'
+    +'Notas 2026+ marcadas “Terapeuta no reconocido”: <b>'+obj.length+'</b><br>'
+    +'✅ Se atribuirán por el Excel: <b>'+ident+'</b>'+(repar?(' ('+repar+')'):'')+'<br>'
+    +'❓ Quedan como <b>Desconocido</b>: <b>'+desco.length+'</b>'
+    +(multiMotivo?('<br><span style="color:#92400E">'+multiMotivo+' tienen ADEMÁS otro motivo (fecha, etc.): se les pone terapeuta pero SIGUEN en la cola por ese otro motivo.</span>'):'')
+    +'</div>';
+  if(!obj.length){ h='<div style="font-size:12px;color:#2E7D52;font-weight:700">✅ No hay notas 2026+ con “Terapeuta no reconocido”. Nada que hacer.</div>'; }
+  else {
+    h+='<div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap"><button onclick="_detAtrAplicar()" style="font-size:13px;font-weight:800;border:none;border-radius:10px;padding:9px 16px;cursor:pointer;font-family:inherit;background:#B45309;color:#fff">✍️ Aplicar ('+obj.length+')</button></div>';
+    if(desco.length){
+      h+='<div style="font-size:11px;color:var(--gray-500);margin-top:8px">Lista “Desconocido” (para revisar en tus calendarios'+(desco.length>400?'; muestra 400 de '+desco.length:'')+'):</div>'
+        +'<textarea readonly rows="4" style="width:100%;box-sizing:border-box;border:1px solid var(--gray-200);border-radius:8px;padding:6px;font-size:11px;font-family:monospace">'+escapeHTML(desco.slice(0,400).join('\n'))+'</textarea>';
+    }
+  }
+  if(out) out.innerHTML=h;
+}
+async function _detAtrAplicar(){
+  if(!(typeof esSupervisorUI==='function' && esSupervisorUI())){ showToast('Solo supervisor','error'); return; }
+  var out=document.getElementById('det-atr-out'), ta=document.getElementById('det-atr-map');
+  var map=_detParseMapaTer(ta&&ta.value);
+  if(!Object.keys(map).length){ showToast('Falta el mapa','error'); return; }
+  var cache; try{ cache=await _fetchColaRevision(false); }catch(e){ showToast('No se pudo leer la cola','error'); return; }
+  var obj=_detColaObjetivoTNR(cache);
+  if(!obj.length){ showToast('Nada que atribuir','success'); return; }
+  if(!confirm('¿Escribir el terapeuta en '+obj.length+' notas (2026+) marcadas “Terapeuta no reconocido”?\n\nLas que no estén en el Excel quedan “Desconocido”. Se quita ese motivo; si la nota tiene otro motivo (fecha, etc.) sigue en la cola por ese.\n\nEs por lotes, idempotente y se puede repetir.')) return;
+  var ok=await FST_init(); if(!ok||!window._fstDb){ showToast('Sin conexión a la nube','error'); return; }
+  var okN=0, fail=0, _B=400, resueltos={};
+  for(var i=0;i<obj.length;i+=_B){
+    var lote=obj.slice(i,i+_B);
+    if(out) out.innerHTML='<div style="font-size:12px;color:var(--gray-500)">✍️ Aplicando… '+Math.min(i+_B,obj.length)+'/'+obj.length+'</div>';
+    await new Promise(function(r){ setTimeout(r,0); });
+    var batch=window._fstDb.batch();
+    lote.forEach(function(it){
+      var ter=map[_normPend(it.nombre)]||'Desconocido';
+      var resto=(it.motivos||[]).filter(function(m){return m!=='TERAPEUTA_NO_RECONOCIDO';});
+      var upd={ terapeuta:ter, motivosRevision:resto, revisionPendiente:(resto.length>0) };
+      try{ upd.updatedAt=firebase.firestore.FieldValue.serverTimestamp(); }catch(_){}
+      if(resto.length===0) resueltos[it.path]=true;
+      batch.set(window._fstDb.doc(it.path), upd, {merge:true});
+    });
+    try{ await batch.commit(); okN+=lote.length; }catch(e){ fail+=lote.length; }
+  }
+  // Reflejar en cache de sesión: quitar los resueltos y limpiar el motivo de los que siguen.
+  try{
+    if(window._colaRevisionCache&&Array.isArray(window._colaRevisionCache.items)){
+      window._colaRevisionCache.items=window._colaRevisionCache.items.filter(function(it){ return !resueltos[it.path]; });
+      window._colaRevisionCache.items.forEach(function(it){ if(it.motivos) it.motivos=it.motivos.filter(function(m){return m!=='TERAPEUTA_NO_RECONOCIDO';}); });
+      _pintarBadgeColaRevision(_colaRevItemsVisibles(window._colaRevisionCache.items).length);
+    }
+  }catch(_){}
+  if(out) out.innerHTML=_detBloque('✍️ Atribución aplicada', '<b>'+okN+'</b> notas actualizadas'+(fail?(' · <b>'+fail+'</b> fallaron (reintenta el botón)'):'')+'. Se quitó el motivo “Terapeuta no reconocido”; las que tenían otro motivo siguen en la cola por ese.', fail?'warning':'ok');
+  showToast(fail?('Aplicado con '+fail+' fallos'):('✍️ '+okN+' notas atribuidas'), fail?'warning':'success');
+}
 // ── RETROACTIVO: nota de valoración (sesión 1) para expedientes con historia y 0 sesiones ──────
 // Genera la nota de valoración a partir de los datos YA capturados del expediente (igual que lo
 // hace un alta nueva), con la FECHA ORIGINAL del expediente. Salvaguardas: supervisor-only,
