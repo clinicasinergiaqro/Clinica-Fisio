@@ -5501,6 +5501,10 @@ function _evaSinMejoria(p){
     .map(_evaRep).filter(function(v){return v!=null;});
   if(conEva.length<3) return null;
   var u=conEva.slice(-3);
+  // CRITERIO (Carlos 2026-09-19): la alerta es por dolor que NO cede. Si el dolor ACTUAL (última EVA)
+  // ya es bajo (<=2), el paciente está bien y no hay nada que "mejorar" → NO es caso de revaloración.
+  // Esto elimina los falsos positivos tipo 0→0, 1→0, 2→2, etc. (EVA baja = paciente resuelto).
+  if(u[2] <= 2) return null;
   var caida=u[0]-u[2];
   if(caida<3){
     var txt=(caida<=0)
