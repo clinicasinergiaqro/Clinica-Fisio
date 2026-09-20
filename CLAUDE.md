@@ -76,7 +76,8 @@ Decisión de Carlos ("simplificar", limpieza fuerte). `renderSupervision` (~L238
 - La leyenda "ℹ️ Qué mide cada cifra" ahora es `<details>` colapsado.
 - Se retiró la sección "📅 SOAP pendiente semanal" (se traslapaba con "😴 Pacientes sin actividad reciente"; queda una sola). La función `necesitaAlertaSoapSemanal` puede quedar sin uso aquí (no se borró, sin riesgo).
 - NO se tocaron los botones de arriba (Exportar CSV, Preparar offline, Aviso privacidad, Abrir importador, Limpiar consentimientos prueba) ni el recuadro de estado offline ni la franja de aviso legal.
-- OBSERVADO (no cambiado): la franja "avisoLegalRevisado: false" sigue pendiente (aviso de privacidad sin revisar por abogado LFPDPPP); y en la tarjeta de Carlos "Sin consentimiento" = todos sus pacientes (revisar si el flujo de consentimiento se está usando).
+- OBSERVADO (no cambiado): la franja "avisoLegalRevisado: false" sigue pendiente (aviso de privacidad sin revisar por abogado LFPDPPP); y en la tarjeta de Carlos "Sin consentimiento" = todos sus pacientes.
+- **CONSENTIMIENTOS — EN PAUSA (decisión de Carlos 2026-09-20):** se diagnosticó que el guardado NO está roto (`guardarConsentimiento` guarda `firmado:true`+`firma/firmaUrl`; `consentimientos` es columna real del Sheet + se espeja a FS; `tieneConsentimientoFirmado` exige firmado Y firma). Que salgan todos en rojo = esos pacientes de verdad no tienen firma digital. Carlos: el flujo de consentimiento (y su aviso legal) lo tienen EN REVISIÓN interna y "todavía no lo usaremos" → NO tocar la función de consentimientos (ni el conteo, ni agregar 'consentimiento en papel', ni excluir migrados) hasta que ellos cierren esa revisión y digan cómo firman (app/papel/mixto). Retomar solo cuando Carlos lo pida.
 
 ## Respaldos (estado: COMPLETO — 2026-09-16)
 - Sheets: `respaldoDiarioPacientes` (Apps Script, 03:00) → JSON diario en Drive `Respaldos_Clinica` (retención 180) + copia externa por correo a lftaranda.
