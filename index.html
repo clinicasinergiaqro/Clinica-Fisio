@@ -7827,7 +7827,8 @@ async function _calcularTriRango(dias){
   var resueltas=await FST_leerCitasResueltas(false);
   var noAcudioMap=await FST_leerNoAcudio(false);
   var tri=_triangularCitasNotas(eventos, resueltos, ultimaHist, asigMap, resueltas, fechasHist, candFechas, noAcudioMap);
-  return {tri:tri, dias:dias, parcial:!!(res&&res.parcial)};
+  var datos=_computarRendimiento(eventos, dias, asigMap);   // stats (score) para el PDF
+  return {tri:tri, datos:datos, dias:dias, parcial:!!(res&&res.parcial)};
 }
 // Arma el HTML del correo: por terapeuta, las citas SIN nota (fecha + paciente). Solo cuenta lo mismo
 // que la columna 🔴 del tablero (sinNotaPacs): excluye en-tiempo, no-acudió y los 🔎 no identificados.
@@ -7866,25 +7867,47 @@ async function enviarReporteFaltantes(tipoOVentana, opts){
   if(tipoOVentana==='agosep'){
     dias=_diasEntreISO('2026-08-01','2026-09-30');
     etiqueta='Agosto y Septiembre 2026';
-    asunto='Notas faltantes — Agosto + Septiembre 2026 — Clínica Sinergia';
+    asunto='Reporte de desempeño — Agosto + Septiembre 2026 — Clínica Sinergia';
     if(opts.auto) dedupKey='AGOSEP_2026';
   } else {
     var v=(tipoOVentana==='hoy'||tipoOVentana==='semana'||tipoOVentana==='7dias'||tipoOVentana==='mes'||tipoOVentana==='mesAnterior')?tipoOVentana:'7dias';
     dias=_diasVentanaRendimiento(v);
     var ETQ={hoy:'Hoy', semana:'Esta semana', '7dias':'Últimos 7 días', mes:'Este mes', mesAnterior:'Mes anterior'};
     etiqueta=ETQ[v]||'Últimos 7 días';
-    asunto='Notas faltantes ('+etiqueta+') — Clínica Sinergia';
+    asunto='Reporte de desempeño ('+etiqueta+') — Clínica Sinergia';
     if(opts.auto) dedupKey='SEMANA_'+_hoyISOlocal();
   }
-  if(!opts.auto) showToast('⏳ Calculando y enviando reporte…','info');
+  if(!opts.auto) showToast('⏳ Generando PDFs y enviando…','info');
   var r=null; try{ r=await _calcularTriRango(dias); }catch(e){}
-  if(!r||!r.tri){ if(!opts.auto) showToast('No se pudo calcular el reporte','error'); return; }
-  var html=_reporteFaltantesHTML(r.tri, etiqueta, r.parcial);
+  if(!r||!r.tri||!r.datos){ if(!opts.auto) showToast('No se pudo calcular el reporte','error'); return; }
+  // Un PDF de desempeño (nuestro formato) por terapeuta CON citas en el período; se adjuntan al correo.
+  var terapeutas=Object.keys(TERAPEUTA_CAL2COD);
+  var adjuntos=[], resumen=[], fA=_hoyISOlocal();
+  terapeutas.forEach(function(n){
+    var t=r.tri[n], st=(r.datos.stats||{})[n];
+    if(!t || !st) return;
+    var citasId=(t.conNota||0)+(t.sinNota||0);
+    if(citasId<=0 && (t.citas||0)<=0) return;   // sin actividad en el período → sin PDF
+    var doc=null; try{ doc=_pdfDesempenoDoc(n, t, st, etiqueta); }catch(e){}
+    if(!doc) return;
+    var b64=''; try{ b64=doc.output('datauristring').split('base64,')[1]||''; }catch(e){}
+    if(!b64) return;
+    adjuntos.push({nombre:'desempeno_'+String(n).replace(/[^\w]+/g,'_')+'_'+fA+'.pdf', b64:b64});
+    resumen.push({n:n, sin:(t.sinNotaPacs||[]).length, citas:citasId});
+  });
+  if(!adjuntos.length){ if(!opts.auto) showToast('No hay actividad en el período','info'); return; }
+  var filas=resumen.map(function(x){ return '<tr><td style="padding:4px 10px 4px 0;font-weight:700;color:#1B3A6B">'+escapeHTML(x.n)+'</td><td style="padding:4px 10px;color:#333">'+x.citas+' citas</td><td style="padding:4px 0;color:'+(x.sin>0?'#B91C1C':'#2E7D52')+';font-weight:700">'+(x.sin>0?(x.sin+' sin nota'):'al día')+'</td></tr>'; }).join('');
+  var html='<div style="font-family:-apple-system,system-ui,Arial,sans-serif;max-width:560px;color:#222">'
+    +'<h2 style="color:#1B3A6B;margin:0 0 2px">Reporte de desempeño — Clínica Sinergia</h2>'
+    +'<div style="color:#5A6478;font-size:13px;margin-bottom:12px">'+escapeHTML(etiqueta)+' · Adjunto el PDF de cada terapeuta (nuestro formato).</div>'
+    +'<table style="border-collapse:collapse;font-size:13px">'+filas+'</table>'
+    +(r.parcial?'<div style="background:#FEF3C7;color:#92400E;border-radius:8px;padding:7px 10px;font-size:12px;margin-top:12px">⚠️ El rango cargó parcial; vuelve a generarlo si notas huecos.</div>':'')
+    +'</div>';
   var resp=null;
-  try{ resp=await callAppsScriptPrivado('enviarReporteCorreo', {asunto:asunto, html:html, dedupKey:dedupKey}); }catch(e){}
+  try{ resp=await callAppsScriptPrivado('enviarReporteCorreo', {asunto:asunto, html:html, dedupKey:dedupKey, adjuntos:adjuntos}); }catch(e){}
   if(resp&&resp.ok){
     if(resp.enviado===false){ if(!opts.auto) showToast('Ese reporte ya se había enviado hoy','info'); }
-    else if(!opts.auto) showToast('📧 Reporte enviado a lftaranda@gmail.com','success');
+    else if(!opts.auto) showToast('📧 Enviado a lftaranda@gmail.com ('+adjuntos.length+' PDF)','success');
   } else if(!opts.auto){ showToast('⚠️ No se pudo enviar el correo — reintenta','error'); }
 }
 // Disparo AUTOMÁTICO en el arranque de un supervisor: viernes y lunes ≥8am → reporte de la semana;
@@ -8072,6 +8095,91 @@ async function mostrarRendimientoEquipo(ventana, forzar){
 // los 🔎 no identificados NUNCA cuentan como falta (van en nota al pie de transparencia).
 // Faltas = SOLO sinNotaPacs. "Atendidas por otro" es contexto, no reproche. Entrega:
 // navigator.share con File (hoja nativa iPad → WhatsApp) y fallback a doc.save().
+// [PDF-DESEMPEÑO] Constructor COMPARTIDO del PDF de desempeño (nuestro formato oficial). Lo usan el
+// botón 📄 por terapeuta Y el envío por correo (adjuntos). Devuelve el doc jsPDF (o null). MISMA
+// maqueta que siempre: encabezado navy+dorado, RESUMEN, CITAS SIN NOTA y notas de transparencia.
+function _pdfDesempenoDoc(n, t, st, periodo){
+  var jsPDF=(window.jspdf && window.jspdf.jsPDF)||window.jsPDF;
+  if(!jsPDF || !t || !st) return null;
+  // Números HONESTOS: denominador = SOLO identificadas.
+  var conNota=t.conNota||0, sinNota=t.sinNota||0, identificadas=conNota+sinNota;
+  var cobertura=identificadas>0 ? Math.round(conNota/identificadas*100) : null;
+  var score=st.scoreN ? Math.round(st.scoreSum/st.scoreN) : null;
+  var noIdent=t.noIdentificados||0, tardias=t.tardias||0;
+  var enTiempo=t.enTiempo||0, prePiso=t.prePiso||0, noAcudio=t.noAcudio||0;
+  var atendidasOtro=Array.isArray(t.atendidasOtro)?t.atendidasOtro:[];
+  var cod=(typeof TERAPEUTA_CAL2COD!=='undefined' && TERAPEUTA_CAL2COD[n]) ? TERAPEUTA_CAL2COD[n] : String(n).toUpperCase();
+  var info=(typeof TERAPEUTAS_INFO!=='undefined' && TERAPEUTAS_INFO[cod]) ? TERAPEUTAS_INFO[cod] : {nombreCompleto:n};
+  var nombreCompleto=info.nombreCompleto||n;
+  var doc=new jsPDF({orientation:'portrait',unit:'mm',format:'letter'});
+  var W=215.9, ml=18, mr=18, ancho=W-ml-mr, y=0;
+  function checkPage(need){ if(y+(need||6)>248){ doc.addPage(); y=20; } }
+  function divider(){ doc.setDrawColor(27,58,107); doc.setLineWidth(0.3); doc.line(ml,y,W-mr,y); y+=4; }
+  function seccionTitulo(txt){ checkPage(12); doc.setTextColor(27,58,107); doc.setFont('helvetica','bold'); doc.setFontSize(9.5); doc.text(txt,ml,y); y+=4; divider(); doc.setFont('helvetica','normal'); doc.setTextColor(40,40,40); doc.setFontSize(8.5); }
+  function campo(label,valor){ checkPage(7); doc.setFont('helvetica','bold'); doc.setFontSize(8.5); doc.text(label+':',ml,y); doc.setFont('helvetica','normal'); var lines=doc.splitTextToSize(String(valor==null?'':valor),ancho-52); doc.text(lines[0]||'',ml+52,y); if(lines.length>1){ y+=4.8; lines.slice(1).forEach(function(l){ doc.text(l,ml+52,y); y+=4.8; }); } else { y+=6; } }
+  function bullet(txt){ var lines=doc.splitTextToSize('• '+txt, ancho-6); lines.forEach(function(line,i){ checkPage(6); doc.text(line, ml+(i===0?0:4), y); y+=4.8; }); }
+  function parrafo(txt){ var lines=doc.splitTextToSize(txt, ancho); lines.forEach(function(line){ checkPage(6); doc.text(line, ml, y); y+=4.6; }); y+=1; }
+  var altoCab=30;
+  doc.setFillColor(27,58,107); doc.rect(0,0,W,altoCab,'F');
+  var logoX=ml;
+  try{ if(typeof LOGO_B64!=='undefined'){ doc.addImage(LOGO_B64,'JPEG',logoX,4,30,21); logoX=ml+34; } }catch(e){ logoX=ml; }
+  var centroX=logoX+(W-mr-logoX)/2;
+  doc.setTextColor(212,170,80); doc.setFontSize(13); doc.setFont('helvetica','bold');
+  doc.text('CLÍNICA SINERGIA', centroX, 10, {align:'center'});
+  doc.setTextColor(255,255,255); doc.setFontSize(10); doc.setFont('helvetica','bold');
+  doc.text('REPORTE DE DESEMPEÑO DE DOCUMENTACIÓN', centroX, 18, {align:'center'});
+  doc.setFontSize(7); doc.setFont('helvetica','normal');
+  doc.text('Fisioterapia y Rehabilitación  |  Juriquílla, Querétaro', centroX, 25, {align:'center'});
+  y=altoCab+8;
+  var ahora=new Date();
+  var emitido=ahora.toLocaleDateString('es-MX')+' '+ahora.toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'});
+  seccionTitulo('TERAPEUTA');
+  campo('Nombre', nombreCompleto);
+  campo('Período', periodo);
+  campo('Emitido', emitido);
+  y+=2;
+  seccionTitulo('RESUMEN DEL PERÍODO');
+  campo('Citas identificadas', identificadas);
+  campo('Notas realizadas', conNota);
+  campo('Cobertura', cobertura==null ? 'Sin citas identificadas' : (cobertura+' %  ('+conNota+' de '+identificadas+')'));
+  campo('Calidad promedio', score==null ? '—' : (score+' / 100'));
+  campo('Notas fuera de 24 h', tardias);
+  campo('En tiempo (últimas 24 h)', enTiempo);
+  campo('No acudió (excluidas)', noAcudio);
+  campo('Atendidas por otro', atendidasOtro.length);
+  y+=2;
+  seccionTitulo('CITAS SIN NOTA');
+  var faltas=Array.isArray(t.sinNotaPacs)?t.sinNotaPacs:[];
+  if(!faltas.length){ parrafo('Sin faltas: todas las citas identificadas del período tienen nota.'); }
+  else { faltas.slice().sort(function(a,b){ return (String(a.fecha)<String(b.fecha))?-1:1; }).forEach(function(x){ bullet((x.nombre||'(sin nombre)')+'  —  '+(x.fecha||'')); }); y+=1; }
+  var enT=Array.isArray(t.enTiempoPacs)?t.enTiempoPacs:[];
+  if(enT.length){
+    seccionTitulo('EN TIEMPO (ÚLTIMAS 24 H)');
+    doc.setTextColor(120,120,120); parrafo('Citas de las últimas 24 h (o futuras) sin nota todavía: aún están en tiempo de documentarse. No cuentan como falta ni entran a la cobertura.'); doc.setTextColor(40,40,40);
+    enT.forEach(function(x){ bullet((x.nombre||'(sin nombre)')+'  —  '+(x.fecha||'')); }); y+=1;
+  }
+  var tard=Array.isArray(t.tardiasPacs)?t.tardiasPacs:[];
+  if(tard.length){
+    seccionTitulo('NOTAS FUERA DE LAS 24 H');
+    doc.setTextColor(120,120,120); parrafo('Cuentan como nota hecha; solo informan la puntualidad respecto a la hora de la cita.'); doc.setTextColor(40,40,40);
+    tard.forEach(function(x){ bullet((x.nombre||'(sin nombre)')+'  —  '+(x.fecha||'')+'  (nota +'+x.horas+' h)'); }); y+=1;
+  }
+  if(atendidasOtro.length){
+    seccionTitulo('ATENDIDAS POR OTRO TERAPEUTA (CONTEXTO)');
+    doc.setTextColor(120,120,120); parrafo('Estas citas cuentan como atendidas; solo indican quién escribió la nota. No son una falta.'); doc.setTextColor(40,40,40);
+    atendidasOtro.forEach(function(x){ bullet((x.nombre||'(sin nombre)')+'  —  '+(x.fecha||'')+'  (atendió: '+(x.atendioPor||'?')+')'); }); y+=1;
+  }
+  checkPage(24); y+=2; divider();
+  doc.setFontSize(7.5); doc.setTextColor(120,120,120);
+  parrafo('Cómo se calcula: Cobertura = notas hechas ÷ citas identificadas. Las citas sin identificar NO cuentan como falta ni como atendida.');
+  parrafo('Las citas de las últimas 24 h al momento de la emisión no cuentan como falta: aún están en tiempo de documentarse.');
+  parrafo('Solo se contabilizan citas a partir del '+_ddmmFromISO(APP_INICIO_OPERACION)+', fecha en que el equipo comenzó a documentar en la app.');
+  if(prePiso>0){ parrafo(prePiso+' cita'+(prePiso!==1?'s':'')+' del período anterior'+(prePiso!==1?'es':'')+' a esa fecha — excluida'+(prePiso!==1?'s':'')+' del cálculo.'); }
+  if(noIdent>0){ parrafo(noIdent+' cita'+(noIdent!==1?'s':'')+' sin identificar en el calendario del período — no contada'+(noIdent!==1?'s':'')+' como falta; requiere'+(noIdent!==1?'n':'')+' vincular el nombre a un expediente.'); }
+  if(noAcudio>0){ parrafo(noAcudio+' cita'+(noAcudio!==1?'s':'')+' marcada'+(noAcudio!==1?'s':'')+' como "no acudió" (el paciente no se presentó) — excluida'+(noAcudio!==1?'s':'')+' del cálculo, no cuenta'+(noAcudio!==1?'n':'')+' como falta.'); }
+  doc.setTextColor(40,40,40);
+  return doc;
+}
 async function generarPDFRendimiento(terapeuta){
   if(!esSupervisorUI()){ showToast('Solo supervisor','error'); return; }
   var snap=window._rendUltimo;
