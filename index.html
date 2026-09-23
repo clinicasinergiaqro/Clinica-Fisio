@@ -5478,6 +5478,44 @@ function _diasVentanaPendientes(){
 function FST_fetchAgendaRango(desde, hasta){
   return callAppsScriptPrivado('leerAgenda', {rango:'rango_fechas', desde:desde, hasta:hasta});
 }
+// [RANGO-CHUNK] La lectura de agenda en UNA sola llamada FALLA para ventanas grandes (Mes / Mes
+// anterior): el backend lee CalendarApp de 22-31 días de golpe y el fetch se cae → "No se pudo leer
+// el rango — mostrando solo HOY". En cambio ≤7 días SÍ carga (la pestaña "7 días" funciona). Solución:
+// partir la ventana en tramos de ≤7 días y pedirlos EN PARALELO, luego unir los eventos. Cada tramo es
+// tan liviano como la vista de 7 días. Tolerante a fallos: reintenta 1 vez el tramo caído; si aun así
+// falla, entrega lo que SÍ cargó y avisa "parcial" (mucho mejor que degradar TODO a HOY).
+async function FST_fetchAgendaRangoChunked(diasISO){
+  var dias=(Array.isArray(diasISO)?diasISO:[]).filter(Boolean);
+  if(!dias.length) return {ok:false, error:'SIN_DIAS'};
+  if(dias.length<=7) return await FST_fetchAgendaRango(dias[0], dias[dias.length-1]);
+  var chunks=[]; for(var i=0;i<dias.length;i+=7){ chunks.push(dias.slice(i, i+7)); }
+  var pedir=async function(ch){
+    var r=await FST_fetchAgendaRango(ch[0], ch[ch.length-1]).catch(function(){ return null; });
+    if(!r || !r.ok){ r=await FST_fetchAgendaRango(ch[0], ch[ch.length-1]).catch(function(){ return null; }); }   // 1 reintento
+    return r;
+  };
+  // Sonda con el primer tramo: si el backend es viejo (apiAgenda<2 → ignora rango y solo da HOY), no
+  // tiene caso partir → devolver apiAgenda:1 y dejar que el llamador degrade a HOY con su aviso.
+  var sonda=await pedir(chunks[0]);
+  if(!sonda || !sonda.ok) return {ok:false, error:'RANGO_CHUNK_FALLO'};   // ni el primer tramo cargó → error real
+  if(!sonda.apiAgenda || sonda.apiAgenda<2){
+    return {ok:true, apiAgenda:1, eventos:sonda.eventos||[], total:(sonda.eventos||[]).length};
+  }
+  var resto=await Promise.all(chunks.slice(1).map(pedir));
+  var eventos=[], fallidos=0, vistos={};
+  [sonda].concat(resto).forEach(function(r){
+    if(r && r.ok && Array.isArray(r.eventos)){
+      r.eventos.forEach(function(ev){
+        var k=(ev&&ev.inicio||'')+'|'+(ev&&ev.tituloOriginal||'');
+        if(vistos[k]) return; vistos[k]=true; eventos.push(ev);
+      });
+    } else { fallidos++; }
+  });
+  eventos.sort(function(a,b){ return (a.inicio<b.inicio)?-1:1; });
+  var out={ok:true, apiAgenda:2, eventos:eventos, total:eventos.length};
+  if(fallidos>0){ out.parcial=true; out.avisoParcial='Rango parcial — '+fallidos+' tramo(s) de ~7 días no cargaron. Toca 🔄 Actualizar para reintentar.'; }
+  return out;
+}
 function _ddmmFromISO(diaISO){
   var p=String(diaISO||'').split('-'); return (p.length===3) ? (p[2]+'/'+p[1]+'/'+p[0]) : '';   // DD/MM/YYYY (= todayFmt)
 }
@@ -7348,6 +7386,19 @@ async function _validarSesionRevision(path){
     showToast('⚠️ No se pudo validar: '+((e&&e.message)||''),'error');
   }
 }
+// [SCORE-AUTOR] Resuelve la terapeuta (cal: Jess/Zara/…) de una nota para el promedio de calidad,
+// IGUAL que la triangulación de la columna ✅: por creadoPor/terapeuta/atendidoPor (código 'JESS' o
+// nombre 'Jess'). Antes el Score solo miraba s.terapeuta → las notas con el autor en atendidoPor/
+// creadoPor (y terapeuta vacío) no sumaban → Score "—" aunque la ✅ SÍ las contara (caso Jess).
+function _calDeNota(s){
+  var a=String((_autorNota(s)||(s&&s.terapeuta)||'')).trim();
+  if(!a) return null;
+  var au=a.toUpperCase();
+  for(var cal in TERAPEUTA_CAL2COD){
+    if(TERAPEUTA_CAL2COD[cal]===au || cal.toUpperCase()===au) return cal;
+  }
+  return null;
+}
 function _computarRendimiento(eventos, diasISO, asigMap){
   // B1 (auditoría dashboard): el SCORE casaba la fecha de la nota en CRUDO (s.fecha contra claves
   // DD/MM/YYYY) mientras el resto del dashboard usa fecha CANÓNICA (_diaCanon). Una nota válida en otro
@@ -7386,19 +7437,16 @@ function _computarRendimiento(eventos, diasISO, asigMap){
   (Array.isArray(patientsDB)?patientsDB:[]).forEach(function(p){
     _soapVivas(p).forEach(function(s){   // [BORRADO-NOTAS] VISTA (rendimiento por terapeuta)
       if(!s || !diasCanon[_diaCanon(s.fecha)]) return;
-      var cod=String(s.terapeuta||'').toUpperCase();
-      for(var cal in TERAPEUTA_CAL2COD){
-        if(TERAPEUTA_CAL2COD[cal]===cod){
-          stats[cal].notas++;
-          // Notas auto-generadas (valoración del alta y descarga 1C): cuentan como cita-con-nota
-          // pero NO entran al promedio de calidad (decisión supervisor 2026-08). Si la terapeuta
-          // la editó (historialEdiciones con entradas), entonces SÍ entra como cualquier nota.
-          var _esAutoSinEditar = (s.modoNota==='valoracion'||s.modoNota==='descarga') && !(Array.isArray(s.historialEdiciones)&&s.historialEdiciones.length);
-          if(!_esAutoSinEditar){ stats[cal].scoreSum+=_scoreSoapCalidad(s); stats[cal].scoreN++; }
-          // AUTO-REVISOR: contar notas incompletas (faltan S/A/P) de la ventana → "por completar".
-          var _fInc=_faltantesSoap(s); if(_fInc.aplica && _fInc.incompleta) stats[cal].incompletas++;
-          break;
-        }
+      var cal=_calDeNota(s);
+      if(cal && stats[cal]){
+        stats[cal].notas++;
+        // Notas auto-generadas (valoración del alta y descarga 1C): cuentan como cita-con-nota
+        // pero NO entran al promedio de calidad (decisión supervisor 2026-08). Si la terapeuta
+        // la editó (historialEdiciones con entradas), entonces SÍ entra como cualquier nota.
+        var _esAutoSinEditar = (s.modoNota==='valoracion'||s.modoNota==='descarga') && !(Array.isArray(s.historialEdiciones)&&s.historialEdiciones.length);
+        if(!_esAutoSinEditar){ stats[cal].scoreSum+=_scoreSoapCalidad(s); stats[cal].scoreN++; }
+        // AUTO-REVISOR: contar notas incompletas (faltan S/A/P) de la ventana → "por completar".
+        var _fInc=_faltantesSoap(s); if(_fInc.aplica && _fInc.incompleta) stats[cal].incompletas++;
       }
     });
   });
@@ -7785,7 +7833,7 @@ async function mostrarRendimientoEquipo(ventana, forzar){
     dias=_diasVentanaRendimiento(ventana);
     // PERF(c): agenda + pacientes + asignaciones + índice de históricos EN PARALELO (antes: 4 esperas secuenciales).
     var tRed=_now();
-    var pAgenda=FST_fetchAgendaRango(dias[0], dias[dias.length-1]).catch(function(){ return null; });
+    var pAgenda=FST_fetchAgendaRangoChunked(dias).catch(function(){ return null; });
     // [PERF] loadFromCloud relee TODOS los pacientes de Sheets (3-8 s de Apps Script). Si patientsDB
     // YA está cargado en memoria, NO bloquear el tablero con eso: se refresca en 2º plano y el
     // próximo cálculo usa lo nuevo. Solo se espera cuando patientsDB viene vacío (arranque en frío,
@@ -7801,6 +7849,7 @@ async function mostrarRendimientoEquipo(ventana, forzar){
       aviso='El backend de agenda aún no soporta rangos (falta desplegar Codigo.gs actualizado) — mostrando solo HOY.';
       dias=[_hoyISOlocal()];
     }
+    else if(res && res.ok && res.parcial && res.avisoParcial){ aviso=res.avisoParcial; }
     if(!res||!res.ok){
       try{ res=await FST_fetchAgendaCalendar('dia'); dias=[_hoyISOlocal()]; if(ventana!=='hoy') aviso='No se pudo leer el rango — mostrando solo HOY.'; }catch(e2){ res=null; }
     }
