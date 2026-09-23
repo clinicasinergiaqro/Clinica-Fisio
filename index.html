@@ -7860,6 +7860,17 @@ function _reporteFaltantesHTML(tri, etiqueta, parcial){
 // Envía el reporte. tipoOVentana: 'hoy'|'semana'|'7dias'|'mes'|'mesAnterior' (usa esa ventana) o
 // 'agosep' (Agosto+Septiembre 2026 combinados). opts.auto=true → silencioso + dedupKey (backend no
 // reenvía el mismo día/reporte). Sin opts.auto → feedback por toast (botón manual).
+// Aviso PERSISTENTE para el envío de reportes (el cálculo + PDFs tardan más que un toast de 2.4 s;
+// sin esto parecía que el botón no hacía nada). Se queda fijo hasta que termina y cambia de color.
+function _repProgreso(msg, tipo){
+  var el=document.getElementById('_repprog');
+  if(!el){ el=document.createElement('div'); el.id='_repprog';
+    el.style.cssText='position:fixed;left:50%;top:18px;transform:translateX(-50%);z-index:10060;max-width:92vw;padding:12px 18px;border-radius:12px;box-shadow:0 8px 28px rgba(0,0,0,.32);font-size:13px;font-weight:700;font-family:inherit;text-align:center;line-height:1.35;color:#fff';
+    document.body.appendChild(el); }
+  el.style.background=({info:'#1B3A6B', ok:'#2E7D52', err:'#B91C1C'}[tipo||'info']);
+  el.textContent=msg; return el;
+}
+function _repProgresoCerrar(ms){ var el=document.getElementById('_repprog'); if(!el) return; setTimeout(function(){ try{ el.remove(); }catch(_){} }, ms||2800); }
 async function enviarReporteFaltantes(tipoOVentana, opts){
   opts=opts||{};
   if(!esSupervisorUI()){ if(!opts.auto) showToast('Solo supervisor','error'); return; }
@@ -7877,9 +7888,10 @@ async function enviarReporteFaltantes(tipoOVentana, opts){
     asunto='Reporte de desempeño ('+etiqueta+') — Clínica Sinergia';
     if(opts.auto) dedupKey='SEMANA_'+_hoyISOlocal();
   }
-  if(!opts.auto) showToast('⏳ Generando PDFs y enviando…','info');
+  if(!opts.auto) _repProgreso('⏳ Generando el reporte ('+etiqueta+') y preparando los PDF… esto tarda unos segundos, no cierres la app.','info');
   var r=null; try{ r=await _calcularTriRango(dias); }catch(e){}
-  if(!r||!r.tri||!r.datos){ if(!opts.auto) showToast('No se pudo calcular el reporte','error'); return; }
+  if(!r||!r.tri||!r.datos){ if(!opts.auto){ _repProgreso('⚠️ No se pudo calcular el reporte. Revisa tu conexión y reintenta.','err'); _repProgresoCerrar(4200); } return; }
+  if(!opts.auto) _repProgreso('📄 Armando los PDF por terapeuta…','info');
   // Un PDF de desempeño (nuestro formato) por terapeuta CON citas en el período; se adjuntan al correo.
   var terapeutas=Object.keys(TERAPEUTA_CAL2COD);
   var adjuntos=[], resumen=[], fA=_hoyISOlocal();
@@ -7895,7 +7907,8 @@ async function enviarReporteFaltantes(tipoOVentana, opts){
     adjuntos.push({nombre:'desempeno_'+String(n).replace(/[^\w]+/g,'_')+'_'+fA+'.pdf', b64:b64});
     resumen.push({n:n, sin:(t.sinNotaPacs||[]).length, citas:citasId});
   });
-  if(!adjuntos.length){ if(!opts.auto) showToast('No hay actividad en el período','info'); return; }
+  if(!adjuntos.length){ if(!opts.auto){ _repProgreso('No hay actividad en el período — no hay PDF que enviar.','info'); _repProgresoCerrar(3800); } return; }
+  if(!opts.auto) _repProgreso('📧 Enviando '+adjuntos.length+' PDF a lftaranda@gmail.com…','info');
   var filas=resumen.map(function(x){ return '<tr><td style="padding:4px 10px 4px 0;font-weight:700;color:#1B3A6B">'+escapeHTML(x.n)+'</td><td style="padding:4px 10px;color:#333">'+x.citas+' citas</td><td style="padding:4px 0;color:'+(x.sin>0?'#B91C1C':'#2E7D52')+';font-weight:700">'+(x.sin>0?(x.sin+' sin nota'):'al día')+'</td></tr>'; }).join('');
   var html='<div style="font-family:-apple-system,system-ui,Arial,sans-serif;max-width:560px;color:#222">'
     +'<h2 style="color:#1B3A6B;margin:0 0 2px">Reporte de desempeño — Clínica Sinergia</h2>'
@@ -7906,9 +7919,12 @@ async function enviarReporteFaltantes(tipoOVentana, opts){
   var resp=null;
   try{ resp=await callAppsScriptPrivado('enviarReporteCorreo', {asunto:asunto, html:html, dedupKey:dedupKey, adjuntos:adjuntos}); }catch(e){}
   if(resp&&resp.ok){
-    if(resp.enviado===false){ if(!opts.auto) showToast('Ese reporte ya se había enviado hoy','info'); }
-    else if(!opts.auto) showToast('📧 Enviado a lftaranda@gmail.com ('+adjuntos.length+' PDF)','success');
-  } else if(!opts.auto){ showToast('⚠️ No se pudo enviar el correo — reintenta','error'); }
+    if(resp.enviado===false){ if(!opts.auto){ _repProgreso('Ese reporte ya se había enviado hoy (revisa tu correo).','info'); _repProgresoCerrar(3800); } }
+    else if(!opts.auto){ _repProgreso('✅ Enviado a lftaranda@gmail.com — '+adjuntos.length+' PDF adjuntos. Revisa tu correo.','ok'); _repProgresoCerrar(5000); }
+  } else if(!opts.auto){
+    var _msgErr=(resp&&(resp.msg||resp.error))?(' ('+(resp.msg||resp.error)+')'):'';
+    _repProgreso('⚠️ No se pudo enviar el correo — reintenta.'+_msgErr,'err'); _repProgresoCerrar(5200);
+  }
 }
 // Disparo AUTOMÁTICO en el arranque de un supervisor: viernes y lunes ≥8am → reporte de la semana;
 // y el reporte único Ago+Sep hasta que se envíe una vez. El backend deduplica (no reenvía).
