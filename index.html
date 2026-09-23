@@ -4404,6 +4404,7 @@ function entrarComo(perfil, email, silencioso){
   actualizarIndicadorSync();
   try{ setTimeout(function(){ _reportarSaludSync(true); }, 3500); }catch(_){}   // [SALUD-SYNC] reporte inicial al tablero
   try{ setTimeout(function(){ _autoRescateFallidos(); }, 6000); }catch(_){}     // [AUTO-RESCATE] sube lo rendido solo, sin tocar nada
+  try{ if(typeof _autoReportesSupervisor==='function') _autoReportesSupervisor(); }catch(_){}   // [REPORTE-CORREO] vie/lun 8am → notas faltantes de la semana + one-shot Ago+Sep (backend deduplica)
   if(navigator.onLine) setTimeout(sincronizarPendientes, 1500);
   // C: precargar OpenCV en segundo plano (silencioso, no bloquea login ni agenda)
   try{
@@ -7616,6 +7617,8 @@ function _rendimientoHTML(datos, noId, ventana, etiqueta, aviso, refresco, tri){
     +'<div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap;align-items:center">'+btnV('hoy','Hoy')+btnV('semana','Esta semana')+btnV('7dias','7 días')+btnV('mes','Mes')+btnV('mesAnterior','Mes anterior')
     +'<button onclick="mostrarRendimientoEquipo(\''+ventana+'\', true)" style="font-size:11px;font-weight:700;border:none;border-radius:10px;padding:5px 10px;cursor:pointer;font-family:inherit;background:#EEF1F6;color:var(--navy)">🔄 Actualizar</button>'
     +'<button onclick="mostrarPendientesSOAP()" style="font-size:11px;font-weight:700;border:none;border-radius:10px;padding:5px 10px;cursor:pointer;font-family:inherit;background:#FEF3C7;color:#92400E" title="Lista simple, cruzando terapeutas, con los nombres por identificar">📋 Sin documentar (lista)</button>'
+    +'<button onclick="enviarReporteFaltantes(\''+ventana+'\')" style="font-size:11px;font-weight:700;border:none;border-radius:10px;padding:5px 10px;cursor:pointer;font-family:inherit;background:#E7F1FB;color:#1B3A6B" title="Envía por correo a lftaranda@gmail.com las notas que faltan de este período, por terapeuta">📧 Enviarme este reporte</button>'
+    +'<button onclick="enviarReporteFaltantes(\'agosep\')" style="font-size:11px;font-weight:700;border:none;border-radius:10px;padding:5px 10px;cursor:pointer;font-family:inherit;background:#E7F1FB;color:#1B3A6B" title="Envía por correo el reporte combinado de Agosto + Septiembre 2026, por terapeuta">📧 Ago+Sep</button>'
     +((refresco&&refresco.desdeCache)?('<span style="font-size:10px;color:var(--gray-400)">cache · hace '+Math.max(1,Math.round((Date.now()-(refresco.ts||Date.now()))/1000))+' s</span>'):'')
     +'</div>'
     +'<div style="font-size:12px;color:var(--gray-500);margin-bottom:8px">'+escapeHTML(etiqueta)+' · Citas de Google Calendar vs notas SOAP (activos + históricos)</div>'
@@ -7792,6 +7795,107 @@ async function _rendIdxHist(forzar){
   }catch(_h){ idxHist=[]; }
   window._idxHistRendCache={ts:Date.now(), arr:idxHist};
   return idxHist;
+}
+// ── REPORTE POR CORREO — "notas faltantes" por terapeuta ─────────────────────────────────────
+// Reusa el MISMO motor del tablero (agenda por tramos + triangulación) → el reporte trae exactamente
+// los mismos números/nombres que "Rendimiento", nunca una reimplementación aparte (la resolución de
+// pacientes contra 3 mil expedientes con homónimos vive aquí; recrearla fuera manda nombres mal).
+// Lo calcula el cliente y lo entrega al backend, que envía el correo (MailApp) a lftaranda@gmail.com.
+function _diasEntreISO(desdeISO, hastaISO){
+  function iso(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+  var p=String(desdeISO).split('-'), q=String(hastaISO).split('-');
+  var d=new Date(Number(p[0]),Number(p[1])-1,Number(p[2]),12);
+  var fin=new Date(Number(q[0]),Number(q[1])-1,Number(q[2]),12);
+  var out=[]; while(d<=fin){ out.push(iso(d)); d.setDate(d.getDate()+1); }
+  return out;
+}
+// Calcula la triangulación para un arreglo de días ISO, sin pintar UI (headless). Misma secuencia que
+// mostrarRendimientoEquipo, sin caché de pantalla.
+async function _calcularTriRango(dias){
+  var res=await FST_fetchAgendaRangoChunked(dias).catch(function(){ return null; });
+  if(res && res.ok && (!res.apiAgenda||res.apiAgenda<2) && dias.length>1){ dias=[_hoyISOlocal()]; }
+  if(!res||!res.ok){ try{ res=await FST_fetchAgendaCalendar('dia'); dias=[_hoyISOlocal()]; }catch(e){ res=null; } }
+  if(!res||!res.ok) return null;
+  if(!(Array.isArray(patientsDB)&&patientsDB.length)){ try{ var dP=await loadFromCloud(); if(Array.isArray(dP)&&dP.length) patientsDB=dP; }catch(e){} }
+  var eventos=res.eventos||[];
+  var asigMap=await FST_leerAsignacionesAgenda(false);
+  await _rendIdxHist(false);
+  var resueltos=await _resolverPacientesCalendario(eventos);
+  var ultimaHist=await _fetchUltimaSesionHistoricos(resueltos, false);
+  var fechasHist=(window._triUltimaHistCache&&window._triUltimaHistCache.mapFechas)||{};
+  var candFechas=(window._triUltimaHistCache&&window._triUltimaHistCache.mapFechasCand)||{};
+  var resueltas=await FST_leerCitasResueltas(false);
+  var noAcudioMap=await FST_leerNoAcudio(false);
+  var tri=_triangularCitasNotas(eventos, resueltos, ultimaHist, asigMap, resueltas, fechasHist, candFechas, noAcudioMap);
+  return {tri:tri, dias:dias, parcial:!!(res&&res.parcial)};
+}
+// Arma el HTML del correo: por terapeuta, las citas SIN nota (fecha + paciente). Solo cuenta lo mismo
+// que la columna 🔴 del tablero (sinNotaPacs): excluye en-tiempo, no-acudió y los 🔎 no identificados.
+function _reporteFaltantesHTML(tri, etiqueta, parcial){
+  var terapeutas=Object.keys(TERAPEUTA_CAL2COD);
+  var totalFaltan=0, bloques='';
+  terapeutas.forEach(function(n){
+    var t=tri[n]; if(!t) return;
+    var arr=((t.sinNotaPacs)||[]).slice().sort(function(a,b){ return (String(a.fecha)<String(b.fecha))?-1:1; });
+    totalFaltan+=arr.length;
+    var c=(typeof AGENDA_COLORES!=='undefined'&&AGENDA_COLORES[n])?AGENDA_COLORES[n]:'#1B3A6B';
+    var items = arr.length
+      ? '<ul style="margin:6px 0 0 0;padding-left:18px;color:#222;font-size:13px;line-height:1.55">'+arr.map(function(x){ return '<li><b>'+escapeHTML(String(x.fecha||''))+'</b> — '+escapeHTML(x.nombre||'(sin nombre)')+'</li>'; }).join('')+'</ul>'
+      : '<div style="color:#2E7D52;font-size:13px;margin-top:4px">✓ Sin notas pendientes</div>';
+    bloques += '<div style="margin:16px 0;border-left:4px solid '+c+';padding-left:10px">'
+      +'<div style="font-weight:700;color:#1B3A6B;font-size:15px">'+escapeHTML(n)+' — '+arr.length+' nota'+(arr.length!==1?'s':'')+' por documentar</div>'+items+'</div>';
+  });
+  var hoy=new Date();
+  var stamp=hoy.toLocaleString('es-MX',{ dateStyle:'medium', timeStyle:'short' });
+  return '<div style="font-family:-apple-system,system-ui,Arial,sans-serif;max-width:620px;margin:0 auto;color:#222">'
+    +'<h2 style="color:#1B3A6B;margin:0 0 2px">Notas faltantes — Clínica Sinergia</h2>'
+    +'<div style="color:#5A6478;font-size:13px;margin-bottom:2px">'+escapeHTML(etiqueta)+'</div>'
+    +'<div style="color:#5A6478;font-size:12px;margin-bottom:12px">Citas de Google Calendar sin nota SOAP · '+totalFaltan+' en total · generado '+escapeHTML(stamp)+'</div>'
+    +(parcial?'<div style="background:#FEF3C7;color:#92400E;border-radius:8px;padding:7px 10px;font-size:12px;margin-bottom:10px">⚠️ El rango cargó parcial; algún tramo pudo faltar. Vuelve a generarlo si notas huecos.</div>':'')
+    +bloques
+    +'<div style="color:#8A93A5;font-size:11px;margin-top:18px;border-top:1px solid #E5E8EF;padding-top:8px">Reporte automático. No incluye citas de las últimas 24 h (aún en tiempo de documentar), pacientes que no acudieron, ni nombres sin expediente (🔎). Cuenta lo mismo que la columna 🔴 del tablero de Rendimiento.</div>'
+    +'</div>';
+}
+// Envía el reporte. tipoOVentana: 'hoy'|'semana'|'7dias'|'mes'|'mesAnterior' (usa esa ventana) o
+// 'agosep' (Agosto+Septiembre 2026 combinados). opts.auto=true → silencioso + dedupKey (backend no
+// reenvía el mismo día/reporte). Sin opts.auto → feedback por toast (botón manual).
+async function enviarReporteFaltantes(tipoOVentana, opts){
+  opts=opts||{};
+  if(!esSupervisorUI()){ if(!opts.auto) showToast('Solo supervisor','error'); return; }
+  var dias, etiqueta, asunto, dedupKey='';
+  if(tipoOVentana==='agosep'){
+    dias=_diasEntreISO('2026-08-01','2026-09-30');
+    etiqueta='Agosto y Septiembre 2026';
+    asunto='Notas faltantes — Agosto + Septiembre 2026 — Clínica Sinergia';
+    if(opts.auto) dedupKey='AGOSEP_2026';
+  } else {
+    var v=(tipoOVentana==='hoy'||tipoOVentana==='semana'||tipoOVentana==='7dias'||tipoOVentana==='mes'||tipoOVentana==='mesAnterior')?tipoOVentana:'7dias';
+    dias=_diasVentanaRendimiento(v);
+    var ETQ={hoy:'Hoy', semana:'Esta semana', '7dias':'Últimos 7 días', mes:'Este mes', mesAnterior:'Mes anterior'};
+    etiqueta=ETQ[v]||'Últimos 7 días';
+    asunto='Notas faltantes ('+etiqueta+') — Clínica Sinergia';
+    if(opts.auto) dedupKey='SEMANA_'+_hoyISOlocal();
+  }
+  if(!opts.auto) showToast('⏳ Calculando y enviando reporte…','info');
+  var r=null; try{ r=await _calcularTriRango(dias); }catch(e){}
+  if(!r||!r.tri){ if(!opts.auto) showToast('No se pudo calcular el reporte','error'); return; }
+  var html=_reporteFaltantesHTML(r.tri, etiqueta, r.parcial);
+  var resp=null;
+  try{ resp=await callAppsScriptPrivado('enviarReporteCorreo', {asunto:asunto, html:html, dedupKey:dedupKey}); }catch(e){}
+  if(resp&&resp.ok){
+    if(resp.enviado===false){ if(!opts.auto) showToast('Ese reporte ya se había enviado hoy','info'); }
+    else if(!opts.auto) showToast('📧 Reporte enviado a lftaranda@gmail.com','success');
+  } else if(!opts.auto){ showToast('⚠️ No se pudo enviar el correo — reintenta','error'); }
+}
+// Disparo AUTOMÁTICO en el arranque de un supervisor: viernes y lunes ≥8am → reporte de la semana;
+// y el reporte único Ago+Sep hasta que se envíe una vez. El backend deduplica (no reenvía).
+function _autoReportesSupervisor(){
+  try{
+    if(!esSupervisorUI()) return;
+    var d=new Date(), dow=d.getDay();   // 0=Dom … 5=Vie, 1=Lun
+    if((dow===5||dow===1) && d.getHours()>=8){ setTimeout(function(){ enviarReporteFaltantes('7dias', {auto:true}); }, 16000); }
+    setTimeout(function(){ enviarReporteFaltantes('agosep', {auto:true}); }, 28000);   // one-shot; dedup en backend
+  }catch(_){}
 }
 async function mostrarRendimientoEquipo(ventana, forzar){
   if(!esSupervisorUI()){ showToast('Solo supervisor','error'); return; }
