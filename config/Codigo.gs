@@ -1873,7 +1873,7 @@ function _claudeRouter_(body) {
     var lista = leerPacientes(ss);
     _claudeBitacora_(ss, 'claudePing', 'n=' + lista.length);
     // build: marca de versión desplegada — permite confirmar desde fuera qué código está EN VIVO en /exec.
-    return respuesta({ ok: true, pong: true, totalPacientes: lista.length, fecha: new Date().toISOString(), build: '2026-09-25-soap-nativa' });
+    return respuesta({ ok: true, pong: true, totalPacientes: lista.length, fecha: new Date().toISOString(), build: '2026-09-25-soap-continuidad' });
   }
 
   if (action === 'claudeGetPacientes') {
@@ -2153,20 +2153,33 @@ function _claudeRouter_(body) {
     var tokSF = _claudeFsToken_();
     if (!tokSF) return respuesta({ ok: false, error: 'Sin credenciales Firestore', code: 500 });
     var PROJSF = PropertiesService.getScriptProperties().getProperty('FIRESTORE_PROJECT_ID') || 'clinicasinergia-ec2cf';
-    // 1) Calcular el siguiente num leyendo la subcolección de sesiones existente.
+    // 1) CONTINUIDAD: leer el doc (episodio actual) y las sesiones existentes para numerar bien.
+    //    - motivoIndex de la nota = episodio ACTUAL del paciente (motivoActualIndex) salvo que se indique.
+    //    - num = siguiente global; numEpisodio = siguiente dentro de ese episodio.
+    var docPadSF = _claudeFsGetDoc_(idSF) || {};
+    var epIdx = (sf.motivoIndex != null) ? Number(sf.motivoIndex)
+              : ((typeof docPadSF.motivoActualIndex === 'number') ? docPadSF.motivoActualIndex : 0);
+    var sidPrev = sf.id ? String(sf.id) : '';   // si se reusa un id (corrección) NO se cuenta como nueva del episodio
     var baseL = 'https://firestore.googleapis.com/v1/projects/' + PROJSF + '/databases/(default)/documents/pacientes/' + encodeURIComponent(idSF) + '/sesiones?pageSize=300';
-    var maxNumF = 0, ptokF = '', pgF = 0;
+    var maxNumF = 0, epCount = 0, ptokF = '', pgF = 0;
     try {
       do {
         var urlL = baseL + (ptokF ? '&pageToken=' + encodeURIComponent(ptokF) : '');
         var rL = UrlFetchApp.fetch(urlL, { method: 'get', headers: { Authorization: 'Bearer ' + tokSF }, muteHttpExceptions: true });
         var jL = JSON.parse(rL.getContentText() || '{}');
-        (jL.documents || []).forEach(function(doc){ var f = _fsDecodeFields_(doc.fields || {}); var n = Number(f.num) || 0; if (n > maxNumF) maxNumF = n; });
+        (jL.documents || []).forEach(function(doc){
+          var f = _fsDecodeFields_(doc.fields || {});
+          var n = Number(f.num) || 0; if (n > maxNumF) maxNumF = n;
+          var mi = (typeof f.motivoIndex === 'number') ? f.motivoIndex : 0;
+          var thisId = (f.id != null ? String(f.id) : String(doc.name || '').split('/').pop());
+          if (mi === epIdx && thisId !== sidPrev) epCount++;
+        });
         ptokF = jL.nextPageToken || ''; pgF++;
       } while (ptokF && pgF < 20);
     } catch (eL) {}
     var ahoraF = new Date();
     var numF = Number(sf.num) || (maxNumF + 1);
+    var numEpisodioF = (sf.numEpisodio != null) ? Number(sf.numEpisodio) : (epCount + 1);
     var sidF = sf.id || ('claude-soap-' + ahoraF.getTime());
     var _so = function(v){ return (v && typeof v === 'object' && !Array.isArray(v)) ? v : String(v || ''); };
     // día ISO (yyyy-mm-dd) desde la fecha de la nota — para el índice fechasSesiones.
@@ -2177,6 +2190,7 @@ function _claudeRouter_(body) {
     var _mrg = function(def, v){ var o = {}; var i; for (i in def) o[i] = def[i]; if (v && typeof v === 'object' && !Array.isArray(v)) { for (i in v) if (v[i] != null) o[i] = v[i]; } return o; };
     var sesionF = {
       id: sidF, num: numF, totalSesiones: numF, semana: Number(sf.semana) || 1,
+      motivoIndex: epIdx, numEpisodio: numEpisodioF,
       fecha: fechaNota,
       fechaHoraISO: sf.fechaHoraISO || ahoraF.toISOString(),
       terapeuta: sf.terapeuta || '',
@@ -2209,7 +2223,7 @@ function _claudeRouter_(body) {
     //    "sin documentar" se limpie al instante sin depender del auto-reparador de índice cojo.
     if (okC) {
       try {
-        var docPad = _claudeFsGetDoc_(idSF) || {};
+        var docPad = docPadSF || {};
         var fechas = Array.isArray(docPad.fechasSesiones) ? docPad.fechasSesiones.slice() : [];
         var diaISO = _diaISO(fechaNota);
         if (diaISO && fechas.indexOf(diaISO) === -1) fechas.push(diaISO);
