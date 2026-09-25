@@ -1873,7 +1873,7 @@ function _claudeRouter_(body) {
     var lista = leerPacientes(ss);
     _claudeBitacora_(ss, 'claudePing', 'n=' + lista.length);
     // build: marca de versión desplegada — permite confirmar desde fuera qué código está EN VIVO en /exec.
-    return respuesta({ ok: true, pong: true, totalPacientes: lista.length, fecha: new Date().toISOString(), build: '2026-09-25-soap-continuidad' });
+    return respuesta({ ok: true, pong: true, totalPacientes: lista.length, fecha: new Date().toISOString(), build: '2026-09-25-estudio-multipart' });
   }
 
   if (action === 'claudeGetPacientes') {
@@ -2023,18 +2023,18 @@ function _claudeRouter_(body) {
     var safeSU = nombreSU.replace(/[^\w.\-]+/g, '_');
     var pathSU = 'clinica/sinergia/' + idSU + '/estudios/' + tsSU + '_' + safeSU;
     var tokenDesc = Utilities.getUuid();
-    // 1) Subir el binario (uploadType=media: cuerpo = bytes crudos).
-    var upUrl = 'https://storage.googleapis.com/upload/storage/v1/b/' + encodeURIComponent(CLAUDE_STORAGE_BUCKET) + '/o?uploadType=media&name=' + encodeURIComponent(pathSU);
-    var rUp = UrlFetchApp.fetch(upUrl, { method: 'post', contentType: mimeSU, payload: bytesSU, headers: { Authorization: 'Bearer ' + tokRW }, muteHttpExceptions: true });
+    // Subida MULTIPART en UNA sola llamada (objects.create) con el token de descarga en la metadata.
+    // Antes eran 2 pasos (subir + PATCH metadata); el PATCH (objects.update) fallaba con 403 "scope not
+    // authorized". Al fijar la metadata durante la CREACIÓN, solo se usa objects.create (que sí funciona).
+    var _bnd = 'claudebnd' + Utilities.getUuid().replace(/-/g, '');
+    var _metaObj = { name: pathSU, contentType: mimeSU, metadata: { firebaseStorageDownloadTokens: tokenDesc } };
+    var _pre = '--' + _bnd + '\r\n' + 'Content-Type: application/json; charset=UTF-8\r\n\r\n' + JSON.stringify(_metaObj) + '\r\n' + '--' + _bnd + '\r\n' + 'Content-Type: ' + mimeSU + '\r\n\r\n';
+    var _post = '\r\n--' + _bnd + '--';
+    var _bodyBytes = Utilities.newBlob(_pre).getBytes().concat(bytesSU).concat(Utilities.newBlob(_post).getBytes());
+    var upUrl = 'https://storage.googleapis.com/upload/storage/v1/b/' + encodeURIComponent(CLAUDE_STORAGE_BUCKET) + '/o?uploadType=multipart';
+    var rUp = UrlFetchApp.fetch(upUrl, { method: 'post', contentType: 'multipart/related; boundary=' + _bnd, payload: _bodyBytes, headers: { Authorization: 'Bearer ' + tokRW }, muteHttpExceptions: true });
     var codeUp = rUp.getResponseCode();
-    if (codeUp < 200 || codeUp >= 300) return respuesta({ ok: false, error: 'Storage upload ' + codeUp + ': ' + (rUp.getContentText() || '').slice(0, 200), code: codeUp });
-    // 2) Fijar el token de descarga Firebase en la metadata del objeto (para construir la URL pública firmada).
-    var patchUrl = 'https://storage.googleapis.com/storage/v1/b/' + encodeURIComponent(CLAUDE_STORAGE_BUCKET) + '/o/' + encodeURIComponent(pathSU);
-    var rMeta = UrlFetchApp.fetch(patchUrl, { method: 'patch', contentType: 'application/json',
-      headers: { Authorization: 'Bearer ' + tokRW }, muteHttpExceptions: true,
-      payload: JSON.stringify({ metadata: { firebaseStorageDownloadTokens: tokenDesc } }) });
-    var codeMeta = rMeta.getResponseCode();
-    if (codeMeta < 200 || codeMeta >= 300) return respuesta({ ok: false, error: 'Storage metadata ' + codeMeta + ': ' + (rMeta.getContentText() || '').slice(0, 200), code: codeMeta });
+    if (codeUp < 200 || codeUp >= 300) return respuesta({ ok: false, error: 'Storage upload ' + codeUp + ': ' + (rUp.getContentText() || '').slice(0, 250), code: codeUp });
     var urlSU = 'https://firebasestorage.googleapis.com/v0/b/' + CLAUDE_STORAGE_BUCKET + '/o/' + encodeURIComponent(pathSU) + '?alt=media&token=' + tokenDesc;
     // 3) Armar la entrada estudiosDocs igual que la app (_baseItem) y agregarla al doc de Firestore.
     var esImg = /^image\//.test(mimeSU);
@@ -2157,11 +2157,12 @@ function _claudeRouter_(body) {
     //    - motivoIndex de la nota = episodio ACTUAL del paciente (motivoActualIndex) salvo que se indique.
     //    - num = siguiente global; numEpisodio = siguiente dentro de ese episodio.
     var docPadSF = _claudeFsGetDoc_(idSF) || {};
-    var epIdx = (sf.motivoIndex != null) ? Number(sf.motivoIndex)
-              : ((typeof docPadSF.motivoActualIndex === 'number') ? docPadSF.motivoActualIndex : 0);
     var sidPrev = sf.id ? String(sf.id) : '';   // si se reusa un id (corrección) NO se cuenta como nueva del episodio
+    // 1a) Listar TODAS las sesiones existentes (para numerar y para saber el episodio de la última nota).
+    var _diaISOx = function(f){ var s=String(f||'').trim(); var m=s.match(/^(\d{4})-(\d{2})-(\d{2})/); if(m) return m[0];
+      m=s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})/); if(m){ var d=('0'+m[1]).slice(-2), mo=('0'+m[2]).slice(-2), y=m[3]; if(y.length===2) y='20'+y; return y+'-'+mo+'-'+d; } return ''; };
     var baseL = 'https://firestore.googleapis.com/v1/projects/' + PROJSF + '/databases/(default)/documents/pacientes/' + encodeURIComponent(idSF) + '/sesiones?pageSize=300';
-    var maxNumF = 0, epCount = 0, ptokF = '', pgF = 0;
+    var maxNumF = 0, ptokF = '', pgF = 0, _todas = [], _ultDia = '', _ultMi = null;
     try {
       do {
         var urlL = baseL + (ptokF ? '&pageToken=' + encodeURIComponent(ptokF) : '');
@@ -2172,11 +2173,19 @@ function _claudeRouter_(body) {
           var n = Number(f.num) || 0; if (n > maxNumF) maxNumF = n;
           var mi = (typeof f.motivoIndex === 'number') ? f.motivoIndex : 0;
           var thisId = (f.id != null ? String(f.id) : String(doc.name || '').split('/').pop());
-          if (mi === epIdx && thisId !== sidPrev) epCount++;
+          var d = _diaISOx(f.fecha || f.fechaHoraISO);
+          _todas.push({ id: thisId, mi: mi, dia: d });
+          if (thisId !== sidPrev && d && d >= _ultDia) { _ultDia = d; _ultMi = mi; }   // episodio de la última nota real
         });
         ptokF = jL.nextPageToken || ''; pgF++;
       } while (ptokF && pgF < 20);
     } catch (eL) {}
+    // 1b) Episodio de la nota: lo indicado > motivoActualIndex del doc > episodio de la ÚLTIMA nota > 0.
+    var epIdx = (sf.motivoIndex != null) ? Number(sf.motivoIndex)
+              : ((typeof docPadSF.motivoActualIndex === 'number') ? docPadSF.motivoActualIndex
+              : ((_ultMi != null) ? _ultMi : 0));
+    var epCount = 0;
+    _todas.forEach(function(x){ if (x.mi === epIdx && x.id !== sidPrev) epCount++; });
     var ahoraF = new Date();
     var numF = Number(sf.num) || (maxNumF + 1);
     var numEpisodioF = (sf.numEpisodio != null) ? Number(sf.numEpisodio) : (epCount + 1);
