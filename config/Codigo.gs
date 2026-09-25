@@ -1873,7 +1873,7 @@ function _claudeRouter_(body) {
     var lista = leerPacientes(ss);
     _claudeBitacora_(ss, 'claudePing', 'n=' + lista.length);
     // build: marca de versión desplegada — permite confirmar desde fuera qué código está EN VIVO en /exec.
-    return respuesta({ ok: true, pong: true, totalPacientes: lista.length, fecha: new Date().toISOString(), build: '2026-09-25-soap-fs' });
+    return respuesta({ ok: true, pong: true, totalPacientes: lista.length, fecha: new Date().toISOString(), build: '2026-09-25-cobertura-total' });
   }
 
   if (action === 'claudeGetPacientes') {
@@ -2228,9 +2228,10 @@ function _claudeRouter_(body) {
     var camposFS = (body.campos && typeof body.campos === 'object') ? body.campos : null;
     if (!idFS || !camposFS) return respuesta({ ok: false, error: 'Falta id o campos', code: 400 });
     var PERMITIDOS_FS = ['estudiosDocs','reportesClinicosIA','ejercicios','ejerciciosToken','ejerciciosLinkActivo',
-                         'dx','motivo','motivoHC','valoracion','dxFuncional','planTto','antecedentes',
+                         'dx','motivo','motivoHC','motivoConsulta','valoracion','dxFuncional','planTto','antecedentes',
                          'alergias','contraindicaciones','seguridadClinica','altaClinica','revaloraciones',
-                         'eventosAdversos','etiquetas','motivosAnteriores'];
+                         'eventosAdversos','etiquetas','motivosAnteriores','motivoActualIndex','numSesionEpisodioActual',
+                         'inasistencias','fotos','docs'];
     var tokFS = _claudeFsToken_();
     if (!tokFS) return respuesta({ ok: false, error: 'Sin credenciales Firestore', code: 500 });
     var PROJ2 = PropertiesService.getScriptProperties().getProperty('FIRESTORE_PROJECT_ID') || 'clinicasinergia-ec2cf';
