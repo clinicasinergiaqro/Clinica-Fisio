@@ -15,11 +15,19 @@ permissions:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    env:
+      HAS_SA: ${{ secrets.FIREBASE_SERVICE_ACCOUNT != '' }}
     steps:
+      - name: Aviso si falta el secreto
+        if: env.HAS_SA != 'true'
+        run: echo "Falta el secreto FIREBASE_SERVICE_ACCOUNT — se omite el deploy (esto NO es un error)."
+
       - name: Checkout
+        if: env.HAS_SA == 'true'
         uses: actions/checkout@v4
 
       - name: Deploy a Firebase Hosting (canal live)
+        if: env.HAS_SA == 'true'
         uses: FirebaseExtended/action-hosting-deploy@v0
         with:
           repoToken: ${{ secrets.GITHUB_TOKEN }}
