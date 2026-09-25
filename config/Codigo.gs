@@ -1873,7 +1873,7 @@ function _claudeRouter_(body) {
     var lista = leerPacientes(ss);
     _claudeBitacora_(ss, 'claudePing', 'n=' + lista.length);
     // build: marca de versión desplegada — permite confirmar desde fuera qué código está EN VIVO en /exec.
-    return respuesta({ ok: true, pong: true, totalPacientes: lista.length, fecha: new Date().toISOString(), build: '2026-09-25-estudio-multipart' });
+    return respuesta({ ok: true, pong: true, totalPacientes: lista.length, fecha: new Date().toISOString(), build: '2026-09-25-sexo' });
   }
 
   if (action === 'claudeGetPacientes') {
@@ -2098,7 +2098,8 @@ function _claudeRouter_(body) {
     if (!campos) return respuesta({ ok: false, error: 'Falta campos {}', code: 400 });
     var PERMITIDOS = ['dx','motivo','motivoHC','motivoConsulta','valoracion','dxFuncional','planTto',
                       'antecedentes','alergias','contraindicaciones','seguridadClinica',
-                      'motivosAnteriores','motivoActualIndex','numSesionEpisodioActual','altaClinica'];
+                      'motivosAnteriores','motivoActualIndex','numSesionEpisodioActual','altaClinica',
+                      'sexo'];   // sexo: único campo de identidad habilitado (dato clínico); resto de identidad sigue bloqueado
     var pAC = { id: idAC, updatedAt: Date.now(), ultimoUsuario: 'CLAUDE' }, tocados = [];
     Object.keys(campos).forEach(function(k){ if (PERMITIDOS.indexOf(k) >= 0) { pAC[k] = campos[k]; tocados.push(k); } });
     if (!tocados.length) return respuesta({ ok: false, error: 'Ningún campo permitido en campos', code: 400 });
@@ -2279,7 +2280,7 @@ function _claudeRouter_(body) {
                          'dx','motivo','motivoHC','motivoConsulta','valoracion','dxFuncional','planTto','antecedentes',
                          'alergias','contraindicaciones','seguridadClinica','altaClinica','revaloraciones',
                          'eventosAdversos','etiquetas','motivosAnteriores','motivoActualIndex','numSesionEpisodioActual',
-                         'inasistencias','fotos','docs'];
+                         'inasistencias','fotos','docs','sexo'];
     var tokFS = _claudeFsToken_();
     if (!tokFS) return respuesta({ ok: false, error: 'Sin credenciales Firestore', code: 500 });
     var PROJ2 = PropertiesService.getScriptProperties().getProperty('FIRESTORE_PROJECT_ID') || 'clinicasinergia-ec2cf';
