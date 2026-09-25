@@ -4,6 +4,19 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Clínica Sinergia — Sistema Clínico</title>
+<!-- [MIGRACIÓN HOSTING] Redirige el sitio VIEJO (GitHub Pages) al nuevo (Firebase Hosting), donde Telcel
+     sí carga. Solo actúa en *.github.io; en el sitio nuevo (.web.app / .firebaseapp.com) es no-op (evita
+     bucle). Quita el prefijo /Clinica-Fisio del path y conserva query+hash (incluye ?ejercicios=). -->
+<script>
+(function(){
+  try{
+    if(/\.github\.io$/i.test(location.hostname)){
+      var path = location.pathname.replace(/^\/Clinica-Fisio(?=\/|$)/i,'') || '/';
+      location.replace('https://clinicasinergia-ec2cf.web.app' + path + location.search + location.hash);
+    }
+  }catch(_e){}
+})();
+</script>
 <!-- [LINK LIGERO] Redirección TEMPRANA: un link de paciente (?ejercicios=) se abre en la página ligera
      rutina.html, que abre en datos móviles. Corre ANTES de descargar la app pesada (Firebase, etc.) y
      aborta su carga con location.replace. Los links VIEJOS (index.html?ejercicios=) quedan cubiertos así,
