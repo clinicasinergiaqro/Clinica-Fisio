@@ -1873,7 +1873,7 @@ function _claudeRouter_(body) {
     var lista = leerPacientes(ss);
     _claudeBitacora_(ss, 'claudePing', 'n=' + lista.length);
     // build: marca de versión desplegada — permite confirmar desde fuera qué código está EN VIVO en /exec.
-    return respuesta({ ok: true, pong: true, totalPacientes: lista.length, fecha: new Date().toISOString(), build: '2026-09-25-cobertura-total' });
+    return respuesta({ ok: true, pong: true, totalPacientes: lista.length, fecha: new Date().toISOString(), build: '2026-09-25-soap-nativa' });
   }
 
   if (action === 'claudeGetPacientes') {
@@ -2169,30 +2169,55 @@ function _claudeRouter_(body) {
     var numF = Number(sf.num) || (maxNumF + 1);
     var sidF = sf.id || ('claude-soap-' + ahoraF.getTime());
     var _so = function(v){ return (v && typeof v === 'object' && !Array.isArray(v)) ? v : String(v || ''); };
+    // día ISO (yyyy-mm-dd) desde la fecha de la nota — para el índice fechasSesiones.
+    var _diaISO = function(f){ var s=String(f||'').trim(); var m=s.match(/^(\d{4})-(\d{2})-(\d{2})/); if(m) return m[1]+'-'+m[2]+'-'+m[3];
+      m=s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})/); if(m){ var d=('0'+m[1]).slice(-2), mo=('0'+m[2]).slice(-2), y=m[3]; if(y.length===2) y='20'+y; return y+'-'+mo+'-'+d; } return ''; };
+    var fechaNota = sf.fecha || Utilities.formatDate(ahoraF, 'America/Mexico_City', 'yyyy-MM-dd');
+    // s/o/a/p con la MISMA estructura que arma la app (defaults + lo recibido), para que se pinte igual.
+    var _mrg = function(def, v){ var o = {}; var i; for (i in def) o[i] = def[i]; if (v && typeof v === 'object' && !Array.isArray(v)) { for (i in v) if (v[i] != null) o[i] = v[i]; } return o; };
     var sesionF = {
-      id: sidF, num: numF, totalSesiones: numF,
-      fecha: sf.fecha || Utilities.formatDate(ahoraF, 'America/Mexico_City', 'yyyy-MM-dd'),
-      fechaHoraISO: ahoraF.toISOString(),
+      id: sidF, num: numF, totalSesiones: numF, semana: Number(sf.semana) || 1,
+      fecha: fechaNota,
+      fechaHoraISO: sf.fechaHoraISO || ahoraF.toISOString(),
       terapeuta: sf.terapeuta || '',
-      s: _so(sf.s), o: _so(sf.o), a: _so(sf.a), p: _so(sf.p),
+      s: _mrg({ dolor:'', cambios:'', actFisica:'' }, sf.s),
+      o: _mrg({ rom:'', fuerza:'', hallazgos:'' }, sf.o),
+      a: _mrg({ evolucion:'', respuesta:'', analisis:'' }, sf.a),
+      p: _mrg({ tratamiento:'', indicaciones:'', contraindicaciones:'' }, sf.p),
       evaI: (sf.evaI != null ? sf.evaI : null), evaF: (sf.evaF != null ? sf.evaF : null),
       modalidades: Array.isArray(sf.modalidades) ? sf.modalidades : [],
-      completa: true, creadoPor: 'CLAUDE', origen: 'claude', importado: false,
-      revisionPendiente: false, createdAt: ahoraF.toISOString(), updatedAt: ahoraF.getTime()
+      // Campos NOM que la app escribe (vacíos por defecto) — mismo esquema de una nota nativa.
+      objetivoSesion: String(sf.objetivoSesion || ''), respuestaTratamiento: String(sf.respuestaTratamiento || ''),
+      tolerancia: String(sf.tolerancia || ''), eventosAdversosSesion: String(sf.eventosAdversosSesion || ''),
+      cambiosPlan: String(sf.cambiosPlan || ''), criteriosProgreso: String(sf.criteriosProgreso || ''),
+      indicacionesDomiciliarias: String(sf.indicacionesDomiciliarias || ''),
+      // BANDERAS DE FORMATO: sin formatoOriginal:'soap' la app la carga como 'texto_libre' y la pinta
+      // como "NOTA IMPORTADA — TEXTO ORIGINAL" (sin S/O/A/P). Se igualan a las de una nota nativa.
+      completa: true, modoNota: '', importado: false, formatoOriginal: 'soap',
+      creadoPor: 'CLAUDE', origen: 'claude', revisionPendiente: false,
+      createdAt: sf.createdAt || ahoraF.toISOString(), updatedAt: ahoraF.getTime()
     };
     var fieldsF = {}; Object.keys(sesionF).forEach(function(k){ fieldsF[k] = _fsEncodeValue_(sesionF[k]); });
-    var urlC = 'https://firestore.googleapis.com/v1/projects/' + PROJSF + '/databases/(default)/documents/pacientes/' + encodeURIComponent(idSF) + '/sesiones?documentId=' + encodeURIComponent(sidF);
-    var rC = UrlFetchApp.fetch(urlC, { method: 'post', contentType: 'application/json',
+    // UPSERT por PATCH al doc de la sesión: crea si no existe, ACTUALIZA si ya existe (permite corregir
+    // una nota reusando su mismo id, sin duplicar). SA de datastore ⇒ salta reglas.
+    var urlC = 'https://firestore.googleapis.com/v1/projects/' + PROJSF + '/databases/(default)/documents/pacientes/' + encodeURIComponent(idSF) + '/sesiones/' + encodeURIComponent(sidF);
+    var rC = UrlFetchApp.fetch(urlC, { method: 'patch', contentType: 'application/json',
       headers: { Authorization: 'Bearer ' + tokSF }, muteHttpExceptions: true, payload: JSON.stringify({ fields: fieldsF }) });
     var codeC = rC.getResponseCode();
     var okC = (codeC >= 200 && codeC < 300);
-    // 2) Bump del doc padre (updatedAt/ultimoUsuario) para refrescar la vista/última actividad.
+    // 2) Doc padre: mantener el índice de fechas (fechasSesiones) + últimaSesión + bump, para que
+    //    "sin documentar" se limpie al instante sin depender del auto-reparador de índice cojo.
     if (okC) {
       try {
-        var maskP = ['updateMask.fieldPaths=updatedAt','updateMask.fieldPaths=ultimoUsuario'];
+        var docPad = _claudeFsGetDoc_(idSF) || {};
+        var fechas = Array.isArray(docPad.fechasSesiones) ? docPad.fechasSesiones.slice() : [];
+        var diaISO = _diaISO(fechaNota);
+        if (diaISO && fechas.indexOf(diaISO) === -1) fechas.push(diaISO);
+        var camposPad = { fechasSesiones: fechas, ultimaSesionLive: fechaNota, updatedAt: ahoraF.getTime(), ultimoUsuario: 'CLAUDE' };
+        var maskP = [], fieldsPad = {};
+        Object.keys(camposPad).forEach(function(k){ fieldsPad[k] = _fsEncodeValue_(camposPad[k]); maskP.push('updateMask.fieldPaths=' + encodeURIComponent(k)); });
         var urlP = 'https://firestore.googleapis.com/v1/projects/' + PROJSF + '/databases/(default)/documents/pacientes/' + encodeURIComponent(idSF) + '?' + maskP.join('&');
-        UrlFetchApp.fetch(urlP, { method: 'patch', contentType: 'application/json', headers: { Authorization: 'Bearer ' + tokSF }, muteHttpExceptions: true,
-          payload: JSON.stringify({ fields: { updatedAt: _fsEncodeValue_(ahoraF.getTime()), ultimoUsuario: _fsEncodeValue_('CLAUDE') } }) });
+        UrlFetchApp.fetch(urlP, { method: 'patch', contentType: 'application/json', headers: { Authorization: 'Bearer ' + tokSF }, muteHttpExceptions: true, payload: JSON.stringify({ fields: fieldsPad }) });
       } catch (eP) {}
     }
     _claudeBitacora_(ss, 'claudeAgregarSoapFS', 'id=' + idSF + ' num=' + numF + ' http=' + codeC);
