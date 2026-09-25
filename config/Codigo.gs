@@ -1739,6 +1739,7 @@ function respaldar47EnLog(){
 //            claudeGetArchivo (descarga foto/archivo de Storage → base64).
 //  Escritura (Sheet, pipeline de la app → merge por columna, no pisa lo no tocado):
 //    claudePonerSugerencia, claudeActualizarClinico, claudeAgregarSoap, claudeAgregarItem.
+//  Escritura (Firestore subcolección sesiones): claudeAgregarSoapFS (nota SOAP de históricos mig_pac_).
 //  Escritura (Firestore .doc(p.id)): claudeFsMerge (estudiosDocs, reportesClinicosIA, …).
 //  Subida de archivos: claudeSubirEstudio (base64 → Storage + entrada en estudiosDocs FS).
 //  NUNCA identidad ni consentimientos. Todo queda en Bitacora como CLAUDE.
@@ -1872,7 +1873,7 @@ function _claudeRouter_(body) {
     var lista = leerPacientes(ss);
     _claudeBitacora_(ss, 'claudePing', 'n=' + lista.length);
     // build: marca de versión desplegada — permite confirmar desde fuera qué código está EN VIVO en /exec.
-    return respuesta({ ok: true, pong: true, totalPacientes: lista.length, fecha: new Date().toISOString(), build: '2026-09-25-subir-estudio' });
+    return respuesta({ ok: true, pong: true, totalPacientes: lista.length, fecha: new Date().toISOString(), build: '2026-09-25-soap-fs' });
   }
 
   if (action === 'claudeGetPacientes') {
@@ -2139,6 +2140,63 @@ function _claudeRouter_(body) {
     guardarPacientesConMerge_(ss, [pSO], { usuario: 'CLAUDE' });
     _claudeBitacora_(ss, 'claudeAgregarSoap', 'id=' + idSO + ' num=' + sesion.num);
     return respuesta({ ok: true, id: idSO, sesion: { id: sesion.id, num: sesion.num, fecha: sesion.fecha } });
+  }
+
+  // Agregar una nota SOAP a un HISTÓRICO (o cualquier paciente): escribe en la subcolección Firestore
+  // pacientes/<id>/sesiones (que es de donde la app lee las notas de históricos), NO en el Sheet.
+  // body: { id, sesion:{ s,o,a,p (texto u objeto {dolor,cambios,actFisica}...), evaI?, evaF?, fecha?, num?, terapeuta?, modalidades? } }
+  if (action === 'claudeAgregarSoapFS') {
+    var idSF = String(body.id || '').trim();
+    if (!idSF) return respuesta({ ok: false, error: 'Falta id', code: 400 });
+    var sf = (body.sesion && typeof body.sesion === 'object') ? body.sesion : null;
+    if (!sf) return respuesta({ ok: false, error: 'Falta sesion {}', code: 400 });
+    var tokSF = _claudeFsToken_();
+    if (!tokSF) return respuesta({ ok: false, error: 'Sin credenciales Firestore', code: 500 });
+    var PROJSF = PropertiesService.getScriptProperties().getProperty('FIRESTORE_PROJECT_ID') || 'clinicasinergia-ec2cf';
+    // 1) Calcular el siguiente num leyendo la subcolección de sesiones existente.
+    var baseL = 'https://firestore.googleapis.com/v1/projects/' + PROJSF + '/databases/(default)/documents/pacientes/' + encodeURIComponent(idSF) + '/sesiones?pageSize=300';
+    var maxNumF = 0, ptokF = '', pgF = 0;
+    try {
+      do {
+        var urlL = baseL + (ptokF ? '&pageToken=' + encodeURIComponent(ptokF) : '');
+        var rL = UrlFetchApp.fetch(urlL, { method: 'get', headers: { Authorization: 'Bearer ' + tokSF }, muteHttpExceptions: true });
+        var jL = JSON.parse(rL.getContentText() || '{}');
+        (jL.documents || []).forEach(function(doc){ var f = _fsDecodeFields_(doc.fields || {}); var n = Number(f.num) || 0; if (n > maxNumF) maxNumF = n; });
+        ptokF = jL.nextPageToken || ''; pgF++;
+      } while (ptokF && pgF < 20);
+    } catch (eL) {}
+    var ahoraF = new Date();
+    var numF = Number(sf.num) || (maxNumF + 1);
+    var sidF = sf.id || ('claude-soap-' + ahoraF.getTime());
+    var _so = function(v){ return (v && typeof v === 'object' && !Array.isArray(v)) ? v : String(v || ''); };
+    var sesionF = {
+      id: sidF, num: numF, totalSesiones: numF,
+      fecha: sf.fecha || Utilities.formatDate(ahoraF, 'America/Mexico_City', 'yyyy-MM-dd'),
+      fechaHoraISO: ahoraF.toISOString(),
+      terapeuta: sf.terapeuta || '',
+      s: _so(sf.s), o: _so(sf.o), a: _so(sf.a), p: _so(sf.p),
+      evaI: (sf.evaI != null ? sf.evaI : null), evaF: (sf.evaF != null ? sf.evaF : null),
+      modalidades: Array.isArray(sf.modalidades) ? sf.modalidades : [],
+      completa: true, creadoPor: 'CLAUDE', origen: 'claude', importado: false,
+      revisionPendiente: false, createdAt: ahoraF.toISOString(), updatedAt: ahoraF.getTime()
+    };
+    var fieldsF = {}; Object.keys(sesionF).forEach(function(k){ fieldsF[k] = _fsEncodeValue_(sesionF[k]); });
+    var urlC = 'https://firestore.googleapis.com/v1/projects/' + PROJSF + '/databases/(default)/documents/pacientes/' + encodeURIComponent(idSF) + '/sesiones?documentId=' + encodeURIComponent(sidF);
+    var rC = UrlFetchApp.fetch(urlC, { method: 'post', contentType: 'application/json',
+      headers: { Authorization: 'Bearer ' + tokSF }, muteHttpExceptions: true, payload: JSON.stringify({ fields: fieldsF }) });
+    var codeC = rC.getResponseCode();
+    var okC = (codeC >= 200 && codeC < 300);
+    // 2) Bump del doc padre (updatedAt/ultimoUsuario) para refrescar la vista/última actividad.
+    if (okC) {
+      try {
+        var maskP = ['updateMask.fieldPaths=updatedAt','updateMask.fieldPaths=ultimoUsuario'];
+        var urlP = 'https://firestore.googleapis.com/v1/projects/' + PROJSF + '/databases/(default)/documents/pacientes/' + encodeURIComponent(idSF) + '?' + maskP.join('&');
+        UrlFetchApp.fetch(urlP, { method: 'patch', contentType: 'application/json', headers: { Authorization: 'Bearer ' + tokSF }, muteHttpExceptions: true,
+          payload: JSON.stringify({ fields: { updatedAt: _fsEncodeValue_(ahoraF.getTime()), ultimoUsuario: _fsEncodeValue_('CLAUDE') } }) });
+      } catch (eP) {}
+    }
+    _claudeBitacora_(ss, 'claudeAgregarSoapFS', 'id=' + idSF + ' num=' + numF + ' http=' + codeC);
+    return respuesta({ ok: okC, id: idSF, num: numF, sid: sidF, http: codeC, error: okC ? undefined : (rC.getContentText() || '').slice(0, 200) });
   }
 
   // Agregar un ítem a un arreglo del Sheet (SUMA por id, no reemplaza). body: { id, campo, item }
