@@ -47,7 +47,11 @@ const HEADERS = [
   // FIX PÉRDIDA DE DATOS: 'inasistencias' ("No acudió") y 'motivoHC' se escribían desde el front pero
   // NO existían como columna → el backend los descartaba y se perdían al recargar (solo activos; los
   // históricos ya iban por Firestore). Agregar la columna hace que persistan en el Sheet.
-  'inasistencias','motivoHC'
+  'inasistencias','motivoHC',
+  // CONEXIÓN CLAUDE — Fase 1: columna donde Claude deja sugerencias de mejora de la historia clínica
+  // (SOLO propuestas para revisión; nunca sobrescribe campos clínicos). Es la ÚNICA columna que puede
+  // escribir el endpoint claude*. Texto plano (no va en CAMPOS_JSON).
+  'sugerenciaIA'
 ];
 
 // ── SPRINT TOKEN PASO 1: validación de Firebase ID Token ──
@@ -315,6 +319,14 @@ function doGet(e) {
 function doPost(e) {
   try {
     const body = JSON.parse(e.postData.contents);
+
+    // ── CONEXIÓN CLAUDE — Fase 1 ──
+    // Las acciones que empiezan con "claude" se autentican con CLAUDE_TOKEN (no con Firebase ID Token),
+    // por eso se rutean ANTES de validarRequestPrivado. La autenticación real la hace _claudeRouter_.
+    if (String(body.action || '').indexOf('claude') === 0) {
+      return _claudeRouter_(body);
+    }
+
     const auth = validarRequestPrivado(body);
     if (!auth.ok) {
       return respuesta({ok:false, error: auth.error, code: 401});
@@ -399,6 +411,43 @@ function doPost(e) {
     }
     if (body.action === 'leerAgenda') {
       return respuesta(leerAgenda(body.rango || 'dia', body.desde, body.hasta));
+    }
+    // Envía por correo el reporte de "notas faltantes" que arma el cliente (mismo motor del tablero
+    // de Rendimiento). Destinatario FIJO = supervisor; el cuerpo trae PHI, por eso jamás a un correo
+    // variable. dedupKey (opcional) evita reenviar el mismo reporte automático el mismo día.
+    if (body.action === 'enviarReporteCorreo') {
+      if (auth.role !== 'supervisor') {
+        return respuesta({ ok: false, error: 'SIN_PERMISO', msg: 'Solo el supervisor puede enviar reportes.' });
+      }
+      var REPORTE_TO = 'lftaranda@gmail.com';   // destinatario fijo (supervisor)
+      var htmlR = String(body.html || '');
+      if (!htmlR) return respuesta({ ok: false, error: 'SIN_CONTENIDO' });
+      var propsR = PropertiesService.getScriptProperties();
+      var dk = String(body.dedupKey || '').trim();
+      if (dk) {
+        var yaR = propsR.getProperty('REPORTE_ENVIADO_' + dk);
+        if (yaR) return respuesta({ ok: true, enviado: false, motivo: 'YA_ENVIADO', cuando: yaR });
+      }
+      var asuntoR = String(body.asunto || 'Reporte de desempeño — Clínica Sinergia');
+      // Adjuntos: PDF de desempeño por terapeuta (nuestro formato), llegan como base64 desde el cliente.
+      var adjIn = Array.isArray(body.adjuntos) ? body.adjuntos : [];
+      var attachments = [];
+      try {
+        adjIn.forEach(function (a) {
+          if (a && a.b64) attachments.push(Utilities.newBlob(Utilities.base64Decode(a.b64), 'application/pdf', String(a.nombre || 'desempeno.pdf')));
+        });
+      } catch (eB) {
+        return respuesta({ ok: false, error: 'ADJUNTO_ERROR', msg: String(eB && eB.message || eB) });
+      }
+      try {
+        var opcMail = { to: REPORTE_TO, subject: asuntoR, htmlBody: htmlR };
+        if (attachments.length) opcMail.attachments = attachments;
+        MailApp.sendEmail(opcMail);
+      } catch (eMail) {
+        return respuesta({ ok: false, error: 'MAIL_ERROR', msg: String(eMail && eMail.message || eMail) });
+      }
+      if (dk) propsR.setProperty('REPORTE_ENVIADO_' + dk, new Date().toISOString());
+      return respuesta({ ok: true, enviado: true, to: REPORTE_TO });
     }
     if (body.action === 'interpretarEstudio') {
       return interpretarEstudioIA(body);
@@ -1677,4 +1726,471 @@ function respaldar47EnLog(){
   Logger.log('=== INICIO RESPALDO JSON (copia TODO esto a un archivo .json en tu compu) ===');
   Logger.log(JSON.stringify(filas));
   Logger.log('=== FIN RESPALDO JSON ===');
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// CONEXIÓN CLAUDE — lectura TOTAL + escritura autorizada de todas las pestañas
+// ────────────────────────────────────────────────────────────────────────────
+// Acciones "claude*" por POST autenticadas con CLAUDE_TOKEN (no Firebase).
+//  Lectura:  claudePing, claudeGetPacientes, claudeGetHistoricos, claudeGetPaciente,
+//            claudeGetPacienteFull (Sheet + Firestore: incluye estudios/reportes),
+//            claudeGetExpedienteFull (doc COMPLETO de Firestore por id, activo o histórico),
+//            claudeGetNotas (subcolección sesiones por id),
+//            claudeGetArchivo (descarga foto/archivo de Storage → base64).
+//  Escritura (Sheet, pipeline de la app → merge por columna, no pisa lo no tocado):
+//    claudePonerSugerencia, claudeActualizarClinico, claudeAgregarSoap, claudeAgregarItem.
+//  Escritura (Firestore .doc(p.id)): claudeFsMerge (estudiosDocs, reportesClinicosIA, …).
+//  Subida de archivos: claudeSubirEstudio (base64 → Storage + entrada en estudiosDocs FS).
+//  NUNCA identidad ni consentimientos. Todo queda en Bitacora como CLAUDE.
+// El token vive en Script Properties + Drive (claude_token.txt); nunca por chat.
+// ════════════════════════════════════════════════════════════════════════════
+
+var CLAUDE_DRIVE_FOLDER_ID = '1rKlV5HHe6hfSzKGU6Y-0_JknTdWNm98w'; // carpeta Respaldos_Clinica
+var CLAUDE_STORAGE_BUCKET = 'clinicasinergia-ec2cf.firebasestorage.app';
+
+// Genera (o rota) el token de la conexión Claude. Ejecutar UNA VEZ desde el editor.
+function generarTokenClaude() {
+  var token = (Utilities.getUuid() + Utilities.getUuid()).replace(/-/g, '');
+  PropertiesService.getScriptProperties().setProperty('CLAUDE_TOKEN', token);
+  var escritoEnDrive = false;
+  try {
+    var folder = DriveApp.getFolderById(CLAUDE_DRIVE_FOLDER_ID);
+    var it = folder.getFilesByName('claude_token.txt');
+    if (it.hasNext()) { it.next().setContent(token); }
+    else { folder.createFile('claude_token.txt', token, 'text/plain'); }
+    escritoEnDrive = true;
+  } catch (e) {
+    Logger.log('CLAUDE_TOKEN guardado en Script Properties, pero NO se pudo escribir en Drive: ' + e.message);
+  }
+  try { getOrCreateSheet(SpreadsheetApp.openById(SHEET_ID)); } catch (e2) {}
+  Logger.log('✅ CLAUDE_TOKEN generado. En Drive (Respaldos_Clinica/claude_token.txt): ' + (escritoEnDrive ? 'SÍ' : 'NO — revisar permisos'));
+  return 'OK';
+}
+
+// Comparación de token en tiempo (casi) constante.
+function _claudeAuthOK_(body) {
+  var stored = PropertiesService.getScriptProperties().getProperty('CLAUDE_TOKEN');
+  if (!stored) return false;
+  var recibido = String((body && body.token) || '');
+  if (recibido.length !== stored.length) return false;
+  var diff = 0;
+  for (var i = 0; i < stored.length; i++) diff |= (stored.charCodeAt(i) ^ recibido.charCodeAt(i));
+  return diff === 0;
+}
+
+// Registra cada acceso de Claude en la hoja Bitacora (usuario = CLAUDE).
+function _claudeBitacora_(ss, accion, detalle) {
+  try {
+    var sh = ss.getSheetByName('Bitacora');
+    if (!sh) { sh = ss.insertSheet('Bitacora'); sh.appendRow(['fecha','hora','accion','usuario','correo','rol','userAgent','registradoEn']); }
+    var ahora = new Date();
+    sh.appendRow([
+      Utilities.formatDate(ahora, 'America/Mexico_City', 'yyyy-MM-dd'),
+      Utilities.formatDate(ahora, 'America/Mexico_City', 'HH:mm:ss'),
+      String(accion || ''), 'CLAUDE', '', 'conexion-claude',
+      String(detalle || '').slice(0, 200), ahora.toISOString()
+    ]);
+  } catch (e) {}
+}
+
+// Access token de una Service Account con el scope dado (Firestore o Storage).
+function _claudeSAToken_(scope) {
+  var props = PropertiesService.getScriptProperties();
+  var SA_EMAIL = props.getProperty('FIRESTORE_SA_EMAIL');
+  var SA_KEY = props.getProperty('FIRESTORE_SA_KEY');
+  if (!SA_EMAIL || !SA_KEY) return null;
+  var _b64url = function (s) { return Utilities.base64EncodeWebSafe(s).replace(/=+$/, ''); };
+  var now = Math.floor(Date.now() / 1000);
+  var head = _b64url(JSON.stringify({ alg: 'RS256', typ: 'JWT' }));
+  var claim = _b64url(JSON.stringify({
+    iss: SA_EMAIL, scope: scope,
+    aud: 'https://oauth2.googleapis.com/token', iat: now, exp: now + 3600
+  }));
+  var uns = head + '.' + claim;
+  var sig = Utilities.computeRsaSha256Signature(uns, SA_KEY.replace(/\\n/g, '\n'));
+  var assertion = uns + '.' + Utilities.base64EncodeWebSafe(sig).replace(/=+$/, '');
+  var res = UrlFetchApp.fetch('https://oauth2.googleapis.com/token', {
+    method: 'post', muteHttpExceptions: true,
+    payload: { grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer', assertion: assertion }
+  });
+  return (JSON.parse(res.getContentText() || '{}') || {}).access_token || null;
+}
+function _claudeFsToken_() { return _claudeSAToken_('https://www.googleapis.com/auth/datastore'); }
+function _claudeStorageToken_() { return _claudeSAToken_('https://www.googleapis.com/auth/devstorage.read_only'); }
+// Token de Storage con permiso de ESCRITURA (solo para claudeSubirEstudio; el resto usa read_only).
+function _claudeStorageTokenRW_() { return _claudeSAToken_('https://www.googleapis.com/auth/devstorage.read_write'); }
+
+// Decodifica el objeto fields de un documento Firestore REST → JS plano.
+function _fsDecodeFields_(fields) {
+  var _v = function (v) {
+    if (v == null) return null;
+    if ('stringValue' in v) return v.stringValue;
+    if ('booleanValue' in v) return v.booleanValue;
+    if ('integerValue' in v) return Number(v.integerValue);
+    if ('doubleValue' in v) return v.doubleValue;
+    if ('nullValue' in v) return null;
+    if ('timestampValue' in v) return v.timestampValue;
+    if ('mapValue' in v) { var o = {}; var f = (v.mapValue.fields || {}); for (var k in f) o[k] = _v(f[k]); return o; }
+    if ('arrayValue' in v) { return ((v.arrayValue.values) || []).map(_v); }
+    return null;
+  };
+  var out = {}; for (var k in fields) out[k] = _v(fields[k]); return out;
+}
+
+// Codifica un valor JS → formato de campo Firestore REST (inverso de _fsDecodeFields_).
+function _fsEncodeValue_(v) {
+  if (v === null || v === undefined) return { nullValue: null };
+  if (typeof v === 'boolean') return { booleanValue: v };
+  if (typeof v === 'number') return (Math.floor(v) === v ? { integerValue: String(v) } : { doubleValue: v });
+  if (typeof v === 'string') return { stringValue: v };
+  if (Array.isArray(v)) return { arrayValue: { values: v.map(_fsEncodeValue_) } };
+  if (typeof v === 'object') { var f = {}; for (var k in v) { if (v[k] !== undefined) f[k] = _fsEncodeValue_(v[k]); } return { mapValue: { fields: f } }; }
+  return { nullValue: null };
+}
+
+// Lee el doc de Firestore .doc(pid) → objeto plano (o null).
+function _claudeFsGetDoc_(pid) {
+  var tok = _claudeFsToken_();
+  if (!tok) return null;
+  var PROJ = PropertiesService.getScriptProperties().getProperty('FIRESTORE_PROJECT_ID') || 'clinicasinergia-ec2cf';
+  var url = 'https://firestore.googleapis.com/v1/projects/' + PROJ + '/databases/(default)/documents/pacientes/' + encodeURIComponent(pid);
+  var r = UrlFetchApp.fetch(url, { method: 'get', headers: { Authorization: 'Bearer ' + tok }, muteHttpExceptions: true });
+  if (r.getResponseCode() !== 200) return null;
+  return _fsDecodeFields_((JSON.parse(r.getContentText() || '{}').fields) || {});
+}
+
+// Router de las acciones claude*. La autenticación se hace AQUÍ (token propio).
+function _claudeRouter_(body) {
+  if (!_claudeAuthOK_(body)) {
+    return respuesta({ ok: false, error: 'CLAUDE_TOKEN inválido o no configurado', code: 401 });
+  }
+  var ss = SpreadsheetApp.openById(SHEET_ID);
+  var action = String(body.action || '');
+
+  if (action === 'claudePing') {
+    getOrCreateSheet(ss);
+    var lista = leerPacientes(ss);
+    _claudeBitacora_(ss, 'claudePing', 'n=' + lista.length);
+    // build: marca de versión desplegada — permite confirmar desde fuera qué código está EN VIVO en /exec.
+    return respuesta({ ok: true, pong: true, totalPacientes: lista.length, fecha: new Date().toISOString(), build: '2026-09-25-subir-estudio' });
+  }
+
+  if (action === 'claudeGetPacientes') {
+    var todos = leerPacientes(ss);
+    _claudeBitacora_(ss, 'claudeGetPacientes', 'n=' + todos.length);
+    return respuesta({ ok: true, total: todos.length, pacientes: todos });
+  }
+
+  if (action === 'claudeGetHistoricos') {
+    var tok = _claudeFsToken_();
+    if (!tok) return respuesta({ ok: false, error: 'Sin credenciales Firestore (FIRESTORE_SA_*)', code: 500 });
+    var PROJ = PropertiesService.getScriptProperties().getProperty('FIRESTORE_PROJECT_ID') || 'clinicasinergia-ec2cf';
+    var base = 'https://firestore.googleapis.com/v1/projects/' + PROJ + '/databases/(default)/documents/pacientes?pageSize=300';
+    var out = [], pageToken = '', paginas = 0;
+    try {
+      do {
+        var url = base + (pageToken ? '&pageToken=' + encodeURIComponent(pageToken) : '');
+        var r = UrlFetchApp.fetch(url, { method: 'get', headers: { Authorization: 'Bearer ' + tok }, muteHttpExceptions: true });
+        var j = JSON.parse(r.getContentText() || '{}');
+        (j.documents || []).forEach(function (doc) {
+          var f = _fsDecodeFields_(doc.fields || {});
+          var idPath = String(doc.name || '').split('/').pop();
+          out.push({
+            id: f.id || idPath, name: f.name || '', terapeuta: f.terapeuta || '',
+            terapeutaSeguimiento: f.terapeutaSeguimiento || '',
+            motivo: f.motivo || f.motivoConsulta || '', motivoHC: f.motivoHC || '',
+            dx: f.dx || '', fechaCreacion: f.fechaCreacion || '', updatedAt: f.updatedAt || 0, _origen: 'firestore'
+          });
+        });
+        pageToken = j.nextPageToken || ''; paginas++;
+      } while (pageToken && paginas < 30);
+    } catch (e) { return respuesta({ ok: false, error: 'Firestore: ' + e.message, code: 500 }); }
+    _claudeBitacora_(ss, 'claudeGetHistoricos', 'n=' + out.length);
+    return respuesta({ ok: true, total: out.length, historicos: out });
+  }
+
+  if (action === 'claudeGetPaciente') {
+    var q = String(body.id || body.query || '').trim().toLowerCase();
+    if (!q) return respuesta({ ok: false, error: 'Falta id o query', code: 400 });
+    var pacs = leerPacientes(ss);
+    var exactos = pacs.filter(function (p) { return String(p.id || '').toLowerCase() === q; });
+    var res = exactos.length ? exactos
+      : pacs.filter(function (p) { return String(p.name || '').toLowerCase().indexOf(q) >= 0; }).slice(0, 5);
+    _claudeBitacora_(ss, 'claudeGetPaciente', 'q=' + q + ' hits=' + res.length);
+    return respuesta({ ok: true, total: res.length, pacientes: res });
+  }
+
+  // Paciente COMPLETO: objeto del Sheet + merge de lo que vive solo en Firestore (estudios, reportes).
+  if (action === 'claudeGetPacienteFull') {
+    var idF = String(body.id || '').trim();
+    if (!idF) return respuesta({ ok: false, error: 'Falta id', code: 400 });
+    var pacF = null;
+    leerPacientes(ss).forEach(function (p) { if (String(p.id || '') === idF) pacF = p; });
+    if (!pacF) return respuesta({ ok: false, error: 'Paciente no encontrado: ' + idF, code: 404 });
+    try {
+      var dF = _claudeFsGetDoc_(idF);
+      if (dF) {
+        ['estudiosDocs','reportesClinicosIA'].forEach(function (k) {
+          if (dF[k] != null && (pacF[k] == null || (Array.isArray(pacF[k]) && !pacF[k].length))) pacF[k] = dF[k];
+        });
+        pacF._fs = { estudios: (Array.isArray(dF.estudiosDocs) ? dF.estudiosDocs.length : 0),
+                     reportes: (Array.isArray(dF.reportesClinicosIA) ? dF.reportesClinicosIA.length : 0),
+                     ejercicios: (Array.isArray(dF.ejercicios) ? dF.ejercicios.length : 0) };
+      }
+    } catch (eF) {}
+    _claudeBitacora_(ss, 'claudeGetPacienteFull', 'id=' + idF);
+    return respuesta({ ok: true, paciente: pacF });
+  }
+
+  // Expediente COMPLETO: TODOS los campos del doc de Firestore por id (activo o histórico mig_pac_).
+  // Trae antecedentes, cirugías, valoracion, dx, motivo, seguridadClinica, etc. — todo lo que exista.
+  if (action === 'claudeGetExpedienteFull') {
+    var idE = String(body.id || '').trim();
+    if (!idE) return respuesta({ ok: false, error: 'Falta id', code: 400 });
+    var dE = _claudeFsGetDoc_(idE);
+    if (!dE) return respuesta({ ok: false, error: 'Doc no encontrado en Firestore: ' + idE, code: 404 });
+    _claudeBitacora_(ss, 'claudeGetExpedienteFull', 'id=' + idE);
+    return respuesta({ ok: true, id: idE, expediente: dE });
+  }
+
+  // NOTAS SOAP (subcolección sesiones) de cualquier paciente por id (activo o histórico).
+  if (action === 'claudeGetNotas') {
+    var idN = String(body.id || '').trim();
+    if (!idN) return respuesta({ ok: false, error: 'Falta id', code: 400 });
+    var tokN = _claudeFsToken_();
+    if (!tokN) return respuesta({ ok: false, error: 'Sin credenciales Firestore', code: 500 });
+    var PROJN = PropertiesService.getScriptProperties().getProperty('FIRESTORE_PROJECT_ID') || 'clinicasinergia-ec2cf';
+    var baseN = 'https://firestore.googleapis.com/v1/projects/' + PROJN + '/databases/(default)/documents/pacientes/' + encodeURIComponent(idN) + '/sesiones?pageSize=300';
+    var outN = [], ptokN = '', pagN = 0;
+    try {
+      do {
+        var urlN = baseN + (ptokN ? '&pageToken=' + encodeURIComponent(ptokN) : '');
+        var rN = UrlFetchApp.fetch(urlN, { method: 'get', headers: { Authorization: 'Bearer ' + tokN }, muteHttpExceptions: true });
+        var jN = JSON.parse(rN.getContentText() || '{}');
+        (jN.documents || []).forEach(function (doc) { var f = _fsDecodeFields_(doc.fields || {}); f._sid = String(doc.name || '').split('/').pop(); outN.push(f); });
+        ptokN = jN.nextPageToken || ''; pagN++;
+      } while (ptokN && pagN < 20);
+    } catch (eN) { return respuesta({ ok: false, error: 'Firestore sesiones: ' + eN.message, code: 500 }); }
+    outN.sort(function (a, b) { return (Number(a.num) || 0) - (Number(b.num) || 0); });
+    _claudeBitacora_(ss, 'claudeGetNotas', 'id=' + idN + ' n=' + outN.length);
+    return respuesta({ ok: true, id: idN, total: outN.length, notas: outN });
+  }
+
+  // Descarga un archivo de Storage (foto/estudio/doc) → base64. body: { path } (fbPath) o { url }.
+  if (action === 'claudeGetArchivo') {
+    var pathA = String(body.path || '').trim();
+    var urlA = String(body.url || '').trim();
+    if (!pathA && urlA) {
+      var mm = urlA.match(/\/o\/([^?]+)/);
+      if (mm) pathA = decodeURIComponent(mm[1]);
+      else { var seg = urlA.split(CLAUDE_STORAGE_BUCKET + '/'); if (seg.length > 1) pathA = decodeURIComponent(seg[1].split('?')[0]); }
+    }
+    if (!pathA) return respuesta({ ok: false, error: 'Falta path o url', code: 400 });
+    var tokS = _claudeStorageToken_();
+    if (!tokS) return respuesta({ ok: false, error: 'Sin credenciales Storage', code: 500 });
+    var urlG = 'https://storage.googleapis.com/storage/v1/b/' + encodeURIComponent(CLAUDE_STORAGE_BUCKET) + '/o/' + encodeURIComponent(pathA) + '?alt=media';
+    var rG = UrlFetchApp.fetch(urlG, { method: 'get', headers: { Authorization: 'Bearer ' + tokS }, muteHttpExceptions: true });
+    var codeG = rG.getResponseCode();
+    if (codeG < 200 || codeG >= 300) return respuesta({ ok: false, error: 'Storage ' + codeG + ': ' + (rG.getContentText() || '').slice(0, 150), code: codeG });
+    var blob = rG.getBlob();
+    var bytes = blob.getBytes();
+    var ct = blob.getContentType() || 'application/octet-stream';
+    _claudeBitacora_(ss, 'claudeGetArchivo', 'path=' + pathA + ' bytes=' + bytes.length);
+    if (bytes.length > 7000000) return respuesta({ ok: false, error: 'Archivo muy grande para base64 (' + bytes.length + ' bytes); ábrelo por su URL', bytes: bytes.length, contentType: ct, code: 413 });
+    return respuesta({ ok: true, path: pathA, contentType: ct, bytes: bytes.length, base64: Utilities.base64Encode(bytes) });
+  }
+
+  // ── SUBIDA: foto/estudio (base64 → Storage) + entrada en estudiosDocs de Firestore .doc(id). ──
+  // Sube un archivo al MISMO almacén y ruta que usa la app (clinica/sinergia/<id>/estudios/…) con un
+  // token de descarga Firebase, y agrega la entrada a estudiosDocs del doc del paciente (activo o
+  // histórico) para que se vea en la pestaña Estudios igual que si se hubiera subido desde la app.
+  if (action === 'claudeSubirEstudio') {
+    var idSU = String(body.id || '').trim();
+    if (!idSU) return respuesta({ ok: false, error: 'Falta id', code: 400 });
+    var b64SU = String(body.base64 || body.contenido || '');
+    if (!b64SU) return respuesta({ ok: false, error: 'Falta base64 del archivo', code: 400 });
+    if (b64SU.indexOf(',') >= 0 && /^data:/.test(b64SU)) b64SU = b64SU.slice(b64SU.indexOf(',') + 1); // tolera data URI
+    var mimeSU = String(body.mime || body.contentType || 'application/octet-stream').trim() || 'application/octet-stream';
+    var nombreSU = String(body.name || body.nombre || 'estudio').trim() || 'estudio';
+    var bytesSU;
+    try { bytesSU = Utilities.base64Decode(b64SU); } catch (eDec) { return respuesta({ ok: false, error: 'base64 inválido', code: 400 }); }
+    if (!bytesSU || !bytesSU.length) return respuesta({ ok: false, error: 'Archivo vacío', code: 400 });
+    if (bytesSU.length > 20000000) return respuesta({ ok: false, error: 'Archivo muy grande (' + bytesSU.length + ' bytes; máx 20MB)', bytes: bytesSU.length, code: 413 });
+    var tokRW = _claudeStorageTokenRW_();
+    if (!tokRW) return respuesta({ ok: false, error: 'Sin credenciales Storage (escritura)', code: 500 });
+    var tsSU = Date.now();
+    var safeSU = nombreSU.replace(/[^\w.\-]+/g, '_');
+    var pathSU = 'clinica/sinergia/' + idSU + '/estudios/' + tsSU + '_' + safeSU;
+    var tokenDesc = Utilities.getUuid();
+    // 1) Subir el binario (uploadType=media: cuerpo = bytes crudos).
+    var upUrl = 'https://storage.googleapis.com/upload/storage/v1/b/' + encodeURIComponent(CLAUDE_STORAGE_BUCKET) + '/o?uploadType=media&name=' + encodeURIComponent(pathSU);
+    var rUp = UrlFetchApp.fetch(upUrl, { method: 'post', contentType: mimeSU, payload: bytesSU, headers: { Authorization: 'Bearer ' + tokRW }, muteHttpExceptions: true });
+    var codeUp = rUp.getResponseCode();
+    if (codeUp < 200 || codeUp >= 300) return respuesta({ ok: false, error: 'Storage upload ' + codeUp + ': ' + (rUp.getContentText() || '').slice(0, 200), code: codeUp });
+    // 2) Fijar el token de descarga Firebase en la metadata del objeto (para construir la URL pública firmada).
+    var patchUrl = 'https://storage.googleapis.com/storage/v1/b/' + encodeURIComponent(CLAUDE_STORAGE_BUCKET) + '/o/' + encodeURIComponent(pathSU);
+    var rMeta = UrlFetchApp.fetch(patchUrl, { method: 'patch', contentType: 'application/json',
+      headers: { Authorization: 'Bearer ' + tokRW }, muteHttpExceptions: true,
+      payload: JSON.stringify({ metadata: { firebaseStorageDownloadTokens: tokenDesc } }) });
+    var codeMeta = rMeta.getResponseCode();
+    if (codeMeta < 200 || codeMeta >= 300) return respuesta({ ok: false, error: 'Storage metadata ' + codeMeta + ': ' + (rMeta.getContentText() || '').slice(0, 200), code: codeMeta });
+    var urlSU = 'https://firebasestorage.googleapis.com/v0/b/' + CLAUDE_STORAGE_BUCKET + '/o/' + encodeURIComponent(pathSU) + '?alt=media&token=' + tokenDesc;
+    // 3) Armar la entrada estudiosDocs igual que la app (_baseItem) y agregarla al doc de Firestore.
+    var esImg = /^image\//.test(mimeSU);
+    var tipoSU = String(body.tipo || (esImg ? 'imagen' : 'documento'));
+    var descSU = String(body.descripcion || nombreSU.replace(/\.[^.]+$/, ''));
+    var hoyISO = Utilities.formatDate(new Date(), 'America/Mexico_City', 'yyyy-MM-dd');
+    var hoyMX = Utilities.formatDate(new Date(), 'America/Mexico_City', 'dd/MM/yyyy');
+    var itemSU = {
+      id: 'est_' + tsSU + '_' + Math.random().toString(36).slice(2, 6),
+      tipo: tipoSU, tipoClinico: String(body.tipoClinico || ''),
+      type: mimeSU, descripcion: descSU, name: nombreSU,
+      fechaEstudio: String(body.fechaEstudio || hoyISO), fechaAgregado: hoyMX,
+      agregadoPor: String(body.agregadoPor || 'Claude'),
+      url: urlSU, fbPath: pathSU
+    };
+    var resumenSU = String(body.resumen || body.interpretacion || '').trim();
+    if (resumenSU) itemSU.resumenManual = { texto: resumenSU.slice(0, 600), autor: String(body.agregadoPor || 'Claude'), fecha: new Date().toISOString() };
+    var tokFSs = _claudeFsToken_();
+    if (!tokFSs) return respuesta({ ok: false, error: 'Subido a Storage pero sin credenciales Firestore para registrar', url: urlSU, fbPath: pathSU, code: 500 });
+    var PROJs = PropertiesService.getScriptProperties().getProperty('FIRESTORE_PROJECT_ID') || 'clinicasinergia-ec2cf';
+    var docSU = _claudeFsGetDoc_(idSU) || {};
+    var arrSU = Array.isArray(docSU.estudiosDocs) ? docSU.estudiosDocs.slice() : [];
+    arrSU.push(itemSU);
+    var fieldsSU = { estudiosDocs: _fsEncodeValue_(arrSU), ultimoUsuario: _fsEncodeValue_('CLAUDE') };
+    var maskSU = ['updateMask.fieldPaths=estudiosDocs', 'updateMask.fieldPaths=ultimoUsuario'];
+    var urlFSs = 'https://firestore.googleapis.com/v1/projects/' + PROJs + '/databases/(default)/documents/pacientes/' + encodeURIComponent(idSU) + '?' + maskSU.join('&');
+    var rFSs = UrlFetchApp.fetch(urlFSs, { method: 'patch', contentType: 'application/json',
+      headers: { Authorization: 'Bearer ' + tokFSs }, muteHttpExceptions: true, payload: JSON.stringify({ fields: fieldsSU }) });
+    var codeFSs = rFSs.getResponseCode();
+    var okFSs = (codeFSs >= 200 && codeFSs < 300);
+    _claudeBitacora_(ss, 'claudeSubirEstudio', 'id=' + idSU + ' path=' + pathSU + ' bytes=' + bytesSU.length + ' fsHttp=' + codeFSs);
+    return respuesta({ ok: okFSs, id: idSU, url: urlSU, fbPath: pathSU, bytes: bytesSU.length, item: itemSU, total: arrSU.length,
+      fsHttp: codeFSs, error: okFSs ? undefined : ('Subido a Storage; falló registro en Firestore: ' + (rFSs.getContentText() || '').slice(0, 200)) });
+  }
+
+  // ── ESCRITURA: sugerencia (SOLO columna sugerenciaIA). texto:'' la limpia. ──
+  if (action === 'claudePonerSugerencia') {
+    var id = String(body.id || '').trim();
+    if (!id) return respuesta({ ok: false, error: 'Falta id', code: 400 });
+    var texto = (body.texto === null || body.texto === undefined) ? '' : String(body.texto);
+    if (texto.length > 2000) texto = texto.slice(0, 2000);
+    var sheet = getOrCreateSheet(ss);
+    var lastRow = sheet.getLastRow();
+    if (lastRow <= 1) return respuesta({ ok: false, error: 'Sheet vacío', code: 404 });
+    var colSug = HEADERS.indexOf('sugerenciaIA');
+    if (colSug < 0) return respuesta({ ok: false, error: 'Columna sugerenciaIA no existe', code: 500 });
+    var idsCol = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
+    var fila = -1;
+    for (var i = 0; i < idsCol.length; i++) { if (String(idsCol[i][0]).trim() === id) { fila = i + 2; break; } }
+    if (fila < 0) return respuesta({ ok: false, error: 'Paciente no encontrado en Sheet: ' + id, code: 404 });
+    sheet.getRange(fila, colSug + 1).setValue(texto);
+    _claudeBitacora_(ss, 'claudePonerSugerencia', 'id=' + id + ' len=' + texto.length + (texto ? '' : ' (limpiada)'));
+    return respuesta({ ok: true, id: id, escrito: texto.length });
+  }
+
+  // Anamnesis / campos de historia (SET). body: { id, campos:{ motivo, motivoHC, dx, valoracion, ... } }
+  if (action === 'claudeActualizarClinico') {
+    var idAC = String(body.id || '').trim();
+    if (!idAC) return respuesta({ ok: false, error: 'Falta id', code: 400 });
+    var campos = (body.campos && typeof body.campos === 'object') ? body.campos : null;
+    if (!campos) return respuesta({ ok: false, error: 'Falta campos {}', code: 400 });
+    var PERMITIDOS = ['dx','motivo','motivoHC','motivoConsulta','valoracion','dxFuncional','planTto',
+                      'antecedentes','alergias','contraindicaciones','seguridadClinica',
+                      'motivosAnteriores','motivoActualIndex','numSesionEpisodioActual','altaClinica'];
+    var pAC = { id: idAC, updatedAt: Date.now(), ultimoUsuario: 'CLAUDE' }, tocados = [];
+    Object.keys(campos).forEach(function(k){ if (PERMITIDOS.indexOf(k) >= 0) { pAC[k] = campos[k]; tocados.push(k); } });
+    if (!tocados.length) return respuesta({ ok: false, error: 'Ningún campo permitido en campos', code: 400 });
+    var existeAC = leerPacientes(ss).some(function(p){ return String(p.id||'') === idAC; });
+    if (!existeAC) return respuesta({ ok: false, error: 'Paciente no encontrado: ' + idAC, code: 404 });
+    pAC._soloCampos = tocados.concat(['updatedAt','ultimoUsuario']);
+    guardarPacientesConMerge_(ss, [pAC], { usuario: 'CLAUDE' });
+    _claudeBitacora_(ss, 'claudeActualizarClinico', 'id=' + idAC + ' campos=' + tocados.join(','));
+    return respuesta({ ok: true, id: idAC, actualizados: tocados });
+  }
+
+  // Agregar una nota SOAP. body: { id, sesion:{ s,o,a,p, evaI?, evaF?, fecha?, num?, terapeuta? } }
+  if (action === 'claudeAgregarSoap') {
+    var idSO = String(body.id || '').trim();
+    if (!idSO) return respuesta({ ok: false, error: 'Falta id', code: 400 });
+    var s = (body.sesion && typeof body.sesion === 'object') ? body.sesion : null;
+    if (!s) return respuesta({ ok: false, error: 'Falta sesion {}', code: 400 });
+    var pacSO = null;
+    leerPacientes(ss).forEach(function(p){ if (String(p.id||'') === idSO) pacSO = p; });
+    if (!pacSO) return respuesta({ ok: false, error: 'Paciente no encontrado: ' + idSO, code: 404 });
+    var soapPrev = ensamblarSoap_(pacSO);
+    var maxNum = 0; soapPrev.forEach(function(x){ var n = Number(x && x.num) || 0; if (n > maxNum) maxNum = n; });
+    var ahora = new Date();
+    var sesion = {
+      id: s.id || ('claude-soap-' + ahora.getTime()),
+      num: Number(s.num) || (maxNum + 1),
+      fecha: s.fecha || Utilities.formatDate(ahora, 'America/Mexico_City', 'yyyy-MM-dd'),
+      fechaHoraISO: ahora.toISOString(),
+      terapeuta: s.terapeuta || pacSO.terapeuta || '',
+      s: String(s.s || ''), o: String(s.o || ''), a: String(s.a || ''), p: String(s.p || ''),
+      evaI: (s.evaI != null ? s.evaI : null), evaF: (s.evaF != null ? s.evaF : null),
+      modalidades: Array.isArray(s.modalidades) ? s.modalidades : [],
+      completa: true, creadoPor: 'CLAUDE', origen: 'claude',
+      updatedAt: ahora.getTime(), createdAt: ahora.toISOString()
+    };
+    var pSO = { id: idSO, soap: JSON.stringify([sesion]), sesiones: (maxNum + 1),
+                updatedAt: ahora.getTime(), ultimoUsuario: 'CLAUDE',
+                _soloCampos: ['soap','sesiones','updatedAt','ultimoUsuario'] };
+    guardarPacientesConMerge_(ss, [pSO], { usuario: 'CLAUDE' });
+    _claudeBitacora_(ss, 'claudeAgregarSoap', 'id=' + idSO + ' num=' + sesion.num);
+    return respuesta({ ok: true, id: idSO, sesion: { id: sesion.id, num: sesion.num, fecha: sesion.fecha } });
+  }
+
+  // Agregar un ítem a un arreglo del Sheet (SUMA por id, no reemplaza). body: { id, campo, item }
+  if (action === 'claudeAgregarItem') {
+    var idIT = String(body.id || '').trim();
+    if (!idIT) return respuesta({ ok: false, error: 'Falta id', code: 400 });
+    var campo = String(body.campo || '').trim();
+    var CAMPOS_ARR = ['ejercicios','etiquetas','revaloraciones','eventosAdversos','fotos','docs','inasistencias','motivosAnteriores'];
+    if (CAMPOS_ARR.indexOf(campo) < 0) return respuesta({ ok: false, error: 'Campo de arreglo no permitido: ' + campo, code: 400 });
+    if (body.item === null || body.item === undefined) return respuesta({ ok: false, error: 'Falta item', code: 400 });
+    var pacIT = null;
+    leerPacientes(ss).forEach(function(p){ if (String(p.id||'') === idIT) pacIT = p; });
+    if (!pacIT) return respuesta({ ok: false, error: 'Paciente no encontrado: ' + idIT, code: 404 });
+    var arr = Array.isArray(pacIT[campo]) ? pacIT[campo].slice() : [];
+    var item = body.item;
+    if (item && typeof item === 'object' && !Array.isArray(item) && !item.id) item.id = 'claude-' + campo + '-' + Date.now();
+    arr.push(item);
+    var pIT = { id: idIT, updatedAt: Date.now(), ultimoUsuario: 'CLAUDE' };
+    pIT[campo] = arr;
+    pIT._soloCampos = [campo, 'updatedAt', 'ultimoUsuario'];
+    guardarPacientesConMerge_(ss, [pIT], { usuario: 'CLAUDE' });
+    _claudeBitacora_(ss, 'claudeAgregarItem', 'id=' + idIT + ' campo=' + campo + ' total=' + arr.length);
+    return respuesta({ ok: true, id: idIT, campo: campo, total: arr.length });
+  }
+
+  // Escribir campos que viven en Firestore .doc(p.id) (estudios, reportes, ejercicios).
+  if (action === 'claudeFsMerge') {
+    var idFS = String(body.id || '').trim();
+    var camposFS = (body.campos && typeof body.campos === 'object') ? body.campos : null;
+    if (!idFS || !camposFS) return respuesta({ ok: false, error: 'Falta id o campos', code: 400 });
+    var PERMITIDOS_FS = ['estudiosDocs','reportesClinicosIA','ejercicios','ejerciciosToken','ejerciciosLinkActivo',
+                         'dx','motivo','motivoHC','valoracion','dxFuncional','planTto','antecedentes',
+                         'alergias','contraindicaciones','seguridadClinica','altaClinica','revaloraciones',
+                         'eventosAdversos','etiquetas','motivosAnteriores'];
+    var tokFS = _claudeFsToken_();
+    if (!tokFS) return respuesta({ ok: false, error: 'Sin credenciales Firestore', code: 500 });
+    var PROJ2 = PropertiesService.getScriptProperties().getProperty('FIRESTORE_PROJECT_ID') || 'clinicasinergia-ec2cf';
+    var fields = {}, mask = [], escritos = [];
+    Object.keys(camposFS).forEach(function(k){
+      if (PERMITIDOS_FS.indexOf(k) < 0) return;
+      fields[k] = _fsEncodeValue_(camposFS[k]); mask.push('updateMask.fieldPaths=' + encodeURIComponent(k)); escritos.push(k);
+    });
+    if (!escritos.length) return respuesta({ ok: false, error: 'Ningún campo FS permitido', code: 400 });
+    fields['ultimoUsuario'] = _fsEncodeValue_('CLAUDE'); mask.push('updateMask.fieldPaths=ultimoUsuario');
+    var urlFS = 'https://firestore.googleapis.com/v1/projects/' + PROJ2 + '/databases/(default)/documents/pacientes/' + encodeURIComponent(idFS) + '?' + mask.join('&');
+    var rFS = UrlFetchApp.fetch(urlFS, { method: 'patch', contentType: 'application/json',
+      headers: { Authorization: 'Bearer ' + tokFS }, muteHttpExceptions: true, payload: JSON.stringify({ fields: fields }) });
+    var codeFS = rFS.getResponseCode();
+    var okFS = (codeFS >= 200 && codeFS < 300);
+    _claudeBitacora_(ss, 'claudeFsMerge', 'id=' + idFS + ' campos=' + escritos.join(',') + ' http=' + codeFS);
+    return respuesta({ ok: okFS, id: idFS, http: codeFS, escritos: escritos, error: okFS ? undefined : (rFS.getContentText() || '').slice(0, 200) });
+  }
+
+  return respuesta({ ok: false, error: 'Acción claude no reconocida: ' + action, code: 400 });
 }
