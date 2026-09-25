@@ -13825,6 +13825,104 @@ function _borrarEstudioVal(id){
   try{ if(typeof guardarBorradorNuevo==='function') guardarBorradorNuevo(); }catch(_){}
   showToast('🗑 Eliminado','success');
 }
+
+// ── NUEVO PACIENTE — paridad con la pestaña Estudios ──
+// Mismo menú de 4 opciones que menuAgregarEstudio (link/receta/interpretación/imagen), pero en modo
+// ALTA: bufferea en window._altaEstudios (se guarda al crear el paciente) en vez de persistir ya.
+// Reusa los mismos diálogos (_pedirLinkEstudio, _pedirFechaEstudio) y el mismo preview (_renderEstudiosVal).
+function menuAgregarEstudioAlta(){
+  var ov=document.createElement('div');
+  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:9999;display:flex;align-items:flex-end;justify-content:center';
+  function cerrar(){ ov.remove(); }
+  ov.onclick=function(e){ if(e.target===ov) cerrar(); };
+  var ops=[['link','🔗 Link de estudio'],['receta','💊 Receta'],['interpretacion','📝 Interpretación'],['imagen','🩻 Imagen / estudio']];
+  ov.innerHTML='<div style="background:#fff;border-radius:16px 16px 0 0;width:100%;max-width:480px;padding:16px">'
+    +'<div style="font-weight:800;color:var(--navy);margin-bottom:10px">Agregar estudio</div>'
+    +ops.map(function(o){ return '<button data-tipo="'+o[0]+'" style="width:100%;text-align:left;padding:12px;margin-bottom:6px;border:1px solid var(--gray-200);border-radius:10px;background:#fff;font-size:14px;cursor:pointer">'+o[1]+'</button>'; }).join('')
+    +'<button data-cancel="1" style="width:100%;padding:10px;margin-top:4px;border:none;background:none;color:var(--gray-400);font-size:13px;cursor:pointer">Cancelar</button></div>';
+  ov.querySelectorAll('button').forEach(function(b){
+    b.onclick=function(){
+      if(b.dataset.cancel){ cerrar(); return; }
+      var tipo=b.dataset.tipo; cerrar();
+      if(tipo==='link') agregarEstudioLinkAlta(); else agregarEstudioArchivoAlta(tipo);
+    };
+  });
+  document.body.appendChild(ov);
+}
+
+async function agregarEstudioLinkAlta(){
+  var datos=await _pedirLinkEstudio();
+  if(!datos) return;
+  var fecha=await _pedirFechaEstudio();
+  if(!fecha) return;
+  if(!Array.isArray(window._altaEstudios)) window._altaEstudios=[];
+  var ts=Date.now();
+  window._altaEstudios.push({ id:'est_'+ts+'_'+Math.random().toString(36).slice(2,6), tipo:'link', tipoClinico:'Link',
+    url:datos.url, descripcion:datos.desc, name:datos.desc||'Link', fechaEstudio:fecha,
+    fechaAgregado:new Date().toLocaleDateString('es-MX'), agregadoPor:(currentUser&&currentUser.name)||'' });
+  _renderEstudiosVal(); marcarDirty();
+  try{ if(typeof guardarBorradorNuevo==='function') guardarBorradorNuevo(); }catch(_){}
+  showToast('✅ Link agregado','success');
+}
+
+// Archivo (receta/interpretación/imagen) en modo alta: sube a Storage bajo _altaPid y bufferea en
+// _altaEstudios. MISMA red de seguridad que _capturarEstudioVal: contador en vuelo (bloquea el guardado
+// hasta que termine), guard de _altaPid (si cambias de formulario no cruza estudios), y fallback a IDB.
+function agregarEstudioArchivoAlta(tipo){
+  var inp=document.createElement('input');
+  inp.type='file'; inp.multiple=true;
+  inp.accept=(tipo==='imagen')?'image/*':'*/*';
+  inp.onchange=async function(ev){
+    var files=Array.from(ev.target.files||[]); if(ev&&ev.target) ev.target.value='';
+    if(!files.length) return;
+    var fecha=await _pedirFechaEstudio();
+    if(!fecha) return;
+    if(!window._altaPid) window._altaPid=(typeof generarIdSeguro_==='function'?generarIdSeguro_('p'):('p'+Date.now()));
+    var _pidEst=window._altaPid;
+    if(!Array.isArray(window._altaEstudios)) window._altaEstudios=[];
+    var etqTipo=(tipo==='receta'?'Receta':(tipo==='interpretacion'?'Interpretación':''));
+    var ok=0, fallo=0;
+    for(var i=0;i<files.length;i++){
+      var f=files[i];
+      if(f.size>15*1024*1024){ fallo++; showToast('⚠️ '+(f.name||'archivo')+' supera 15MB — omitido','error'); continue; }
+      window._altaEstudiosEnVuelo=(window._altaEstudiosEnVuelo||0)+1;
+      try{
+        showToast('☁️ Subiendo '+(i+1)+' de '+files.length+'…','');
+        var ts=Date.now();
+        var safe=String(f.name||'archivo').replace(/[^\w.\-]+/g,'_');
+        var fbPath='clinica/sinergia/'+_pidEst+'/estudios/'+ts+'_'+i+'_'+safe;
+        var url=await new Promise(function(resolve,reject){
+          var task=fbStorage.ref(fbPath).put(f,{ contentType:f.type||'application/octet-stream' });
+          task.on('state_changed', null, function(err){ reject(err); }, async function(){ try{ resolve(await task.snapshot.ref.getDownloadURL()); }catch(e){ reject(e); } });
+        });
+        if(window._altaPid!==_pidEst){ showToast('Cambiaste de formulario — el estudio no se adjuntó','warning'); return; }
+        window._altaEstudios.push({ id:'est_'+ts+'_'+i+'_'+Math.random().toString(36).slice(2,6), tipo:tipo, tipoClinico:etqTipo,
+          type:f.type||'', url:url, fbPath:fbPath, descripcion:(f.name||'').replace(/\.[^.]+$/,''), name:(f.name||'estudio'),
+          fechaEstudio:fecha, fechaAgregado:new Date().toLocaleDateString('es-MX'), agregadoPor:(currentUser&&currentUser.name)||'' });
+        ok++;
+      }catch(e){
+        // FALLBACK-IDB: mala señal → guarda el binario local (mediaId + pendienteSubida) y se re-sube al reconectar.
+        try{
+          var _ts2=Date.now();
+          var _data=await readFile(f);
+          var _mid='estv_'+_pidEst+'_'+_ts2+'_'+i+'_'+Math.random().toString(36).slice(2,7);
+          await idbSet(_mid,_data);
+          if(window._altaPid!==_pidEst) return;
+          window._altaEstudios.push({ id:'est_'+_ts2+'_'+i+'_'+Math.random().toString(36).slice(2,6), tipo:tipo, tipoClinico:etqTipo,
+            type:f.type||'', mediaId:_mid, descripcion:(f.name||'').replace(/\.[^.]+$/,''), name:(f.name||'estudio'),
+            fechaEstudio:fecha, fechaAgregado:new Date().toLocaleDateString('es-MX'), agregadoPor:(currentUser&&currentUser.name)||'', pendienteSubida:true });
+          ok++;
+          showToast('📴 Estudio guardado en el equipo — se subirá solo al reconectar','warning');
+        }catch(e2){ fallo++; console.warn('[estudio-alta]', e&&e.message, e2&&e2.message); }
+      }finally{ window._altaEstudiosEnVuelo=Math.max(0,(window._altaEstudiosEnVuelo||1)-1); }
+    }
+    if(!ok){ showToast('❌ No se agregó ningún estudio'+(fallo?(' ('+fallo+' con error)'):''),'error'); return; }
+    _renderEstudiosVal(); marcarDirty();
+    try{ if(typeof guardarBorradorNuevo==='function') guardarBorradorNuevo(); }catch(_){}
+    showToast('✅ '+ok+' estudio(s) agregado(s)'+(fallo?(' · '+fallo+' con error'):''),'success');
+  };
+  inp.click();
+}
 // Grabar/subir un ejercicio DESDE la nota SOAP: sube la media, crea el ejercicio en el paciente
 // (aparece también en la pestaña Ejercicios) y lo marca como trabajado en esta sesión. Sin nombre:
 // se identifica por su video/foto + la dosis de la sesión (editable). Reutiliza la subida a Storage.
@@ -18398,7 +18496,9 @@ function renderNuevoPaciente(){
         <div id="n-estudios-val-wrap" style="margin-top:10px"></div>
         <div style="font-size:12.5px;font-weight:700;color:#00584E;margin:14px 0 7px">3. Captura el documento</div>
         <button type="button" onclick="var i=document.getElementById('n-estudio-val-capture');if(i)i.click()" style="width:100%;background:#00695C;color:#fff;border:none;border-radius:12px;padding:14px;font-size:15px;font-weight:800;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px">📷 Escanear / foto / PDF de estudio</button>
-        <div style="font-size:11px;color:var(--gray-500);margin-top:8px;line-height:1.45">Elige el tipo y escribe la interpretación <b>antes</b> de capturar. Cada estudio queda ligado al paciente y visible en la pestaña Estudios.</div>
+        <div style="display:flex;align-items:center;gap:8px;margin:12px 0 4px"><div style="flex:1;height:1px;background:#B7D8D2"></div><div style="font-size:11px;font-weight:700;color:#00584E">o agrega de un jalón</div><div style="flex:1;height:1px;background:#B7D8D2"></div></div>
+        <button type="button" onclick="menuAgregarEstudioAlta()" style="width:100%;background:#F4FBFA;color:#00584E;border:1.5px solid #00695C;border-radius:12px;padding:13px;font-size:14px;font-weight:800;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px">➕ Link · Receta · Interpretación · Imagen</button>
+        <div style="font-size:11px;color:var(--gray-500);margin-top:8px;line-height:1.45">Con los chips capturas foto/PDF con su interpretación. Con <b>➕</b> agregas también <b>link</b> de estudio, receta, interpretación o imagen — igual que en la pestaña Estudios. Todo queda ligado al paciente al crearlo.</div>
       </div>
     </div>
   </div>
