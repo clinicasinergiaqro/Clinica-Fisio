@@ -1904,14 +1904,12 @@ function saveLocal(k,v){
     var esCuota = !!(e && (e.name==='QuotaExceededError' || e.code===22 || e.code===1014
       || /quota/i.test((e.name||'')+' '+(e.message||''))));
     if(esCuota){
-      console.warn('saveLocal QUOTA:', e.message);
-      // FIX-B: avisar UNA vez por sesión (no en bucle). La nube ya tiene los datos; falló solo el respaldo local.
-      if(!window._quotaAvisado){
-        window._quotaAvisado = true;
-        // NO es la memoria del dispositivo: es el espacio de respaldo LOCAL del sitio (límite chico de
-        // Safari por app). Los datos SÍ están en la nube. Texto honesto y calmado (warning, no rojo).
-        try{ showToast('📦 Respaldo local de la app lleno en este equipo — tus cambios SÍ se guardaron en la nube (no perdiste nada). Es normal con muchos pacientes; lo estamos mejorando.','warning'); }catch(_){}
-      }
+      // Respaldo local (localStorage) lleno: el límite chico de Safari por sitio se satura con muchos
+      // pacientes. La nube (Sheets/Firestore) YA tiene los datos y la app se rehidrata de ahí al recargar,
+      // así que esto NO pierde nada. El toast que se mostraba a todos se quitó por ruido (decisión Carlos):
+      // queda solo en consola para diagnóstico. Fix de fondo pendiente: mover el respaldo a IndexedDB.
+      window._quotaAvisado = true;
+      console.warn('saveLocal QUOTA (respaldo local lleno; datos en la nube):', e && e.message);
     } else {
       console.warn('saveLocal error:', e.message);   // otros errores: comportamiento igual que hoy
     }
