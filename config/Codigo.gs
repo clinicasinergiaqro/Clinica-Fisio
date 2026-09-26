@@ -1873,7 +1873,7 @@ function _claudeRouter_(body) {
     var lista = leerPacientes(ss);
     _claudeBitacora_(ss, 'claudePing', 'n=' + lista.length);
     // build: marca de versión desplegada — permite confirmar desde fuera qué código está EN VIVO en /exec.
-    return respuesta({ ok: true, pong: true, totalPacientes: lista.length, fecha: new Date().toISOString(), build: '2026-09-25-sexo' });
+    return respuesta({ ok: true, pong: true, totalPacientes: lista.length, fecha: new Date().toISOString(), build: '2026-09-26-editar-soap' });
   }
 
   if (action === 'claudeGetPacientes') {
@@ -2141,6 +2141,49 @@ function _claudeRouter_(body) {
     guardarPacientesConMerge_(ss, [pSO], { usuario: 'CLAUDE' });
     _claudeBitacora_(ss, 'claudeAgregarSoap', 'id=' + idSO + ' num=' + sesion.num);
     return respuesta({ ok: true, id: idSO, sesion: { id: sesion.id, num: sesion.num, fecha: sesion.fecha } });
+  }
+
+  // EDITAR una nota SOAP EXISTENTE de un ACTIVO (Sheet): corrige texto de s/o/a/p sin cambiar el resto.
+  // body: { id, sesionId, campos:{ s|o|a|p (objeto {dolor,...} → merge de subcampos, o string), evaI?, evaF?, modalidades? } }
+  // Preserva todos los demás campos de la nota, sube updatedAt (para que el merge la conserve) y deja historialEdiciones.
+  if (action === 'claudeEditarSoap') {
+    var idES = String(body.id || '').trim();
+    var sidES = String(body.sesionId || body.sid || '').trim();
+    if (!idES || !sidES) return respuesta({ ok: false, error: 'Falta id o sesionId', code: 400 });
+    var camposES = (body.campos && typeof body.campos === 'object') ? body.campos : null;
+    if (!camposES) return respuesta({ ok: false, error: 'Falta campos {}', code: 400 });
+    var pacES = null;
+    leerPacientes(ss).forEach(function(p){ if (String(p.id || '') === idES) pacES = p; });
+    if (!pacES) return respuesta({ ok: false, error: 'Paciente no encontrado: ' + idES, code: 404 });
+    var soapArr = ensamblarSoap_(pacES);
+    var idxES = -1;
+    for (var iE = 0; iE < soapArr.length; iE++) { if (String((soapArr[iE] && soapArr[iE].id) || '') === sidES) { idxES = iE; break; } }
+    if (idxES < 0) return respuesta({ ok: false, error: 'Nota no encontrada: ' + sidES, code: 404 });
+    var notaES = soapArr[idxES];
+    var PERM_ES = ['s','o','a','p','evaI','evaF','modalidades'];
+    var tocES = [];
+    PERM_ES.forEach(function(k){
+      if (!(k in camposES)) return;
+      var nv = camposES[k];
+      if ((k==='s'||k==='o'||k==='a'||k==='p') && nv && typeof nv === 'object' && !Array.isArray(nv)) {
+        var cur = (notaES[k] && typeof notaES[k] === 'object' && !Array.isArray(notaES[k])) ? notaES[k] : {};
+        var mrg = {}; var z; for (z in cur) mrg[z] = cur[z]; for (z in nv) if (nv[z] != null) mrg[z] = nv[z];
+        notaES[k] = mrg;
+      } else { notaES[k] = nv; }
+      tocES.push(k);
+    });
+    if (!tocES.length) return respuesta({ ok: false, error: 'Ningún campo editable', code: 400 });
+    notaES.updatedAt = Date.now();
+    if (!Array.isArray(notaES.historialEdiciones)) notaES.historialEdiciones = [];
+    var ahoraES = new Date();
+    notaES.historialEdiciones.push({ fecha: Utilities.formatDate(ahoraES,'America/Mexico_City','yyyy-MM-dd'), hora: Utilities.formatDate(ahoraES,'America/Mexico_City','HH:mm:ss'), usuario: 'CLAUDE', accion: 'corrección ortografía/redacción' });
+    soapArr[idxES] = notaES;
+    var chES = repartirSoap_(soapArr);
+    var pES = { id: idES, soap: chES.soap, soap2: chES.soap2, soap3: chES.soap3, updatedAt: Date.now(), ultimoUsuario: 'CLAUDE',
+                _soloCampos: ['soap','soap2','soap3','updatedAt','ultimoUsuario'] };
+    guardarPacientesConMerge_(ss, [pES], { usuario: 'CLAUDE' });
+    _claudeBitacora_(ss, 'claudeEditarSoap', 'id=' + idES + ' sid=' + sidES + ' campos=' + tocES.join(','));
+    return respuesta({ ok: true, id: idES, sesionId: sidES, editados: tocES });
   }
 
   // Agregar una nota SOAP a un HISTÓRICO (o cualquier paciente): escribe en la subcolección Firestore
