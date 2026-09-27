@@ -12533,17 +12533,32 @@ function _archivarMotivoActual(p, nuevoMotivo, nuevoDx){
 // paciente VE HOY en su rutina, con el MISMO criterio que el link/rutina.html (L~21608 y L~22707-22709):
 // visibles (privado!==true), para casa (paraCasa!==false) y activos (estado 'activo'). Así la nota liga
 // con la pestaña Ejercicios sin duplicar la dosis (que vive allá). Es una foto al abrir la nota.
+function _ejEnRutina(e){ return !!(e && e.privado!==true && e.paraCasa!==false && (e.estado||'activo')==='activo'); }
 function _contarEjRutina(p){
   var ejs=(p&&Array.isArray(p.ejercicios))?p.ejercicios:[];
-  return ejs.filter(function(e){ return e && e.privado!==true && e.paraCasa!==false && (e.estado||'activo')==='activo'; }).length;
+  return ejs.filter(_ejEnRutina).length;
+}
+// Dosis pendiente = sin dosis real: ni el campo `dosis` ni el compuesto series/reps/tiempo/frec/duración,
+// o un placeholder ("Por definir"/"Pendiente"). Se usa para marcar los ejercicios que faltan completar.
+function _ejDosisPendiente(ej){
+  if(!ej) return false;
+  var d=String(ej.dosis||'').trim().toLowerCase();
+  var comp=[ej.series,ej.repeticiones,ej.tiempo,ej.frecuencia,ej.duracion].filter(Boolean).join(' ').trim();
+  if(!d && !comp) return true;
+  return (d==='por definir'||d==='pendiente'||d==='[pendiente]'||d==='—'||d==='-'||d==='n/a'||d==='na');
 }
 function _refRutinaEjHTML(){
   try{
-    var n=_contarEjRutina(currentPatient);
-    var txt = n>0
-      ? ('🏃 Rutina actual: <b>'+n+'</b> ejercicio'+(n!==1?'s':'')+' asignado'+(n!==1?'s':'')+' · edítalos en la pestaña Ejercicios')
-      : '🏃 Sin ejercicios en la rutina — asígnalos en la pestaña Ejercicios';
-    return '<div style="font-size:11px;color:'+(n>0?'#2E7D52':'#8A6D1A')+';margin-top:4px;padding:0 2px;font-weight:600">'+txt+'</div>';
+    var ejs=(currentPatient&&Array.isArray(currentPatient.ejercicios))?currentPatient.ejercicios:[];
+    var enRutina=ejs.filter(_ejEnRutina);
+    var n=enRutina.length;
+    var sinDosis=enRutina.filter(_ejDosisPendiente).length;
+    if(!n){
+      return '<div style="font-size:11px;color:#8A6D1A;margin-top:4px;padding:0 2px;font-weight:600">🏃 Sin ejercicios en la rutina — asígnalos en la pestaña Ejercicios</div>';
+    }
+    var base='🏃 Rutina actual: <b>'+n+'</b> ejercicio'+(n!==1?'s':'')+' asignado'+(n!==1?'s':'')+' · edítalos en la pestaña Ejercicios';
+    var aviso=sinDosis>0 ? '<div style="font-size:11px;color:#B45309;margin-top:2px;padding:0 2px;font-weight:700">⚠️ '+sinDosis+' sin dosis — complétala(s) en la pestaña Ejercicios</div>' : '';
+    return '<div style="font-size:11px;color:#2E7D52;margin-top:4px;padding:0 2px;font-weight:600">'+base+'</div>'+aviso;
   }catch(_){ return ''; }
 }
 function renderSOAPForm(){
@@ -21750,7 +21765,7 @@ function renderEjercicios(){
           <div style="font-size:20px">${isVideo?'🎥':isImg?'🖼️':'📝'}</div>
         </div>
         <div class="ejercicio-body">
-          <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px">${_statusChip}</div>
+          <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px">${_statusChip}${_ejDosisPendiente(ej)?_chip('⚠️ Falta dosis','#B45309','#FEF3C7'):''}</div>
           ${ej.media ? `<div class="ejercicio-media" onclick="verMediaEjercicio(${i})">
             ${!srcEj
               ? `<div style="padding:20px;text-align:center;color:#9BA3B5">Video no disponible</div>`
