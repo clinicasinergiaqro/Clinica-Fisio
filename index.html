@@ -12833,7 +12833,13 @@ function renderSOAPForm(){
       <div class="form-field">
         <div class="form-label">Análisis clínico <span class="req">*</span></div>
         <div style="font-size:11px;color:var(--gray-400);font-weight:400;margin:-2px 0 5px;line-height:1.45">Tu razonamiento en 1-2 líneas: por qué está así (relaciona lo que mediste), qué significa y qué justifica el plan/decisión de hoy.</div>
-        <textarea class="form-input" id="f-aanalisis" placeholder="Ej: Tendinopatía rotuliana en fase reactiva; tolera excéntricos sin aumento de dolor → se progresa carga. Dolor residual esperado, sin banderas."></textarea>
+        <textarea class="form-input" id="f-aanalisis" placeholder="Escribe aquí tu razonamiento clínico de la sesión…"></textarea>
+        <!-- Ejemplo SIEMPRE visible (decisión Carlos 2026-09-27): guía permanente para que escriban un
+             análisis objetivo y con criterio, no un placeholder que desaparece al empezar a teclear. -->
+        <div style="font-size:11px;color:var(--gray-500);background:var(--gray-50);border:1px solid var(--gray-200);border-radius:8px;padding:8px 10px;margin-top:6px;line-height:1.5">
+          <b style="color:var(--navy)">Ejemplo:</b> Tendinopatía rotuliana en fase reactiva; tolera excéntricos sin aumento de dolor → se progresa carga. Dolor residual esperado, sin banderas.<br>
+          <span style="color:var(--gray-400)">Relaciona lo que mediste (EVA/ROM/fuerza) → qué significa → qué decides.</span>
+        </div>
       </div>
     </div>
   </div>
