@@ -22,10 +22,10 @@ El código ya está en el repo, pero **Apps Script sigue sirviendo el deploy vie
 - **Id de modelo de IA centralizado** en `MODELO_IA` (antes duplicado en `generarSoapIA`). ⚠️ **VERIFICA que `MODELO_IA = 'claude-sonnet-4-6'` sea un modelo vigente de la API**; si no lo es, TODA la IA (dictado, SOAP-IA, estudios, síntesis) falla.
 - **PHI a Anthropic minimizada:** ya no se envía el nombre del paciente en `interpretarEstudioIA` ni en `generarSintesisIA_` (solo edad/datos clínicos). Igual que ya hacía SOAP-IA.
 - **LockService (concurrencia):** el candado ahora vive dentro de `guardarPacientesConMerge_` (cubre `savePacientes` y las escrituras `claude*` de merge) y `deletePaciente` toma el suyo. `savePacientes` ya no lo toma por fuera (evita doble-adquisición). Cierra la ventana de clobber entre un guardado normal y una escritura de la conexión.
+- **`repartirSoap_` (tope de celda):** el `chunk3` ahora falla EXPLÍCITO (`MERGE_ERROR:SOAP_CELL_LIMIT`) si supera ~49 000 chars, en vez de que `setValues` reviente de forma opaca y se pierda el guardado en el Sheet. El expediente completo sigue en Firestore por el espejo.
+- **`claudeGetArchivo` (acotado):** solo descarga rutas bajo `clinica/sinergia/` (antes, con el token, podía bajar cualquier objeto del bucket).
 
 ## 3) Backend recomendado — NO aplicado (requiere tu revisión, no lo pude probar aquí)
-- **`repartirSoap_`:** poner tope al `chunk3` (hoy sin límite) o desviar SOAP grande a Firestore, para no perder guardados por el límite de 50 000 chars/celda.
-- **`claudeGetArchivo`:** acotar el path a `clinica/sinergia/` (hoy puede descargar cualquier objeto del bucket con el token).
 - **`validarFirebaseIdToken`:** verificar `email_verified` si Firebase Auth permite auto-registro (por confirmar).
 
 ## 4) Reglas (`firestore.rules` / `storage.rules`) — NO aplicado (riesgo de romper acceso)
