@@ -14310,12 +14310,11 @@ async function guardarSOAP(){
     media:[...tempEvolMedia], completa:true,
     modoNota: modoNotaActual||'',
     objetivoSesion: v('f-objetivo-sesion'),
-    respuestaTratamiento: v('f-respuesta-tto'),
-    tolerancia: v('f-tolerancia'),
-    eventosAdversosSesion: v('f-eventos-sesion'),
-    cambiosPlan: v('f-cambios-plan'),
-    criteriosProgreso: v('f-criterios-progreso'),
-    indicacionesDomiciliarias: v('f-indicaciones-dom'),
+    // #1 limpieza (2026-09-27): se retiraron las lecturas de 5 campos que NO existen en el editor
+    // (f-respuesta-tto, f-tolerancia, f-eventos-sesion, f-cambios-plan, f-criterios-progreso,
+    // f-indicaciones-dom) → v() siempre daba '' (0% en sept-2026). La info ya se captura en A·Respuesta,
+    // P·Indicaciones y el botón 🚨 Registrar evento adverso. Eran lecturas muertas; el loader ya
+    // default-ea a '' para notas viejas que trajeran algo.
     dictado:(()=>{
       const trans=v('dictado-textarea') || (_dictado&&_dictado.textoFinal?_dictado.textoFinal.trim():'');
       const ahora=new Date();
