@@ -12784,8 +12784,10 @@ function renderSOAPForm(){
     <div class="form-group">
       <div class="form-field">
         <div class="form-label">Progreso vs. objetivos <span class="req" id="req-aevolucion">*</span><span id="opt-aevolucion" style="display:none;font-size:11px;font-weight:700;color:#8A6D1A"> · opcional (1ª nota del motivo nuevo)</span></div>
-        <input class="form-input" type="text" id="f-aevolucion" placeholder="Ej: Semana 1, sesión 2. Respuesta inicial favorable.">
-        ${chipsHTML('f-aevolucion',['En curso esperado','Más lento de lo esperado','Sin progreso','Objetivo alcanzado','Recaída','No valorable hoy'])}
+        <input class="form-input" type="text" id="f-aevolucion" placeholder="Ej: Semana 2 del episodio; evoluciona según lo esperado hacia el objetivo funcional.">
+        <!-- #3 chips (2026-09-27): trayectoria del EPISODIO con criterio objetivo (no la respuesta de hoy,
+             que ya la da A·Respuesta desde el EVA). "Estancado" lleva su criterio (≥2 sesiones sin cambio). -->
+        ${chipsHTML('f-aevolucion',['Evoluciona según lo esperado','Más lento de lo esperado','Estancado: sin cambios ≥2 sesiones','Objetivo funcional alcanzado','Recaída / reagudización','No valorable hoy'])}
       </div>
       <div class="form-field">
         <div class="form-label">Respuesta inmediata a la sesión <span class="req">*</span></div>
@@ -12831,8 +12833,11 @@ function renderSOAPForm(){
       <textarea class="form-input" id="f-ptratamiento" style="display:none"></textarea>
       <div class="form-field">
         <div class="form-label">Indicaciones para casa <span class="req">*</span>${_traerBtn('f-pindicaciones')}</div>
-        <textarea class="form-input" id="f-pindicaciones" placeholder="Ej: Isométricos 4 series 45seg, 3 veces al día. Hielo 10min post ejercicio..."></textarea>
-        ${chipsAppendHTML('f-pindicaciones',['Mantener ejercicios domiciliarios','Reposo relativo','Frío/calor en casa','Movilidad / estiramientos','Ejercicios de fuerza'])}
+        <textarea class="form-input" id="f-pindicaciones" placeholder="Ej: Isométricos cuádriceps 4 series × 45 seg, 3 veces al día. Hielo 10 min post ejercicio..."></textarea>
+        <!-- #2 chips (2026-09-27): específicos primero; el genérico "Continuar programa domiciliario" al
+             FINAL (último recurso, decisión Carlos). El hint empuja a nombrar ejercicio + dosis. -->
+        ${chipsAppendHTML('f-pindicaciones',['Fuerza domiciliaria','Movilidad / estiramientos','Frío/calor en casa','Reposo relativo','Continuar programa domiciliario'])}
+        <div style="font-size:11px;color:var(--gray-400);margin-top:5px;padding:0 2px">💡 Nombra <b>ejercicio + dosis</b> (series × reps × frecuencia), no solo "mantener ejercicios".</div>
       </div>
       <div class="form-field">
         <div class="form-label">Precauciones / restricciones vigentes</div>
