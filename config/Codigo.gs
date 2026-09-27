@@ -987,11 +987,16 @@ function repartirSoap_(soapArr) {
     else if (tam2 + str.length < MAX_SOAP) { chunk2.push(s); tam2 += str.length; }
     else { chunk3.push(s); }
   });
-  return {
-    soap: JSON.stringify(chunk1),
-    soap2: JSON.stringify(chunk2),
-    soap3: JSON.stringify(chunk3)
-  };
+  var s1 = JSON.stringify(chunk1), s2 = JSON.stringify(chunk2), s3 = JSON.stringify(chunk3);
+  // FIX límite de celda: chunk3 no tenía tope. El límite de celda de Sheets es ~50000 chars; si soap3 lo
+  // rebasa, el setValues falla de forma OPACA y el guardado se pierde en el Sheet. Fallamos aquí de forma
+  // EXPLÍCITA (mismo prefijo MERGE_ERROR que ya maneja el cliente → conserva local). El expediente completo
+  // sigue en Firestore por el espejo (Fase 1), así que no se pierde el dato.
+  var CELL_LIMIT = 49000;
+  if (s3.length > CELL_LIMIT) {
+    throw new Error('MERGE_ERROR:SOAP_CELL_LIMIT:soap3=' + s3.length + 'chars>' + CELL_LIMIT + ' (expediente muy grande para el Sheet; vive en Firestore)');
+  }
+  return { soap: s1, soap2: s2, soap3: s3 };
 }
 
 function mergePacienteSeguro_(actual, entrante) {
@@ -1889,7 +1894,7 @@ function _claudeRouter_(body) {
     var lista = leerPacientes(ss);
     _claudeBitacora_(ss, 'claudePing', 'n=' + lista.length);
     // build: marca de versión desplegada — permite confirmar desde fuera qué código está EN VIVO en /exec.
-    return respuesta({ ok: true, pong: true, totalPacientes: lista.length, fecha: new Date().toISOString(), build: '2026-09-27-lockservice' });
+    return respuesta({ ok: true, pong: true, totalPacientes: lista.length, fecha: new Date().toISOString(), build: '2026-09-27-soap-cap-archivo' });
   }
 
   if (action === 'claudeGetPacientes') {
@@ -2003,6 +2008,11 @@ function _claudeRouter_(body) {
       else { var seg = urlA.split(CLAUDE_STORAGE_BUCKET + '/'); if (seg.length > 1) pathA = decodeURIComponent(seg[1].split('?')[0]); }
     }
     if (!pathA) return respuesta({ ok: false, error: 'Falta path o url', code: 400 });
+    // FIX seguridad: acotar la descarga al prefijo de la clínica. Sin esto, con el CLAUDE_TOKEN se podía
+    // bajar CUALQUIER objeto del bucket. Toda la media clínica vive bajo clinica/sinergia/.
+    if (pathA.indexOf('clinica/sinergia/') !== 0 || pathA.indexOf('..') >= 0) {
+      return respuesta({ ok: false, error: 'Ruta no permitida (solo clinica/sinergia/)', code: 403 });
+    }
     var tokS = _claudeStorageToken_();
     if (!tokS) return respuesta({ ok: false, error: 'Sin credenciales Storage', code: 500 });
     var urlG = 'https://storage.googleapis.com/storage/v1/b/' + encodeURIComponent(CLAUDE_STORAGE_BUCKET) + '/o/' + encodeURIComponent(pathA) + '?alt=media';
