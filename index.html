@@ -12529,6 +12529,23 @@ function _archivarMotivoActual(p, nuevoMotivo, nuevoDx){
   p.fechaCreacion=todayFmt();
   try{ if(typeof borrarBorradorValoracion==='function') borrarBorradorValoracion(p.id); }catch(_){}
 }
+// REFERENCIA a la rutina de Ejercicios en la nota SOAP (2026-09-27): cuenta los ejercicios que el
+// paciente VE HOY en su rutina, con el MISMO criterio que el link/rutina.html (L~21608 y L~22707-22709):
+// visibles (privado!==true), para casa (paraCasa!==false) y activos (estado 'activo'). Así la nota liga
+// con la pestaña Ejercicios sin duplicar la dosis (que vive allá). Es una foto al abrir la nota.
+function _contarEjRutina(p){
+  var ejs=(p&&Array.isArray(p.ejercicios))?p.ejercicios:[];
+  return ejs.filter(function(e){ return e && e.privado!==true && e.paraCasa!==false && (e.estado||'activo')==='activo'; }).length;
+}
+function _refRutinaEjHTML(){
+  try{
+    var n=_contarEjRutina(currentPatient);
+    var txt = n>0
+      ? ('🏃 Rutina actual: <b>'+n+'</b> ejercicio'+(n!==1?'s':'')+' asignado'+(n!==1?'s':'')+' · edítalos en la pestaña Ejercicios')
+      : '🏃 Sin ejercicios en la rutina — asígnalos en la pestaña Ejercicios';
+    return '<div style="font-size:11px;color:'+(n>0?'#2E7D52':'#8A6D1A')+';margin-top:4px;padding:0 2px;font-weight:600">'+txt+'</div>';
+  }catch(_){ return ''; }
+}
 function renderSOAPForm(){
   const p=currentPatient;
   // FIX HEADER: total real PRIMERO (cache hidratado vía obtenerSesiones) — inmune al campo
@@ -12840,6 +12857,7 @@ function renderSOAPForm(){
              pestaña Ejercicios en vez de pedir dosis inline. -->
         ${chipsAppendHTML('f-pindicaciones',['Movilidad y estiramientos','Trabajo de fuerza','Frío/calor en casa','Reposo relativo','Continuar rutina asignada'])}
         <div style="font-size:11px;color:var(--gray-400);margin-top:5px;padding:0 2px">💡 La <b>dosis</b> de cada ejercicio va en la pestaña 🏃 <b>Ejercicios</b> (rutina del paciente); aquí basta el enfoque.</div>
+        ${_refRutinaEjHTML()}
       </div>
       <div class="form-field">
         <div class="form-label">Precauciones / restricciones vigentes</div>
