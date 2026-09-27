@@ -13187,6 +13187,31 @@ function _pintarEvaBtns(cual){
 function _setEvaTap(cual,v){
   if(cual==='i') tempEvaI=v; else tempEvaF=v;
   marcarDirty(); _pintarEvaBtns(cual);
+  try{ _autofillRespuestaEva(); }catch(_){}
+}
+// Respuesta (A) OBJETIVA desde el EVA medido (decisión Carlos 2026-09-27): al tocar el EVA, la
+// "Respuesta al tratamiento" se deriva del delta REAL, no de un chip subjetivo. Solo escribe si el
+// campo está vacío o trae una respuesta auto previa → NO pisa lo que el fisio escribió a mano ni un
+// chip que haya elegido. Sin número (EVA "No evaluado") no autollena. Solo desde tap manual
+// (_setEvaTap); la vía IA/dictado (_setEvaProg) trae su propia redacción y no se toca.
+function _respuestaDesdeEva(i,f){
+  if(i==null||f==null||isNaN(Number(f))||isNaN(Number(i))) return '';
+  i=Number(i); f=Number(f);
+  if(f<i) return 'Favorable: EVA '+i+'→'+f+' (disminución del dolor).';
+  if(f===i) return 'Sin cambio en dolor: EVA '+i+'→'+f+'.';
+  return 'EVA '+i+'→'+f+' (aumento); vigilar irritabilidad/respuesta la próxima sesión.';
+}
+function _esRespuestaAutoEva(txt){
+  return /^(Favorable: EVA \d+→\d+|Sin cambio en dolor: EVA \d+→\d+|EVA \d+→\d+ \(aumento\))/.test(String(txt||'').trim());
+}
+function _autofillRespuestaEva(){
+  var el=document.getElementById('f-arespuesta'); if(!el) return;
+  var nuevo=_respuestaDesdeEva(tempEvaI,tempEvaF); if(!nuevo) return;
+  var actual=String(el.value||'').trim();
+  if(actual==='' || _esRespuestaAutoEva(actual)){
+    el.value=nuevo;
+    el.dispatchEvent(new Event('input'));
+  }
 }
 // Setter programático (IA, dictado, borrador): asigna el temp y repinta la grilla si existe.
 // Sustituye a los antiguos updates directos del slider (sl-i/sl-f ya no existen en el form).
