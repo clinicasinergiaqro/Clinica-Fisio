@@ -55,10 +55,12 @@ service cloud.firestore {
                   'updatedAt','ultimoUsuario','fechaActualizacion','ultimosCampos']);
     }
     // Borrado LOGICO: solo el flag y su metadata. Cubre marcar Y restaurar.
+    // 'esTest' se incluye para que la limpieza de pruebas pueda MARCAR el doc como test
+    // (supervisor) justo antes del borrado fisico permitido abajo.
     function pacienteBorradoOK() {
       return request.resource.data.diff(resource.data).affectedKeys()
         .hasOnly(['eliminado','eliminadoPor','eliminadoFecha','eliminadoMotivo',
-                  'restauradoPor','restauradoFecha']);
+                  'restauradoPor','restauradoFecha','esTest']);
     }
     function sesionBorradoOK() {
       return request.resource.data.diff(resource.data).affectedKeys()
@@ -133,10 +135,11 @@ service cloud.firestore {
         pacienteEjerciciosUpdateOK() ||
         pacienteClinicoUpdateOK()
       )) || (isSupervisor() && pacienteBorradoOK());
-      // Queda abierto: _limpiarTodosLosTest borra docs de pacientes TEST en fisico.
-      // El front ya no tiene ningun otro camino de borrado fisico de datos clinicos.
-      // Cerrarlo requiere un campo durable esTest + backfill (entrega futura).
-      allow delete: if isSupervisor();
+      // NOM-004: el borrado FISICO de un doc de paciente (que puede contener historia/dx/valoracion en
+      // el doc raiz, no solo en la subcoleccion sesiones) queda restringido a docs marcados esTest:true.
+      // La limpieza de pruebas (_limpiarTodosLosTest, supervisor) marca esTest y luego borra; un
+      // expediente real NUNCA tiene el flag -> no se puede borrar en fisico, solo logico (tombstone).
+      allow delete: if isSupervisor() && resource.data.get('esTest', false) == true;
     }
     match /pacientes/{pacienteId}/sesiones/{sesionId} {
       allow read: if isWriter();
