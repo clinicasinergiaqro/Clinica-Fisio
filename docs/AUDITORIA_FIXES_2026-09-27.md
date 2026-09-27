@@ -20,9 +20,9 @@ El código ya está en el repo, pero **Apps Script sigue sirviendo el deploy vie
 - **`CLAUDE_TOKEN` ya no se guarda en claro en Drive** (`claude_token.txt`). Al desplegar, **rota el token** ejecutando `generarTokenClaude` una vez y copia el nuevo token del Logger (ya no queda en Drive). Actualiza donde lo consuma la conexión.
 - **Id de modelo de IA centralizado** en `MODELO_IA` (antes duplicado en `generarSoapIA`). ⚠️ **VERIFICA que `MODELO_IA = 'claude-sonnet-4-6'` sea un modelo vigente de la API**; si no lo es, TODA la IA (dictado, SOAP-IA, estudios, síntesis) falla.
 - **PHI a Anthropic minimizada:** ya no se envía el nombre del paciente en `interpretarEstudioIA` ni en `generarSintesisIA_` (solo edad/datos clínicos). Igual que ya hacía SOAP-IA.
+- **LockService (concurrencia):** el candado ahora vive dentro de `guardarPacientesConMerge_` (cubre `savePacientes` y las escrituras `claude*` de merge) y `deletePaciente` toma el suyo. `savePacientes` ya no lo toma por fuera (evita doble-adquisición). Cierra la ventana de clobber entre un guardado normal y una escritura de la conexión.
 
 ## 3) Backend recomendado — NO aplicado (requiere tu revisión, no lo pude probar aquí)
-- **LockService en las rutas `claude*` de escritura y en `deletePaciente`** (hoy solo `savePacientes` toma el lock). Envolver el read-modify-write en `LockService.getScriptLock()` como en `savePacientes` para evitar clobber con guardados concurrentes.
 - **CSV/fórmula injection:** sanitizar valores que empiezan con `= + - @` **al EXPORTAR CSV** (no al escribir al Sheet, o corromperías el round-trip JSON). El export es cliente (pestaña Supervisión).
 - **`repartirSoap_`:** poner tope al `chunk3` (hoy sin límite) o desviar SOAP grande a Firestore, para no perder guardados por el límite de 50 000 chars/celda.
 - **`claudeGetArchivo`:** acotar el path a `clinica/sinergia/` (hoy puede descargar cualquier objeto del bucket con el token).

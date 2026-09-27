@@ -336,22 +336,19 @@ function doPost(e) {
       return respuesta(leerPacientes(ss));
     }
     if (body.action === 'savePacientes') {
-      var lock = LockService.getScriptLock();
-      try {
-        lock.waitLock(10000);
-      } catch(eLock) {
-        return respuesta({ok:false, error:'LOCK_TIMEOUT', msg:'El sistema está ocupado. Tus cambios se conservarán localmente.'});
-      }
+      // El candado (LockService) ahora vive DENTRO de guardarPacientesConMerge_ (punto único para
+      // savePacientes y las escrituras claude*), así que aquí ya no se toma por fuera.
       try {
         return respuesta(guardarPacientesConMerge_(ss, body.data || body.datos || [], {email: auth.email, userAgent: body.userAgent}));
       } catch(eMergeGlobal) {
         var msgE = String(eMergeGlobal.message || '');
+        if (msgE.indexOf('LOCK_TIMEOUT') >= 0) {
+          return respuesta({ok:false, error:'LOCK_TIMEOUT', msg:'El sistema está ocupado. Tus cambios se conservarán localmente.'});
+        }
         if (msgE.indexOf('MERGE_ERROR') >= 0) {
           return respuesta({ok:false, error:'MERGE_ERROR', msg:'No se pudo completar el merge seguro. Tus cambios se conservarán localmente.'});
         }
         return respuesta({ok:false, error:'SAVE_ERROR', msg: msgE || 'Error al guardar pacientes'});
-      } finally {
-        try { lock.releaseLock(); } catch(eRel) {}
       }
     }
     if (body.action === 'generarSoapIA') {
@@ -381,28 +378,34 @@ function doPost(e) {
       if (idBorrar.indexOf('mig_pac_') === 0) {
         return respuesta({ok:false, error:'mig_pac_ no vive en el Sheet', code:400});
       }
-      var sheetD = getOrCreateSheet(ss);
-      var lastRowD = sheetD.getLastRow();
-      if (lastRowD <= 1) {
-        Logger.log('[deletePaciente] Sheet vacío — id=' + idBorrar + ' (ok, idempotente)');
-        return respuesta({ok:true, deleted:false, msg:'Sheet vacío'});
-      }
-      var idsCol = sheetD.getRange(2, 1, lastRowD - 1, 1).getValues();
-      var filaEliminar = -1;
-      for (var di = 0; di < idsCol.length; di++) {
-        if (String(idsCol[di][0]).trim() === idBorrar) {
-          filaEliminar = di + 2;
-          break;
+      // FIX concurrencia (LockService): el read-modify (buscar la fila) + deleteRow no debe intercalarse
+      // con un savePacientes/claude* concurrente (correrían los índices de fila).
+      var _lockD = LockService.getScriptLock();
+      try { _lockD.waitLock(15000); } catch (eLkD) { return respuesta({ok:false, error:'LOCK_TIMEOUT', msg:'Sistema ocupado, reintenta.'}); }
+      try {
+        var sheetD = getOrCreateSheet(ss);
+        var lastRowD = sheetD.getLastRow();
+        if (lastRowD <= 1) {
+          Logger.log('[deletePaciente] Sheet vacío — id=' + idBorrar + ' (ok, idempotente)');
+          return respuesta({ok:true, deleted:false, msg:'Sheet vacío'});
         }
-      }
-      if (filaEliminar > 0) {
-        sheetD.deleteRow(filaEliminar);
-        Logger.log('[deletePaciente] ELIMINADO id=' + idBorrar + ' fila=' + filaEliminar + ' por ' + auth.email);
-        return respuesta({ok:true, deleted:true});
-      } else {
-        Logger.log('[deletePaciente] No encontrado id=' + idBorrar + ' — ok (idempotente) por ' + auth.email);
-        return respuesta({ok:true, deleted:false, msg:'No encontrado en Sheet'});
-      }
+        var idsCol = sheetD.getRange(2, 1, lastRowD - 1, 1).getValues();
+        var filaEliminar = -1;
+        for (var di = 0; di < idsCol.length; di++) {
+          if (String(idsCol[di][0]).trim() === idBorrar) {
+            filaEliminar = di + 2;
+            break;
+          }
+        }
+        if (filaEliminar > 0) {
+          sheetD.deleteRow(filaEliminar);
+          Logger.log('[deletePaciente] ELIMINADO id=' + idBorrar + ' fila=' + filaEliminar + ' por ' + auth.email);
+          return respuesta({ok:true, deleted:true});
+        } else {
+          Logger.log('[deletePaciente] No encontrado id=' + idBorrar + ' — ok (idempotente) por ' + auth.email);
+          return respuesta({ok:true, deleted:false, msg:'No encontrado en Sheet'});
+        }
+      } finally { try { _lockD.releaseLock(); } catch (_rD) {} }
     }
     if (body.action === 'deleteTestQA') {
       if (!auth || auth.role !== 'supervisor') return respuesta({ok:false, error:'Solo supervisor', code:403});
@@ -1056,6 +1059,14 @@ function pacienteARow_(p) {
 
 function guardarPacientesConMerge_(ss, pacientes, meta) {
   if (!pacientes || !pacientes.length) return {ok:true, guardados:0};
+  // FIX concurrencia (LockService): serializa el read-modify-write del Sheet para TODAS las escrituras
+  // por merge — savePacientes y las claude* (claudeActualizarClinico/AgregarSoap/EditarSoap/AgregarItem).
+  // Antes SOLO savePacientes tomaba el candado por fuera; una escritura de la conexión podía intercalarse
+  // y pisar un guardado concurrente (actualización perdida). Ahora el candado vive AQUÍ (punto único), por
+  // eso savePacientes ya NO lo toma por fuera (evita doble-adquisición en la misma ejecución).
+  var _lock = LockService.getScriptLock();
+  try { _lock.waitLock(15000); } catch (eLk) { throw new Error('LOCK_TIMEOUT'); }
+  try {
   var sheet = getOrCreateSheet(ss);
   var lastRow = sheet.getLastRow();
   var existingIds = lastRow > 1
@@ -1110,6 +1121,7 @@ function guardarPacientesConMerge_(ss, pacientes, meta) {
   if (mergeWarning) resp.mergeWarning = 'merge parcial';
   if (saltadosMig.length) resp.saltadosMig = saltadosMig.length;
   return resp;
+  } finally { try { _lock.releaseLock(); } catch (_rel) {} }
 }
 
 function testScript() {
