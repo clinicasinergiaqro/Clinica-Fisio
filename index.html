@@ -14171,6 +14171,26 @@ async function guardarSOAP(){
     _liberarGuardSOAP();return;
   }
 
+  // #1/#2/#4 (2026-09-27): COMPUERTA SUAVE DE CALIDAD — NO bloqueante, solo NOTAS NUEVAS de seguimiento.
+  // Diagnóstico sept-2026: EVA final sin medir en 28% y ROM/fuerza en "[pendiente]" en ~40-47%. Estos
+  // datos objetivos respaldan el expediente clínico (y la NOM-004), pero no siempre se exploran, así que
+  // no se FUERZAN: se AVISA UNA vez (confirm) para que el fisio decida guardar así o completar. Se salta
+  // en 'descarga' (mantenimiento, no mide ROM/fuerza) y 'valoracion' (tiene su propia captura de examen),
+  // y al EDITAR notas viejas (!editingSoapId) para no volverlas molestas de corregir.
+  if(!_esTextoLibreHist && !editingSoapId && modoNotaActual!=='descarga' && modoNotaActual!=='valoracion'){
+    var _gaps=[];
+    if(tempEvaF===null) _gaps.push('• EVA final (quedó como “No evaluado”)');
+    var _rom=v('f-orom'), _fza=v('f-ofuerza'), _dol=v('f-sdolor');
+    if(!_rom || _rom==='[pendiente]') _gaps.push('• ROM (rango de movilidad) sin medir');
+    if(!_fza || _fza==='[pendiente]') _gaps.push('• Fuerza sin medir');
+    // Dolor sin número SOLO cuando hay dolor real (EVA inicio > 0); si EVA inicio es 0 no hay nada que cuantificar.
+    if(_dol && Number(tempEvaI)>0 && !/\d/.test(_dol)) _gaps.push('• Dolor sin número (ej. 6/10)');
+    if(_gaps.length){
+      var _okGaps=confirm('Esta nota se va a guardar sin:\n\n'+_gaps.join('\n')+'\n\nEstos datos objetivos respaldan el expediente clínico. ¿Guardar así de todas formas?\n\n(Toca Cancelar para completarlos.)');
+      if(!_okGaps){ _liberarGuardSOAP(); return; }
+    }
+  }
+
   const p=currentPatient;
   if(!p){ showToast('No hay paciente activo — recarga la app e intenta de nuevo','error'); _liberarGuardSOAP(); return; } // guard: sin esto un currentPatient nulo lanzaba y dejaba _guardandoSOAP=true (botón bloqueado hasta recargar)
   const ter=currentUser.name;
