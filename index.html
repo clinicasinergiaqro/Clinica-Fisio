@@ -482,7 +482,12 @@ function FST_renderCard(s, pid){
   const autorHTML = _autorNotaHTML(s);   // AUTORÍA: siempre visible (antes caía a "REVISAR" y no se sabía quién)
   const semana = Number.isFinite(s.semana) ? s.semana : 1;
   const texto = linkify_(s.textoOriginal || '');  // LOOP H: links clicables (ya escapa HTML internamente)
-  const isTextoLibre = s.formatoOriginal === 'texto_libre' || !(s.s && s.s.dolor);
+  // FIX R1: NO ocultar el S/O/A/P de notas estructuradas. El loader de históricos fuerza importado:true
+  // y formatoOriginal cae a 'texto_libre' por defecto (L424/L444), y el criterio viejo (!(s.s&&s.s.dolor))
+  // marcaba como "importada" cualquier nota estructurada con s.dolor vacío → escondía todo el SOAP real.
+  // Ahora: es texto libre SOLO si el formato lo dice Y no hay ningún campo S/O/A/P con contenido.
+  var _hayEstructuraSOAP = ['s','o','a','p'].some(function(_k){ var _o = s && s[_k]; return _o && typeof _o === 'object' && Object.keys(_o).some(function(_kk){ return String(_o[_kk] || '').trim() !== ''; }); });
+  const isTextoLibre = (s.formatoOriginal === 'texto_libre') && !_hayEstructuraSOAP;
   var ultimaEdicion = Array.isArray(s.historialEdiciones) && s.historialEdiciones.length
     ? s.historialEdiciones[s.historialEdiciones.length-1] : null;
   var bannerEdicion = ultimaEdicion
@@ -5348,7 +5353,7 @@ async function FST_montarAgendaCalendar(rango){
     + '<div style="font-size:13px;font-weight:700;color:var(--navy);margin-bottom:8px">📅 Agenda del calendario</div>'
     + '<div style="font-size:10px;color:var(--gray-400);margin:-4px 0 8px">Sincronizado desde Google Calendar · Solo lectura</div>'
     + '<div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap">'+btn('dia','Hoy')+btn('manana','Mañana')+btn('pasado','Pasado')+btn('semana','Semana')+btn('semanaSiguiente','Próxima')+'</div>'
-    + (esSupervisorUI()?'<div style="margin-bottom:10px;display:flex;gap:6px;flex-wrap:wrap;align-items:center"><button onclick="mostrarRendimientoEquipo(\'hoy\')" style="font-size:12px;font-weight:700;border:none;border-radius:10px;padding:6px 12px;cursor:pointer;font-family:inherit;background:#E8F5EE;color:#2E7D52">📊 Rendimiento</button><button id="btn-colarev" onclick="mostrarColaRevision()" style="font-size:12px;font-weight:700;border:none;border-radius:10px;padding:6px 12px;cursor:pointer;font-family:inherit;background:#FDE8E8;color:#B91C1C">🔍 Cola de revisión<span id="colarev-badge"></span></button><button onclick="mostrarRevaloraciones()" style="font-size:12px;font-weight:700;border:none;border-radius:10px;padding:6px 12px;cursor:pointer;font-family:inherit;background:#E0E7FF;color:#3730A3">🔄 Revalorar'+((typeof _countRevaloraciones==="function"&&_countRevaloraciones()>0)?(" ("+_countRevaloraciones()+")"):"")+'</button><span style="position:relative;display:inline-block"><button onclick="_toggleMenuMasSup(this)" style="font-size:12px;font-weight:700;border:none;border-radius:10px;padding:6px 12px;cursor:pointer;font-family:inherit;background:#EEF1F6;color:var(--navy)">⚙️ Más ▾</button><div id="menu-mas-sup" style="display:none;position:absolute;right:0;top:112%;z-index:40;background:#fff;border:1px solid var(--gray-200);border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,.14);padding:6px;min-width:200px"><button onclick="document.getElementById(\'menu-mas-sup\').style.display=\'none\';toggleVistaTerapeuta()" style="display:block;width:100%;text-align:left;font-size:12px;font-weight:700;border:none;border-radius:8px;padding:9px 10px;cursor:pointer;font-family:inherit;background:#F7F9FC;color:var(--navy)">👁️ Ver como terapeuta</button>'+(_puedeBorrar()?'<button onclick="document.getElementById(\'menu-mas-sup\').style.display=\'none\';abrirPapelera()" style="display:block;width:100%;text-align:left;font-size:12px;font-weight:700;border:none;border-radius:8px;padding:9px 10px;margin-top:4px;cursor:pointer;font-family:inherit;background:#F7F9FC;color:#334155">🗑️ Papelera</button>':'')+'</div></span></div>':'')
+    + (esSupervisorUI()?'<div style="margin-bottom:10px;display:flex;gap:6px;flex-wrap:wrap;align-items:center"><button onclick="mostrarRendimientoEquipo(\'hoy\')" style="font-size:12px;font-weight:700;border:none;border-radius:10px;padding:6px 12px;cursor:pointer;font-family:inherit;background:#E8F5EE;color:#2E7D52">📊 Rendimiento</button><button id="btn-colarev" onclick="mostrarColaRevision()" style="font-size:12px;font-weight:700;border:none;border-radius:10px;padding:6px 12px;cursor:pointer;font-family:inherit;background:#FDE8E8;color:#B91C1C">🔍 Cola de revisión<span id="colarev-badge"></span></button><button onclick="mostrarRevaloraciones()" style="font-size:12px;font-weight:700;border:none;border-radius:10px;padding:6px 12px;cursor:pointer;font-family:inherit;background:#E0E7FF;color:#3730A3">🔄 Revalorar'+((function(){var _nRev=(typeof _countRevaloraciones==="function")?_countRevaloraciones():0;return _nRev>0?(" ("+_nRev+")"):"";})())+'</button><span style="position:relative;display:inline-block"><button onclick="_toggleMenuMasSup(this)" style="font-size:12px;font-weight:700;border:none;border-radius:10px;padding:6px 12px;cursor:pointer;font-family:inherit;background:#EEF1F6;color:var(--navy)">⚙️ Más ▾</button><div id="menu-mas-sup" style="display:none;position:absolute;right:0;top:112%;z-index:40;background:#fff;border:1px solid var(--gray-200);border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,.14);padding:6px;min-width:200px"><button onclick="document.getElementById(\'menu-mas-sup\').style.display=\'none\';toggleVistaTerapeuta()" style="display:block;width:100%;text-align:left;font-size:12px;font-weight:700;border:none;border-radius:8px;padding:9px 10px;cursor:pointer;font-family:inherit;background:#F7F9FC;color:var(--navy)">👁️ Ver como terapeuta</button>'+(_puedeBorrar()?'<button onclick="document.getElementById(\'menu-mas-sup\').style.display=\'none\';abrirPapelera()" style="display:block;width:100%;text-align:left;font-size:12px;font-weight:700;border:none;border-radius:8px;padding:9px 10px;margin-top:4px;cursor:pointer;font-family:inherit;background:#F7F9FC;color:#334155">🗑️ Papelera</button>':'')+'</div></span></div>':'')
     + '<div id="banner-pend-personal"></div>'
     + '<div id="agenda-cal-list"><div style="font-size:12px;color:var(--gray-400);padding:6px 0">⏳ Cargando agenda…</div></div>'
     + '</div></div>';
@@ -10147,7 +10152,11 @@ function renderIndicadorCompletitud(p){
   if(cons) items.push({label:'Consentimiento', estado:'ok'});
   else if(esPrimeraCita) items.push({label:'Consentimiento previo', estado:'info'});
   else items.push({label:'Consentimiento', estado:'bad'});
-  items.push({label:'Datos personales', estado: datos?'ok':'bad'});
+  // FIX completitud: la sección de captura de "Datos personales" está OCULTA por la pausa legal del
+  // consentimiento (avisoLegalRevisado:false) → aceptado siempre false → 'bad' penalizaba a TODOS y el
+  // score nunca llegaba a 100%. Mientras esté en pausa, si no está aceptado se muestra como 'info'
+  // (neutral, no cuenta), y sigue en 'ok' cuando algún paciente sí lo tiene firmado.
+  items.push({label:'Datos personales', estado: datos?'ok':'info'});
   items.push({label:'Sexo', estado: sexoOk?'ok':'warn'});
   items.push({label:'Revaloración', estado: tieneRevalor?'ok':'warn'});
   if(muchasSesiones) items.push({label:'Alta clínica', estado: tieneAlta?'ok':'warn'});
@@ -15524,9 +15533,15 @@ async function _persistirEstudios(p){
 }
 // ── LOOP E: editar datos básicos del paciente (solo supervisor; activos + históricos) ──
 // Persiste datos básicos. Activo → saveDB (Sheet). Histórico → Firestore merge (NO toca el Sheet). Patrón de _persistirEstudios.
+// FIX EXP-A (clobber): al editar datos de un ACTIVO se guardaba SIN camposHist → guardado COMPLETO que
+// (a) en el Sheet solo protegía clínicos VERDADERAMENTE vacíos (no una copia vieja no-vacía en memoria) y
+// (b) espejaba a Firestore el BLOQUE CLÍNICO COMPLETO en silencio (sin detección de conflicto). Editar el
+// teléfono/nombre con una copia vieja podía pisar la valoración nueva de otro equipo. Ahora "Editar datos"
+// declara SOLO los campos de identidad → el Sheet mergea por columna y el espejo NO toca los clínicos.
+var _CAMPOS_IDENTIDAD_ACTIVO = ['name','age','terapeuta','terapeutaSeguimiento','telefono','sexo','fechaNacimiento','medicoReferente'];
 async function _persistirDatosPaciente(p){
   if (patientsDB.some(function(x){ return x.id===p.id; })) {
-    var _rAct = await saveDB('pts',[p]);                             // activo: guarda el objeto como hoy
+    var _rAct = await saveDB('pts',[p],{camposHist:_CAMPOS_IDENTIDAD_ACTIVO});   // activo: solo identidad (anti-clobber)
     // FASE 3a: además, espejar la IDENTIDAD del activo a Firestore (name/nombreNormalizado/terapeuta/
     // age/tel/sexo/…) para que la nube quede COMPLETA (prerequisito de FS-primario). Es el camino de
     // identidad (edición explícita de datos) → sin riesgo del snapshot viejo del bulk. Aditivo y
@@ -16415,7 +16430,15 @@ async function _borrarPaciente(){
     papRef=await window._fstDb.collection('papelera').add(_sinUndefined({ tipo:(esHist?'pacienteHistorico':'pacienteActivo'), pid:pid, nombre:(p.name||pid), numSesiones:nSes, fecha:fechaUlt, resumen:(nSes+' nota'+(nSes!==1?'s':'')), ts:ts, borradoPor:borradoPor, revId:(_omitirRespaldo?null:revId), espejoDocId:espejoDocId, sinRespaldo:(_omitirRespaldo||null) }));
     // RECIÉN AHORA el marcado del "padre".
     if(esHist){ await window._fstDb.collection('pacientes').doc(pid).set({ eliminado:true, eliminadoPor:borradoPor, eliminadoFecha:new Date(ts).toISOString() },{merge:true}); }
-    else { await window._fstDb.collection('pacientesEliminados').doc('pacienteActivo__'+pid).set({ tipo:'pacienteActivo', id:pid, eliminadoPor:borradoPor, eliminadoFecha:new Date(ts).toISOString() }); }
+    else {
+      await window._fstDb.collection('pacientesEliminados').doc('pacienteActivo__'+pid).set({ tipo:'pacienteActivo', id:pid, eliminadoPor:borradoPor, eliminadoFecha:new Date(ts).toISOString() });
+      // FIX FST-1: tombstonear TAMBIÉN el doc propio del activo (espejo Fase 1/3a en pacientes/.doc(pid)).
+      // Sin esto, la desaparición del borrado dependía SOLO del set _FST_activosEliminados (que hace
+      // fail-open si un equipo no puede leer pacientesEliminados) → el paciente podía REAPARECER. Con el
+      // doc marcado, el propio read del índice (filtra eliminado===true) lo excluye por sí mismo.
+      try{ await window._fstDb.collection('pacientes').doc(pid).set({ eliminado:true, eliminadoPor:borradoPor, eliminadoFecha:new Date(ts).toISOString() },{merge:true}); }
+      catch(_eT){ console.warn('[BORRADO-ACTIVOS] no se pudo tombstonear el doc propio (reintentable, queda el set/pacientesEliminados):', _eT&&_eT.message); }
+    }
     console.log('[BORRADO-PACIENTE] marcado OK ·', (esHist?'historico':'activo'), pid);
   }catch(e){
     console.error('[BORRADO-PACIENTE]', e);
@@ -16497,6 +16520,8 @@ async function _restaurarDesdePapelera(entryId, btn){
       // Restore de ACTIVO = DES-OCULTAR (el registro local nunca se removió bajo ii): quitar de
       // pacientesEliminados + desmarcar el espejo por su doc-id GUARDADO (sin re-buscar → sin parcial).
       await window._fstDb.collection('pacientesEliminados').doc('pacienteActivo__'+e.pid).delete();
+      // FIX FST-1: desmarcar TAMBIÉN el doc propio del activo (contraparte del tombstone del borrado).
+      try{ await window._fstDb.collection('pacientes').doc(e.pid).set({ eliminado:false, restauradoPor:restauradoPor, restauradoFecha:restauradoFecha },{merge:true}); }catch(_xp){ console.warn('[restaurar] doc propio (reintentable):', _xp&&_xp.message); }
       if(e.espejoDocId){ try{ await window._fstDb.collection('pacientes').doc(e.espejoDocId).set({ eliminado:false, restauradoPor:restauradoPor, restauradoFecha:restauradoFecha },{merge:true}); }catch(_x){ console.warn('[restaurar] espejo (reintentable):', _x&&_x.message); } }
       try{ if(window._FST_activosEliminados) window._FST_activosEliminados.delete(String(e.pid)); }catch(_){}
       try{ var _c=JSON.parse(localStorage.getItem(LS_ACTIVOS_ELIM)||'{}'); var _ids=(Array.isArray(_c.ids)?_c.ids:[]).filter(function(x){ return String(x)!==String(e.pid); }); localStorage.setItem(LS_ACTIVOS_ELIM, JSON.stringify({ ts:Date.now(), ids:_ids })); }catch(_){}
@@ -20585,6 +20610,15 @@ function abrirNuevoMotivoConsulta(){
 let currentEjercicio = null; // ejercicio being edited
 
 function generateToken(){
+  // SEGURIDAD: token del link público del paciente. Math.random NO es criptográfico (predecible).
+  // Usar crypto.getRandomValues (128 bits) cuando esté disponible; fallback al viejo esquema si no.
+  try{
+    if(window.crypto && window.crypto.getRandomValues){
+      var _a=new Uint8Array(16); window.crypto.getRandomValues(_a);
+      var _h=''; for(var _i=0;_i<_a.length;_i++){ _h+=('0'+_a[_i].toString(16)).slice(-2); }
+      return _h + Date.now().toString(36);
+    }
+  }catch(_){}
   return Math.random().toString(36).substr(2,16) + Date.now().toString(36);
 }
 
@@ -21609,8 +21643,8 @@ function renderEjercicios(){
       return `<div class="ejercicio-card">
         <div class="ejercicio-header">
           <div style="min-width:0;flex:1">
-            <div class="ejercicio-nombre">${ej.nombre}</div>
-            <div class="ejercicio-meta">📅 ${ej.fecha||'—'}${ej.terapeuta?(' · '+ej.terapeuta):''}</div>
+            <div class="ejercicio-nombre">${escapeHTML(ej.nombre||'')}</div>
+            <div class="ejercicio-meta">📅 ${escapeHTML(ej.fecha||'—')}${ej.terapeuta?(' · '+escapeHTML(ej.terapeuta)):''}</div>
           </div>
           <div style="font-size:20px">${isVideo?'🎥':isImg?'🖼️':'📝'}</div>
         </div>
@@ -21620,11 +21654,11 @@ function renderEjercicios(){
             ${!srcEj
               ? `<div style="padding:20px;text-align:center;color:#9BA3B5">Video no disponible</div>`
               : isVideo
-                ? `<video src="${srcEj}#t=0.1" playsinline preload="metadata" muted style="width:100%;max-height:220px;object-fit:cover;border-radius:8px"></video>
+                ? `<video src="${escapeAttr_(srcEj)}#t=0.1" playsinline preload="metadata" muted style="width:100%;max-height:220px;object-fit:cover;border-radius:8px"></video>
                    <div class="play-overlay">▶️</div>`
                 : isImg
-                  ? `<img src="${srcEj}" loading="lazy" decoding="async" style="width:100%;max-height:220px;object-fit:cover;border-radius:8px">`
-                  : `<div style="padding:20px;text-align:center;color:white">📄 ${ej.media.label||ej.media.name}</div>`
+                  ? `<img src="${escapeAttr_(srcEj)}" loading="lazy" decoding="async" style="width:100%;max-height:220px;object-fit:cover;border-radius:8px">`
+                  : `<div style="padding:20px;text-align:center;color:white">📄 ${escapeHTML(ej.media.label||ej.media.name||'')}</div>`
             }
           </div>` : ''}
 
@@ -21632,14 +21666,14 @@ function renderEjercicios(){
             ${(ej.dosis||[ej.series,ej.repeticiones,ej.tiempo,ej.frecuencia,ej.duracion].filter(Boolean).join(' · '))?
               `<div class="dosis-chip" style="grid-column:1/-1;text-align:left;padding:10px 12px">
                 <div class="dlbl" style="margin-bottom:4px">Dosificación</div>
-                <div class="dval" style="font-size:15px">${ej.dosis||[ej.series,ej.repeticiones,ej.tiempo,ej.frecuencia,ej.duracion].filter(Boolean).join(' · ')}</div>
+                <div class="dval" style="font-size:15px">${escapeHTML(ej.dosis||[ej.series,ej.repeticiones,ej.tiempo,ej.frecuencia,ej.duracion].filter(Boolean).join(' · '))}</div>
               </div>`:''
             }
           </div>
 
           ${ej.objetivo?'':''}
-          ${ej.indicaciones?`<div style="font-size:13px;color:var(--gray-600);margin-bottom:6px"><b style="color:var(--navy)">Indicaciones:</b> ${ej.indicaciones}</div>`:''}
-          ${ej.precauciones?`<div style="font-size:13px;color:var(--red);margin-bottom:6px"><b>⚠ Precauciones:</b> ${ej.precauciones}</div>`:''}
+          ${ej.indicaciones?`<div style="font-size:13px;color:var(--gray-600);margin-bottom:6px"><b style="color:var(--navy)">Indicaciones:</b> ${escapeHTML(ej.indicaciones)}</div>`:''}
+          ${ej.precauciones?`<div style="font-size:13px;color:var(--red);margin-bottom:6px"><b>⚠ Precauciones:</b> ${escapeHTML(ej.precauciones)}</div>`:''}
           ${ej.observaciones?'':''}
 
           ${(function(){
@@ -21792,7 +21826,7 @@ function moverEjercicio(idx, direccion){
 function verComoPaciente(){
   if(!currentPatient) return;
   if(!currentPatient.ejerciciosToken){
-    currentPatient.ejerciciosToken = 'ej_'+Math.random().toString(36).slice(2);
+    currentPatient.ejerciciosToken = generateToken();   // SEGURIDAD: token cripto (antes Math.random débil)
     currentPatient.ejerciciosLinkActivo = true;
     const idxP=patientsDB.findIndex(x=>x.id===currentPatient.id);
     if(idxP>=0) patientsDB[idxP]=currentPatient;

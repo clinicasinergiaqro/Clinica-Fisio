@@ -3,6 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<!-- SEGURIDAD: el token del paciente viaja en ?ejercicios= (query string). Sin esto, cada carga de una
+     imagen/video de Storage mandaría el Referer con la URL completa (token incluido) a terceros. -->
+<meta name="referrer" content="no-referrer">
 <meta name="theme-color" content="#122950">
 <title>Mi rutina de ejercicios · Clínica Sinergia</title>
 <!-- [MIGRACIÓN HOSTING] Redirige el sitio viejo (GitHub Pages) al nuevo (Firebase Hosting). Solo en

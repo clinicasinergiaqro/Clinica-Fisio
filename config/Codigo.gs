@@ -368,6 +368,11 @@ function doPost(e) {
     }
     // C1 FIX — eliminar paciente del Sheet para que loadFromCloud no lo reinyecte
     if (body.action === 'deletePaciente') {
+      // FIX seguridad: borrar es acción de SUPERVISOR (antes cualquier terapeuta autenticado borraba
+      // la fila de cualquier paciente por id). Mismo patrón que export/reporte.
+      if (!auth || auth.role !== 'supervisor') {
+        return respuesta({ok:false, error:'Solo supervisor puede borrar', code:403});
+      }
       var idBorrar = String(body.id || '').trim();
       if (!idBorrar) {
         return respuesta({ok:false, error:'Falta body.id', code:400});
@@ -400,9 +405,11 @@ function doPost(e) {
       }
     }
     if (body.action === 'deleteTestQA') {
+      if (!auth || auth.role !== 'supervisor') return respuesta({ok:false, error:'Solo supervisor', code:403});
       return eliminarPorPrefijo(ss, 'TEST QA');
     }
     if (body.action === 'deleteTestQATerapeutas') {
+      if (!auth || auth.role !== 'supervisor') return respuesta({ok:false, error:'Solo supervisor', code:403});
       return eliminarPorPrefijo(ss, 'TEST_QA_');
     }
     if (body.action === 'testPost') {
@@ -604,7 +611,7 @@ function generarSoapIA(body) {
   const promptElegido = (body.modoRapido === true) ? systemPromptRapido : systemPrompt;
 
   const payload = {
-    model: 'claude-sonnet-4-6',
+    model: MODELO_IA,   // FIX: id centralizado (antes literal duplicado). VERIFICAR que MODELO_IA (L496) sea un modelo vigente de la API o TODA la IA falla.
     max_tokens: 1500,
     system: promptElegido,
     messages: [{role: 'user', content: userMessage}]
@@ -719,11 +726,14 @@ function interpretarEstudioIA(body) {
     : tipo === 'interpretacion' ? promptInterpretacion
     : promptGeneral;
 
+  // FIX privacidad (LFPDPPP): no enviar el nombre del paciente a un tercero (Anthropic). El modelo no lo
+  // necesita para interpretar el estudio. Se conserva nombrePaciente en el servidor (logs/uso local) pero
+  // NO viaja en el prompt.
   var userContent = esPDF
     ? [{ type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: base64 } },
-       { type: 'text', text: 'Paciente: ' + nombrePaciente + '. Analiza este documento.' }]
+       { type: 'text', text: 'Analiza este documento clínico.' }]
     : [{ type: 'image', source: { type: 'base64', media_type: mediaType, data: base64 } },
-       { type: 'text', text: 'Paciente: ' + nombrePaciente + '. Analiza este documento.' }];
+       { type: 'text', text: 'Analiza este documento clínico.' }];
 
   try {
     var httpResp = UrlFetchApp.fetch('https://api.anthropic.com/v1/messages', {
@@ -759,7 +769,8 @@ function generarSintesisIA_(body) {
     'Responde SOLO JSON: {"sintesisEjecutiva":"...","recomendaciones":{"corto":[],"mediano":[],"largo":[]}}';
 
   var userMsg =
-    'Paciente: ' + (p.nombre || '') + ', ' + (p.edad || '') + ' años.\n' +
+    // FIX privacidad (LFPDPPP): no enviar el nombre del paciente a Anthropic; la edad basta para el contexto clínico.
+    'Paciente de ' + (p.edad || '?') + ' años.\n' +
     'Dx funcional: ' + (p.dxFuncional || 'Sin documentar') + '\n' +
     'Contraindicaciones: ' + (p.contraindicaciones || 'Ninguna') + '\n' +
     'Medicamentos: ' + (p.medicamentos || 'No documentados') + '\n' +
@@ -1753,18 +1764,11 @@ var CLAUDE_STORAGE_BUCKET = 'clinicasinergia-ec2cf.firebasestorage.app';
 function generarTokenClaude() {
   var token = (Utilities.getUuid() + Utilities.getUuid()).replace(/-/g, '');
   PropertiesService.getScriptProperties().setProperty('CLAUDE_TOKEN', token);
-  var escritoEnDrive = false;
-  try {
-    var folder = DriveApp.getFolderById(CLAUDE_DRIVE_FOLDER_ID);
-    var it = folder.getFilesByName('claude_token.txt');
-    if (it.hasNext()) { it.next().setContent(token); }
-    else { folder.createFile('claude_token.txt', token, 'text/plain'); }
-    escritoEnDrive = true;
-  } catch (e) {
-    Logger.log('CLAUDE_TOKEN guardado en Script Properties, pero NO se pudo escribir en Drive: ' + e.message);
-  }
+  // FIX seguridad: NO persistir el token en claro en Drive (Respaldos_Clinica/claude_token.txt). Esa
+  // carpeta se comparte por correo con los respaldos diarios → filtración. El token vive SOLO en Script
+  // Properties. Al rotar, copia el token del Logger (abajo) una sola vez y pégalo donde lo consuma Claude.
   try { getOrCreateSheet(SpreadsheetApp.openById(SHEET_ID)); } catch (e2) {}
-  Logger.log('✅ CLAUDE_TOKEN generado. En Drive (Respaldos_Clinica/claude_token.txt): ' + (escritoEnDrive ? 'SÍ' : 'NO — revisar permisos'));
+  Logger.log('✅ CLAUDE_TOKEN generado (solo en Script Properties). Token: ' + token);
   return 'OK';
 }
 
