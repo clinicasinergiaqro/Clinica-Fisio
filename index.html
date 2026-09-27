@@ -5710,7 +5710,11 @@ async function _limpiarTodosLosTest(){
       patientsDB=patientsDB.filter(function(p){ return p.id!==pid; });
       try{ var pts=JSON.parse(localStorage.getItem('sinergia_pts')||'[]'); localStorage.setItem('sinergia_pts', JSON.stringify(pts.filter(function(p){ return p.id!==pid; }))); }catch(e){}
       if(String(pid).indexOf('mig_pac')!==0){
-        try{ if(window._fstDb) await window._fstDb.collection('pacientes').doc(pid).delete(); }catch(e){ console.warn('[limpiar] FST:',e); }
+        // FIX reglas/NOM-004: el borrado FÍSICO de un doc de paciente ahora exige el flag durable
+        // esTest:true (firestore.rules). Se marca AQUÍ (solo un doc de prueba real llega a este punto,
+        // filtrado por _esPacienteTest) y recién entonces se borra. Un expediente real nunca tiene el
+        // flag → la DB rechaza su borrado físico (solo admite borrado lógico/tombstone).
+        try{ if(window._fstDb){ await window._fstDb.collection('pacientes').doc(pid).set({ esTest:true },{merge:true}); await window._fstDb.collection('pacientes').doc(pid).delete(); } }catch(e){ console.warn('[limpiar] FST:',e); }
         try{ await qaFetchPrivado('deletePaciente', { id: pid }); }catch(e){ console.warn('[limpiar] Sheet:',e); }
       }
       okCount++;
