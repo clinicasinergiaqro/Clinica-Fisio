@@ -8724,6 +8724,26 @@ function _retroFechaFmt(p){
   if(!d){ return (typeof todayFmt==='function')?todayFmt():''; }
   return String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0')+'/'+d.getFullYear();
 }
+// ANTI-LEAK de plantillas "Pendiente" (2026-09-27): valores placeholder que NO deben quedar guardados
+// como contenido clínico de la nota de valoración. En sept-2026 el Análisis traía "No cuenta con
+// diagnóstico médico referido. Pendiente" (15%) y las Indicaciones "Enfoque: Pendiente" (22%) porque
+// se concatenaban aunque estuvieran vacíos → ensuciaban el expediente y los PDFs. Ahora, si el valor
+// es placeholder, el campo queda VACÍO (honesto) en vez de guardar el relleno.
+// NOTA: 'ninguna/ninguno' NO va aquí — en Contraindicaciones es una afirmación clínica válida.
+function _esPlaceholderClinico(x){
+  var t=String(x==null?'':x).trim().toLowerCase();
+  if(!t) return true;
+  return ['pendiente','[pendiente]','no cuenta con diagnóstico médico referido',
+          'no cuenta con diagnostico medico referido','enfoque: pendiente','no especificado',
+          'no especificada','no especificadas en la nota.','—','-','n/a','na'].indexOf(t)>=0;
+}
+function _analisisValoracionLimpio(dxClinico,dxFuncional){
+  return [dxClinico,dxFuncional].map(function(x){return String(x==null?'':x).trim();})
+    .filter(function(x){return x && !_esPlaceholderClinico(x);}).join('. ');
+}
+function _indicacionesEnfoque(enfoque){
+  return _esPlaceholderClinico(enfoque) ? '' : ('Enfoque: '+String(enfoque).trim());
+}
 function _retroConstruirNota(p){
   var val=p.valoracion||{}, dxf=p.dxFuncional||{}, plan=p.planTto||{}, mot=p.motivo||{}, ant=p.antecedentes||{};
   var evaNum = (val.eva!=null && String(val.eva).trim()!=='' && !isNaN(Number(val.eva))) ? Number(val.eva) : null;
@@ -8744,9 +8764,9 @@ function _retroConstruirNota(p){
         actFisica:(ant.deportivos||'')+((ant.deporteFrecuencia&&ant.deporteFrecuencia!=='No aplica')?(' ('+ant.deporteFrecuencia+')'):'') },
     o:{ rom:val.rom||'No evaluado', fuerza:val.fuerza||'No evaluada', hallazgos:oExtra },
     a:{ evolucion:'Valoración inicial — primera consulta del episodio.', respuesta:'',
-        analisis:((dxf.dxClinico||'')+'. '+(dxf.dxFuncional||'')).trim() },
+        analisis:_analisisValoracionLimpio(dxf.dxClinico,dxf.dxFuncional) },
     p:{ tratamiento:'Sesión de valoración (registro retroactivo)',
-        indicaciones:'Enfoque: '+enfoque,
+        indicaciones:_indicacionesEnfoque(enfoque),
         contraindicaciones:plan.contraindicaciones||'Ninguna' },
     evaI: evaNum, evaF:null, modalidades:[],
     completa:true, modoNota:'valoracion', revisionPendiente:false,
@@ -19054,9 +19074,9 @@ function guardarNuevoPaciente(){
           actFisica:nuevo.antecedentes.deportivos+((nuevo.antecedentes.deporteFrecuencia&&nuevo.antecedentes.deporteFrecuencia!=='No aplica')?(' ('+nuevo.antecedentes.deporteFrecuencia+')'):'') },
       o:{ rom:nuevo.valoracion.rom, fuerza:nuevo.valoracion.fuerza, hallazgos:_oExtra },
       a:{ evolucion:'Valoración inicial — primera consulta del episodio.', respuesta:'',
-          analisis:(nuevo.dxFuncional.dxClinico||'')+'. '+(nuevo.dxFuncional.dxFuncional||'') },
+          analisis:_analisisValoracionLimpio(nuevo.dxFuncional.dxClinico,nuevo.dxFuncional.dxFuncional) },
       p:{ tratamiento:_ttoHoy||'Sesión de valoración (sin tratamiento adicional registrado)',
-          indicaciones:'Enfoque: '+(nuevo.planTto.enfoqueTerapeutico||'Pendiente'),
+          indicaciones:_indicacionesEnfoque(nuevo.planTto.enfoqueTerapeutico),
           contraindicaciones:nuevo.planTto.contraindicaciones },
       evaI:evaVal, evaF:null, modalidades:[],
       completa:true, modoNota:'valoracion', revisionPendiente:false,
