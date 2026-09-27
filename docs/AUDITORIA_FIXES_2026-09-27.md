@@ -11,6 +11,7 @@ Estos van solos por el deploy de GitHub Pages/Firebase Hosting. Requieren un ref
 - **XSS almacenado cerrado.** `renderEjercicios`: se escapan nombre/fecha/terapeuta/indicaciones/precauciones/dosis/label y el `src` de media (la vista pública ya escapaba; la del terapeuta no).
 - **Rendimiento arranque.** Barra de supervisor: `_countRevaloraciones()` se calcula una sola vez (antes 2×).
 - **Link público más seguro.** `rutina.html` con `<meta name="referrer" content="no-referrer">` (el token dejaba de filtrarse por `Referer`); `generateToken` usa `crypto.getRandomValues` y "Ver como paciente" usa la misma función (antes `Math.random`).
+- **CSV injection al exportar.** `csvEscape_` neutraliza valores que empiezan con `= + - @` (se les antepone un apóstrofo) para que al abrir el CSV en Excel/Sheets no se ejecuten como fórmula. No altera el dato guardado, solo la copia exportada.
 - **Completitud.** "Datos personales" pasa de `bad` (penalizaba a TODOS por la sección de consentimiento en pausa) a `info` cuando no está aceptado.
 
 ## 2) Backend `config/Codigo.gs` — EN EL REPO, requiere que TÚ despliegues
@@ -23,7 +24,6 @@ El código ya está en el repo, pero **Apps Script sigue sirviendo el deploy vie
 - **LockService (concurrencia):** el candado ahora vive dentro de `guardarPacientesConMerge_` (cubre `savePacientes` y las escrituras `claude*` de merge) y `deletePaciente` toma el suyo. `savePacientes` ya no lo toma por fuera (evita doble-adquisición). Cierra la ventana de clobber entre un guardado normal y una escritura de la conexión.
 
 ## 3) Backend recomendado — NO aplicado (requiere tu revisión, no lo pude probar aquí)
-- **CSV/fórmula injection:** sanitizar valores que empiezan con `= + - @` **al EXPORTAR CSV** (no al escribir al Sheet, o corromperías el round-trip JSON). El export es cliente (pestaña Supervisión).
 - **`repartirSoap_`:** poner tope al `chunk3` (hoy sin límite) o desviar SOAP grande a Firestore, para no perder guardados por el límite de 50 000 chars/celda.
 - **`claudeGetArchivo`:** acotar el path a `clinica/sinergia/` (hoy puede descargar cualquier objeto del bucket con el token).
 - **`validarFirebaseIdToken`:** verificar `email_verified` si Firebase Auth permite auto-registro (por confirmar).
