@@ -12826,10 +12826,9 @@ function renderSOAPForm(){
         <textarea class="form-input" id="f-arespuesta" placeholder="Ej: Mejoró tras la sesión. Reducción de dolor en reposo y a la palpación..."></textarea>
         ${chipsHTML('f-arespuesta',['Mejoró','Sin cambio significativo','Aumento transitorio esperado','Empeoró','No evaluada'])}
       </div>
-      <div class="form-field">
-        <div class="form-label">Decisión clínica <span style="color:var(--gray-400);font-weight:400">(agrega al análisis)</span></div>
-        ${chipsAppendHTML('f-aanalisis',['Progresar carga','Mantener','Reducir carga','Modificar plan','Revalorar','Referir'])}
-      </div>
+      <!-- Chips "Decisión clínica" RETIRADOS (decisión Carlos 2026-09-27): tapar el chip dejaba el análisis
+           en una sola palabra ("Progresar carga" = 34% de sept-2026). Ahora el fisio ESCRIBE su razonamiento
+           completo (incluida la decisión), guiado por el ejemplo permanente de abajo. -->
       <div class="form-field">
         <div class="form-label">Análisis clínico <span class="req">*</span></div>
         <div style="font-size:11px;color:var(--gray-400);font-weight:400;margin:-2px 0 5px;line-height:1.45">Tu razonamiento en 1-2 líneas: por qué está así (relaciona lo que mediste), qué significa y qué justifica el plan/decisión de hoy.</div>
