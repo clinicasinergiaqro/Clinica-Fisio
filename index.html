@@ -12833,11 +12833,13 @@ function renderSOAPForm(){
       <textarea class="form-input" id="f-ptratamiento" style="display:none"></textarea>
       <div class="form-field">
         <div class="form-label">Indicaciones para casa <span class="req">*</span>${_traerBtn('f-pindicaciones')}</div>
-        <textarea class="form-input" id="f-pindicaciones" placeholder="Ej: Isométricos cuádriceps 4 series × 45 seg, 3 veces al día. Hielo 10 min post ejercicio..."></textarea>
-        <!-- #2 chips (2026-09-27): específicos primero; el genérico "Continuar programa domiciliario" al
-             FINAL (último recurso, decisión Carlos). El hint empuja a nombrar ejercicio + dosis. -->
-        ${chipsAppendHTML('f-pindicaciones',['Fuerza domiciliaria','Movilidad / estiramientos','Frío/calor en casa','Reposo relativo','Continuar programa domiciliario'])}
-        <div style="font-size:11px;color:var(--gray-400);margin-top:5px;padding:0 2px">💡 Nombra <b>ejercicio + dosis</b> (series × reps × frecuencia), no solo "mantener ejercicios".</div>
+        <textarea class="form-input" id="f-pindicaciones" placeholder="Ej: Movilidad y estiramientos. Trabajo de fuerza. (El ejercicio y su dosis van en la pestaña 🏃 Ejercicios)"></textarea>
+        <!-- #2 chips (2026-09-27, ajustado a flujo real de Carlos): la DOSIS por ejercicio vive en la
+             pestaña Ejercicios (rutina del paciente), NO se duplica aquí. Indicaciones = enfoque de alto
+             nivel que ellos ya usan (movilidad/estiramientos, trabajo de fuerza). El hint apunta a la
+             pestaña Ejercicios en vez de pedir dosis inline. -->
+        ${chipsAppendHTML('f-pindicaciones',['Movilidad y estiramientos','Trabajo de fuerza','Frío/calor en casa','Reposo relativo','Continuar rutina asignada'])}
+        <div style="font-size:11px;color:var(--gray-400);margin-top:5px;padding:0 2px">💡 La <b>dosis</b> de cada ejercicio va en la pestaña 🏃 <b>Ejercicios</b> (rutina del paciente); aquí basta el enfoque.</div>
       </div>
       <div class="form-field">
         <div class="form-label">Precauciones / restricciones vigentes</div>
