@@ -1877,7 +1877,7 @@ function _claudeRouter_(body) {
     var lista = leerPacientes(ss);
     _claudeBitacora_(ss, 'claudePing', 'n=' + lista.length);
     // build: marca de versión desplegada — permite confirmar desde fuera qué código está EN VIVO en /exec.
-    return respuesta({ ok: true, pong: true, totalPacientes: lista.length, fecha: new Date().toISOString(), build: '2026-09-26-editar-soap' });
+    return respuesta({ ok: true, pong: true, totalPacientes: lista.length, fecha: new Date().toISOString(), build: '2026-09-27-auditoria-fixes' });
   }
 
   if (action === 'claudeGetPacientes') {
