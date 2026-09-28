@@ -5203,12 +5203,38 @@ function _msgConfirmacionWa(hora){
     +'En caso contrario, la sesión se cobrará en su totalidad, ya que respetamos el tiempo tanto del paciente como del fisioterapeuta.\n\n'
     +'Gracias por tu comprensión y nos vemos más tarde 🙌';
 }
-function _enviarConfirmacionWaIdx(i, btn){
-  var row=(Array.isArray(window._confWaRows)?window._confWaRows:[])[i];
-  if(!row || !row.tel){ showToast('Sin teléfono válido','error'); return; }
+function _confWaMarcarEnviado(idx){
+  var cell=document.getElementById('conf-wa-act-'+idx);
+  if(cell) cell.innerHTML='<span style="font-size:12px;color:#2E7D52;font-weight:800;white-space:nowrap">✓ Enviado</span>';
+}
+function _confWaEnviarIdx(i){
+  var rows=Array.isArray(window._confWaRows)?window._confWaRows:[];
+  var row=rows[i]; if(!row || !row.tel){ showToast('Sin teléfono válido','error'); return; }
   var wa='https://wa.me/'+row.tel+'?text='+encodeURIComponent(_msgConfirmacionWa(row.hora));
   window.open(wa,'_blank'); // URL externa de WhatsApp — window.open correcto
-  if(btn){ btn.textContent='✓ Enviado'; btn.style.background='#E8F5E9'; btn.style.color='#2E7D52'; btn.style.borderColor='#2E7D52'; }
+  row.sent=true; _confWaMarcarEnviado(i); _confWaRefrescarGuia();
+}
+// MODO GUIADO: un solo botón que siempre apunta al siguiente pendiente y avanza solo.
+// El tap "Enviar" en WhatsApp sigue siendo por persona (límite de WhatsApp), pero así no hay
+// que buscar a nadie en la lista: tap → WhatsApp → volver → tap.
+function _confWaSiguiente(){
+  var rows=Array.isArray(window._confWaRows)?window._confWaRows:[];
+  var i=0; while(i<rows.length && rows[i].sent) i++;
+  if(i>=rows.length){ _confWaRefrescarGuia(); return; }
+  _confWaEnviarIdx(i);
+}
+function _confWaRefrescarGuia(){
+  var rows=Array.isArray(window._confWaRows)?window._confWaRows:[];
+  var tot=rows.length, enviados=rows.filter(function(r){return r.sent;}).length;
+  var prog=document.getElementById('conf-wa-prog'); if(prog) prog.textContent=enviados+' de '+tot+' enviados';
+  var g=document.getElementById('conf-wa-guia'); if(!g) return;
+  var i=0; while(i<rows.length && rows[i].sent) i++;
+  if(i>=rows.length){
+    g.textContent='✓ Todas enviadas ('+tot+')';
+    g.disabled=true; g.style.background='#E8F5E9'; g.style.color='#2E7D52'; g.style.cursor='default';
+  } else {
+    g.textContent='▶️ Enviar a '+(rows[i].nombre||'')+'  ·  '+(rows[i].hora||'')+'   ('+(i+1)+' de '+tot+')';
+  }
 }
 async function _confirmacionesDelDia(){
   var ex=document.querySelector('[data-confwa]'); if(ex) ex.remove();
@@ -5242,8 +5268,8 @@ async function _confirmacionesDelDia(){
     var telWa=(x.r.tipo==='unico')?_telWa(x.r.p&&x.r.p.telefono):'';
     if(x.r.tipo==='unico' && telWa){
       var idx=window._confWaRows.length;
-      window._confWaRows.push({tel:telWa, hora:x.hora, nombre:x.ev.paciente});
-      accion='<button onclick="_enviarConfirmacionWaIdx('+idx+',this)" style="background:#25D366;color:#fff;border:1.5px solid #25D366;border-radius:14px;padding:7px 14px;font-weight:800;font-size:12px;cursor:pointer;font-family:inherit;white-space:nowrap">📲 Enviar</button>';
+      window._confWaRows.push({tel:telWa, hora:x.hora, nombre:x.ev.paciente, sent:false});
+      accion='<span id="conf-wa-act-'+idx+'"><button onclick="_confWaEnviarIdx('+idx+')" style="background:#25D366;color:#fff;border:1.5px solid #25D366;border-radius:14px;padding:7px 14px;font-weight:800;font-size:12px;cursor:pointer;font-family:inherit;white-space:nowrap">📲 Enviar</button></span>';
       listas++;
     } else if(x.r.tipo==='unico'){
       accion='<span style="font-size:11px;color:#B45309;font-weight:700;white-space:nowrap">⚠️ Sin teléfono</span>'; sin++;
@@ -5254,7 +5280,12 @@ async function _confirmacionesDelDia(){
     }
     return '<div style="display:flex;align-items:center;gap:10px;padding:9px 6px;border-bottom:1px solid var(--gray-100)"><div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:700;color:var(--navy);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+nombre+'</div>'+meta+'</div><div style="flex-shrink:0">'+accion+'</div></div>';
   }).join('');
-  box.innerHTML=head(evs.length,listas,sin)+'<div style="max-height:58vh;overflow:auto;border:1px solid var(--gray-100);border-radius:10px">'+filas+'</div>'+cerrar;
+  var guia = listas>0
+    ? '<button id="conf-wa-guia" onclick="_confWaSiguiente()" style="width:100%;padding:13px;border:none;border-radius:14px;background:#25D366;color:#fff;font-weight:800;font-size:14px;cursor:pointer;font-family:inherit;margin-bottom:6px">▶️ Enviar al siguiente</button>'
+      +'<div style="text-align:center;font-size:11px;color:var(--gray-500);margin-bottom:10px"><span id="conf-wa-prog">0 de '+listas+' enviados</span> · el botón avanza solo al siguiente</div>'
+    : '';
+  box.innerHTML=head(evs.length,listas,sin)+guia+'<div style="max-height:52vh;overflow:auto;border:1px solid var(--gray-100);border-radius:10px">'+filas+'</div>'+cerrar;
+  _confWaRefrescarGuia();
 }
 async function _resolverCitaAgenda(nombre){
   var nq=_normPend(nombre);
