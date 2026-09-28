@@ -5018,9 +5018,6 @@ function renderAgenda(){
     <div><div class="date-text">${today.toLocaleDateString('es-MX',{weekday:'long',day:'numeric',month:'long'})}</div>
     <div class="date-sub">Hoy</div></div>
     <div class="session-count">Google Calendar</div></div>`;
-  // Confirmaciones de WhatsApp del día (semi-automático): abre la lista de citas de hoy con el mensaje
-  // listo por paciente. El envío final lo da la persona en WhatsApp (sin API de Meta, sin costo).
-  html+=`<button onclick="_confirmacionesDelDia()" style="width:100%;margin-bottom:12px;padding:11px;border:none;border-radius:14px;background:#25D366;color:#fff;font-weight:800;font-size:14px;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px">📲 Confirmaciones de WhatsApp de hoy</button>`;
   // CONEXIÓN CLAUDE — aviso PROMINENTE al abrir la app: expedientes con sugerencia por revisar.
   // Cuenta sobre TODOS los activos (no solo los de hoy) para que no se les olvide; toca → lista filtrada.
   const _nSugAg=(Array.isArray(patientsDB)?patientsDB:[]).filter(p=>p&&!_activoEliminado(p.id)&&_sugVisiblePara(p)).length;
@@ -5180,113 +5177,6 @@ function _casaCitaExpediente(toks, p){
 }
 // Resuelve el nombre de una cita: {tipo:'unico',p} | {tipo:'multiple',lista} | {tipo:'ninguno'}.
 // 1) activos síncronos; 2) lista fusionada (incluye históricos), dedupe por id.
-// ── Confirmaciones de WhatsApp del día (semi-automático, 2026-09-28) ────────────
-// Arma la lista de citas de HOY (Google Calendar), resuelve cada una a su paciente con
-// el resolver homónimo-safe (_resolverCitaAgenda) para sacar el teléfono, y deja un botón
-// por cita que abre WhatsApp con el mensaje de confirmación ya escrito y la hora rellenada.
-// El envío final lo da la persona (tap "Enviar" en WhatsApp) → NO requiere API de Meta ni
-// tiene costo/riesgo de ban. Mensaje = plantilla oficial de la clínica.
-function _telWa(tel){
-  var d=String(tel||'').replace(/\D/g,'');
-  if(!d) return '';
-  if(d.length===10) return '52'+d;                                   // MX móvil (10 dígitos)
-  if(d.length===12 && d.slice(0,2)==='52') return d;                 // ya trae 52
-  if(d.length===13 && d.slice(0,3)==='521') return '52'+d.slice(3);  // 521 legacy → 52
-  return d;                                                          // otro formato: usar tal cual
-}
-function _msgConfirmacionWa(hora){
-  return 'Buenos días 😊\n'
-    +'Te recordamos que tienes una cita el día de hoy a las '+hora+'\n\n'
-    +'📌 Importante:\n'
-    +'El no responder este mensaje no cancela tu cita.\n'
-    +'Si necesitas modificar o cancelar, es necesario avisar con mínimo 6 horas de anticipación.\n'
-    +'En caso contrario, la sesión se cobrará en su totalidad, ya que respetamos el tiempo tanto del paciente como del fisioterapeuta.\n\n'
-    +'Gracias por tu comprensión y nos vemos más tarde 🙌';
-}
-function _confWaMarcarEnviado(idx){
-  var cell=document.getElementById('conf-wa-act-'+idx);
-  if(cell) cell.innerHTML='<span style="font-size:12px;color:#2E7D52;font-weight:800;white-space:nowrap">✓ Enviado</span>';
-}
-function _confWaEnviarIdx(i){
-  var rows=Array.isArray(window._confWaRows)?window._confWaRows:[];
-  var row=rows[i]; if(!row || !row.tel){ showToast('Sin teléfono válido','error'); return; }
-  var wa='https://wa.me/'+row.tel+'?text='+encodeURIComponent(_msgConfirmacionWa(row.hora));
-  window.open(wa,'_blank'); // URL externa de WhatsApp — window.open correcto
-  row.sent=true; _confWaMarcarEnviado(i); _confWaRefrescarGuia();
-}
-// MODO GUIADO: un solo botón que siempre apunta al siguiente pendiente y avanza solo.
-// El tap "Enviar" en WhatsApp sigue siendo por persona (límite de WhatsApp), pero así no hay
-// que buscar a nadie en la lista: tap → WhatsApp → volver → tap.
-function _confWaSiguiente(){
-  var rows=Array.isArray(window._confWaRows)?window._confWaRows:[];
-  var i=0; while(i<rows.length && rows[i].sent) i++;
-  if(i>=rows.length){ _confWaRefrescarGuia(); return; }
-  _confWaEnviarIdx(i);
-}
-function _confWaRefrescarGuia(){
-  var rows=Array.isArray(window._confWaRows)?window._confWaRows:[];
-  var tot=rows.length, enviados=rows.filter(function(r){return r.sent;}).length;
-  var prog=document.getElementById('conf-wa-prog'); if(prog) prog.textContent=enviados+' de '+tot+' enviados';
-  var g=document.getElementById('conf-wa-guia'); if(!g) return;
-  var i=0; while(i<rows.length && rows[i].sent) i++;
-  if(i>=rows.length){
-    g.textContent='✓ Todas enviadas ('+tot+')';
-    g.disabled=true; g.style.background='#E8F5E9'; g.style.color='#2E7D52'; g.style.cursor='default';
-  } else {
-    g.textContent='▶️ Enviar a '+(rows[i].nombre||'')+'  ·  '+(rows[i].hora||'')+'   ('+(i+1)+' de '+tot+')';
-  }
-}
-async function _confirmacionesDelDia(){
-  var ex=document.querySelector('[data-confwa]'); if(ex) ex.remove();
-  var ov=document.createElement('div');
-  ov.setAttribute('data-confwa','1');
-  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:10002;display:flex;align-items:flex-start;justify-content:center;overflow:auto;padding:30px 12px';
-  ov.onclick=function(e){ if(e.target===ov) ov.remove(); };
-  var cerrar='<div style="text-align:right;margin-top:12px"><button onclick="this.closest(\'[data-confwa]\').remove()" style="background:var(--gray-100);border:none;border-radius:12px;padding:8px 16px;font-weight:700;color:var(--gray-600);cursor:pointer;font-family:inherit">Cerrar</button></div>';
-  var head=function(tot,listas,sin){ return '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px"><div style="font-size:15px;font-weight:800;color:var(--navy)">📲 Confirmaciones de hoy</div><button onclick="this.closest(\'[data-confwa]\').remove()" style="background:none;border:none;font-size:22px;color:var(--gray-400);cursor:pointer">×</button></div>'
-    +'<div style="font-size:12px;color:var(--gray-500);margin-bottom:10px">'+tot+' cita'+(tot!==1?'s':'')+' hoy · <b style="color:#2E7D52">'+listas+' con teléfono</b>'+(sin?(' · <b style="color:#B45309">'+sin+' sin teléfono/expediente</b>'):'')+'<br>Toca <b>Enviar</b> en cada una: abre WhatsApp con el mensaje listo, solo das "Enviar".</div>'; };
-  ov.innerHTML='<div style="background:#fff;border-radius:16px;width:100%;max-width:540px;padding:18px" onclick="event.stopPropagation()"><div style="font-size:15px;font-weight:800;color:var(--navy)">📲 Confirmaciones de hoy</div><div style="padding:24px;text-align:center;color:var(--gray-400)">⏳ Cargando agenda de hoy…</div></div>';
-  document.body.appendChild(ov);
-  var box=ov.firstChild;
-  var res=null; try{ res=await FST_fetchAgendaCalendar('dia'); }catch(e){ res=null; }
-  var evs=(res&&Array.isArray(res.eventos))?res.eventos:[];
-  evs=evs.filter(function(e){ return e && String(e.paciente||'').trim(); });
-  evs.sort(function(a,b){ return String(a.inicio||'').localeCompare(String(b.inicio||'')); });
-  if(!evs.length){ box.innerHTML=head(0,0,0)+'<div style="padding:16px;text-align:center;color:var(--gray-400)">No hay citas con nombre en la agenda de hoy.</div>'+cerrar; return; }
-  var resueltos=await Promise.all(evs.map(async function(ev){
-    var hora=_horaLocal(ev.inicio); var r;
-    try{ r=await _resolverCitaAgenda(ev.paciente); }catch(_){ r={tipo:'ninguno'}; }
-    return {ev:ev, hora:hora, r:r};
-  }));
-  window._confWaRows=[];
-  var listas=0, sin=0;
-  var filas=resueltos.map(function(x){
-    var nombre=escapeHTML(x.ev.paciente||'(sin nombre)');
-    var ter=(Array.isArray(x.ev.terapeutas)&&x.ev.terapeutas.length)?(' · '+escapeHTML(x.ev.terapeutas.join(', '))):'';
-    var meta='<div style="font-size:11px;color:var(--gray-500)">🕒 '+escapeHTML(x.hora||'—')+ter+'</div>';
-    var accion='';
-    var telWa=(x.r.tipo==='unico')?_telWa(x.r.p&&x.r.p.telefono):'';
-    if(x.r.tipo==='unico' && telWa){
-      var idx=window._confWaRows.length;
-      window._confWaRows.push({tel:telWa, hora:x.hora, nombre:x.ev.paciente, sent:false});
-      accion='<span id="conf-wa-act-'+idx+'"><button onclick="_confWaEnviarIdx('+idx+')" style="background:#25D366;color:#fff;border:1.5px solid #25D366;border-radius:14px;padding:7px 14px;font-weight:800;font-size:12px;cursor:pointer;font-family:inherit;white-space:nowrap">📲 Enviar</button></span>';
-      listas++;
-    } else if(x.r.tipo==='unico'){
-      accion='<span style="font-size:11px;color:#B45309;font-weight:700;white-space:nowrap">⚠️ Sin teléfono</span>'; sin++;
-    } else if(x.r.tipo==='multiple'){
-      accion='<span style="font-size:11px;color:#8A6D1A;font-weight:700;white-space:nowrap">👥 Varios — a mano</span>'; sin++;
-    } else {
-      accion='<span style="font-size:11px;color:var(--gray-400);font-weight:700;white-space:nowrap">❔ Sin expediente</span>'; sin++;
-    }
-    return '<div style="display:flex;align-items:center;gap:10px;padding:9px 6px;border-bottom:1px solid var(--gray-100)"><div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:700;color:var(--navy);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+nombre+'</div>'+meta+'</div><div style="flex-shrink:0">'+accion+'</div></div>';
-  }).join('');
-  var guia = listas>0
-    ? '<button id="conf-wa-guia" onclick="_confWaSiguiente()" style="width:100%;padding:13px;border:none;border-radius:14px;background:#25D366;color:#fff;font-weight:800;font-size:14px;cursor:pointer;font-family:inherit;margin-bottom:6px">▶️ Enviar al siguiente</button>'
-      +'<div style="text-align:center;font-size:11px;color:var(--gray-500);margin-bottom:10px"><span id="conf-wa-prog">0 de '+listas+' enviados</span> · el botón avanza solo al siguiente</div>'
-    : '';
-  box.innerHTML=head(evs.length,listas,sin)+guia+'<div style="max-height:52vh;overflow:auto;border:1px solid var(--gray-100);border-radius:10px">'+filas+'</div>'+cerrar;
-  _confWaRefrescarGuia();
-}
 async function _resolverCitaAgenda(nombre){
   var nq=_normPend(nombre);
   var toks=nq?nq.split(' ').filter(Boolean):[];
