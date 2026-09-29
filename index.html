@@ -10544,10 +10544,9 @@ function renderExpediente(tab='historia'){
   <div style="padding:6px 14px 0;text-align:right"><button data-pid="${escapeAttr_(p.id)}" onclick="pedirRevaloracion(this.dataset.pid)" style="background:#C0392B;border:none;color:#fff;border-radius:14px;padding:10px 20px;font-size:14px;cursor:pointer;font-weight:800;box-shadow:0 2px 6px rgba(192,57,43,.35)">🆘 Pedir valoración o apoyo de Carlos</button></div>
   ${renderIndicadorCompletitud(p)}`;
 
-  // Alerta de seguridad clínica — visible en todos los tabs del expediente
-  if(p.seguridadClinica&&p.seguridadClinica.tienePrecaucion){
-    html+=`<div class="alerta-precaucion">⚠️ Precaución clínica — revisar contraindicaciones antes de aplicar agentes físicos o técnicas invasivas.</div>`;
-  }
+  // Alerta de seguridad clínica — visible en TODOS los tabs del expediente (incluida SOAP/notas).
+  // Caja rica y específica (implantes, condiciones, contraindicaciones, banderas, alergias); roja si es grave.
+  html+=_soapSeguridadHTML(p);
 
   if(tab==='historia'){
     if(hasContra) html+=`<div class="contraindication-box">⚠️ ${escapeHTML(p.contraindicaciones)}</div>`;
@@ -12414,24 +12413,54 @@ function aplicarDictadoSOAP(modo){
 // alergias, contraindicaciones vigentes y banderas rojas, para que la terapeuta las tenga enfrente al
 // documentar y prescribir. Antes solo había un banner genérico "revisar contraindicaciones".
 function _segClinLleno(x){ var t=String(x==null?'':x).trim(); return t && !/^ningun[ao]s?$/i.test(t) && !/^\[?pendiente\]?$/i.test(t) && !/^no (evaluad|realizad|aplica)/i.test(t); }
+// Alerta de SEGURIDAD CLÍNICA (2026-09-29): salta al abrir el expediente Y el editor de notas.
+// AMPLIADA para incluir implantes y condiciones (donde viven "Desfibrilador", "Material de osteosíntesis",
+// "Anticoagulantes", "Cáncer…") — antes solo mostraba alergias/contraindicaciones/banderas y no saltaba
+// para esos casos. Se pone ROJA con leyenda de CUIDADO cuando hay algo grave (marcapasos, anticoagulado,
+// cáncer, metal, embarazo, trombosis); ámbar para el resto.
+function _segNegDefault(v){
+  var t=String(v||'').trim().toLowerCase();
+  if(!t) return true;
+  if(/^(no|ningun[ao]?|n\/a|-|sin)$/.test(t)) return true;
+  return t==='sin marcapasos ni implantes referidos'
+      || t==='sin contraindicaciones para agentes fisicos'
+      || t==='sin contraindicaciones para agentes físicos'
+      || t==='sin antecedentes heredofamiliares relevantes'
+      || t==='sin antecedentes oncologicos' || t==='sin antecedentes oncológicos';
+}
 function _soapSeguridadHTML(p){
   if(!p) return '';
+  var sc=p.seguridadClinica||{};
+  var dedup=function(a){ var s={},o=[]; a.forEach(function(x){ x=String(x||'').trim(); var k=x.toLowerCase(); if(x&&!s[k]){s[k]=1;o.push(x);} }); return o; };
   var alergias=_segClinLleno(p.alergias)?String(p.alergias).trim():'';
   var contra=(p.planTto&&_segClinLleno(p.planTto.contraindicaciones))?String(p.planTto.contraindicaciones).trim()
             :(_segClinLleno(p.contraindicaciones)?String(p.contraindicaciones).trim():'');
-  var sc=p.seguridadClinica||{};
   var banderas=Array.isArray(sc.banderasRojas)?sc.banderasRojas.filter(Boolean):[];
+  var impl=[]; (Array.isArray(sc.implantes)?sc.implantes:[]).forEach(function(x){ if(x&&x!=='Otro') impl.push(x); });
+  if(!_segNegDefault(sc.implantesDetalle)) impl.push(String(sc.implantesDetalle).trim());
+  var cond=[]; (Array.isArray(sc.condiciones)?sc.condiciones:[]).forEach(function(x){ if(x&&x!=='Otro') cond.push(x); });
+  if(!_segNegDefault(sc.condicionesObs)) cond.push(String(sc.condicionesObs).trim());
+  impl=dedup(impl); cond=dedup(cond);
   var precaucion=!!sc.tienePrecaucion;
-  if(!alergias && !contra && !banderas.length && !precaucion) return '';
-  var fila=function(ic,lbl,val,col){ return '<div style="display:flex;gap:7px;margin-top:5px;font-size:13px;line-height:1.45"><span style="font-weight:800;color:'+col+';flex:none;white-space:nowrap">'+ic+' '+lbl+':</span><span style="color:var(--gray-800)">'+escapeHTML(val)+'</span></div>'; };
+  if(!alergias && !contra && !banderas.length && !impl.length && !cond.length && !precaucion) return '';
+  var blob=(contra+' '+banderas.join(' ')+' '+impl.join(' ')+' '+cond.join(' ')).toLowerCase();
+  try{ blob=blob.normalize('NFD').replace(/[̀-ͯ]/g,''); }catch(_){}
+  var rojo=/marcapaso|desfibrilador|\bdai\b|anticoagul|cancer|oncolog|tumor|linfoma|leucemia|metastas|osteosintesis|protesis|\bplaca\b|\bclavo|tornillo|embaraz|trombos|\btvp\b/.test(blob);
+  var col= rojo ? '#B91C1C' : '#B45309';
+  var bg = rojo ? '#FEF2F2' : '#FFF7E6';
+  var bd = rojo ? '#B91C1C' : '#E0B000';
+  var fila=function(ic,lbl,val){ return '<div style="display:flex;gap:7px;margin-top:5px;font-size:13px;line-height:1.45"><span style="font-weight:800;color:'+col+';flex:none;white-space:nowrap">'+ic+' '+lbl+':</span><span style="color:var(--gray-800)">'+escapeHTML(val)+'</span></div>'; };
   var filas='';
-  if(alergias) filas+=fila('🚫','Alergias',alergias,'#B91C1C');
-  if(contra) filas+=fila('⛔','Contraindicaciones',contra,'#B45309');
-  if(banderas.length) filas+=fila('🚩','Banderas rojas',banderas.join(', '),'#B91C1C');
-  return '<div style="margin:0 14px 12px;background:#FEF2F2;border:1.5px solid #F4B4B0;border-left:5px solid #B91C1C;border-radius:12px;padding:11px 14px">'
-    +'<div style="font-size:12px;font-weight:800;color:#B91C1C;text-transform:uppercase;letter-spacing:.4px">⚠️ Seguridad clínica del paciente</div>'
+  if(impl.length) filas+=fila('🩻','Implantes',impl.join(', '));
+  if(cond.length) filas+=fila('🫀','Condiciones',cond.join(', '));
+  if(contra) filas+=fila('⛔','Contraindicaciones',contra);
+  if(banderas.length) filas+=fila('🚩','Banderas rojas',banderas.join(', '));
+  if(alergias) filas+=fila('🚫','Alergias',alergias);
+  var titulo = rojo ? '🛑 CUIDADO — SEGURIDAD CLÍNICA' : '⚠️ SEGURIDAD CLÍNICA DEL PACIENTE';
+  return '<div style="margin:0 14px 12px;background:'+bg+';border:1.5px solid '+bd+';border-left:6px solid '+bd+';border-radius:12px;padding:11px 14px">'
+    +'<div style="font-size:12px;font-weight:800;color:'+col+';text-transform:uppercase;letter-spacing:.4px">'+titulo+'</div>'
     +filas
-    +(precaucion?'<div style="font-size:11px;color:#8A6D1A;margin-top:7px">Revisa contraindicaciones antes de aplicar agentes físicos o técnicas invasivas, y antes de prescribir ejercicio.</div>':'')
+    +'<div style="font-size:11px;color:#8A6D1A;margin-top:7px;font-weight:600">Verifica antes de aplicar agentes físicos (tecar, US, ondas, electro, termo, láser) o ejercicio de carga.</div>'
     +'</div>';
 }
 // [CONEXIÓN #1 y #2] Prellenado SOFT en NOTA NUEVA (solo si el campo está vacío; editable):
