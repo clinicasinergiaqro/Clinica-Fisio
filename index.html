@@ -1455,7 +1455,7 @@ body.modo-oscuro .topbar{background:#141824}
       <div class="topbar-title" id="nuevo-topbar-title">Nuevo paciente</div>
     </div>
   </div>
-  <div class="content nuevopaciente-form" id="content-nuevo" oninput="marcarDirty();actualizarProgresoLlenado_()" onchange="marcarDirty()"></div>
+  <div class="content nuevopaciente-form" id="content-nuevo" oninput="marcarDirty();actualizarProgresoLlenado_();_actualizarAlertaSegVivo()" onchange="marcarDirty();_actualizarAlertaSegVivo()"></div>
 </div>
 
 <!-- EDITAR VALORACIÓN COMPLETA -->
@@ -3876,6 +3876,7 @@ function updateSegSummary(){
     label.textContent='Sin hallazgos de seguridad';pills.innerHTML='';
     if(!_segOpen)sub.textContent='Toca para reportar implantes, banderas rojas o contraindicaciones';
   }
+  try{ _actualizarAlertaSegVivo(); }catch(_){}   // LIVE: refrescar también la caja de CUIDADO
 }
 
 // Genera fila de chips para un campo
@@ -12463,6 +12464,29 @@ function _soapSeguridadHTML(p){
     +'<div style="font-size:11px;color:#8A6D1A;margin-top:7px;font-weight:600">Verifica antes de aplicar agentes físicos (tecar, US, ondas, electro, termo, láser) o ejercicio de carga.</div>'
     +'</div>';
 }
+// LIVE (2026-09-30): caja de seguridad que se actualiza MIENTRAS se llena la historia (form content-nuevo).
+// Lee los checkboxes/campos del formulario y reusa _soapSeguridadHTML con un objeto armado al vuelo, para
+// que "🛑 CUIDADO / seguridad clínica" aparezca al momento (no solo después de guardar).
+function _segVivoDesdeForm(){
+  var g=function(cls){ return Array.prototype.slice.call(document.querySelectorAll('.'+cls+':checked')).map(function(c){return c.value;}); };
+  var val=function(id){ var e=document.getElementById(id); return e?String(e.value||'').trim():''; };
+  var cond=g('sc-condicion').filter(function(v){return v && v!=='Ninguna referida' && v!=='Otro';});
+  var impl=g('sc-implante').filter(function(v){return v && v!=='Otro';});
+  var brs=g('sc-bandera').filter(function(v){return v && v!=='Ninguna referida';});
+  var condObs=val('sc-condiciones-obs'), implObs=val('sc-implantes-detalle'), brsObs=val('sc-banderas-detalle');
+  var contra=val('n-contra'), alergias=val('n-alergias');
+  if(brsObs && !_segNegDefault(brsObs)) brs=brs.concat([brsObs]);
+  var p={ contraindicaciones:contra, alergias:alergias, seguridadClinica:{
+    implantes:impl, implantesDetalle:implObs, condiciones:cond, condicionesObs:condObs,
+    banderasRojas:brs, banderasDetalle:'',
+    tienePrecaucion:(impl.length||cond.length||brs.length||_segClinLleno(condObs)||_segClinLleno(implObs)||_segClinLleno(contra))>0
+  }};
+  return _soapSeguridadHTML(p);
+}
+function _actualizarAlertaSegVivo(){
+  var box=document.getElementById('seg-live-alert'); if(!box) return;
+  try{ box.innerHTML=_segVivoDesdeForm(); }catch(_){ box.innerHTML=''; }
+}
 // [CONEXIÓN #1 y #2] Prellenado SOFT en NOTA NUEVA (solo si el campo está vacío; editable):
 //  #2 objetivoSesion ← objetivo funcional de la valoración (corto plazo; fallback largo plazo).
 //  #1 f-pcontra ← contraindicaciones del plan/historia (en vez de arrancar en [pendiente]).
@@ -18495,6 +18519,8 @@ function renderNuevoPaciente(){
     <div class="form-group" style="margin-bottom:10px">
       <div class="form-field"><div class="form-label">Antecedentes heredofamiliares</div><input class="form-input" id="n-patologicos" type="text" placeholder="Ej. diabetes, hipertensión, cáncer, cardiopatías u otros antecedentes familiares relevantes"><div class="chip-row"><button type="button" class="chip-quick" onclick="setCampoRapido('n-patologicos','Sin antecedentes heredofamiliares relevantes')">Sin antecedentes heredofamiliares relevantes</button></div></div>
     </div>
+    <!-- LIVE: caja de seguridad que se actualiza al marcar condiciones/implantes/banderas/contraindicaciones. -->
+    <div id="seg-live-alert"></div>
     <!-- Personales patológicos: checkboxes mudados desde "Seguridad clínica" (REACOMODO fase 1).
          Mismas clases sc-condicion / sc-condiciones-obs → siguen guardando en seguridadClinica. -->
     <div class="form-group" style="margin-bottom:10px">
@@ -18831,6 +18857,7 @@ function _prefillNuevoDesdePaciente(p){
   // Seguridad clínica
   setChecks('sc-implante', sc.implantes||[]); setChecks('sc-condicion', sc.condiciones||[]); setChecks('sc-bandera', sc.banderasRojas||[]);
   S('sc-implantes-detalle', sc.implantesDetalle||''); S('sc-condiciones-obs', sc.condicionesObs||''); S('sc-banderas-detalle', sc.banderasDetalle||'');
+  try{ _actualizarAlertaSegVivo(); }catch(_){}   // LIVE: mostrar la caja al abrir en edición si ya trae seguridad
   // Consentimientos (solo reflejar; no se re-piden en edición)
   var _ck=function(id,on){ var el=document.getElementById(id); if(el) el.checked=!!on; };
   var _cw=(p.consentimientoWhatsApp||{});
