@@ -12830,6 +12830,8 @@ function renderSOAPForm(){
       <div class="form-field">
         <div class="form-label">Dolor (contexto, provocación) <span class="req">*</span>${_traerBtn('f-sdolor')}</div>
         <textarea class="form-input" id="f-sdolor" placeholder="Ej: 6/10 al bajar escaleras, 3/10 en reposo..."></textarea>
+        <div style="font-size:10.5px;color:var(--gray-400);margin:5px 0 2px">¿Cuándo / con qué? — desencadenante (agrega, no borra lo escrito):</div>
+        ${chipsAppendHTML('f-sdolor',['En reposo','Al mover','Al cargar/esfuerzo','Al caminar','Al subir/bajar','En la noche','Constante','Intermitente'])}
       </div>
       <div class="form-field">
         <div class="form-label">Cambios que refiere el paciente <span class="req" id="req-scambios">*</span><span id="opt-scambios" style="display:none;font-size:11px;font-weight:700;color:#8A6D1A"> · opcional (1ª nota del motivo nuevo)</span></div>
