@@ -3951,8 +3951,11 @@ function _fuerzaPickerHTML(){
     + '<div id="fz-mus-wrap" style="display:none;margin-top:5px"><div style="font-size:10px;color:var(--gray-400);margin:0 0 2px">Músculo:</div><div class="chip-row" id="fz-mus"></div></div>'
     + '<div id="fz-num-wrap" style="display:none;margin-top:5px"><div style="font-size:10px;color:var(--gray-400);margin:0 0 2px">Fuerza (1 = muy débil · 10 = sano):</div>'
       + '<div class="chip-row" id="fz-num">'+nums+'</div>'
-      + '<div class="chip-row" id="fz-lado" style="margin-top:3px"><button type="button" class="chip-quick" onclick="_fzPickLado(this,\'der\')">Der</button><button type="button" class="chip-quick" onclick="_fzPickLado(this,\'izq\')">Izq</button><button type="button" class="chip-quick" onclick="_fzPickLado(this,\'bilateral\')">Bilateral</button></div></div>'
-    + '<div id="fz-prev" style="display:none;margin-top:7px;font-size:12px;background:#E9F6EF;border:1px solid #2FA36B;color:#1c6b46;border-radius:9px;padding:7px 10px"></div>';
+      + '<div style="font-size:10px;color:var(--gray-400);margin:6px 0 2px">Lado (opcional):</div>'
+      + '<div class="chip-row" id="fz-lado"><button type="button" class="chip-quick" onclick="_fzPickLado(this,\'der\')">Der</button><button type="button" class="chip-quick" onclick="_fzPickLado(this,\'izq\')">Izq</button><button type="button" class="chip-quick" onclick="_fzPickLado(this,\'bilateral\')">Bilateral</button></div>'
+      + '<div id="fz-prev" style="margin-top:7px;font-size:12px;background:#F1F4F8;border:1px solid var(--gray-200);color:var(--gray-500);border-radius:9px;padding:7px 10px">Elige músculo y número.</div>'
+      + '<button type="button" id="fz-add" class="chip-quick" disabled style="margin-top:8px;width:100%;background:var(--gray-200);color:var(--gray-500);border-color:var(--gray-200);padding:10px;font-size:13px;min-height:44px" onclick="_fzAgregar()">➕ Agregar a la nota</button>'
+    + '</div>';
 }
 function _fzReset(){ window._fzSel={reg:'',mus:'',n:'',lado:''}; }
 function _fzSelOne(container,el,okClass){
@@ -3978,15 +3981,16 @@ function _fzPickMus(el,mus){
   _fzPrev();
 }
 function _fzPickNum(el,n){
-  window._fzSel.n=n;
-  _fzSelOne(document.getElementById('fz-num'), el, n==='10'?'sel-ok':'sel');
-  _fzPrev(); _fzCommit();
+  const was=el.classList.contains('sel')||el.classList.contains('sel-ok');
+  _fzSelOne(document.getElementById('fz-num'), was?null:el, n==='10'?'sel-ok':'sel');
+  window._fzSel.n = was?'':n;
+  _fzPrev();   // ya NO agrega solo: espera a que toques "Agregar"
 }
 function _fzPickLado(el,l){
   const was=el.classList.contains('sel');
   _fzSelOne(document.getElementById('fz-lado'), was?null:el);
   window._fzSel.lado = was?'':l;
-  _fzPrev(); _fzCommit();
+  _fzPrev();
 }
 function _fzFrase(){
   const s=window._fzSel; if(!s.mus||!s.n) return '';
@@ -3994,14 +3998,23 @@ function _fzFrase(){
 }
 function _fzPrev(){
   const p=document.getElementById('fz-prev'); if(!p) return;
+  const btn=document.getElementById('fz-add');
   const f=_fzFrase();
-  if(f){ p.style.display='block'; p.innerHTML='Se escribirá: <b>'+f+'</b>'; }
-  else { p.style.display='none'; p.textContent=''; }
+  if(f){
+    p.style.background='#E9F6EF'; p.style.borderColor='#2FA36B'; p.style.color='#1c6b46';
+    p.innerHTML='Se escribirá: <b>'+f+'</b>';
+    if(btn){ btn.disabled=false; btn.style.background='var(--navy)'; btn.style.color='#fff'; btn.style.borderColor='var(--navy)'; }
+  } else {
+    p.style.background='#F1F4F8'; p.style.borderColor='var(--gray-200)'; p.style.color='var(--gray-500)';
+    p.textContent = window._fzSel.mus ? 'Elige el número (1-10).' : 'Elige músculo y número.';
+    if(btn){ btn.disabled=true; btn.style.background='var(--gray-200)'; btn.style.color='var(--gray-500)'; btn.style.borderColor='var(--gray-200)'; }
+  }
 }
-function _fzCommit(){
+// Agrega la frase completa (músculo + número + lado) SOLO cuando tocas el botón.
+function _fzAgregar(){
   const f=_fzFrase(); if(!f) return;
   setCampoAppend('f-ofuerza', f);
-  // reset músculo/número para seguir con otro; deja la región activa
+  // reset músculo/número/lado para seguir con otro; deja la región activa
   window._fzSel.mus=''; window._fzSel.n=''; window._fzSel.lado='';
   const mc=document.getElementById('fz-mus'); if(mc) Array.from(mc.children).forEach(c=>c.classList.remove('sel'));
   document.getElementById('fz-num-wrap').style.display='none';
