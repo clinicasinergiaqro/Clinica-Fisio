@@ -1157,6 +1157,8 @@ select.form-input{font-size:14px}
 .chip-row{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px;padding:0 2px}
 .chip-quick{background:var(--gray-50);border:1px solid var(--gray-200);border-radius:14px;padding:5px 11px;font-size:11.5px;font-weight:600;color:var(--navy);cursor:pointer;font-family:inherit;transition:all .12s;min-height:40px;display:inline-flex;align-items:center;justify-content:center}
 .chip-quick:active{background:var(--navy);color:white}
+.chip-quick.sel{background:var(--navy);color:white;border-color:var(--navy)}
+.chip-quick.sel-ok{background:#2FA36B;color:white;border-color:#2FA36B}
 .chip-oneshot{background:#E8F0FE;border:1px solid var(--navy);border-radius:14px;padding:6px 12px;font-size:12px;font-weight:700;color:var(--navy);cursor:pointer;font-family:inherit;margin-top:6px}
 /* Historia clínica híbrida (Fase 1) — chips de toque rápido del Motivo de consulta */
 .hc-row{margin-top:14px}
@@ -3904,6 +3906,106 @@ function chipsAppendHTML(targetId, opciones){
   return '<div class="chip-row">'+opciones.map(o=>
     `<button type="button" class="chip-quick" onclick="setCampoAppend('${targetId}',${JSON.stringify(o).replace(/"/g,'&quot;')})">${o}</button>`
   ).join('')+'</div>';
+}
+
+// ─────────────────────────────────────────────────────────────
+// LLENADO GUIADO de ROM y FUERZA (O del SOAP) — toca y escribe la frase solo.
+// Aditivo: solo escriben en los mismos campos de texto (f-orom / f-ofuerza), editables.
+// ─────────────────────────────────────────────────────────────
+// ROM: toca el movimiento → agrega "Flexión °" y deja el cursor para el número.
+function _romInsertMov(mov){
+  const el=document.getElementById('f-orom'); if(!el) return;
+  const cur=(el.value||'').replace(/\s*$/,'');
+  const pre = cur ? cur.replace(/[.,;]\s*$/,'')+', ' : '';
+  el.value = pre + mov + ' °';
+  const pos = el.value.length-1;            // justo ANTES del símbolo °
+  el.dispatchEvent(new Event('input'));
+  el.focus(); try{ el.setSelectionRange(pos,pos); }catch(_){}
+}
+function _romChipsHTML(){
+  const movs=['Flexión','Extensión','Abducción','Aducción','Rot. interna','Rot. externa','Dorsiflexión','Plantiflexión'];
+  const vs=['▲ mejoró vs previo','= igual','▼ bajó','con dolor al final del arco'];
+  return '<div style="font-size:10.5px;color:var(--gray-400);margin:6px 0 2px">Toca el movimiento (escribe «Flexión °», tú pones el número):</div>'
+    + '<div class="chip-row">'+movs.map(m=>`<button type="button" class="chip-quick" onclick="_romInsertMov(${JSON.stringify(m).replace(/"/g,'&quot;')})">${m}</button>`).join('')+'</div>'
+    + '<div style="font-size:10.5px;color:var(--gray-400);margin:6px 0 2px">¿Cómo va vs. la sesión pasada? (agrega al texto)</div>'
+    + chipsAppendHTML('f-orom', vs);
+}
+
+// FUERZA: Región → Músculo → número 1-10 (10 = sano). Escribe "Músculo 7/10 der" en f-ofuerza.
+window._FZ_MUS = {
+  "Cuello":["Flexores cervicales","Extensores cervicales","ECOM","Trapecio sup."],
+  "Hombro":["Manguito rotador","Deltoides","Trapecio","Romboides","Serrato","Pectoral","Dorsal ancho"],
+  "Codo":["Bíceps","Tríceps","Braquial","Supinadores","Pronadores"],
+  "Muñeca/Mano":["Flexores muñeca","Extensores muñeca","Prensión (grip)","Intrínsecos mano"],
+  "Tronco/Core":["Recto abdominal","Transverso","Oblicuos","Paravertebrales","Cuadrado lumbar"],
+  "Cadera":["Glúteo mayor","Glúteo medio","Psoas (flexores)","Aductores","Abductores","Rotadores"],
+  "Rodilla":["Cuádriceps","Isquiotibiales","Poplíteo"],
+  "Tobillo/Pie":["Gastrocnemio/Sóleo","Tibial anterior","Peroneos","Inversores","Eversores"]
+};
+window._fzSel = {reg:'',mus:'',n:'',lado:''};
+function _fuerzaPickerHTML(){
+  const regs=Object.keys(window._FZ_MUS);
+  let nums=''; for(let i=1;i<=10;i++){ nums+=`<button type="button" class="chip-quick" data-n="${i}" onclick="_fzPickNum(this,'${i}')">${i}</button>`; }
+  return '<div style="font-size:10.5px;color:var(--gray-400);margin:7px 0 3px">Llenado guiado (opcional): Región → Músculo → número.</div>'
+    + '<div class="chip-row" id="fz-reg">'+regs.map(r=>`<button type="button" class="chip-quick" onclick="_fzPickReg(this,${JSON.stringify(r).replace(/"/g,'&quot;')})">${r}</button>`).join('')+'</div>'
+    + '<div id="fz-mus-wrap" style="display:none;margin-top:5px"><div style="font-size:10px;color:var(--gray-400);margin:0 0 2px">Músculo:</div><div class="chip-row" id="fz-mus"></div></div>'
+    + '<div id="fz-num-wrap" style="display:none;margin-top:5px"><div style="font-size:10px;color:var(--gray-400);margin:0 0 2px">Fuerza (1 = muy débil · 10 = sano):</div>'
+      + '<div class="chip-row" id="fz-num">'+nums+'</div>'
+      + '<div class="chip-row" id="fz-lado" style="margin-top:3px"><button type="button" class="chip-quick" onclick="_fzPickLado(this,\'der\')">Der</button><button type="button" class="chip-quick" onclick="_fzPickLado(this,\'izq\')">Izq</button><button type="button" class="chip-quick" onclick="_fzPickLado(this,\'bilateral\')">Bilateral</button></div></div>'
+    + '<div id="fz-prev" style="display:none;margin-top:7px;font-size:12px;background:#E9F6EF;border:1px solid #2FA36B;color:#1c6b46;border-radius:9px;padding:7px 10px"></div>';
+}
+function _fzReset(){ window._fzSel={reg:'',mus:'',n:'',lado:''}; }
+function _fzSelOne(container,el,okClass){
+  if(!container) return;
+  Array.from(container.children).forEach(c=>c.classList.remove('sel','sel-ok'));
+  if(el) el.classList.add(okClass||'sel');
+}
+function _fzPickReg(el,reg){
+  window._fzSel.reg=reg; window._fzSel.mus=''; window._fzSel.n=''; window._fzSel.lado='';
+  _fzSelOne(document.getElementById('fz-reg'), el);
+  const mw=document.getElementById('fz-mus-wrap'), mc=document.getElementById('fz-mus');
+  mc.innerHTML=(window._FZ_MUS[reg]||[]).map(m=>`<button type="button" class="chip-quick" onclick="_fzPickMus(this,${JSON.stringify(m).replace(/"/g,'&quot;')})">${m}</button>`).join('');
+  mw.style.display='block';
+  document.getElementById('fz-num-wrap').style.display='none';
+  _fzPrev();
+}
+function _fzPickMus(el,mus){
+  window._fzSel.mus=mus; window._fzSel.n=''; window._fzSel.lado='';
+  _fzSelOne(document.getElementById('fz-mus'), el);
+  document.getElementById('fz-num-wrap').style.display='block';
+  Array.from(document.getElementById('fz-num').children).forEach(c=>c.classList.remove('sel','sel-ok'));
+  Array.from(document.getElementById('fz-lado').children).forEach(c=>c.classList.remove('sel'));
+  _fzPrev();
+}
+function _fzPickNum(el,n){
+  window._fzSel.n=n;
+  _fzSelOne(document.getElementById('fz-num'), el, n==='10'?'sel-ok':'sel');
+  _fzPrev(); _fzCommit();
+}
+function _fzPickLado(el,l){
+  const was=el.classList.contains('sel');
+  _fzSelOne(document.getElementById('fz-lado'), was?null:el);
+  window._fzSel.lado = was?'':l;
+  _fzPrev(); _fzCommit();
+}
+function _fzFrase(){
+  const s=window._fzSel; if(!s.mus||!s.n) return '';
+  return s.mus+' '+s.n+'/10'+(s.n==='10'?' (sano)':'')+(s.lado?(' '+s.lado):'');
+}
+function _fzPrev(){
+  const p=document.getElementById('fz-prev'); if(!p) return;
+  const f=_fzFrase();
+  if(f){ p.style.display='block'; p.innerHTML='Se escribirá: <b>'+f+'</b>'; }
+  else { p.style.display='none'; p.textContent=''; }
+}
+function _fzCommit(){
+  const f=_fzFrase(); if(!f) return;
+  setCampoAppend('f-ofuerza', f);
+  // reset músculo/número para seguir con otro; deja la región activa
+  window._fzSel.mus=''; window._fzSel.n=''; window._fzSel.lado='';
+  const mc=document.getElementById('fz-mus'); if(mc) Array.from(mc.children).forEach(c=>c.classList.remove('sel'));
+  document.getElementById('fz-num-wrap').style.display='none';
+  _fzPrev();
 }
 function initials(n){return n.split(' ').slice(0,2).map(w=>w[0]).join('').toUpperCase()}
 // ── Modo oscuro (persiste en localStorage; no afecta PDFs ni vista pública) ──
@@ -12853,10 +12955,12 @@ function renderSOAPForm(){
       <div class="form-field">
         <div class="form-label">ROM (valores específicos) ${_traerBtn('f-orom')}</div>
         <textarea class="form-input" id="f-orom" placeholder="Ej: Flexión 130°, dolor 3/10 a partir de 60°..."></textarea>
+        ${_romChipsHTML()}
       </div>
       <div class="form-field">
         <div class="form-label">Fuerza muscular <span style="font-weight:400;color:var(--gray-400);font-size:11px">· 10 = lado sano/control; califica el afectado (simetría)</span> ${_traerBtn('f-ofuerza')}</div>
         <textarea class="form-input" id="f-ofuerza" placeholder="Ej: Cuádriceps sano 10/10, afectado 7/10 con dolor en arco 30-60°..."></textarea>
+        ${_fuerzaPickerHTML()}
       </div>
       <div class="form-field">
         <div class="form-label">Hallazgos / pruebas clínicas <span style="font-weight:400;color:var(--gray-400);font-size:11px">· si exploraste</span>${_traerBtn('f-ohallazgos')}</div>
