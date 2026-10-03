@@ -6475,7 +6475,7 @@ function _renderBannerPendientes(r){
   var lista=visibles.map(function(x){
     var pista=x.notaCerca?(' <span style="font-weight:700">⚠️ hay nota del '+escapeHTML(x.notaCerca)+' — ¿fecha equivocada?</span>'):'';
     var nombreHTML=x.pid
-      ? '<a data-pid="'+escapeAttr_(x.pid)+'" onclick="openExpediente(this.dataset.pid)" style="color:#B45309;font-weight:800;text-decoration:underline;cursor:pointer">'+escapeHTML(x.nombre)+'</a>'
+      ? '<a data-pid="'+escapeAttr_(x.pid)+'" onclick="nuevaSesionRapida(this.dataset.pid)" style="color:#B45309;font-weight:800;text-decoration:underline;cursor:pointer">'+escapeHTML(x.nombre)+'</a>'
       : escapeHTML(x.nombre);
     return '<div style="font-size:11px;color:#92400E;padding:2px 0">• '+nombreHTML+' — '+escapeHTML(x.fecha)+pista+'</div>';
   }).join('');
@@ -6530,10 +6530,15 @@ function _htmlNotasPorCompletar(){
 }
 async function _montarBannerPendientes(){
   if(!document.getElementById('banner-pend-personal')) return;
+  // PINTAR YA desde caché (instantáneo) para que la caja no "aparezca y desaparezca" mientras recalcula.
+  if(window._bannerPendCache){ try{ _renderBannerPendientes(window._bannerPendCache); }catch(_){} }
   var r=null;
   try{ r=await _computarBannerPendientes(); }catch(_){ r=null; }
   if(!document.getElementById('banner-pend-personal')) return;   // el bloque pudo re-renderizarse durante el await
-  _renderBannerPendientes(r);   // incluye el nudge "notas por completar"
+  // Si el recálculo dio resultado, úsalo; si falló (red/índice), NO blanquear: conserva la última caché.
+  if(r) _renderBannerPendientes(r);
+  else if(window._bannerPendCache) _renderBannerPendientes(window._bannerPendCache);
+  else _renderBannerPendientes(null);
 }
 // ── LOOP S1+S2+S3: Dashboard de rendimiento de equipo (solo supervisor) ─────────────
 // S1: citas (Google Calendar vía leerAgenda) vs notas SOAP escritas, ventanas hoy/7días/mes.
