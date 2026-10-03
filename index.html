@@ -6536,20 +6536,23 @@ function _htmlNotasPorCompletar(){
 }
 async function _montarBannerPendientes(){
   if(!document.getElementById('banner-pend-personal')) return;
-  // Hidratar caché desde localStorage si no hay en memoria (sobrevive recargas → la caja NO desaparece
-  // al reabrir por SW nuevo). El recálculo de abajo la refresca; si la agenda falla, se conserva esta.
+  // Caché PREVIA para pintar al instante (de memoria o, si no hay, de localStorage para sobrevivir
+  // recargas por SW nuevo). CLAVE: NO reescribir window._bannerPendCache aquí — si lo repoblamos con un
+  // ts reciente, _computarBannerPendientes lo toma como "fresco" y NO recalcula, anulando la invalidación
+  // (=null) que el guardado hace para limpiar el pendiente tras documentar. Esa era la causa de que el
+  // pendiente de un MIGRADO no se limpiara (regresión). Por eso usamos una variable LOCAL.
   var _codB=String((currentUser&&currentUser.name)||'').toUpperCase();
-  if(!window._bannerPendCache && _codB){
-    try{ var _ls=JSON.parse(localStorage.getItem('sinergia_bannerPend_'+_codB)||'null'); if(_ls && _ls.cod===_codB && Array.isArray(_ls.items)) window._bannerPendCache=_ls; }catch(_){}
+  var _previa=window._bannerPendCache;
+  if(!_previa && _codB){
+    try{ var _ls=JSON.parse(localStorage.getItem('sinergia_bannerPend_'+_codB)||'null'); if(_ls && _ls.cod===_codB && Array.isArray(_ls.items)) _previa=_ls; }catch(_){}
   }
-  // PINTAR YA desde caché (instantáneo) para que la caja no "aparezca y desaparezca" mientras recalcula.
-  if(window._bannerPendCache){ try{ _renderBannerPendientes(window._bannerPendCache); }catch(_){} }
+  if(_previa){ try{ _renderBannerPendientes(_previa); }catch(_){} }   // pintar ya (no desaparece), sin tocar la caché global
   var r=null;
   try{ r=await _computarBannerPendientes(); }catch(_){ r=null; }
   if(!document.getElementById('banner-pend-personal')) return;   // el bloque pudo re-renderizarse durante el await
-  // Si el recálculo dio resultado, úsalo; si falló (red/índice), NO blanquear: conserva la última caché.
+  // Si el recálculo dio resultado, úsalo; si falló (red/índice), NO blanquear: conserva la última caché previa.
   if(r) _renderBannerPendientes(r);
-  else if(window._bannerPendCache) _renderBannerPendientes(window._bannerPendCache);
+  else if(_previa) _renderBannerPendientes(_previa);
   else _renderBannerPendientes(null);
 }
 // ── LOOP S1+S2+S3: Dashboard de rendimiento de equipo (solo supervisor) ─────────────
