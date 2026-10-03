@@ -6406,7 +6406,7 @@ async function _computarBannerPendientes(){
     // que corrijan la fecha en la nota); solo se diagnostica para no perseguir a ciegas.
     var notaCerca='', _mejor=99;
     fechasNotas.forEach(function(c){ var d=_difDiasCanon(c, citaCanon); if(d>0 && d<=2 && d<_mejor){ _mejor=d; notaCerca=c; } });
-    var _it={nombre:ev.paciente||'(sin nombre)', fecha:ddmm, notaCerca:(notaCerca?_ddmmFromISO(notaCerca):'')};
+    var _it={nombre:ev.paciente||'(sin nombre)', fecha:ddmm, notaCerca:(notaCerca?_ddmmFromISO(notaCerca):''), pid:(r.pid||'')};
     if(r.tipo==='historico' && r.pid){ _it._pidHist=r.pid; _it._claveHist=clave; _it._citaCanon=citaCanon; }   // [ÍNDICE-COJO] confirmar contra notas reales antes de rendir el pendiente
     items.push(_it);
   });
@@ -6474,7 +6474,10 @@ function _renderBannerPendientes(r){
   var visibles=exp?r.items:r.items.slice(0,8);
   var lista=visibles.map(function(x){
     var pista=x.notaCerca?(' <span style="font-weight:700">⚠️ hay nota del '+escapeHTML(x.notaCerca)+' — ¿fecha equivocada?</span>'):'';
-    return '<div style="font-size:11px;color:#92400E;padding:1px 0">• '+escapeHTML(x.nombre)+' — '+escapeHTML(x.fecha)+pista+'</div>';
+    var nombreHTML=x.pid
+      ? '<a data-pid="'+escapeAttr_(x.pid)+'" onclick="openExpediente(this.dataset.pid)" style="color:#B45309;font-weight:800;text-decoration:underline;cursor:pointer">'+escapeHTML(x.nombre)+'</a>'
+      : escapeHTML(x.nombre);
+    return '<div style="font-size:11px;color:#92400E;padding:2px 0">• '+nombreHTML+' — '+escapeHTML(x.fecha)+pista+'</div>';
   }).join('');
   var toggle='';
   if(r.items.length>8){
@@ -6483,7 +6486,7 @@ function _renderBannerPendientes(r){
   }
   el.innerHTML='<div style="margin-bottom:10px;padding:10px 12px;background:#FEF3C7;border-radius:10px">'
     +'<div style="font-size:13px;font-weight:800;color:#92400E">📋 Tienes '+r.total+' '+(r.total===1?'sesión':'sesiones')+' sin documentar</div>'
-    +'<div style="font-size:10px;color:#92400E;margin:2px 0 4px">Citas del calendario sin nota SOAP del día (desde el '+_ddmmFromISO(APP_INICIO_OPERACION)+'). Se salda escribiendo la nota.</div>'
+    +'<div style="font-size:10px;color:#92400E;margin:2px 0 4px">Citas del calendario sin nota SOAP del día (desde el '+_ddmmFromISO(APP_INICIO_OPERACION)+'). <b>Toca el nombre</b> para abrir el expediente y escribir la nota.</div>'
     +lista+toggle+'</div>'+extra;
 }
 function _toggleBannerPendientes(){
