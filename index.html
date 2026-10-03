@@ -24565,18 +24565,32 @@ function generarGraficaEVA(p){
 
 // ── B1: Nueva sesión SOAP rápida desde lista/agenda ──
 async function nuevaSesionRapida(patientId){
-  let p = patientsDB.find(x=>x.id===patientId);
-  if(!p){
-    p = (window._FST_listaPacientesPorId||{})[patientId];
-    if(p && String(patientId).startsWith('mig_pac_')){
-      await FST_hidratarCamposClinicos(p, patientId);
-      if(!Array.isArray(p.soap)) p.soap=[];
-      if(typeof FST_fetchSesiones==='function' && window._fstDb){
-        try{ var _r = await FST_fetchSesiones(patientId); if(Array.isArray(_r)) _fstSesionesCache[patientId]=_r; }catch(e){}   // [SENTINEL] jamás cachear el sentinel null
+  patientId=String(patientId||'');
+  let p = (Array.isArray(patientsDB)?patientsDB:[]).find(x=>x && x.id===patientId);
+  if(!p) p = (window._FST_listaPacientesPorId||{})[patientId];
+  // SELF-HEAL (regla ACTIVO=MIGRADO): si el pid no está cargado en memoria, sembrarlo desde el índice
+  // FST antes de rendirse. Sin esto, un migrado/histórico (o un activo no listado aún) daba el falso
+  // "Paciente no encontrado" cuando no se había abierto Pacientes. Mismo patrón que _abrirExpedienteDesdeRendimiento.
+  if(!p && typeof FST_cargarIndicePacientes==='function'){
+    try{
+      var _lista=(await FST_cargarIndicePacientes())||[];
+      for(var _i=0;_i<_lista.length;_i++){
+        if(String((_lista[_i]&&_lista[_i].id)||'')===patientId){
+          window._FST_listaPacientesPorId=window._FST_listaPacientesPorId||{};
+          p=window._FST_listaPacientesPorId[patientId]=_lista[_i]; break;
+        }
       }
-    }
+    }catch(_e){}
   }
   if(!p){ showToast('Paciente no encontrado','error'); return; }
+  // Migrados/históricos: hidratar campos clínicos + cache de sesiones (activo=migrado)
+  if(String(patientId).startsWith('mig_pac_')){
+    try{ await FST_hidratarCamposClinicos(p, patientId); }catch(_){}
+    if(!Array.isArray(p.soap)) p.soap=[];
+    if(typeof FST_fetchSesiones==='function' && window._fstDb){
+      try{ var _r = await FST_fetchSesiones(patientId); if(Array.isArray(_r)) _fstSesionesCache[patientId]=_r; }catch(e){}   // [SENTINEL] jamás cachear el sentinel null
+    }
+  }
   // FIX SESIÓN-NaN (autorizado): renderSOAPForm hacía p.sesiones+1 = NaN cuando p.sesiones no era
   // número. Normalizar DESPUÉS de la hidratación (ya esperada arriba) con datos REALES: máximo num
   // de las sesiones hidratadas → máximo num en p.soap → soap.length. [RETIRO sesionesCount] el campo
