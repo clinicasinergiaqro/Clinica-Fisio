@@ -2369,5 +2369,63 @@ function _claudeRouter_(body) {
     return respuesta({ ok: okFS, id: idFS, http: codeFS, escritos: escritos, error: okFS ? undefined : (rFS.getContentText() || '').slice(0, 200) });
   }
 
+  // LISTA la Cola de revisión filtrada a motivo FECHA_FUTURA (sesiones con fecha en el futuro por typo de
+  // año de la migración). collectionGroup sobre 'sesiones' donde revisionPendiente==true, filtra FECHA_FUTURA
+  // en código. Devuelve [{pid, sid, fecha, num, motivos}] para que Claude calcule la fecha correcta y la corrija.
+  if (action === 'claudeColaFechaFutura') {
+    var tokLF = _claudeFsToken_();
+    if (!tokLF) return respuesta({ ok: false, error: 'Sin credenciales Firestore', code: 500 });
+    var PROJLF = PropertiesService.getScriptProperties().getProperty('FIRESTORE_PROJECT_ID') || 'clinicasinergia-ec2cf';
+    var urlLF = 'https://firestore.googleapis.com/v1/projects/' + PROJLF + '/databases/(default)/documents:runQuery';
+    var qLF = { structuredQuery: { from: [{ collectionId: 'sesiones', allDescendants: true }],
+      where: { fieldFilter: { field: { fieldPath: 'revisionPendiente' }, op: 'EQUAL', value: { booleanValue: true } } }, limit: 3000 } };
+    var rLF = UrlFetchApp.fetch(urlLF, { method: 'post', contentType: 'application/json', headers: { Authorization: 'Bearer ' + tokLF }, muteHttpExceptions: true, payload: JSON.stringify(qLF) });
+    if (rLF.getResponseCode() !== 200) return respuesta({ ok: false, error: 'runQuery ' + rLF.getResponseCode() + ': ' + (rLF.getContentText() || '').slice(0, 180), code: rLF.getResponseCode() });
+    var rowsLF; try { rowsLF = JSON.parse(rLF.getContentText() || '[]'); } catch (eLF) { return respuesta({ ok: false, error: 'runQuery parse', code: 500 }); }
+    var outLF = [];
+    (rowsLF || []).forEach(function (row) {
+      if (!row || !row.document) return;
+      var fLF = _fsDecodeFields_(row.document.fields || {});
+      var motLF = Array.isArray(fLF.motivosRevision) ? fLF.motivosRevision : [];
+      if (motLF.indexOf('FECHA_FUTURA') < 0) return;
+      var nmLF = String(row.document.name || '');
+      var mLF = nmLF.match(/pacientes\/([^/]+)\/sesiones\/([^/]+)$/);
+      if (!mLF) return;
+      outLF.push({ pid: mLF[1], sid: mLF[2], fecha: fLF.fecha || '', num: (fLF.num != null ? fLF.num : null), motivos: motLF });
+    });
+    _claudeBitacora_(ss, 'claudeColaFechaFutura', 'n=' + outLF.length);
+    return respuesta({ ok: true, total: outLF.length, items: outLF });
+  }
+
+  // CORRIGE la fecha de UNA sesión marcada FECHA_FUTURA y quita ese flag. ACOTADA (seguridad): solo actúa si
+  // la sesión tiene 'FECHA_FUTURA' en motivosRevision → no puede cambiar fechas de notas normales. Escribe en
+  // Firestore pacientes/<id>/sesiones/<sid>: fecha nueva + motivosRevision sin FECHA_FUTURA + revisionPendiente
+  // (true solo si quedan otros motivos). La FECHA la calcula Claude (año correcto) y la pasa aquí.
+  if (action === 'claudeCorregirFechaSesion') {
+    var idCF = String(body.id || '').trim();
+    var sidCF = String(body.sesionId || body.sid || '').trim();
+    var fechaCF = String(body.fecha || '').trim();
+    if (!idCF || !sidCF || !fechaCF) return respuesta({ ok: false, error: 'Falta id, sesionId o fecha', code: 400 });
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(fechaCF)) return respuesta({ ok: false, error: 'fecha debe ser yyyy-mm-dd', code: 400 });
+    var tokCF = _claudeFsToken_();
+    if (!tokCF) return respuesta({ ok: false, error: 'Sin credenciales Firestore', code: 500 });
+    var PROJCF = PropertiesService.getScriptProperties().getProperty('FIRESTORE_PROJECT_ID') || 'clinicasinergia-ec2cf';
+    var baseCF = 'https://firestore.googleapis.com/v1/projects/' + PROJCF + '/databases/(default)/documents/pacientes/' + encodeURIComponent(idCF) + '/sesiones/' + encodeURIComponent(sidCF);
+    var rGetCF = UrlFetchApp.fetch(baseCF, { method: 'get', headers: { Authorization: 'Bearer ' + tokCF }, muteHttpExceptions: true });
+    if (rGetCF.getResponseCode() !== 200) return respuesta({ ok: false, error: 'Sesión no encontrada: ' + (rGetCF.getContentText() || '').slice(0, 150), code: 404 });
+    var fCF = _fsDecodeFields_((JSON.parse(rGetCF.getContentText() || '{}').fields) || {});
+    var motCF = Array.isArray(fCF.motivosRevision) ? fCF.motivosRevision : [];
+    if (motCF.indexOf('FECHA_FUTURA') < 0) return respuesta({ ok: false, error: 'La sesión no tiene FECHA_FUTURA; no se modifica', code: 400 });
+    var nuevosCF = motCF.filter(function (m) { return m !== 'FECHA_FUTURA'; });
+    var pendCF = nuevosCF.length > 0;
+    var fieldsCF = { fecha: _fsEncodeValue_(fechaCF), motivosRevision: _fsEncodeValue_(nuevosCF), revisionPendiente: _fsEncodeValue_(pendCF), updatedAt: _fsEncodeValue_(Date.now()), ultimoUsuario: _fsEncodeValue_('CLAUDE') };
+    var maskCF = ['updateMask.fieldPaths=fecha', 'updateMask.fieldPaths=motivosRevision', 'updateMask.fieldPaths=revisionPendiente', 'updateMask.fieldPaths=updatedAt', 'updateMask.fieldPaths=ultimoUsuario'];
+    var rPCF = UrlFetchApp.fetch(baseCF + '?' + maskCF.join('&'), { method: 'patch', contentType: 'application/json', headers: { Authorization: 'Bearer ' + tokCF }, muteHttpExceptions: true, payload: JSON.stringify({ fields: fieldsCF }) });
+    var codePCF = rPCF.getResponseCode();
+    var okCF = (codePCF >= 200 && codePCF < 300);
+    _claudeBitacora_(ss, 'claudeCorregirFechaSesion', 'id=' + idCF + ' sid=' + sidCF + ' fecha=' + fechaCF + ' http=' + codePCF);
+    return respuesta({ ok: okCF, id: idCF, sesionId: sidCF, fecha: fechaCF, revisionPendiente: pendCF, motivosRestantes: nuevosCF, http: codePCF, error: okCF ? undefined : (rPCF.getContentText() || '').slice(0, 200) });
+  }
+
   return respuesta({ ok: false, error: 'Acción claude no reconocida: ' + action, code: 400 });
 }
