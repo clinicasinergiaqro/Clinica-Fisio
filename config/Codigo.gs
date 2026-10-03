@@ -2369,62 +2369,68 @@ function _claudeRouter_(body) {
     return respuesta({ ok: okFS, id: idFS, http: codeFS, escritos: escritos, error: okFS ? undefined : (rFS.getContentText() || '').slice(0, 200) });
   }
 
-  // LISTA la Cola de revisión filtrada a motivo FECHA_FUTURA (sesiones con fecha en el futuro por typo de
-  // año de la migración). collectionGroup sobre 'sesiones' donde revisionPendiente==true, filtra FECHA_FUTURA
-  // en código. Devuelve [{pid, sid, fecha, num, motivos}] para que Claude calcule la fecha correcta y la corrija.
-  if (action === 'claudeColaFechaFutura') {
-    var tokLF = _claudeFsToken_();
-    if (!tokLF) return respuesta({ ok: false, error: 'Sin credenciales Firestore', code: 500 });
-    var PROJLF = PropertiesService.getScriptProperties().getProperty('FIRESTORE_PROJECT_ID') || 'clinicasinergia-ec2cf';
-    var urlLF = 'https://firestore.googleapis.com/v1/projects/' + PROJLF + '/databases/(default)/documents:runQuery';
-    var qLF = { structuredQuery: { from: [{ collectionId: 'sesiones', allDescendants: true }],
-      where: { fieldFilter: { field: { fieldPath: 'revisionPendiente' }, op: 'EQUAL', value: { booleanValue: true } } }, limit: 3000 } };
-    var rLF = UrlFetchApp.fetch(urlLF, { method: 'post', contentType: 'application/json', headers: { Authorization: 'Bearer ' + tokLF }, muteHttpExceptions: true, payload: JSON.stringify(qLF) });
-    if (rLF.getResponseCode() !== 200) return respuesta({ ok: false, error: 'runQuery ' + rLF.getResponseCode() + ': ' + (rLF.getContentText() || '').slice(0, 180), code: rLF.getResponseCode() });
-    var rowsLF; try { rowsLF = JSON.parse(rLF.getContentText() || '[]'); } catch (eLF) { return respuesta({ ok: false, error: 'runQuery parse', code: 500 }); }
-    var outLF = [];
-    (rowsLF || []).forEach(function (row) {
+  // LISTA TODA la Cola de revisión (sesiones con revisionPendiente==true), cualquier motivo. collectionGroup
+  // sobre 'sesiones'. Devuelve por cada una {pid, sid, fecha, num, terapeuta, atendidoPor, creadoPor, motivos,
+  // textoVacio} para que Claude decida y resuelva cada item (fecha / terapeuta / validar).
+  if (action === 'claudeColaRevision') {
+    var tokLR = _claudeFsToken_();
+    if (!tokLR) return respuesta({ ok: false, error: 'Sin credenciales Firestore', code: 500 });
+    var PROJLR = PropertiesService.getScriptProperties().getProperty('FIRESTORE_PROJECT_ID') || 'clinicasinergia-ec2cf';
+    var urlLR = 'https://firestore.googleapis.com/v1/projects/' + PROJLR + '/databases/(default)/documents:runQuery';
+    var qLR = { structuredQuery: { from: [{ collectionId: 'sesiones', allDescendants: true }],
+      where: { fieldFilter: { field: { fieldPath: 'revisionPendiente' }, op: 'EQUAL', value: { booleanValue: true } } }, limit: 5000 } };
+    var rLR = UrlFetchApp.fetch(urlLR, { method: 'post', contentType: 'application/json', headers: { Authorization: 'Bearer ' + tokLR }, muteHttpExceptions: true, payload: JSON.stringify(qLR) });
+    if (rLR.getResponseCode() !== 200) return respuesta({ ok: false, error: 'runQuery ' + rLR.getResponseCode() + ': ' + (rLR.getContentText() || '').slice(0, 180), code: rLR.getResponseCode() });
+    var rowsLR; try { rowsLR = JSON.parse(rLR.getContentText() || '[]'); } catch (eLR) { return respuesta({ ok: false, error: 'runQuery parse', code: 500 }); }
+    var outLR = [];
+    (rowsLR || []).forEach(function (row) {
       if (!row || !row.document) return;
-      var fLF = _fsDecodeFields_(row.document.fields || {});
-      var motLF = Array.isArray(fLF.motivosRevision) ? fLF.motivosRevision : [];
-      if (motLF.indexOf('FECHA_FUTURA') < 0) return;
-      var nmLF = String(row.document.name || '');
-      var mLF = nmLF.match(/pacientes\/([^/]+)\/sesiones\/([^/]+)$/);
-      if (!mLF) return;
-      outLF.push({ pid: mLF[1], sid: mLF[2], fecha: fLF.fecha || '', num: (fLF.num != null ? fLF.num : null), motivos: motLF });
+      var fLR = _fsDecodeFields_(row.document.fields || {});
+      var nmLR = String(row.document.name || '');
+      var mLR = nmLR.match(/pacientes\/([^/]+)\/sesiones\/([^/]+)$/);
+      if (!mLR) return;
+      var sBlobLR = '';
+      try { var sObjLR = fLR.s; if (sObjLR && typeof sObjLR === 'object') sBlobLR = [sObjLR.dolor, sObjLR.cambios, sObjLR.actFisica].join(' '); else if (typeof fLR.s === 'string') sBlobLR = fLR.s; } catch (_sLR) {}
+      outLR.push({ pid: mLR[1], sid: mLR[2], fecha: fLR.fecha || '', num: (fLR.num != null ? fLR.num : null),
+        terapeuta: fLR.terapeuta || '', atendidoPor: (Array.isArray(fLR.atendidoPor) ? fLR.atendidoPor : (fLR.atendidoPor || '')), creadoPor: fLR.creadoPor || '',
+        motivos: (Array.isArray(fLR.motivosRevision) ? fLR.motivosRevision : []), textoVacio: !(String(sBlobLR).trim()) });
     });
-    _claudeBitacora_(ss, 'claudeColaFechaFutura', 'n=' + outLF.length);
-    return respuesta({ ok: true, total: outLF.length, items: outLF });
+    _claudeBitacora_(ss, 'claudeColaRevision', 'n=' + outLR.length);
+    return respuesta({ ok: true, total: outLR.length, items: outLR });
   }
 
-  // CORRIGE la fecha de UNA sesión marcada FECHA_FUTURA y quita ese flag. ACOTADA (seguridad): solo actúa si
-  // la sesión tiene 'FECHA_FUTURA' en motivosRevision → no puede cambiar fechas de notas normales. Escribe en
-  // Firestore pacientes/<id>/sesiones/<sid>: fecha nueva + motivosRevision sin FECHA_FUTURA + revisionPendiente
-  // (true solo si quedan otros motivos). La FECHA la calcula Claude (año correcto) y la pasa aquí.
-  if (action === 'claudeCorregirFechaSesion') {
-    var idCF = String(body.id || '').trim();
-    var sidCF = String(body.sesionId || body.sid || '').trim();
-    var fechaCF = String(body.fecha || '').trim();
-    if (!idCF || !sidCF || !fechaCF) return respuesta({ ok: false, error: 'Falta id, sesionId o fecha', code: 400 });
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(fechaCF)) return respuesta({ ok: false, error: 'fecha debe ser yyyy-mm-dd', code: 400 });
-    var tokCF = _claudeFsToken_();
-    if (!tokCF) return respuesta({ ok: false, error: 'Sin credenciales Firestore', code: 500 });
-    var PROJCF = PropertiesService.getScriptProperties().getProperty('FIRESTORE_PROJECT_ID') || 'clinicasinergia-ec2cf';
-    var baseCF = 'https://firestore.googleapis.com/v1/projects/' + PROJCF + '/databases/(default)/documents/pacientes/' + encodeURIComponent(idCF) + '/sesiones/' + encodeURIComponent(sidCF);
-    var rGetCF = UrlFetchApp.fetch(baseCF, { method: 'get', headers: { Authorization: 'Bearer ' + tokCF }, muteHttpExceptions: true });
-    if (rGetCF.getResponseCode() !== 200) return respuesta({ ok: false, error: 'Sesión no encontrada: ' + (rGetCF.getContentText() || '').slice(0, 150), code: 404 });
-    var fCF = _fsDecodeFields_((JSON.parse(rGetCF.getContentText() || '{}').fields) || {});
-    var motCF = Array.isArray(fCF.motivosRevision) ? fCF.motivosRevision : [];
-    if (motCF.indexOf('FECHA_FUTURA') < 0) return respuesta({ ok: false, error: 'La sesión no tiene FECHA_FUTURA; no se modifica', code: 400 });
-    var nuevosCF = motCF.filter(function (m) { return m !== 'FECHA_FUTURA'; });
-    var pendCF = nuevosCF.length > 0;
-    var fieldsCF = { fecha: _fsEncodeValue_(fechaCF), motivosRevision: _fsEncodeValue_(nuevosCF), revisionPendiente: _fsEncodeValue_(pendCF), updatedAt: _fsEncodeValue_(Date.now()), ultimoUsuario: _fsEncodeValue_('CLAUDE') };
-    var maskCF = ['updateMask.fieldPaths=fecha', 'updateMask.fieldPaths=motivosRevision', 'updateMask.fieldPaths=revisionPendiente', 'updateMask.fieldPaths=updatedAt', 'updateMask.fieldPaths=ultimoUsuario'];
-    var rPCF = UrlFetchApp.fetch(baseCF + '?' + maskCF.join('&'), { method: 'patch', contentType: 'application/json', headers: { Authorization: 'Bearer ' + tokCF }, muteHttpExceptions: true, payload: JSON.stringify({ fields: fieldsCF }) });
-    var codePCF = rPCF.getResponseCode();
-    var okCF = (codePCF >= 200 && codePCF < 300);
-    _claudeBitacora_(ss, 'claudeCorregirFechaSesion', 'id=' + idCF + ' sid=' + sidCF + ' fecha=' + fechaCF + ' http=' + codePCF);
-    return respuesta({ ok: okCF, id: idCF, sesionId: sidCF, fecha: fechaCF, revisionPendiente: pendCF, motivosRestantes: nuevosCF, http: codePCF, error: okCF ? undefined : (rPCF.getContentText() || '').slice(0, 200) });
+  // RESUELVE una sesión de la Cola. ACOTADA (seguridad): solo actúa si la sesión tiene revisionPendiente==true
+  // (está en la cola) → no puede tocar notas normales. body: { id, sesionId, fecha?(yyyy-mm-dd), terapeuta?,
+  // quitarMotivos?[] }. Aplica fecha/terapeuta si vienen, quita los motivos indicados, y revisionPendiente =
+  // (quedan motivos). La decisión (qué fecha / terapeuta / qué motivos quitar) la calcula Claude.
+  if (action === 'claudeResolverSesion') {
+    var idRS = String(body.id || '').trim();
+    var sidRS = String(body.sesionId || body.sid || '').trim();
+    if (!idRS || !sidRS) return respuesta({ ok: false, error: 'Falta id o sesionId', code: 400 });
+    var fechaRS = String(body.fecha || '').trim();
+    if (fechaRS && !/^\d{4}-\d{2}-\d{2}$/.test(fechaRS)) return respuesta({ ok: false, error: 'fecha debe ser yyyy-mm-dd', code: 400 });
+    var terRS = (body.terapeuta != null) ? String(body.terapeuta) : null;
+    var quitRS = Array.isArray(body.quitarMotivos) ? body.quitarMotivos.map(String) : [];
+    var tokRS = _claudeFsToken_();
+    if (!tokRS) return respuesta({ ok: false, error: 'Sin credenciales Firestore', code: 500 });
+    var PROJRS = PropertiesService.getScriptProperties().getProperty('FIRESTORE_PROJECT_ID') || 'clinicasinergia-ec2cf';
+    var baseRS = 'https://firestore.googleapis.com/v1/projects/' + PROJRS + '/databases/(default)/documents/pacientes/' + encodeURIComponent(idRS) + '/sesiones/' + encodeURIComponent(sidRS);
+    var rGetRS = UrlFetchApp.fetch(baseRS, { method: 'get', headers: { Authorization: 'Bearer ' + tokRS }, muteHttpExceptions: true });
+    if (rGetRS.getResponseCode() !== 200) return respuesta({ ok: false, error: 'Sesion no encontrada: ' + (rGetRS.getContentText() || '').slice(0, 150), code: 404 });
+    var fRS = _fsDecodeFields_((JSON.parse(rGetRS.getContentText() || '{}').fields) || {});
+    if (fRS.revisionPendiente !== true) return respuesta({ ok: false, error: 'La sesion no esta en la cola (revisionPendiente!=true); no se modifica', code: 400 });
+    var motRS = Array.isArray(fRS.motivosRevision) ? fRS.motivosRevision : [];
+    var nuevosRS = motRS.filter(function (m) { return quitRS.indexOf(m) < 0; });
+    var pendRS = nuevosRS.length > 0;
+    var fieldsRS = { motivosRevision: _fsEncodeValue_(nuevosRS), revisionPendiente: _fsEncodeValue_(pendRS), updatedAt: _fsEncodeValue_(Date.now()), ultimoUsuario: _fsEncodeValue_('CLAUDE') };
+    var maskRS = ['updateMask.fieldPaths=motivosRevision', 'updateMask.fieldPaths=revisionPendiente', 'updateMask.fieldPaths=updatedAt', 'updateMask.fieldPaths=ultimoUsuario'];
+    if (fechaRS) { fieldsRS.fecha = _fsEncodeValue_(fechaRS); maskRS.push('updateMask.fieldPaths=fecha'); }
+    if (terRS !== null) { fieldsRS.terapeuta = _fsEncodeValue_(terRS); maskRS.push('updateMask.fieldPaths=terapeuta'); }
+    var rPRS = UrlFetchApp.fetch(baseRS + '?' + maskRS.join('&'), { method: 'patch', contentType: 'application/json', headers: { Authorization: 'Bearer ' + tokRS }, muteHttpExceptions: true, payload: JSON.stringify({ fields: fieldsRS }) });
+    var codePRS = rPRS.getResponseCode();
+    var okRS = (codePRS >= 200 && codePRS < 300);
+    _claudeBitacora_(ss, 'claudeResolverSesion', 'id=' + idRS + ' sid=' + sidRS + ' fecha=' + fechaRS + ' ter=' + (terRS || '') + ' quita=' + quitRS.join('|') + ' http=' + codePRS);
+    return respuesta({ ok: okRS, id: idRS, sesionId: sidRS, fecha: fechaRS || undefined, terapeuta: (terRS !== null ? terRS : undefined), revisionPendiente: pendRS, motivosRestantes: nuevosRS, http: codePRS, error: okRS ? undefined : (rPRS.getContentText() || '').slice(0, 200) });
   }
 
   return respuesta({ ok: false, error: 'Acción claude no reconocida: ' + action, code: 400 });
