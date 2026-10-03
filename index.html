@@ -6481,7 +6481,7 @@ function _renderBannerPendientes(r){
   var lista=visibles.map(function(x){
     var pista=x.notaCerca?(' <span style="font-weight:700">⚠️ hay nota del '+escapeHTML(x.notaCerca)+' — ¿fecha equivocada?</span>'):'';
     var nombreHTML=x.pid
-      ? '<a data-pid="'+escapeAttr_(x.pid)+'" onclick="nuevaSesionRapida(this.dataset.pid)" style="color:#B45309;font-weight:800;text-decoration:underline;cursor:pointer">'+escapeHTML(x.nombre)+'</a>'
+      ? '<a data-pid="'+escapeAttr_(x.pid)+'" data-fecha="'+escapeAttr_(x.fecha||'')+'" onclick="nuevaSesionRapida(this.dataset.pid, this.dataset.fecha)" style="color:#B45309;font-weight:800;text-decoration:underline;cursor:pointer">'+escapeHTML(x.nombre)+'</a>'
       : escapeHTML(x.nombre);
     return '<div style="font-size:11px;color:#92400E;padding:2px 0">• '+nombreHTML+' — '+escapeHTML(x.fecha)+pista+'</div>';
   }).join('');
@@ -12783,6 +12783,11 @@ function renderSOAPForm(){
 
   // FECHA EDITABLE: valor inicial del campo (edición = fecha de la nota; nueva = hoy). Formato YYYY-MM-DD para type=date.
   var _fechaConsultaVal = _isoMasDias(0);
+  // PRESET (banner "sin documentar"): nota nueva fechada en el día de la cita que falta, no en hoy.
+  if(!editingSoapId && window._nuevaSoapFechaPreset){
+    try{ var _pf=_normalizarFechaParaInput(window._nuevaSoapFechaPreset); if(_pf) _fechaConsultaVal=_pf; }catch(_){}
+  }
+  window._nuevaSoapFechaPreset=null;   // consumir una sola vez (que una nota manual posterior salga en hoy)
   if(editingSoapId && Array.isArray(p.soap)){
     var _naFecha=p.soap.find(function(s){return s.id===editingSoapId;});
     if(_naFecha && _naFecha.fecha){ var _fi=_normalizarFechaParaInput(_naFecha.fecha); if(_fi) _fechaConsultaVal=_fi; }
@@ -24576,7 +24581,7 @@ function generarGraficaEVA(p){
 }
 
 // ── B1: Nueva sesión SOAP rápida desde lista/agenda ──
-async function nuevaSesionRapida(patientId){
+async function nuevaSesionRapida(patientId, fechaPreset){
   patientId=String(patientId||'');
   let p = (Array.isArray(patientsDB)?patientsDB:[]).find(x=>x && x.id===patientId);
   if(!p) p = (window._FST_listaPacientesPorId||{})[patientId];
@@ -24615,6 +24620,9 @@ async function nuevaSesionRapida(patientId){
     p.sesiones=_mxNSR || (Array.isArray(p.soap)?p.soap.length:0);
   }
   currentPatient=p;
+  // Preset de fecha: abrir la nota YA fechada en el día de la cita que falta (no en hoy). showNuevoSOAP
+  // lo consume una sola vez. Útil desde el banner "sin documentar": lleva directo a la SOAP de ESE día.
+  window._nuevaSoapFechaPreset = fechaPreset || null;
   showNuevoSOAP();
 }
 
