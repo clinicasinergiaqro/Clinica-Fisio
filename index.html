@@ -6358,8 +6358,11 @@ async function _computarBannerPendientes(){
   var _hoyBanner=_hoyISOlocal();
   var _pisoBanner=(function(){ try{ var d=new Date(_hoyBanner+'T12:00:00'); d.setDate(d.getDate()-60); var s=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); return s>APP_INICIO_OPERACION?s:APP_INICIO_OPERACION; }catch(_e){ return APP_INICIO_OPERACION; } })();
   var res=null;
-  try{ res=await FST_fetchAgendaRango(_pisoBanner, _hoyBanner); }catch(_){ res=null; }
-  if(!res||!res.ok) return null;   // sin agenda no se inventa nada (banner ausente)
+  // [RANGO-CHUNK] La lectura de 60 días en UNA sola llamada FALLA seguido (la misma causa que "No se
+  // pudo leer el rango") → devolvía null → la caja de pendientes DESAPARECÍA. Usar la vía por tramos
+  // ≤7 días en paralelo (tolerante a fallos, entrega parcial) igual que Rendimiento.
+  try{ res=await FST_fetchAgendaRangoChunked(_diasEntreISO(_pisoBanner, _hoyBanner)); }catch(_){ res=null; }
+  if(!res||!res.ok) return null;   // sin agenda no se inventa nada (cae a la caché persistida en _montar)
   var eventos=Array.isArray(res.eventos)?res.eventos:[];
   var asigMap={};    try{ asigMap=await FST_leerAsignacionesAgenda(false); }catch(_){}
   var resueltos={};  try{ resueltos=await _resolverPacientesCalendario(eventos); }catch(_){ resueltos={}; }
@@ -6456,6 +6459,9 @@ async function _computarBannerPendientes(){
   items.forEach(function(x){ delete x._pidHist; delete x._citaCanon; delete x._claveHist; });   // limpiar campos internos antes de cachear/rendir
   var out={ts:Date.now(), cod:cod, total:items.length, items:items};
   window._bannerPendCache=out;
+  // SWR: persistir en localStorage para que la caja SOBREVIVA recargas (SW nuevo, cold start) y no
+  // "desaparezca" si la próxima lectura de agenda falla. Se re-pinta al instante y luego se recalcula.
+  try{ localStorage.setItem('sinergia_bannerPend_'+cod, JSON.stringify(out)); }catch(_){}
   return out;
 }
 window._bannerPendExpandido=false;   // toggle "ver todos" del banner (persiste durante la sesión)
@@ -6530,6 +6536,12 @@ function _htmlNotasPorCompletar(){
 }
 async function _montarBannerPendientes(){
   if(!document.getElementById('banner-pend-personal')) return;
+  // Hidratar caché desde localStorage si no hay en memoria (sobrevive recargas → la caja NO desaparece
+  // al reabrir por SW nuevo). El recálculo de abajo la refresca; si la agenda falla, se conserva esta.
+  var _codB=String((currentUser&&currentUser.name)||'').toUpperCase();
+  if(!window._bannerPendCache && _codB){
+    try{ var _ls=JSON.parse(localStorage.getItem('sinergia_bannerPend_'+_codB)||'null'); if(_ls && _ls.cod===_codB && Array.isArray(_ls.items)) window._bannerPendCache=_ls; }catch(_){}
+  }
   // PINTAR YA desde caché (instantáneo) para que la caja no "aparezca y desaparezca" mientras recalcula.
   if(window._bannerPendCache){ try{ _renderBannerPendientes(window._bannerPendCache); }catch(_){} }
   var r=null;
