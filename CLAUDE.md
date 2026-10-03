@@ -10,6 +10,15 @@
 - SIN líneas separadoras horizontales (═══, ───, etc.), SIN numeración en saltos de línea que corte la selección.
 - En el iPad los separadores cortan la selección y no se puede copiar completo: todo seguido en una sola caja.
 
+## REGLA PERMANENTE — ACTIVO y MIGRADO (histórico) se tratan IGUAL
+Esto nos pasa UNA Y OTRA VEZ, así que es regla de oro en todo lo que toque pacientes:
+- Un paciente puede existir como **ACTIVO** (id `p…`, en `patientsDB`/Sheet) o como **MIGRADO/HISTÓRICO** (id `mig_pac_…`, solo en Firestore), y a veces el MISMO paciente vive en ambos lados. NUNCA asumir que un paciente es solo uno de los dos.
+- CUALQUIER función que **abra, resuelva, cuente, enlace, hidrate o muestre** un paciente DEBE funcionar idéntico para activo y migrado. Si una vía solo sirve para activos, es un bug en espera.
+- **Abrir expediente:** usar `FST_abrirPacienteDesdeLista(pid)`; **abrir directo a escribir nota:** `nuevaSesionRapida(pid)`. Ambos resuelven activo E histórico (hidratan campos + cache de sesiones). `openExpediente(pid)` es SOLO para activos ya garantizados en `patientsDB` (hace `return` MUDO con `patientsDB.find` si no está → nunca usarlo para algo que pueda tocar un migrado; ese fue el bug del click de "sin documentar", PR #427).
+- **Contar/listar:** incluir ambos orígenes (patientsDB + índice FST `FST_cargarIndicePacientes`), respetando los DOS sistemas de tombstone (activos: `_FST_activosEliminados` + colección `pacientesEliminados`; históricos: `eliminado` + `_FST_pidsEliminados`) y la disciplina SENTINEL `null` (fallo de índice ≠ vacío). Distinción activo/histórico por prefijo de id (`p…`/`app_live_` vs `mig_pac_`) y `creadoPor==='MIGRACION'`.
+- Origen de bugs repetidos: click mudo, conteos cortos (ej. médicos/recetas), "no carga", pacientes que "desaparecen". Antes de entregar cualquier feature de pacientes, preguntarse: **¿esto funciona si el paciente es migrado?** Si no, arreglarlo primero.
+- Norte de largo plazo: la migración de activos a Firestore (Fase 3) es justo para que esta distinción deje de existir; mientras tanto, el código la absorbe tratándolos igual.
+
 ## Flujo de git por loop
 - GitHub Pages se publica desde `main`. Cada loop termina con MERGE A MAIN (PR + squash merge) para llegar a producción.
 - Tras cada merge a main, RECREAR la rama de trabajo desde main para evitar conflictos en el siguiente loop:
