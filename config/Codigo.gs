@@ -1817,6 +1817,13 @@ function _claudeBitacora_(ss, accion, detalle) {
 
 // Access token de una Service Account con el scope dado (Firestore o Storage).
 function _claudeSAToken_(scope) {
+  // [CACHE TOKEN] El token de servicio vive 3600s. Cachearlo ~50 min evita gastar 1 UrlFetch
+  // (al endpoint oauth2) en CADA llamada del conector → ~25% menos consumo de la cuota UrlFetch.
+  // CacheService es per-script, compartido entre ejecuciones; el valor (~1-2KB) cabe de sobra.
+  var _cacheTok = null;
+  try { _cacheTok = CacheService.getScriptCache(); } catch (eC) { _cacheTok = null; }
+  var _ckey = 'SA_TOK_' + scope;
+  if (_cacheTok) { var _hit = _cacheTok.get(_ckey); if (_hit) return _hit; }
   var props = PropertiesService.getScriptProperties();
   var SA_EMAIL = props.getProperty('FIRESTORE_SA_EMAIL');
   var SA_KEY = props.getProperty('FIRESTORE_SA_KEY');
@@ -1835,7 +1842,9 @@ function _claudeSAToken_(scope) {
     method: 'post', muteHttpExceptions: true,
     payload: { grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer', assertion: assertion }
   });
-  return (JSON.parse(res.getContentText() || '{}') || {}).access_token || null;
+  var _tok = (JSON.parse(res.getContentText() || '{}') || {}).access_token || null;
+  if (_tok && _cacheTok) { try { _cacheTok.put(_ckey, _tok, 3000); } catch (ePut) {} }   // 50 min (vive 60)
+  return _tok;
 }
 function _claudeFsToken_() { return _claudeSAToken_('https://www.googleapis.com/auth/datastore'); }
 function _claudeStorageToken_() { return _claudeSAToken_('https://www.googleapis.com/auth/devstorage.read_only'); }
