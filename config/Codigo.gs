@@ -2096,6 +2096,55 @@ function _claudeRouter_(body) {
       fsHttp: codeFSs, error: okFSs ? undefined : ('Subido a Storage; falló registro en Firestore: ' + (rFSs.getContentText() || '').slice(0, 200)) });
   }
 
+  // ── SUBIDA POR LOTE: varios estudios en 1 llamada; 1 lectura+PATCH de Firestore por paciente. ──
+  // Reduce ~60% las llamadas vs claudeSubirEstudio 1x1. Cada imagen usa 1 subida a Storage (inevitable).
+  // items:[{id,base64,mime,name,tipo,descripcion,fechaEstudio,agregadoPor,dedupNombre}]. Agrupa por id.
+  if (action === 'claudeSubirEstudiosLote') {
+    var itemsLT = (body.items && body.items.length) ? body.items : null;
+    if (!itemsLT) return respuesta({ ok:false, error:'Falta items[]', code:400 });
+    var tokRWl = _claudeStorageTokenRW_(); if (!tokRWl) return respuesta({ ok:false, error:'Sin credenciales Storage', code:500 });
+    var tokFSl = _claudeFsToken_();        if (!tokFSl) return respuesta({ ok:false, error:'Sin credenciales Firestore', code:500 });
+    var PROJl = PropertiesService.getScriptProperties().getProperty('FIRESTORE_PROJECT_ID') || 'clinicasinergia-ec2cf';
+    var porPac = {};
+    itemsLT.forEach(function(it){ var k=String(it.id||'').trim(); if(k){ (porPac[k]=porPac[k]||[]).push(it); } });
+    var resultados=[], subidas=0, fallos=0;
+    Object.keys(porPac).forEach(function(idLT){
+      var docLT = _claudeFsGetDoc_(idLT) || {};
+      var arrLT = Array.isArray(docLT.estudiosDocs) ? docLT.estudiosDocs.slice() : [];
+      var existe={}; arrLT.forEach(function(e){ if(e&&e.name) existe[e.name]=1; });
+      porPac[idLT].forEach(function(it){
+        try {
+          var b64=String(it.base64||it.contenido||'');
+          if (b64.indexOf(',')>=0 && /^data:/.test(b64)) b64=b64.slice(b64.indexOf(',')+1);
+          var nom=String(it.name||it.nombre||'estudio').trim()||'estudio';
+          if (it.dedupNombre && existe[nom]) { resultados.push({id:idLT,name:nom,ok:true,skip:'ya_existe'}); return; }
+          var bytes=Utilities.base64Decode(b64);
+          if (!bytes||!bytes.length){ resultados.push({id:idLT,name:nom,ok:false,error:'vacio'}); fallos++; return; }
+          if (bytes.length>20000000){ resultados.push({id:idLT,name:nom,ok:false,error:'muy_grande'}); fallos++; return; }
+          var mime=String(it.mime||it.contentType|| (/\.jpe?g$/i.test(nom)?'image/jpeg':(/\.png$/i.test(nom)?'image/png':(/\.pdf$/i.test(nom)?'application/pdf':'application/octet-stream'))));
+          var ts=Date.now()+'_'+Math.random().toString(36).slice(2,6);
+          var path='clinica/sinergia/'+idLT+'/estudios/'+ts+'_'+nom.replace(/[^\w.\-]+/g,'_');
+          var tokenD=Utilities.getUuid();
+          var bnd='claudebnd'+Utilities.getUuid().replace(/-/g,'');
+          var pre='--'+bnd+'\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n'+JSON.stringify({name:path,contentType:mime,metadata:{firebaseStorageDownloadTokens:tokenD}})+'\r\n--'+bnd+'\r\nContent-Type: '+mime+'\r\n\r\n';
+          var payload=Utilities.newBlob(pre).getBytes().concat(bytes).concat(Utilities.newBlob('\r\n--'+bnd+'--').getBytes());
+          var up=UrlFetchApp.fetch('https://storage.googleapis.com/upload/storage/v1/b/'+encodeURIComponent(CLAUDE_STORAGE_BUCKET)+'/o?uploadType=multipart',{ method:'post', contentType:'multipart/related; boundary='+bnd, payload:payload, headers:{Authorization:'Bearer '+tokRWl}, muteHttpExceptions:true });
+          if (up.getResponseCode()<200||up.getResponseCode()>=300){ resultados.push({id:idLT,name:nom,ok:false,error:'storage_'+up.getResponseCode()}); fallos++; return; }
+          var url='https://firebasestorage.googleapis.com/v0/b/'+CLAUDE_STORAGE_BUCKET+'/o/'+encodeURIComponent(path)+'?alt=media&token='+tokenD;
+          var esImg=/^image\//.test(mime);
+          var item={ id:'est_'+ts, tipo:String(it.tipo||(esImg?'imagen':'documento')), type:mime, descripcion:String(it.descripcion||nom.replace(/\.[^.]+$/,'')), name:nom, fechaEstudio:String(it.fechaEstudio||Utilities.formatDate(new Date(),'America/Mexico_City','yyyy-MM-dd')), fechaAgregado:Utilities.formatDate(new Date(),'America/Mexico_City','dd/MM/yyyy'), agregadoPor:String(it.agregadoPor||'Claude'), url:url, fbPath:path };
+          if (it.resumen||it.interpretacion){ item.resumenManual={texto:String(it.resumen||it.interpretacion).slice(0,600),autor:item.agregadoPor,fecha:new Date().toISOString()}; }
+          arrLT.push(item); existe[nom]=1; subidas++; resultados.push({id:idLT,name:nom,ok:true,url:url});
+        } catch(eIt){ resultados.push({id:idLT,name:String(it.name||''),ok:false,error:String(eIt).slice(0,120)}); fallos++; }
+      });
+      var fieldsLT={ estudiosDocs:_fsEncodeValue_(arrLT), ultimoUsuario:_fsEncodeValue_('CLAUDE') };
+      UrlFetchApp.fetch('https://firestore.googleapis.com/v1/projects/'+PROJl+'/databases/(default)/documents/pacientes/'+encodeURIComponent(idLT)+'?updateMask.fieldPaths=estudiosDocs&updateMask.fieldPaths=ultimoUsuario',{ method:'patch', contentType:'application/json', headers:{Authorization:'Bearer '+tokFSl}, muteHttpExceptions:true, payload:JSON.stringify({fields:fieldsLT}) });
+    });
+    _claudeBitacora_(ss,'claudeSubirEstudiosLote','items='+itemsLT.length+' subidas='+subidas+' fallos='+fallos);
+    return respuesta({ ok:true, subidas:subidas, fallos:fallos, pacientes:Object.keys(porPac).length, resultados:resultados });
+  }
+
+
   // ── ESCRITURA: sugerencia (SOLO columna sugerenciaIA). texto:'' la limpia. ──
   if (action === 'claudePonerSugerencia') {
     var id = String(body.id || '').trim();
