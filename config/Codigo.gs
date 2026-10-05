@@ -2183,7 +2183,7 @@ function _claudeRouter_(body) {
     var PERMITIDOS = ['dx','motivo','motivoHC','motivoConsulta','valoracion','dxFuncional','planTto',
                       'antecedentes','alergias','contraindicaciones','seguridadClinica',
                       'motivosAnteriores','motivoActualIndex','numSesionEpisodioActual','altaClinica',
-                      'sexo'];   // sexo: único campo de identidad habilitado (dato clínico); resto de identidad sigue bloqueado
+                      'sexo','fechaNacimiento'];   // sexo + fechaNacimiento: identidad clínica habilitada (se extraen de estudios/recetas); resto de identidad sigue bloqueado
     var pAC = { id: idAC, updatedAt: Date.now(), ultimoUsuario: 'CLAUDE' }, tocados = [];
     Object.keys(campos).forEach(function(k){ if (PERMITIDOS.indexOf(k) >= 0) { pAC[k] = campos[k]; tocados.push(k); } });
     if (!tocados.length) return respuesta({ ok: false, error: 'Ningún campo permitido en campos', code: 400 });
@@ -2407,7 +2407,7 @@ function _claudeRouter_(body) {
                          'dx','motivo','motivoHC','motivoConsulta','valoracion','dxFuncional','planTto','antecedentes',
                          'alergias','contraindicaciones','seguridadClinica','altaClinica','revaloraciones',
                          'eventosAdversos','etiquetas','motivosAnteriores','motivoActualIndex','numSesionEpisodioActual',
-                         'inasistencias','fotos','docs','sexo'];
+                         'inasistencias','fotos','docs','sexo','fechaNacimiento'];
     var tokFS = _claudeFsToken_();
     if (!tokFS) return respuesta({ ok: false, error: 'Sin credenciales Firestore', code: 500 });
     var PROJ2 = PropertiesService.getScriptProperties().getProperty('FIRESTORE_PROJECT_ID') || 'clinicasinergia-ec2cf';
