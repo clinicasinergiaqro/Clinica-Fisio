@@ -564,15 +564,20 @@ async function FST_renderGaleriaHistorica(pid){
     const tipoPorUrl = {};
     (Array.isArray(data.estudiosDocs)?data.estudiosDocs:[]).forEach(function(e){ if(e&&e.url&&e.tipo) tipoPorUrl[e.url]=e.tipo; });
     const vistos = {};
-    const items = [];
-    (Array.isArray(data.fotosHistoricas)?data.fotosHistoricas:[]).forEach(function(f){
-      if(!f||!f.url||vistos[f.url]) return; vistos[f.url]=1; items.push({url:f.url, fbPath:f.fbPath||'', esHist:true});
-    });
+    // [LISTA CURADA ÚNICA] Primario = estudiosDocs (curado: solo estudios reales, sin fotos de ejercicio).
+    // Las imágenes crudas de la migración (fotosHistoricas) van a un <details> plegado "originales sin
+    // curar" para no perder nada ni mostrar el volcado por defecto. DEPLOY-SEGURO: si aún NO hay estudios
+    // curados (imagen en estudiosDocs), se comporta como antes (migración visible) y nada desaparece.
+    const items = [];       // curados (estudiosDocs)
     (Array.isArray(data.estudiosDocs)?data.estudiosDocs:[]).forEach(function(e){
       if(!e||e.eliminado===true||!e.url||vistos[e.url]) return; vistos[e.url]=1; items.push({url:e.url, fbPath:e.fbPath||'', esHist:false, tipo:e.tipo});   // [TOMBSTONE] ocultar borrados
     });
-    if (!items.length) return '';
-    const thumbs = items.map(function(it){
+    const itemsHist = [];   // crudos de migración NO representados ya en estudiosDocs
+    (Array.isArray(data.fotosHistoricas)?data.fotosHistoricas:[]).forEach(function(f){
+      if(!f||!f.url||vistos[f.url]) return; vistos[f.url]=1; itemsHist.push({url:f.url, fbPath:f.fbPath||'', esHist:true});
+    });
+    if (!items.length && !itemsHist.length) return '';
+    function mkThumb(it){
       const u = escapeAttr_(it.url);
       const tp = it.tipo || tipoPorUrl[it.url];
       const t = tp ? (ESTUDIO_TIPOS[tp]||{icono:'📎',label:tp}) : null;
@@ -587,10 +592,27 @@ async function FST_renderGaleriaHistorica(pid){
       return '<div class="media-thumb">'
         + '<a href="'+u+'" target="_blank" rel="noopener" style="display:block;width:100%;height:100%">'+cuerpo+'</a>'
         + btnClas + etiqueta + '</div>';
-    }).join('');
-    return '<div style="margin:14px 0 6px;padding:0 14px">'
-      + '<div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.7px;color:var(--gray-400)">\u{1F4F7} Imágenes y estudios del expediente (' + items.length + ')</div>'
-      + '<div class="media-grid">' + thumbs + '</div></div>';
+    }
+    // ¿ya hay estudios curados (imagen) en estudiosDocs? Señal de que la subida curada ya corrió.
+    const hayCurados = items.some(function(it){ return it.tipo==='imagen' || /\.(jpg|jpeg|png|gif|webp|heic|bmp)(\?|$)/i.test(it.url); });
+    let out = '';
+    if (hayCurados) {
+      // Curados arriba; migración cruda plegada (nada se pierde, pero no estorba).
+      out += '<div style="margin:14px 0 6px;padding:0 14px">'
+        + '<div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.7px;color:var(--gray-400)">\u{1F4F7} Imágenes y estudios del expediente (' + items.length + ')</div>'
+        + '<div class="media-grid">' + items.map(mkThumb).join('') + '</div></div>';
+      if (itemsHist.length) {
+        out += '<div style="margin:4px 0 6px;padding:0 14px"><details><summary style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.7px;color:var(--gray-400);cursor:pointer;padding:4px 0">\u{1F4E6} Imágenes originales de migración — sin curar (' + itemsHist.length + ')</summary>'
+          + '<div class="media-grid" style="margin-top:6px">' + itemsHist.map(mkThumb).join('') + '</div></details></div>';
+      }
+    } else {
+      // Aún sin curar: comportamiento previo (todo junto), para no esconder nada.
+      const todo = items.concat(itemsHist);
+      out += '<div style="margin:14px 0 6px;padding:0 14px">'
+        + '<div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.7px;color:var(--gray-400)">\u{1F4F7} Imágenes y estudios del expediente (' + todo.length + ')</div>'
+        + '<div class="media-grid">' + todo.map(mkThumb).join('') + '</div></div>';
+    }
+    return out;
   } catch (e) {
     console.warn('[FST] galería histórica error:', e.message);
     return '';
