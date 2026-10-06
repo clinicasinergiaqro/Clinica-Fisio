@@ -3737,7 +3737,8 @@ function calcularTienePrecaucion(sc){
   if(!sc) return false;
   const criticos=['Marcapasos','Cáncer activo','Hemofilia','Anticoagulantes','Embarazo',
     'Alteración de sensibilidad','Infección activa','Herida abierta','Sospecha de TVP',
-    'Hemofilia / trastorno de coagulación'];
+    'Hemofilia / trastorno de coagulación',
+    'Prótesis metálica','Material de osteosíntesis','Implante electrónico'];
   const todos=[...(sc.implantes||[]),...(sc.condiciones||[]),...(sc.banderasRojas||[])];
   return todos.some(item=>criticos.includes(item));
 }
@@ -12606,7 +12607,8 @@ function _soapSeguridadHTML(p){
   if(!alergias && !contra && !banderas.length && !impl.length && !cond.length && !precaucion) return '';
   var blob=(contra+' '+banderas.join(' ')+' '+impl.join(' ')+' '+cond.join(' ')).toLowerCase();
   try{ blob=blob.normalize('NFD').replace(/[̀-ͯ]/g,''); }catch(_){}
-  var rojo=/marcapaso|desfibrilador|\bdai\b|anticoagul|cancer|oncolog|tumor|linfoma|leucemia|metastas|osteosintesis|protesis|\bplaca\b|\bclavo|tornillo|embaraz|trombos|\btvp\b/.test(blob);
+  var rojo=/marcapaso|desfibrilador|\bdai\b|anticoagul|cancer|oncolog|tumor|linfoma|leucemia|metastas|osteosintesis|protesis|\bmetal|\bplaca\b|\bclavo|tornillo|embaraz|trombos|\btvp\b/.test(blob);
+  var metalImpl=/marcapaso|osteosintesis|protesis|\bmetal|\bplaca\b|\bclavo|tornillo|implante/.test(blob) || impl.length>0;
   var col= rojo ? '#B91C1C' : '#B45309';
   var bg = rojo ? '#FEF2F2' : '#FFF7E6';
   var bd = rojo ? '#B91C1C' : '#E0B000';
@@ -12621,6 +12623,7 @@ function _soapSeguridadHTML(p){
   return '<div style="margin:0 14px 12px;background:'+bg+';border:1.5px solid '+bd+';border-left:6px solid '+bd+';border-radius:12px;padding:11px 14px">'
     +'<div style="font-size:12px;font-weight:800;color:'+col+';text-transform:uppercase;letter-spacing:.4px">'+titulo+'</div>'
     +filas
+    +(metalImpl?'<div style="font-size:11px;color:#B91C1C;margin-top:7px;font-weight:700">⚡ Metal / osteosíntesis / implante: NO aplicar radiofrecuencia (tecar) ni electroterapia sobre la zona.</div>':'')
     +'<div style="font-size:11px;color:#8A6D1A;margin-top:7px;font-weight:600">Verifica antes de aplicar agentes físicos (tecar, US, ondas, electro, termo, láser) o ejercicio de carga.</div>'
     +'</div>';
 }
@@ -19449,6 +19452,13 @@ function abrirEditarAntecedentesCompleto(){
           <input class="form-input" id="ed-sc-condiciones-obs" type="text" placeholder="Si marcaste 'Otro': especifica la condición aquí" value="${lt(sc.condicionesObs||'','').replace(/"/g,'&quot;')}" style="margin-top:8px;font-size:15px;padding:14px;border:2px dashed var(--gray-300)">
         </div>
       </div>
+      <div class="form-group" style="margin-bottom:10px">
+        <div class="form-field">
+          <div class="form-label">Aparatos / implantes <span style="color:var(--gray-400);font-weight:400">(metal / osteosíntesis — no radiofrecuencia)</span></div>
+          <div class="checkbox-grid">${['Marcapasos','Prótesis articular','Prótesis metálica','Material de osteosíntesis','Implante electrónico','Otro'].map(o=>`<label class="checkbox-item"><input type="checkbox" class="ed-sc-implante" value="${o}" ${(sc.implantes||[]).includes(o)?'checked':''} style="width:16px;height:16px"> <span class="cb-label">${o}</span></label>`).join('')}</div>
+          <input class="form-input" id="ed-sc-implantes-detalle" type="text" placeholder="Si marcaste 'Otro': especifica ubicación / tipo (ej. placa y tornillos en rodilla derecha)" value="${lt(sc.implantesDetalle||'','').replace(/"/g,'&quot;')}" style="margin-top:8px;font-size:15px;padding:14px;border:2px dashed var(--gray-300)">
+        </div>
+      </div>
       <div class="form-group">
         <div class="form-field">
           <div class="form-label">Antecedentes deportivos</div>
@@ -19753,6 +19763,9 @@ function guardarAntecedentesCompleto(){
   if(!p.seguridadClinica) p.seguridadClinica = {};
   p.seguridadClinica.condiciones = Array.from(document.querySelectorAll('.ed-sc-condicion:checked')).map(c=>c.value);
   p.seguridadClinica.condicionesObs = v('ed-sc-condiciones-obs');
+  p.seguridadClinica.implantes = Array.from(document.querySelectorAll('.ed-sc-implante:checked')).map(c=>c.value);
+  p.seguridadClinica.implantesDetalle = v('ed-sc-implantes-detalle');
+  p.seguridadClinica.tienePrecaucion = calcularTienePrecaucion(p.seguridadClinica);
   // LOOP3A: guardar sexo (campo opcional, no bloquea)
   p.sexo = v('ed-sexo') || '';
 
