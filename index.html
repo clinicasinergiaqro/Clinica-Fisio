@@ -1927,6 +1927,12 @@ function saveLocal(k,v){
         fotos:(Array.isArray(p.fotos)?p.fotos:[]).map(f=>({...f,data:f.mediaId?undefined:f.data})),
         docs:(Array.isArray(p.docs)?p.docs:[]).map(d=>({...d,data:d.mediaId?undefined:d.data})),
       }));
+      // [RESPALDO IDB] Espejo DURABLE del backup de pacientes en IndexedDB. localStorage tiene cuota
+      // chica (Safari/iOS lo desaloja) → un alta creada y aún no subida podía perderse al desalojarse.
+      // IndexedDB tiene mucho más margen y sobrevive mejor. Se escribe SIEMPRE (fire-and-forget, antes
+      // del setItem) para que quede respaldado aunque localStorage reviente por cuota. loadFromCloud
+      // recupera de aquí si localStorage quedó vacío → ningún paciente no-sincronizado se pierde.
+      try{ if(typeof idbSet==='function') idbSet('__pts_backup__', toSave); }catch(_){}
     }
     localStorage.setItem('sinergia_'+k, JSON.stringify(toSave));
   }catch(e){
@@ -3374,7 +3380,20 @@ async function loadFromCloud(){
     if(d && d.error){console.error('Cloud error:',d.error);return null;}
     if(Array.isArray(d)&&d.length>0){
       // Cargar versión local actual para preservar base64 (fotos, firmas, docs)
-      const local = loadLocal('pts') || [];
+      let local = loadLocal('pts') || [];
+      // [RESPALDO IDB] Si localStorage fue DESALOJADO (iOS/Safari lo hace sin avisar), `local` queda
+      // vacío y un paciente creado y aún NO sincronizado se perdería (la preservación local-only de más
+      // abajo no tendría de dónde leerlo). Recuperarlo del espejo durable en IndexedDB para que suba.
+      if(!local.length){
+        try{
+          const _idbPts = (typeof idbGet==='function') ? await idbGet('__pts_backup__') : null;
+          if(Array.isArray(_idbPts) && _idbPts.length){
+            local=_idbPts;
+            console.warn('[RESPALDO] patientsDB recuperado de IndexedDB tras desalojo de localStorage: '+_idbPts.length);
+            try{ showToast('🛟 Recuperé '+_idbPts.length+' paciente(s) del respaldo local','success'); }catch(_){}
+          }
+        }catch(_){}
+      }
       const MARGEN = 3000; // ms — margen contra relojes desfasados entre iPads
       const idsDeNube = new Set();
 
@@ -19320,6 +19339,10 @@ function guardarNuevoPaciente(){
   }
   patientsDB.push(nuevo);
   if(typeof _sinRespaldoAdd==='function') _sinRespaldoAdd(nuevo.id);   // [RESPALDO] nace "sin respaldo" hasta que la nube confirme
+  // [RESPALDO IDB] Volcado DURABLE INMEDIATO (localStorage + IndexedDB) al crear: no esperar el
+  // guardado coalescido de ~800ms ni depender de que la subida a la nube tenga señal. Así un alta
+  // queda respaldada en disco al instante y nunca vive SOLO en memoria (caso Ana Gabriela).
+  try{ if(typeof _flushGuardadoLocalPts==='function') _flushGuardadoLocalPts(); }catch(_){}
   // ── NOTA DE VALORACIÓN AUTO-GENERADA (sesión 1) ────────────────────────────
   // La primera consulta ES un SOAP: S←padecimiento, O←exploración, A←dx+EVA, P←plan+tratamiento
   // aplicado hoy. modoNota:'valoracion' la distingue (excluida del promedio de calidad salvo que
