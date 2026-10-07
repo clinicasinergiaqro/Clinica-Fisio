@@ -21124,7 +21124,7 @@ function _RPT_css(){
   + '.rpt-h{font-size:12px;font-weight:800;color:var(--navy);margin:0 0 8px;text-transform:uppercase;letter-spacing:.4px}'
   + '.rpt-sec{background:#fff;border:1px solid var(--gray-200);border-radius:12px;padding:12px 14px;margin-bottom:12px}'
   + '.rpt-dash{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:12px}'
-  + '.rpt-card{border:1px solid var(--gray-200);border-radius:12px;padding:10px 12px;background:var(--gray-50)}'
+  + '.rpt-card{border:1px solid var(--gray-200);border-top:3px solid #C49A2E;border-radius:12px;padding:10px 12px;background:var(--gray-50);-webkit-print-color-adjust:exact;print-color-adjust:exact}'
   + '.rpt-card .lbl{font-size:10px;font-weight:700;color:var(--gray-400);text-transform:uppercase;letter-spacing:.4px}'
   + '.rpt-card .val{font-size:16px;font-weight:800;margin-top:2px;line-height:1.2}'
   + '.rpt-kv{display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-bottom:1px solid var(--gray-100)}'
@@ -21157,10 +21157,10 @@ function _RPT_htmlCabecera(p, sesiones){
   var logo='https://storage.googleapis.com/clinicasinergia-ec2cf.firebasestorage.app/clinica/sinergia/assets/logo_horizontal.png';
   var exp=p.folio?escapeHTML(String(p.folio)):escapeHTML(_RPT_folioExpediente(p.id));
   var hoy=escapeHTML(new Date().toLocaleDateString('es-MX'));
-  return '<div style="display:flex;justify-content:space-between;align-items:flex-start;padding:4px 0 12px;border-bottom:2px solid #1F5C4D;-webkit-print-color-adjust:exact;print-color-adjust:exact">'
+  return '<div style="display:flex;justify-content:space-between;align-items:flex-start;padding:4px 0 12px;border-bottom:2px solid #C49A2E;-webkit-print-color-adjust:exact;print-color-adjust:exact">'
     + '<img src="'+logo+'" alt="Clínica Sinergia" style="height:38px;width:auto;display:block">'
     + '<div style="text-align:right">'
-    + '<div style="font-size:10px;font-weight:700;color:#1F5C4D;letter-spacing:1px">RESUMEN CLÍNICO DE EXPEDIENTE</div>'
+    + '<div style="font-size:10px;font-weight:700;color:#15325B;letter-spacing:1px">RESUMEN CLÍNICO DE EXPEDIENTE</div>'
     + '<div style="font-size:9px;color:#8A8D8A;margin-top:3px">Expediente N.º '+exp+'</div>'
     + '<div style="font-size:9px;color:#8A8D8A">Emitido: '+hoy+' · Confidencial</div>'
     + '</div></div>';
@@ -21172,7 +21172,7 @@ function _RPT_htmlFranjaPaciente(p, sesiones){
   var ter=escapeHTML(p.terapeuta||p.terapeutaActual||'—');
   function c(lbl,val,color){ return '<div><div style="font-size:8.5px;color:#9497A2;letter-spacing:0.8px;text-transform:uppercase;margin-bottom:3px">'+lbl+'</div><div style="font-size:13px'+(color?';font-weight:700;color:'+color:'')+'">'+val+'</div></div>'; }
   return '<div style="display:grid;grid-template-columns:2fr 1fr 1fr 1.4fr;margin:14px 0;padding:12px 14px;border:0.5px solid #E2E4E0;border-radius:6px">'
-    + c('Paciente', escapeHTML(p.name||'—'), '#2E3192')
+    + c('Paciente', escapeHTML(p.name||'—'), '#15325B')
     + c('Edad / Sexo', edad+' · '+sexo)
     + c('Terapeuta', ter)
     + c('Periodo', escapeHTML(_RPT_periodo(sesiones)))
@@ -21227,10 +21227,10 @@ async function RPT_imprimirReporte(pid){
   }catch(err){ console.warn('[RPT pdf]', err&&err.message); showToast('No se pudo generar el PDF: '+((err&&err.message)||''),'error'); }
 }
 function _RPT_secHead(n, titulo){
-  return '<div class="rc-sec-head" style="display:flex;align-items:center;gap:8px;margin:18px 0 8px">'
-    + '<span style="width:18px;height:18px;background:#2E3192;color:#fff;font-size:10px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;border-radius:3px;-webkit-print-color-adjust:exact;print-color-adjust:exact">'+escapeHTML(String(n))+'</span>'
-    + '<span style="font-size:11.5px;font-weight:700;color:#2E3192;letter-spacing:0.5px;text-transform:uppercase;white-space:nowrap">'+escapeHTML(titulo)+'</span>'
-    + '<span style="flex:1;height:1px;background:#E2E4E0"></span></div>';
+  return '<div class="rc-sec-head" style="display:flex;align-items:center;gap:10px;margin:18px 0 9px;background:#15325B;border-radius:7px;padding:7px 12px;-webkit-print-color-adjust:exact;print-color-adjust:exact">'
+    + '<span style="width:19px;height:19px;background:#C49A2E;color:#15325B;font-size:11px;font-weight:800;display:inline-flex;align-items:center;justify-content:center;border-radius:5px;-webkit-print-color-adjust:exact;print-color-adjust:exact">'+escapeHTML(String(n))+'</span>'
+    + '<span style="font-size:11.5px;font-weight:700;color:#fff;letter-spacing:1.2px;text-transform:uppercase">'+escapeHTML(titulo)+'</span>'
+    + '</div>';
 }
 function _RPT_card(lbl,val,color,small){
   return '<div class="rpt-card"><div class="lbl">'+escapeHTML(lbl)+'</div><div class="val" style="color:'+color+(small?';font-size:12.5px':'')+'">'+escapeHTML(val)+'</div></div>';
@@ -21284,9 +21284,10 @@ function _RPT_htmlResumen(p){
   var enfoque=_limpio(plan.enfoqueTerapeutico);
   if(!enfoque) enfoque=[_limpio(plan.ejercicioTerapeutico),_limpio(plan.terapiaManual),_limpio(plan.agentesFisicos)].filter(Boolean).join(', ');
   function row(k,val,last){ return '<tr'+(last?'':' style="border-bottom:0.5px solid #EEEFEC"')+'><td style="padding:7px 10px;font-weight:700;color:#3A3B38;font-size:10.5px;width:160px;vertical-align:top">'+k+'</td><td style="padding:7px 10px;color:#4A4B48;font-size:11px">'+_RPT_val(val)+'</td></tr>'; }
-  return '<div class="rc-sec-head" style="display:flex;align-items:center;gap:8px;margin:6px 0 8px">'
-    + '<span style="font-size:11.5px;font-weight:700;color:#2E3192;letter-spacing:0.5px;text-transform:uppercase;white-space:nowrap">Diagnóstico y plan</span>'
-    + '<span style="flex:1;height:1px;background:#E2E4E0"></span></div>'
+  return '<div class="rc-sec-head" style="display:flex;align-items:center;gap:10px;margin:18px 0 9px;background:#15325B;border-radius:7px;padding:7px 12px;-webkit-print-color-adjust:exact;print-color-adjust:exact">'
+    + '<span style="width:7px;height:19px;background:#C49A2E;border-radius:3px;display:inline-block;-webkit-print-color-adjust:exact;print-color-adjust:exact"></span>'
+    + '<span style="font-size:11.5px;font-weight:700;color:#fff;letter-spacing:1.2px;text-transform:uppercase">Diagnóstico y plan</span>'
+    + '</div>'
     + '<div class="rc-avoid" style="margin-bottom:12px"><table style="width:100%;border-collapse:collapse">'
     + row('Motivo de consulta', motivo)
     + row('Diagnóstico médico', dxMed)
@@ -21438,7 +21439,7 @@ function _RPT_htmlLineaVisual(p, sesiones){
     var sub=[it.ses,it.fechaTxt].filter(Boolean).join(' · ');
     return '<div class="rc-avoid" style="width:132px">'
       +'<div style="width:132px;height:132px;border-radius:8px;overflow:hidden;background:#0E1622;border:0.5px solid #E2E4E0">'+inner+'</div>'
-      +'<div style="font-size:9px;font-weight:800;color:#2E3192;margin-top:3px">Imagen '+(i+1)+(esVid?' (video)':'')+'</div>'
+      +'<div style="font-size:9px;font-weight:800;color:#15325B;margin-top:3px">Imagen '+(i+1)+(esVid?' (video)':'')+'</div>'
       +(it.etiqueta?('<div style="font-size:8.5px;color:#4A4B48;line-height:1.25">'+escapeHTML(it.etiqueta)+'</div>'):'')
       +(sub?('<div style="font-size:8px;color:#9497A2">'+escapeHTML(sub)+'</div>'):'')
       +'</div>';
@@ -21456,7 +21457,7 @@ function _RPT_htmlSoap(sesiones){
     var c=eva>=5?{bg:'#FCEBEB',fg:'#A32D2D'}:(eva>=3?{bg:'#FBF3E4',fg:'#8A5A0B'}:{bg:'#E1F5EE',fg:'#0F6E56'});
     return '<span style="background:'+c.bg+';color:'+c.fg+';padding:2px 8px;border-radius:9px;font-size:9px;font-weight:700;-webkit-print-color-adjust:exact;print-color-adjust:exact">'+eva+'/10</span>';
   }
-  var th='background:#1F5C4D;color:#fff;text-align:left;padding:7px 9px;font-size:9px;text-transform:uppercase;letter-spacing:0.5px;-webkit-print-color-adjust:exact;print-color-adjust:exact';
+  var th='background:#15325B;color:#fff;text-align:left;padding:7px 9px;font-size:9px;text-transform:uppercase;letter-spacing:0.5px;-webkit-print-color-adjust:exact;print-color-adjust:exact';
   var tdB='padding:8px 9px;border-bottom:0.5px solid #EEEFEC';
   // ¿algún registro tiene tratamiento estructurado? Si no, se omite también el header de esa columna.
   var hayP=orden.some(function(s){ return s.p && s.p.tratamiento && String(s.p.tratamiento).trim(); });
@@ -21467,7 +21468,7 @@ function _RPT_htmlSoap(sesiones){
     // texto_libre: sin tratamiento estructurado y con texto original → Hallazgos ancho completo, sin col Tratamiento.
     var textoLibre = !String(trat).trim() && !!String(s.textoOriginal||'').trim();
     var zebra=(idx%2===0)?'background:#FAFAF8;-webkit-print-color-adjust:exact;print-color-adjust:exact;':'';
-    var celS='<td style="'+tdB+'"><span style="font-weight:700">S'+escapeHTML(String((_posMap[String(s.id)]&&_posMap[String(s.id)].n)||''))+' · '+escapeHTML(_RPT_fechaCorta(s.fecha||s.date))+'</span><br><span style="font-size:8.5px;color:#9497A2">'+escapeHTML(s.terapeuta||'—')+'</span>'+((s.modoNota==='valoracion')?'<br><span style="font-size:8px;color:#1F5C4D;font-weight:800">📋 Valoración</span>':'')+((s.modoNota==='descarga')?'<br><span style="font-size:8px;color:#8A6D1A;font-weight:800">🙌 Descarga</span>':'')+'</td>';
+    var celS='<td style="'+tdB+'"><span style="font-weight:700">S'+escapeHTML(String((_posMap[String(s.id)]&&_posMap[String(s.id)].n)||''))+' · '+escapeHTML(_RPT_fechaCorta(s.fecha||s.date))+'</span><br><span style="font-size:8.5px;color:#9497A2">'+escapeHTML(s.terapeuta||'—')+'</span>'+((s.modoNota==='valoracion')?'<br><span style="font-size:8px;color:#15325B;font-weight:800">📋 Valoración</span>':'')+((s.modoNota==='descarga')?'<br><span style="font-size:8px;color:#8A6D1A;font-weight:800">🙌 Descarga</span>':'')+'</td>';
     var celD='<td style="'+tdB+'">'+pill(eva)+'</td>';
     if(textoLibre){
       var txt=String(s.textoOriginal||'').replace(/\s+/g,' ').slice(0,190);
@@ -21488,9 +21489,9 @@ function _RPT_htmlMetricas(p, sesiones){
   var evas=[]; sesiones.forEach(function(s){ var e=_RPT_evaDeSesion(s); if(e!=null) evas.push(e); });
   var ini=evas.length?evas[0]:null, act=evas.length?evas[evas.length-1]:null;
   var red=(ini!=null&&act!=null&&ini>0)?Math.round((ini-act)/ini*100):null;
-  function m(val,lbl){ return '<div style="text-align:center"><div style="font-size:22px;font-weight:700;line-height:1">'+val+'</div><div style="font-size:8px;letter-spacing:0.5px;text-transform:uppercase;color:#A8C8BC;margin-top:4px">'+lbl+'</div></div>'; }
+  function m(val,lbl){ return '<div style="text-align:center"><div style="font-size:22px;font-weight:700;line-height:1;color:#E8C96A;-webkit-print-color-adjust:exact;print-color-adjust:exact">'+val+'</div><div style="font-size:8px;letter-spacing:0.5px;text-transform:uppercase;color:#AEBEDC;margin-top:4px">'+lbl+'</div></div>'; }
   return _RPT_secHead(7,'Métricas del tratamiento')
-    + '<div class="rc-avoid" style="background:#1F5C4D;color:#fff;border-radius:8px;padding:16px 18px;display:grid;grid-template-columns:repeat(4,1fr);gap:16px;-webkit-print-color-adjust:exact;print-color-adjust:exact">'
+    + '<div class="rc-avoid" style="background:#15325B;color:#fff;border-radius:8px;padding:16px 18px;display:grid;grid-template-columns:repeat(4,1fr);gap:16px;-webkit-print-color-adjust:exact;print-color-adjust:exact">'
     + m((ini!=null?ini+'/10':'—'),'EVA 1ª sesión')
     + m((act!=null?act+'/10':'—'),'EVA última sesión')
     + m((red!=null?'↓ '+red+'%':'—'),'Reducción')
@@ -21792,7 +21793,7 @@ async function RPT_pintarPestanaReporte(pid, filtroEpisodio){
     }
     root.innerHTML='<div class="rpt-container">'
       + _RPT_css()
-      + '<div class="no-print" style="display:flex;justify-content:flex-end;margin-bottom:10px"><button onclick="RPT_imprimirReporte(\''+escapeAttr_(pid)+'\')" style="background:#2E3192;color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:6px">📄 Guardar / compartir PDF</button></div>'
+      + '<div class="no-print" style="display:flex;justify-content:flex-end;margin-bottom:10px"><button onclick="RPT_imprimirReporte(\''+escapeAttr_(pid)+'\')" style="background:#15325B;color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:6px">📄 Guardar / compartir PDF</button></div>'
       + selectorHTML
       // FASE C: título imprimible con el episodio seleccionado
       + (_filt.etiqueta?'<div class="rc-avoid" style="font-size:14px;font-weight:800;color:#1B3A6B;margin:0 0 8px;padding:6px 0;border-bottom:2px solid #1B3A6B">📄 Reporte del '+escapeHTML(_filt.etiqueta)+'</div>':'')
