@@ -1078,7 +1078,7 @@ function guardarPacientesConMerge_(ss, pacientes, meta) {
     ? sheet.getRange(2, 1, lastRow - 1, 1).getValues().flat()
     : [];
 
-  var guardados = 0, huboMerge = false, mergeWarning = false, saltadosMig = [];
+  var guardados = 0, huboMerge = false, mergeWarning = false, saltadosMig = [], fallidos = [];
 
   pacientes.forEach(function(pEntrante) {
     if (!pEntrante || !pEntrante.id) return;
@@ -1099,7 +1099,16 @@ function guardarPacientesConMerge_(ss, pacientes, meta) {
         existingIds.push(pEntrante.id);
         guardados++;
       } catch(eNew) {
-        try { guardarPacientes(ss, [pEntrante], meta); guardados++; mergeWarning = true; } catch(e2){}
+        // FIX pérdida silenciosa (caso Dulce): antes el fallo del alta (p.ej. fila/celda demasiado
+        // grande por base64) se tragaba con catch(e2){} y la función IGUAL devolvía ok:true → el
+        // cliente mostraba "✅ guardado" sin haber escrito nada. Ahora, si el fallback TAMBIÉN falla,
+        // se registra en `fallidos` para devolver ok:false (el cliente conserva local + encola + avisa).
+        try { guardarPacientes(ss, [pEntrante], meta); guardados++; mergeWarning = true; }
+        catch(e2){
+          fallidos.push(String(pEntrante.id));
+          Logger.log('[savePacientes] ALTA NO PERSISTIÓ id=' + pEntrante.id
+            + ' — append: ' + (eNew && eNew.message) + ' | fallback: ' + (e2 && e2.message));
+        }
       }
       return;
     }
@@ -1120,6 +1129,15 @@ function guardarPacientesConMerge_(ss, pacientes, meta) {
   });
 
   if (saltadosMig.length) _logGuardaMigSkip_(ss, saltadosMig, meta);
+
+  // FIX honestidad (caso Dulce): si algún paciente NO se pudo escribir, NUNCA reportar éxito. El
+  // cliente mapea ok:false → conserva local + encola + avisa (jamás un ✅ sobre un guardado que no
+  // ocurrió). Antes se devolvía ok:true aunque guardados fuera 0 → "se guarda y no se guarda".
+  if (fallidos.length) {
+    return {ok:false, error:'SAVE_INCOMPLETO', guardados:guardados,
+            fallidos:fallidos.length, idsFallidos:fallidos,
+            msg: fallidos.length + ' paciente(s) no se pudieron guardar en el Sheet (fila inválida/grande). Conservados localmente.'};
+  }
 
   var resp = {ok:true, guardados:guardados};
   if (huboMerge) resp.merged = true;
