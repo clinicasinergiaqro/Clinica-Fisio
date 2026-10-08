@@ -1078,7 +1078,7 @@ function guardarPacientesConMerge_(ss, pacientes, meta) {
     ? sheet.getRange(2, 1, lastRow - 1, 1).getValues().flat()
     : [];
 
-  var guardados = 0, huboMerge = false, mergeWarning = false, saltadosMig = [];
+  var guardados = 0, huboMerge = false, mergeWarning = false, saltadosMig = [], fallidos = [];
 
   pacientes.forEach(function(pEntrante) {
     if (!pEntrante || !pEntrante.id) return;
@@ -1099,7 +1099,16 @@ function guardarPacientesConMerge_(ss, pacientes, meta) {
         existingIds.push(pEntrante.id);
         guardados++;
       } catch(eNew) {
-        try { guardarPacientes(ss, [pEntrante], meta); guardados++; mergeWarning = true; } catch(e2){}
+        // FIX pérdida silenciosa (caso Dulce): antes el fallo del alta (p.ej. fila/celda demasiado
+        // grande por base64) se tragaba con catch(e2){} y la función IGUAL devolvía ok:true → el
+        // cliente mostraba "✅ guardado" sin haber escrito nada. Ahora, si el fallback TAMBIÉN falla,
+        // se registra en `fallidos` para devolver ok:false (el cliente conserva local + encola + avisa).
+        try { guardarPacientes(ss, [pEntrante], meta); guardados++; mergeWarning = true; }
+        catch(e2){
+          fallidos.push(String(pEntrante.id));
+          Logger.log('[savePacientes] ALTA NO PERSISTIÓ id=' + pEntrante.id
+            + ' — append: ' + (eNew && eNew.message) + ' | fallback: ' + (e2 && e2.message));
+        }
       }
       return;
     }
@@ -1120,6 +1129,15 @@ function guardarPacientesConMerge_(ss, pacientes, meta) {
   });
 
   if (saltadosMig.length) _logGuardaMigSkip_(ss, saltadosMig, meta);
+
+  // FIX honestidad (caso Dulce): si algún paciente NO se pudo escribir, NUNCA reportar éxito. El
+  // cliente mapea ok:false → conserva local + encola + avisa (jamás un ✅ sobre un guardado que no
+  // ocurrió). Antes se devolvía ok:true aunque guardados fuera 0 → "se guarda y no se guarda".
+  if (fallidos.length) {
+    return {ok:false, error:'SAVE_INCOMPLETO', guardados:guardados,
+            fallidos:fallidos.length, idsFallidos:fallidos,
+            msg: fallidos.length + ' paciente(s) no se pudieron guardar en el Sheet (fila inválida/grande). Conservados localmente.'};
+  }
 
   var resp = {ok:true, guardados:guardados};
   if (huboMerge) resp.merged = true;
@@ -2490,6 +2508,160 @@ function _claudeRouter_(body) {
     _claudeBitacora_(ss, 'claudeResolverSesion', 'id=' + idRS + ' sid=' + sidRS + ' fecha=' + fechaRS + ' ter=' + (terRS || '') + ' quita=' + quitRS.join('|') + ' http=' + codePRS);
     return respuesta({ ok: okRS, id: idRS, sesionId: sidRS, fecha: fechaRS || undefined, terapeuta: (terRS !== null ? terRS : undefined), revisionPendiente: pendRS, motivosRestantes: nuevosRS, http: codePRS, error: okRS ? undefined : (rPRS.getContentText() || '').slice(0, 200) });
   }
+
+  // INICIO MANTENIMIENTO TEMPORAL (conexion Claude) - QUITAR AL TERMINAR LA LIMPIEZA
+  // Acciones destructivas con candado CLAUDE_TOKEN. Borrado SIEMPRE SUAVE: respaldo a
+  // revision/ + entrada en papelera/ + tombstone (identico a _borrarPaciente del front) ->
+  // todo RESTAURABLE desde la papelera de la app. Para QUITAR: borrar este bloque completo
+  // (de "INICIO MANTENIMIENTO" a "FIN MANTENIMIENTO") y volver a desplegar (New version).
+  var _MNT_PROJ = PropertiesService.getScriptProperties().getProperty('FIRESTORE_PROJECT_ID') || 'clinicasinergia-ec2cf';
+  var _mntBase = function(){ return 'https://firestore.googleapis.com/v1/projects/' + _MNT_PROJ + '/databases/(default)/documents'; };
+  var _mntEnc  = function(obj){ var f = {}; for (var k in obj) { if (obj[k] !== undefined) f[k] = _fsEncodeValue_(obj[k]); } return { fields: f }; };
+  var _mntTok  = function(){ return _claudeFsToken_(); };
+  var _mntGet  = function(path){ var t=_mntTok(); if(!t) return null; var r=UrlFetchApp.fetch(_mntBase()+'/'+path,{method:'get',headers:{Authorization:'Bearer '+t},muteHttpExceptions:true}); if(r.getResponseCode()!==200) return null; return _fsDecodeFields_((JSON.parse(r.getContentText()||'{}').fields)||{}); };
+  var _mntPatch = function(path, obj, mask){ var t=_mntTok(); var q = (mask&&mask.length) ? ('?'+mask.map(function(m){return 'updateMask.fieldPaths='+encodeURIComponent(m);}).join('&')) : ''; var r=UrlFetchApp.fetch(_mntBase()+'/'+path+q,{method:'patch',contentType:'application/json',headers:{Authorization:'Bearer '+t},muteHttpExceptions:true,payload:JSON.stringify(_mntEnc(obj))}); return r.getResponseCode(); };
+  var _mntCreate = function(coll, obj){ var t=_mntTok(); var r=UrlFetchApp.fetch(_mntBase()+'/'+coll,{method:'post',contentType:'application/json',headers:{Authorization:'Bearer '+t},muteHttpExceptions:true,payload:JSON.stringify(_mntEnc(obj))}); return {code:r.getResponseCode(), name:((JSON.parse(r.getContentText()||'{}')||{}).name||'')}; };
+  var _mntListSub = function(path){ var t=_mntTok(); var out=[]; var pg=''; do { var u=_mntBase()+'/'+path+'?pageSize=300'+(pg?('&pageToken='+encodeURIComponent(pg)):''); var r=UrlFetchApp.fetch(u,{method:'get',headers:{Authorization:'Bearer '+t},muteHttpExceptions:true}); if(r.getResponseCode()!==200) break; var j=JSON.parse(r.getContentText()||'{}'); (j.documents||[]).forEach(function(d){ out.push({id:String(d.name||'').split('/').pop(), data:_fsDecodeFields_(d.fields||{})}); }); pg=j.nextPageToken||''; } while(pg); return out; };
+  var _mntVacio = function(v){ if (v===null||v===undefined) return true; if (typeof v==='string'){ var t=v.trim().toLowerCase(); return (!t || /^(pendiente|no cuenta con diagn|sin diagn|no especificad|ninguna|ninguno|n\/?d|n\/?a|—|-|\[pendiente\])/.test(t)); } if (Array.isArray(v)) return v.length===0; if (typeof v==='object'){ for (var k in v){ if (!_mntVacio(v[k])) return false; } return true; } return false; };
+  var _mntTombstonePac = function(pid, borradoPor, ts, esHist){
+    var pref = 'pacientes/' + encodeURIComponent(pid);
+    var doc = _mntGet(pref);
+    if (!doc) return { ok:false, msg:'doc no existe en Firestore' };
+    var revId = (esHist?'pacHist':'pacAct') + '__' + pid + '__' + ts;
+    var cBk = _mntPatch('revision/' + encodeURIComponent(revId), { tipo:(esHist?'pacienteHistorico':'pacienteActivo'), pid:pid, ts:ts, borradoPor:borradoPor, nombre:(doc.name||pid), paciente:doc, origen:'claude-mantenimiento' }, null);
+    if (cBk<200||cBk>=300) return { ok:false, msg:'backup revision/ fallo http '+cBk };
+    var ses = _mntListSub(pref + '/sesiones');
+    var nSes = ses.length, backOK=0;
+    ses.forEach(function(s){ var c=_mntPatch('revision/'+encodeURIComponent(revId)+'/sesiones/'+encodeURIComponent(s.id), s.data, null); if(c>=200&&c<300) backOK++; });
+    if (backOK !== nSes) return { ok:false, msg:'backup sesiones incompleto ('+backOK+'/'+nSes+') - NO se borro' };
+    var pap = _mntCreate('papelera', { tipo:(esHist?'pacienteHistorico':'pacienteActivo'), pid:pid, nombre:(doc.name||pid), numSesiones:nSes, ts:ts, borradoPor:borradoPor, revId:revId, origen:'claude-mantenimiento' });
+    if (pap.code<200||pap.code>=300) return { ok:false, msg:'papelera/ fallo http '+pap.code };
+    _mntPatch(pref, { eliminado:true, eliminadoPor:borradoPor, eliminadoFecha:new Date(ts).toISOString() }, ['eliminado','eliminadoPor','eliminadoFecha']);
+    if (!esHist) {
+      _mntPatch('pacientesEliminados/' + encodeURIComponent('pacienteActivo__'+pid), { tipo:'pacienteActivo', id:pid, eliminadoPor:borradoPor, eliminadoFecha:new Date(ts).toISOString() }, null);
+    }
+    return { ok:true, revId:revId, papId:(pap.name.split('/').pop()||''), numSesiones:nSes };
+  };
+
+  if (action === 'claudeBorrarEstudio') {
+    var idBE = String(body.id||'').trim();
+    var keyBE = String(body.estudioId||body.name||body.url||'').trim();
+    if (!idBE || !keyBE) return respuesta({ ok:false, error:'Falta id y (estudioId|name|url)', code:400 });
+    var docBE = _claudeFsGetDoc_(idBE); if (!docBE) return respuesta({ ok:false, error:'Paciente no existe en FS', code:404 });
+    var arrBE = Array.isArray(docBE.estudiosDocs) ? docBE.estudiosDocs.slice() : [];
+    var quitados = arrBE.filter(function(e){ return e && (String(e.id)===keyBE || String(e.name)===keyBE || String(e.url)===keyBE); });
+    if (!quitados.length) return respuesta({ ok:true, removed:0, msg:'No habia estudio con ese id/name/url (idempotente)' });
+    var nuevoBE = arrBE.filter(function(e){ return !(e && (String(e.id)===keyBE || String(e.name)===keyBE || String(e.url)===keyBE)); });
+    var tsBE = Date.now();
+    _mntPatch('revision/' + encodeURIComponent('estudio__'+idBE+'__'+tsBE), { tipo:'estudioBorrado', pid:idBE, ts:tsBE, quitados:quitados, origen:'claude-mantenimiento' }, null);
+    var cBE = _mntPatch('pacientes/'+encodeURIComponent(idBE), { estudiosDocs:nuevoBE, ultimoUsuario:'CLAUDE' }, ['estudiosDocs','ultimoUsuario']);
+    _claudeBitacora_(ss,'claudeBorrarEstudio','id='+idBE+' key='+keyBE+' quitados='+quitados.length+' http='+cBE);
+    return respuesta({ ok:(cBE>=200&&cBE<300), id:idBE, removed:quitados.length, http:cBE });
+  }
+
+  if (action === 'claudeReemplazarEstudio') {
+    var idRE = String(body.id||'').trim();
+    var eidRE = String(body.estudioId||'').trim();
+    var b64RE = String(body.base64||body.contenido||'');
+    if (!idRE || !eidRE || !b64RE) return respuesta({ ok:false, error:'Falta id, estudioId o base64', code:400 });
+    if (b64RE.indexOf(',')>=0 && /^data:/.test(b64RE)) b64RE=b64RE.slice(b64RE.indexOf(',')+1);
+    var docRE = _claudeFsGetDoc_(idRE); if (!docRE) return respuesta({ ok:false, error:'Paciente no existe en FS', code:404 });
+    var arrRE = Array.isArray(docRE.estudiosDocs) ? docRE.estudiosDocs.slice() : [];
+    var ixRE = -1; for (var i=0;i<arrRE.length;i++){ if (arrRE[i] && String(arrRE[i].id)===eidRE){ ixRE=i; break; } }
+    if (ixRE<0) return respuesta({ ok:false, error:'No existe estudio con id '+eidRE, code:404 });
+    var bytesRE=Utilities.base64Decode(b64RE);
+    if (!bytesRE||!bytesRE.length) return respuesta({ ok:false, error:'imagen vacia', code:400 });
+    if (bytesRE.length>20000000) return respuesta({ ok:false, error:'muy_grande', code:400 });
+    var nomRE = String(body.name||arrRE[ixRE].name||'estudio').trim()||'estudio';
+    var mimeRE = String(body.mime||body.contentType|| (/\.png$/i.test(nomRE)?'image/png':(/\.pdf$/i.test(nomRE)?'application/pdf':'image/jpeg')));
+    var tokRWre=_claudeStorageTokenRW_(); if(!tokRWre) return respuesta({ ok:false, error:'Sin credenciales Storage', code:500 });
+    var tsRE=Date.now()+'_'+Math.random().toString(36).slice(2,6);
+    var pathRE='clinica/sinergia/'+idRE+'/estudios/'+tsRE+'_'+nomRE.replace(/[^\w.\-]+/g,'_');
+    var tokenDre=Utilities.getUuid();
+    var bndRE='claudebnd'+Utilities.getUuid().replace(/-/g,'');
+    var preRE='--'+bndRE+'\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n'+JSON.stringify({name:pathRE,contentType:mimeRE,metadata:{firebaseStorageDownloadTokens:tokenDre}})+'\r\n--'+bndRE+'\r\nContent-Type: '+mimeRE+'\r\n\r\n';
+    var payloadRE=Utilities.newBlob(preRE).getBytes().concat(bytesRE).concat(Utilities.newBlob('\r\n--'+bndRE+'--').getBytes());
+    var upRE=UrlFetchApp.fetch('https://storage.googleapis.com/upload/storage/v1/b/'+encodeURIComponent(CLAUDE_STORAGE_BUCKET)+'/o?uploadType=multipart',{ method:'post', contentType:'multipart/related; boundary='+bndRE, payload:payloadRE, headers:{Authorization:'Bearer '+tokRWre}, muteHttpExceptions:true });
+    if (upRE.getResponseCode()<200||upRE.getResponseCode()>=300) return respuesta({ ok:false, error:'storage_'+upRE.getResponseCode(), code:502 });
+    var urlRE='https://firebasestorage.googleapis.com/v0/b/'+CLAUDE_STORAGE_BUCKET+'/o/'+encodeURIComponent(pathRE)+'?alt=media&token='+tokenDre;
+    var oldPath = arrRE[ixRE].fbPath||'';
+    arrRE[ixRE].url = urlRE; arrRE[ixRE].fbPath = pathRE; arrRE[ixRE].type = mimeRE;
+    arrRE[ixRE].tipo = (/^image\//.test(mimeRE)?'imagen':'documento');
+    if (body.name) arrRE[ixRE].name = nomRE;
+    arrRE[ixRE].corregidoPor='CLAUDE'; arrRE[ixRE].corregidoFecha=new Date().toISOString(); if(oldPath) arrRE[ixRE].fbPathAnterior=oldPath;
+    var cRE = _mntPatch('pacientes/'+encodeURIComponent(idRE), { estudiosDocs:arrRE, ultimoUsuario:'CLAUDE' }, ['estudiosDocs','ultimoUsuario']);
+    _claudeBitacora_(ss,'claudeReemplazarEstudio','id='+idRE+' eid='+eidRE+' path='+pathRE+' http='+cRE);
+    return respuesta({ ok:(cRE>=200&&cRE<300), id:idRE, estudioId:eidRE, url:urlRE, http:cRE });
+  }
+
+  if (action === 'claudeBorrarPaciente') {
+    var idBP = String(body.id||'').trim();
+    if (!idBP) return respuesta({ ok:false, error:'Falta id', code:400 });
+    var esHistBP = idBP.indexOf('mig_pac_')===0;
+    var tsBP = Date.now();
+    var porBP = 'CLAUDE/lftaranda@gmail.com';
+    var tomb = _mntTombstonePac(idBP, porBP, tsBP, esHistBP);
+    if (!tomb.ok) { _claudeBitacora_(ss,'claudeBorrarPaciente','id='+idBP+' ABORTADO: '+tomb.msg); return respuesta({ ok:false, error:tomb.msg, code:500 }); }
+    var sheetDeleted = false;
+    if (!esHistBP) {
+      var _lkBP=LockService.getScriptLock(); var gotLk=false;
+      try { _lkBP.waitLock(15000); gotLk=true; } catch(eLk){}
+      if (gotLk) { try {
+        var shBP=getOrCreateSheet(ss); var lrBP=shBP.getLastRow();
+        if (lrBP>1){ var colBP=shBP.getRange(2,1,lrBP-1,1).getValues(); for (var di=0; di<colBP.length; di++){ if (String(colBP[di][0]).trim()===idBP){ shBP.deleteRow(di+2); sheetDeleted=true; break; } } }
+      } finally { try{_lkBP.releaseLock();}catch(_r){} } }
+      try {
+        var tokQ=_mntTok();
+        var q={ structuredQuery:{ from:[{collectionId:'pacientes'}], where:{ fieldFilter:{ field:{fieldPath:'appSourceId'}, op:'EQUAL', value:{stringValue:idBP} } }, limit:5 } };
+        var rQ=UrlFetchApp.fetch(_mntBase()+':runQuery',{method:'post',contentType:'application/json',headers:{Authorization:'Bearer '+tokQ},muteHttpExceptions:true,payload:JSON.stringify(q)});
+        if (rQ.getResponseCode()===200){ var rowsQ=JSON.parse(rQ.getContentText()||'[]'); var espIds=[]; (rowsQ||[]).forEach(function(r){ if(r&&r.document&&r.document.name){ espIds.push(String(r.document.name).split('/').pop()); } }); if (espIds.length===1){ _mntPatch('pacientes/'+encodeURIComponent(espIds[0]), { eliminado:true, eliminadoPor:porBP, eliminadoFecha:new Date(tsBP).toISOString() }, ['eliminado','eliminadoPor','eliminadoFecha']); } }
+      } catch(_eQ){}
+    }
+    _claudeBitacora_(ss,'claudeBorrarPaciente','id='+idBP+' hist='+esHistBP+' ses='+tomb.numSesiones+' sheet='+sheetDeleted+' rev='+tomb.revId);
+    return respuesta({ ok:true, id:idBP, historico:esHistBP, numSesiones:tomb.numSesiones, sheetDeleted:sheetDeleted, revId:tomb.revId, papeleraId:tomb.papId, restaurable:true });
+  }
+
+  if (action === 'claudeFusionarPacientes') {
+    var pPri = String(body.idPrincipal||'').trim(), pSec = String(body.idSecundario||'').trim();
+    if (!pPri || !pSec) return respuesta({ ok:false, error:'Falta idPrincipal o idSecundario', code:400 });
+    if (pPri===pSec) return respuesta({ ok:false, error:'idPrincipal == idSecundario', code:400 });
+    var moverSes = (body.moverSesiones===false) ? false : true;
+    var dPri = _claudeFsGetDoc_(pPri), dSec = _claudeFsGetDoc_(pSec);
+    if (!dPri) return respuesta({ ok:false, error:'Principal no existe en FS', code:404 });
+    if (!dSec) return respuesta({ ok:false, error:'Secundario no existe en FS', code:404 });
+    var tsMg = Date.now();
+    _mntPatch('revision/'+encodeURIComponent('merge__'+pPri+'__'+pSec+'__'+tsMg), { tipo:'merge', idPrincipal:pPri, idSecundario:pSec, ts:tsMg, principal:dPri, secundario:dSec, origen:'claude-mantenimiento' }, null);
+    var mergeArr = function(a,b,keyf){ var out=Array.isArray(a)?a.slice():[]; var seen={}; out.forEach(function(x){ if(x){ seen[keyf(x)]=1; } }); (Array.isArray(b)?b:[]).forEach(function(x){ if(x && !seen[keyf(x)]){ out.push(x); seen[keyf(x)]=1; } }); return out; };
+    var kEst=function(e){ return String((e&&(e.url||e.name||e.id))||''); };
+    var campos = {};
+    campos.estudiosDocs = mergeArr(dPri.estudiosDocs, dSec.estudiosDocs, kEst);
+    campos.fotos = mergeArr(dPri.fotos, dSec.fotos, kEst);
+    campos.docs  = mergeArr(dPri.docs,  dSec.docs,  kEst);
+    ['dx','motivoConsulta','motivo','motivoHC','dxFuncional','planTto','antecedentes','alergias','contraindicaciones','seguridadClinica','valoracion','sexo','fechaNacimiento','age','terapeuta'].forEach(function(k){
+      if (_mntVacio(dPri[k]) && !_mntVacio(dSec[k])) campos[k] = dSec[k];
+    });
+    var maskMg=[], camposMg={}; Object.keys(campos).forEach(function(k){ camposMg[k]=campos[k]; maskMg.push(k); });
+    camposMg.ultimoUsuario='CLAUDE'; maskMg.push('ultimoUsuario');
+    var cMg = _mntPatch('pacientes/'+encodeURIComponent(pPri), camposMg, maskMg);
+    if (cMg<200||cMg>=300) { _claudeBitacora_(ss,'claudeFusionarPacientes','ABORT escribir principal http='+cMg); return respuesta({ ok:false, error:'No se pudo escribir el principal http '+cMg, code:500 }); }
+    var sesMovidas=0, sesTotal=0;
+    if (moverSes) {
+      var sPri = _mntListSub('pacientes/'+encodeURIComponent(pPri)+'/sesiones');
+      var firmaPri={}; sPri.forEach(function(s){ var d=s.data||{}; firmaPri[String(d.fecha||'')+'#'+String(d.num||'')+'#'+String((d.textoOriginal||'')).slice(0,40)]=1; });
+      var sSec = _mntListSub('pacientes/'+encodeURIComponent(pSec)+'/sesiones'); sesTotal=sSec.length;
+      sSec.forEach(function(s){ var d=s.data||{}; var fg=String(d.fecha||'')+'#'+String(d.num||'')+'#'+String((d.textoOriginal||'')).slice(0,40); if(firmaPri[fg]) return; var nid=String(s.id)+'__mg'+tsMg; var c=_mntPatch('pacientes/'+encodeURIComponent(pPri)+'/sesiones/'+encodeURIComponent(nid), d, null); if(c>=200&&c<300){ sesMovidas++; firmaPri[fg]=1; } });
+    }
+    var esHistSec = pSec.indexOf('mig_pac_')===0;
+    var tombSec = _mntTombstonePac(pSec, 'CLAUDE/merge->'+pPri, tsMg, esHistSec);
+    if (!esHistSec) {
+      var _lkMg=LockService.getScriptLock(); try{ _lkMg.waitLock(15000);
+        var shMg=getOrCreateSheet(ss); var lrMg=shMg.getLastRow(); if(lrMg>1){ var colMg=shMg.getRange(2,1,lrMg-1,1).getValues(); for(var dj=0; dj<colMg.length; dj++){ if(String(colMg[dj][0]).trim()===pSec){ shMg.deleteRow(dj+2); break; } } }
+      } catch(eLkm){} finally { try{_lkMg.releaseLock();}catch(_rm){} }
+    }
+    _claudeBitacora_(ss,'claudeFusionarPacientes','pri='+pPri+' sec='+pSec+' estudios='+(campos.estudiosDocs?campos.estudiosDocs.length:0)+' sesMovidas='+sesMovidas+'/'+sesTotal+' secBorrado='+(tombSec&&tombSec.ok));
+    return respuesta({ ok:true, idPrincipal:pPri, idSecundario:pSec, estudiosEnPrincipal:(campos.estudiosDocs?campos.estudiosDocs.length:0), sesionesMovidas:sesMovidas, sesionesSecundario:sesTotal, secundarioBorrado:(tombSec&&tombSec.ok)||false, revMergeTs:tsMg, restaurable:true });
+  }
+  // FIN MANTENIMIENTO TEMPORAL - quitar este bloque al terminar
 
   return respuesta({ ok: false, error: 'Acción claude no reconocida: ' + action, code: 400 });
 }

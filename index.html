@@ -1939,12 +1939,16 @@ function saveLocal(k,v){
     var esCuota = !!(e && (e.name==='QuotaExceededError' || e.code===22 || e.code===1014
       || /quota/i.test((e.name||'')+' '+(e.message||''))));
     if(esCuota){
-      // Respaldo local (localStorage) lleno: el límite chico de Safari por sitio se satura con muchos
-      // pacientes. La nube (Sheets/Firestore) YA tiene los datos y la app se rehidrata de ahí al recargar,
-      // así que esto NO pierde nada. El toast que se mostraba a todos se quitó por ruido (decisión Carlos):
-      // queda solo en consola para diagnóstico. Fix de fondo pendiente: mover el respaldo a IndexedDB.
+      // Respaldo local (localStorage) lleno: el límite chico por sitio se satura con muchos pacientes.
+      // El respaldo durable en IndexedDB (arriba) SÍ se escribió, así que el dato no se pierde aquí.
+      // FIX silencio peligroso (caso Dulce): el toast se había quitado por ruido (decisión Carlos), pero
+      // si además la nube falló (alta no sincronizada) el expediente se perdía MUDO. Se avisa UNA sola
+      // vez por sesión (no en cada guardado, para no volver al ruido) para que liberen espacio.
+      if(!window._quotaAvisado){
+        try{ showToastCritico_('⚠️ Memoria local llena en este equipo. Libera espacio o avisa al administrador — puede fallar el guardado local.'); }catch(_){}
+      }
       window._quotaAvisado = true;
-      console.warn('saveLocal QUOTA (respaldo local lleno; datos en la nube):', e && e.message);
+      console.warn('saveLocal QUOTA (respaldo local lleno):', e && e.message);
     } else {
       console.warn('saveLocal error:', e.message);   // otros errores: comportamiento igual que hoy
     }
@@ -2186,11 +2190,15 @@ async function saveDB(k, v, opts){
         }:null
       })),
       // AUDITORÍA pLimpio: source/pages/scannerMeta (trazabilidad del escáner clínico) se caían al
-      // viajar a Sheets en activos → se pasan por referencia. `data`: base64 de respaldo SOLO si es
-      // imagen sin puntero (mismo criterio que ejercicios.media), para no perder el binario agregado
-      // offline al recargar en otro equipo; recuperable además por IDB (mediaId) en el mismo equipo.
-      fotos: (Array.isArray(p.fotos)?p.fotos:[]).map(f=>({id:f.id||f.mediaId||'',patientId:f.patientId||'',patientName:f.patientName||'',categoria:f.categoria||'foto',name:f.name||'',originalFileName:f.originalFileName||f.name||'',safeFileName:f.safeFileName||'',label:f.label||'',type:f.type||'',mimeType:f.mimeType||f.type||'',kind:f.kind||'',sizeBytes:f.sizeBytes||0,storageProvider:f.url?'firebase':(f.storageProvider||''),fbPath:f.fbPath||'',url:f.url||'',mediaId:f.mediaId||'',subidoPor:f.subidoPor||'',uploadedBy:f.uploadedBy||f.subidoPor||'',fecha:f.fecha||'',fechaCreacion:f.fechaCreacion||f.fecha||'',source:f.source||'',pages:(typeof f.pages==='number'?f.pages:null),scannerMeta:f.scannerMeta||null,data:(f.url?null:((f.data&&String(f.data).startsWith('data:image/'))?f.data:null)),isDeleted:f.isDeleted||false})),
-      docs: (Array.isArray(p.docs)?p.docs:[]).map(d=>({id:d.id||d.mediaId||'',patientId:d.patientId||'',patientName:d.patientName||'',categoria:d.categoria||'doc',name:d.name||'',originalFileName:d.originalFileName||d.name||'',safeFileName:d.safeFileName||'',label:d.label||'',type:d.type||'',mimeType:d.mimeType||d.type||'',kind:d.kind||'',sizeBytes:d.sizeBytes||0,storageProvider:d.url?'firebase':(d.storageProvider||''),fbPath:d.fbPath||'',url:d.url||'',mediaId:d.mediaId||'',subidoPor:d.subidoPor||'',uploadedBy:d.uploadedBy||d.subidoPor||'',fecha:d.fecha||'',fechaCreacion:d.fechaCreacion||d.fecha||'',source:d.source||'',pages:(typeof d.pages==='number'?d.pages:null),scannerMeta:d.scannerMeta||null,data:(d.url?null:((d.data&&String(d.data).startsWith('data:image/'))?d.data:null)),isDeleted:d.isDeleted||false})),
+      // viajar a Sheets en activos → se pasan por referencia.
+      // FIX CELDA (caso Dulce): `data` (base64) ya NO viaja al Sheet. Una sola foto en base64 rebasa el
+      // límite de celda de Google Sheets (~50000 chars) → appendRow truena → ANTES el backend se lo
+      // tragaba y confirmaba un ✅ FALSO → se perdía el EXPEDIENTE COMPLETO por respaldar una imagen.
+      // El binario sigue a salvo local (patientsDB en memoria + IndexedDB por mediaId) y sube a Storage
+      // (url) + se espeja a Firestore; en otro equipo se ve en cuanto termina esa subida. Vale mil veces
+      // más no perder el expediente que respaldar en el Sheet una foto que aún no sube.
+      fotos: (Array.isArray(p.fotos)?p.fotos:[]).map(f=>({id:f.id||f.mediaId||'',patientId:f.patientId||'',patientName:f.patientName||'',categoria:f.categoria||'foto',name:f.name||'',originalFileName:f.originalFileName||f.name||'',safeFileName:f.safeFileName||'',label:f.label||'',type:f.type||'',mimeType:f.mimeType||f.type||'',kind:f.kind||'',sizeBytes:f.sizeBytes||0,storageProvider:f.url?'firebase':(f.storageProvider||''),fbPath:f.fbPath||'',url:f.url||'',mediaId:f.mediaId||'',subidoPor:f.subidoPor||'',uploadedBy:f.uploadedBy||f.subidoPor||'',fecha:f.fecha||'',fechaCreacion:f.fechaCreacion||f.fecha||'',source:f.source||'',pages:(typeof f.pages==='number'?f.pages:null),scannerMeta:f.scannerMeta||null,data:null,isDeleted:f.isDeleted||false})),
+      docs: (Array.isArray(p.docs)?p.docs:[]).map(d=>({id:d.id||d.mediaId||'',patientId:d.patientId||'',patientName:d.patientName||'',categoria:d.categoria||'doc',name:d.name||'',originalFileName:d.originalFileName||d.name||'',safeFileName:d.safeFileName||'',label:d.label||'',type:d.type||'',mimeType:d.mimeType||d.type||'',kind:d.kind||'',sizeBytes:d.sizeBytes||0,storageProvider:d.url?'firebase':(d.storageProvider||''),fbPath:d.fbPath||'',url:d.url||'',mediaId:d.mediaId||'',subidoPor:d.subidoPor||'',uploadedBy:d.uploadedBy||d.subidoPor||'',fecha:d.fecha||'',fechaCreacion:d.fechaCreacion||d.fecha||'',source:d.source||'',pages:(typeof d.pages==='number'?d.pages:null),scannerMeta:d.scannerMeta||null,data:null,isDeleted:d.isDeleted||false})),
       ejerciciosToken: p.ejerciciosToken||'',
       ejerciciosLinkActivo: p.ejerciciosLinkActivo||false,
       creadoPor: p.creadoPor||'',
@@ -2303,8 +2311,19 @@ async function saveDB(k, v, opts){
           showToastCritico_('⚠️ Conflicto de versiones — tus cambios se conservaron localmente. Recarga y sincroniza.');
           errores++; ok=false; break;
         }
-        // H-01: backend mergeó arrays clínicos — tratar como éxito
-        if(d && d.ok){ ok=true; if(d.merged) console.log('[Sync] Paciente mergeado en backend:',p.id); break; }
+        // FIX pérdida silenciosa (caso Dulce): el backend aceptó la llamada pero NO escribió a este
+        // paciente (fila inválida/grande). Conservar local + encolar + avisar; sin reintento en bucle
+        // (fallaría igual). El drenador lo reintentará cuando la causa (p.ej. foto sin subir) se resuelva.
+        if(d?.error==='SAVE_INCOMPLETO'){
+          encolarSync(p.id);
+          showToastCritico_('⚠️ No se pudo guardar en la nube — tus cambios quedaron en este equipo y se reintentarán.');
+          errores++; ok=false; break;
+        }
+        // H-01: backend mergeó arrays clínicos — tratar como éxito.
+        // FIX ✅ FALSO (caso Dulce): exigir que el backend confirme guardados!==0. Antes bastaba d.ok,
+        // pero el backend podía devolver {ok:true, guardados:0} (alta que falló en silencio) → se
+        // mostraba "✅ guardado" sin persistir. Ahora guardados:0 cae a reintento/encolar, no a éxito.
+        if(d && d.ok && d.guardados!==0){ ok=true; if(d.merged) console.log('[Sync] Paciente mergeado en backend:',p.id); break; }
         else console.warn(`saveDB POST intento ${intento}:`, d);
       }catch(e){
         console.warn(`saveDB intento ${intento} error:`, e.message);
@@ -3391,6 +3410,27 @@ async function loadFromCloud(){
             local=_idbPts;
             console.warn('[RESPALDO] patientsDB recuperado de IndexedDB tras desalojo de localStorage: '+_idbPts.length);
             try{ showToast('🛟 Recuperé '+_idbPts.length+' paciente(s) del respaldo local','success'); }catch(_){}
+          }
+        }catch(_){}
+      } else {
+        // FIX pérdida silenciosa (caso Dulce): si localStorage NO está vacío pero quedó DESACTUALIZADO
+        // (un alta cuyo setItem falló por cuota llena → el paciente solo quedó en IndexedDB), unir los
+        // que estén en el respaldo durable de IDB pero NO en localStorage. Antes IDB solo se leía con
+        // localStorage TOTALMENTE vacío → un alta no-sincronizada se perdía de vista aunque estuviera
+        // a salvo en IDB. Solo AÑADE lo que falta (por id); nunca pisa lo local ni resucita borrados
+        // (el backup refleja el último patientsDB → un paciente borrado no está en él).
+        try{
+          const _idbPts = (typeof idbGet==='function') ? await idbGet('__pts_backup__') : null;
+          if(Array.isArray(_idbPts) && _idbPts.length){
+            const _idsLocal = new Set(local.map(function(x){ return x && x.id; }));
+            const _strays = _idbPts.filter(function(x){ return x && x.id && !_idsLocal.has(x.id)
+              && !String(x.id).startsWith('mig_pac_')
+              && !(typeof _esPacienteTest==='function' && _esPacienteTest(x)); });
+            if(_strays.length){
+              local = local.concat(_strays);
+              console.warn('[RESPALDO] '+_strays.length+' paciente(s) solo en IndexedDB (localStorage lleno/desactualizado) unidos para no perderlos');
+              try{ showToast('🛟 Recuperé '+_strays.length+' paciente(s) no sincronizado(s) del respaldo local','success'); }catch(_){}
+            }
           }
         }catch(_){}
       }

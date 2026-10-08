@@ -29,6 +29,14 @@ Esto nos pasa UNA Y OTRA VEZ, así que es regla de oro en todo lo que toque paci
 
 # Trabajo pendiente
 
+## [TEMPORAL] Acciones de mantenimiento en el backend (Claude) — QUITAR AL TERMINAR
+Se agregaron 4 acciones `claude*` a `config/Codigo.gs` (dentro de `_claudeRouter_`, justo antes del `return` de "Acción claude no reconocida"), en un bloque marcado `INICIO/FIN MANTENIMIENTO TEMPORAL`, con candado `CLAUDE_TOKEN`:
+- `claudeBorrarEstudio` (quita un estudio por estudioId|name|url; respaldo en `revision/`).
+- `claudeReemplazarEstudio` (reemplaza la imagen de un estudio EN SU LUGAR, sin duplicar; sube a Storage y cambia url/fbPath/type del mismo item). → para enderezar/recortar recetas.
+- `claudeBorrarPaciente` (borrado SUAVE: respaldo a `revision/` + `papelera/` + tombstones idénticos a `_borrarPaciente`; activos también borran fila del Sheet + marcan espejo `appSourceId`). RESTAURABLE.
+- `claudeFusionarPacientes` (principal gana; une estudiosDocs/fotos/docs, rellena SOLO campos vacíos, mueve sesiones con dedup; respalda ambos en `revision/`; borra suave el secundario). RESTAURABLE.
+ESTADO: código integrado en el repo, **pendiente de que Carlos despliegue** (Apps Script → pegar/guardar → Deploy → New version). NO validado por `node` (el sandbox bloqueó Bash); Apps Script valida al guardar. PROBAR con UN caso de prueba (reemplazar 1 receta / borrar 1 paciente de prueba) y verificar bitácora ANTES de barridos. USOS: enderezar recetas torcidas (reemplazar), quitar duplicados de Fausto (`receta_dr_larranaga_rotura_patelar_izq…` y `receta_dr_castellanos_tendon_rotuliano_izq…` del pid p375160b5), fusionar los 3 dobles (#12), limpiar test/papelera. **QUITAR el bloque y redeploy cuando termine la limpieza.**
+
 ## PRIORIDAD — Migrar pacientes ACTIVOS a Firestore (agendado: fin de semana)
 Motivo: hoy el expediente vive partido en dos backends (Sheets = historia de activos; Firestore = SOAP/históricos/live), cada uno con su propia lista de permisos desplegada a mano. Ese diseño es la RAÍZ de las fugas (caso Jess: Firestore la autorizaba pero el Sheets desplegado no; Storage sin `.lower()` y sin Dulce; clobber cross-device; límites de celda/lock de Sheets). Unificar en Firestore cierra la clase entera de problema.
 Hacerlo POR FASES y PROBANDO cada una (una migración a las prisas ya rompió la lectura antes → "no carga"):
