@@ -19,6 +19,25 @@ Esto nos pasa UNA Y OTRA VEZ, así que es regla de oro en todo lo que toque paci
 - Origen de bugs repetidos: click mudo, conteos cortos (ej. médicos/recetas), "no carga", pacientes que "desaparecen". Antes de entregar cualquier feature de pacientes, preguntarse: **¿esto funciona si el paciente es migrado?** Si no, arreglarlo primero.
 - Norte de largo plazo: la migración de activos a Firestore (Fase 3) es justo para que esta distinción deje de existir; mientras tanto, el código la absorbe tratándolos igual.
 
+## REGLA PERMANENTE — INTEGRIDAD DE GUARDADO (un "✅ guardado" DEBE significar que SÍ se guardó)
+Esto ya nos costó expedientes (caso Dulce: se perdieron 2 pacientes nuevos, ambos de ella, mostrando "✅ Historia clínica guardada correctamente"; nunca llegaron a Sheet/Firestore/SOAP — PR #441). Causa: una optimización de rendimiento (PR #336 volvió el respaldo local coalescido/diferido) destapó un bug viejo del backend que confirmaba guardados que no ocurrían. **Lección: cualquier cambio —sobre todo de RENDIMIENTO— en la ruta de guardado puede causar PÉRDIDA SILENCIOSA de datos clínicos. Antes de tocar esa ruta, releer esto y preservar TODOS estos invariantes:**
+- **El backend NUNCA reporta éxito sobre un guardado que no ocurrió.** `guardarPacientesConMerge_` devuelve `{ok:false, error:'SAVE_INCOMPLETO'}` si algún alta no se escribió (no tragarse el `appendRow` fallido con un `catch` mudo).
+- **El cliente verifica de verdad.** `saveDB` exige `d.ok && d.guardados!==0` para dar por bueno; maneja `SAVE_INCOMPLETO`/`LOCK_TIMEOUT`/`MERGE_ERROR`/`AUTH_REQUIRED` conservando local + encolando + avisando. Nunca mostrar "✅" solo por `d.ok`.
+- **Base64 JAMÁS a una celda del Sheet.** Una foto en base64 rebasa el límite de celda (~50000) y revienta la fila → se perdía el expediente completo. `pLimpio.fotos/docs` mandan `data:null`; el binario vive en IndexedDB(mediaId)+Storage(url)+espejo Firestore.
+- **Respaldo local durable e inmediato en altas.** Un alta se vuelca YA a localStorage **y** IndexedDB (`_flushGuardadoLocalPts`), no esperar el coalescido de 800ms. Nunca dejar un paciente viviendo SOLO en memoria.
+- **Recuperar desde IndexedDB aunque localStorage NO esté vacío.** `loadFromCloud` une los pacientes que estén en `__pts_backup__` (IDB) pero no en localStorage ni en la nube (altas atoradas por cuota llena). Antes solo rescataba si localStorage estaba 100% vacío → fuga.
+- **El disco lleno NO es silencioso.** `saveLocal`/cola en quota avisan (crítico, 1 vez por sesión). Un `catch` mudo sobre `setItem`/`idbSet` en la ruta de guardado es un bug en espera.
+- Regla de oro al tocar guardado/sync/respaldo: **preferir molestar con un aviso honesto que perder un dato en silencio.**
+
+## REGLA PERMANENTE — TODO CAMBIO DEBE SERVIR EN Android Y iOS
+Nunca se sabe desde dónde van a abrir la app (los fisios usan Android y iOS indistintamente). **Cualquier modificación se piensa y se prueba para AMBOS**, nunca para uno solo:
+- No asumir el dispositivo. iOS desaloja localStorage sin avisar; Android llena la cuota de localStorage; ambos casos tienen que estar cubiertos (por eso el respaldo durable en IndexedDB + la recuperación de arriba sirven para los dos).
+- Al revisar una falla "solo le pasa a X", preguntarse qué del equipo de X difiere (navegador, iOS vs Android, cuota, sesión) — no asumir que es permisos ni culpa del usuario.
+- Antes de entregar, validar que el flujo funciona en Safari/iOS (PWA) y en Chrome/Android.
+
+## REGLA PERMANENTE — MANTENER ESTA MEMORIA AL DÍA
+Después de cualquier cambio, decisión o diagnóstico relevante (sobre todo de guardado/sync/pérdida de datos), **actualizar este CLAUDE.md** para que la siguiente sesión lo sepa. La memoria viva es lo que evita repetir los mismos bugs.
+
 ## Flujo de git por loop
 - GitHub Pages se publica desde `main`. Cada loop termina con MERGE A MAIN (PR + squash merge) para llegar a producción.
 - Tras cada merge a main, RECREAR la rama de trabajo desde main para evitar conflictos en el siguiente loop:
