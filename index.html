@@ -21915,7 +21915,11 @@ function _protoVal(x){
   if(typeof x==='number') return String(x);
   if(typeof x==='object'){ try{ return Object.keys(x).map(function(k){ return _protoVal(x[k]); }).filter(Boolean).join(' · '); }catch(_){ return ''; } }
   var s=String(x).trim();
-  return (/^(ninguna|ninguno|n\/a|na|no|sin datos|-|\.)$/i.test(s)) ? '' : s;
+  if(!s) return '';
+  // placeholders que significan "NO capturado" → cuentan como vacío (para el semáforo de "qué falta"):
+  // ninguna/no, y sobre todo "no especificado/evaluado/realizado/valorado", "pendiente", "por evaluar", "sin evaluar"…
+  if(/^(ningun[ao]s?|n\/?a|no|sin datos?|s\/d|-+|\.+|no (especificad|evaluad|realizad|valorad)[oa]|no aplica|pendiente( .*)?|por (evaluar|definir|capturar|valorar|determinar)|sin (evaluar|especificar|valorar|determinar|informaci[oó]n)|a evaluar|por determinar|no referid[oa])$/i.test(s)) return '';
+  return s;
 }
 function _protoDx(p){
   if(typeof p.dx==='string'){ var s=p.dx.trim(); if(s && !/no cuenta con diagn|sin diagn[oó]stico/i.test(s)) return s; }
