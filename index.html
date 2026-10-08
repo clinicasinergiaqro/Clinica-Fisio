@@ -1571,10 +1571,11 @@ body.modo-oscuro .topbar{background:#141824}
 #content-protocolo .proto-save:disabled{opacity:.6;cursor:default}
 #content-protocolo .proto-save.saved{background:#fff;color:#1F8A4C;border:1px solid #bfe6cd}
 #content-protocolo .proto-estado-wrap{flex:1 1 180px;min-width:0}
-#content-protocolo .proto-botones{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+#content-protocolo .proto-botones{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:flex-end;flex:1 1 auto;min-width:0}
 #content-protocolo .proto-exp{background:#fff;color:#15325B;border:1px solid #cdd6e2;border-radius:9px;padding:9px 13px;font-size:13px;font-weight:800;font-family:inherit;cursor:pointer}
 #content-protocolo .proto-exp:active{opacity:.85}
 #content-protocolo .proto-exp.wa{background:#25D366;color:#fff;border-color:#25D366}
+#content-protocolo .proto-exp.rutina{background:#1F8A4C;color:#fff;border-color:#1F8A4C}
 #content-protocolo .pcard-band{background:linear-gradient(135deg,#15325B,#1d436f);color:#fff;padding:18px 22px}
 #content-protocolo .pkick{font-size:11px;letter-spacing:2px;color:#D9B24A;font-weight:800;text-transform:uppercase}
 #content-protocolo .ptitle{font-size:19px;font-weight:800;margin:4px 0 2px;line-height:1.25}
@@ -22036,10 +22037,75 @@ function _protoAccionesHTML(p, pr, faseId){
   var btn=limpio
     ? '<button id="proto-save-btn" class="proto-save saved" onclick="_protoGuardarPlan()">💾 Volver a guardar</button>'
     : '<button id="proto-save-btn" class="proto-save" onclick="_protoGuardarPlan()">💾 Guardar plan</button>';
-  var exp='<button class="proto-exp" onclick="_protoPDF(\'descargar\')">📄 PDF</button>'
+  var exp='<button class="proto-exp rutina" onclick="_protoAEjercicios()">🏃 Rutina</button>'
+        +'<button class="proto-exp" onclick="_protoPDF(\'descargar\')">📄 PDF</button>'
         +'<button class="proto-exp wa" onclick="_protoPDF(\'whatsapp\')">📲 WhatsApp</button>';
   return '<div class="proto-acciones"><div class="proto-estado-wrap">'+estado+'</div><div class="proto-botones">'+exp+btn+'</div></div>';
 }
+// ── INCREMENTO 3: pasar la "sesión tipo de la fase actual" a la RUTINA del paciente ───────────
+// Toma los ejercicios de la fase (NO los agentes físicos, que aplica el fisio en clínica), los
+// convierte en objetos `ejercicio` para casa (editables) y REUSA la maquinaria de ejercicios:
+// se guardan con saveDB (verificado) y se navega a la pantalla Ejercicios para revisarlos y
+// enviarlos por el link/WhatsApp que ya existe. Idempotente (dedup por nombre). Activo=migrado.
+function _protoEsAgenteFisico(txt){
+  var t=String(txt||'');
+  // Agentes físicos (los aplica el fisio) + líneas de monitoreo/alta (no son ejercicios del paciente).
+  return /^\s*agentes\b/i.test(t)
+    || /coadyuvante|tecar|l[áa]ser|ultrasonid|\bus\b|crioterap|termoterap|presoterap|ondas de choque|electroterap|corriente aura|\bmep\b|punci[óo]n|ilib|magnetoter|drenaje linf|radiofrecuencia|\beem\b|russian|tens\b/i.test(t)
+    || /^\s*(monitoreo|sem[áa]foro|vigila|alta por criterios|alta cl[íi]nica)\b/i.test(t);
+}
+function _protoEjDeTexto(txt, objetivo){
+  var t=String(txt||'').trim();
+  var dosisParts=[];
+  var m1=t.match(/\d+\s*[–-]?\s*\d*\s*[×x]\s*\d+[\d–\-]*\s*(s|seg)?/i); if(m1) dosisParts.push(m1[0].replace(/\s+/g,''));
+  var m2=t.match(/tempo\s*\d\s*-\s*\d/i); if(m2) dosisParts.push(m2[0].replace(/\s+/g,''));
+  var m3=t.match(/~?\s*\d+\s*%\s*CVM/i); if(m3) dosisParts.push(m3[0].replace(/\s+/g,''));
+  var dosis=dosisParts.join(' · ');
+  var nombre = m1 ? t.slice(0, t.indexOf(m1[0])) : t.split('(')[0];
+  nombre = nombre.replace(/[·,;:\-\s]+$/,'').trim();
+  if(!nombre) nombre = t.slice(0,70);
+  if(nombre.length>70) nombre = nombre.slice(0,70).replace(/\s+\S*$/,'')+'…';
+  return { nombre:nombre, dosis:dosis, indicaciones:t, objetivo:objetivo||'' };
+}
+async function _protoAEjercicios(){
+  var p=currentPatient; if(!p) return;
+  var s=(window._protoSel||{})[p.id];
+  if(!s||!s.proto){ showToast('Elige un protocolo primero.','warning'); return; }
+  var pr=_protoById(s.proto); if(!pr){ showToast('Protocolo no válido.','warning'); return; }
+  var faseId=s.fase||((pr.fases[0]||{}).id||'');
+  var fase=null; (pr.fases||[]).forEach(function(f){ if(f.id===faseId) fase=f; }); if(!fase) fase=(pr.fases||[])[0]||{};
+  var items=(fase.sesion||[]).filter(function(t){ return t && !_protoEsAgenteFisico(t); });
+  if(!items.length){ showToast('Esta fase no tiene ejercicios para el paciente (solo agentes físicos).','warning'); return; }
+  if(!Array.isArray(p.ejercicios)) p.ejercicios=[];
+  function norm(x){ return _protoNorm(String(x||'')).replace(/[^a-z0-9]+/g,' ').trim(); }
+  var existentes={}; p.ejercicios.forEach(function(e){ if(e) existentes[norm(e.nombre||e.name)]=true; });
+  var nuevos=items.map(function(t){ return _protoEjDeTexto(t, fase.obj); }).filter(function(ej){ return ej.nombre && !existentes[norm(ej.nombre)]; });
+  if(!nuevos.length){ showToast('Esos ejercicios ya están en la rutina del paciente.','success'); _protoIrEjercicios(); return; }
+  var ok=window.confirm('Se agregarán '+nuevos.length+' ejercicio(s) de la fase '+fase.id+' («'+(pr.nombre||'')+'») a la RUTINA del paciente. Podrás editarlos y enviarlos por WhatsApp. ¿Continuar?');
+  if(!ok) return;
+  var hoy=(typeof todayFmt==='function')?todayFmt():'';
+  var ter=(typeof currentUser!=='undefined'&&currentUser&&currentUser.name)?currentUser.name:(p.terapeuta||'');
+  var base=Date.now();
+  nuevos.forEach(function(ej,i){
+    p.ejercicios.push({
+      id:'ej'+(base+i), nombre:ej.nombre, name:ej.nombre, objetivo:ej.objetivo||'',
+      dosis:ej.dosis||'', series:'', repeticiones:'', tiempo:'', frecuencia:'', duracion:'',
+      indicaciones:ej.indicaciones||'', precauciones:'', observaciones:'',
+      fecha:hoy, terapeuta:ter, estado:'activo', paraCasa:true,
+      origen:'protocolo', _protoFase:(pr.id+'/'+fase.id), media:null
+    });
+  });
+  if(!p.ejerciciosToken){ p.ejerciciosToken=(typeof generateToken==='function')?generateToken():('tok'+base); p.ejerciciosLinkActivo=true; }
+  try{ var idx=patientsDB.findIndex(function(x){return x&&x.id===p.id;}); if(idx>=0) patientsDB[idx]=p; }catch(_){}
+  showToast('⏳ Guardando rutina…','');
+  var res=null;
+  try{ res=await saveDB('pts',[p],{camposHist:['ejercicios','ejerciciosToken','ejerciciosLinkActivo']}); }catch(e){ res={ok:false,error:(e&&e.message)||String(e)}; }
+  if(res && res.ok){ showToast('✅ '+nuevos.length+' ejercicio(s) en la rutina — revísalos y envíalos','success'); }
+  else if(res && res.pendiente){ showToast('📴 Sin conexión — la rutina quedó local y se sincronizará','warning'); }
+  else { showToast('⚠️ No se pudo confirmar el guardado de la rutina. Reintenta con conexión.','warning'); }
+  _protoIrEjercicios();
+}
+function _protoIrEjercicios(){ try{ if(typeof showEjercicios==='function') showEjercicios(); }catch(_){} }
 // Barra para elegir protocolo de la biblioteca + fase actual.
 function _protoSelectorHTML(p, pr, faseId){
   var opts='<option value="">— Elegir protocolo —</option>'+PROTO_LIB.map(function(x){
@@ -22278,7 +22344,7 @@ var PROTO_LIB = [
    precauciones:'Extensión completa en las primeras 2 semanas. Sin derrame. Evitar valgo dinámico. Material de fijación (tornillos/grapas): tecar y US siempre ATÉRMICOS y NO sobre el material.',
    fases:[
      {id:'M1',nombre:'Postop temprano',sem:'0–2 sem',obj:'Control dolor/edema, extensión completa, activación de cuádriceps',carga:'Isométricos, movilidad, marcha',agentes:'Crioterapia + presoterapia · Electroterapia (EEM/Russian) si inhibición del cuádriceps',
-      sesion:['Isométricos de cuádriceps · activación','Movilidad → extensión completa','Crioterapia/presoterapia para edema · Electroterapia (EEM/Russian) si hay inhibición del cuádriceps · láser sobre cicatriz (tecar/US NO térmicos sobre los tornillos)']},
+      sesion:['Isométricos de cuádriceps · activación','Movilidad → extensión completa','Crioterapia/presoterapia + Corriente Aura (masaje electrovibracional) para edema/equimosis · Electroterapia (EEM/Russian) si hay inhibición del cuádriceps · láser sobre cicatriz (tecar/US NO térmicos sobre los tornillos)']},
      {id:'M2',nombre:'Fuerza base',sem:'3–12 sem',obj:'ROM completo, fuerza cuádriceps/isquios, control lumbopélvico',carga:'Cadena cerrada progresiva, bici, prensa, puentes',agentes:'Coadyuvantes',
       sesion:['Cadena cerrada progresiva (prensa, sentadilla parcial)','Bici · puentes · control lumbopélvico']},
      {id:'M3',nombre:'Fuerza / potencia',sem:'Mes 3–5',obj:'Fuerza ≥80% simetría, correr en recto',carga:'Fuerza pesada bilateral→unilateral · iniciar carrera por criterios',agentes:'—',
@@ -22297,7 +22363,7 @@ var PROTO_LIB = [
    precauciones:'Considerar vendaje/órtesis en el retorno deportivo temprano.',
    fases:[
      {id:'M1',nombre:'Dolor / activación',sem:'1–2',obj:'Bajar dolor/edema, rango, activar peroneos',carga:'Isométricos de eversión, movilidad, apoyo',agentes:'Láser / tecar CAP+RES / US',
-      sesion:['Isométricos de eversión','Movilidad de tobillo · apoyo progresivo','Tecar (CAP en peroneos/tejido blando; RES sobre el ligamento lateral) + láser/US coadyuvante']},
+      sesion:['Isométricos de eversión','Movilidad de tobillo · apoyo progresivo','Tecar (CAP en peroneos/tejido blando; RES sobre el ligamento lateral) + láser/US coadyuvante · Corriente Aura para edema/equimosis']},
      {id:'M2',nombre:'Fuerza + equilibrio',sem:'3–6',obj:'Fuerza de eversores, estabilidad estática',carga:'Banda de eversión · apoyo monopodal (ojos abiertos→cerrados)',agentes:'Coadyuvantes',
       sesion:['Banda de eversión progresiva','Apoyo monopodal (ojos abiertos→cerrados)']},
      {id:'M3',nombre:'Propiocepción dinámica',sem:'7–10',obj:'Control dinámico, superficies inestables',carga:'Bosu/cojín · alcances multidireccionales (Star/Y-balance)',agentes:'—',
@@ -22449,7 +22515,7 @@ function _protoGenerarHTML(p, pr, faseId){
       '<div class="pnote">Las semanas son guía: <b>se avanza por CRITERIOS, no por calendario</b>.</div></div>'+
     dosi+
     '<div class="psec"><div class="psh"><span class="psn">06</span><span class="pst">Sesión tipo — fase actual ('+escapeHTML(fase.id)+')</span></div><div class="pcardb">'+sesion+
-      '<div class="plink">🏃 <b>Esta sesión tipo se convierte en la RUTINA del paciente</b> → se le manda por el link de ejercicios que ya existe (WhatsApp / rutina.html), con el semáforo del dolor. <i>(Incremento 3.)</i></div>'+
+      '<div class="plink">🏃 <b>Pasa esta sesión tipo a la RUTINA del paciente</b> con el botón <b>🏃 Rutina</b> (arriba): crea los ejercicios para casa (editables) y se envían por el link / WhatsApp que ya existe. Los agentes físicos NO se incluyen (los aplica el fisio en clínica).</div>'+
     '</div></div>'+
     '<div class="psec"><div class="psh"><span class="psn">08</span><span class="pst">Monitoreo del dolor (semáforo)</span></div>'+sem+'</div>'+
     '<div class="psec"><div class="psh"><span class="psn">07</span><span class="pst">Criterios de retorno</span></div><div class="pcardb ptxt">'+escapeHTML(pr.retorno)+'</div></div>'+
