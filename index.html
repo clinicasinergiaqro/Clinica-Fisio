@@ -1570,6 +1570,11 @@ body.modo-oscuro .topbar{background:#141824}
 #content-protocolo .proto-save:active{opacity:.85}
 #content-protocolo .proto-save:disabled{opacity:.6;cursor:default}
 #content-protocolo .proto-save.saved{background:#fff;color:#1F8A4C;border:1px solid #bfe6cd}
+#content-protocolo .proto-estado-wrap{flex:1 1 180px;min-width:0}
+#content-protocolo .proto-botones{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+#content-protocolo .proto-exp{background:#fff;color:#15325B;border:1px solid #cdd6e2;border-radius:9px;padding:9px 13px;font-size:13px;font-weight:800;font-family:inherit;cursor:pointer}
+#content-protocolo .proto-exp:active{opacity:.85}
+#content-protocolo .proto-exp.wa{background:#25D366;color:#fff;border-color:#25D366}
 #content-protocolo .pcard-band{background:linear-gradient(135deg,#15325B,#1d436f);color:#fff;padding:18px 22px}
 #content-protocolo .pkick{font-size:11px;letter-spacing:2px;color:#D9B24A;font-weight:800;text-transform:uppercase}
 #content-protocolo .ptitle{font-size:19px;font-weight:800;margin:4px 0 2px;line-height:1.25}
@@ -22031,7 +22036,9 @@ function _protoAccionesHTML(p, pr, faseId){
   var btn=limpio
     ? '<button id="proto-save-btn" class="proto-save saved" onclick="_protoGuardarPlan()">💾 Volver a guardar</button>'
     : '<button id="proto-save-btn" class="proto-save" onclick="_protoGuardarPlan()">💾 Guardar plan</button>';
-  return '<div class="proto-acciones">'+estado+btn+'</div>';
+  var exp='<button class="proto-exp" onclick="_protoPDF(\'descargar\')">📄 PDF</button>'
+        +'<button class="proto-exp wa" onclick="_protoPDF(\'whatsapp\')">📲 WhatsApp</button>';
+  return '<div class="proto-acciones"><div class="proto-estado-wrap">'+estado+'</div><div class="proto-botones">'+exp+btn+'</div></div>';
 }
 // Barra para elegir protocolo de la biblioteca + fase actual.
 function _protoSelectorHTML(p, pr, faseId){
@@ -22098,6 +22105,60 @@ async function _protoGuardarPlan(){
     showToast('⚠️ No se pudo confirmar el guardado del plan. Reintenta con conexión.','warning');
   }
   renderProtocolo();
+}
+// Generar PDF del PROTOCOLO CLÍNICO y entregarlo. modo='descargar' (hoja de compartir / descarga) o
+// 'whatsapp' (hoja de compartir con el archivo → el usuario elige WhatsApp y manda el PDF). Reusa la MISMA
+// maquinaria que el reporte del expediente (html2canvas + jsPDF, multipágina, probado en iPhone/PWA). Rinde
+// el documento en un contenedor de ancho fijo 760px (dentro de #content-protocolo para heredar el CSS p*),
+// así el PDF se ve igual en celular y en compu. Funciona para activo y migrado (solo lee currentPatient).
+async function _protoPDF(modo){
+  var p=currentPatient; if(!p){ return; }
+  var s=(window._protoSel||{})[p.id];
+  if(!s||!s.proto){ showToast('Elige un protocolo primero.','warning'); return; }
+  var pr=_protoById(s.proto); if(!pr){ showToast('Protocolo no válido.','warning'); return; }
+  var faseId=s.fase||((pr.fases[0]||{}).id||'');
+  var jsPDF=(window.jspdf&&window.jspdf.jsPDF)||window.jsPDF;
+  if(!jsPDF){ showToast('jsPDF no disponible — abre con señal','error'); return; }
+  showToast('⏳ Generando PDF…','');
+  if(!window.html2canvas){
+    try{ await new Promise(function(res,rej){ var sc=document.createElement('script'); sc.src='https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js'; sc.onload=res; sc.onerror=rej; document.head.appendChild(sc); }); }catch(_){}
+  }
+  if(!window.html2canvas){ showToast('Sin conexión para preparar el PDF — conéctate un momento','error'); return; }
+  // Render en contenedor fijo 760px, fuera de pantalla, dentro de #content-protocolo (hereda el CSS p*).
+  var host=document.getElementById('content-protocolo')||document.body;
+  var tmp=document.createElement('div');
+  tmp.id='proto-pdf-tmp';
+  tmp.style.cssText='position:fixed;left:-10000px;top:0;width:760px;background:#fff;z-index:-1';
+  tmp.innerHTML=_protoGenerarHTML(p,pr,faseId);
+  host.appendChild(tmp);
+  try{
+    var canvas=await window.html2canvas(tmp,{ scale:2, backgroundColor:'#ffffff', useCORS:true, width:760, windowWidth:900 });
+    var img=canvas.toDataURL('image/jpeg',0.92);
+    var doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
+    var pw=210, ph=297, m=8, iw=pw-m*2;
+    var ih=canvas.height*iw/canvas.width;
+    var pageContent=ph-m*2;
+    if(ih<=pageContent){ doc.addImage(img,'JPEG',m,m,iw,ih,'','FAST'); }
+    else { var sy=0, restante=ih; while(restante>0){ doc.addImage(img,'JPEG', m, m-sy, iw, ih, '', 'FAST'); restante-=pageContent; sy+=pageContent; if(restante>0) doc.addPage(); } }
+    var nombre=(p.name)?String(p.name).trim().replace(/\s+/g,'_').replace(/[^0-9A-Za-zÁÉÍÓÚÜáéíóúüÑñ_-]/g,''):'Paciente';
+    var f=new Date(); var fecha=f.getFullYear()+'-'+('0'+(f.getMonth()+1)).slice(-2)+'-'+('0'+f.getDate()).slice(-2);
+    var arch='Protocolo_'+pr.id+'_'+nombre+'_'+fecha+'.pdf';
+    var blob=doc.output('blob');
+    var file=new File([blob], arch, {type:'application/pdf'});
+    // Hoja de compartir nativa (iOS/Android): en 'whatsapp' el usuario elige WhatsApp y manda el PDF;
+    // en 'descargar' puede "Guardar en Archivos" o compartir. Fallback: descarga directa / abrir blob.
+    if(navigator.canShare && navigator.canShare({files:[file]})){
+      try{
+        await navigator.share({files:[file], title:arch, text:(modo==='whatsapp'?'Protocolo de tratamiento — Clínica Sinergia':'Protocolo de tratamiento')});
+        showToast(modo==='whatsapp'?'✅ Elige WhatsApp para enviarlo':'✅ Elige dónde guardar/enviar','success');
+        return;
+      }catch(e){ if(e&&e.name==='AbortError') return; /* si falla, cae a descarga */ }
+    }
+    try{ doc.save(arch); }
+    catch(e2){ var url=URL.createObjectURL(blob); window.open(url,'_blank'); setTimeout(function(){ URL.revokeObjectURL(url); },60000); }
+    showToast(modo==='whatsapp' ? '📄 PDF descargado — adjúntalo en WhatsApp (en celular se abre el envío directo)' : '✅ PDF generado','success');
+  }catch(err){ console.warn('[proto pdf]', err&&err.message); showToast('No se pudo generar el PDF: '+((err&&err.message)||''),'error'); }
+  finally{ try{ tmp.remove(); }catch(_){} }
 }
 // Tarjeta de ESTADO CLÍNICO ("qué falta") — fallback cuando ningún protocolo coincide o el usuario no eligió.
 function _protoEstadoHTML(p, intentoManual){
