@@ -1552,6 +1552,20 @@ body.modo-oscuro .topbar{background:#141824}
   <div class="content" id="content-pub-ejercicios" style="padding:0;padding-bottom:40px"></div>
 </div>
 
+<!-- PROTOCOLO / DOSIFICACIÓN (estado clínico + qué falta) -->
+<div class="screen" id="screen-protocolo">
+  <div class="topbar">
+    <div class="topbar-left">
+      <button class="back-btn" onclick="goBack()">‹</button>
+      <div>
+        <div class="topbar-title" id="proto-topbar-name">Protocolo</div>
+        <div class="topbar-sub" id="proto-topbar-meta"></div>
+      </div>
+    </div>
+  </div>
+  <div class="content" id="content-protocolo" style="padding:0"></div>
+</div>
+
 <script>
 // ── USERS ─────────────────────────────────────────────────────────────────
 // El login viejo por contraseñas fue retirado. La autenticación real vive en
@@ -10758,6 +10772,7 @@ function renderExpediente(tab='historia'){
     <button class="tab ${tab==='estudios'?'active':''}" onclick="renderExpediente('estudios')">Estudios</button>
     <button class="tab ${tab==='reporte'?'active':''}" onclick="renderExpediente('reporte')">📄 Reporte${(typeof _RPT_tieneSintesisValidada==='function' && !_RPT_tieneSintesisValidada(p))?' <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--amber);vertical-align:middle"></span>':''}</button>
     <button class="tab ${tab==='ejercicios'?'active':''}" onclick="showEjercicios()">🏃 Ejercicios</button>
+    <button class="tab" onclick="showProtocolo()">📋 Protocolo</button>
     <button class="tab ${tab==='consent'?'active':''}" onclick="renderExpediente('consent')">Consentimiento</button>
   </div>
   ${(currentUser&&(currentUser.role==='supervisor'||currentUser.name==='CARLOS'||p.terapeuta===currentUser.name||p.terapeutaSeguimiento===currentUser.name))?`<div style="padding:4px 14px 0;text-align:right"><button data-pid="${escapeAttr_(p.id)}" onclick="exportarExpedienteJSON(this.dataset.pid)" style="background:transparent;border:1px solid rgba(255,255,255,.4);color:white;border-radius:16px;padding:4px 12px;font-size:11px;cursor:pointer;font-weight:600">📥 Exportar JSON</button></div>`:''}
@@ -21879,6 +21894,83 @@ function showEjercicios(){
   screenStack.push('screen-ejercicios');
   showScreen('screen-ejercicios', false);
   renderEjercicios();
+}
+
+// ── PROTOCOLO / DOSIFICACIÓN — Incremento 1: estado clínico + "qué falta" ─────
+// SOLO LECTURA: saca del expediente los datos que un buen plan periodizado necesita
+// (dx, región/lado, mecanismo, evolución, EVA, ROM, fuerza, deporte, objetivo) y marca
+// con semáforo lo que ya está vs lo que falta capturar (y dónde). No toca el guardado,
+// funciona igual para activo y migrado (solo lee currentPatient). El armado del protocolo
+// con la biblioteca viene en el siguiente incremento. (Base: docs/biblioteca_protocolos.md)
+function showProtocolo(){
+  if(!currentPatient) return;
+  try{ document.getElementById('proto-topbar-name').textContent = (currentPatient.name||'').split(' ').slice(0,2).join(' ') || 'Protocolo'; }catch(_){}
+  try{ document.getElementById('proto-topbar-meta').textContent = 'Estado clínico para el plan'; }catch(_){}
+  screenStack.push('screen-protocolo');
+  showScreen('screen-protocolo', false);
+  renderProtocolo();
+}
+function _protoVal(x){
+  if(x==null) return '';
+  if(typeof x==='number') return String(x);
+  if(typeof x==='object'){ try{ return Object.keys(x).map(function(k){ return _protoVal(x[k]); }).filter(Boolean).join(' · '); }catch(_){ return ''; } }
+  var s=String(x).trim();
+  return (/^(ninguna|ninguno|n\/a|na|no|sin datos|-|\.)$/i.test(s)) ? '' : s;
+}
+function _protoDx(p){
+  if(typeof p.dx==='string'){ var s=p.dx.trim(); if(s && !/no cuenta con diagn|sin diagn[oó]stico/i.test(s)) return s; }
+  var d = (p.dx && typeof p.dx==='object') ? (p.dx.dxClinico||p.dx.dxMedico||'') : '';
+  return _protoVal(d) || _protoVal((p.motivo||{}).dxMedico) || _protoVal((p.dxFuncional||{}).dxClinico) || '';
+}
+function renderProtocolo(){
+  var cont=document.getElementById('content-protocolo'); if(!cont) return;
+  var p=currentPatient; if(!p){ cont.innerHTML='<div style="padding:24px;text-align:center;color:#889">Abre un expediente primero.</div>'; return; }
+  var mot=p.motivo||{}, val=p.valoracion||{}, ant=p.antecedentes||{}, dxf=p.dxFuncional||{};
+  var zona=_protoVal(mot.zonaPrincipal) || _protoVal((p.motivoHC||{}).zonaPrincipal);
+  var lado=_protoVal(mot.lado);
+  var campos=[
+    {k:'Diagnóstico', v:_protoDx(p), donde:'Valoración / Editar datos'},
+    {k:'Región y lado', v:[zona,lado].filter(Boolean).join(' · '), donde:'Valoración → Motivo'},
+    {k:'Mecanismo de lesión', v:_protoVal(mot.mecanismo), donde:'Valoración → Motivo'},
+    {k:'Tiempo de evolución', v:_protoVal(mot.desdeCuando)||_protoVal(mot.evolucion), donde:'Valoración → Motivo'},
+    {k:'Dolor actual (EVA)', v:((val.eva!=null&&val.eva!=='')?(String(val.eva)+'/10'):''), donde:'Valoración'},
+    {k:'Arco de movimiento (ROM)', v:_protoVal(val.rom), donde:'Valoración'},
+    {k:'Fuerza', v:_protoVal(val.fuerza), donde:'Valoración'},
+    {k:'Deporte / actividad', v:_protoVal(ant.deportivos)||_protoVal(ant.deporteFrecuencia), donde:'Editar datos → Antecedentes'},
+    {k:'Objetivo funcional', v:_protoVal(dxf.objetivosCP)||_protoVal(dxf.objetivosLP), donde:'Valoración → Dx funcional'}
+  ];
+  var hechos=campos.filter(function(c){return !!c.v;}).length, total=campos.length;
+  var pct=Math.round(100*hechos/total);
+  var barColor = pct>=80?'#1F8A4C':(pct>=50?'#C49A2E':'#C0392B');
+  var seg=p.seguridadClinica||{};
+  var segTxt=[_protoVal(seg.implantes),_protoVal(seg.implantesDetalle),_protoVal(seg.condiciones),_protoVal(seg.condicionesObs),_protoVal(seg.banderasRojas),_protoVal(p.contraindicaciones),_protoVal(p.alergias)].filter(Boolean).join(' · ');
+  var filas=campos.map(function(c){
+    var ok=!!c.v;
+    return '<div style="display:flex;gap:10px;align-items:flex-start;padding:10px 0;border-bottom:1px solid #eef1f5">'
+      +'<div style="flex:0 0 20px;font-size:15px;line-height:1.3">'+(ok?'✅':'⚠️')+'</div>'
+      +'<div style="flex:1;min-width:0">'
+        +'<div style="font-weight:700;color:#15325B;font-size:13px">'+escapeHTML(c.k)+'</div>'
+        +(ok ? ('<div style="color:#334;font-size:13px;margin-top:2px;white-space:pre-wrap;word-break:break-word">'+escapeHTML(c.v)+'</div>')
+             : ('<div style="color:#B07A00;font-size:12px;margin-top:2px">Falta — captúralo en: '+escapeHTML(c.donde)+'</div>'))
+      +'</div></div>';
+  }).join('');
+  var html=''
+    + _soapSeguridadHTML(p)
+    + '<div style="padding:14px 16px 48px;max-width:720px;margin:0 auto">'
+      + '<div style="background:#fff;border:1px solid #e6e9ef;border-radius:14px;padding:14px 16px;margin-bottom:14px">'
+        + '<div style="font-weight:800;color:#15325B;font-size:15px;margin-bottom:4px">📋 Estado clínico para el plan</div>'
+        + '<div style="color:#667;font-size:12px;margin-bottom:10px">Lo que el expediente ya tiene y lo que falta para armar un buen protocolo periodizado. Solo lectura — el armado del plan con la biblioteca viene en el siguiente paso.</div>'
+        + '<div style="font-size:12px;color:'+barColor+';font-weight:800;margin-bottom:5px">'+hechos+' de '+total+' datos clave capturados</div>'
+        + '<div style="height:8px;border-radius:6px;background:#eef1f5;overflow:hidden"><div style="height:100%;width:'+pct+'%;background:'+barColor+'"></div></div>'
+      + '</div>'
+      + '<div style="background:#fff;border:1px solid #e6e9ef;border-radius:14px;padding:2px 16px 8px">'+filas+'</div>'
+      + '<div style="background:#FFF8E8;border:1px solid #EAD9A0;border-radius:12px;padding:12px 14px;margin-top:14px;font-size:12px;color:#6b5a1f;line-height:1.5">'
+        + '<b>🛡️ Seguridad clínica (agentes físicos):</b><br>'
+        + (segTxt ? escapeHTML(segTxt) : 'Sin datos de seguridad capturados — revísalo antes de indicar radiofrecuencia / diatermia / US térmico (metal, marcapaso, anticoagulación, cáncer, embarazo).')
+      + '</div>'
+      + '<div style="text-align:center;color:#99a;font-size:12px;margin-top:18px">🚧 Siguiente paso: elegir protocolo de la biblioteca y armar el plan periodizado (macro/meso/micro + agentes físicos).</div>'
+    + '</div>';
+  cont.innerHTML=html;
 }
 
 // ── Envío de ejercicios por WhatsApp (híbrido, robusto) ────────────────────
