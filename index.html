@@ -1561,6 +1561,15 @@ body.modo-oscuro .topbar{background:#141824}
 #content-protocolo .proto-selbar .pflab{font-size:11px;font-weight:800;color:#5b6b7d;letter-spacing:.3px;text-transform:uppercase}
 #content-protocolo .proto-selbar select{width:100%;padding:9px 10px;border:1px solid #cdd6e2;border-radius:9px;background:#fff;color:#23303f;font-size:13px;font-weight:600;font-family:inherit}
 #content-protocolo .proto-autonote{font-size:12px;color:#2a4a74;background:#F3F7FF;border-bottom:1px solid #d6e2f5;padding:8px 16px}
+#content-protocolo .proto-acciones{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;justify-content:space-between;padding:10px 16px;background:#fff;border-bottom:1px solid #eef1f5}
+#content-protocolo .proto-estado{font-size:12px;font-weight:700}
+#content-protocolo .proto-estado.ok{color:#1F8A4C}
+#content-protocolo .proto-estado.dirty{color:#B07A00}
+#content-protocolo .proto-estado.none{color:#5b6b7d;font-weight:600}
+#content-protocolo .proto-save{background:#15325B;color:#fff;border:0;border-radius:9px;padding:9px 16px;font-size:13px;font-weight:800;font-family:inherit;cursor:pointer}
+#content-protocolo .proto-save:active{opacity:.85}
+#content-protocolo .proto-save:disabled{opacity:.6;cursor:default}
+#content-protocolo .proto-save.saved{background:#fff;color:#1F8A4C;border:1px solid #bfe6cd}
 #content-protocolo .pcard-band{background:linear-gradient(135deg,#15325B,#1d436f);color:#fff;padding:18px 22px}
 #content-protocolo .pkick{font-size:11px;letter-spacing:2px;color:#D9B24A;font-weight:800;text-transform:uppercase}
 #content-protocolo .ptitle{font-size:19px;font-weight:800;margin:4px 0 2px;line-height:1.25}
@@ -21984,15 +21993,45 @@ function renderProtocolo(){
   if(!window._protoSel) window._protoSel={};
   var s=window._protoSel[p.id];
   if(!s){
-    var sug=_protoSugerir(p);
-    s={ proto: sug?sug.id:'', fase: sug?((sug.fases[0]||{}).id||''):'', _auto:true };
+    // Si el paciente YA tiene un plan guardado (p.planTto.protocolo), arrancar de ahí (no re-sugerir).
+    var guardado=_protoPlanGuardado(p);
+    if(guardado){
+      s={ proto:guardado.id, fase:guardado.fase||'', _auto:false };
+    } else {
+      var sug=_protoSugerir(p);
+      s={ proto: sug?sug.id:'', fase: sug?((sug.fases[0]||{}).id||''):'', _auto:true };
+    }
     window._protoSel[p.id]=s;
   }
   var pr = s.proto ? _protoById(s.proto) : null;
   var faseId = s.fase || (pr && pr.fases[0] && pr.fases[0].id) || '';
-  var autoNote = (s._auto && pr) ? '<div class="proto-autonote">✨ Protocolo <b>sugerido</b> según el diagnóstico del expediente. Puedes cambiarlo o la fase arriba.</div>' : '';
+  var autoNote = (s._auto && pr) ? '<div class="proto-autonote">✨ Protocolo <b>sugerido</b> según el diagnóstico del expediente. Puedes cambiarlo o la fase arriba, y <b>💾 Guardar plan</b> para dejarlo en el expediente.</div>' : '';
   var body = pr ? _protoGenerarHTML(p, pr, faseId) : _protoEstadoHTML(p, s.proto!==undefined);
-  cont.innerHTML = _soapSeguridadHTML(p) + '<div class="proto-wrap">' + _protoSelectorHTML(p, pr, faseId) + autoNote + body + '</div>';
+  cont.innerHTML = _soapSeguridadHTML(p) + '<div class="proto-wrap">' + _protoSelectorHTML(p, pr, faseId) + _protoAccionesHTML(p, pr, faseId) + autoNote + body + '</div>';
+}
+// Lee el plan guardado del expediente (activo o migrado): p.planTto.protocolo = {id,fase,fechaGuardado,guardadoPor}.
+function _protoPlanGuardado(p){
+  var pt=p&&p.planTto; var pl=(pt&&typeof pt==='object'&&!Array.isArray(pt))?pt.protocolo:null;
+  if(pl&&typeof pl==='object'&&pl.id&&_protoById(pl.id)) return pl;
+  return null;
+}
+// Barra de acciones: estado "guardado / sin guardar" + botón 💾 Guardar plan. Solo si hay protocolo elegido.
+function _protoAccionesHTML(p, pr, faseId){
+  if(!pr) return '';
+  var g=_protoPlanGuardado(p);
+  var limpio = !!g && g.id===pr.id && (g.fase||'')===(faseId||'');
+  var estado;
+  if(limpio){
+    estado='<span class="proto-estado ok">✅ Plan guardado'+(g.fechaGuardado?(' · '+escapeHTML(g.fechaGuardado)):'')+(g.guardadoPor?(' · '+escapeHTML(g.guardadoPor)):'')+'</span>';
+  } else if(g){
+    estado='<span class="proto-estado dirty">● Cambios sin guardar (guardado: '+escapeHTML(_protoById(g.id)?_protoById(g.id).id:g.id)+' · fase '+escapeHTML(g.fase||'—')+')</span>';
+  } else {
+    estado='<span class="proto-estado none">Plan no guardado aún</span>';
+  }
+  var btn=limpio
+    ? '<button id="proto-save-btn" class="proto-save saved" onclick="_protoGuardarPlan()">💾 Volver a guardar</button>'
+    : '<button id="proto-save-btn" class="proto-save" onclick="_protoGuardarPlan()">💾 Guardar plan</button>';
+  return '<div class="proto-acciones">'+estado+btn+'</div>';
 }
 // Barra para elegir protocolo de la biblioteca + fase actual.
 function _protoSelectorHTML(p, pr, faseId){
@@ -22019,6 +22058,45 @@ function _protoCambiar(campo, valor){
   if(campo==='proto'){ s.proto=valor; var pr=valor?_protoById(valor):null; s.fase=(pr&&pr.fases[0]&&pr.fases[0].id)||''; }
   else if(campo==='fase'){ s.fase=valor; }
   window._protoSel[p.id]=s;
+  renderProtocolo();
+}
+// Guardar el plan (protocolo + fase) en el EXPEDIENTE → p.planTto.protocolo. Funciona para ACTIVO y MIGRADO:
+// saveDB('pts',…) enruta solo: activo → Sheet + espejo Firestore; mig_pac_ → Firestore directo. Reusa planTto
+// (campo YA permitido en Sheet/reglas/pLimpio/espejo/hidratación → sin desplegar backend ni reglas). NUNCA
+// pisa el resto de planTto (se hace Object.assign preservando lo existente) y VERIFICA el resultado (integridad
+// de guardado): solo da "guardado" si saveDB confirma; si no, avisa honesto y conserva local/cola.
+async function _protoGuardarPlan(){
+  var p=currentPatient; if(!p){ return; }
+  var s=(window._protoSel||{})[p.id];
+  if(!s||!s.proto){ showToast('Elige un protocolo primero.','warning'); return; }
+  var pr=_protoById(s.proto); if(!pr){ showToast('Protocolo no válido.','warning'); return; }
+  var faseId=s.fase||((pr.fases[0]||{}).id||'');
+  var ahora=new Date();
+  var fechaHora=ahora.toLocaleDateString('es-MX')+' '+ahora.toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'});
+  var quien=(typeof currentUser!=='undefined'&&currentUser&&currentUser.name)?currentUser.name:'';
+  // Preservar TODO lo que ya tuviera planTto (enfoque, contraindicaciones, sesiones, objetivos…) y solo añadir .protocolo.
+  if(!p.planTto||typeof p.planTto!=='object'||Array.isArray(p.planTto)) p.planTto={};
+  p.planTto=Object.assign({}, p.planTto, { protocolo:{ id:pr.id, fase:faseId, fechaGuardado:fechaHora, guardadoPor:quien } });
+  p.fechaActualizacion=fechaHora;
+  p.ultimoUsuario=quien;
+  if(!Array.isArray(p.historialCambios)) p.historialCambios=[];
+  p.historialCambios.push({usuario:quien,seccion:'protocolo',fecha:fechaHora,accion:'Guardó protocolo de tratamiento',antes:'',despues:pr.id+' · fase '+faseId});
+  try{ var idx=patientsDB.findIndex(function(x){return x&&x.id===p.id;}); if(idx>=0) patientsDB[idx]=p; }catch(_){}
+  var btn=document.getElementById('proto-save-btn'); if(btn){ btn.disabled=true; btn.textContent='Guardando…'; }
+  var res=null;
+  try{
+    res=await saveDB('pts',[p],{camposHist:['planTto','fechaActualizacion','ultimoUsuario','historialCambios']});
+  }catch(e){ res={ok:false,error:(e&&e.message)||String(e)}; }
+  if(res && res.ok){
+    s._auto=false; window._protoSel[p.id]=s;
+    showToast('✅ Plan guardado en el expediente','success');
+  } else if(res && res.pendiente){
+    s._auto=false; window._protoSel[p.id]=s;
+    showToast('📴 Sin conexión — el plan quedó en este equipo y se sincronizará.','warning');
+  } else {
+    // No confirmó: NO mentir con "✅". El dato sigue en memoria/local; el estado seguirá mostrando "sin guardar".
+    showToast('⚠️ No se pudo confirmar el guardado del plan. Reintenta con conexión.','warning');
+  }
   renderProtocolo();
 }
 // Tarjeta de ESTADO CLÍNICO ("qué falta") — fallback cuando ningún protocolo coincide o el usuario no eligió.
