@@ -1552,7 +1552,57 @@ body.modo-oscuro .topbar{background:#141824}
   <div class="content" id="content-pub-ejercicios" style="padding:0;padding-bottom:40px"></div>
 </div>
 
-<!-- PROTOCOLO / DOSIFICACIÓN (estado clínico + qué falta) -->
+<!-- PROTOCOLO / DOSIFICACIÓN (estado clínico + plan periodizado) -->
+<style id="proto-style">
+/* Protocolo clínico — estilos aislados con prefijo p* para no chocar con el resto de la app */
+#content-protocolo .proto-wrap{max-width:760px;margin:0 auto;background:#fff;padding-bottom:36px}
+#content-protocolo .proto-selbar{display:flex;flex-wrap:wrap;gap:10px 14px;align-items:flex-end;padding:12px 16px;background:#F4F6FA;border-bottom:1px solid #e5e9f0}
+#content-protocolo .proto-selbar .pfld{display:flex;flex-direction:column;gap:3px;flex:1 1 220px;min-width:0}
+#content-protocolo .proto-selbar .pflab{font-size:11px;font-weight:800;color:#5b6b7d;letter-spacing:.3px;text-transform:uppercase}
+#content-protocolo .proto-selbar select{width:100%;padding:9px 10px;border:1px solid #cdd6e2;border-radius:9px;background:#fff;color:#23303f;font-size:13px;font-weight:600;font-family:inherit}
+#content-protocolo .proto-autonote{font-size:12px;color:#2a4a74;background:#F3F7FF;border-bottom:1px solid #d6e2f5;padding:8px 16px}
+#content-protocolo .pcard-band{background:linear-gradient(135deg,#15325B,#1d436f);color:#fff;padding:18px 22px}
+#content-protocolo .pkick{font-size:11px;letter-spacing:2px;color:#D9B24A;font-weight:800;text-transform:uppercase}
+#content-protocolo .ptitle{font-size:19px;font-weight:800;margin:4px 0 2px;line-height:1.25}
+#content-protocolo .psub{font-size:12.5px;opacity:.92}
+#content-protocolo .pmeta{display:flex;flex-wrap:wrap;gap:5px 16px;margin-top:11px;font-size:12px}
+#content-protocolo .pmeta span{opacity:.85}#content-protocolo .pmeta b{color:#fff;opacity:1}
+#content-protocolo .pchips{margin-top:11px;display:flex;gap:7px;flex-wrap:wrap}
+#content-protocolo .pchip{display:inline-block;background:rgba(196,154,46,.22);color:#F2D98B;border:1px solid rgba(196,154,46,.5);border-radius:20px;padding:3px 10px;font-size:11px;font-weight:700}
+#content-protocolo .pchip-warn{background:rgba(192,57,43,.25);color:#FFD2CC;border-color:rgba(192,57,43,.55)}
+#content-protocolo .pbody{padding:16px 22px 26px}
+#content-protocolo .psec{margin:18px 0}
+#content-protocolo .psh{display:flex;align-items:center;gap:8px;border-left:4px solid #C49A2E;padding-left:10px;margin-bottom:8px}
+#content-protocolo .psn{font-size:11px;font-weight:800;color:#C49A2E}
+#content-protocolo .pst{font-size:15px;font-weight:800;color:#15325B}
+#content-protocolo .pcardb{background:#fff;border:1px solid #e5e9f0;border-radius:12px;padding:12px 14px}
+#content-protocolo .ptxt{font-size:13px;line-height:1.55}
+#content-protocolo .prow{display:flex;gap:10px;align-items:baseline;padding:6px 0;border-bottom:1px dashed #eef1f5;font-size:13px}
+#content-protocolo .prow:last-child{border-bottom:0}
+#content-protocolo .pk{flex:0 0 140px;color:#5b6b7d;font-weight:700}
+#content-protocolo .pv{flex:1;min-width:0;word-break:break-word}
+#content-protocolo .pwarn{color:#B07A00;font-weight:700}
+#content-protocolo .ptab{width:100%;border-collapse:collapse;font-size:12px}
+#content-protocolo .ptab th,#content-protocolo .ptab td{text-align:left;padding:7px 8px;border-bottom:1px solid #e5e9f0;vertical-align:top}
+#content-protocolo .ptab th{background:#f4f6fa;color:#15325B;font-weight:800;font-size:10.5px;text-transform:uppercase;letter-spacing:.5px}
+#content-protocolo .ptab td b{color:#15325B}
+#content-protocolo .phot{background:#FFF8E8}
+#content-protocolo .ppill{display:inline-block;border-radius:16px;padding:2px 9px;font-size:10.5px;font-weight:800}
+#content-protocolo .ppill.now{background:#C49A2E;color:#3a2d06}
+#content-protocolo .pnote{background:#F3F7FF;border:1px solid #d6e2f5;border-radius:10px;padding:9px 12px;font-size:12px;color:#2a4a74;margin-top:7px}
+#content-protocolo .psafe{background:#EAF7EF;border:1px solid #bfe6cd;border-radius:10px;padding:8px 12px;font-size:12px;color:#17603a;margin-top:10px}
+#content-protocolo .psafe-warn{background:#FDECEA;border-color:#f3c2bb;color:#9c2c20}
+#content-protocolo .pses{font-size:13px;line-height:1.5;padding:3px 0}
+#content-protocolo .plink{background:linear-gradient(135deg,#1b7a46,#239155);color:#fff;border-radius:12px;padding:12px 14px;font-size:12px;margin-top:12px;line-height:1.5}
+#content-protocolo .plink b{color:#D6F5E2}
+#content-protocolo .psem{display:grid;grid-template-columns:72px 1fr;border:1px solid #e5e9f0;border-radius:10px;overflow:hidden;font-size:12px;margin-top:6px}
+#content-protocolo .psem .plbl{font-weight:800;color:#fff;padding:9px 10px;display:flex;align-items:center}
+#content-protocolo .psem>div:last-child{padding:9px 10px}
+#content-protocolo .psem.g .plbl{background:#1F8A4C}
+#content-protocolo .psem.a .plbl{background:#B07A00}
+#content-protocolo .psem.r .plbl{background:#C0392B}
+#content-protocolo .pfoot{border-top:2px solid #e5e9f0;margin-top:22px;padding-top:12px;font-size:11px;color:#5b6b7d;line-height:1.5}
+</style>
 <div class="screen" id="screen-protocolo">
   <div class="topbar">
     <div class="topbar-left">
@@ -21926,9 +21976,53 @@ function _protoDx(p){
   var d = (p.dx && typeof p.dx==='object') ? (p.dx.dxClinico||p.dx.dxMedico||'') : '';
   return _protoVal(d) || _protoVal((p.motivo||{}).dxMedico) || _protoVal((p.dxFuncional||{}).dxClinico) || '';
 }
+// Orquestador: sugiere protocolo según dx, deja elegir protocolo + fase, y arma el plan.
+// window._protoSel[p.id] = {proto, fase, _auto}. Si no hay protocolo elegido/sugerido → tarjeta de estado.
 function renderProtocolo(){
   var cont=document.getElementById('content-protocolo'); if(!cont) return;
   var p=currentPatient; if(!p){ cont.innerHTML='<div style="padding:24px;text-align:center;color:#889">Abre un expediente primero.</div>'; return; }
+  if(!window._protoSel) window._protoSel={};
+  var s=window._protoSel[p.id];
+  if(!s){
+    var sug=_protoSugerir(p);
+    s={ proto: sug?sug.id:'', fase: sug?((sug.fases[0]||{}).id||''):'', _auto:true };
+    window._protoSel[p.id]=s;
+  }
+  var pr = s.proto ? _protoById(s.proto) : null;
+  var faseId = s.fase || (pr && pr.fases[0] && pr.fases[0].id) || '';
+  var autoNote = (s._auto && pr) ? '<div class="proto-autonote">✨ Protocolo <b>sugerido</b> según el diagnóstico del expediente. Puedes cambiarlo o la fase arriba.</div>' : '';
+  var body = pr ? _protoGenerarHTML(p, pr, faseId) : _protoEstadoHTML(p, s.proto!==undefined);
+  cont.innerHTML = _soapSeguridadHTML(p) + '<div class="proto-wrap">' + _protoSelectorHTML(p, pr, faseId) + autoNote + body + '</div>';
+}
+// Barra para elegir protocolo de la biblioteca + fase actual.
+function _protoSelectorHTML(p, pr, faseId){
+  var opts='<option value="">— Elegir protocolo —</option>'+PROTO_LIB.map(function(x){
+    return '<option value="'+x.id+'"'+((pr&&pr.id===x.id)?' selected':'')+'>'+escapeHTML(x.id+' · '+x.nombre)+'</option>';
+  }).join('');
+  var fase='';
+  if(pr){
+    fase='<div class="pfld"><div class="pflab">Fase actual</div>'
+      +'<select onchange="_protoCambiar(\'fase\',this.value)">'
+      + (pr.fases||[]).map(function(f){ return '<option value="'+f.id+'"'+((f.id===faseId)?' selected':'')+'>'+escapeHTML(f.id+' · '+f.nombre+(f.sem?(' ('+f.sem+')'):''))+'</option>'; }).join('')
+      +'</select></div>';
+  }
+  return '<div class="proto-selbar">'
+    +'<div class="pfld"><div class="pflab">📋 Protocolo</div><select onchange="_protoCambiar(\'proto\',this.value)">'+opts+'</select></div>'
+    + fase + '</div>';
+}
+// Cambiar protocolo (resetea la fase a la primera) o fase. Re-renderiza.
+function _protoCambiar(campo, valor){
+  var p=currentPatient; if(!p) return;
+  if(!window._protoSel) window._protoSel={};
+  var s=window._protoSel[p.id]||{proto:'',fase:''};
+  s._auto=false;
+  if(campo==='proto'){ s.proto=valor; var pr=valor?_protoById(valor):null; s.fase=(pr&&pr.fases[0]&&pr.fases[0].id)||''; }
+  else if(campo==='fase'){ s.fase=valor; }
+  window._protoSel[p.id]=s;
+  renderProtocolo();
+}
+// Tarjeta de ESTADO CLÍNICO ("qué falta") — fallback cuando ningún protocolo coincide o el usuario no eligió.
+function _protoEstadoHTML(p, intentoManual){
   var mot=p.motivo||{}, val=p.valoracion||{}, ant=p.antecedentes||{}, dxf=p.dxFuncional||{};
   var zona=_protoVal(mot.zonaPrincipal) || _protoVal((p.motivoHC||{}).zonaPrincipal);
   var lado=_protoVal(mot.lado);
@@ -21958,12 +22052,12 @@ function renderProtocolo(){
              : ('<div style="color:#B07A00;font-size:12px;margin-top:2px">Falta — captúralo en: '+escapeHTML(c.donde)+'</div>'))
       +'</div></div>';
   }).join('');
-  var html=''
-    + _soapSeguridadHTML(p)
-    + '<div style="padding:14px 16px 48px;max-width:720px;margin:0 auto">'
+  var cabecera = intentoManual
+    ? '<div style="font-weight:800;color:#15325B;font-size:15px;margin-bottom:4px">📋 Elige un protocolo arriba</div><div style="color:#667;font-size:12px;margin-bottom:10px">Ningún protocolo de la biblioteca coincidió automáticamente con el diagnóstico. Elige uno manualmente arriba para armar el plan periodizado. Mientras tanto, este es el estado clínico capturado:</div>'
+    : '<div style="font-weight:800;color:#15325B;font-size:15px;margin-bottom:4px">📋 Estado clínico para el plan</div><div style="color:#667;font-size:12px;margin-bottom:10px">Lo que el expediente ya tiene y lo que falta para armar un buen protocolo periodizado.</div>';
+  return '<div style="padding:14px 16px 48px">'
       + '<div style="background:#fff;border:1px solid #e6e9ef;border-radius:14px;padding:14px 16px;margin-bottom:14px">'
-        + '<div style="font-weight:800;color:#15325B;font-size:15px;margin-bottom:4px">📋 Estado clínico para el plan</div>'
-        + '<div style="color:#667;font-size:12px;margin-bottom:10px">Lo que el expediente ya tiene y lo que falta para armar un buen protocolo periodizado. Solo lectura — el armado del plan con la biblioteca viene en el siguiente paso.</div>'
+        + cabecera
         + '<div style="font-size:12px;color:'+barColor+';font-weight:800;margin-bottom:5px">'+hechos+' de '+total+' datos clave capturados</div>'
         + '<div style="height:8px;border-radius:6px;background:#eef1f5;overflow:hidden"><div style="height:100%;width:'+pct+'%;background:'+barColor+'"></div></div>'
       + '</div>'
@@ -21972,9 +22066,250 @@ function renderProtocolo(){
         + '<b>🛡️ Seguridad clínica (agentes físicos):</b><br>'
         + (segTxt ? escapeHTML(segTxt) : 'Sin datos de seguridad capturados — revísalo antes de indicar radiofrecuencia / diatermia / US térmico (metal, marcapaso, anticoagulación, cáncer, embarazo).')
       + '</div>'
-      + '<div style="text-align:center;color:#99a;font-size:12px;margin-top:18px">🚧 Siguiente paso: elegir protocolo de la biblioteca y armar el plan periodizado (macro/meso/micro + agentes físicos).</div>'
     + '</div>';
-  cont.innerHTML=html;
+}
+
+/* ============================================================================
+   MOTOR DE PROTOCOLOS — biblioteca como datos + generador del PROTOCOLO CLÍNICO
+   Fuente clínica: docs/biblioteca_protocolos.md (modelos Fausto P1 / Edgar P7).
+   Agentes físicos: "solo cuál y cuándo" (sin dosimetría). HSR explícito en tendón.
+   Transversal: semáforo del dolor (Silbernagel). Se avanza por CRITERIOS, no calendario.
+   ============================================================================ */
+var PROTO_SEMAFORO = [
+  ['g','VERDE','≤3/10 durante y normaliza en 24 h, sin aumento de rigidez matutina','progresar según criterios'],
+  ['a','ÁMBAR','4–5/10 durante, o molestia que cede en 24 h','mantener carga, no progresar, repetir semana'],
+  ['r','ROJO','>5/10 durante, rigidez matutina que empeora, o síntoma >24 h','bajar un escalón, revalorar 48–72 h']
+];
+var PROTO_LIB = [
+ { id:'P1', nombre:'Tendón rotuliano — tendinopatía / desgarre parcial del polo inferior',
+   metodo:'HSR (carga pesada-lenta)', hsr:true, duracion:'≈24 semanas',
+   kw:['rotulian','patelar','rotuliano','jumper','salto','entesitis del polo inferior','tendon rotuliano'],
+   encuadre:'La carga pesada-lenta (HSR) es el motor del remodelado del tendón; los agentes físicos son coadyuvantes. Si es desgarre parcial en reparación, dosificar respetando la cicatriz.',
+   precauciones:'Controlar la flexión profunda bajo carga (sentadilla profunda, aterrizajes) en fases tempranas. Posición de máxima tensión: extensión resistida en flexión profunda.',
+   fases:[
+     {id:'M1',nombre:'Descarga y analgesia',sem:'1–3',obj:'Controlar dolor, iniciar carga, proteger entesis',carga:'Isométricos cuádriceps 5×45s ~70% CVM',agentes:'Tecar + láser + US (coadyuvantes)',
+      sesion:['Agentes físicos: tecar atérmico + láser sobre polo inferior · US pulsado si edema','Isométricos de cuádriceps 5×45s ~70% CVM (sentadilla isométrica/extensión isométrica)','Movilidad indolora de rodilla · activación de glúteo/core','Crioterapia 10 min post-sesión si hay molestia']},
+     {id:'M2',nombre:'HSR introducción',sem:'4–8',obj:'Remodelado, tolerancia a carga lenta',carga:'HSR 3×/sem · tempo 3-3 · 3×10–12 · rango controlado',agentes:'Láser/tecar antes-después de la carga',
+      sesion:['HSR (sentadilla goblet talones elevados / prensa / extensión) tempo 3-3 · 3×10–12','Agentes como coadyuvantes antes/después','Control motor de rodilla y cadera']},
+     {id:'M3',nombre:'HSR fuerza (pesada)',sem:'9–14',obj:'Fuerza y capacidad del tendón',carga:'HSR 3×/sem → 8RM · rango completo · unilateral',agentes:'Agentes ocasionales si molestia',
+      sesion:['HSR pesado 3–4×8 (8RM) · añadir unilateral','Trabajo de cadena (glúteo/isquios)','Monitoreo del dolor matutino']},
+     {id:'M4',nombre:'Energía elástica / pliometría',sem:'15–20',obj:'Almacenamiento elástico, aterrizajes',carga:'Pliometría progresiva + 2×/sem HSR pesado',agentes:'Casi se retiran',
+      sesion:['Pliometría progresiva (saltos, aterrizajes controlados)','Mantener 2×/sem HSR pesado','Técnica de aterrizaje / control de valgo']},
+     {id:'M5',nombre:'Readaptación deportiva',sem:'21–24',obj:'Gesto específico y retorno',carga:'Salto/aterrizaje/cambios de dirección',agentes:'No requiere',
+      sesion:['Gesto deportivo por etapas','Cambios de dirección / desaceleración','Alta por criterios']}
+   ],
+   dosificacion:[
+     ['Sem 1','3×15','15RM','Entrada; priorizar técnica y tempo'],
+     ['Sem 2–3','3×12','12RM','Progresar si dolor ≤3/10 que cede en 24 h'],
+     ['Sem 4–8','3×10–12','10–12RM','Aumentar rango; énfasis excéntrico'],
+     ['Sem 9–12','3–4×8','8RM','Carga pesada; añadir unilateral'],
+     ['Avanzado','4×6','6RM','Máxima carga tolerable; base para pliometría']
+   ],
+   retorno:'Sin dolor de polo inferior en carga/gesto · cuádriceps ≥90% de simetría · hop tests ≥90% · VISA-P en ascenso.' },
+
+ { id:'P2', nombre:'Tendón de Aquiles — tendinopatía de porción media',
+   metodo:'HSR / excéntrico', hsr:true, duracion:'≈12–24 semanas',
+   kw:['aquiles','aquíleo','aquileo','tendon de aquiles','porcion media','insercional','triceps sural','gemelo'],
+   encuadre:'Carga progresiva del tríceps sural. Diferenciar porción media (mejor pronóstico) de insercional. El dolor matutino es el termómetro.',
+   precauciones:'Insercional: NO dejar caer el talón por debajo del escalón hasta fases avanzadas.',
+   fases:[
+     {id:'M1',nombre:'Analgesia / isométrico',sem:'1–2',obj:'Bajar dolor, activar',carga:'Isométrico de gemelo 5×45s',agentes:'Láser / tecar · US pulsado',
+      sesion:['Isométrico de gemelo 5×45s','Láser/tecar · US pulsado si dolor local','Movilidad de tobillo indolora']},
+     {id:'M2',nombre:'HSR / excéntrico intro',sem:'3–6',obj:'Carga lenta tolerante',carga:'Elevación de talón bipodal→unipodal · tempo 3-3 · 3×/sem',agentes:'Coadyuvantes',
+      sesion:['Elevación de talón (bipodal→unipodal) tempo 3-3','Progresión de rango','Monitoreo del dolor matutino']},
+     {id:'M3',nombre:'HSR fuerza',sem:'7–12',obj:'Capacidad de carga',carga:'Prensa de gemelo / mancuernas · unilateral',agentes:'Ocasional',
+      sesion:['Elevación de talón cargada (prensa/mancuerna) · unilateral','Fuerza progresiva']},
+     {id:'M4',nombre:'Energía elástica',sem:'13–18',obj:'Rebote, saltos',carga:'Skipping, saltos, pogos progresivos',agentes:'Casi se retiran',
+      sesion:['Pliometría progresiva (skipping, pogos)','Técnica de rebote']},
+     {id:'M5',nombre:'Readaptación / carrera',sem:'19–24',obj:'Retorno a correr/deporte',carga:'Progresión de carrera · gesto específico',agentes:'No requiere',
+      sesion:['Progresión de carrera','Gesto deportivo','Alta por criterios']}
+   ],
+   dosificacion:[
+     ['Intro','3×15','—','Elevación de talón tempo 3-3'],
+     ['Progresión','3×12','—','Aumentar carga/rango'],
+     ['Fuerza','3×8','8RM','Unilateral pesado'],
+     ['Insercional','—','—','Sin dejar caer el talón bajo el escalón hasta fases avanzadas']
+   ],
+   retorno:'Elevación unipodal ≥90% del lado sano (nº y carga) · hop/salto ≥90% · VISA-A en ascenso · correr sin dolor matutino.' },
+
+ { id:'P3', nombre:'Post-reconstrucción de LCA (injerto)',
+   metodo:'Progresión por fases + criterios', hsr:false, duracion:'≈9–12 meses',
+   kw:['lca','ligamento cruzado','cruzado anterior','acl','plastia','reconstruccion de rodilla','injerto'],
+   encuadre:'Proteger el injerto y la fijación; recuperar extensión completa temprano; evitar valgo dinámico. Retorno al deporte por criterios y no antes de ~9 meses.',
+   precauciones:'Extensión completa en las primeras 2 semanas. Sin derrame. Evitar valgo dinámico.',
+   fases:[
+     {id:'M1',nombre:'Postop temprano',sem:'0–2 sem',obj:'Control dolor/edema, extensión completa, activación de cuádriceps',carga:'Isométricos, movilidad, marcha',agentes:'Crio/compresión · EEM si inhibición',
+      sesion:['Isométricos de cuádriceps · activación','Movilidad → extensión completa','Crio/compresión · EEM si inhibición del cuádriceps']},
+     {id:'M2',nombre:'Fuerza base',sem:'3–12 sem',obj:'ROM completo, fuerza cuádriceps/isquios, control lumbopélvico',carga:'Cadena cerrada progresiva, bici, prensa, puentes',agentes:'Coadyuvantes',
+      sesion:['Cadena cerrada progresiva (prensa, sentadilla parcial)','Bici · puentes · control lumbopélvico']},
+     {id:'M3',nombre:'Fuerza / potencia',sem:'Mes 3–5',obj:'Fuerza ≥80% simetría, correr en recto',carga:'Fuerza pesada bilateral→unilateral · iniciar carrera por criterios',agentes:'—',
+      sesion:['Fuerza pesada bilateral→unilateral','Iniciar carrera en recto por criterios']},
+     {id:'M4',nombre:'Pliometría / agilidad',sem:'Mes 5–8',obj:'Aterrizajes, cambios de dirección controlados',carga:'Pliometría progresiva, desaceleración',agentes:'—',
+      sesion:['Pliometría progresiva · técnica de aterrizaje','Desaceleración y cambios de dirección']},
+     {id:'M5',nombre:'Retorno al deporte',sem:'Mes 9+',obj:'Gesto específico, contacto',carga:'Batería de retorno (LSI ≥90%, hop tests, fuerza, ACL-RSI)',agentes:'—',
+      sesion:['Gesto específico y contacto','Batería de retorno (LSI ≥90%)']}
+   ],
+   retorno:'Extensión completa temprana · sin derrame · cuádriceps ≥90% antes de pliometría pesada · LSI ≥90% en batería de saltos · ACL-RSI (psicológico).' },
+
+ { id:'P4', nombre:'Inestabilidad lateral crónica de tobillo',
+   metodo:'Propiocepción + fuerza de peroneos', hsr:false, duracion:'≈8–16 semanas',
+   kw:['esguince','tobillo','inestabilidad','peroneo','lateral de tobillo','ligamento lateral','giving way'],
+   encuadre:'Combinar fuerza de peroneos (eversores), control neuromuscular/propiocepción y reeducación del aterrizaje. Descartar inestabilidad mecánica quirúrgica.',
+   precauciones:'Considerar vendaje/órtesis en el retorno deportivo temprano.',
+   fases:[
+     {id:'M1',nombre:'Dolor / activación',sem:'1–2',obj:'Bajar dolor/edema, rango, activar peroneos',carga:'Isométricos de eversión, movilidad, apoyo',agentes:'Láser / tecar / US',
+      sesion:['Isométricos de eversión','Movilidad de tobillo · apoyo progresivo','Láser/tecar/US coadyuvante']},
+     {id:'M2',nombre:'Fuerza + equilibrio',sem:'3–6',obj:'Fuerza de eversores, estabilidad estática',carga:'Banda de eversión · apoyo monopodal (ojos abiertos→cerrados)',agentes:'Coadyuvantes',
+      sesion:['Banda de eversión progresiva','Apoyo monopodal (ojos abiertos→cerrados)']},
+     {id:'M3',nombre:'Propiocepción dinámica',sem:'7–10',obj:'Control dinámico, superficies inestables',carga:'Bosu/cojín · alcances multidireccionales (Star/Y-balance)',agentes:'—',
+      sesion:['Superficies inestables (bosu/cojín)','Alcances multidireccionales (Y-balance)']},
+     {id:'M4',nombre:'Pliometría / agilidad',sem:'11–14',obj:'Aterrizaje y cambios de dirección',carga:'Saltos uni/bipodales · desaceleración · cortes',agentes:'—',
+      sesion:['Saltos uni/bipodales','Desaceleración y cortes']},
+     {id:'M5',nombre:'Readaptación',sem:'15+',obj:'Gesto deportivo',carga:'Drills específicos · alta por criterios',agentes:'—',
+      sesion:['Drills deportivos específicos','Alta por criterios']}
+   ],
+   retorno:'Fuerza de eversores simétrica · Y-balance/SEBT simétrico · hop tests ≥90% · sin "giving way" · gesto sin aprensión.' },
+
+ { id:'P5', nombre:'Hombro — subacromial / tendinopatía del manguito (conservador)',
+   metodo:'Ejercicio progresivo del manguito + control escapular', hsr:false, duracion:'≈12–20 semanas',
+   kw:['hombro','manguito','rotador','subacromial','pinzamiento','supraespinoso','escapular'],
+   encuadre:'Carga progresiva del manguito + control escapular; evitar posiciones de pinzamiento al inicio; corregir cinemática escapulotorácica.',
+   precauciones:'Si hay desgarro de espesor completo irreparable o inestabilidad, revalorar con el médico.',
+   fases:[
+     {id:'M1',nombre:'Dolor / activación',sem:'1–3',obj:'Analgesia, activación del manguito sin pinzamiento',carga:'Isométricos de rotadores en rango neutro · control escapular',agentes:'Láser / tecar / US',
+      sesion:['Isométricos de rotadores en rango neutro','Control escapular (serrato)','Láser/tecar/US coadyuvante']},
+     {id:'M2',nombre:'Fuerza en rango medio',sem:'4–8',obj:'Fuerza de rotadores y escapulares',carga:'Banda: RE/RI, remo, serrato · rango progresivo',agentes:'Coadyuvantes',
+      sesion:['Banda: rotación externa/interna','Remo · serrato · rango progresivo']},
+     {id:'M3',nombre:'Fuerza en rango alto',sem:'9–14',obj:'Fuerza por encima del hombro',carga:'Elevación cargada, press controlado, pull',agentes:'Ocasional',
+      sesion:['Elevación cargada progresiva','Press controlado · pull']},
+     {id:'M4',nombre:'Potencia / funcional',sem:'15–18',obj:'Velocidad y función específica',carga:'Pliometría de MMSS (lanzar/atrapar) · cadena cinética',agentes:'—',
+      sesion:['Pliometría de MMSS (lanzar/atrapar)','Cadena cinética']},
+     {id:'M5',nombre:'Readaptación',sem:'19+',obj:'Gesto deportivo/laboral',carga:'Drills específicos · alta por criterios',agentes:'—',
+      sesion:['Drills específicos (deporte/trabajo)','Alta por criterios']}
+   ],
+   retorno:'Rotación externa/interna ≥90% de simetría · sin dolor nocturno · función por encima de la cabeza sin dolor · SPADI en mejora.' },
+
+ { id:'P6', nombre:'Lumbar — lumbalgia/lumbociática (control motor + carga graduada)',
+   metodo:'Control motor + ejercicio graduado + educación en dolor', hsr:false, duracion:'≈8–16 semanas',
+   kw:['lumbar','lumbalgia','lumbago','ciatica','ciática','radiculopatia','disco','hernia','discopatia','espalda baja'],
+   encuadre:'Educación en dolor, control motor lumbopélvico y progresión graduada de carga; preferencia direccional si existe (centralización). Evitar reposo prolongado.',
+   precauciones:'Banderas rojas neurológicas (déficit progresivo, cauda equina) → médico.',
+   fases:[
+     {id:'M1',nombre:'Dolor / educación',sem:'1–2',obj:'Bajar dolor, educación, movilidad sin provocar',carga:'Control motor básico (transverso/multífido), respiración',agentes:'Tecar / láser analgésico',
+      sesion:['Control motor básico (transverso/multífido)','Respiración · movilidad sin provocar','Tecar/láser analgésico']},
+     {id:'M2',nombre:'Control motor + base',sem:'3–6',obj:'Estabilidad, tolerancia a posiciones',carga:'Bird-dog, puente, dead-bug · cargas ligeras por patrón',agentes:'Coadyuvantes',
+      sesion:['Bird-dog · puente · dead-bug','Cargas ligeras por patrón']},
+     {id:'M3',nombre:'Fuerza graduada',sem:'7–10',obj:'Fuerza de cadena posterior y global',carga:'Bisagra de cadera, sentadilla, remo · progresión de carga',agentes:'—',
+      sesion:['Bisagra de cadera · sentadilla · remo','Progresión de carga']},
+     {id:'M4',nombre:'Carga / función',sem:'11–14',obj:'Tolerancia a carga y gesto',carga:'Patrones cargados, levantamiento, acondicionamiento',agentes:'—',
+      sesion:['Patrones cargados · levantamiento','Acondicionamiento']},
+     {id:'M5',nombre:'Readaptación',sem:'15+',obj:'Actividad/laboral/deporte',carga:'Gesto específico · alta por criterios',agentes:'—',
+      sesion:['Gesto laboral/deportivo específico','Alta por criterios']}
+   ],
+   retorno:'Tolerancia a sedestación/carga sin aumento radicular · fuerza y resistencia de core · función laboral/deportiva sin flare sostenido.' },
+
+ { id:'P7', nombre:'Post-op reinserción tendón-hueso (extensor/epicóndilo) — reintegración deportiva',
+   metodo:'Carga tendinosa escalonada + retorno por criterios (autoriza cirujano)', hsr:true, duracion:'por fases (criterios)',
+   kw:['epicondil','extensor','codo','reinsercion','ancla','tendon hueso','escalada','epitroclear'],
+   encuadre:'Reparación tendón-hueso con anclas → la cicatriz de inserción manda; progresión por fases y con AUTORIZACIÓN del cirujano para liberar el retorno deportivo.',
+   precauciones:'Posición de máxima tensión del extensor: extensión terminal de codo + agarre fuerte + muñeca extendida con codo separado de la pared. Fase 4 SOLO con autorización del cirujano.',
+   fases:[
+     {id:'F1',nombre:'Protección',sem:'0–2 sem',obj:'Proteger la reinserción',carga:'Arco sin extensión terminal · férula de muñeca',agentes:'Crio/compresión/elevación',
+      sesion:['Arco permitido sin extensión terminal','Crio/compresión/elevación · férula','Evitar agarre fuerte y estiramiento de extensores']},
+     {id:'F2',nombre:'Movilidad y activación',sem:'2–6 sem',obj:'Recuperar arco, activar',carga:'Flexo-extensión a completo gradual · prono-supinación · isométricos submáximos indoloros',agentes:'Manejo de cicatriz',
+      sesion:['Flexo-extensión a completo gradual','Prono-supinación · isométricos submáximos indoloros','Manejo de cicatriz']},
+     {id:'F3',nombre:'Carga tendinosa',sem:'6–12 sem',obj:'Capacidad de carga del tendón',carga:'Isométrico analgésico 5×45s ~70% CVM + excéntrico lento 3×15 (banda→mancuerna→pesa rusa) · agarre con dinamómetro (% contralateral)',agentes:'Coadyuvantes',
+      sesion:['Isométrico analgésico 5×45s','Excéntrico lento tempo 3 · 3×15 (banda→mancuerna)','Agarre con dinamómetro (% contralateral) · cadena escápulo-humeral']},
+     {id:'F4',nombre:'Reintegración (autoriza cirujano)',sem:'>12 sem',obj:'Retorno deportivo por etapas',carga:'Agarre progresivo (abierto→romo→regleta) · hangboard dosificado · pliometría de MS',agentes:'—',
+      sesion:['SOLO con autorización del cirujano','Agarre progresivo · hangboard con descarga de % de peso','Pliometría de MS tras tolerar carga estática']}
+   ],
+   dosificacion:[
+     ['Escalera','1) isométrico','→','2) isotónico resistido lento (tempo 3-3, 3×/sem)'],
+     ['','3) energía elástica','→','4) gesto deportivo por etapas (volumen antes que intensidad)'],
+     ['Regla dolor','≤4/10','','durante Y a la mañana siguiente, sin aumento semanal; si se rompe → etapa previa']
+   ],
+   retorno:'Arco completo indoloro · extensores y agarre ≥85–90% del contralateral · tolera carga pesada + energía elástica · decisión compartida fisio–cirujano–paciente (firma de autorización para Fase 4).' }
+];
+function _protoNorm(s){try{return String(s==null?'':s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');}catch(_){return String(s==null?'':s).toLowerCase();}}
+function _protoSugerir(p){
+  var dx=_protoNorm((typeof _protoDx==='function'?_protoDx(p):'')+' '+((p&&p.motivo&&p.motivo.dxMedico)||'')+' '+((p&&p.dxFuncional&&p.dxFuncional.dxClinico)||''));
+  var best=null,bestN=0;
+  PROTO_LIB.forEach(function(pr){ var n=0; pr.kw.forEach(function(k){ if(dx.indexOf(_protoNorm(k))>=0) n++; }); if(n>bestN){bestN=n;best=pr;} });
+  return bestN>0?best:null;
+}
+function _protoById(id){ for(var i=0;i<PROTO_LIB.length;i++) if(PROTO_LIB[i].id===id) return PROTO_LIB[i]; return null; }
+// Banderas de seguridad para filtrar agentes físicos ("solo cuál y cuándo").
+function _protoSegFlags(p){
+  var seg=p.seguridadClinica||{};
+  var blob=_protoNorm([seg.implantes,seg.implantesDetalle,seg.condiciones,seg.condicionesObs,seg.banderasRojas,p.contraindicaciones].map(function(x){return x||'';}).join(' '));
+  var metal=/marcapaso|desfibrilador|dai|osteosintesis|protesis|placa|clavo|tornillo|implante|stent|material de osteo/.test(blob);
+  var anticoag=/anticoagul|warfarina|acenocumarol|rivaroxab|apixab/.test(blob);
+  var cancer=/cancer|oncolog|tumor|linfoma|leucemia|metastas|quimio|radioterap/.test(blob);
+  var otros=[]; if(anticoag) otros.push('anticoagulación'); if(cancer) otros.push('cáncer activo');
+  return {metal:metal,otros:otros,
+    texto: metal ? 'Metal/implante referido → NO radiofrecuencia / diatermia / tecar térmica / US térmico sobre el material.'
+         : (otros.length ? ('Precaución por '+otros.join(' y ')+' — valorar agentes físicos.') : 'Sin implantes/metal referidos → tecar, US y ondas disponibles.')};
+}
+function _protoChip(t){ return '<span class="pchip">'+escapeHTML(t)+'</span>'; }
+function _protoGenerarHTML(p, pr, faseId){
+  if(!pr) return '<div style="padding:16px;color:#889">Elige un protocolo para generar el plan.</div>';
+  var fases=pr.fases||[]; var fase=null; for(var i=0;i<fases.length;i++){ if(fases[i].id===faseId) fase=fases[i]; } if(!fase) fase=fases[0]||{};
+  var sf=_protoSegFlags(p);
+  var mot=p.motivo||{}, val=p.valoracion||{}, ant=p.antecedentes||{}, dxf=p.dxFuncional||{};
+  var zona=_protoVal(mot.zonaPrincipal)||_protoVal((p.motivoHC||{}).zonaPrincipal);
+  var lado=_protoVal(mot.lado);
+  var region=[zona,lado].filter(Boolean).join(' ')||'—';
+  var deporte=(_protoVal(ant.deportivos)||_protoVal(ant.deporteFrecuencia))||'—';
+  var eva=(val.eva!=null&&val.eva!=='')?(String(val.eva)+'/10'):'';
+  var rom=_protoVal(val.rom); var fza=_protoVal(val.fuerza);
+  var obj=_protoVal(dxf.objetivosCP)||_protoVal(dxf.objetivosLP);
+  var dx=_protoDx(p)||'—';
+  var fisio=p.terapeuta||p.terapeutaSeguimiento||'—';
+  function estRow(k,v,hint){ return '<div class="prow"><div class="pk">'+k+'</div><div class="pv'+(v?'':' pwarn')+'">'+(v?escapeHTML(v):('⚠️ '+hint))+'</div></div>'; }
+  var macro=fases.map(function(f){
+    var hot=(f.id===fase.id);
+    return '<tr'+(hot?' class="phot"':'')+'><td><b>'+escapeHTML(f.id)+'</b> '+escapeHTML(f.nombre)+(hot?' <span class="ppill now">AQUÍ</span>':'')+'</td><td>'+escapeHTML(f.sem||'')+'</td><td>'+escapeHTML(f.obj||'')+'</td><td>'+escapeHTML(f.carga||'')+(f.agentes?(' · <i>'+escapeHTML(f.agentes)+'</i>'):'')+'</td></tr>';
+  }).join('');
+  var dosi=''; if(pr.dosificacion&&pr.dosificacion.length){
+    dosi='<div class="psec"><div class="psh"><span class="psn">05</span><span class="pst">Dosificación'+(pr.hsr?' HSR':'')+'</span></div><table class="ptab"><tr><th>Bloque</th><th>Series × reps</th><th>Carga</th><th>Nota clínica</th></tr>'+
+      pr.dosificacion.map(function(r){return '<tr><td>'+escapeHTML(r[0])+'</td><td>'+escapeHTML(r[1])+'</td><td>'+escapeHTML(r[2])+'</td><td>'+escapeHTML(r[3])+'</td></tr>';}).join('')+'</table></div>';
+  }
+  var sesion=(fase.sesion||[]).map(function(s,i){return '<div class="pses">'+(i+1)+') '+escapeHTML(s)+'</div>';}).join('');
+  var sem=PROTO_SEMAFORO.map(function(s){return '<div class="psem '+s[0]+'"><div class="plbl">'+s[1]+'</div><div>'+escapeHTML(s[2])+' → <b>'+escapeHTML(s[3])+'</b></div></div>';}).join('');
+  return ''+
+  '<div class="pcard-band">'+
+    '<div class="pkick">Protocolo de tratamiento · Clínica Sinergia</div>'+
+    '<div class="ptitle">'+escapeHTML(pr.nombre)+'</div>'+
+    '<div class="psub">Plan periodizado · '+escapeHTML(pr.metodo)+' · '+escapeHTML(pr.duracion)+'</div>'+
+    '<div class="pmeta"><span><b>'+escapeHTML((p.name||'').trim()||'—')+'</b>'+(p.age!=null&&p.age!==''?(' · '+escapeHTML(String(p.age))+' años'):'')+'</span>'+
+      '<span>Región: <b>'+escapeHTML(region)+'</b></span><span>Deporte: <b>'+escapeHTML(deporte)+'</b></span><span>Fisio: <b>'+escapeHTML(fisio)+'</b></span></div>'+
+    '<div class="pchips">'+_protoChip('Ubicación: Fase '+fase.id+(fase.sem?(' ('+fase.sem+')'):''))+
+      (pr.hsr?_protoChip('Método: HSR'):'')+
+      '<span class="pchip'+(sf.metal?' pchip-warn':'')+'">'+(sf.metal?'⚠️ Agentes con restricción (metal)':'Agentes físicos: disponibles')+'</span>'+'</div>'+
+  '</div>'+
+  '<div class="pbody">'+
+    '<div class="psec"><div class="psh"><span class="psn">01</span><span class="pst">Evolución y estado funcional (hoy)</span></div><div class="pcardb">'+
+      '<div class="prow"><div class="pk">Diagnóstico</div><div class="pv">'+escapeHTML(dx)+'</div></div>'+
+      estRow('Dolor (EVA)',eva,'capturar en Valoración')+
+      estRow('Arco de movimiento',rom,'baseline pendiente — capturar en Valoración para dosificar')+
+      estRow('Fuerza',fza,'baseline pendiente — es el motor del plan (% simetría)')+
+      estRow('Objetivo funcional',obj,'pendiente — define los criterios de retorno')+
+    '</div></div>'+
+    '<div class="psec"><div class="psh"><span class="psn">02</span><span class="pst">Encuadre clínico y precauciones</span></div><div class="pcardb ptxt">'+
+      escapeHTML(pr.encuadre)+'<br><b>Precauciones:</b> '+escapeHTML(pr.precauciones)+
+      '<div class="psafe'+(sf.metal?' psafe-warn':'')+'">🛡️ Seguridad: '+escapeHTML(sf.texto)+'</div>'+
+    '</div></div>'+
+    '<div class="psec"><div class="psh"><span class="psn">03</span><span class="pst">Macrociclo y mesociclos ('+escapeHTML(pr.duracion)+')</span></div>'+
+      '<table class="ptab"><tr><th>Fase</th><th>Tiempo</th><th>Objetivo</th><th>Carga / agentes</th></tr>'+macro+'</table>'+
+      '<div class="pnote">Las semanas son guía: <b>se avanza por CRITERIOS, no por calendario</b>.</div></div>'+
+    dosi+
+    '<div class="psec"><div class="psh"><span class="psn">06</span><span class="pst">Sesión tipo — fase actual ('+escapeHTML(fase.id)+')</span></div><div class="pcardb">'+sesion+
+      '<div class="plink">🏃 <b>Esta sesión tipo se convierte en la RUTINA del paciente</b> → se le manda por el link de ejercicios que ya existe (WhatsApp / rutina.html), con el semáforo del dolor. <i>(Incremento 3.)</i></div>'+
+    '</div></div>'+
+    '<div class="psec"><div class="psh"><span class="psn">08</span><span class="pst">Monitoreo del dolor (semáforo)</span></div>'+sem+'</div>'+
+    '<div class="psec"><div class="psh"><span class="psn">07</span><span class="pst">Criterios de retorno</span></div><div class="pcardb ptxt">'+escapeHTML(pr.retorno)+'</div></div>'+
+    '<div class="pfoot">Documento de apoyo a la decisión clínica — <b>no sustituye el criterio del fisioterapeuta tratante</b>. Individualizar por edad, deporte, comorbilidades y seguridad clínica.</div>'+
+  '</div>';
 }
 
 // ── Envío de ejercicios por WhatsApp (híbrido, robusto) ────────────────────
