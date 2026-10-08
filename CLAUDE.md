@@ -48,6 +48,17 @@ Después de cualquier cambio, decisión o diagnóstico relevante (sobre todo de 
 
 # Trabajo pendiente
 
+## PRÓXIMA FUNCIÓN GRANDE — Protocolos / Dosificación en la app (EN CURSO — prioridad de Carlos)
+Objetivo: estandarizar los planes de tratamiento con **periodización** (macrociclo → mesociclo → microciclo + agentes físicos) como **FUNCIÓN de la app**, no a mano. Que el plan salga siempre con la misma lógica y los fisios aprendan a construir macro/meso/micro.
+- **Fundamento LISTO (en el repo):** `docs/biblioteca_protocolos.md` — biblioteca de ~7 protocolos periodizados + la plantilla de 2 documentos (sin PHI). Ejemplos ya armados en PDF (Fausto, Christopher Mercado) con `scratchpad/build_christopher.py` — OJO: el scratchpad es EFÍMERO (se pierde entre sesiones); lo durable es la biblioteca en `docs/`. Los PDF de ejemplo traían PHI → NO van al repo.
+- **Modelo (de la biblioteca):** cada paciente recibe DOS documentos del MISMO plan: (1) **PROTOCOLO CLÍNICO** (expediente/médico): periodización completa + razonamiento + agentes físicos por fase + criterios, en 8 secciones (evolución/estado funcional; encuadre+precauciones; macro/mesociclos; progresión por CRITERIOS no calendario; dosificación; sesión tipo; criterios de retorno; semáforo del dolor). (2) **RUTINA DEL PACIENTE** (lenguaje simple + semáforo del dolor).
+- **Reglas de oro del plan:** periodizar por CRITERIOS, no calendario; la CARGA es el motor (ejercicio terapéutico) y los agentes físicos son COADYUVANTES; dosificar respetando el tejido (tendón≠ligamento≠hueso≠post-qx); monitoreo del dolor transversal (semáforo Silbernagel; en tendón, la rigidez/dolor matutino es el termómetro); individualizar por edad/deporte/comorbilidades y **seguridad clínica** (metal/osteosíntesis → NO radiofrecuencia/diatermia/tecar térmica/US térmico sobre el material; marcapaso; anticoagulación; embarazo; cáncer) — se LIGA con `_soapSeguridadHTML`/`seguridadClinica` (alerta de metal ya existe, PR #419).
+- **Visión de la función:** pestaña/función nueva en el expediente que (a) SACA el estado clínico del expediente (dx, región/lado, EVA, fuerza/ROM, deporte/gesto, manejo conservador/post-qx, seguridadClinica) y **MUESTRA QUÉ FALTA** (así los fisios se dan cuenta de lo que no capturaron); (b) elige protocolo de la biblioteca según dx; (c) arma el PROTOCOLO + la RUTINA pre-llenados y editables; (d) guarda + comparte (evaluar reusar la maquinaria de `ejercicios`/link del paciente).
+- **Primer paciente para estrenarla:** Christopher Mercado (su protocolo ya está armado como referencia).
+- **Estado actual:** hoy la app tiene la función `ejercicios` (rutina con link), pero NO hay pestaña de Protocolo/Dosificación. Tabs del expediente hoy: historia/valoracion/soap/estudios/reporte/consent. Se estaba mapeando la función de ejercicios/rutina para construir ENCIMA (no aparte).
+- **PENDIENTE decidir al construir:** ¿pestaña nueva "Protocolo" o se extiende "ejercicios"? cómo pre-llenar desde el expediente; cómo generar/compartir los 2 documentos.
+- Al construir: cumplir las REGLAS PERMANENTES de arriba (integridad de guardado; Android+iOS).
+
 ## [TEMPORAL] Acciones de mantenimiento en el backend (Claude) — QUITAR AL TERMINAR
 Se agregaron 4 acciones `claude*` a `config/Codigo.gs` (dentro de `_claudeRouter_`, justo antes del `return` de "Acción claude no reconocida"), en un bloque marcado `INICIO/FIN MANTENIMIENTO TEMPORAL`, con candado `CLAUDE_TOKEN`:
 - `claudeBorrarEstudio` (quita un estudio por estudioId|name|url; respaldo en `revision/`).
