@@ -1617,6 +1617,23 @@ body.modo-oscuro .topbar{background:#141824}
 #content-protocolo .psem.a .plbl{background:#B07A00}
 #content-protocolo .psem.r .plbl{background:#C0392B}
 #content-protocolo .pfoot{border-top:2px solid #e5e9f0;margin-top:22px;padding-top:12px;font-size:11px;color:#5b6b7d;line-height:1.5}
+/* Inc. A — barra de desbloqueo progresivo del protocolo (dentro de #content-protocolo) */
+#content-protocolo .proto-unlock{display:flex;gap:12px;align-items:flex-start;margin:12px 16px;padding:13px 15px;background:#FFF8E8;border:1.5px solid #EAD9A0;border-radius:14px}
+#content-protocolo .proto-unlock.ok{background:#EEF7F1;border-color:#C4E2CE}
+#content-protocolo .proto-unlock .pul-ico{font-size:22px;line-height:1;flex:0 0 auto}
+#content-protocolo .proto-unlock .pul-body{flex:1;min-width:0}
+#content-protocolo .proto-unlock .pul-t{font-weight:800;color:#6b5a1f;font-size:14px}
+#content-protocolo .proto-unlock.ok .pul-t{color:#1E6B45}
+#content-protocolo .proto-unlock .pul-s{color:#8a7736;font-size:12px;margin-top:2px;line-height:1.45}
+#content-protocolo .proto-unlock.ok .pul-s{color:#3c7b58}
+#content-protocolo .proto-unlock .pul-chips{display:flex;flex-wrap:wrap;gap:7px;margin-top:9px}
+#content-protocolo .proto-unlock .pul-bar{height:7px;border-radius:6px;background:#efe3c4;overflow:hidden;margin-top:10px}
+#content-protocolo .proto-unlock .pul-fill{height:100%;background:#C49A2E;transition:width .3s}
+#content-protocolo .proto-unlock .pul-pct{font-size:11px;font-weight:800;color:#9a8436;margin-top:4px}
+/* Botón "falta este dato" (deep-link) — GLOBAL: se usa en el protocolo y el resaltado cae en el expediente */
+.proto-falta-btn{display:inline-block;background:#fff;border:1.5px solid #E0B651;color:#9A6B00;border-radius:999px;padding:6px 12px;font-size:12px;font-weight:800;cursor:pointer;font-family:inherit;line-height:1.2;margin:2px 0;-webkit-tap-highlight-color:transparent}
+.proto-falta-btn:active{background:#FFF4DD}
+.proto-focusfield{outline:3px solid #C49A2E !important;outline-offset:2px;border-radius:8px;box-shadow:0 0 0 4px rgba(196,154,46,.18) !important;transition:box-shadow .2s,outline .2s}
 </style>
 <div class="screen" id="screen-protocolo">
   <div class="topbar">
@@ -10848,6 +10865,9 @@ function renderExpediente(tab='historia'){
   // Alerta de seguridad clínica — visible en TODOS los tabs del expediente (incluida SOAP/notas).
   // Caja rica y específica (implantes, condiciones, contraindicaciones, banderas, alergias); roja si es grave.
   html+=_soapSeguridadHTML(p);
+  // Inc. C — aviso de "qué falta para el protocolo" donde el fisio ya trabaja (Historia/Valoración).
+  // Oculto si los datos clave ya están completos. Botón → abre la pestaña Protocolo. Solo lectura.
+  if(tab==='historia'||tab==='valoracion'){ try{ html+=_protoAvisoExpedienteHTML(p); }catch(_){} }
 
   if(tab==='historia'){
     if(hasContra) html+=`<div class="contraindication-box">⚠️ ${escapeHTML(p.contraindicaciones)}</div>`;
@@ -21991,6 +22011,104 @@ function _protoDx(p){
   var d = (p.dx && typeof p.dx==='object') ? (p.dx.dxClinico||p.dx.dxMedico||'') : '';
   return _protoVal(d) || _protoVal((p.motivo||{}).dxMedico) || _protoVal((p.dxFuncional||{}).dxClinico) || '';
 }
+// ── DESBLOQUEO PROGRESIVO (Inc. A) ───────────────────────────────────────────
+// Fuente ÚNICA de completitud del protocolo: qué datos clínicos tiene el expediente y qué falta.
+// Cada campo trae su destino de captura (sec = sección de editarHistoria, fid = id del input) para
+// el deep-link. Los CLAVE son el mínimo que "libera" el plan (PDF + rutina con confianza).
+// Solo LECTURA (no toca guardado). activo=migrado (lee currentPatient). Android/iOS (DOM puro).
+function _protoCompletitud(p){
+  p=p||{};
+  var mot=p.motivo||{}, val=p.valoracion||{}, ant=p.antecedentes||{}, dxf=p.dxFuncional||{};
+  var zona=_protoVal(mot.zonaPrincipal) || _protoVal((p.motivoHC||{}).zonaPrincipal);
+  var lado=_protoVal(mot.lado);
+  var campos=[
+    {k:'Diagnóstico',             v:_protoDx(p),                                                 sec:'generales',   fid:'ed-dx',        clave:true},
+    {k:'Dolor actual (EVA)',      v:((val.eva!=null&&val.eva!=='')?(String(val.eva)+'/10'):''),  sec:'valoracion',  fid:'ed-eva',       clave:true},
+    {k:'Arco de movimiento (ROM)',v:_protoVal(val.rom),                                          sec:'valoracion',  fid:'ed-rom',       clave:true},
+    {k:'Fuerza',                  v:_protoVal(val.fuerza),                                       sec:'valoracion',  fid:'ed-fuerza',    clave:true},
+    {k:'Objetivo funcional',      v:_protoVal(dxf.objetivosCP)||_protoVal(dxf.objetivosLP),      sec:'dxfuncional', fid:'ed-objcp',     clave:true},
+    {k:'Región y lado',           v:[zona,lado].filter(Boolean).join(' · '),                     sec:'motivo',      fid:'',             clave:false},
+    {k:'Mecanismo de lesión',     v:_protoVal(mot.mecanismo),                                    sec:'motivo',      fid:'ed-mecanismo', clave:false},
+    {k:'Tiempo de evolución',     v:_protoVal(mot.desdeCuando)||_protoVal(mot.evolucion),        sec:'motivo',      fid:'ed-evolucion', clave:false},
+    {k:'Deporte / actividad',     v:_protoVal(ant.deportivos)||_protoVal(ant.deporteFrecuencia), sec:'antecedentes',fid:'ed-deportivos',clave:false}
+  ];
+  var hechos=0, claveTotal=0, claveHechos=0, claveFaltan=[];
+  campos.forEach(function(c){ c.ok=!!c.v; if(c.ok) hechos++;
+    if(c.clave){ claveTotal++; if(c.ok) claveHechos++; else claveFaltan.push(c); } });
+  var total=campos.length;
+  return { campos:campos, hechos:hechos, total:total, pct:Math.round(100*hechos/total),
+           claveTotal:claveTotal, claveHechos:claveHechos, claveFaltan:claveFaltan,
+           clavePct:claveTotal?Math.round(100*claveHechos/claveTotal):100,
+           completoClave:(claveFaltan.length===0), tieneDx:!!_protoDx(p) };
+}
+// Deep-link: abre "Editar datos" en la sección correcta y enfoca el campo que falta.
+// Si estamos en la pantalla Protocolo, regresa al expediente primero (editarHistoria pinta en
+// #content-expediente). Resalta el campo 2.6 s. Robusto si algo no existe (try/catch).
+function _protoIrACampo(sec, fid){
+  try{
+    var sp=document.getElementById('screen-protocolo');
+    if(sp && sp.classList.contains('active')){ showScreen('screen-expediente', false); }
+  }catch(_){}
+  try{ editarHistoria(sec); }catch(_){}
+  setTimeout(function(){
+    try{
+      var el=fid?document.getElementById(fid):null;
+      if(el){
+        try{ el.scrollIntoView({behavior:'smooth',block:'center'}); }catch(_){ try{el.scrollIntoView();}catch(__){} }
+        try{ el.focus({preventScroll:true}); }catch(_){ try{ el.focus(); }catch(__){} }
+        el.classList.add('proto-focusfield');
+        setTimeout(function(){ try{ el.classList.remove('proto-focusfield'); }catch(_){} }, 2600);
+      }
+    }catch(_){}
+  }, 180);
+}
+// Barra de desbloqueo dentro de la pestaña Protocolo: muestra el % de datos clave y un botón por
+// cada dato faltante (deep-link). Verde "liberado" cuando están todos. Es la recompensa visible.
+function _protoDesbloqueoHTML(p, comp){
+  comp = comp || _protoCompletitud(p);
+  if(comp.completoClave){
+    return '<div class="proto-unlock ok">'
+      + '<div class="pul-ico">✅</div>'
+      + '<div class="pul-body"><div class="pul-t">Datos clave completos — protocolo y rutina liberados</div>'
+      + '<div class="pul-s">Ya puedes generar el PDF y mandar la rutina del paciente con confianza.</div></div>'
+      + '</div>';
+  }
+  var n=comp.claveFaltan.length;
+  var chips=comp.claveFaltan.map(function(c){
+    return '<button type="button" class="proto-falta-btn" onclick="_protoIrACampo(\''+c.sec+'\',\''+c.fid+'\')">⚠️ '
+      + escapeHTML(c.k.replace(/\s*\(.*\)/,'')) + ' →</button>';
+  }).join('');
+  return '<div class="proto-unlock">'
+    + '<div class="pul-ico">🔓</div>'
+    + '<div class="pul-body">'
+      + '<div class="pul-t">Desbloquea el protocolo completo — falta'+(n>1?'n':'')+' '+n+' dato'+(n>1?'s':'')+' clave</div>'
+      + '<div class="pul-s">Toca cada uno para capturarlo donde va; al completarlos el plan queda listo para PDF y rutina.</div>'
+      + '<div class="pul-chips">'+chips+'</div>'
+      + '<div class="pul-bar"><div class="pul-fill" style="width:'+comp.clavePct+'%"></div></div>'
+      + '<div class="pul-pct">'+comp.claveHechos+' de '+comp.claveTotal+' datos clave</div>'
+    + '</div></div>';
+}
+// Aviso en el expediente (Inc. C): empuja a capturar lo que falta para el protocolo, donde el fisio
+// YA trabaja (Historia/Valoración). Oculto si ya está completo. Botón → abre la pestaña Protocolo.
+// Estilos inline (vive fuera de #content-protocolo). Solo lectura; robusto con try/catch.
+function _protoAvisoExpedienteHTML(p){
+  try{
+    if(!p) return '';
+    var comp=_protoCompletitud(p);
+    if(comp.completoClave) return '';
+    var n=comp.claveFaltan.length;
+    var faltan=comp.claveFaltan.map(function(c){ return c.k.replace(/\s*\(.*\)/,''); }).join(', ');
+    return '<div style="display:flex;align-items:center;gap:10px;margin:10px 14px 0;padding:11px 14px;'
+      + 'background:#FFF8E8;border:1.5px solid #EAD9A0;border-radius:14px">'
+      + '<div style="font-size:20px;line-height:1">📋</div>'
+      + '<div style="flex:1;min-width:0">'
+        + '<div style="font-weight:800;color:#6b5a1f;font-size:13px">Protocolo al '+comp.clavePct+'% — falta'+(n>1?'n':'')+': '+escapeHTML(faltan)+'</div>'
+        + '<div style="color:#8a7736;font-size:11.5px;margin-top:1px">Captura estos datos para generar el protocolo de tratamiento y la rutina del paciente.</div>'
+      + '</div>'
+      + '<button type="button" onclick="showProtocolo()" style="flex:0 0 auto;background:var(--navy,#1B3A6B);color:#fff;border:none;border-radius:12px;padding:9px 13px;font-size:12px;font-weight:800;cursor:pointer;font-family:inherit">Abrir Protocolo →</button>'
+      + '</div>';
+  }catch(_){ return ''; }
+}
 // Orquestador: sugiere protocolo según dx, deja elegir protocolo + fase, y arma el plan.
 // window._protoSel[p.id] = {proto, fase, _auto}. Si no hay protocolo elegido/sugerido → tarjeta de estado.
 function renderProtocolo(){
@@ -22013,7 +22131,8 @@ function renderProtocolo(){
   var faseId = s.fase || (pr && pr.fases[0] && pr.fases[0].id) || '';
   var autoNote = (s._auto && pr) ? '<div class="proto-autonote">✨ Protocolo <b>sugerido</b> según el diagnóstico del expediente. Puedes cambiarlo o la fase arriba, y <b>💾 Guardar plan</b> para dejarlo en el expediente.</div>' : '';
   var body = pr ? _protoGenerarHTML(p, pr, faseId) : _protoEstadoHTML(p, s.proto!==undefined);
-  cont.innerHTML = _soapSeguridadHTML(p) + '<div class="proto-wrap">' + _protoSelectorHTML(p, pr, faseId) + _protoAccionesHTML(p, pr, faseId) + autoNote + body + '</div>';
+  var desbloqueo = _protoDesbloqueoHTML(p);
+  cont.innerHTML = _soapSeguridadHTML(p) + '<div class="proto-wrap">' + _protoSelectorHTML(p, pr, faseId) + desbloqueo + _protoAccionesHTML(p, pr, faseId) + autoNote + body + '</div>';
 }
 // Lee el plan guardado del expediente (activo o migrado): p.planTto.protocolo = {id,fase,fechaGuardado,guardadoPor}.
 function _protoPlanGuardado(p){
@@ -22228,33 +22347,22 @@ async function _protoPDF(modo){
 }
 // Tarjeta de ESTADO CLÍNICO ("qué falta") — fallback cuando ningún protocolo coincide o el usuario no eligió.
 function _protoEstadoHTML(p, intentoManual){
-  var mot=p.motivo||{}, val=p.valoracion||{}, ant=p.antecedentes||{}, dxf=p.dxFuncional||{};
-  var zona=_protoVal(mot.zonaPrincipal) || _protoVal((p.motivoHC||{}).zonaPrincipal);
-  var lado=_protoVal(mot.lado);
-  var campos=[
-    {k:'Diagnóstico', v:_protoDx(p), donde:'Valoración / Editar datos'},
-    {k:'Región y lado', v:[zona,lado].filter(Boolean).join(' · '), donde:'Valoración → Motivo'},
-    {k:'Mecanismo de lesión', v:_protoVal(mot.mecanismo), donde:'Valoración → Motivo'},
-    {k:'Tiempo de evolución', v:_protoVal(mot.desdeCuando)||_protoVal(mot.evolucion), donde:'Valoración → Motivo'},
-    {k:'Dolor actual (EVA)', v:((val.eva!=null&&val.eva!=='')?(String(val.eva)+'/10'):''), donde:'Valoración'},
-    {k:'Arco de movimiento (ROM)', v:_protoVal(val.rom), donde:'Valoración'},
-    {k:'Fuerza', v:_protoVal(val.fuerza), donde:'Valoración'},
-    {k:'Deporte / actividad', v:_protoVal(ant.deportivos)||_protoVal(ant.deporteFrecuencia), donde:'Editar datos → Antecedentes'},
-    {k:'Objetivo funcional', v:_protoVal(dxf.objetivosCP)||_protoVal(dxf.objetivosLP), donde:'Valoración → Dx funcional'}
-  ];
-  var hechos=campos.filter(function(c){return !!c.v;}).length, total=campos.length;
-  var pct=Math.round(100*hechos/total);
+  var comp=_protoCompletitud(p);
+  var campos=comp.campos, hechos=comp.hechos, total=comp.total, pct=comp.pct;
   var barColor = pct>=80?'#1F8A4C':(pct>=50?'#C49A2E':'#C0392B');
   var seg=p.seguridadClinica||{};
   var segTxt=[_protoVal(seg.implantes),_protoVal(seg.implantesDetalle),_protoVal(seg.condiciones),_protoVal(seg.condicionesObs),_protoVal(seg.banderasRojas),_protoVal(p.contraindicaciones),_protoVal(p.alergias)].filter(Boolean).join(' · ');
   var filas=campos.map(function(c){
     var ok=!!c.v;
+    var faltaLinea = c.sec
+      ? ('<button type="button" class="proto-falta-btn" onclick="_protoIrACampo(\''+c.sec+'\',\''+(c.fid||'')+'\')">⚠️ Capturar '+escapeHTML(c.k.replace(/\s*\(.*\)/,'').toLowerCase())+' →</button>')
+      : ('<span style="color:#B07A00;font-size:12px">Falta — captúralo en el expediente</span>');
     return '<div style="display:flex;gap:10px;align-items:flex-start;padding:10px 0;border-bottom:1px solid #eef1f5">'
-      +'<div style="flex:0 0 20px;font-size:15px;line-height:1.3">'+(ok?'✅':'⚠️')+'</div>'
+      +'<div style="flex:0 0 20px;font-size:15px;line-height:1.3">'+(ok?'✅':(c.clave?'⚠️':'○'))+'</div>'
       +'<div style="flex:1;min-width:0">'
-        +'<div style="font-weight:700;color:#15325B;font-size:13px">'+escapeHTML(c.k)+'</div>'
+        +'<div style="font-weight:700;color:#15325B;font-size:13px">'+escapeHTML(c.k)+(c.clave?' <span style="font-size:10px;color:#B07A00;font-weight:800;letter-spacing:.3px">CLAVE</span>':'')+'</div>'
         +(ok ? ('<div style="color:#334;font-size:13px;margin-top:2px;white-space:pre-wrap;word-break:break-word">'+escapeHTML(c.v)+'</div>')
-             : ('<div style="color:#B07A00;font-size:12px;margin-top:2px">Falta — captúralo en: '+escapeHTML(c.donde)+'</div>'))
+             : ('<div style="margin-top:4px">'+faltaLinea+'</div>'))
       +'</div></div>';
   }).join('');
   var cabecera = intentoManual
@@ -22470,7 +22578,12 @@ function _protoGenerarHTML(p, pr, faseId){
   var obj=_protoVal(dxf.objetivosCP)||_protoVal(dxf.objetivosLP);
   var dx=_protoDx(p)||'—';
   var fisio=p.terapeuta||p.terapeutaSeguimiento||'—';
-  function estRow(k,v,hint){ return '<div class="prow"><div class="pk">'+k+'</div><div class="pv'+(v?'':' pwarn')+'">'+(v?escapeHTML(v):('⚠️ '+hint))+'</div></div>'; }
+  function estRow(k,v,hint,sec,fid){
+    var falta = sec
+      ? ('<button type="button" class="proto-falta-btn" onclick="_protoIrACampo(\''+sec+'\',\''+(fid||'')+'\')">⚠️ '+escapeHTML(hint)+' →</button>')
+      : ('⚠️ '+escapeHTML(hint));
+    return '<div class="prow"><div class="pk">'+k+'</div><div class="pv'+(v?'':' pwarn')+'">'+(v?escapeHTML(v):falta)+'</div></div>';
+  }
   var macro=fases.map(function(f){
     var hot=(f.id===fase.id);
     return '<tr'+(hot?' class="phot"':'')+'><td><b>'+escapeHTML(f.id)+'</b> '+escapeHTML(f.nombre)+(hot?' <span class="ppill now">AQUÍ</span>':'')+'</td><td>'+escapeHTML(f.sem||'')+'</td><td>'+escapeHTML(f.obj||'')+'</td><td>'+escapeHTML(f.carga||'')+(f.agentes?(' · <i>'+escapeHTML(f.agentes)+'</i>'):'')+'</td></tr>';
@@ -22495,10 +22608,10 @@ function _protoGenerarHTML(p, pr, faseId){
   '<div class="pbody">'+
     '<div class="psec"><div class="psh"><span class="psn">01</span><span class="pst">Evolución y estado funcional (hoy)</span></div><div class="pcardb">'+
       '<div class="prow"><div class="pk">Diagnóstico</div><div class="pv">'+escapeHTML(dx)+'</div></div>'+
-      estRow('Dolor (EVA)',eva,'capturar en Valoración')+
-      estRow('Arco de movimiento',rom,'baseline pendiente — capturar en Valoración para dosificar')+
-      estRow('Fuerza',fza,'baseline pendiente — es el motor del plan (% simetría)')+
-      estRow('Objetivo funcional',obj,'pendiente — define los criterios de retorno')+
+      estRow('Dolor (EVA)',eva,'Capturar EVA','valoracion','ed-eva')+
+      estRow('Arco de movimiento',rom,'Capturar ROM','valoracion','ed-rom')+
+      estRow('Fuerza',fza,'Capturar fuerza','valoracion','ed-fuerza')+
+      estRow('Objetivo funcional',obj,'Capturar objetivo','dxfuncional','ed-objcp')+
     '</div></div>'+
     '<div class="psec"><div class="psh"><span class="psn">02</span><span class="pst">Encuadre clínico y precauciones</span></div><div class="pcardb ptxt">'+
       escapeHTML(pr.encuadre)+'<br><b>Precauciones:</b> '+escapeHTML(pr.precauciones)+
