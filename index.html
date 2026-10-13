@@ -6644,7 +6644,12 @@ function _renderBannerPendientes(r){
     var nombreHTML=x.pid
       ? '<a data-pid="'+escapeAttr_(x.pid)+'" data-fecha="'+escapeAttr_(x.fecha||'')+'" onclick="nuevaSesionRapida(this.dataset.pid, this.dataset.fecha)" style="color:#B45309;font-weight:800;text-decoration:underline;cursor:pointer">'+escapeHTML(x.nombre)+'</a>'
       : escapeHTML(x.nombre);
-    return '<div style="font-size:11px;color:#92400E;padding:2px 0">• '+nombreHTML+' — '+escapeHTML(x.fecha)+pista+'</div>';
+    // "🚫 No acudió": registra la inasistencia de ESE día sin crear nota ni buscar al paciente. Reusa
+    // la misma maquinaria probada (p.inasistencias + citasNoAcudio); silencia este aviso al instante.
+    var btnNA=x.pid
+      ? ' <button data-pid="'+escapeAttr_(x.pid)+'" data-fecha="'+escapeAttr_(x.fecha||'')+'" data-nombre="'+escapeAttr_(x.nombre||'')+'" onclick="_bannerNoAcudio(this.dataset.pid,this.dataset.fecha,this.dataset.nombre)" style="margin-left:6px;font-size:10px;font-weight:800;border:1px solid #FCA5A5;border-radius:8px;padding:2px 7px;cursor:pointer;font-family:inherit;background:#FEF2F2;color:#B91C1C;white-space:nowrap">🚫 No acudió</button>'
+      : '';
+    return '<div style="font-size:11px;color:#92400E;padding:3px 0">• '+nombreHTML+' — '+escapeHTML(x.fecha)+pista+btnNA+'</div>';
   }).join('');
   var toggle='';
   if(r.items.length>8){
@@ -6653,12 +6658,57 @@ function _renderBannerPendientes(r){
   }
   el.innerHTML='<div style="margin-bottom:10px;padding:10px 12px;background:#FEF3C7;border-radius:10px">'
     +'<div style="font-size:13px;font-weight:800;color:#92400E">📋 Tienes '+r.total+' '+(r.total===1?'sesión':'sesiones')+' sin documentar</div>'
-    +'<div style="font-size:10px;color:#92400E;margin:2px 0 4px">Citas del calendario sin nota SOAP del día (desde el '+_ddmmFromISO(APP_INICIO_OPERACION)+'). <b>Toca el nombre</b> para abrir el expediente y escribir la nota.</div>'
+    +'<div style="font-size:10px;color:#92400E;margin:2px 0 4px">Citas del calendario sin nota SOAP del día (desde el '+_ddmmFromISO(APP_INICIO_OPERACION)+'). <b>Toca el nombre</b> para escribir la nota, o <b>🚫 No acudió</b> si el paciente no se presentó (no crea nota).</div>'
     +lista+toggle+'</div>'+extra;
 }
 function _toggleBannerPendientes(){
   window._bannerPendExpandido=!window._bannerPendExpandido;
   if(window._bannerPendCache) _renderBannerPendientes(window._bannerPendCache);
+}
+// Quita OPTIMISTA un ítem del banner (por pid+fecha) y re-pinta, para feedback inmediato tras marcar
+// "no acudió" (el siguiente recálculo real de la agenda ya lo excluirá por p.inasistencias).
+function _bannerQuitarItem(pid, ddmm){
+  try{
+    var c=window._bannerPendCache;
+    if(c && Array.isArray(c.items)){
+      c.items=c.items.filter(function(it){ return !(it && String(it.pid)===String(pid) && String(it.fecha)===String(ddmm)); });
+      c.total=c.items.length;
+      _renderBannerPendientes(c);
+    }
+  }catch(_){}
+}
+// "🚫 No acudió" desde el banner "sin documentar": marca la inasistencia de ESE día SIN crear nota y sin
+// tener que buscar al paciente. ACTIVO cargado → registra inline (mismo patrón que _confirmarNoAcudio:
+// p.inasistencias silencia el aviso + _noAcudioCita lo saca del reporte de cobertura). MIGRADO / no
+// cargado → reusa el flujo probado (abre el expediente y abre el modal con la fecha pre-llenada).
+function _bannerNoAcudio(pid, fecha, nombre){
+  if(!pid){ showToast('Paciente no identificado','error'); return; }
+  var ddmm=String(fecha||'');
+  var iso='';
+  var m=ddmm.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if(m){ iso=m[3]+'-'+m[2]+'-'+m[1]; }
+  else { var d=(typeof parseFechaClinicaSegura==='function')?parseFechaClinicaSegura(ddmm):null; if(d){ iso=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); } }
+  var nom=((nombre||'').split(' ').slice(0,2).join(' '))||'el paciente';
+  if(!confirm('¿Marcar que '+nom+' NO acudió el '+ddmm+'?\n\nNo se crea nota y esa cita no contará como falta. (Reversible desde el expediente.)')) return;
+  var p=(Array.isArray(patientsDB)?patientsDB:[]).find(function(x){ return x && String(x.id)===String(pid); });
+  if(p && !String(pid).startsWith('mig_pac_')){
+    if(!Array.isArray(p.inasistencias)) p.inasistencias=[];
+    if(iso && p.inasistencias.some(function(x){ return x && x.fechaISO===iso; })){ showToast('Ya había una inasistencia en esa fecha','warning'); _bannerQuitarItem(pid, ddmm); return; }
+    var _hora=(typeof _horaActual==='function')?_horaActual():'';
+    var _ina={ id:(typeof generarIdSeguro_==='function'?generarIdSeguro_('ina_'):('ina_'+Date.now())), fecha:ddmm, fechaISO:iso, hora:_hora, terapeuta:(currentUser&&currentUser.name)||'', marcadoPor:(currentUser&&currentUser.name)||'' };
+    p.inasistencias.push(_ina); p.updatedAt=Date.now();
+    saveDB('pts',[p],{camposHist:['inasistencias']})
+      .then(function(res){ if(res&&res.pendiente) return; showToast(res&&res.ok?('🚫 Inasistencia registrada — '+ddmm):'⚠️ Local, pendiente de subir', res&&res.ok?'success':'warning'); })
+      .catch(function(){ showToast('⚠️ Sin conexión — registro local','warning'); });
+    if(typeof _noAcudioCita==='function') _noAcudioCita(p.name, ddmm, true);
+    _bannerQuitarItem(pid, ddmm);
+  } else {
+    // MIGRADO o activo no presente en patientsDB: abrir expediente (hidrata activo/histórico) y abrir el
+    // modal con la fecha ya puesta → el guardado lo hace el flujo probado (_confirmarNoAcudio).
+    Promise.resolve((typeof FST_abrirPacienteDesdeLista==='function')?FST_abrirPacienteDesdeLista(pid):null)
+      .then(function(){ if(typeof marcarNoAcudio==='function'){ setTimeout(function(){ marcarNoAcudio(pid, iso); }, 150); } })
+      .catch(function(){ showToast('No se pudo abrir el expediente','error'); });
+  }
 }
 // AUTO-REVISOR (nudge del fisio): notas PROPIAS (activos) de los últimos 60 días con secciones
 // obligatorias (S/A/P) sin llenar — existen pero están incompletas. Puro cliente, sobre patientsDB.
@@ -19737,18 +19787,20 @@ function registrarEventoAdverso(){
 // puede marcarla días después). Doble efecto: (1) p.inasistencias silencia la alerta "SOAP semanal"
 // del perfil; (2) citasNoAcudio (por nombre+fecha) hace que esa cita NO cuente como falta en el
 // reporte de cobertura del supervisor. Queda registrado quién la marcó (marcadoPor). Reversible.
-function marcarNoAcudio(pid){
+function marcarNoAcudio(pid, prefISO){
   const p = currentPatient;
   if(!p){ showToast('Abre el expediente','error'); return; }
   var prev=document.getElementById('noacudio-overlay'); if(prev) prev.remove();
   var hoyISO=new Date().toISOString().slice(0,10);
+  // Fecha por defecto: la de la cita (prefISO) si viene válida y no es futura; si no, hoy.
+  var defISO=(prefISO && /^\d{4}-\d{2}-\d{2}$/.test(prefISO) && prefISO<=hoyISO) ? prefISO : hoyISO;
   var ov=document.createElement('div');
   ov.id='noacudio-overlay';
   ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px';
   ov.innerHTML='<div style="background:#fff;border-radius:16px;max-width:360px;width:100%;padding:20px">'
     +'<div style="font-size:16px;font-weight:800;color:var(--navy);margin-bottom:6px">🚫 Registrar inasistencia</div>'
     +'<div style="font-size:13px;color:var(--gray-600);margin-bottom:12px">¿Qué día NO acudió <b>'+escapeHTML((p.name||'').split(' ').slice(0,2).join(' '))+'</b>?</div>'
-    +'<input type="date" id="noacudio-fecha" value="'+hoyISO+'" max="'+hoyISO+'" style="width:100%;box-sizing:border-box;font-size:15px;padding:12px;border:2px solid var(--gray-200);border-radius:10px;font-family:inherit;margin-bottom:8px">'
+    +'<input type="date" id="noacudio-fecha" value="'+defISO+'" max="'+hoyISO+'" style="width:100%;box-sizing:border-box;font-size:15px;padding:12px;border:2px solid var(--gray-200);border-radius:10px;font-family:inherit;margin-bottom:8px">'
     +'<div style="font-size:11px;color:var(--gray-400);margin-bottom:14px;line-height:1.4">Elige el día real de la cita. No se crea nota; esa cita no contará como falta en el reporte.</div>'
     +'<button onclick="_confirmarNoAcudio(this.getAttribute(\'data-pid\'))" data-pid="'+escapeAttr_(p.id)+'" style="width:100%;background:var(--navy);color:#fff;border:none;border-radius:10px;padding:12px;font-size:14px;font-weight:800;cursor:pointer;font-family:inherit;margin-bottom:6px">Registrar inasistencia</button>'
     +'<button onclick="var o=document.getElementById(\'noacudio-overlay\');if(o)o.remove()" style="width:100%;background:none;border:none;color:var(--gray-400);font-size:13px;cursor:pointer;font-family:inherit;padding:6px">Cancelar</button>'
