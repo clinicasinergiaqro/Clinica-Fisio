@@ -3189,6 +3189,57 @@ async function drenarColaHistDoc(){
   } finally { _DRENANDO_HIST_DOC = false; }
 }
 
+// ── SELF-HEAL de FALLIDOS de doc histórico/espejo (arregla el aviso "N sin sincronizar" clavado) ──
+// El guard de recencia (drenarColaHistDoc) manda a COLA_SYNC_HIST_DOC_FALLIDOS los diffs cuyo doc en la
+// nube quedó MÁS NUEVO (conflicto); esos NUNCA se reintentan (reintentar pisaría datos más nuevos) y
+// ANTES nadie los limpiaba → el aviso "N cambio(s) sin sincronizar" se quedaba clavado días (caso Camila;
+// viene del espejo SILENCIOSO de Fase 1). Aquí, en 2º plano, se re-verifica cada fallido contra la nube y
+// SOLO se descarta cuando el doc en la nube YA TIENE valores IDÉNTICOS a lo que ese diff escribiría
+// (cero pérdida: NUNCA re-escribe, NUNCA descarta un cambio que de verdad falte; un conflicto REAL con
+// valores distintos, o media, se CONSERVA para revisión). Activo=histórico (lee .doc(pid) de ambos).
+let _SANANDO_FALL_HIST_DOC = false;
+async function _autoSanarFallidosHistDoc(){
+  if(_SANANDO_FALL_HIST_DOC || !navigator.onLine) return;
+  var f;
+  try{ f=JSON.parse(localStorage.getItem('COLA_SYNC_HIST_DOC_FALLIDOS')||'[]'); }catch(_){ return; }
+  if(!Array.isArray(f) || !f.length) return;
+  _SANANDO_FALL_HIST_DOC = true;
+  // stringify estable (ordena claves) para que el MISMO objeto con otro orden no parezca distinto.
+  var _stable=function(v){
+    if(v===null||typeof v!=='object') return JSON.stringify(v===undefined?null:v);
+    if(Array.isArray(v)) return '['+v.map(_stable).join(',')+']';
+    return '{'+Object.keys(v).sort().map(function(k){ return JSON.stringify(k)+':'+_stable(v[k]); }).join(',')+'}';
+  };
+  var _eq=function(a,b){ try{ return _stable(a)===_stable(b); }catch(_){ return false; } };
+  try{
+    if(!window._fstDb && typeof FST_init==='function'){ try{ await FST_init(); }catch(_){} }
+    if(!window._fstDb) return;   // sin Firestore → no verificar (el finally libera; se reintenta luego)
+    var quedan=[], limpiados=0, TOPE=25;   // tope por corrida: no competir con el primer pintado
+    for(var i=0;i<f.length;i++){
+      var it=f[i];
+      if(!it || !it.pid || it.tipo==='identidad' || i>=TOPE){ quedan.push(it); continue; } // identidad/forma rara/tope → conservar
+      try{
+        var snap=await _conTimeout(window._fstDb.collection('pacientes').doc(it.pid).get(), 7000);
+        var d=(snap && snap.exists && snap.data()) || null;
+        if(!d){ quedan.push(it); continue; }   // la nube NO tiene el doc → posible pendiente real → conservar
+        var campos=it.campos||{}, claves=Object.keys(campos), ok=claves.length>0;
+        for(var c=0;c<claves.length;c++){
+          var k=claves[c];
+          if(k==='fotos'||k==='docs'||k==='estudiosDocs'){ ok=false; break; }   // media (base64→null en cola) no comparable fiable → conservar
+          if(!_eq(d[k], campos[k])){ ok=false; break; }
+        }
+        if(ok){ limpiados++; }   // la nube YA tiene valores idénticos → el diff ya está aplicado → descartar sin riesgo
+        else{ quedan.push(it); }   // la nube difiere (conflicto real) o hay media → conservar para revisión
+      }catch(_e){ quedan.push(it); }   // error de red/lectura → conservar (JAMÁS descartar a ciegas)
+    }
+    if(limpiados>0){
+      try{ localStorage.setItem('COLA_SYNC_HIST_DOC_FALLIDOS', JSON.stringify(quedan)); }catch(_){}
+      try{ actualizarIndicadorSync(); }catch(_){}
+      console.warn('[hist-doc self-heal] limpiados', limpiados, '· conservados', quedan.length);
+    }
+  } finally { _SANANDO_FALL_HIST_DOC=false; }
+}
+
 // Indicador visual de estado de sincronización (Pieza 5)
 // CAPA 2: el indicador contaba SOLO COLA_SYNC (activos) → mentía cuando había writes de históricos
 // pendientes (etiquetas/adiciones/doc) o writes buffered offline. Ahora cuenta TODAS las colas y,
@@ -3405,6 +3456,7 @@ async function sincronizarPendientes(){
   drenarColaHistDoc();       // LOOP C — drenar cambios de DOC de históricos pendientes (diffs filtrados del Loop B)
   drenarColaEtiqHist();      // CAPA 1 — drenar etiquetas/adiciones que quedaron pendientes offline (idempotentes)
   drenarColaNoAcudio();      // AUDITORÍA (Jess) — reintentar "No acudió" que no persistió (antes se tragaba silencioso)
+  _autoSanarFallidosHistDoc(); // SELF-HEAL — limpia fallidos de doc histórico que la nube YA tiene (contador "N sin sincronizar" clavado)
   const cola = getColaSync();
   if(cola.length===0){ actualizarIndicadorSync(); return; }
 
