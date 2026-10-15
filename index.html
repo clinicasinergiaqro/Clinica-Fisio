@@ -18821,6 +18821,7 @@ function renderNuevoPaciente(){
   ];
 
   const c=document.getElementById('content-nuevo');
+  _segOpen=true;  // [SEG-DESPLEGADO] tarjeta de Seguridad y banderas rojas ABIERTA por defecto (antes venía cerrada y los fisios se la saltaban)
   c.innerHTML=`
   <div id="progreso-llenado" style="position:sticky;top:0;z-index:10;background:#fff;padding:8px 14px;border-bottom:1px solid var(--gray-200)">
     <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--gray-600);margin-bottom:4px">
@@ -18902,20 +18903,20 @@ function renderNuevoPaciente(){
   <div class="form-section">
     <div class="form-section-title">🛡️ Seguridad y banderas rojas</div>
 
-    <!-- Toggle colapsable: por defecto cerrado, verde = sin hallazgos -->
-    <div class="seg-toggle" id="seg-toggle" onclick="toggleSeguridad()">
+    <!-- Toggle colapsable: por defecto ABIERTO (los fisios se saltaban la sección cuando venía cerrada); verde = sin hallazgos -->
+    <div class="seg-toggle open" id="seg-toggle" onclick="toggleSeguridad()">
       <div class="seg-toggle-row">
         <span class="seg-toggle-icon" id="seg-icon">🟢</span>
         <div class="seg-toggle-text">
           <div class="seg-toggle-label" id="seg-label">Sin hallazgos de seguridad</div>
-          <div class="seg-toggle-sub" id="seg-sub">Toca para reportar implantes, banderas rojas o contraindicaciones</div>
+          <div class="seg-toggle-sub" id="seg-sub">Marca lo que aplique; deja vacío lo que no</div>
         </div>
         <span class="seg-toggle-arrow" id="seg-arrow">›</span>
       </div>
       <div class="seg-pills" id="seg-pills"></div>
     </div>
 
-    <div class="seg-detail" id="seg-detail">
+    <div class="seg-detail open" id="seg-detail">
       <div class="seg-detail-inner">
 
         <!-- BLOQUE 1 — Implantes (IDs idénticos para guardar/restaurar) -->
