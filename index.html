@@ -1356,7 +1356,7 @@ body.modo-oscuro .topbar{background:#141824}
 <body>
 <div id="sync-indicator" class="sync-indicator ok" style="display:none"></div>
 <div id="app-version-chip" title="Versión de la app en este equipo — toca para buscar actualización" onclick="try{_tapVersionChip()}catch(e){}"></div>
-<script>/* VERSIÓN VISIBLE: refleja el index.html realmente cargado en ESTE equipo (se bumpea junto con sw.js). Así un iPad con versión vieja se ve de un vistazo. */window.APP_VERSION='v1-2026-10-15c';(function(){try{var c=document.getElementById('app-version-chip');if(c)c.textContent=window.APP_VERSION;}catch(e){}})();</script>
+<script>/* VERSIÓN VISIBLE: refleja el index.html realmente cargado en ESTE equipo (se bumpea junto con sw.js). Así un iPad con versión vieja se ve de un vistazo. */window.APP_VERSION='v1-2026-10-15d';(function(){try{var c=document.getElementById('app-version-chip');if(c)c.textContent=window.APP_VERSION;}catch(e){}})();</script>
 <div class="toast" id="toast" aria-live="polite" aria-atomic="true"></div>
 
 <!-- LOGIN -->
@@ -1830,6 +1830,51 @@ function registrarAcceso(accion){
     // fire-and-forget; usa idToken. Sin sesión no registra remoto pero no bloquea login/logout
     callAppsScriptPrivado('registrarAcceso', payload).catch(()=>{});
   }catch(e){ /* nunca bloquear el flujo de login/logout */ }
+}
+
+// ── BITÁCORA DE LECTURA DE EXPEDIENTES (NOM-024, trazabilidad de CONSULTAS) ──────────
+// Registra QUIÉN abre QUÉ expediente y CUÁNDO. Complementa el historialCambios (que solo
+// registra EDICIONES) y el LOGIN/LOGOUT: la NOM-024 y la LFPDPPP esperan trazabilidad
+// también de las consultas de lectura, no solo de los cambios. Reusa la acción de backend
+// 'registrarAcceso' (hoja Bitacora) → NO requiere desplegar backend: la identidad del
+// expediente viaja en el campo 'accion' (texto libre que el backend ya escribe) y, además,
+// en campos estructurados (pacienteId/pacienteNombre/…) que el backend actual ignora sin
+// romperse y que quedan disponibles si algún día se amplían las columnas de la Bitácora.
+// INVARIANTES: fire-and-forget con idToken, NUNCA bloquea ni retrasa la apertura (todo en
+// try/catch); dedup por paciente dentro de 2 min para no spamear en re-renders, cambios de
+// pestaña ni al abrir-y-escribir-nota. ACTIVO=MIGRADO: se engancha en openExpediente (por el
+// que pasan AMBOS orígenes al ver el expediente) y en nuevaSesionRapida (abrir directo a
+// nota). Android+iOS: DOM/fetch puro, sin APIs de dispositivo. Limitación: si no hay red, el
+// registro se pierde (fire-and-forget, igual que LOGIN/LOGOUT) — no se encola.
+let _ultConsultaExp = { id:'', ts:0 };
+function registrarConsultaExpediente(p, modo){
+  try{
+    if(!p || !p.id || !currentUser) return;
+    const id = String(p.id);
+    const ahora = Date.now();
+    // Dedup: mismo expediente dentro de 2 min = un solo registro (re-render/pestaña/abrir+nota).
+    if(_ultConsultaExp.id===id && (ahora-_ultConsultaExp.ts)<120000) return;
+    _ultConsultaExp = { id, ts: ahora };
+    // No ensuciar la bitácora con pacientes de prueba.
+    const nom = String(p.name||'').toLowerCase();
+    if(p.esTest===true || nom.includes('prueba') || nom==='test') return;
+    const origen = id.startsWith('mig_pac_') ? 'migrado' : 'activo';
+    const d = new Date();
+    const payload = {
+      // El campo 'accion' carga el evento + la identidad del expediente (así es útil HOY sin
+      // tocar el backend; filtrable por prefijo 'CONSULTA_EXPEDIENTE').
+      accion: 'CONSULTA_EXPEDIENTE · ' + (p.name||'(sin nombre)') + ' · ' + origen + ' · ' + id + (modo==='nota' ? ' · [nota]' : ''),
+      usuario: currentUser.name || '',
+      correo: currentUser.email || currentUser.username || '',
+      rol: currentUser.role || '',
+      fecha: d.toLocaleDateString('es-MX'),
+      hora: d.toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit',second:'2-digit'}),
+      userAgent: (navigator.userAgent||'').slice(0,160),
+      // Estructurados (reserva para columnas futuras de la Bitácora; el backend actual los ignora):
+      tipoEvento:'CONSULTA_EXPEDIENTE', pacienteId:id, pacienteNombre:(p.name||''), origenPaciente:origen, modoApertura:(modo||'expediente')
+    };
+    callAppsScriptPrivado('registrarAcceso', payload).catch(()=>{});
+  }catch(e){ /* nunca bloquear la apertura del expediente */ }
 }
 // ── SPRINT TOKEN PASO 2: Firebase ID Token es la ÚNICA autenticación ──
 // El token legacy fue eliminado por completo. Las acciones privadas solo
@@ -10518,6 +10563,7 @@ function openExpediente(pid){
   }
   currentPatient=patientsDB.find(p=>p.id===pid);
   if(!currentPatient) return;
+  try{ registrarConsultaExpediente(currentPatient,'expediente'); }catch(_){}   // BITÁCORA: consulta de lectura (activo+migrado pasan por aquí)
   document.getElementById('exp-topbar-name').textContent=currentPatient.name.split(' ').slice(0,2).join(' ');
   document.getElementById('exp-topbar-meta').textContent=`${currentPatient.age} años · ${currentPatient.terapeuta}${(currentPatient.terapeutaSeguimiento&&!currentPatient.terapeutaSeguimiento.includes('T00:'))?' → '+currentPatient.terapeutaSeguimiento:''}`;
   document.getElementById('exp-avatar').textContent=initials(currentPatient.name);
@@ -25513,6 +25559,7 @@ async function nuevaSesionRapida(patientId, fechaPreset){
     p.sesiones=_mxNSR || (Array.isArray(p.soap)?p.soap.length:0);
   }
   currentPatient=p;
+  try{ registrarConsultaExpediente(p,'nota'); }catch(_){}   // BITÁCORA: abrir directo a escribir nota (activo+migrado)
   // Preset de fecha: abrir la nota YA fechada en el día de la cita que falta (no en hoy). showNuevoSOAP
   // lo consume una sola vez. Útil desde el banner "sin documentar": lleva directo a la SOAP de ESE día.
   window._nuevaSoapFechaPreset = fechaPreset || null;
