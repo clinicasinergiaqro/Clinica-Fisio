@@ -4,6 +4,7 @@
 - SIEMPRE entregar diffs o código en UN SOLO bloque de código continuo y copiable de corrido.
 - NO fragmentar en varias partes/bloques. El usuario trabaja en iPad y no puede copiar por pedazos.
 - Si un cambio toca varios puntos del archivo, mostrarlo igualmente como un único bloque continuo.
+- 🔴🔴🔴 **REGLA ABSOLUTA (Carlos lo ha pedido MUCHAS veces — 2026-10-23): SIEMPRE entregar el ARCHIVO COMPLETO, de principio a fin, NUNCA un pedazo/fragmento.** Cuando se da código de un archivo para pegar (SOBRE TODO el backend `Codigo.gs` en Apps Script), se entrega el archivo **ENTERO** en UN solo bloque copiable. JAMÁS "pega este bloque en tal lugar" ni un snippet suelto: Carlos reemplaza el archivo completo y buscar dónde pegar en iPad es inviable y propenso a error. **El repo puede diferir del DESPLEGADO** → si va a pegar, PEDIRLE a Carlos el archivo ACTUAL que tiene en vivo, integrar el cambio EN ESE, y devolver el COMPLETO. Nunca más dar un pedazo. (Esto aplica a index.html, Codigo.gs, rutina.html, reglas, etc.)
 
 ## Instrucciones / pruebas / prompts para copiar
 - SIEMPRE en UN SOLO bloque de código de texto plano corrido, de principio a fin, en una sola caja copiable.
