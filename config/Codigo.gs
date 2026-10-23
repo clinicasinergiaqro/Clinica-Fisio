@@ -2192,6 +2192,59 @@ function _claudeRouter_(body) {
     return respuesta({ ok: true, id: id, escrito: texto.length });
   }
 
+  // ── RENOMBRAR paciente (identidad: SOLO el nombre). Candado token. Respaldo del nombre viejo + Bitacora. ──
+  // La identidad está bloqueada en claudeActualizarClinico/claudeFsMerge a propósito; esta acción es la
+  // ÚNICA vía para corregir un typo de nombre desde la conexión Claude, y SOLO toca 'name' (+ su normalizado en FS).
+  // ACTIVO (id p…): escribe la celda 'name' del Sheet (lo que muestra la app) + espeja name/nombreNormalizado a FS.
+  // MIGRADO (mig_pac_…): escribe name/nombreNormalizado en el doc de Firestore (no tiene fila en el Sheet).
+  if (action === 'claudeRenombrarPaciente') {
+    var idRN = String(body.id || '').trim();
+    var nombreRN = String(body.name || body.nombre || '').trim();
+    if (!idRN) return respuesta({ ok: false, error: 'Falta id', code: 400 });
+    if (!nombreRN) return respuesta({ ok: false, error: 'Falta name (nombre nuevo)', code: 400 });
+    if (nombreRN.length > 120) return respuesta({ ok: false, error: 'Nombre muy largo (máx 120)', code: 400 });
+    // Normalización IGUAL que FST_normalizarNombreLive: sin paréntesis, sin acentos, minúsculas, sin dígitos, no-letra→espacio.
+    var _normRN = function (s) {
+      s = String(s || '').replace(/\([^)]*\)/g, ' ');
+      s = s.normalize('NFD').replace(/[̀-ͯ]/g, '');
+      s = s.toLowerCase().replace(/[0-9]/g, ' ').replace(/[^a-z\s]/g, ' ');
+      return s.replace(/\s+/g, ' ').trim();
+    };
+    var nnRN = _normRN(nombreRN);
+    var esMigRN = idRN.indexOf('mig_pac_') === 0;
+    var viejoRN = '', okSheetRN = false, okFSrn = false;
+    if (!esMigRN) {
+      var shRN = getOrCreateSheet(ss);
+      var lastRowRN = shRN.getLastRow();
+      if (lastRowRN <= 1) return respuesta({ ok: false, error: 'Sheet vacío', code: 404 });
+      var colNameRN = HEADERS.indexOf('name');
+      if (colNameRN < 0) return respuesta({ ok: false, error: 'Columna name no existe', code: 500 });
+      var idsColRN = shRN.getRange(2, 1, lastRowRN - 1, 1).getValues();
+      var filaRN = -1;
+      for (var iRN = 0; iRN < idsColRN.length; iRN++) { if (String(idsColRN[iRN][0]).trim() === idRN) { filaRN = iRN + 2; break; } }
+      if (filaRN < 0) return respuesta({ ok: false, error: 'Paciente activo no encontrado en Sheet: ' + idRN, code: 404 });
+      viejoRN = String(shRN.getRange(filaRN, colNameRN + 1).getValue() || '');
+      shRN.getRange(filaRN, colNameRN + 1).setValue(nombreRN);
+      okSheetRN = true;
+    }
+    // Espejar a Firestore (activo Y migrado): name + nombreNormalizado.
+    try {
+      var tokFSrn = _claudeFsToken_();
+      if (tokFSrn) {
+        var PROJrn = PropertiesService.getScriptProperties().getProperty('FIRESTORE_PROJECT_ID') || 'clinicasinergia-ec2cf';
+        if (esMigRN) { var docRN = _claudeFsGetDoc_(idRN); if (docRN && docRN.name) viejoRN = String(docRN.name); }
+        var fieldsRN = { name: _fsEncodeValue_(nombreRN), nombreNormalizado: _fsEncodeValue_(nnRN), updatedAt: _fsEncodeValue_(Date.now()), ultimoUsuario: _fsEncodeValue_('CLAUDE') };
+        var urlRN = 'https://firestore.googleapis.com/v1/projects/' + PROJrn + '/databases/(default)/documents/pacientes/' + encodeURIComponent(idRN) +
+          '?updateMask.fieldPaths=name&updateMask.fieldPaths=nombreNormalizado&updateMask.fieldPaths=updatedAt&updateMask.fieldPaths=ultimoUsuario';
+        var rRN = UrlFetchApp.fetch(urlRN, { method: 'patch', contentType: 'application/json', headers: { Authorization: 'Bearer ' + tokFSrn }, muteHttpExceptions: true, payload: JSON.stringify({ fields: fieldsRN }) });
+        okFSrn = (rRN.getResponseCode() >= 200 && rRN.getResponseCode() < 300);
+      }
+    } catch (eRN) {}
+    if (esMigRN && !okFSrn) return respuesta({ ok: false, error: 'No se pudo escribir el nombre en Firestore (migrado)', code: 500 });
+    _claudeBitacora_(ss, 'claudeRenombrarPaciente', 'id=' + idRN + ' "' + viejoRN + '" -> "' + nombreRN + '" sheet=' + okSheetRN + ' fs=' + okFSrn);
+    return respuesta({ ok: true, id: idRN, anterior: viejoRN, nuevo: nombreRN, nombreNormalizado: nnRN, sheet: okSheetRN, fs: okFSrn, migrado: esMigRN });
+  }
+
   // Anamnesis / campos de historia (SET). body: { id, campos:{ motivo, motivoHC, dx, valoracion, ... } }
   if (action === 'claudeActualizarClinico') {
     var idAC = String(body.id || '').trim();
