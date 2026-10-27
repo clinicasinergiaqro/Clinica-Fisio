@@ -1356,7 +1356,7 @@ body.modo-oscuro .topbar{background:#141824}
 <body>
 <div id="sync-indicator" class="sync-indicator ok" style="display:none"></div>
 <div id="app-version-chip" title="Versión de la app en este equipo — toca para buscar actualización" onclick="try{_tapVersionChip()}catch(e){}"></div>
-<script>/* VERSIÓN VISIBLE: refleja el index.html realmente cargado en ESTE equipo (se bumpea junto con sw.js). Así un iPad con versión vieja se ve de un vistazo. */window.APP_VERSION='v1-2026-10-21a';(function(){try{var c=document.getElementById('app-version-chip');if(c)c.textContent=window.APP_VERSION;}catch(e){}})();</script>
+<script>/* VERSIÓN VISIBLE: refleja el index.html realmente cargado en ESTE equipo (se bumpea junto con sw.js). Así un iPad con versión vieja se ve de un vistazo. */window.APP_VERSION='v1-2026-10-27a';(function(){try{var c=document.getElementById('app-version-chip');if(c)c.textContent=window.APP_VERSION;}catch(e){}})();</script>
 <div class="toast" id="toast" aria-live="polite" aria-atomic="true"></div>
 
 <!-- LOGIN -->
@@ -7120,8 +7120,19 @@ async function _resolverPacientesCalendario(eventos){
         // Sin activo (no debería: gate huérfanos=0) → NO adjudicar al espejo parcial (se ignora).
         var _actEsp=_espejoAActivo[_pidH];
         if(_actEsp) _resCand.push({pid:String(_actEsp.id||''), tipo:'activo', p:_actEsp});
-      } else {
+      } else if(_pidH.indexOf('mig_pac_')===0){
         _resCand.push({pid:_pidH, tipo:'historico'});
+      } else {
+        // [FIX activo-mal-clasificado] Un id REAL de activo (p-uuid, ni app_live_ ni mig_pac_) puede
+        // entrar al índice FST porque el activo tiene doc ESPEJO en `pacientes` (espejo de historia/
+        // identidad Fase 1/3a, o un rename que escribió nombreNormalizado). NO es histórico: su SOAP
+        // vive en p.soap (Sheet), NO en fechasSesiones → si se adjudicaba como 'historico' el saldado
+        // buscaba la nota en el índice vacío y la cita salía "sin documentar" para SIEMPRE pese a tener
+        // nota (caso Eduardo de la Llata / Martha). Si el pid está en patientsDB → resolver como ACTIVO
+        // (con r.p) para leer sus notas reales de p.soap; si no está en local, caer al modo previo.
+        var _actReal=(Array.isArray(patientsDB)?patientsDB:[]).find(function(pp){ return pp && String(pp.id||'')===_pidH && !(typeof _activoEliminado==='function' && _activoEliminado(pp.id)); });
+        if(_actReal) _resCand.push({pid:_pidH, tipo:'activo', p:_actReal});
+        else _resCand.push({pid:_pidH, tipo:'historico'});
       }
     });
     // ── FASE 1 MATCHING: recuperar 🔎 sin adjudicar a ciegas ──────────────────────────────────
