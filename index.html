@@ -1356,7 +1356,7 @@ body.modo-oscuro .topbar{background:#141824}
 <body>
 <div id="sync-indicator" class="sync-indicator ok" style="display:none"></div>
 <div id="app-version-chip" title="Versión de la app en este equipo — toca para buscar actualización" onclick="try{_tapVersionChip()}catch(e){}"></div>
-<script>/* VERSIÓN VISIBLE: refleja el index.html realmente cargado en ESTE equipo (se bumpea junto con sw.js). Así un iPad con versión vieja se ve de un vistazo. */window.APP_VERSION='v1-2026-10-27a';(function(){try{var c=document.getElementById('app-version-chip');if(c)c.textContent=window.APP_VERSION;}catch(e){}})();</script>
+<script>/* VERSIÓN VISIBLE: refleja el index.html realmente cargado en ESTE equipo (se bumpea junto con sw.js). Así un iPad con versión vieja se ve de un vistazo. */window.APP_VERSION='v1-2026-10-28a';(function(){try{var c=document.getElementById('app-version-chip');if(c)c.textContent=window.APP_VERSION;}catch(e){}})();</script>
 <div class="toast" id="toast" aria-live="polite" aria-atomic="true"></div>
 
 <!-- LOGIN -->
@@ -19001,7 +19001,7 @@ function renderNuevoPaciente(){
         <input class="form-input" id="n-edad" type="number" placeholder="44" style="background:var(--gray-50)" readonly>
         <div style="font-size:11px;color:var(--gray-400);padding:3px 14px" id="n-edad-hint">Se calcula automáticamente desde la fecha de nacimiento</div>
       </div>
-      <div class="form-field"><div class="form-label">Teléfono <span style="color:var(--gray-400);font-weight:400">(opcional)</span></div><input class="form-input" id="n-telefono" type="tel" inputmode="numeric" placeholder="Ej: 4421234567"></div>
+      <div class="form-field"><div class="form-label">Teléfono <span class="req">*</span></div><input class="form-input" id="n-telefono" type="tel" inputmode="numeric" placeholder="Ej: 4421234567"></div>
       <div class="form-field">
         <div class="form-label">Sexo biológico (NOM-004) <span style="color:var(--gray-400);font-weight:400">(requerido)</span></div>
         <select class="form-input" id="n-sexo">
@@ -19444,6 +19444,13 @@ function guardarNuevoPaciente(){
   if(!_esEdicion){
     if(!nombre||!alergias||!padecimiento){
       showToast('Faltan: nombre, alergias o el relato del motivo','error');return;
+    }
+    // TELÉFONO OBLIGATORIO (decisión de Carlos 2026-10-28): NO se crea el expediente sin un teléfono
+    // de contacto. Se exigen ≥10 dígitos (celular MX) para que no se "llene" con un placeholder.
+    var _telDigitos=(telefono||'').replace(/\D/g,'');
+    if(_telDigitos.length<10){
+      var _ti=document.getElementById('n-telefono'); if(_ti){ try{ _ti.focus(); _ti.scrollIntoView({block:'center'}); _ti.style.borderColor='#DC2626'; }catch(_){} }
+      showToast('Falta: TELÉFONO del paciente (obligatorio, 10 dígitos)','error');return;
     }
     if(!_hc.zona){
       showToast('Falta: toca la ZONA principal del dolor','error');return;
