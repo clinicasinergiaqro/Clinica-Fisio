@@ -1356,7 +1356,7 @@ body.modo-oscuro .topbar{background:#141824}
 <body>
 <div id="sync-indicator" class="sync-indicator ok" style="display:none"></div>
 <div id="app-version-chip" title="Versión de la app en este equipo — toca para buscar actualización" onclick="try{_tapVersionChip()}catch(e){}"></div>
-<script>/* VERSIÓN VISIBLE: refleja el index.html realmente cargado en ESTE equipo (se bumpea junto con sw.js). Así un iPad con versión vieja se ve de un vistazo. */window.APP_VERSION='v1-2026-10-28c';(function(){try{var c=document.getElementById('app-version-chip');if(c)c.textContent=window.APP_VERSION;}catch(e){}})();</script>
+<script>/* VERSIÓN VISIBLE: refleja el index.html realmente cargado en ESTE equipo (se bumpea junto con sw.js). Así un iPad con versión vieja se ve de un vistazo. */window.APP_VERSION='v1-2026-10-28d';(function(){try{var c=document.getElementById('app-version-chip');if(c)c.textContent=window.APP_VERSION;}catch(e){}})();</script>
 <div class="toast" id="toast" aria-live="polite" aria-atomic="true"></div>
 
 <!-- LOGIN -->
@@ -19315,6 +19315,23 @@ function renderNuevoPaciente(){
           <input class="form-input" id="n-derma-senszonas" type="text" style="margin-top:7px" placeholder="Zonas: Ej: hipoestesia infraumbilical (esperada post-abdominoplastia)"></div>
         <div class="form-field"><div class="form-label">Perímetros / medidas basales</div><textarea class="form-input" id="n-derma-perimetros" placeholder="Cintura: __ cm · Cadera: __ · Muslo D/I: __ · Brazo D/I: __ · Peso: __ kg"></textarea></div>
         <div class="form-field"><div class="form-label">Objetivo estético del paciente</div><input class="form-input" id="n-derma-objetivo" type="text" placeholder="Qué espera lograr/recuperar (contorno, cicatriz discreta, desinflamar…)"></div>
+        <div style="font-size:12.5px;font-weight:700;color:#7A2F5D;margin:14px 0 4px">Plan de tratamiento estético</div>
+        <div class="form-field"><div class="form-label">Equipos / modalidades a usar <span style="font-weight:400;color:var(--gray-400);font-size:11px">· marca las que apliquen</span></div>
+          <div style="display:flex;flex-wrap:wrap;gap:8px 14px;padding:4px 2px">
+            ${['Drenaje linfático manual','Presoterapia','Corriente Aura (edema/equimosis)','Ultrasonido (fibrosis)','Tecar / radiofrecuencia','Láser rojo 660 nm (cicatriz)','LED azul 410 nm (acné)','LED estética (RGB/590/cluster)','PLASMED (plasma)','Neurodyn Esthetic (tonificación)','Ultrasónico facial','Masaje de cicatriz','Vendaje neuromuscular','Crioterapia / Termoterapia'].map(function(x){ return '<label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--gray-800)"><input type="checkbox" class="derma-eq" value="'+x+'">'+x+'</label>'; }).join('')}
+          </div>
+        </div>
+        <div class="form-field"><div class="form-label">Frecuencia y sesiones estimadas</div><input class="form-input" id="n-derma-frec" type="text" placeholder="Ej: 2-3 por semana × 4 semanas, luego 1/semana"></div>
+        <div class="form-field"><div class="form-label">Plan por fases (detalle)</div>
+          <textarea class="form-input" id="n-derma-plan" autocapitalize="sentences" style="min-height:90px" placeholder="Qué se hará en cada fase y con qué equipo…"></textarea>
+          <div style="background:#FBEAF3;border:1px solid #EFC9DE;border-radius:10px;padding:9px 12px;font-size:11.5px;color:#7A2F5D;margin-top:7px;line-height:1.7">
+            <b>Guía de fases post-qx 👇</b><br>
+            • <b>Fase 1 — desinflamatoria</b> (sem 1-3): drenaje linfático manual + presoterapia + Corriente Aura (edema/equimosis); cuidado de herida; NADA térmico sobre zonas con sensibilidad alterada.<br>
+            • <b>Fase 2 — anti-fibrosis</b> (sem 3-8): ultrasonido + masaje de liberación + tecar (atérmica al inicio) sobre induraciones; manejo de cicatriz (660 nm, silicón, masaje).<br>
+            • <b>Fase 3 — remodelación/firmeza</b>: radiofrecuencia/tecar térmica, Neurodyn Esthetic, LED estética según objetivo.<br>
+            ⚠️ Metal/marcapasos/embarazo → NO radiofrecuencia/tecar térmica ni US sobre la zona (marca 🛡️ Seguridad). PLASMED y ultrasónico facial = solo indicación estética específica.
+          </div>
+        </div>
         <div style="background:#FEE2E2;border:1px solid #FCA5A5;border-radius:10px;padding:9px 12px;font-size:11.5px;color:#991B1B;line-height:1.6;margin-top:6px">🛑 Banderas rojas post-qx: dolor de pantorrilla/disnea (TVP-TEP), fiebre + herida caliente (infección), piel violácea/negra (necrosis) → derivar YA con el cirujano. Marca lo que aplique también en 🛡️ Seguridad.</div>
       </div>
     </div>
@@ -19584,7 +19601,10 @@ function _dermaCollectAlta(){
       sensibilidadZonas:g('n-derma-senszonas')||'',
       perimetros:g('n-derma-perimetros')||'',
       objetivoEstetico:g('n-derma-objetivo')||'',
-      capturadoEn:(typeof todayISO!=='undefined'?todayISO:''), version:1 };
+      equipos:(function(){ var e=Array.from(document.querySelectorAll('.derma-eq:checked')).map(function(c){ return c.value; }); return e.length?e.join(', '):''; })(),
+      frecuencia:g('n-derma-frec')||'',
+      planEstetico:g('n-derma-plan')||'',
+      capturadoEn:(typeof todayISO!=='undefined'?todayISO:''), version:2 };
   }catch(_e){ return null; }
 }
 function _dermaPrefill(d){
@@ -19600,8 +19620,11 @@ function _dermaPrefill(d){
     S('n-derma-cicatriz',cl(d.cicatriz)); S('n-derma-cicatrizdet',d.cicatrizDetalle||'');
     S('n-derma-sens',cl(d.sensibilidad)); S('n-derma-senszonas',d.sensibilidadZonas||'');
     S('n-derma-perimetros',d.perimetros||''); S('n-derma-objetivo',d.objetivoEstetico||'');
+    S('n-derma-frec',d.frecuencia||''); S('n-derma-plan',d.planEstetico||'');
     var cs=String(d.complicaciones||'');
     document.querySelectorAll('.derma-comp').forEach(function(c){ c.checked=cs.indexOf(c.value)!==-1; });
+    var eq=String(d.equipos||'');
+    document.querySelectorAll('.derma-eq').forEach(function(c){ c.checked=eq.indexOf(c.value)!==-1; });
   }catch(_e){}
 }
 function _dermaDiasPostQx(f){
@@ -19629,6 +19652,10 @@ function _dermaCardHTML(v){
       +row('Sensibilidad',[d.sensibilidad,d.sensibilidadZonas].filter(function(x){return x&&x!=='No evaluada';}).join(' — '))
       +row('Perímetros basales',d.perimetros,' narrative')
       +row('Objetivo estético',d.objetivoEstetico)
+      +((d.equipos||d.frecuencia||d.planEstetico)?('<div class="field-row" style="border-top:2px solid #EFC9DE"><div class="field-label" style="color:#8E3B6E;font-weight:800">💆 Plan estético</div><div class="field-value"></div></div>'):'')
+      +row('Equipos / modalidades',d.equipos)
+      +row('Frecuencia',d.frecuencia)
+      +row('Plan por fases',d.planEstetico,' narrative')
       +'</div>';
   }catch(_e){ return ''; }
 }
