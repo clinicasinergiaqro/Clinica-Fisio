@@ -1356,7 +1356,7 @@ body.modo-oscuro .topbar{background:#141824}
 <body>
 <div id="sync-indicator" class="sync-indicator ok" style="display:none"></div>
 <div id="app-version-chip" title="Versión de la app en este equipo — toca para buscar actualización" onclick="try{_tapVersionChip()}catch(e){}"></div>
-<script>/* VERSIÓN VISIBLE: refleja el index.html realmente cargado en ESTE equipo (se bumpea junto con sw.js). Así un iPad con versión vieja se ve de un vistazo. */window.APP_VERSION='v1-2026-10-28f';(function(){try{var c=document.getElementById('app-version-chip');if(c)c.textContent=window.APP_VERSION;}catch(e){}})();</script>
+<script>/* VERSIÓN VISIBLE: refleja el index.html realmente cargado en ESTE equipo (se bumpea junto con sw.js). Así un iPad con versión vieja se ve de un vistazo. */window.APP_VERSION='v1-2026-10-28g';(function(){try{var c=document.getElementById('app-version-chip');if(c)c.textContent=window.APP_VERSION;}catch(e){}})();</script>
 <div class="toast" id="toast" aria-live="polite" aria-atomic="true"></div>
 
 <!-- LOGIN -->
@@ -10302,7 +10302,11 @@ function _resaltarNombre(nombre, qRaw){
   return escapeHTML(n.slice(0,i))+'<mark style="background:#FEF08A;color:inherit;padding:0 1px;border-radius:3px">'+escapeHTML(n.slice(i,i+qw.length))+'</mark>'+escapeHTML(n.slice(i+qw.length));
 }
 // Tarjeta de paciente — fuente ÚNICA (usada por la lista y por "Ver más").
+// DERMATO: un paciente es dermatofuncional si tiene valoracion.dermato.es. Sirve para pintarlo en
+// rosa en la lista. Es aditivo: el mismo paciente puede tener también lo MSK (no se excluyen).
+function _esDerma(p){ try{ return !!(p && p.valoracion && p.valoracion.dermato && p.valoracion.dermato.es); }catch(_){ return false; } }
 function _pacCardHTML(p, q, abrirFn){
+  const _dm=_esDerma(p);   // DERMATO: tarjeta en rosa + pill para distinguir pacientes de dermato funcional
   const hasConsent=tieneConsentimientoFirmado(p);   // [LOOP-D D1-a] helper único (array+legacy, exige firma real)
   const _vivas=_soapVivas(p);   // RENDIMIENTO: una sola vez por tarjeta (antes se llamaba 3× y cada una copiaba el array)
   const inc=_vivas.some(s=>!s.completa);   // [BORRADO-NOTAS] VISTA
@@ -10314,8 +10318,8 @@ function _pacCardHTML(p, q, abrirFn){
   const _sugChip=_sugTxt?(_sugTxt.indexOf('RECAPTURAR')>=0
     ? `<div style="margin-top:5px;font-size:10.5px;font-weight:800;color:#8A5A08;background:#FDF4E3;border:1px solid #F0D9AB;border-radius:8px;padding:4px 8px;display:inline-block">⚠️ Recapturar anamnesis</div>`
     : `<div style="margin-top:5px;font-size:10.5px;font-weight:800;color:#1E6B45;background:#EAF5EE;border:1px solid #BFE0CC;border-radius:8px;padding:4px 8px;display:inline-block">💡 Sugerencia por revisar</div>`):'';
-  return `<div class="patient-card" data-pid="${escapeAttr_(p.id)}" onclick="${abrirFn}(this.dataset.pid)">
-        <div class="patient-avatar">${initials(p.name)}</div>
+  return `<div class="patient-card" data-pid="${escapeAttr_(p.id)}" onclick="${abrirFn}(this.dataset.pid)" style="${_dm?'border-left:5px solid #8E3B6E;background:#FDF6FA':''}">
+        <div class="patient-avatar" style="${_dm?'background:#F2D7E6;color:#7A2F5D':''}">${initials(p.name)}</div>
         <div class="patient-info">
           <div class="patient-name">${_resaltarNombre(p.name, q)}</div>
           <div class="patient-meta">
@@ -10327,6 +10331,7 @@ function _pacCardHTML(p, q, abrirFn){
           <div class="patient-meta" style="margin-top:3px;font-size:11px;color:#5A6478;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:200px">${escapeHTML(typeof p.dx==='string'?p.dx.split(',')[0]:(p.dx?.dxClinico||p.dx?.dxMedico||'Sin diagnóstico'))}</div>
           ${(typeof _sinRespaldoTiene==='function'&&_sinRespaldoTiene(p.id))?`<div style="margin-top:5px;font-size:10.5px;font-weight:800;color:#7C2D12;background:#FEF2F2;border:1px solid #FCA5A5;border-radius:8px;padding:4px 8px;display:inline-block">🆘 Sin respaldo en la nube — abre con señal</div>`:''}
           ${Array.isArray(p.etiquetas)&&p.etiquetas.length?`<div style="display:flex;flex-wrap:wrap;gap:3px;margin-top:4px">${p.etiquetas.slice(0,3).map(e=>`<span style="font-size:9px;font-weight:700;background:#E8EEF7;color:var(--navy);padding:2px 7px;border-radius:8px">${escapeHTML(e)}</span>`).join('')}</div>`:''}
+          ${_dm?`<div style="margin-top:5px;font-size:10.5px;font-weight:800;color:#7A2F5D;background:#FBEAF3;border:1px solid #EFC9DE;border-radius:8px;padding:4px 8px;display:inline-block">🧴 Dermato funcional</div>`:''}
           ${_sugChip}
           <button data-pid="${escapeAttr_(p.id)}" onclick="event.stopPropagation();nuevaSesionRapida(this.dataset.pid)" style="font-size:11px;padding:4px 10px;border-radius:12px;background:var(--navy);color:white;border:none;cursor:pointer;margin-top:6px;font-family:inherit;font-weight:700">➕ Sesión</button>
         </div>
@@ -10344,7 +10349,8 @@ function renderPacientesShell(){
   const chips=_PAC_FILTROS.map(([k,l])=>`<button class="chip-quick" data-k="${k}" onclick="_pacChip('${k}')">${l}</button>`).join('');
   c.innerHTML=
     `<div id="pac-shell" style="position:sticky;top:0;z-index:20;background:var(--gray-50);padding-top:2px">`
-    +`<button class="btn-primary" style="width:100%;margin-bottom:10px;padding:14px;font-size:15px;font-weight:700;border-radius:var(--radius)" onclick="showNuevoPaciente()">+ Nuevo paciente</button>`
+    +`<button class="btn-primary" style="width:100%;margin-bottom:8px;padding:14px;font-size:15px;font-weight:700;border-radius:var(--radius)" onclick="showNuevoPaciente()">+ Nuevo paciente</button>`
+    +`<button style="width:100%;margin-bottom:10px;padding:13px;font-size:14px;font-weight:700;border-radius:var(--radius);background:#8E3B6E;color:#fff;border:none;cursor:pointer;font-family:inherit" onclick="showNuevoPacienteDerma()">🧴 Nuevo paciente dermatofuncional</button>`
     +`<div class="search-wrap">`
     +`<svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>`
     +`<input class="search-input" id="buscador-pacientes" placeholder="Buscar por nombre, diagnóstico o terapeuta..." oninput="_pacInput(this.value)" autocomplete="off" autocorrect="off" autocapitalize="off">`
@@ -19014,7 +19020,18 @@ function _hcRenderIrrad(){
 function _hcInit(){ try{ _hcRenderZonas(); _hcRenderSecundarias(); _hcRenderIrrad(); }catch(_e){ console.warn('[HC] init',_e&&_e.message); } }
 function showNuevoPaciente(){
   limpiarDirty();
+  window._nuevoModoDerma=false;   // alta MSK normal
   window._nuevoEditPid=null;   // modo CREAR
+  screenStack.push('screen-nuevo');showScreen('screen-nuevo',false);renderNuevoPaciente();
+}
+// Alta DERMATOFUNCIONAL: mismo formulario (ficha + historia básica), pero abre el apartado 🧴 ya
+// activado, oculta la exploración músculo-esquelética y marca el expediente como dermato → sale en
+// ROSA en la lista. El paciente queda como dermato por valoracion.dermato.es; si luego necesita
+// ortopedia, se le agrega desde "Editar datos" SIN perder lo de derma (es aditivo, no excluyente).
+function showNuevoPacienteDerma(){
+  limpiarDirty();
+  window._nuevoModoDerma=true;
+  window._nuevoEditPid=null;
   screenStack.push('screen-nuevo');showScreen('screen-nuevo',false);renderNuevoPaciente();
 }
 // EDITAR VALORACIÓN reusando el MISMO formulario de nuevo paciente, en modo edición.
@@ -19024,6 +19041,7 @@ function editarValoracionComoNuevo(pid){
   if(!p){ if(currentPatient) p=currentPatient; }
   if(!p){ showToast('Paciente no encontrado','error'); return; }
   limpiarDirty();
+  window._nuevoModoDerma=false;   // edición: mostrar el formulario completo (el apartado derma se re-abre por _dermaPrefill si el paciente ya es dermato)
   window._nuevoEditPid=String(p.id);
   screenStack.push('screen-nuevo'); showScreen('screen-nuevo',false); renderNuevoPaciente();
 }
@@ -19244,12 +19262,13 @@ function renderNuevoPaciente(){
     </div>
   </div>
   <div class="form-section">
-    <div class="form-section-title">📊 Valoración inicial</div>
+    <div class="form-section-title" id="n-val-title">📊 Valoración inicial</div>
     <div class="form-group">
       <div class="form-field">
         <div class="form-label">EVA inicial <span class="req">*</span> <span style="font-size:11px;color:var(--gray-400);font-weight:400">(toca el número)</span></div>
         <div class="evabtn-row" id="n-eva-row">${_nEvaBtnsHTML()}</div>
       </div>
+      <div id="n-msk-exam">
       <div class="form-field"><div class="form-label">Inflamación</div><input class="form-input" id="n-inflamacion" type="text" placeholder="Ej: Inflamación en cara anterior y lateral del tobillo con edema y equimosis"><div style="margin-top:4px;font-size:12px;color:var(--gray-400);line-height:1.4">Anota intensidad + zona + signos (edema, equimosis, calor, enrojecimiento). Ej: "Moderada en cara anterior y lateral del tobillo con edema y equimosis"</div></div>
       <div class="form-field"><div class="form-label">Marcha / postura</div><input class="form-input" id="n-marcha" type="text" placeholder="Ej: Pronación bilateral"></div>
       <div class="form-field"><div class="form-label">ROM</div><input class="form-input" id="n-rom" type="text" placeholder="Ej: Limitado en flexión lumbar"></div>
@@ -19261,6 +19280,7 @@ function renderNuevoPaciente(){
            alta — duplicaba los checkboxes sc-bandera de Seguridad. valoracion.banderasRojas se sigue
            escribiendo SIEMPRE (derivado de los checkboxes en guardarNuevoPaciente). -->
       <div class="form-field"><div class="form-label">Estudios de imagen y hallazgos</div><textarea class="form-input" id="n-estudios" placeholder="Ej: US tendón rotuliano — engrosamiento con áreas hipoecoicas"></textarea></div>
+      </div><!-- /n-msk-exam -->
       <div class="form-field">
         <div class="form-label">📐 Foto / video de valoración <span style="font-weight:400;color:var(--gray-400);font-size:11px">· línea base y seguimiento (equimosis, marcha…)</span></div>
         <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:6px">${_ETIQ_VALORACION.map(function(e){ return '<button type="button" onclick="_setEtqAlta('+JSON.stringify(e).replace(/"/g,'&quot;')+')" style="font-size:11px;font-weight:700;border:1.5px solid var(--gray-200);background:#fff;color:var(--navy);border-radius:14px;padding:5px 10px;cursor:pointer;font-family:inherit">'+e+'</button>'; }).join('')}</div>
@@ -19471,6 +19491,22 @@ function renderNuevoPaciente(){
       try{ _prefillNuevoDesdePaciente(_edP2); }catch(_e){ console.warn('[edit-val] prefill:', _e&&_e.message); }
     } else {
       cargarBorradorNuevoSiExiste();
+      // ALTA DERMATOFUNCIONAL: abre el apartado 🧴 activado, oculta la exploración MSK y avisa el modo.
+      // (Solo en CREAR, no en edición. El paciente queda marcado como dermato al guardar con el toggle ON.)
+      if(window._nuevoModoDerma){
+        try{ _dermaToggleAlta(true); }catch(_){}
+        var _ttd=document.getElementById('nuevo-topbar-title'); if(_ttd) _ttd.textContent='🧴 Nuevo paciente dermato';
+        var _mx=document.getElementById('n-msk-exam'); if(_mx) _mx.style.display='none';
+        var _vt=document.getElementById('n-val-title'); if(_vt) _vt.textContent='📊 Dolor (EVA) y fotos de línea base';
+        if(!document.getElementById('n-derma-banner')){
+          var _bn=document.createElement('div');
+          _bn.id='n-derma-banner';
+          _bn.style.cssText='background:#8E3B6E;color:#fff;border-radius:12px;padding:11px 14px;margin:10px 0 2px;font-size:12.5px;font-weight:600;line-height:1.5';
+          _bn.innerHTML='🧴 <b>Alta dermatofuncional.</b> Llena la ficha y la historia básica; la exploración músculo-esquelética se ocultó. Captura la sección rosa <b>🧴 Dermato funcional</b>. Este paciente saldrá en rosa en la lista.';
+          var _prog=document.getElementById('progreso-llenado');
+          if(_prog&&_prog.parentNode){ _prog.parentNode.insertBefore(_bn, _prog.nextSibling); }
+        }
+      }
     }
     _hcInit();   // pinta los chips dinámicos del Motivo (zonas, irradiación según zona, otras zonas)
     // EDICIÓN: re-marcar zona/lado/irradiación ya con _HC precargado (los de lado son inline).
