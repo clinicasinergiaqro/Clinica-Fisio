@@ -19162,7 +19162,7 @@ function renderNuevoPaciente(){
       <div class="form-field"><div class="form-label">Cirugías previas</div><input class="form-input" id="n-cirugias" type="text" placeholder="Ej: Apendicectomía 2018"><div class="chip-row"><button type="button" class="chip-oneshot" onclick="setCampoRapido('n-cirugias','Ninguna')">Sin cirugías previas relevantes</button></div></div>
       <div class="form-field"><div class="form-label">Medicamentos actuales</div><input class="form-input" id="n-medicamentos" type="text" placeholder="Ej: Enalapril 10mg"><div class="chip-row"><button type="button" class="chip-oneshot" onclick="setCampoRapido('n-medicamentos','Ninguno')">No toma medicamentos</button></div></div>
       <div class="form-field"><div class="form-label">🚫 Alergias <span class="req">*</span></div><input class="form-input" id="n-alergias" type="text" placeholder="Ej: Penicilina, AINES, látex. O escribir 'Ninguna'"><div class="chip-row"><button type="button" class="chip-oneshot" onclick="setCampoRapido('n-alergias','Ninguna')">Sin alergias conocidas</button></div></div>
-      <div class="form-field"><div class="form-label">Antecedentes deportivos</div><input class="form-input" id="n-deportivos" type="text" placeholder="Ej: Crossfit, natación..."><div class="chip-row"><button type="button" class="chip-quick" onclick="setCampoRapido('n-deportivos','No practica actividad deportiva')">No practica</button></div></div>
+      <div class="form-field"><div class="form-label" id="n-depo-label">Antecedentes deportivos</div><input class="form-input" id="n-deportivos" type="text" placeholder="Ej: Crossfit, natación..."><div class="chip-row"><button type="button" class="chip-quick" onclick="setCampoRapido('n-deportivos','No practica actividad deportiva')">No practica</button></div></div>
       <div class="form-field"><div class="form-label">Deporte y frecuencia</div><input class="form-input" id="n-deporte-freq" type="text" placeholder="Ej: Crossfit 4x semana"><div class="chip-row"><button type="button" class="chip-quick" onclick="setCampoRapido('n-deporte-freq','No aplica')">No aplica</button></div></div>
     </div>
   </div>
@@ -19334,7 +19334,7 @@ function renderNuevoPaciente(){
         <div data-db="postqx" style="display:none">
         <div style="font-size:12.5px;font-weight:700;color:#7A2F5D;margin-bottom:7px">Procedimiento quirúrgico</div>
         <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px">
-          ${['Liposucción','Lipoabdominoplastia','Abdominoplastia','Mamoplastia (aumento)','Mamoplastia (reducción/pexia)','Lipotransferencia glútea','Blefaroplastia','Rinoplastia','Braquioplastia','Mini-lifting','Lifting de muslos','Post-cesárea'].map(function(x){ return '<button type="button" class="chip-quick" onclick="_dermaChipProc(this.textContent)">'+x+'</button>'; }).join('')}
+          ${['Liposucción','Lipo HD / VASER','Lipoabdominoplastia','Abdominoplastia','Mamoplastia (aumento)','Mamoplastia (reducción/pexia)','Ginecomastia','Lipotransferencia glútea','Body lift / post-bariátrica','Blefaroplastia','Rinoplastia','Braquioplastia','Lifting facial / cuello','Mini-lifting','Lifting de muslos','Bichectomía / mentoplastia','Otoplastia','Post-cesárea'].map(function(x){ return '<button type="button" class="chip-quick" onclick="_dermaChipProc(this.textContent)">'+x+'</button>'; }).join('')}
         </div>
         <input class="form-input" id="n-derma-proc" type="text" placeholder="Toca un chip o escribe el procedimiento (puede ser más de uno)">
         <div class="form-field" style="margin-top:12px"><div class="form-label">Fecha de la cirugía / procedimiento</div><input type="date" class="form-input" id="n-derma-fqx" style="max-width:200px" max="${_isoMasDias(0)}"></div>
@@ -19354,13 +19354,25 @@ function renderNuevoPaciente(){
           </div>
         </div>
         <div class="form-field"><div class="form-label">Indicaciones del cirujano</div><input class="form-input" id="n-derma-indicaciones" type="text" placeholder="Faja 24/7 por 4 sem, sin ejercicio 6 sem, drenaje linfático desde día 5…"></div>
+        <div class="form-field"><div class="form-label">Drenajes</div>
+          <select class="form-input" id="n-derma-drenajes"><option value="">No referido</option><option>No tuvo drenajes</option><option>Activos (aún puestos)</option><option>Ya retirados</option></select>
+          <input class="form-input" id="n-derma-drendet" type="text" style="margin-top:7px" placeholder="Cuántos · gasto ml/día · fecha de retiro (real o prevista)"></div>
+        <div class="form-field"><div class="form-label">Faja / prenda de compresión</div>
+          <select class="form-input" id="n-derma-faja"><option value="">No referido</option><option>No indicada</option><option>Indicada — la usa (cumple)</option><option>Indicada — la usa a ratos</option><option>Indicada — NO la usa</option></select></div>
+        <div class="form-field"><div class="form-label">Autorización del cirujano para fisioterapia <span style="font-weight:400;color:var(--gray-400);font-size:11px">· clave antes de iniciar</span></div>
+          <select class="form-input" id="n-derma-autoriza"><option value="">No referida</option><option>Sí — sin restricciones</option><option>Sí — con restricciones</option><option>Pendiente de autorización</option><option>Viene por su cuenta (sin contacto con cirujano)</option></select>
+          <input class="form-input" id="n-derma-autorizadet" type="text" style="margin-top:7px" placeholder="Qué autorizó / restricciones / retiro de puntos (fecha)"></div>
+        <div class="form-field"><div class="form-label">Posición antálgica / postura de defensa <span style="font-weight:400;color:var(--gray-400);font-size:11px">· PANFIC</span></div><input class="form-input" id="n-derma-antalgica" type="text" placeholder="Vacío = no. Ej: camina en flexión de tronco (post-abdomino), protege hombro"></div>
         </div>
         <div style="font-size:12.5px;font-weight:700;color:#7A2F5D;margin:14px 0 4px">Factores de riesgo y hábitos <span style="font-weight:400;color:var(--gray-400);font-size:11px">· condicionan cicatrización y elección de equipos</span></div>
         <div style="display:flex;flex-wrap:wrap;gap:8px 14px;padding:4px 2px">
-          ${['Tabaquismo','Diabetes','Propenso a queloide / cicatriz hipertrófica','Trastornos de cicatrización','Anticoagulantes','Corticoides / AINES prolongados','Disfunción hormonal / tiroides','Anticonceptivos / terapia hormonal','Embarazo o lactancia','Alergia a corriente eléctrica','Alergia a productos / cosméticos','Problemas circulatorios / várices','Estrés alto / mal sueño','Ninguno referido'].map(function(x){ return '<label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--gray-800)"><input type="checkbox" class="derma-riesgo" value="'+x+'">'+x+'</label>'; }).join('')}
+          ${['Tabaquismo','Diabetes','Propenso a queloide / cicatriz hipertrófica','Trastornos de cicatrización','Anticoagulantes','Corticoides / AINES prolongados','Isotretinoína reciente (acné)','Medicamentos fotosensibilizantes','Herpes labial / zóster recurrente','Enfermedad autoinmune (lupus / esclerodermia)','Epilepsia','Cáncer de piel / melanoma','Disfunción hormonal / tiroides','Anticonceptivos / terapia hormonal','Embarazo o lactancia','Alergia a corriente eléctrica','Alergia a productos / cosméticos','Problemas circulatorios / várices','Estrés alto / mal sueño','Ninguno referido'].map(function(x){ return '<label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--gray-800)"><input type="checkbox" class="derma-riesgo" value="'+x+'">'+x+'</label>'; }).join('')}
         </div>
         <input class="form-input" id="n-derma-riesgosdet" type="text" style="margin-top:7px" placeholder="Detalle: cuánto fuma, tipo de diabetes, qué medicamento/hormona…">
-        <div class="form-field" style="margin-top:10px"><div class="form-label">Tratamientos estéticos previos y resultado</div><input class="form-input" id="n-derma-prev" type="text" placeholder="Qué se ha hecho antes (aparatología, masajes, bótox…) y si le funcionó"></div>
+        <div class="form-field" style="margin-top:10px"><div class="form-label">Gineco / hormonal <span style="font-weight:400;color:var(--gray-400);font-size:11px">· melasma, celulitis y estrías son hormonales</span></div><input class="form-input" id="n-derma-gineco" type="text" placeholder="Embarazos/partos/cesáreas · ¿lactancia actual? · menopausia · anticonceptivo"></div>
+        <div class="form-field"><div class="form-label">Tratamientos estéticos previos y resultado</div><input class="form-input" id="n-derma-prev" type="text" placeholder="Qué se ha hecho antes (aparatología, masajes, bótox…) y si le funcionó"></div>
+        <div class="form-field"><div class="form-label">Expectativas del paciente <span style="font-weight:400;color:var(--gray-400);font-size:11px">· no realistas = bandera, valorar derivar</span></div>
+          <select class="form-input" id="n-derma-expectativas"><option value="">No exploradas</option><option>Realistas</option><option>Parcialmente realistas — requiere educación</option><option>No realistas — bandera (valorar derivar)</option></select></div>
         <div style="font-size:12.5px;font-weight:700;color:#7A2F5D;margin:14px 0 4px">Exploración dermatofuncional</div>
         <div class="form-field"><div class="form-label">Fototipo de piel (Fitzpatrick)</div>
           <select class="form-input" id="n-derma-fototipo"><option value="">No evaluado</option><option>I — muy clara, siempre se quema</option><option>II — clara, se quema con facilidad</option><option>III — clara-media, a veces se quema</option><option>IV — morena clara, rara vez se quema</option><option>V — morena oscura</option><option>VI — muy oscura</option></select></div>
@@ -19368,6 +19380,9 @@ function renderNuevoPaciente(){
           <select class="form-input" id="n-derma-sens"><option value="">No evaluada</option><option>Normal</option><option>Hipoestesia (dormido)</option><option>Hiperestesia</option><option>Disestesia (ardor/hormigueo)</option><option>Mixta por zonas</option></select>
           <select class="form-input" id="n-derma-sw" style="margin-top:7px"><option value="">Monofilamento Semmes-Weinstein: no evaluado</option><option>Verde 0.05 g — sensibilidad normal</option><option>Azul 0.2 g — disminución leve del tacto</option><option>Morado 2.0 g — pérdida de sensación protectora</option><option>Rojo 4.0 g — pérdida de protección y tacto</option></select>
           <input class="form-input" id="n-derma-senszonas" type="text" style="margin-top:7px" placeholder="Zonas: Ej: hipoestesia infraumbilical (esperada post-abdominoplastia)"></div>
+        <div class="form-field"><div class="form-label">Apariencia de la piel <span style="font-weight:400;color:var(--gray-400);font-size:11px">· color · trofismo · temperatura local</span></div><input class="form-input" id="n-derma-piel" type="text" placeholder="Ej: piel brillante y tensa, caliente en flanco der; trofismo conservado"></div>
+        <div class="form-field"><div class="form-label">Dolor a la presión (test PAFEG)</div>
+          <select class="form-input" id="n-derma-testpresion"><option value="">No evaluado</option><option>Sin dolor</option><option>Dolor débil</option><option>Desconfortante</option><option>Angustiante</option><option>Torturante</option></select></div>
         <div data-db="edema" style="display:none">
         <div class="form-field"><div class="form-label">Edema (signo de godete / fóvea)</div>
           <select class="form-input" id="n-derma-edema"><option value="">No evaluado</option><option>Sin edema</option><option>Leve (+1)</option><option>Moderado (+2)</option><option>Importante (+3)</option><option>Severo (+4)</option></select></div>
@@ -19410,6 +19425,7 @@ function renderNuevoPaciente(){
         </div>
         <div style="font-size:12px;font-weight:800;color:#7A2F5D;padding:0 2px 8px"><span id="n-derma-imc"></span><span id="n-derma-whr" style="margin-left:12px"></span></div>
         <div class="form-field"><div class="form-label">Perímetros comparativos (Der / Izq por punto)</div><textarea class="form-input" id="n-derma-perimetros" placeholder="Mide SIEMPRE en el mismo punto. Ej: Muslo (10 cm suprapatelar): D 52 / I 54.5 · Brazo: D 28 / I 28 · Abdomen supra: 92 · infra: 97"></textarea></div>
+        <div class="form-field"><div class="form-label">Diástasis de rectos <span style="font-weight:400;color:var(--gray-400);font-size:11px">· post-parto / abdomino</span></div><input class="form-input" id="n-derma-diastasis" type="text" placeholder="Vacío = no evaluada. Ej: 2.5 dedos supraumbilical, 2 infraumbilical"></div>
         </div>
         <div data-db="corporal" style="display:none">
         <div style="font-size:12.5px;font-weight:700;color:#7A2F5D;margin:14px 0 4px">Corporal: celulitis · adiposidad · flacidez <span style="font-weight:400;color:var(--gray-400);font-size:11px">· PAFEG</span></div>
@@ -19425,6 +19441,9 @@ function renderNuevoPaciente(){
         <div class="form-field"><div class="form-label">Flacidez de la piel — ¿dónde?</div><input class="form-input" id="n-derma-flacpiel" type="text" placeholder="Vacío = sin flacidez. Ej: abdomen infraumbilical, cara interna de brazos"></div>
         <div class="form-field"><div class="form-label">Flacidez muscular</div>
           <select class="form-input" id="n-derma-flacmusc"><option value="">No evaluada</option><option>Ausente</option><option>Presente</option></select></div>
+        <div class="form-field"><div class="form-label">Microvárices / telangiectasias</div>
+          <select class="form-input" id="n-derma-microvarices"><option value="">No evaluadas</option><option>Ausentes</option><option>Microvárices</option><option>Telangiectasias</option><option>Ambas</option></select></div>
+        <div class="form-field"><div class="form-label">Alteraciones posturales <span style="font-weight:400;color:var(--gray-400);font-size:11px">· influyen en celulitis/edema (PAFEG)</span></div><input class="form-input" id="n-derma-posturales" type="text" placeholder="Vacío = sin alteraciones. Ej: hiperlordosis lumbar, valgo de rodillas"></div>
         </div>
         <div data-db="facial" style="display:none">
         <div style="font-size:12.5px;font-weight:700;color:#7A2F5D;margin:14px 0 4px">Facial <span style="font-weight:400;color:var(--gray-400);font-size:11px">· protocolo PAF</span></div>
@@ -19448,6 +19467,8 @@ function renderNuevoPaciente(){
           <select class="form-input" id="n-derma-lapiere" style="margin-top:7px"><option value="">Grado (Lapiere-Pierard): no evaluado</option><option>I — arrugas de expresión</option><option>II — adelgazamiento dermoepidérmico</option><option>III — alteración gravitacional (descolgamiento)</option></select></div>
         <div class="form-field"><div class="form-label">Flacidez facial — ¿dónde?</div><input class="form-input" id="n-derma-flacfacial" type="text" placeholder="Ej: óvalo facial, párpados, cuello"></div>
         <div class="form-field"><div class="form-label">Bótox / procedimientos faciales previos</div><input class="form-input" id="n-derma-botox" type="text" placeholder="¿Dónde? ¿Hace cuánto? (bótox, rellenos, peelings, hilos…)"></div>
+        <div class="form-field"><div class="form-label">Fotoprotección y rutina actual</div><input class="form-input" id="n-derma-fotoprot" type="text" placeholder="¿Usa protector solar? ¿cuál/frecuencia? · rutina/cosméticos actuales"></div>
+        <div class="form-field"><div class="form-label">Lesión / condición de la piel <span style="font-weight:400;color:var(--gray-400);font-size:11px">· topografía + morfología (HC dermatológica)</span></div><input class="form-input" id="n-derma-lesion" type="text" placeholder="DÓNDE exacto + CÓMO se ve: mácula/pápula/placa, color, bordes, tamaño"></div>
         </div>
         <div data-db="estrias" style="display:none">
         <div style="font-size:12.5px;font-weight:700;color:#7A2F5D;margin:14px 0 4px">Estrías</div>
@@ -19613,6 +19634,7 @@ function renderNuevoPaciente(){
         var _ll=document.getElementById('n-limit-label'); if(_ll) _ll.innerHTML='¿Cómo le afecta en su día a día? (limitaciones, ropa, autoestima) <span class="req">*</span>';
         var _dt=document.getElementById('n-dxplan-title'); if(_dt) _dt.textContent='🔎 Diagnóstico dermatofuncional y plan';
         var _dl=document.getElementById('n-dxf-label'); if(_dl) _dl.textContent='Diagnóstico cineticofuncional (dermato)';
+        var _dp=document.getElementById('n-depo-label'); if(_dp) _dp.textContent='Actividad física (tipo)';
         if(!document.getElementById('n-derma-banner')){
           var _bn=document.createElement('div');
           _bn.id='n-derma-banner';
@@ -19810,13 +19832,20 @@ function _dermaCollectAlta(){
       hallazgosQx:g('n-derma-hallazgos')||'',
       complicaciones:comps||'Ninguna referida',
       indicacionesCirujano:g('n-derma-indicaciones')||'',
+      drenajes:g('n-derma-drenajes'), drenajesDet:g('n-derma-drendet'),
+      faja:g('n-derma-faja'),
+      autorizacionCirujano:g('n-derma-autoriza'), autorizacionDet:g('n-derma-autorizadet'),
+      posicionAntalgica:g('n-derma-antalgica'),
       riesgos:checks('derma-riesgo'),
       riesgosDetalle:g('n-derma-riesgosdet'),
+      gineco:g('n-derma-gineco'),
       tratamientosPrevios:g('n-derma-prev'),
+      expectativas:g('n-derma-expectativas'),
       fototipo:g('n-derma-fototipo')||'No evaluado',
       sensibilidad:g('n-derma-sens')||'No evaluada',
       sensibilidadSW:g('n-derma-sw'),
       sensibilidadZonas:g('n-derma-senszonas')||'',
+      pielApariencia:g('n-derma-piel'), dolorPresion:g('n-derma-testpresion'),
       edema:g('n-derma-edema')||'No evaluado',
       equimosis:g('n-derma-equimosis')||'',
       stemmer:g('n-derma-stemmer'),
@@ -19828,20 +19857,23 @@ function _dermaCollectAlta(){
       posasObs:posas('po'), posasPac:posas('pp'),
       peso:g('n-derma-peso'), talla:g('n-derma-talla'), cintura:g('n-derma-cintura'), cadera:g('n-derma-cadera'),
       perimetros:g('n-derma-perimetros')||'',
+      diastasis:g('n-derma-diastasis'),
       adiposidad:g('n-derma-adiposidad'),
       celulitisTipo:g('n-derma-celtipo'), celulitisGrado:g('n-derma-celgrado'),
       pielNaranja:g('n-derma-pielnaranja'), depresiones:g('n-derma-depresiones'),
       flacidezPiel:g('n-derma-flacpiel'), flacidezMuscular:g('n-derma-flacmusc'),
+      microvarices:g('n-derma-microvarices'), posturales:g('n-derma-posturales'),
       tipoPiel:g('n-derma-tipopiel'), glogau:g('n-derma-goglau'), acne:g('n-derma-acne'),
       alteracionesFaciales:checks('derma-altfac'),
       arrugasLoc:checks('derma-arrloc'), arrugasTipo:g('n-derma-arrtipo'), arrugasTsuji:g('n-derma-tsuji'), arrugasGrado:g('n-derma-lapiere'),
       flacidezFacial:g('n-derma-flacfacial'), botoxPrevio:g('n-derma-botox'),
+      fotoproteccion:g('n-derma-fotoprot'), lesionPiel:g('n-derma-lesion'),
       estriasAparicion:g('n-derma-estapar'), estriasColor:g('n-derma-estcolor'), estriasLocal:g('n-derma-estlocal'),
       objetivoEstetico:g('n-derma-objetivo')||'',
       equipos:checks('derma-eq'),
       frecuencia:g('n-derma-frec')||'',
       planEstetico:g('n-derma-plan')||'',
-      capturadoEn:(typeof todayISO!=='undefined'?todayISO:''), version:3 };
+      capturadoEn:(typeof todayISO!=='undefined'?todayISO:''), version:4 };
     // IMC y WHR calculados — se guardan como texto para el expediente y las revaloraciones
     var nf=function(x){ var n=parseFloat(String(x).replace(',','.')); return (isFinite(n)&&n>0)?n:null; };
     var _p=nf(o.peso), _t=nf(o.talla), _ci=nf(o.cintura), _ca=nf(o.cadera); var _tm=(_t&&_t>3)?_t/100:_t;
@@ -19861,7 +19893,13 @@ function _dermaPrefill(d){
     try{ _dermaTiposMarcar(); _dermaAplicarTipos(); }catch(_){}
     S('n-derma-proc',cl(d.procedimiento)); S('n-derma-fqx',d.fechaCirugia||''); S('n-derma-cirujano',d.cirujano||'');
     S('n-derma-hallazgos',d.hallazgosQx||''); S('n-derma-indicaciones',d.indicacionesCirujano||'');
-    S('n-derma-riesgosdet',d.riesgosDetalle||''); S('n-derma-prev',d.tratamientosPrevios||'');
+    S('n-derma-drenajes',d.drenajes||''); S('n-derma-drendet',d.drenajesDet||'');
+    S('n-derma-faja',d.faja||'');
+    S('n-derma-autoriza',d.autorizacionCirujano||''); S('n-derma-autorizadet',d.autorizacionDet||'');
+    S('n-derma-antalgica',d.posicionAntalgica||'');
+    S('n-derma-riesgosdet',d.riesgosDetalle||''); S('n-derma-gineco',d.gineco||'');
+    S('n-derma-prev',d.tratamientosPrevios||''); S('n-derma-expectativas',d.expectativas||'');
+    S('n-derma-piel',d.pielApariencia||''); S('n-derma-testpresion',d.dolorPresion||'');
     S('n-derma-fototipo',cl(d.fototipo)); S('n-derma-edema',cl(d.edema)); S('n-derma-equimosis',d.equimosis||'');
     S('n-derma-stemmer',d.stemmer||''); S('n-derma-isl',d.linfedemaISL||'');
     // Fibrosis: mapear la escala v1/v2 a los niveles PANFIC del libro
@@ -19874,13 +19912,15 @@ function _dermaPrefill(d){
     if(Array.isArray(d.posasPac)) d.posasPac.forEach(function(v,i){ S('n-derma-pp'+i,v||''); });
     S('n-derma-peso',d.peso||''); S('n-derma-talla',d.talla||''); S('n-derma-cintura',d.cintura||''); S('n-derma-cadera',d.cadera||'');
     try{ _dermaCalcMedidas(); }catch(_){}
-    S('n-derma-perimetros',d.perimetros||''); S('n-derma-objetivo',d.objetivoEstetico||'');
+    S('n-derma-perimetros',d.perimetros||''); S('n-derma-diastasis',d.diastasis||''); S('n-derma-objetivo',d.objetivoEstetico||'');
     S('n-derma-adiposidad',d.adiposidad||''); S('n-derma-celtipo',d.celulitisTipo||''); S('n-derma-celgrado',d.celulitisGrado||'');
     S('n-derma-pielnaranja',d.pielNaranja||''); S('n-derma-depresiones',d.depresiones||'');
     S('n-derma-flacpiel',d.flacidezPiel||''); S('n-derma-flacmusc',d.flacidezMuscular||'');
+    S('n-derma-microvarices',d.microvarices||''); S('n-derma-posturales',d.posturales||'');
     S('n-derma-tipopiel',d.tipoPiel||''); S('n-derma-goglau',d.glogau||''); S('n-derma-acne',d.acne||'');
     S('n-derma-arrtipo',d.arrugasTipo||''); S('n-derma-tsuji',d.arrugasTsuji||''); S('n-derma-lapiere',d.arrugasGrado||'');
     S('n-derma-flacfacial',d.flacidezFacial||''); S('n-derma-botox',d.botoxPrevio||'');
+    S('n-derma-fotoprot',d.fotoproteccion||''); S('n-derma-lesion',d.lesionPiel||'');
     S('n-derma-estapar',d.estriasAparicion||''); S('n-derma-estcolor',d.estriasColor||''); S('n-derma-estlocal',d.estriasLocal||'');
     S('n-derma-frec',d.frecuencia||''); S('n-derma-plan',d.planEstetico||'');
     var marcar=function(cls,txt){ var s=String(txt||''); document.querySelectorAll('.'+cls).forEach(function(c){ c.checked=s.indexOf(c.value)!==-1; }); };
@@ -19911,10 +19951,18 @@ function _dermaCardHTML(v){
       +row('Qué se realizó / encontró',d.hallazgosQx,' narrative')
       +(d.complicaciones?('<div class="field-row"><div class="field-label">Complicaciones</div><div class="field-value" style="color:'+(compMal?'var(--red)':'var(--green)')+';font-weight:600">'+valorSeguroHTML(d.complicaciones)+'</div></div>'):'')
       +row('Indicaciones del cirujano',d.indicacionesCirujano)
+      +row('Drenajes',[d.drenajes,d.drenajesDet].filter(Boolean).join(' — '))
+      +row('Faja / compresión',d.faja)
+      +((d.autorizacionCirujano||d.autorizacionDet)?('<div class="field-row"><div class="field-label">Autorización del cirujano</div><div class="field-value" style="font-weight:600;color:'+((String(d.autorizacionCirujano||'').indexOf('Sí')===0)?'var(--green)':'var(--red)')+'">'+valorSeguroHTML([d.autorizacionCirujano,d.autorizacionDet].filter(Boolean).join(' — '))+'</div></div>'):'')
+      +row('Posición antálgica',d.posicionAntalgica)
       +row('Factores de riesgo',[d.riesgos,d.riesgosDetalle].filter(Boolean).join(' — '))
+      +row('Gineco / hormonal',d.gineco)
       +row('Tratamientos previos',d.tratamientosPrevios)
+      +row('Expectativas',d.expectativas)
       +row('Fototipo (Fitzpatrick)',d.fototipo)
       +row('Sensibilidad',[d.sensibilidad,d.sensibilidadSW,d.sensibilidadZonas].filter(function(x){return x&&x!=='No evaluada';}).join(' — '))
+      +row('Apariencia de la piel',d.pielApariencia)
+      +row('Dolor a la presión',d.dolorPresion)
       +row('Edema',d.edema)
       +row('Equimosis / zonas',d.equimosis)
       +row('Signo de Stemmer',d.stemmer)
@@ -19925,14 +19973,17 @@ function _dermaCardHTML(v){
       +row('POSAS paciente',posasTxt(d.posasPac,['Dolor','Comezón','Color','Rigidez','Grosor','Irregularidad']))
       +row('Medidas',medidasTxt)
       +row('Perímetros (D/I)',d.perimetros,' narrative')
-      +((d.adiposidad||d.celulitisTipo||d.celulitisGrado||d.pielNaranja||d.depresiones||d.flacidezPiel||d.flacidezMuscular)?sub('🍊 Corporal'):'')
+      +row('Diástasis de rectos',d.diastasis)
+      +((d.adiposidad||d.celulitisTipo||d.celulitisGrado||d.pielNaranja||d.depresiones||d.flacidezPiel||d.flacidezMuscular||d.microvarices||d.posturales)?sub('🍊 Corporal'):'')
       +row('Adiposidad localizada',d.adiposidad)
       +row('Celulitis',[d.celulitisTipo,d.celulitisGrado].filter(Boolean).join(' · '))
       +row('Piel de naranja',d.pielNaranja)
       +row('Depresiones',d.depresiones)
       +row('Flacidez de piel',d.flacidezPiel)
       +row('Flacidez muscular',d.flacidezMuscular)
-      +((d.tipoPiel||d.glogau||d.acne||d.alteracionesFaciales||d.arrugasLoc||d.arrugasTipo||d.flacidezFacial||d.botoxPrevio)?sub('✨ Facial'):'')
+      +row('Microvárices / telangiectasias',d.microvarices)
+      +row('Alteraciones posturales',d.posturales)
+      +((d.tipoPiel||d.glogau||d.acne||d.alteracionesFaciales||d.arrugasLoc||d.arrugasTipo||d.flacidezFacial||d.botoxPrevio||d.fotoproteccion||d.lesionPiel)?sub('✨ Facial'):'')
       +row('Tipo de piel',d.tipoPiel)
       +row('Envejecimiento (Glogau)',d.glogau)
       +row('Acné',d.acne)
@@ -19940,6 +19991,8 @@ function _dermaCardHTML(v){
       +row('Arrugas',[d.arrugasLoc,d.arrugasTipo,d.arrugasTsuji,d.arrugasGrado].filter(Boolean).join(' · '))
       +row('Flacidez facial',d.flacidezFacial)
       +row('Bótox / procedimientos previos',d.botoxPrevio)
+      +row('Fotoprotección / rutina',d.fotoproteccion)
+      +row('Lesión (topografía + morfología)',d.lesionPiel)
       +((d.estriasAparicion||d.estriasColor||d.estriasLocal)?sub('〰️ Estrías'):'')
       +row('Aparición',d.estriasAparicion)
       +row('Coloración',d.estriasColor)
@@ -20250,7 +20303,7 @@ function guardarNuevoPaciente(){
     // DERMATO: resumen en la O de la nota de valoración (fail-safe, no rompe el alta)
     try{ var _dmx=nuevo.valoracion&&nuevo.valoracion.dermato;
       if(_dmx&&_dmx.es){ var _dmv=function(l,x){ x=String(x==null?'':x); return (x&&x.indexOf('No evaluad')!==0&&x!=='No especificado')?(l+x):''; };
-        _oExtra+=' · DERMATO FUNCIONAL: '+[(_dmx.tipos?('Caso: '+_dmx.tipos):''),_dmv('',_dmx.procedimiento),(_dmx.fechaCirugia?('Qx '+_dmx.fechaCirugia):''),_dmv('Riesgos: ',_dmx.riesgos),_dmv('Edema: ',_dmx.edema),_dmv('Stemmer: ',_dmx.stemmer),_dmv('Fibrosis: ',_dmx.fibrosis),_dmv('Cicatriz: ',_dmx.cicatriz),('Complicaciones: '+_dmx.complicaciones)].filter(Boolean).join(' · '); }
+        _oExtra+=' · DERMATO FUNCIONAL: '+[(_dmx.tipos?('Caso: '+_dmx.tipos):''),_dmv('',_dmx.procedimiento),(_dmx.fechaCirugia?('Qx '+_dmx.fechaCirugia):''),_dmv('Autorización cirujano: ',_dmx.autorizacionCirujano),_dmv('Drenajes: ',_dmx.drenajes),_dmv('Faja: ',_dmx.faja),_dmv('Riesgos: ',_dmx.riesgos),_dmv('Edema: ',_dmx.edema),_dmv('Stemmer: ',_dmx.stemmer),_dmv('Fibrosis: ',_dmx.fibrosis),_dmv('Cicatriz: ',_dmx.cicatriz),('Complicaciones: '+_dmx.complicaciones)].filter(Boolean).join(' · '); }
     }catch(_){}
     var notaVal={
       id:generarIdSeguro_('s'), num:1, fecha:_fvFmt,
