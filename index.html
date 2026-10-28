@@ -1356,7 +1356,7 @@ body.modo-oscuro .topbar{background:#141824}
 <body>
 <div id="sync-indicator" class="sync-indicator ok" style="display:none"></div>
 <div id="app-version-chip" title="Versión de la app en este equipo — toca para buscar actualización" onclick="try{_tapVersionChip()}catch(e){}"></div>
-<script>/* VERSIÓN VISIBLE: refleja el index.html realmente cargado en ESTE equipo (se bumpea junto con sw.js). Así un iPad con versión vieja se ve de un vistazo. */window.APP_VERSION='v1-2026-10-28a';(function(){try{var c=document.getElementById('app-version-chip');if(c)c.textContent=window.APP_VERSION;}catch(e){}})();</script>
+<script>/* VERSIÓN VISIBLE: refleja el index.html realmente cargado en ESTE equipo (se bumpea junto con sw.js). Así un iPad con versión vieja se ve de un vistazo. */window.APP_VERSION='v1-2026-10-28b';(function(){try{var c=document.getElementById('app-version-chip');if(c)c.textContent=window.APP_VERSION;}catch(e){}})();</script>
 <div class="toast" id="toast" aria-live="polite" aria-atomic="true"></div>
 
 <!-- LOGIN -->
@@ -2504,6 +2504,75 @@ function _mirrorHistoriaActivoFS(p, camposHist){
       .catch(function(e){ console.warn('[espejo FS activo] no crítico:', e&&e.message); });
   }catch(_){}
 }
+// ════════════════════════════════════════════════════════════════════════════
+// ALTA → NUBE AL INSTANTE (caso Nicole Carranza 2026-10-28; antes María Diana y Ana Lucía).
+// Un expediente NUEVO no debe depender de UN solo camino (POST al Sheet) para existir fuera
+// del equipo: si ese POST no entra (offline/red lenta/AUTH/LOCK/app cerrada), el alta vivía
+// SOLO en el dispositivo hasta que ese mismo equipo drenara su cola. Aquí se escribe YA el
+// doc Firestore .doc(p.id) (identidad + historia completa) EN PARALELO al POST del Sheet,
+// reusando las vías probadas de Fase 1/3a (_escribirIdentidadFirestore,
+// _persistirHistoricoFirestore). Las reglas ya lo permiten (allow create: isWriter; el update
+// pasa pacienteClinicoUpdateOK). Si falla u offline → caen a las colas durables existentes
+// (tipo:'identidad' + COLA_SYNC_HIST_DOC) que reintentan solas. ADITIVO: NO toca la ruta del
+// Sheet ni saveDB (regla de integridad); con el doc en FS, el índice/3b lo pintan en los demás
+// equipos y "Forzar actualización" (Fase 2) tiene fuente desde el minuto 1.
+// Campos = la MISMA lista probada del espejo Fase 1 (replay seguro en _encolarHistDoc).
+var _ALTA_CAMPOS_FS=['dx','motivo','motivoHC','motivoConsulta','valoracion','dxFuncional','planTto','antecedentes','contraindicaciones','alergias','seguridadClinica','motivosAnteriores','sugerenciaIA'];
+function _altaNubeInmediata(p){
+  var est={fsOk:false, fsDone:false, sheetOk:false, sheetDone:false};
+  try{
+    if(!p || !p.id || String(p.id).indexOf('mig_pac_')===0){ est.fsDone=true; return est; }
+    var idc=_payloadIdentidadActivo(p);
+    var w1=Promise.resolve().then(function(){ return _escribirIdentidadFirestore(p.id, idc); })
+      .then(function(){ return true; })
+      .catch(function(){ try{ _encolarIdentidadHist(p.id, idc); }catch(_){} return false; });
+    var w2=Promise.resolve().then(function(){ return _persistirHistoricoFirestore(p, _ALTA_CAMPOS_FS, true); })
+      .then(function(r){ if(r && r.ok) return true; try{ _encolarHistDoc(p, _ALTA_CAMPOS_FS, true); }catch(_){} return false; })
+      .catch(function(){ try{ _encolarHistDoc(p, _ALTA_CAMPOS_FS, true); }catch(_){} return false; });
+    Promise.all([w1,w2]).then(function(rr){
+      est.fsDone=true;
+      est.fsOk=!!(rr[0] && rr[1]);   // nube = identidad (visible en listas) + historia completa
+      if(est.fsOk){
+        try{ if(typeof _sinRespaldoDel==='function') _sinRespaldoDel(p.id); }catch(_){}
+        try{ _altaPendienteDel(p.id); }catch(_){}
+        try{ if(typeof window._FST_invalidarIndicePacientes==='function') window._FST_invalidarIndicePacientes(); }catch(_){}
+        // El Sheet ya había reportado fallo → corregir el mensaje: el expediente SÍ está en la nube.
+        if(est.sheetDone && !est.sheetOk){ try{ showToast('☁️ Expediente SUBIDO a la nube (respaldo seguro). El registro principal se completará solo.','success'); }catch(_){} }
+      }
+    }).catch(function(){ est.fsDone=true; });
+  }catch(_e){ est.fsDone=true; }
+  return est;
+}
+// ── Vigilancia de ALTAS atoradas: un paciente NUEVO sin subir es más grave que una edición ──
+// Se registra al fallar la subida del alta; se limpia al confirmar Sheet o Firestore. Si a los
+// 30 min sigue en COLA_SYNC sin haber llegado a la nube → aviso FUERTE en este equipo (máx. 1
+// cada 30 min). Corre dentro de sincronizarPendientes (online/focus/intervalo).
+function _altaPendienteAdd(id, name){
+  try{ var m=JSON.parse(localStorage.getItem('ALTAS_SIN_SUBIR')||'{}')||{};
+    m[id]={n:String(name||'').slice(0,60), ts:Date.now()};
+    localStorage.setItem('ALTAS_SIN_SUBIR', JSON.stringify(m)); }catch(_){}
+}
+function _altaPendienteDel(id){
+  try{ var m=JSON.parse(localStorage.getItem('ALTAS_SIN_SUBIR')||'{}')||{};
+    if(m[id]){ delete m[id]; localStorage.setItem('ALTAS_SIN_SUBIR', JSON.stringify(m)); } }catch(_){}
+}
+function _vigilarAltasSinSubir(){
+  try{
+    var m=JSON.parse(localStorage.getItem('ALTAS_SIN_SUBIR')||'{}')||{};
+    var ids=Object.keys(m); if(!ids.length) return;
+    var cola=getColaSync(), ahora=Date.now(), vivos=[], cambio=false;
+    ids.forEach(function(id){
+      if(cola.indexOf(id)===-1){ delete m[id]; cambio=true; return; }  // ya subió (la cola la soltó)
+      if(ahora-(m[id].ts||0) > 30*60*1000) vivos.push(m[id].n||id);
+    });
+    if(cambio) localStorage.setItem('ALTAS_SIN_SUBIR', JSON.stringify(m));
+    if(!vivos.length) return;
+    var last=+(localStorage.getItem('ALTAS_SIN_SUBIR_AVISO')||0);
+    if(ahora-last < 30*60*1000) return;
+    localStorage.setItem('ALTAS_SIN_SUBIR_AVISO', String(ahora));
+    if(typeof showToastCritico_==='function') showToastCritico_('🚨 EXPEDIENTE NUEVO SIN SUBIR desde este equipo: '+vivos.join(', ')+'. Deja la app abierta con internet hasta ver "✅ Todo sincronizado". NO limpies datos ni reinstales la app.');
+  }catch(_){}
+}
 // FUGA-HISTÓRICOS: Firestore RECHAZA cualquier set() que contenga un valor `undefined` a
 // CUALQUIER profundidad y explota el write ENTERO (permission NO tiene nada que ver). Si el
 // error se traga, el dato se pierde en silencio. Este helper elimina recursivamente las claves
@@ -3507,6 +3576,7 @@ async function sincronizarPendientes(){
   drenarColaEtiqHist();      // CAPA 1 — drenar etiquetas/adiciones que quedaron pendientes offline (idempotentes)
   drenarColaNoAcudio();      // AUDITORÍA (Jess) — reintentar "No acudió" que no persistió (antes se tragaba silencioso)
   _autoSanarFallidosHistDoc(); // SELF-HEAL — limpia fallidos de doc histórico que la nube YA tiene (contador "N sin sincronizar" clavado)
+  try{ _vigilarAltasSinSubir(); }catch(_){}  // ALTA ATORADA — aviso fuerte si un paciente NUEVO lleva >30 min sin subir de este equipo
   const cola = getColaSync();
   if(cola.length===0){ actualizarIndicadorSync(); return; }
 
@@ -19674,6 +19744,10 @@ function guardarNuevoPaciente(){
   // guardado coalescido de ~800ms ni depender de que la subida a la nube tenga señal. Así un alta
   // queda respaldada en disco al instante y nunca vive SOLO en memoria (caso Ana Gabriela).
   try{ if(typeof _flushGuardadoLocalPts==='function') _flushGuardadoLocalPts(); }catch(_){}
+  // ALTA → NUBE AL INSTANTE: doc Firestore (identidad + historia) en PARALELO al POST del Sheet,
+  // para que el expediente exista fuera de este equipo desde el minuto 1 (caso Nicole Carranza).
+  var _nube={fsOk:false,fsDone:true,sheetOk:false,sheetDone:false};
+  try{ _nube=_altaNubeInmediata(nuevo); }catch(_){}
   // ── NOTA DE VALORACIÓN AUTO-GENERADA (sesión 1) ────────────────────────────
   // La primera consulta ES un SOAP: S←padecimiento, O←exploración, A←dx+EVA, P←plan+tratamiento
   // aplicado hoy. modoNota:'valoracion' la distingue (excluida del promedio de calidad salvo que
@@ -19731,17 +19805,28 @@ function guardarNuevoPaciente(){
   if (typeof window._FST_invalidarIndicePacientes === 'function') { window._FST_invalidarIndicePacientes(); }
   saveDB('pts', [nuevo]).then(res => {
     if(res && res.ok){
+      _nube.sheetDone=true; _nube.sheetOk=true;
+      try{ _altaPendienteDel(nuevo.id); }catch(_){}
       borrarBorradorNuevoSiGuardado();
       if(typeof _sinRespaldoDel==='function') _sinRespaldoDel(nuevo.id);   // [RESPALDO] Sheets confirmó → respaldado
-      showToast('✅ Historia clínica guardada correctamente','success');
+      showToast('✅ Historia clínica guardada y subida a la nube','success');
     } else {
+      _nube.sheetDone=true;
       // FIX "subir al instante" (caso María Teresa/Dafne): si la nube NO confirmó, ENCOLAR el alta en
       // COLA_SYNC para que sincronizarPendientes la re-suba SOLA en cuanto haya señal (listener 'online'
       // + reintento 30s + focus/visibility) — SIN esperar a que el fisio vuelva a abrir la app (antes
       // solo se recuperaba al reabrir, vía loadFromCloud). Además el indicador "N sin sincronizar" ya la
       // cuenta, así que el fisio ve que sigue pendiente. El dato local ya es durable (_flushGuardadoLocalPts).
       try{ encolarSync(nuevo.id); }catch(_){}
-      showToast('⚠️ Guardado local — se subirá solo en cuanto haya señal.','warning');
+      // Mensaje HONESTO según dónde esté de verdad: si Firestore ya confirmó, el expediente SÍ
+      // está en la nube (solo falta la fila del Sheet, que se completa sola). Si no, decir claro
+      // que solo vive en este equipo y registrarlo en la vigilancia de altas atoradas.
+      if(_nube.fsOk){
+        showToast('☁️ Expediente SUBIDO a la nube (respaldo seguro). El registro principal se completará solo.','success');
+      } else {
+        try{ _altaPendienteAdd(nuevo.id, nuevo.name); }catch(_){}
+        showToast('📴 Guardado SOLO en este equipo — se subirá solo en cuanto haya señal. No cierres la app sin internet.','warning');
+      }
     }
     // ETAPA 2: los estudios capturados en la valoración van a su almacén propio en Firestore
     // (estudiosDocs; saveDB a Sheets no los lleva). Reutiliza la ruta probada _persistirEstudios,
@@ -19758,7 +19843,13 @@ function guardarNuevoPaciente(){
     // Igual que la rama de arriba: encolar en COLA_SYNC para re-subida AUTOMÁTICA al reconectar
     // (no esperar a reabrir la app). El alta vive durable en local/IndexedDB mientras tanto.
     try{ encolarSync(nuevo.id); }catch(_){}
-    showToast('⚠️ Sin conexión — se subirá solo en cuanto reconectes.','warning');
+    _nube.sheetDone=true;
+    if(_nube.fsOk){
+      showToast('☁️ Expediente SUBIDO a la nube (respaldo seguro). El registro principal se completará solo.','success');
+    } else {
+      try{ _altaPendienteAdd(nuevo.id, nuevo.name); }catch(_){}
+      showToast('📴 Guardado SOLO en este equipo — se subirá solo en cuanto reconectes. No cierres la app sin internet.','warning');
+    }
   });
   // Ir directo al expediente del paciente nuevo
   setTimeout(()=>{
