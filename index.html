@@ -1356,7 +1356,7 @@ body.modo-oscuro .topbar{background:#141824}
 <body>
 <div id="sync-indicator" class="sync-indicator ok" style="display:none"></div>
 <div id="app-version-chip" title="Versión de la app en este equipo — toca para buscar actualización" onclick="try{_tapVersionChip()}catch(e){}"></div>
-<script>/* VERSIÓN VISIBLE: refleja el index.html realmente cargado en ESTE equipo (se bumpea junto con sw.js). Así un iPad con versión vieja se ve de un vistazo. */window.APP_VERSION='v1-2026-10-28j';(function(){try{var c=document.getElementById('app-version-chip');if(c)c.textContent=window.APP_VERSION;}catch(e){}})();</script>
+<script>/* VERSIÓN VISIBLE: refleja el index.html realmente cargado en ESTE equipo (se bumpea junto con sw.js). Así un iPad con versión vieja se ve de un vistazo. */window.APP_VERSION='v1-2026-10-28k';(function(){try{var c=document.getElementById('app-version-chip');if(c)c.textContent=window.APP_VERSION;}catch(e){}})();</script>
 <div class="toast" id="toast" aria-live="polite" aria-atomic="true"></div>
 
 <!-- LOGIN -->
@@ -19391,7 +19391,7 @@ function renderNuevoPaciente(){
           <select class="form-input" id="n-derma-fototipo"><option value="">No evaluado</option><option>I — muy clara, siempre se quema</option><option>II — clara, se quema con facilidad</option><option>III — clara-media, a veces se quema</option><option>IV — morena clara, rara vez se quema</option><option>V — morena oscura</option><option>VI — muy oscura</option></select></div>
         <div class="form-field"><div class="form-label">Sensibilidad</div>
           <select class="form-input" id="n-derma-sens"><option value="">No evaluada</option><option>Normal</option><option>Hipoestesia (dormido)</option><option>Hiperestesia</option><option>Disestesia (ardor/hormigueo)</option><option>Mixta por zonas</option></select>
-          <select class="form-input" id="n-derma-sw" style="margin-top:7px"><option value="">Monofilamento Semmes-Weinstein: no evaluado</option><option>Verde 0.05 g — sensibilidad normal</option><option>Azul 0.2 g — disminución leve del tacto</option><option>Morado 2.0 g — pérdida de sensación protectora</option><option>Rojo 4.0 g — pérdida de protección y tacto</option></select>
+          <input class="form-input" id="n-derma-sw" type="text" style="margin-top:7px" placeholder="Test de sensibilidad (libre): algodón / punta roma / comparar lados — qué sintió y dónde">
           <input class="form-input" id="n-derma-senszonas" type="text" style="margin-top:7px" placeholder="Zonas: Ej: hipoestesia infraumbilical (esperada post-abdominoplastia)"></div>
         <div class="form-field"><div class="form-label">Apariencia de la piel <span style="font-weight:400;color:var(--gray-400);font-size:11px">· color · trofismo · temperatura local</span></div><input class="form-input" id="n-derma-piel" type="text" placeholder="Ej: piel brillante y tensa, caliente en flanco der; trofismo conservado"></div>
         <div class="form-field"><div class="form-label">Dolor a la presión (test PAFEG)</div>
