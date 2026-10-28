@@ -2498,6 +2498,47 @@ function _claudeRouter_(body) {
     return respuesta({ ok: okFS, id: idFS, http: codeFS, escritos: escritos, error: okFS ? undefined : (rFS.getContentText() || '').slice(0, 200) });
   }
 
+  // REEMPLAZO DE MEDIA EN STORAGE (overwrite en su lugar, CONSERVANDO el token de descarga existente).
+  // Sobrescribe el MISMO objeto de Storage (mismo path) con bytes nuevos y le fija el firebaseStorageDownloadTokens
+  // EXISTENTE → la URL que ya tiene el paciente (…?alt=media&token=…) sigue sirviendo el archivo nuevo, sin tocar
+  // NI el expediente NI el array ejercicios. Úsese para recomprimir videos de ejercicio YA subidos (Claude los baja,
+  // los comprime con ffmpeg y los re-sube aquí). El versionado de objetos del bucket (3 versiones / 30 días) conserva
+  // la versión anterior → rollback. body: { path, base64, mime, token }. token = el UUID del ?token= de la URL actual.
+  if (action === 'claudeReemplazarMediaStorage') {
+    var pathRM = String(body.path || '').trim();
+    if (!pathRM) return respuesta({ ok: false, error: 'Falta path', code: 400 });
+    // GUARD: solo media de la clínica; nunca fuera del prefijo ni con traversal (mismo candado que claudeGetArchivo).
+    if (pathRM.indexOf('clinica/sinergia/') !== 0 || pathRM.indexOf('..') >= 0) {
+      return respuesta({ ok: false, error: 'Ruta no permitida (solo clinica/sinergia/)', code: 403 });
+    }
+    var b64RM = String(body.base64 || body.contenido || '');
+    if (!b64RM) return respuesta({ ok: false, error: 'Falta base64 del archivo', code: 400 });
+    if (b64RM.indexOf(',') >= 0 && /^data:/.test(b64RM)) b64RM = b64RM.slice(b64RM.indexOf(',') + 1); // tolera data URI
+    var tokenRM = String(body.token || '').trim();
+    if (!tokenRM) return respuesta({ ok: false, error: 'Falta token (el token de descarga EXISTENTE que hay que conservar)', code: 400 });
+    var mimeRM = String(body.mime || body.contentType || 'video/mp4').trim() || 'video/mp4';
+    var bytesRM;
+    try { bytesRM = Utilities.base64Decode(b64RM); } catch (eDecRM) { return respuesta({ ok: false, error: 'base64 inválido', code: 400 }); }
+    if (!bytesRM || !bytesRM.length) return respuesta({ ok: false, error: 'Archivo vacío', code: 400 });
+    if (bytesRM.length > 30000000) return respuesta({ ok: false, error: 'Archivo muy grande (' + bytesRM.length + ' bytes; máx 30MB)', bytes: bytesRM.length, code: 413 });
+    var tokRWrm = _claudeStorageTokenRW_();
+    if (!tokRWrm) return respuesta({ ok: false, error: 'Sin credenciales Storage (escritura)', code: 500 });
+    // Multipart objects.create con name = path EXISTENTE → GCS crea una generación nueva (overwrite en su lugar);
+    // la metadata fija el MISMO firebaseStorageDownloadTokens → la URL vieja no cambia y sirve el archivo nuevo.
+    var bndRM = 'claudebnd' + Utilities.getUuid().replace(/-/g, '');
+    var metaRM = { name: pathRM, contentType: mimeRM, metadata: { firebaseStorageDownloadTokens: tokenRM } };
+    var preRM = '--' + bndRM + '\r\n' + 'Content-Type: application/json; charset=UTF-8\r\n\r\n' + JSON.stringify(metaRM) + '\r\n' + '--' + bndRM + '\r\n' + 'Content-Type: ' + mimeRM + '\r\n\r\n';
+    var postRM = '\r\n--' + bndRM + '--';
+    var bodyBytesRM = Utilities.newBlob(preRM).getBytes().concat(bytesRM).concat(Utilities.newBlob(postRM).getBytes());
+    var upUrlRM = 'https://storage.googleapis.com/upload/storage/v1/b/' + encodeURIComponent(CLAUDE_STORAGE_BUCKET) + '/o?uploadType=multipart';
+    var rUpRM = UrlFetchApp.fetch(upUrlRM, { method: 'post', contentType: 'multipart/related; boundary=' + bndRM, payload: bodyBytesRM, headers: { Authorization: 'Bearer ' + tokRWrm }, muteHttpExceptions: true });
+    var codeUpRM = rUpRM.getResponseCode();
+    if (codeUpRM < 200 || codeUpRM >= 300) return respuesta({ ok: false, error: 'Storage upload ' + codeUpRM + ': ' + (rUpRM.getContentText() || '').slice(0, 250), code: codeUpRM });
+    var urlRM = 'https://firebasestorage.googleapis.com/v0/b/' + CLAUDE_STORAGE_BUCKET + '/o/' + encodeURIComponent(pathRM) + '?alt=media&token=' + tokenRM;
+    _claudeBitacora_(ss, 'claudeReemplazarMediaStorage', 'path=' + pathRM + ' bytes=' + bytesRM.length + ' http=' + codeUpRM);
+    return respuesta({ ok: true, path: pathRM, bytes: bytesRM.length, mime: mimeRM, url: urlRM, http: codeUpRM });
+  }
+
   // LISTA TODA la Cola de revisión (sesiones con revisionPendiente==true), cualquier motivo. collectionGroup
   // sobre 'sesiones'. Devuelve por cada una {pid, sid, fecha, num, terapeuta, atendidoPor, creadoPor, motivos,
   // textoVacio} para que Claude decida y resuelva cada item (fecha / terapeuta / validar).
