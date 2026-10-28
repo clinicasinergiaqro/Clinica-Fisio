@@ -2503,7 +2503,8 @@ function _claudeRouter_(body) {
   // EXISTENTE → la URL que ya tiene el paciente (…?alt=media&token=…) sigue sirviendo el archivo nuevo, sin tocar
   // NI el expediente NI el array ejercicios. Úsese para recomprimir videos de ejercicio YA subidos (Claude los baja,
   // los comprime con ffmpeg y los re-sube aquí). El versionado de objetos del bucket (3 versiones / 30 días) conserva
-  // la versión anterior → rollback. body: { path, base64, mime, token }. token = el UUID del ?token= de la URL actual.
+  // la versión anterior → rollback. body: { path, base64, mime, dltoken }. dltoken = el UUID del ?token= de
+  // la URL actual del paciente (OJO: NO usar body.token aquí — ese es el CLAUDE_TOKEN de autenticación).
   if (action === 'claudeReemplazarMediaStorage') {
     var pathRM = String(body.path || '').trim();
     if (!pathRM) return respuesta({ ok: false, error: 'Falta path', code: 400 });
@@ -2514,8 +2515,11 @@ function _claudeRouter_(body) {
     var b64RM = String(body.base64 || body.contenido || '');
     if (!b64RM) return respuesta({ ok: false, error: 'Falta base64 del archivo', code: 400 });
     if (b64RM.indexOf(',') >= 0 && /^data:/.test(b64RM)) b64RM = b64RM.slice(b64RM.indexOf(',') + 1); // tolera data URI
-    var tokenRM = String(body.token || '').trim();
-    if (!tokenRM) return respuesta({ ok: false, error: 'Falta token (el token de descarga EXISTENTE que hay que conservar)', code: 400 });
+    // Token de descarga a CONSERVAR: parámetro PROPIO (dltoken/downloadToken), NUNCA body.token (ese es el
+    // CLAUDE_TOKEN de auth). Si se reusara body.token, el objeto quedaría con el secreto de auth como token
+    // de descarga y la URL real del paciente (su token) dejaría de servir (403).
+    var tokenRM = String(body.dltoken || body.downloadToken || '').trim();
+    if (!tokenRM) return respuesta({ ok: false, error: 'Falta dltoken (token de descarga EXISTENTE a conservar; el UUID del ?token= de la URL)', code: 400 });
     var mimeRM = String(body.mime || body.contentType || 'video/mp4').trim() || 'video/mp4';
     var bytesRM;
     try { bytesRM = Utilities.base64Decode(b64RM); } catch (eDecRM) { return respuesta({ ok: false, error: 'base64 inválido', code: 400 }); }
