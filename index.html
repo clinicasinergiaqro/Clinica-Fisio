@@ -1356,7 +1356,7 @@ body.modo-oscuro .topbar{background:#141824}
 <body>
 <div id="sync-indicator" class="sync-indicator ok" style="display:none"></div>
 <div id="app-version-chip" title="Versión de la app en este equipo — toca para buscar actualización" onclick="try{_tapVersionChip()}catch(e){}"></div>
-<script>/* VERSIÓN VISIBLE: refleja el index.html realmente cargado en ESTE equipo (se bumpea junto con sw.js). Así un iPad con versión vieja se ve de un vistazo. */window.APP_VERSION='v1-2026-10-28h';(function(){try{var c=document.getElementById('app-version-chip');if(c)c.textContent=window.APP_VERSION;}catch(e){}})();</script>
+<script>/* VERSIÓN VISIBLE: refleja el index.html realmente cargado en ESTE equipo (se bumpea junto con sw.js). Así un iPad con versión vieja se ve de un vistazo. */window.APP_VERSION='v1-2026-10-28i';(function(){try{var c=document.getElementById('app-version-chip');if(c)c.textContent=window.APP_VERSION;}catch(e){}})();</script>
 <div class="toast" id="toast" aria-live="polite" aria-atomic="true"></div>
 
 <!-- LOGIN -->
@@ -23950,8 +23950,74 @@ function renderEjMediaPreview(media){
   return `<a href="${src}" target="_blank">📎 ${media.name||'Ver archivo'}</a>`;
 }
 
+// ── [VIDEO-LIGERO] Compresión de videos de ejercicio ANTES de subir ──────────────────────────────
+// Problema (Carlos 2026-10-28): los pacientes solo pueden abrir los videos con wifi — son enormes
+// (17-29 MB) y sin faststart. Solución: re-encodear en el navegador con ffmpeg.wasm a un mp4 chico y
+// web-optimizado (≤540px, crf 30, +faststart, con audio). Mismo resultado en iPhone y Android (mp4
+// h264 uniforme). REGLA DE ORO: si el equipo no puede (viejo/sin memoria/sin red/falla) → sube el
+// ORIGINAL (nunca se rompe ni se pierde el video). No necesita HD (son demos para el paciente).
+var _ffmpegEjP = null;              // promesa cacheada del motor (se baja ~1 vez, el SW lo cachea)
+var _ffmpegEjLock = Promise.resolve();   // serializa (ffmpeg no corre 2 videos a la vez)
+function _cargarFFmpegEj(){
+  if(_ffmpegEjP) return _ffmpegEjP;
+  _ffmpegEjP = (async function(){
+    if(!(window.FFmpeg && window.FFmpeg.createFFmpeg)){
+      await new Promise(function(res,rej){
+        var s=document.createElement('script');
+        s.src='https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.11.6/dist/ffmpeg.min.js';
+        s.onload=res; s.onerror=function(){ rej(new Error('no cargó ffmpeg.js')); };
+        document.head.appendChild(s);
+      });
+    }
+    if(!(window.FFmpeg && window.FFmpeg.createFFmpeg)) throw new Error('FFmpeg no disponible');
+    var ff = window.FFmpeg.createFFmpeg({ log:false, corePath:'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.11.0/dist/ffmpeg-core.js' });
+    await ff.load();
+    return ff;
+  })().catch(function(e){ _ffmpegEjP=null; throw e; });   // falló → permite reintentar la próxima
+  return _ffmpegEjP;
+}
+async function _comprimirVideoEjercicio(file){
+  try{
+    if(!file || !/^video\//i.test(file.type||'')) return file;        // no es video
+    if(!navigator.onLine) return file;                                // sin red no se baja el motor
+    if(file.size <= 3*1024*1024) return file;                         // ya es chico (<3 MB)
+    if(file.size > 80*1024*1024) return file;                         // enorme → riesgo de memoria, sube original
+    var corrida = _ffmpegEjLock.then(async function(){
+      var prev=document.getElementById('ej-media-preview');
+      var setMsg=function(t){
+        try{ if(prev) prev.innerHTML='<div style="padding:12px;color:var(--gray-400)">'+t+'</div>'; }catch(_){}
+        try{ _repProgreso(t,'info'); }catch(_){}
+      };
+      setMsg('🎬 Preparando optimizador de video (1ª vez puede tardar, no cierres la app)…');
+      var ff=await _cargarFFmpegEj();
+      var inN='in_'+Date.now()+'.mp4', outN='out_'+Date.now()+'.mp4';
+      try{ ff.setProgress(function(p){ var pct=Math.max(0,Math.min(99,Math.round((p&&p.ratio||0)*100))); setMsg('🎬 Optimizando video… '+pct+'% (para que abra sin wifi)'); }); }catch(_){}
+      ff.FS('writeFile', inN, await window.FFmpeg.fetchFile(file));
+      await ff.run('-i',inN,'-vf',"scale='min(540,iw)':-2",'-r','24','-c:v','libx264','-preset','veryfast','-crf','30','-pix_fmt','yuv420p','-c:a','aac','-b:a','64k','-movflags','+faststart','-y',outN);
+      var data=ff.FS('readFile',outN);
+      try{ ff.FS('unlink',inN); }catch(_){}
+      try{ ff.FS('unlink',outN); }catch(_){}   // liberar memoria del FS virtual
+      try{ ff.setProgress(function(){}); }catch(_){}
+      try{ _repProgresoCerrar(600); }catch(_){}
+      if(!data || !data.length) return file;
+      var blob=new Blob([data.buffer],{type:'video/mp4'});
+      if(blob.size >= file.size) return file;                          // no mejoró → original
+      var base=(String(file.name||'video').replace(/\.[^.]+$/,'')||'video');
+      return new File([blob], base+'.mp4', {type:'video/mp4'});
+    });
+    _ffmpegEjLock = corrida.catch(function(){});   // la cadena sigue viva aunque esta falle
+    return await corrida;
+  }catch(e){
+    console.warn('[VIDEO-LIGERO] no se pudo comprimir — sube el original:', e);
+    try{ _repProgresoCerrar(0); }catch(_){}
+    return file;
+  }
+}
 async function subirMediaEjercicioAStorage(file){
   if(!currentPatient?.id) throw new Error('Sin paciente');
+  // [VIDEO-LIGERO] comprime videos antes de subir (más chico + faststart → abre sin wifi); si no se
+  // puede, sube el ORIGINAL (el fallback vive dentro de _comprimirVideoEjercicio; aquí nunca lanza).
+  try{ file = await _comprimirVideoEjercicio(file); }catch(_){}
   const safeName = file.name.replace(/[^\w.\-]+/g,'_');
   const fbPath = `clinica/sinergia/${currentPatient.id}/ejercicios/${Date.now()}_${safeName}`;
   const ref = fbStorage.ref(fbPath);
