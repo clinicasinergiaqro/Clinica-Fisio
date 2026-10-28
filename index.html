@@ -1356,7 +1356,7 @@ body.modo-oscuro .topbar{background:#141824}
 <body>
 <div id="sync-indicator" class="sync-indicator ok" style="display:none"></div>
 <div id="app-version-chip" title="Versión de la app en este equipo — toca para buscar actualización" onclick="try{_tapVersionChip()}catch(e){}"></div>
-<script>/* VERSIÓN VISIBLE: refleja el index.html realmente cargado en ESTE equipo (se bumpea junto con sw.js). Así un iPad con versión vieja se ve de un vistazo. */window.APP_VERSION='v1-2026-10-28d';(function(){try{var c=document.getElementById('app-version-chip');if(c)c.textContent=window.APP_VERSION;}catch(e){}})();</script>
+<script>/* VERSIÓN VISIBLE: refleja el index.html realmente cargado en ESTE equipo (se bumpea junto con sw.js). Así un iPad con versión vieja se ve de un vistazo. */window.APP_VERSION='v1-2026-10-28e';(function(){try{var c=document.getElementById('app-version-chip');if(c)c.textContent=window.APP_VERSION;}catch(e){}})();</script>
 <div class="toast" id="toast" aria-live="polite" aria-atomic="true"></div>
 
 <!-- LOGIN -->
@@ -14916,11 +14916,15 @@ async function guardarSOAP(){
     // seguimiento y sesiones pasivas no siempre se exploran, y forzarlos genera datos inventados (mismo
     // criterio con que agosto-2026 quitó "Hallazgos" de obligatorio). Se AVISA una vez y el fisio decide.
     var _gaps=[];
-    var _rom=v('f-orom'), _fza=v('f-ofuerza'), _dol=v('f-sdolor');
+    var _rom=v('f-orom'), _fza=v('f-ofuerza');
     if(!_rom || _rom==='[pendiente]') _gaps.push('• ROM (rango de movilidad) sin medir');
     if(!_fza || _fza==='[pendiente]') _gaps.push('• Fuerza sin medir');
-    // Dolor sin número SOLO cuando hay dolor real (EVA inicio > 0); si EVA inicio es 0 no hay nada que cuantificar.
-    if(_dol && Number(tempEvaI)>0 && !/\d/.test(_dol)) _gaps.push('• Dolor sin número (ej. 6/10)');
+    // FIX (2026-10-28, reporte Carlos: "aunque pongas fuerza/movilidad dice que no se puso"):
+    // se QUITÓ el aviso "Dolor sin número". El número de dolor YA se captura de forma OBLIGATORIA en
+    // la EVA inicio (tempEvaI bloquea el guardado si es null, L14879), así que exigirlo TAMBIÉN en el
+    // campo de texto "Dolor (contexto, provocación)" era redundante y generaba un FALSO "se va a
+    // guardar sin: Dolor sin número" aunque la EVA estuviera puesta (7/10, 2/10…). El fisio pone el
+    // número en la EVA y el contexto (desencadenante) como texto libre: no necesita repetir el dígito.
     if(_gaps.length){
       var _okGaps=confirm('Esta nota se va a guardar sin:\n\n'+_gaps.join('\n')+'\n\nSon datos objetivos recomendados (opcionales). ¿Guardar así de todas formas?\n\n(Toca Cancelar para completarlos.)');
       if(!_okGaps){ _liberarGuardSOAP(); return; }
