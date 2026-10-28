@@ -41,6 +41,10 @@
   .cbody{padding:14px}
   .media{border-radius:10px;overflow:hidden;margin-bottom:12px;background:#0E1622;display:flex;align-items:center;justify-content:center;min-height:200px}
   .media video,.media img{width:100%;max-height:300px;object-fit:cover;display:block}
+  .media.vidph{cursor:pointer;position:relative}
+  .media.vidph .playwrap{display:flex;flex-direction:column;align-items:center;gap:8px}
+  .media.vidph .playbtn{width:62px;height:62px;border-radius:50%;background:rgba(255,255,255,.14);border:2px solid rgba(255,255,255,.9);display:flex;align-items:center;justify-content:center;font-size:24px;color:#fff;padding-left:5px;box-sizing:border-box}
+  .media.vidph .playtxt{font-size:12px;color:#cbd5e1;font-weight:600}
   .nomedia{color:var(--gray2);padding:24px;font-size:13px}
   .dosis{background:#F0F4FF;border-radius:9px;padding:10px 13px;margin-bottom:8px}
   .dlbl{font-size:11px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px}
@@ -88,6 +92,19 @@
 
   function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
   function hoyFmt(){ var d=new Date(); return String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0')+'/'+d.getFullYear(); }
+  // Reproductor BAJO DEMANDA: inyecta el <video> real SOLO cuando la paciente toca la tarjeta, para no
+  // descargar NINGÚN video al cargar la página (ver [NO-SE-CARGAN]). Global porque el onclick es inline.
+  window._playVid=function(el){
+    try{
+      var src=el&&el.getAttribute('data-src'); if(!src) return;
+      var v=document.createElement('video');
+      v.src=src; v.controls=true; v.autoplay=true; v.preload='auto';
+      v.setAttribute('playsinline',''); v.setAttribute('webkit-playsinline','');
+      el.classList.remove('vidph'); el.removeAttribute('onclick'); el.removeAttribute('role'); el.removeAttribute('tabindex');
+      el.innerHTML=''; el.appendChild(v);
+      try{ v.play(); }catch(_){}
+    }catch(_){}
+  };
 
   function estado(){ return { spin:function(msg){ app.innerHTML='<div class="state"><div class="spin"></div><div class="d" style="margin-top:16px">'+esc(msg||'Cargando…')+'</div></div>'; },
     error:function(sinRed){ app.innerHTML='<div class="state"><div class="em">'+(sinRed?'📶':'🔒')+'</div><div class="t">'+(sinRed?'Sin conexión':'Rutina no disponible')+'</div><div class="d">'+(sinRed?'No pudimos cargar tu rutina. Revisa tu internet o tus datos y vuelve a intentar. Si estás en datos móviles, prueba en un lugar con mejor señal.':'Este programa ya no está activo o el link es incorrecto. Contacta a tu terapeuta.')+'</div>'+(sinRed?'<button class="btn" onclick="location.reload()">🔄 Reintentar</button>':'')+'</div>'; },
@@ -106,7 +123,12 @@
       // veces el segundo 0.1 del video es negro). Ahora: preload="metadata" + muted + salto a #t=0.5
       // (fotograma más probable con imagen) + onloadeddata que fuerza el seek → se ve un cuadro del
       // ejercicio en vez de negro. Sigue con controles para reproducir.
-      else if(isVid) media='<div class="media"><video src="'+esc(src)+'#t=0.5" controls muted playsinline preload="metadata" onloadedmetadata="try{if(this.currentTime<0.3)this.currentTime=0.5;}catch(e){}"></video></div>';
+      // [NO-SE-CARGAN] Videos grandes y sin faststart (moov al FINAL del archivo) obligaban al navegador
+      // del celular a bajar el archivo COMPLETO solo para mostrar el cuadro de inicio (preload="metadata"
+      // en los 4 a la vez) → en WhatsApp/datos móviles se colgaba y "no cargaban". Ahora NO se descarga
+      // nada hasta que la paciente toca Reproducir: la tarjeta aparece al instante y solo se baja el video
+      // que ella elige ver (uno a la vez). onclick → window._playVid inyecta el <video> real y lo reproduce.
+      else if(isVid) media='<div class="media vidph" role="button" tabindex="0" onclick="_playVid(this)" data-src="'+esc(src)+'"><div class="playwrap"><div class="playbtn">▶</div><div class="playtxt">Toca para ver el video</div></div></div>';
       else if(isImg) media='<div class="media"><img src="'+esc(src)+'" loading="lazy" alt=""></div>';
       else media='<div class="media"><div class="nomedia">📎 '+esc(m.label||'Archivo')+'</div></div>';
     }
