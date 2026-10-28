@@ -1356,7 +1356,7 @@ body.modo-oscuro .topbar{background:#141824}
 <body>
 <div id="sync-indicator" class="sync-indicator ok" style="display:none"></div>
 <div id="app-version-chip" title="Versión de la app en este equipo — toca para buscar actualización" onclick="try{_tapVersionChip()}catch(e){}"></div>
-<script>/* VERSIÓN VISIBLE: refleja el index.html realmente cargado en ESTE equipo (se bumpea junto con sw.js). Así un iPad con versión vieja se ve de un vistazo. */window.APP_VERSION='v1-2026-10-28k';(function(){try{var c=document.getElementById('app-version-chip');if(c)c.textContent=window.APP_VERSION;}catch(e){}})();</script>
+<script>/* VERSIÓN VISIBLE: refleja el index.html realmente cargado en ESTE equipo (se bumpea junto con sw.js). Así un iPad con versión vieja se ve de un vistazo. */window.APP_VERSION='v1-2026-10-28l';(function(){try{var c=document.getElementById('app-version-chip');if(c)c.textContent=window.APP_VERSION;}catch(e){}})();</script>
 <div class="toast" id="toast" aria-live="polite" aria-atomic="true"></div>
 
 <!-- LOGIN -->
@@ -1649,7 +1649,20 @@ const MODALIDADES_GRUPOS={
   'Ejercicio terapéutico':['Ejercicio terap.','Estiramiento','Propiocepción','Readapt. deportiva','Programa domic.','Otra']
 };
 const MODALIDADES=Object.values(MODALIDADES_GRUPOS).flat();
+// DERMATO: modalidades REALES que usan en derma (lista de Carlos 2026-10-28). El SOAP las muestra
+// EN LUGAR de las MSK cuando el paciente es dermato → nota "especial pero sencilla, más aparatología".
+// Se guardan igual que cualquier modalidad (tempMods string + tempModDetalles dosis) → CERO backend.
+const MODALIDADES_GRUPOS_DERMA={
+  '🧴 Dermato / estética':['Ozono','Carboxiterapia','Onda de choque','Radiofrecuencia resistiva','Radiofrecuencia capacitiva','Ultrasonido','Láser','Antares','Presoterapia','Corriente Aura','Drenaje linfático','Ejercicios']
+};
+function _modGruposActivos(){ try{ if(typeof _esDerma==='function'&&_esDerma(currentPatient)) return MODALIDADES_GRUPOS_DERMA; }catch(_){} return MODALIDADES_GRUPOS; }
 const MODALIDADES_PH={
+  'Ozono':'Ej: insuflación/bolsa en abdomen, concentración y tiempo',
+  'Carboxiterapia':'Ej: CO₂ subcutáneo en flancos, Nº punciones / mL',
+  'Antares':'Ej: láser 808 nm sobre cicatriz / LED estética, zona y dosis',
+  'Radiofrecuencia resistiva':'Ej: RES profundo en abdomen, 10 min (fibrosis G3)',
+  'Radiofrecuencia capacitiva':'Ej: CAP superficial en flancos, 8 min',
+  'Ejercicios':'Ej: activación de core, caminata; la dosis va en 🏃 Ejercicios',
   'Tecarterapia R':'Ej: Zona anterior y lateral de hombro, 15 min',
   'Tecarterapia C':'Ej: Fascia plantar pie dcho, 10 min',
   'Ultrasonido':'Ej: 1 MHz continuo, tendón rotuliano izq, 8 min',
@@ -13239,9 +13252,10 @@ function renderSOAPForm(){
   const _traerBtn=function(id){ return _tieneAnterior?'<button type="button" class="traer-btn" onclick="traerCampoAnterior(\''+id+'\')">⧉ anterior</button>':''; };
 
   let modHtml='';
-  Object.keys(MODALIDADES_GRUPOS).forEach(function(grp){
+  var _modGrps=_modGruposActivos();
+  Object.keys(_modGrps).forEach(function(grp){
     modHtml+='<div class="mod-grp-label">'+escapeHTML(grp)+'</div><div class="checkbox-grid">';
-    MODALIDADES_GRUPOS[grp].forEach(function(m){
+    _modGrps[grp].forEach(function(m){
       var chk=tempMods.includes(m);
       modHtml+='<div class="checkbox-item '+(chk?'checked':'')+'" onclick="toggleMod(\''+m.replace(/'/g,"\\'")+'\')">'
         +'<div class="cb-box">'+(chk?'✓':'')+'</div><div class="cb-label">'+escapeHTML(m)+'</div></div>';
@@ -13405,10 +13419,10 @@ function renderSOAPForm(){
         <div class="evabtn-row" id="eva-row-i">${_evaBtnsHTML('i')}</div>
       </div></div>
       <div class="form-field">
-        <div class="form-label">Dolor (contexto, provocación) <span class="req">*</span>${_traerBtn('f-sdolor')}</div>
+        <div class="form-label"><span id="soap-s-dolor-label">Dolor (contexto, provocación)</span> <span class="req">*</span>${_traerBtn('f-sdolor')}</div>
         <textarea class="form-input" id="f-sdolor" placeholder="Ej: 6/10 al bajar escaleras, 3/10 en reposo..."></textarea>
         <div style="font-size:10.5px;color:var(--gray-400);margin:5px 0 2px">¿Cuándo / con qué? — desencadenante (agrega, no borra lo escrito):</div>
-        ${chipsAppendHTML('f-sdolor',['En reposo','Al mover','Al cargar/esfuerzo','Al caminar','Al subir/bajar','En la noche','Constante','Intermitente'])}
+        <div id="soap-s-dolor-chips">${chipsAppendHTML('f-sdolor',['En reposo','Al mover','Al cargar/esfuerzo','Al caminar','Al subir/bajar','En la noche','Constante','Intermitente'])}</div>
       </div>
       <div class="form-field">
         <div class="form-label">Cambios que refiere el paciente <span class="req" id="req-scambios">*</span><span id="opt-scambios" style="display:none;font-size:11px;font-weight:700;color:#8A6D1A"> · opcional (1ª nota del motivo nuevo)</span></div>
@@ -13418,7 +13432,7 @@ function renderSOAPForm(){
         ${chipsAppendHTML('f-scambios',['Ha mejorado','Igual','Ha empeorado','Fluctuante'])}
       </div>
       <div class="form-field">
-        <div class="form-label">Actividad física ${_traerBtn('f-sactfisica')}</div>
+        <div class="form-label"><span id="soap-s-act-label">Actividad física</span> ${_traerBtn('f-sactfisica')}</div>
         <input class="form-input" type="text" id="f-sactfisica" placeholder="Ej: Caminata 15 min diarios sin dolor">
       </div>
     </div>
@@ -13427,19 +13441,20 @@ function renderSOAPForm(){
   <div class="form-section">
     <div class="form-section-title" style="color:#1B5E20">O — Objetivo</div>
     <div class="form-group">
-      <div class="form-field">
+      <div class="form-field" id="soap-o-rom">
         <div class="form-label">ROM (valores específicos) ${_traerBtn('f-orom')}</div>
         <textarea class="form-input" id="f-orom" placeholder="Ej: Flexión 130°, dolor 3/10 a partir de 60°..."></textarea>
         ${_romChipsHTML()}
       </div>
-      <div class="form-field">
+      <div class="form-field" id="soap-o-fuerza">
         <div class="form-label">Fuerza muscular <span style="font-weight:400;color:var(--gray-400);font-size:11px">· 10 = lado sano/control; califica el afectado (simetría)</span> ${_traerBtn('f-ofuerza')}</div>
         <textarea class="form-input" id="f-ofuerza" placeholder="Ej: Cuádriceps sano 10/10, afectado 7/10 con dolor en arco 30-60°..."></textarea>
         ${_fuerzaPickerHTML()}
       </div>
       <div class="form-field">
-        <div class="form-label">Hallazgos / pruebas clínicas <span style="font-weight:400;color:var(--gray-400);font-size:11px">· si exploraste</span>${_traerBtn('f-ohallazgos')}</div>
+        <div class="form-label"><span id="soap-o-hall-label">Hallazgos / pruebas clínicas</span> <span style="font-weight:400;color:var(--gray-400);font-size:11px">· si exploraste</span>${_traerBtn('f-ohallazgos')}</div>
         <textarea class="form-input" id="f-ohallazgos" placeholder="Ej: Clarke (+) con crepitación. Polo inferior rótula 7/10 a palpación..."></textarea>
+        <div id="soap-o-derma-chips"></div>
       </div>
       <div id="media-obj-wrap" style="margin-top:4px"></div>
     </div>
@@ -13469,7 +13484,7 @@ function renderSOAPForm(){
         <textarea class="form-input" id="f-aanalisis" placeholder="Escribe aquí tu razonamiento clínico de la sesión…"></textarea>
         <!-- Ejemplo SIEMPRE visible (decisión Carlos 2026-09-27): guía permanente para que escriban un
              análisis objetivo y con criterio, no un placeholder que desaparece al empezar a teclear. -->
-        <div style="font-size:11px;color:var(--gray-500);background:var(--gray-50);border:1px solid var(--gray-200);border-radius:8px;padding:8px 10px;margin-top:6px;line-height:1.5">
+        <div id="soap-a-ejemplo" style="font-size:11px;color:var(--gray-500);background:var(--gray-50);border:1px solid var(--gray-200);border-radius:8px;padding:8px 10px;margin-top:6px;line-height:1.5">
           <b style="color:var(--navy)">Ejemplo:</b> Tendinopatía rotuliana en fase reactiva; tolera excéntricos sin aumento de dolor → se progresa carga. Dolor residual esperado, sin banderas.<br>
           <span style="color:var(--gray-400)">Relaciona lo que mediste (EVA/ROM/fuerza) → qué significa → qué decides.</span>
         </div>
@@ -13707,6 +13722,7 @@ function renderSOAPForm(){
   </div><!-- /soap-full (1C: se oculta completo en modo descarga) -->
   <div style="height:20px"></div>`;
   // [BORRADOR-SOAP] write-ahead: attach autosave a los campos, y tras el poblado de edición (~150ms) ofrecer restaurar.
+  setTimeout(function(){ try{ _soapAdaptarDerma(p); }catch(_){} }, 50);
   setTimeout(function(){ try{ activarAutosaveSoap(); }catch(_){} }, 60);
   // FASE 1 EJERCICIOS: el grid de modalidades se pinta inline, así que el bloque de "ejercicios
   // trabajados hoy" hay que renderizarlo aquí tras pintar el form (nota nueva). En edición/copiar
@@ -14008,12 +14024,42 @@ function _updateModCounter(){
   var el=document.getElementById('mod-counter-soap');
   if(el) el.textContent=tempMods.length+' seleccionada'+(tempMods.length!==1?'s':'');
 }
+// DERMATO: el MISMO editor SOAP se adapta cuando el paciente es dermato (igual que el alta): menos
+// examen MSK, más piel/aparatología. SOLO toca la UI (re-rotula/oculta/añade chips que escriben en los
+// MISMOS campos) — NO toca la ruta de guardado (guardarSOAP) ni agrega campos nuevos. Activo=migrado
+// (lee currentPatient). Las modalidades derma ya salen por _modGruposActivos().
+function _soapAdaptarDerma(p){
+  try{
+    if(typeof _esDerma!=='function' || !_esDerma(p)) return;
+    var hide=function(id){ var el=document.getElementById(id); if(el) el.style.display='none'; };
+    var txt=function(id,t){ var el=document.getElementById(id); if(el) el.textContent=t; };
+    var ph=function(id,t){ var el=document.getElementById(id); if(el) el.placeholder=t; };
+    // O — ocultar ROM y Fuerza (no aplican a dermato)
+    hide('soap-o-rom'); hide('soap-o-fuerza');
+    // S — molestia/sensación de la zona (no "dolor" MSK) + chips de piel
+    txt('soap-s-dolor-label','Molestia / sensación de la zona (contexto)');
+    ph('f-sdolor','Ej: tirantez al estirarse, ardor leve en cicatriz, zona dormida (infraumbilical)');
+    var dc=document.getElementById('soap-s-dolor-chips');
+    if(dc) dc.innerHTML=chipsAppendHTML('f-sdolor',['Tirantez','Ardor','Comezón','Dormido (hipoestesia)','Al tocar','En reposo','Sin molestia']);
+    txt('soap-s-act-label','Faja / autocuidado en casa');
+    ph('f-sactfisica','Ej: usa faja ~20 h/día; DLM/auto-masaje en casa; evita decúbito prono');
+    // O — hallazgos de piel/tejido + chips de seguimiento (escriben en el MISMO campo hallazgos)
+    txt('soap-o-hall-label','Hallazgos de piel / tejido (seguimiento)');
+    ph('f-ohallazgos','Ej: edema +1 (bajó de +2); fibrosis N2 en flanco der cede; cicatriz plana y móvil; sin seroma');
+    var odc=document.getElementById('soap-o-derma-chips');
+    if(odc) odc.innerHTML='<div style="font-size:10.5px;color:var(--gray-400);margin:6px 0 2px">Seguimiento derma (agrega al hallazgo):</div>'+chipsAppendHTML('f-ohallazgos',['Edema +1','Edema +2','Edema +3','Fibrosis N1','Fibrosis N2','Fibrosis N3','Cicatriz plana/móvil','Cicatriz adherida','Equimosis en resolución','Perímetro (cm): ']);
+    // A — ejemplo en lenguaje dermato
+    var ex=document.getElementById('soap-a-ejemplo');
+    if(ex) ex.innerHTML='<b style="color:var(--navy)">Ejemplo:</b> Día 14 post-lipoabdominoplastia; edema +2→+1 y fibrosis N2 que cede con US + tecar atérmica → se progresa a radiofrecuencia. Cicatriz plana, sin signos de seroma.<br><span style="color:var(--gray-400)">Relaciona lo que viste (edema/fibrosis/cicatriz/perímetro) → qué significa → qué decides.</span>';
+  }catch(_e){}
+}
 function _renderModGrid(){
   var g=document.getElementById('mod-grid'); if(!g) return;
   var html='';
-  Object.keys(MODALIDADES_GRUPOS).forEach(function(grp){
+  var _modGrps=_modGruposActivos();
+  Object.keys(_modGrps).forEach(function(grp){
     html+='<div class="mod-grp-label">'+escapeHTML(grp)+'</div><div class="checkbox-grid">';
-    MODALIDADES_GRUPOS[grp].forEach(function(m){
+    _modGrps[grp].forEach(function(m){
       var chk=tempMods.includes(m);
       html+='<div class="checkbox-item '+(chk?'checked':'')+'" onclick="toggleMod(\''+m.replace(/'/g,"\\'")+'\')">'
         +'<div class="cb-box">'+(chk?'✓':'')+'</div><div class="cb-label">'+escapeHTML(m)+'</div></div>';
