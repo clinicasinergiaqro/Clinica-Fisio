@@ -1356,7 +1356,7 @@ body.modo-oscuro .topbar{background:#141824}
 <body>
 <div id="sync-indicator" class="sync-indicator ok" style="display:none"></div>
 <div id="app-version-chip" title="Versión de la app en este equipo — toca para buscar actualización" onclick="try{_tapVersionChip()}catch(e){}"></div>
-<script>/* VERSIÓN VISIBLE: refleja el index.html realmente cargado en ESTE equipo (se bumpea junto con sw.js). Así un iPad con versión vieja se ve de un vistazo. */window.APP_VERSION='v1-2026-10-28l';(function(){try{var c=document.getElementById('app-version-chip');if(c)c.textContent=window.APP_VERSION;}catch(e){}})();</script>
+<script>/* VERSIÓN VISIBLE: refleja el index.html realmente cargado en ESTE equipo (se bumpea junto con sw.js). Así un iPad con versión vieja se ve de un vistazo. */window.APP_VERSION='v1-2026-10-29a';(function(){try{var c=document.getElementById('app-version-chip');if(c)c.textContent=window.APP_VERSION;}catch(e){}})();</script>
 <div class="toast" id="toast" aria-live="polite" aria-atomic="true"></div>
 
 <!-- LOGIN -->
@@ -27022,7 +27022,8 @@ async function resetImportacion_(){
         <canvas id="scan2-canvas" style="max-width:100%;max-height:46vh;touch-action:none;border-radius:6px"></canvas>
       </div>
       <div id="scan2-modo-esquinas" style="display:none">
-        <div style="font-size:11px;color:var(--gray-400);text-align:center;margin-bottom:8px">Arrastra las 4 esquinas para ajustar el documento.</div>
+        <div style="font-size:11px;color:var(--gray-400);text-align:center;margin-bottom:8px">Arrastra las 4 esquinas para ajustar. Si la foto está de lado, usa 🔄 Rotar.</div>
+        <button onclick="rotarImagenScanner90()" style="width:100%;background:white;border:1.5px solid var(--gray-200);color:var(--gray-600);border-radius:16px;padding:10px;font-weight:700;cursor:pointer;margin-bottom:8px">🔄 Rotar 90°</button>
         <button onclick="confirmarAjusteManualEsquinas()" style="width:100%;background:var(--navy);color:white;border:none;border-radius:16px;padding:11px;font-weight:800;cursor:pointer;margin-bottom:8px">✓ Aplicar perspectiva</button>
       </div>
       <div id="scan2-modo-resultado" style="display:none">
@@ -27578,6 +27579,35 @@ function abrirAjusteManualEsquinas(){
   scannerState.ajusteManual=true; dibujarEditorScanner2();
 }
 function confirmarAjusteManualEsquinas(){ aplicarAutoPerspectivaYFiltro(); mostrarResultadoEscaneado(); }
+// ROTAR 90° la imagen del escáner — para fotos de la fototeca que llegan de lado (antes solo se podía
+// recortar/ajustar perspectiva, no girar). Rota el canvas base Y las 4 esquinas en sincronía (y las
+// re-ordena tl/tr/br/bl) para no perder el ajuste del documento. Se puede tocar varias veces (90° cada una).
+function _scanOrdenarEsquinas(pts){
+  var tl=pts[0],br=pts[0],tr=pts[0],bl=pts[0];
+  pts.forEach(function(p){
+    if(p.x+p.y < tl.x+tl.y) tl=p;
+    if(p.x+p.y > br.x+br.y) br=p;
+    if(p.y-p.x < tr.y-tr.x) tr=p;
+    if(p.y-p.x > bl.y-bl.x) bl=p;
+  });
+  return [tl,tr,br,bl];
+}
+function rotarImagenScanner90(){
+  var src=scannerState.img; if(!src) return;
+  var W=src.width, H=src.height;
+  var out=document.createElement('canvas'); out.width=H; out.height=W;
+  var ctx=out.getContext('2d'); ctx.translate(H,0); ctx.rotate(Math.PI/2); ctx.drawImage(src,0,0);
+  scannerState.img=out;
+  if(Array.isArray(scannerState.corners) && scannerState.corners.length===4){
+    var rot=scannerState.corners.map(function(p){ return {x:H-p.y, y:p.x}; });
+    scannerState.corners=_scanOrdenarEsquinas(rot);
+  } else {
+    scannerState.corners=crearPuntosFallback(out);
+  }
+  // la vista procesada previa ya no aplica tras rotar
+  scannerState.warpBase=null; scannerState.procesadaCanvas=null; scannerState.autoDetectado=false;
+  if(!scannerState.ajusteManual){ abrirAjusteManualEsquinas(); } else { dibujarEditorScanner2(); }
+}
 function dibujarEditorScanner2(){
   const canvas=document.getElementById('scan2-canvas'); const src=scannerState.img; if(!src) return;
   const maxW=Math.min(540, window.innerWidth-60); const escala=Math.min(1, maxW/src.width);
