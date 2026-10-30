@@ -1356,7 +1356,7 @@ body.modo-oscuro .topbar{background:#141824}
 <body>
 <div id="sync-indicator" class="sync-indicator ok" style="display:none"></div>
 <div id="app-version-chip" title="Versión de la app en este equipo — toca para buscar actualización" onclick="try{_tapVersionChip()}catch(e){}"></div>
-<script>/* VERSIÓN VISIBLE: refleja el index.html realmente cargado en ESTE equipo (se bumpea junto con sw.js). Así un iPad con versión vieja se ve de un vistazo. */window.APP_VERSION='v1-2026-10-29a';(function(){try{var c=document.getElementById('app-version-chip');if(c)c.textContent=window.APP_VERSION;}catch(e){}})();</script>
+<script>/* VERSIÓN VISIBLE: refleja el index.html realmente cargado en ESTE equipo (se bumpea junto con sw.js). Así un iPad con versión vieja se ve de un vistazo. */window.APP_VERSION='v1-2026-10-30a';(function(){try{var c=document.getElementById('app-version-chip');if(c)c.textContent=window.APP_VERSION;}catch(e){}})();</script>
 <div class="toast" id="toast" aria-live="polite" aria-atomic="true"></div>
 
 <!-- LOGIN -->
@@ -13185,6 +13185,14 @@ function _ejDosisPendiente(ej){
   if(!d && !comp) return true;
   return (d==='por definir'||d==='pendiente'||d==='[pendiente]'||d==='—'||d==='-'||d==='n/a'||d==='na');
 }
+// Al EDITAR un ejercicio, un valor "placeholder" (Por definir / Pendiente / …) se muestra VACÍO para que
+// el campo enseñe su hint gris y el fisio escriba directo. Antes salía el texto literal y había que
+// borrarlo a mano antes de teclear (queja de Carlos: "le das y no se quita el de por definir").
+function _ejValEditable(v){
+  var s=String(v==null?'':v).trim(); var l=s.toLowerCase();
+  if(l===''||l==='por definir'||l==='pendiente'||l==='[pendiente]'||l==='—'||l==='-'||l==='n/a'||l==='na') return '';
+  return s;
+}
 function _refRutinaEjHTML(){
   try{
     var ejs=(currentPatient&&Array.isArray(currentPatient.ejercicios))?currentPatient.ejercicios:[];
@@ -23616,6 +23624,12 @@ function renderEjercicios(){
     // Update topbar count
     document.getElementById('ej-topbar-meta').textContent = `${ejs.length} ejercicio${ejs.length!==1?'s':''}`;
 
+    // Dosificación en bloque: dosificar/nombrar varios sin abrir uno por uno (resalta si faltan dosis).
+    if(ejs.length>=2){
+      var _pendB=ejs.filter(_ejDosisPendiente).length;
+      html += `<button type="button" onclick="_abrirDosisBloque()" style="width:100%;background:${_pendB?'#FEF3C7':'#EEF4FB'};color:${_pendB?'#B45309':'var(--navy)'};border:1.5px solid ${_pendB?'#F59E0B':'var(--navy)'};border-radius:12px;padding:11px;font-weight:800;font-size:13.5px;cursor:pointer;font-family:inherit;margin-bottom:12px">💊 Dosificar en bloque${_pendB?(' · '+_pendB+' sin dosis'):''}</button>`;
+    }
+
     // LIGADO A SU SOAP: el ejercicio grabado en sesión comparte id con el item de ejerciciosSesion de
     // esa nota (_grabarEjSesion mete el MISMO id en p.ejercicios y en la sesión). Mapear ejId → sesión.
     var _sesLista = (typeof obtenerSesiones==='function') ? obtenerSesiones(currentPatient) : (currentPatient.soap||[]);
@@ -23997,7 +24011,7 @@ function renderNuevoEjercicioForm(){
       <div class="form-field">
         <input class="form-input" type="text" id="ej-dosis"
           placeholder="Ej: 3×15 · 45seg · 2x día · 4 semanas"
-          value="${ej.dosis||[ej.series,ej.repeticiones,ej.tiempo,ej.frecuencia,ej.duracion].filter(Boolean).join(' · ')||''}">
+          value="${_ejValEditable(ej.dosis)||[ej.series,ej.repeticiones,ej.tiempo,ej.frecuencia,ej.duracion].filter(Boolean).join(' · ')||''}">
       </div>
     </div>
     <div style="padding:0 14px 10px">
@@ -24025,7 +24039,7 @@ function renderNuevoEjercicioForm(){
     <div class="form-section-title">📝 Indicaciones <span class="req">*</span></div>
     <div class="form-group">
       <div class="form-field">
-        <textarea class="form-input" id="ej-indicaciones" placeholder="Ej: Realizar con control lento en la bajada. Mantener rodilla alineada con el pie.">${ej.indicaciones||''}</textarea>
+        <textarea class="form-input" id="ej-indicaciones" placeholder="Ej: Realizar con control lento en la bajada. Mantener rodilla alineada con el pie.">${_ejValEditable(ej.indicaciones)}</textarea>
       </div>
     </div>
     <div style="padding:0 14px 10px">
@@ -24287,7 +24301,7 @@ async function _subirVariosEjercicios(ev){
   const btnGuardar = document.getElementById('btn-guardar-ej');
   if(btnGuardar) btnGuardar.disabled = true;
   if(!currentPatient.ejercicios) currentPatient.ejercicios = [];
-  let ok=0, fallo=0;
+  let ok=0, fallo=0; const nuevosIds=[];
   for(let i=0;i<files.length;i++){
     const f=files[i];
     if(preview) preview.innerHTML = '<div style="padding:12px;color:var(--gray-400)">⏳ Subiendo '+(i+1)+' de '+files.length+'…</div>';
@@ -24301,13 +24315,15 @@ async function _subirVariosEjercicios(ev){
       // Guard fuga entre pacientes (la subida es async).
       if(!currentPatient || currentPatient.id!==_pidEj){ showToast('Cambiaste de paciente — se detuvo la subida','warning'); break; }
       const nombre=(media.label||('Ejercicio '+todayFmt()));
+      const _nid='ej'+Date.now()+'_'+i;
       currentPatient.ejercicios.push({
-        id:'ej'+Date.now()+'_'+i, nombre:nombre, name:nombre,
+        id:_nid, nombre:nombre, name:nombre,
         objetivo:'Ejercicio terapéutico indicado en plan de rehabilitación',
-        dosis:'Por definir', series:'', repeticiones:'', tiempo:'', frecuencia:'', duracion:'',
-        indicaciones:'Por definir', precauciones:'', observaciones:'',
+        dosis:'', series:'', repeticiones:'', tiempo:'', frecuencia:'', duracion:'',
+        indicaciones:'', precauciones:'', observaciones:'',
         fecha:todayFmt(), terapeuta:ter, estado:'activo', paraCasa:true, media:media
       });
+      nuevosIds.push(_nid);
       ok++;
     }catch(err){ console.warn('[subir-varios-ej]', err&&err.message); fallo++; }
   }
@@ -24320,8 +24336,108 @@ async function _subirVariosEjercicios(ev){
   saveDB('pts', [currentPatient], {camposHist:['ejercicios']}).then(res=>{
     showToast((res&&res.ok?'✅ ':'⚠️ ')+ok+' ejercicio'+(ok!==1?'s':'')+(res&&res.ok?' subido'+(ok!==1?'s':''):' guardados local')+(fallo?(' · '+fallo+' con error'):''), res&&res.ok?'success':'warning');
     goBack();
-    setTimeout(()=>{ try{ renderEjercicios(); }catch(_){} }, 300);
-  }).catch(()=>{ showToast('⚠️ '+ok+' guardados local — se subirán al reconectar','warning'); goBack(); setTimeout(()=>{ try{ renderEjercicios(); }catch(_){} }, 300); });
+    setTimeout(()=>{ try{ renderEjercicios(); }catch(_){} try{ _abrirDosisBloque(nuevosIds); }catch(_){} }, 320);
+  }).catch(()=>{ showToast('⚠️ '+ok+' guardados local — se subirán al reconectar','warning'); goBack(); setTimeout(()=>{ try{ renderEjercicios(); }catch(_){} try{ _abrirDosisBloque(nuevosIds); }catch(_){} }, 320); });
+}
+
+// ── DOSIFICACIÓN EN BLOQUE ─────────────────────────────────────────────────────────────────
+// Pantalla rápida para dosificar VARIOS ejercicios SIN abrir uno por uno (pedido de Carlos: 8
+// pacientes seguidos; subir varios videos y dosificar fluido). Cada fila: casilla de selección +
+// nombre + dosis + indicaciones. Arriba: una dosis/indicación que puedes "Aplicar a TODOS" o "Aplicar
+// a SELECCIONADOS" (p.ej. los 4 de fuerza con una dosis; marcas los de estiramiento y les pones otra).
+// Guarda la base COMPLETA de ejercicios por la ruta normal (saveDB camposHist:['ejercicios'] con
+// verificación honesta). NO toca media ni Storage.
+var _DB_DOSIS_PRESETS=['3×15 · diario','3×10 · 2 veces al día','3×12 · un día sí y un día no','45 seg × 3 · diario','10 reps · 3 veces al día','Estiramiento 30 seg × 3 · diario'];
+function _dbActualizarContadorSel(){
+  var ids=window._dbIds||[]; var n=0;
+  ids.forEach(function(id){ var c=document.getElementById('db-sel-'+id); if(c&&c.checked) n++; });
+  var el=document.getElementById('db-sel-count'); if(el) el.textContent=n;
+  var b=document.getElementById('db-btn-sel'); if(b) b.disabled=(n===0);
+}
+function _dbMarcar(todos){
+  (window._dbIds||[]).forEach(function(id){ var c=document.getElementById('db-sel-'+id); if(c) c.checked=!!todos; });
+  _dbActualizarContadorSel();
+}
+function _abrirDosisBloque(ids){
+  if(!currentPatient){ showToast('No hay paciente activo','error'); return; }
+  var todos=Array.isArray(currentPatient.ejercicios)?currentPatient.ejercicios:[];
+  var lista=(Array.isArray(ids)&&ids.length)?todos.filter(function(e){return ids.indexOf(e.id)>=0;}):todos.slice();
+  if(!lista.length){ showToast('No hay ejercicios para dosificar','warning'); return; }
+  window._dbIds=lista.map(function(e){return e.id;});
+  var old=document.getElementById('dosis-bloque-overlay'); if(old) old.remove();
+  var ov=document.createElement('div'); ov.id='dosis-bloque-overlay';
+  ov.style.cssText='position:fixed;inset:0;z-index:10000;background:rgba(10,20,40,.94);overflow-y:auto;padding:12px';
+  var inpCss='width:100%;box-sizing:border-box;font-size:14px;padding:8px 10px;border:1.5px solid var(--gray-200);border-radius:10px;font-family:inherit';
+  var rows=lista.map(function(e){
+    var ic=(e.media&&e.media.type&&e.media.type.indexOf('video')===0)?'🎥':((e.media&&e.media.type&&e.media.type.indexOf('image')===0)?'🖼️':'📝');
+    var url=(e.media&&e.media.url)?e.media.url:'';
+    var ver=url?('<button type="button" onclick="window.open(\''+escapeAttr_(url)+'\',\'_blank\')" style="background:none;border:none;font-size:13px;color:var(--navy);cursor:pointer;padding:2px 4px;white-space:nowrap">👁 ver</button>'):'';
+    var dosisVal=_ejValEditable(e.dosis)||[e.series,e.repeticiones,e.tiempo,e.frecuencia,e.duracion].filter(Boolean).join(' · ');
+    return '<div style="border:1px solid var(--gray-100);border-radius:12px;padding:10px;margin-bottom:8px">'
+      +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">'
+        +'<input type="checkbox" id="db-sel-'+e.id+'" onchange="_dbActualizarContadorSel()" style="width:20px;height:20px;flex-shrink:0;accent-color:var(--navy)">'
+        +'<span style="font-size:18px">'+ic+'</span>'
+        +'<input id="db-nombre-'+e.id+'" value="'+escapeAttr_(e.nombre||e.name||'')+'" placeholder="Nombre del ejercicio" style="flex:1;min-width:0;font-size:14px;font-weight:700;padding:7px 9px;border:1.5px solid var(--gray-200);border-radius:10px;font-family:inherit">'
+        +ver
+      +'</div>'
+      +'<input id="db-dosis-'+e.id+'" value="'+escapeAttr_(dosisVal)+'" placeholder="Dosis (ej: 3×15 · diario)" style="'+inpCss+';margin-bottom:6px">'
+      +'<input id="db-indic-'+e.id+'" value="'+escapeAttr_(_ejValEditable(e.indicaciones))+'" placeholder="Indicaciones (opcional)" style="'+inpCss+'">'
+      +'</div>';
+  }).join('');
+  var chips=_DB_DOSIS_PRESETS.map(function(v){ return '<button type="button" class="chip-quick" data-v="'+escapeAttr_(v)+'" onclick="var a=document.getElementById(\'db-all-dosis\');if(a)a.value=this.dataset.v">'+escapeHTML(v)+'</button>'; }).join('');
+  ov.innerHTML='<div style="max-width:620px;margin:0 auto;background:white;border-radius:14px;padding:14px">'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><div style="font-size:17px;font-weight:800;color:var(--navy)">💊 Dosificación rápida · '+lista.length+'</div><button onclick="_dbCerrar()" style="background:none;border:none;font-size:22px;color:var(--gray-400);cursor:pointer">×</button></div>'
+    +'<div style="background:#EEF4FB;border:1px solid #C7D8EE;border-radius:12px;padding:10px;margin-bottom:12px">'
+      +'<div style="font-size:12px;font-weight:800;color:var(--navy);margin-bottom:6px">Pon una dosis/indicación y aplícala</div>'
+      +'<input id="db-all-dosis" placeholder="Ej: 3×15 · diario" style="'+inpCss+';margin-bottom:6px">'
+      +'<div class="chip-row" style="margin-bottom:6px">'+chips+'</div>'
+      +'<input id="db-all-indic" placeholder="Indicaciones (opcional)" style="'+inpCss+';margin-bottom:8px">'
+      +'<div style="display:flex;gap:8px">'
+        +'<button type="button" onclick="_dbAplicar(false)" style="flex:1;background:var(--navy);color:white;border:none;border-radius:12px;padding:10px;font-weight:800;cursor:pointer;font-family:inherit">📋 A TODOS</button>'
+        +'<button type="button" id="db-btn-sel" onclick="_dbAplicar(true)" disabled style="flex:1;background:#2E7D52;color:white;border:none;border-radius:12px;padding:10px;font-weight:800;cursor:pointer;font-family:inherit">✓ A seleccionados (<span id="db-sel-count">0</span>)</button>'
+      +'</div>'
+      +'<div style="display:flex;gap:10px;justify-content:center;margin-top:7px"><button type="button" onclick="_dbMarcar(true)" style="background:none;border:none;color:var(--navy);font-size:12px;font-weight:700;cursor:pointer">Marcar todos</button><span style="color:var(--gray-200)">·</span><button type="button" onclick="_dbMarcar(false)" style="background:none;border:none;color:var(--gray-400);font-size:12px;font-weight:700;cursor:pointer">Desmarcar</button></div>'
+      +'<div style="font-size:11px;color:var(--gray-400);margin-top:6px;line-height:1.4">Tip: marca los de fuerza → "A seleccionados"; luego marca los de estiramiento y ponles su dosis.</div>'
+    +'</div>'
+    +'<div>'+rows+'</div>'
+    +'<button type="button" onclick="_dbGuardarTodos()" style="width:100%;background:var(--green);color:white;border:none;border-radius:14px;padding:12px;font-weight:800;font-size:15px;cursor:pointer;font-family:inherit;margin-top:4px">💾 Guardar todos ('+lista.length+')</button>'
+    +'<button type="button" onclick="_dbCerrar()" style="width:100%;background:white;border:1.5px solid var(--gray-200);color:var(--gray-600);border-radius:14px;padding:10px;font-weight:700;cursor:pointer;font-family:inherit;margin-top:8px">Cerrar</button>'
+    +'<div style="height:16px"></div></div>';
+  document.body.appendChild(ov);
+  _dbActualizarContadorSel();
+}
+function _dbAplicar(soloSel){
+  var ad=document.getElementById('db-all-dosis'), ai=document.getElementById('db-all-indic');
+  var d=(ad?ad.value:'').trim(), ind=(ai?ai.value:'').trim();
+  if(!d && !ind){ showToast('Escribe o elige una dosis (o indicaciones) arriba','error'); return; }
+  var ids=window._dbIds||[];
+  var targets=soloSel?ids.filter(function(id){ var c=document.getElementById('db-sel-'+id); return c&&c.checked; }):ids.slice();
+  if(soloSel && !targets.length){ showToast('Marca al menos un ejercicio (casilla)','error'); return; }
+  targets.forEach(function(id){
+    if(d){ var de=document.getElementById('db-dosis-'+id); if(de) de.value=d; }
+    if(ind){ var ie=document.getElementById('db-indic-'+id); if(ie) ie.value=ind; }
+  });
+  showToast('✓ Aplicado a '+targets.length+(soloSel?(' seleccionado'+(targets.length!==1?'s':'')):' (todos)'),'success');
+  if(soloSel){ _dbMarcar(false); }
+}
+function _dbCerrar(){ var ov=document.getElementById('dosis-bloque-overlay'); if(ov) ov.remove(); }
+function _dbGuardarTodos(){
+  if(!currentPatient){ _dbCerrar(); return; }
+  var ids=window._dbIds||[], n=0;
+  ids.forEach(function(id){
+    var e=(currentPatient.ejercicios||[]).find(function(x){return x.id===id;});
+    if(!e) return;
+    var nmEl=document.getElementById('db-nombre-'+id); if(nmEl){ var nm=nmEl.value.trim(); if(nm){ e.nombre=nm; e.name=nm; } }
+    var dsEl=document.getElementById('db-dosis-'+id); if(dsEl){ e.dosis=dsEl.value.trim(); e.series='';e.repeticiones='';e.tiempo='';e.frecuencia='';e.duracion=''; }
+    var inEl=document.getElementById('db-indic-'+id); if(inEl){ var iv=inEl.value.trim(); if(iv) e.indicaciones=iv; }
+    n++;
+  });
+  var idxP=patientsDB.findIndex(function(x){return x.id===currentPatient.id;}); if(idxP>=0) patientsDB[idxP]=currentPatient;
+  try{ if(typeof window._FST_invalidarVistaPacientes==='function') window._FST_invalidarVistaPacientes(); }catch(_){}
+  saveDB('pts',[currentPatient],{camposHist:['ejercicios']}).then(function(res){
+    showToast((res&&res.ok?'✅ ':'⚠️ ')+n+' ejercicio'+(n!==1?'s':'')+(res&&res.ok?' dosificados':' guardados local'), res&&res.ok?'success':'warning');
+    _dbCerrar(); try{ renderEjercicios(); }catch(_){}
+  }).catch(function(){ showToast('⚠️ Guardado local — se subirá al reconectar','warning'); _dbCerrar(); try{ renderEjercicios(); }catch(_){} });
 }
 
 // ── BORRADOR ANTI-PÉRDIDA del formulario de EJERCICIO (mismo patrón que Nuevo/SOAP) ──────
