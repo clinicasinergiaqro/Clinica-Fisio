@@ -1356,7 +1356,7 @@ body.modo-oscuro .topbar{background:#141824}
 <body>
 <div id="sync-indicator" class="sync-indicator ok" style="display:none"></div>
 <div id="app-version-chip" title="Versión de la app en este equipo — toca para buscar actualización" onclick="try{_tapVersionChip()}catch(e){}"></div>
-<script>/* VERSIÓN VISIBLE: refleja el index.html realmente cargado en ESTE equipo (se bumpea junto con sw.js). Así un iPad con versión vieja se ve de un vistazo. */window.APP_VERSION='v1-2026-10-30h';(function(){try{var c=document.getElementById('app-version-chip');if(c)c.textContent=window.APP_VERSION;}catch(e){}})();</script>
+<script>/* VERSIÓN VISIBLE: refleja el index.html realmente cargado en ESTE equipo (se bumpea junto con sw.js). Así un iPad con versión vieja se ve de un vistazo. */window.APP_VERSION='v1-2026-10-30i';(function(){try{var c=document.getElementById('app-version-chip');if(c)c.textContent=window.APP_VERSION;}catch(e){}})();</script>
 <div class="toast" id="toast" aria-live="polite" aria-atomic="true"></div>
 
 <!-- LOGIN -->
@@ -4889,6 +4889,7 @@ function entrarComo(perfil, email, silencioso){
   // Auto-sync: mostrar estado y sincronizar lo pendiente al abrir
   actualizarIndicadorSync();
   try{ setTimeout(function(){ _reportarSaludSync(true); }, 3500); }catch(_){}   // [SALUD-SYNC] reporte inicial al tablero
+  try{ setTimeout(function(){ try{ _rehidratarBorradorDesdeIDB(); }catch(_){} }, 2500); }catch(_){}   // [CANDADO ALTA] rescatar borrador del alta desde IndexedDB si localStorage fue desalojado
   try{ setTimeout(function(){ _autoRescateFallidos(); }, 6000); }catch(_){}     // [AUTO-RESCATE] sube lo rendido solo, sin tocar nada
   try{ if(typeof _autoReportesSupervisor==='function') _autoReportesSupervisor(); }catch(_){}   // [REPORTE-CORREO] vie/lun 8am → notas faltantes de la semana + one-shot Ago+Sep (backend deduplica)
   if(navigator.onLine) setTimeout(sincronizarPendientes, 1500);
@@ -5524,6 +5525,23 @@ function renderAgenda(){
       <svg width="18" height="18" fill="none" stroke="#2E7D52" stroke-width="2.5" viewBox="0 0 24 24" style="flex-shrink:0"><polyline points="9 18 15 12 9 6"/></svg>
     </div>`;
   }
+  // ALTA A MEDIO LLENAR (candado anti-pérdida de expediente): si quedó un expediente NUEVO sin enviar,
+  // avisarlo SIEMPRE al abrir la app (no solo al reabrir "Nuevo paciente") para que no se abandone en
+  // silencio y se pierda si iOS desaloja el almacenamiento. Toca → abre el alta y ofrece recuperarlo.
+  try{
+    var _bdr=(typeof _borradorAltaPendiente==='function')?_borradorAltaPendiente():null;
+    if(_bdr){
+      var _bnom=String((_bdr.data&&_bdr.data['n-nombre'])||'').replace(/[<>]/g,'').trim();
+      html+=`<div onclick="showNuevoPaciente()" style="margin-bottom:12px;padding:15px 16px;border-radius:16px;background:linear-gradient(135deg,#FFF4E5,#FFE8CC);border:1.5px solid #F5C77E;cursor:pointer;display:flex;align-items:center;gap:13px;box-shadow:0 2px 10px rgba(180,120,20,.14)">
+        <div style="font-size:30px;line-height:1">📝</div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:16px;font-weight:800;color:#8A5A00;letter-spacing:-.01em">Expediente a medio llenar sin guardar</div>
+          <div style="font-size:12.5px;color:#9A6400;margin-top:1px;font-weight:600">${_bnom?('«'+_bnom+'» · '):''}Toca para continuar y guardarlo →</div>
+        </div>
+        <svg width="18" height="18" fill="none" stroke="#B4781E" stroke-width="2.5" viewBox="0 0 24 24" style="flex-shrink:0"><polyline points="9 18 15 12 9 6"/></svg>
+      </div>`;
+    }
+  }catch(_){}
   // ── Dashboard de hoy ──────────────────────────────────────────────────────
   const conPrecaucion=pts.filter(p=>p.seguridadClinica?.tienePrecaucion).length;
   const sinConsent=pts.filter(p=>!tieneConsentimientoFirmado(p)).length;   // [LOOP-D D1-a] helper único (array+legacy, exige firma real)
@@ -21735,7 +21753,18 @@ function guardarBorradorNuevo(){
     var _algoHC=!!(data._HC&&(data._HC.zona||data._HC.lado||(Array.isArray(data._HC.sec)&&data._HC.sec.length)||data._HC.irrad));
     if(!_algoTexto && data._nEvaVal==null && !_algoCheck && !_algoHC && !data._altaEstudios.length && !data._altaMediaAntes.length) return;
     data._editPid=window._nuevoEditPid||'';   // marca de a qué paciente pertenece (modo edición)
-    localStorage.setItem(_draftKeyNuevo(),JSON.stringify({updatedAt:Date.now(),data}));
+    var _k=_draftKeyNuevo();
+    var _payload=JSON.stringify({updatedAt:Date.now(),data});
+    try{ localStorage.setItem(_k,_payload); }
+    catch(_eLS){
+      // DISCO LLENO NO ES SILENCIOSO (regla de integridad): si localStorage está lleno/evictado, avisar
+      // 1 vez/sesión para que el fisio sepa que el expediente a medio llenar podría NO persistir aquí.
+      try{ if(!window._draftQuotaAviso && typeof showToastCritico_==='function'){ window._draftQuotaAviso=true; showToastCritico_('⚠️ Memoria del equipo casi llena: el expediente a medio llenar podría no guardarse. Termínalo y GUÁRDALO ya (o libera espacio).'); } }catch(_){}
+    }
+    // RESPALDO DURABLE (candado anti-pérdida): espejo del borrador a IndexedDB — sobrevive al desalojo de
+    // localStorage por iOS (causa documentada de pérdidas). Fire-and-forget; NO reemplaza al localStorage
+    // (que es síncrono y es el que alcanza el flush de pagehide/cierre). Clave espejo por-borrador.
+    try{ if(typeof idbSet==='function') idbSet('__draft__'+_k, _payload); }catch(_){}
   }catch(e){ console.warn('borrador nuevo:',e); }
 }
 
@@ -21760,27 +21789,58 @@ function aplicarBorradorNuevo(data){
   }catch(e){ console.warn('aplicar borrador nuevo:',e); }
 }
 
-function cargarBorradorNuevoSiExiste(){
+async function cargarBorradorNuevoSiExiste(){
   try{
-    const raw=localStorage.getItem(DRAFT_NUEVO);
-    if(!raw) return;
-    let draft=null; try{ draft=JSON.parse(raw); }catch(e){ return; }
+    var raw=null; try{ raw=localStorage.getItem(DRAFT_NUEVO); }catch(_){}
+    var dLS=null; if(raw){ try{ dLS=JSON.parse(raw); }catch(_){ dLS=null; } }
+    // RESCATE: si localStorage fue desalojado (iOS), recuperar el borrador del espejo en IndexedDB.
+    var dIDB=null;
+    try{ if(typeof idbGet==='function'){ var rawI=await idbGet('__draft__'+DRAFT_NUEVO); if(rawI){ dIDB=JSON.parse(rawI); } } }catch(_){ dIDB=null; }
+    var draft=(dIDB && (!dLS || (dIDB.updatedAt||0)>(dLS.updatedAt||0))) ? dIDB : dLS;
     if(!draft||!draft.data) return;
-    const fecha=new Date(draft.updatedAt||Date.now()).toLocaleString('es-MX');
-    if(confirm(`Hay un borrador de nuevo paciente sin guardar.\n\nÚltima edición: ${fecha}\n\n¿Deseas recuperarlo?`)){
+    // Si el bueno vino de IDB (localStorage vacío/evictado), re-sembrar localStorage para el flush síncrono.
+    if(draft===dIDB){ try{ localStorage.setItem(DRAFT_NUEVO, JSON.stringify(draft)); }catch(_){} }
+    var fecha=new Date(draft.updatedAt||Date.now()).toLocaleString('es-MX');
+    if(confirm('Hay un borrador de nuevo paciente sin guardar.\n\nÚltima edición: '+fecha+'\n\n¿Deseas recuperarlo?')){
       aplicarBorradorNuevo(draft.data); if(typeof updateSegSummary==='function')updateSegSummary(); showToast('Borrador recuperado','success');
     } else {
-      if(confirm('¿Deseas descartar este borrador?')){ localStorage.removeItem(DRAFT_NUEVO); showToast('Borrador descartado','warning'); }
+      if(confirm('¿Deseas descartar este borrador?')){ try{localStorage.removeItem(DRAFT_NUEVO);}catch(_){} try{ if(typeof idbSet==='function') idbSet('__draft__'+DRAFT_NUEVO, ''); }catch(_){} showToast('Borrador descartado','warning'); }
     }
   }catch(e){ console.warn('cargar borrador nuevo:',e); }
 }
 
 function descartarBorradorNuevo(){
-  try{ localStorage.removeItem(DRAFT_NUEVO); showToast('Borrador descartado','warning'); }catch(e){}
+  try{ localStorage.removeItem(DRAFT_NUEVO); }catch(e){}
+  try{ if(typeof idbSet==='function') idbSet('__draft__'+DRAFT_NUEVO, ''); }catch(_){}   // limpiar también el espejo durable
+  showToast('Borrador descartado','warning');
 }
 function borrarBorradorNuevoSiGuardado(){
   // Limpia la clave ACTIVA (crear o edición-por-pid) para no reofrecer un borrador ya persistido.
-  try{ localStorage.removeItem(_draftKeyNuevo()); }catch(e){}
+  var _k=_draftKeyNuevo();
+  try{ localStorage.removeItem(_k); }catch(e){}
+  try{ if(typeof idbSet==='function') idbSet('__draft__'+_k, ''); }catch(_){}   // limpiar también el espejo durable en IDB
+}
+// ¿Hay un alta a medio llenar SIN enviar? (lee localStorage; el boot rehidrata desde IDB si fue desalojado)
+function _borradorAltaPendiente(){
+  try{ var raw=localStorage.getItem(DRAFT_NUEVO); if(!raw) return null;
+    var d=JSON.parse(raw); if(d&&d.data) return d; }catch(_){}
+  return null;
+}
+// RESCATE anti-desalojo: al arrancar, si localStorage ya no tiene el borrador del alta pero SÍ está el
+// espejo en IndexedDB (iOS desaloja localStorage sin avisar), recuperarlo a localStorage y re-pintar la
+// agenda para que el aviso "expediente a medio llenar" lo detecte. Solo cubre la clave de CREAR.
+async function _rehidratarBorradorDesdeIDB(){
+  try{
+    var raw=null; try{ raw=localStorage.getItem(DRAFT_NUEVO); }catch(_){}
+    if(raw) return;   // ya está en localStorage
+    if(typeof idbGet!=='function') return;
+    var rawI=await idbGet('__draft__'+DRAFT_NUEVO);
+    if(!rawI) return;
+    var d=null; try{ d=JSON.parse(rawI); }catch(_){ return; }
+    if(!d||!d.data) return;
+    try{ localStorage.setItem(DRAFT_NUEVO, rawI); }catch(_){}
+    try{ if(typeof renderAgenda==='function' && document.getElementById('content-agenda')) renderAgenda(); }catch(_){}
+  }catch(_){}
 }
 // AUDITORÍA C1: al reabrir "Editar valoración completa" de un paciente, ofrecer recuperar lo que quedó
 // a medio editar (si el iPad se bloqueó/cerró). Se llama DESPUÉS del prefill, para que el borrador (más
