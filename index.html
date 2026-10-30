@@ -1356,7 +1356,7 @@ body.modo-oscuro .topbar{background:#141824}
 <body>
 <div id="sync-indicator" class="sync-indicator ok" style="display:none"></div>
 <div id="app-version-chip" title="Versión de la app en este equipo — toca para buscar actualización" onclick="try{_tapVersionChip()}catch(e){}"></div>
-<script>/* VERSIÓN VISIBLE: refleja el index.html realmente cargado en ESTE equipo (se bumpea junto con sw.js). Así un iPad con versión vieja se ve de un vistazo. */window.APP_VERSION='v1-2026-10-30k';(function(){try{var c=document.getElementById('app-version-chip');if(c)c.textContent=window.APP_VERSION;}catch(e){}})();</script>
+<script>/* VERSIÓN VISIBLE: refleja el index.html realmente cargado en ESTE equipo (se bumpea junto con sw.js). Así un iPad con versión vieja se ve de un vistazo. */window.APP_VERSION='v1-2026-10-30l';(function(){try{var c=document.getElementById('app-version-chip');if(c)c.textContent=window.APP_VERSION;}catch(e){}})();</script>
 <div class="toast" id="toast" aria-live="polite" aria-atomic="true"></div>
 
 <!-- LOGIN -->
@@ -20213,10 +20213,52 @@ function _dermaCardHTML(v){
       +'</div>';
   }catch(_e){ return ''; }
 }
-function guardarNuevoPaciente(){
+// CANDADO #4: ¿esta PWA está DESACTUALIZADA respecto a la versión viva del servidor? Best-effort: compara
+// window.APP_VERSION con el CACHE del sw.js vivo (fetch no-store, timeout 4s), cacheado ~3 min. Offline /
+// timeout / formato inesperado → false (NUNCA bloquea por no poder verificar: no dejar a la clínica sin trabajar).
+var _verChkCache={ts:0, stale:false};
+async function _altaVersionVieja(){
+  try{
+    if(!navigator.onLine) return false;
+    var ahora=Date.now();
+    if(ahora-_verChkCache.ts < 180000) return _verChkCache.stale;   // cache 3 min: no fetchear en cada guardado
+    var local=String(window.APP_VERSION||'');
+    if(!/^v1-\d{4}-\d{2}-\d{2}[a-z]$/.test(local)){ _verChkCache={ts:ahora,stale:false}; return false; }
+    var ctrl=('AbortController' in window)?new AbortController():null;
+    var to=setTimeout(function(){ try{ ctrl&&ctrl.abort(); }catch(_){} }, 4000);
+    var resp=await fetch('./sw.js?vchk='+ahora, { cache:'no-store', signal: ctrl?ctrl.signal:undefined });
+    clearTimeout(to);
+    if(!resp||!resp.ok){ _verChkCache={ts:ahora,stale:false}; return false; }
+    var txt=await resp.text();
+    var m=txt.match(/sinergia-shell-(v1-\d{4}-\d{2}-\d{2}[a-z])/);
+    if(!m){ _verChkCache={ts:ahora,stale:false}; return false; }
+    var stale=(m[1] > local);   // mismo formato/longitud → comparación lexicográfica = cronológica
+    _verChkCache={ts:ahora, stale:stale};
+    return stale;
+  }catch(_){ return false; }
+}
+async function guardarNuevoPaciente(){
   // [ESTUDIO-ALTA-NO-SE-PIERDE] No crear el expediente mientras un estudio sigue subiendo: si no,
   // window._altaEstudios todavía no lo contiene y el alta se guardaría sin él (carrera de tiempos).
   if((window._altaEstudiosEnVuelo||0)>0){ try{ showToast('⏳ Un estudio se está subiendo — espera un momento y vuelve a guardar','warning'); }catch(_){} return; }
+  // [CANDADO #4] Si este equipo corre una PWA DESACTUALIZADA (iOS que no refresca), un alta podría crearse
+  // por una ruta vieja sin los candados anti-pérdida. Antes de crear (solo CREAR; nada que perder aún),
+  // verificar best-effort y, si está vieja CON red, frenar y actualizar seguro. El borrador se guarda solo
+  // (autosave + flush + espejo IDB del candado #1), así que no se pierde lo escrito. Offline/incierto NUNCA frena.
+  if(!window._nuevoEditPid){
+    var _vieja=false; try{ _vieja=await _altaVersionVieja(); }catch(_){ _vieja=false; }
+    if(_vieja){
+      try{
+        if(confirm('Tu app está DESACTUALIZADA en este equipo.\n\nPara que el expediente NO se pierda, hay que actualizarla antes de crearlo. No perderás lo que escribiste (se guarda solo como borrador).\n\n¿Actualizar ahora?')){
+          try{ if(typeof guardarBorradorNuevo==='function') guardarBorradorNuevo(); }catch(_){}
+          try{ if(typeof _recargarConShellLimpio==='function') _recargarConShellLimpio(true); }catch(_){}
+        } else {
+          try{ showToast('⚠️ Actualiza la app para crear expedientes (toca el chip de versión abajo-izquierda)','warning'); }catch(_){}
+        }
+      }catch(_){}
+      return;   // no crear el alta en una versión vieja
+    }
+  }
   const v=(id,def='')=>document.getElementById(id)?.value.trim()||def;
   const nombre=v('n-nombre'), alergias=v('n-alergias');
   const dxmedico=v('n-dxmedico'), padecimiento=v('n-padecimiento');
