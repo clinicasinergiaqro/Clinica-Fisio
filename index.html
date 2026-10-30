@@ -1356,7 +1356,7 @@ body.modo-oscuro .topbar{background:#141824}
 <body>
 <div id="sync-indicator" class="sync-indicator ok" style="display:none"></div>
 <div id="app-version-chip" title="Versión de la app en este equipo — toca para buscar actualización" onclick="try{_tapVersionChip()}catch(e){}"></div>
-<script>/* VERSIÓN VISIBLE: refleja el index.html realmente cargado en ESTE equipo (se bumpea junto con sw.js). Así un iPad con versión vieja se ve de un vistazo. */window.APP_VERSION='v1-2026-10-30e';(function(){try{var c=document.getElementById('app-version-chip');if(c)c.textContent=window.APP_VERSION;}catch(e){}})();</script>
+<script>/* VERSIÓN VISIBLE: refleja el index.html realmente cargado en ESTE equipo (se bumpea junto con sw.js). Así un iPad con versión vieja se ve de un vistazo. */window.APP_VERSION='v1-2026-10-30f';(function(){try{var c=document.getElementById('app-version-chip');if(c)c.textContent=window.APP_VERSION;}catch(e){}})();</script>
 <div class="toast" id="toast" aria-live="polite" aria-atomic="true"></div>
 
 <!-- LOGIN -->
@@ -24186,13 +24186,18 @@ async function _comprimirVideoEjercicio(file){
     return file;
   }
 }
-async function subirMediaEjercicioAStorage(file){
-  if(!currentPatient?.id) throw new Error('Sin paciente');
-  // [VIDEO-LIGERO] comprime videos antes de subir (más chico + faststart → abre sin wifi); si no se
-  // puede, sube el ORIGINAL (el fallback vive dentro de _comprimirVideoEjercicio; aquí nunca lanza).
-  try{ file = await _comprimirVideoEjercicio(file); }catch(_){}
+async function subirMediaEjercicioAStorage(file, opts){
+  opts = opts || {};
+  const _pid = opts.pid || (currentPatient && currentPatient.id);
+  if(!_pid) throw new Error('Sin paciente');
+  // [SUBIR-YA 2026-10-30] Por defecto SUBE EL ORIGINAL sin comprimir → la subida es INSTANTÁNEA. Antes
+  // comprimía con ffmpeg.wasm en el navegador (más lento que tiempo real, ~1-2 min POR video y en serie)
+  // y eso bloqueaba todo (Carlos: 8 videos = +4 min). La optimización (achicar + faststart para que abra
+  // sin wifi) ahora corre EN EL SERVIDOR, manteniendo el MISMO link (claudeReemplazarMediaStorage), sin
+  // que el fisio espere. opts.comprimir=true re-activa el camino viejo en el cliente si algún día se quiere.
+  if(opts.comprimir){ try{ file = await _comprimirVideoEjercicio(file); }catch(_){} }
   const safeName = file.name.replace(/[^\w.\-]+/g,'_');
-  const fbPath = `clinica/sinergia/${currentPatient.id}/ejercicios/${Date.now()}_${safeName}`;
+  const fbPath = `clinica/sinergia/${_pid}/ejercicios/${Date.now()}_${safeName}`;
   const ref = fbStorage.ref(fbPath);
   // D: upload con progreso real (actualiza el preview de media de ejercicios)
   const prevEl = document.getElementById('ej-media-preview');
@@ -24317,35 +24322,50 @@ async function _subirVariosEjercicios(ev){
   const btnGuardar = document.getElementById('btn-guardar-ej');
   if(btnGuardar) btnGuardar.disabled = true;
   if(!currentPatient.ejercicios) currentPatient.ejercicios = [];
-  let ok=0, fallo=0; const nuevosIds=[];
-  for(let i=0;i<files.length;i++){
-    const f=files[i];
-    if(preview) preview.innerHTML = '<div style="padding:12px;color:var(--gray-400)">⏳ Subiendo '+(i+1)+' de '+files.length+'…</div>';
-    if(f.size > 80*1024*1024){ fallo++; showToast('“'+(f.name||'archivo')+'” muy pesado, se omitió','warning'); continue; }
-    try{
-      let media=null;
-      if(f.type && (f.type.startsWith('video/')||f.type.startsWith('image/'))){
-        const { url, fbPath } = await subirMediaEjercicioAStorage(f);
-        media={ id:'media_'+Date.now()+'_'+i, name:f.name, label:(f.name||'').replace(/\.[^.]+$/,''), type:f.type, mimeType:f.type, sizeBytes:f.size, storageProvider:'firebase', fbPath, url, data:null };
-      } else { fallo++; continue; }
-      // Guard fuga entre pacientes (la subida es async).
-      if(!currentPatient || currentPatient.id!==_pidEj){ showToast('Cambiaste de paciente — se detuvo la subida','warning'); break; }
-      const nombre=(media.label||('Ejercicio '+todayFmt()));
-      const _nid='ej'+Date.now()+'_'+i;
-      currentPatient.ejercicios.push({
-        id:_nid, nombre:nombre, name:nombre,
-        objetivo:'Ejercicio terapéutico indicado en plan de rehabilitación',
-        dosis:'', series:'', repeticiones:'', tiempo:'', frecuencia:'', duracion:'',
-        indicaciones:'', precauciones:'', observaciones:'',
-        fecha:todayFmt(), terapeuta:ter, estado:'activo', paraCasa:true, media:media
-      });
-      nuevosIds.push(_nid);
-      ok++;
-    }catch(err){ console.warn('[subir-varios-ej]', err&&err.message); fallo++; }
-  }
+  window._dbLocalBlobs = window._dbLocalBlobs || {};
+  // [SUBIR-YA 2026-10-30] Filtra válidos y SUBE LOS ORIGINALES EN PARALELO (sin comprimir → instantáneo).
+  // Antes era un for serial que comprimía+subía uno por uno (8 videos = +4 min, bloqueado). La optimización
+  // es ahora en el servidor. Guardamos el blob LOCAL de cada archivo (window._dbLocalBlobs) para que el
+  // dosificador lo muestre AL INSTANTE desde el teléfono (sin bajar nada de la nube).
+  let fallo=0; const validos=[];
+  files.forEach(function(f){
+    if(f.size > 80*1024*1024){ fallo++; showToast('“'+(f.name||'archivo')+'” muy pesado, se omitió','warning'); return; }
+    if(!(f.type && (f.type.startsWith('video/')||f.type.startsWith('image/')))){ fallo++; return; }
+    validos.push(f);
+  });
+  if(!validos.length){ if(btnGuardar) btnGuardar.disabled=false; if(preview) preview.innerHTML=''; showToast('No hay videos/fotos válidos para subir','error'); return; }
+  const total=validos.length; let done=0;
+  const _pintar=function(){ if(preview) preview.innerHTML='<div style="padding:12px;color:var(--gray-400)">☁️ Subiendo '+done+' de '+total+'… (sin esperas de compresión)</div>'; };
+  _pintar();
+  const nuevos=[];
+  await Promise.allSettled(validos.map(function(f,idx){
+    return subirMediaEjercicioAStorage(f, {pid:_pidEj, comprimir:false}).then(function(r){
+      done++; _pintar();
+      const _nid='ej'+Date.now()+'_'+idx+'_'+Math.floor(Math.random()*100000);
+      const media={ id:'media_'+Date.now()+'_'+idx, name:f.name, label:(f.name||'').replace(/\.[^.]+$/,''), type:f.type, mimeType:f.type, sizeBytes:f.size, storageProvider:'firebase', fbPath:r.fbPath, url:r.url, data:null };
+      nuevos.push({ _nid:_nid, media:media, file:f, idx:idx });
+    }).catch(function(err){ console.warn('[subir-varios-ej]', err&&err.message); fallo++; done++; _pintar(); });
+  }));
   if(preview) preview.innerHTML='';
   if(btnGuardar) btnGuardar.disabled = false;
-  if(!ok){ showToast('No se pudo subir ningún video'+(fallo?(' ('+fallo+' con error)'):''),'error'); return; }
+  // Guard fuga entre pacientes (la subida es async).
+  if(!currentPatient || currentPatient.id!==_pidEj){ showToast('Cambiaste de paciente — no se adjuntaron','warning'); return; }
+  if(!nuevos.length){ showToast('No se pudo subir ningún video'+(fallo?(' ('+fallo+' con error)'):''),'error'); return; }
+  nuevos.sort(function(a,b){ return a.idx-b.idx; });   // conservar el orden en que los eligió
+  const nuevosIds=[];
+  nuevos.forEach(function(n){
+    try{ window._dbLocalBlobs[n._nid]=n.file; }catch(_){}
+    const nombre=(n.media.label||('Ejercicio '+todayFmt()));
+    currentPatient.ejercicios.push({
+      id:n._nid, nombre:nombre, name:nombre,
+      objetivo:'Ejercicio terapéutico indicado en plan de rehabilitación',
+      dosis:'', series:'', repeticiones:'', tiempo:'', frecuencia:'', duracion:'',
+      indicaciones:'', precauciones:'', observaciones:'',
+      fecha:todayFmt(), terapeuta:ter, estado:'activo', paraCasa:true, media:n.media
+    });
+    nuevosIds.push(n._nid);
+  });
+  const ok=nuevos.length;
   const idxP = patientsDB.findIndex(x=>x.id===currentPatient.id);
   if(idxP>=0) patientsDB[idxP]=currentPatient;
   try{ if(typeof window._FST_invalidarVistaPacientes==='function') window._FST_invalidarVistaPacientes(); }catch(_){}
@@ -24384,6 +24404,9 @@ function _abrirDosisBloque(ids){
   if(!lista.length){ showToast('No hay ejercicios para dosificar','warning'); return; }
   window._dbIds=lista.map(function(e){return e.id;});
   var old=document.getElementById('dosis-bloque-overlay'); if(old) old.remove();
+  // [DB-PREVIEW-LOCAL] revoca URLs de blob de una apertura anterior antes de crear nuevas (no fugar memoria).
+  try{ if(window._dbBlobURLs){ Object.keys(window._dbBlobURLs).forEach(function(k){ try{ URL.revokeObjectURL(window._dbBlobURLs[k]); }catch(_){} }); } }catch(_){}
+  window._dbBlobURLs={};
   var ov=document.createElement('div'); ov.id='dosis-bloque-overlay';
   ov.style.cssText='position:fixed;inset:0;z-index:10000;background:rgba(10,20,40,.94);overflow-y:auto;padding:12px';
   var inpCss='width:100%;box-sizing:border-box;font-size:14px;padding:8px 10px;border:1.5px solid var(--gray-200);border-radius:10px;font-family:inherit';
@@ -24391,7 +24414,15 @@ function _abrirDosisBloque(ids){
     var isVid=(e.media&&e.media.type&&e.media.type.indexOf('video')===0);
     var isImg=(e.media&&e.media.type&&e.media.type.indexOf('image')===0);
     var ic=isVid?'🎥':(isImg?'🖼️':'📝');
+    // [DB-PREVIEW-LOCAL 2026-10-30] Si el archivo se acaba de subir en ESTE equipo, usamos el blob LOCAL
+    // (URL.createObjectURL) → se ve AL INSTANTE sin bajar nada de la nube (clave ahora que subimos el
+    // ORIGINAL sin faststart; bajarlo para el póster sería lento). Si no hay blob local (reabrir después),
+    // cae a la URL de la nube (que para entonces ya está optimizada por el servidor).
     var src=e.media?(e.media.url||e.media.data||''):'';
+    try{
+      var _lb=window._dbLocalBlobs&&window._dbLocalBlobs[e.id];
+      if(_lb){ if(!window._dbBlobURLs[e.id]) window._dbBlobURLs[e.id]=URL.createObjectURL(_lb); src=window._dbBlobURLs[e.id]; }
+    }catch(_){}
     var ver=src?('<button type="button" onclick="window.open(\''+escapeAttr_(src)+'\',\'_blank\')" style="background:none;border:none;font-size:13px;color:var(--navy);cursor:pointer;padding:2px 4px;white-space:nowrap">👁 ver</button>'):'';
     // [DB-PREVIEW] SIEMPRE SE VE el video/la foto en la fila (feedback de Carlos 2026-10-30: con puro
     // nombre de cámara "IMG_7864" no sabes CUÁL estás dosificando). Mismo patrón que la tarjeta de
@@ -24457,7 +24488,16 @@ function _dbAplicar(soloSel){
   showToast('✓ Aplicado a '+targets.length+(soloSel?(' seleccionado'+(targets.length!==1?'s':'')):' (todos)'),'success');
   if(soloSel){ _dbMarcar(false); }
 }
-function _dbCerrar(){ var ov=document.getElementById('dosis-bloque-overlay'); if(ov) ov.remove(); }
+function _dbCerrar(){
+  var ov=document.getElementById('dosis-bloque-overlay'); if(ov) ov.remove();
+  // [DB-PREVIEW-LOCAL] revoca las URLs de blob de esta apertura (los File refs en _dbLocalBlobs se
+  // conservan por si reabre el MISMO lote sin guardar; se liberan al Guardar en _dbGuardarTodos).
+  try{ if(window._dbBlobURLs){ Object.keys(window._dbBlobURLs).forEach(function(k){ try{ URL.revokeObjectURL(window._dbBlobURLs[k]); }catch(_){} }); window._dbBlobURLs={}; } }catch(_){}
+}
+// Libera de memoria los blobs locales de ejercicios ya dosificados/guardados (8 videos ~160 MB).
+function _dbLiberarBlobs(ids){
+  try{ if(window._dbLocalBlobs){ (ids||Object.keys(window._dbLocalBlobs)).forEach(function(id){ delete window._dbLocalBlobs[id]; }); } }catch(_){}
+}
 function _dbGuardarTodos(){
   if(!currentPatient){ _dbCerrar(); return; }
   var ids=window._dbIds||[], n=0;
@@ -24471,10 +24511,11 @@ function _dbGuardarTodos(){
   });
   var idxP=patientsDB.findIndex(function(x){return x.id===currentPatient.id;}); if(idxP>=0) patientsDB[idxP]=currentPatient;
   try{ if(typeof window._FST_invalidarVistaPacientes==='function') window._FST_invalidarVistaPacientes(); }catch(_){}
+  var _idsG=ids.slice();
   saveDB('pts',[currentPatient],{camposHist:['ejercicios']}).then(function(res){
     showToast((res&&res.ok?'✅ ':'⚠️ ')+n+' ejercicio'+(n!==1?'s':'')+(res&&res.ok?' dosificados':' guardados local'), res&&res.ok?'success':'warning');
-    _dbCerrar(); try{ renderEjercicios(); }catch(_){}
-  }).catch(function(){ showToast('⚠️ Guardado local — se subirá al reconectar','warning'); _dbCerrar(); try{ renderEjercicios(); }catch(_){} });
+    _dbCerrar(); _dbLiberarBlobs(_idsG); try{ renderEjercicios(); }catch(_){}
+  }).catch(function(){ showToast('⚠️ Guardado local — se subirá al reconectar','warning'); _dbCerrar(); _dbLiberarBlobs(_idsG); try{ renderEjercicios(); }catch(_){} });
 }
 
 // ── BORRADOR ANTI-PÉRDIDA del formulario de EJERCICIO (mismo patrón que Nuevo/SOAP) ──────
