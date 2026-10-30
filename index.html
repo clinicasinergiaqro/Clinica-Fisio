@@ -1356,7 +1356,7 @@ body.modo-oscuro .topbar{background:#141824}
 <body>
 <div id="sync-indicator" class="sync-indicator ok" style="display:none"></div>
 <div id="app-version-chip" title="Versión de la app en este equipo — toca para buscar actualización" onclick="try{_tapVersionChip()}catch(e){}"></div>
-<script>/* VERSIÓN VISIBLE: refleja el index.html realmente cargado en ESTE equipo (se bumpea junto con sw.js). Así un iPad con versión vieja se ve de un vistazo. */window.APP_VERSION='v1-2026-10-30i';(function(){try{var c=document.getElementById('app-version-chip');if(c)c.textContent=window.APP_VERSION;}catch(e){}})();</script>
+<script>/* VERSIÓN VISIBLE: refleja el index.html realmente cargado en ESTE equipo (se bumpea junto con sw.js). Así un iPad con versión vieja se ve de un vistazo. */window.APP_VERSION='v1-2026-10-30j';(function(){try{var c=document.getElementById('app-version-chip');if(c)c.textContent=window.APP_VERSION;}catch(e){}})();</script>
 <div class="toast" id="toast" aria-live="polite" aria-atomic="true"></div>
 
 <!-- LOGIN -->
@@ -2606,6 +2606,34 @@ function _clinicoVacio(v){
   }
   return false;
 }
+// CANDADO #3 ANTI-CLOBBER: ¿el expediente es un CASCARÓN clínicamente vacío? (bloques clínicos vacíos O
+// con solo los DEFAULTS que rellena el alta —"Pendiente"/"No evaluado"/"Ninguna"/…— + dx vacío/default +
+// sin SOAP). Usa _clinVacioODef (como _clinicoVacio pero tratando esos placeholders como vacío; número/0 =
+// dato). CONSERVADOR a propósito: ante cualquier CONTENIDO REAL o error devuelve false (NO vacío) para
+// NUNCA descartar por error un registro con datos. Un activo real tiene al menos motivo.padecimiento real
+// y su nota de valoración (soap) → jamás se clasifica como cascarón; solo lo son copias corruptas/parciales.
+var _CLIN_DEFAULTS={'no especificado':1,'no evaluada':1,'no evaluado':1,'no realizada':1,'no realizadas':1,'pendiente':1,'[pendiente]':1,'ninguna':1,'ninguno':1,'no aplica':1,'no cuenta con diagnóstico médico referido':1,'no cuenta con diagnostico medico referido':1};
+function _esStrVaciaODefault(s){ var t=String(s==null?'':s).trim().toLowerCase(); return t==='' || !!_CLIN_DEFAULTS[t]; }
+function _clinVacioODef(v){
+  if(v==null) return true;
+  if(typeof v==='number') return false;            // 0 es dato
+  if(typeof v==='boolean') return v===false;
+  if(typeof v==='string') return _esStrVaciaODefault(v);
+  if(Array.isArray(v)) return v.every(_clinVacioODef);
+  if(typeof v==='object'){ for(var k in v){ if(Object.prototype.hasOwnProperty.call(v,k) && !_clinVacioODef(v[k])) return false; } return true; }
+  return false;
+}
+function _esCascaronVacio(p){
+  if(!p) return true;
+  try{
+    var campos=['motivo','motivoHC','valoracion','dxFuncional','planTto','antecedentes','seguridadClinica'];
+    if(campos.some(function(k){ return !_clinVacioODef(p[k]); })) return false;
+    if(typeof p.dx==='string'){ if(!_esStrVaciaODefault(p.dx)) return false; }
+    else if(p.dx && typeof p.dx==='object' && !_clinVacioODef(p.dx)) return false;
+    if(Array.isArray(p.soap) && p.soap.length) return false;
+    return true;
+  }catch(_){ return false; }
+}
 function _sinUndefined(v){
   if(Array.isArray(v)) return v.map(function(x){ return _sinUndefined(x); });
   if(v && typeof v==='object' && (v.constructor===Object || v.constructor===undefined)){
@@ -3713,9 +3741,18 @@ async function loadFromCloud(){
           const tLocal = (typeof pLocal.updatedAt==='number') ? pLocal.updatedAt : 0;
           const tNube  = (typeof pSano.updatedAt==='number')  ? pSano.updatedAt  : 0;
           if(tLocal > 0 && tLocal > tNube + MARGEN){
-            // Lo local gana: conservar el paciente local completo y encolar para sync
-            encolarSync(pLocal.id);
-            return pLocal;
+            // CANDADO #3 ANTI-CLOBBER DE FUSIÓN: lo local gana por recencia SALVO que sea un CASCARÓN
+            // VACÍO (clínicos en blanco) mientras la NUBE sí trae datos. Un updatedAt más nuevo con el
+            // expediente vacío (copia local corrupta/parcial, re-toque sin datos) NO debe pisar un
+            // registro de nube con contenido — era la raíz de "se ve en blanco / se perdió" (Ana Lucía,
+            // María Diana). Si ambos tienen datos (o ambos vacíos), sigue ganando lo local por recencia.
+            if(!(_esCascaronVacio(pLocal) && !_esCascaronVacio(pSano))){
+              // Lo local gana: conservar el paciente local completo y encolar para sync
+              encolarSync(pLocal.id);
+              return pLocal;
+            }
+            console.warn('[ANTI-CLOBBER fusión] cascarón local vacío NO pisa la nube con datos:', pSano.id);
+            // cae abajo a "la nube gana" (y se re-unen media/SOAP/consent locales que no estén en la nube)
           }
           // [FIX CLOBBER MEDIA] Antes solo se conservaba lo local si ALGÚN ítem tenía base64 (f.data).
           // Una foto SUBIDA a Storage (url, sin data) cuyo saveDB a Sheets aún no llegaba se PERDÍA al
