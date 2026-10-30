@@ -1356,7 +1356,7 @@ body.modo-oscuro .topbar{background:#141824}
 <body>
 <div id="sync-indicator" class="sync-indicator ok" style="display:none"></div>
 <div id="app-version-chip" title="Versión de la app en este equipo — toca para buscar actualización" onclick="try{_tapVersionChip()}catch(e){}"></div>
-<script>/* VERSIÓN VISIBLE: refleja el index.html realmente cargado en ESTE equipo (se bumpea junto con sw.js). Así un iPad con versión vieja se ve de un vistazo. */window.APP_VERSION='v1-2026-10-30a';(function(){try{var c=document.getElementById('app-version-chip');if(c)c.textContent=window.APP_VERSION;}catch(e){}})();</script>
+<script>/* VERSIÓN VISIBLE: refleja el index.html realmente cargado en ESTE equipo (se bumpea junto con sw.js). Así un iPad con versión vieja se ve de un vistazo. */window.APP_VERSION='v1-2026-10-30b';(function(){try{var c=document.getElementById('app-version-chip');if(c)c.textContent=window.APP_VERSION;}catch(e){}})();</script>
 <div class="toast" id="toast" aria-live="polite" aria-atomic="true"></div>
 
 <!-- LOGIN -->
@@ -24369,9 +24369,19 @@ function _abrirDosisBloque(ids){
   ov.style.cssText='position:fixed;inset:0;z-index:10000;background:rgba(10,20,40,.94);overflow-y:auto;padding:12px';
   var inpCss='width:100%;box-sizing:border-box;font-size:14px;padding:8px 10px;border:1.5px solid var(--gray-200);border-radius:10px;font-family:inherit';
   var rows=lista.map(function(e){
-    var ic=(e.media&&e.media.type&&e.media.type.indexOf('video')===0)?'🎥':((e.media&&e.media.type&&e.media.type.indexOf('image')===0)?'🖼️':'📝');
-    var url=(e.media&&e.media.url)?e.media.url:'';
-    var ver=url?('<button type="button" onclick="window.open(\''+escapeAttr_(url)+'\',\'_blank\')" style="background:none;border:none;font-size:13px;color:var(--navy);cursor:pointer;padding:2px 4px;white-space:nowrap">👁 ver</button>'):'';
+    var isVid=(e.media&&e.media.type&&e.media.type.indexOf('video')===0);
+    var isImg=(e.media&&e.media.type&&e.media.type.indexOf('image')===0);
+    var ic=isVid?'🎥':(isImg?'🖼️':'📝');
+    var src=e.media?(e.media.url||e.media.data||''):'';
+    var ver=src?('<button type="button" onclick="window.open(\''+escapeAttr_(src)+'\',\'_blank\')" style="background:none;border:none;font-size:13px;color:var(--navy);cursor:pointer;padding:2px 4px;white-space:nowrap">👁 ver</button>'):'';
+    // [DB-PREVIEW] SIEMPRE SE VE el video/la foto en la fila (feedback de Carlos 2026-10-30: con puro
+    // nombre de cámara "IMG_7864" no sabes CUÁL estás dosificando). Mismo patrón que la tarjeta de
+    // ejercicios: #t=0.1 + preload=metadata solo baja el primer cuadro (los videos van con faststart,
+    // es barato) y controls → le das play ahí mismo para confirmar cuál es ANTES de nombrar/dosificar.
+    var prev='';
+    if(src && isVid) prev='<video src="'+escapeAttr_(src)+'#t=0.1" controls playsinline preload="metadata" style="width:100%;max-height:190px;object-fit:cover;border-radius:10px;background:#000;margin-bottom:6px;display:block"></video>';
+    else if(src && isImg) prev='<img src="'+escapeAttr_(src)+'" loading="lazy" decoding="async" style="width:100%;max-height:190px;object-fit:cover;border-radius:10px;margin-bottom:6px;display:block">';
+    else if(e.media) prev='<div style="padding:14px;text-align:center;color:#9BA3B5;background:#F4F6F9;border-radius:10px;margin-bottom:6px;font-size:12.5px">'+ic+' El video aún está subiendo — cierra y vuelve a abrir en un momento</div>';
     var dosisVal=_ejValEditable(e.dosis)||[e.series,e.repeticiones,e.tiempo,e.frecuencia,e.duracion].filter(Boolean).join(' · ');
     return '<div style="border:1px solid var(--gray-100);border-radius:12px;padding:10px;margin-bottom:8px">'
       +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">'
@@ -24380,6 +24390,7 @@ function _abrirDosisBloque(ids){
         +'<input id="db-nombre-'+e.id+'" value="'+escapeAttr_(e.nombre||e.name||'')+'" placeholder="Nombre del ejercicio" style="flex:1;min-width:0;font-size:14px;font-weight:700;padding:7px 9px;border:1.5px solid var(--gray-200);border-radius:10px;font-family:inherit">'
         +ver
       +'</div>'
+      +prev
       +'<input id="db-dosis-'+e.id+'" value="'+escapeAttr_(dosisVal)+'" placeholder="Dosis (ej: 3×15 · diario)" style="'+inpCss+';margin-bottom:6px">'
       +'<input id="db-indic-'+e.id+'" value="'+escapeAttr_(_ejValEditable(e.indicaciones))+'" placeholder="Indicaciones (opcional)" style="'+inpCss+'">'
       +'</div>';
