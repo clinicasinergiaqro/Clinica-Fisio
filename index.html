@@ -1356,7 +1356,7 @@ body.modo-oscuro .topbar{background:#141824}
 <body>
 <div id="sync-indicator" class="sync-indicator ok" style="display:none"></div>
 <div id="app-version-chip" title="Versión de la app en este equipo — toca para buscar actualización" onclick="try{_tapVersionChip()}catch(e){}"></div>
-<script>/* VERSIÓN VISIBLE: refleja el index.html realmente cargado en ESTE equipo (se bumpea junto con sw.js). Así un iPad con versión vieja se ve de un vistazo. */window.APP_VERSION='v1-2026-10-30c';(function(){try{var c=document.getElementById('app-version-chip');if(c)c.textContent=window.APP_VERSION;}catch(e){}})();</script>
+<script>/* VERSIÓN VISIBLE: refleja el index.html realmente cargado en ESTE equipo (se bumpea junto con sw.js). Así un iPad con versión vieja se ve de un vistazo. */window.APP_VERSION='v1-2026-10-30d';(function(){try{var c=document.getElementById('app-version-chip');if(c)c.textContent=window.APP_VERSION;}catch(e){}})();</script>
 <div class="toast" id="toast" aria-live="polite" aria-atomic="true"></div>
 
 <!-- LOGIN -->
@@ -24986,7 +24986,7 @@ function initApp(){
   }catch(_e){}
 }
 
-// ── AUTO-LOGOUT POR INACTIVIDAD (60 min) ─────────────────────────────────
+// ── AUTO-LOGOUT POR INACTIVIDAD (10 h) ─────────────────────────────────
 // Mecanismo por MARCA DE TIEMPO (no setTimeout congelable): en iPad, al
 // bloquearse la pantalla iOS congela los setTimeout; al desbloquear, un
 // setTimeout vencido disparaba y mandaba a login de inmediato (se percibía
@@ -25011,8 +25011,8 @@ function hayOperacionClinicaCritica_(){
     );
   }catch(e){ return false; }
 }
-const AUTO_LOGOUT_MS = 60 * 60 * 1000;      // 60 minutos (sesión de fisio ~60 min; equipo personal, sin sesión heredada)
-const AUTO_LOGOUT_WARN_MS = 59 * 60 * 1000; // aviso 1 min antes
+const AUTO_LOGOUT_MS = 10 * 60 * 60 * 1000;      // 10 h INACTIVIDAD (decisión Carlos 2026-10-30: que aguante toda la jornada; equipo personal → bajo riesgo; mientras se usa NUNCA cierra, el contador se reinicia con cada toque; igual cierra sola al final del día o si olvidan el equipo)
+const AUTO_LOGOUT_WARN_MS = (10 * 60 - 1) * 60 * 1000; // aviso 1 min antes (9 h 59 min)
 const AUTO_LOGOUT_CHECK_MS = 30 * 1000;     // frecuencia de evaluación (timestamp, robusto a sleep de iOS)
 
 // Marca actividad: reinicia el conteo de inactividad y rehabilita el aviso previo.
