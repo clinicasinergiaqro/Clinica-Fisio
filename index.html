@@ -1356,7 +1356,7 @@ body.modo-oscuro .topbar{background:#141824}
 <body>
 <div id="sync-indicator" class="sync-indicator ok" style="display:none"></div>
 <div id="app-version-chip" title="Versión de la app en este equipo — toca para buscar actualización" onclick="try{_tapVersionChip()}catch(e){}"></div>
-<script>/* VERSIÓN VISIBLE: refleja el index.html realmente cargado en ESTE equipo (se bumpea junto con sw.js). Así un iPad con versión vieja se ve de un vistazo. */window.APP_VERSION='v1-2026-10-30d';(function(){try{var c=document.getElementById('app-version-chip');if(c)c.textContent=window.APP_VERSION;}catch(e){}})();</script>
+<script>/* VERSIÓN VISIBLE: refleja el index.html realmente cargado en ESTE equipo (se bumpea junto con sw.js). Así un iPad con versión vieja se ve de un vistazo. */window.APP_VERSION='v1-2026-10-30e';(function(){try{var c=document.getElementById('app-version-chip');if(c)c.textContent=window.APP_VERSION;}catch(e){}})();</script>
 <div class="toast" id="toast" aria-live="polite" aria-atomic="true"></div>
 
 <!-- LOGIN -->
@@ -24363,7 +24363,10 @@ async function _subirVariosEjercicios(ev){
 // a SELECCIONADOS" (p.ej. los 4 de fuerza con una dosis; marcas los de estiramiento y les pones otra).
 // Guarda la base COMPLETA de ejercicios por la ruta normal (saveDB camposHist:['ejercicios'] con
 // verificación honesta). NO toca media ni Storage.
-var _DB_DOSIS_PRESETS=['3×15 · diario','3×10 · 2 veces al día','3×12 · un día sí y un día no','45 seg × 3 · diario','10 reps · 3 veces al día','Estiramiento 30 seg × 3 · diario'];
+var _DB_DOSIS_PRESETS=['3×15 · diario','3×10 · 2 veces al día','3×12 · un día sí y un día no','45 seg × 3 · diario','10 reps · 3 veces al día','Estiramiento 30 seg × 3 · diario','Movilidad dinámica 10–15 reps · diario','3×12 y mantén la última · diario'];
+// HSR (Heavy Slow Resistance / carga pesada-lenta) para tendinopatías — dosificación de docs/biblioteca_protocolos.md
+// (P1 rotuliano / P2 Aquiles): entrada 15RM → 12RM → 10RM → 8RM pesado → 6RM avanzado, tempo 3-3, 3×/semana días alternos; + isométrico analgésico.
+var _DB_DOSIS_HSR=['HSR 3×15 (15RM) · tempo 3-3 · 3×/sem','HSR 3×12 (12RM) · tempo 3-3 · 3×/sem','HSR 3×10 (10RM) · tempo 3-3 · 3×/sem','HSR 3×8 (8RM) · lento · 3×/sem','HSR 4×6 (6RM) · lento · 3×/sem','Isométrico 5×45s ~70% CVM · analgésico'];
 function _dbActualizarContadorSel(){
   var ids=window._dbIds||[]; var n=0;
   ids.forEach(function(id){ var c=document.getElementById('db-sel-'+id); if(c&&c.checked) n++; });
@@ -24411,14 +24414,21 @@ function _abrirDosisBloque(ids){
       +'<input id="db-indic-'+e.id+'" value="'+escapeAttr_(_ejValEditable(e.indicaciones))+'" placeholder="Indicaciones (opcional)" style="'+inpCss+'">'
       +'</div>';
   }).join('');
-  var chips=_DB_DOSIS_PRESETS.map(function(v){ return '<button type="button" class="chip-quick" data-v="'+escapeAttr_(v)+'" onclick="var a=document.getElementById(\'db-all-dosis\');if(a)a.value=this.dataset.v">'+escapeHTML(v)+'</button>'; }).join('');
+  // Al tocar un atajo: llena el campo Y pone el cursor ahí para EDITARLO (pedido de Carlos: dejar
+  // el estiramiento dinámico, o "3×12 y al finalizar mantén la postura"). También puede escribir desde cero.
+  var _mkChips=function(arr){ return arr.map(function(v){ return '<button type="button" class="chip-quick" data-v="'+escapeAttr_(v)+'" onclick="var a=document.getElementById(\'db-all-dosis\');if(a){a.value=this.dataset.v;try{a.focus();a.setSelectionRange(a.value.length,a.value.length);}catch(_){}}">'+escapeHTML(v)+'</button>'; }).join(''); };
+  var chips=_mkChips(_DB_DOSIS_PRESETS);
+  var chipsHSR=_mkChips(_DB_DOSIS_HSR);
   ov.innerHTML='<div style="max-width:620px;margin:0 auto;background:white;border-radius:14px;padding:14px">'
     +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><div style="font-size:17px;font-weight:800;color:var(--navy)">💊 Dosificación rápida · '+lista.length+'</div><button onclick="_dbCerrar()" style="background:none;border:none;font-size:22px;color:var(--gray-400);cursor:pointer">×</button></div>'
     +'<div style="background:#EEF4FB;border:1px solid #C7D8EE;border-radius:12px;padding:10px;margin-bottom:12px">'
-      +'<div style="font-size:12px;font-weight:800;color:var(--navy);margin-bottom:6px">Pon una dosis/indicación y aplícala</div>'
-      +'<input id="db-all-dosis" placeholder="Ej: 3×15 · diario" style="'+inpCss+';margin-bottom:6px">'
+      +'<div style="font-size:12px;font-weight:800;color:var(--navy);margin-bottom:6px">✍️ Escribe tu dosis / indicación (o toca un atajo y edítalo)</div>'
+      +'<input id="db-all-dosis" placeholder="Escribe aquí: ej. 3×12 y al finalizar mantén la postura" style="'+inpCss+';margin-bottom:6px">'
+      +'<div style="font-size:10.5px;font-weight:800;color:var(--gray-600);margin:4px 0 3px">Atajos</div>'
       +'<div class="chip-row" style="margin-bottom:6px">'+chips+'</div>'
-      +'<input id="db-all-indic" placeholder="Indicaciones (opcional)" style="'+inpCss+';margin-bottom:8px">'
+      +'<div style="font-size:10.5px;font-weight:800;color:var(--gray-600);margin:6px 0 3px">Tendón · HSR (carga pesada-lenta)</div>'
+      +'<div class="chip-row" style="margin-bottom:6px">'+chipsHSR+'</div>'
+      +'<input id="db-all-indic" placeholder="Indicaciones (opcional) — ej. mantén la última repetición 10 s" style="'+inpCss+';margin-bottom:8px">'
       +'<div style="display:flex;gap:8px">'
         +'<button type="button" onclick="_dbAplicar(false)" style="flex:1;background:var(--navy);color:white;border:none;border-radius:12px;padding:10px;font-weight:800;cursor:pointer;font-family:inherit">📋 A TODOS</button>'
         +'<button type="button" id="db-btn-sel" onclick="_dbAplicar(true)" disabled style="flex:1;background:#2E7D52;color:white;border:none;border-radius:12px;padding:10px;font-weight:800;cursor:pointer;font-family:inherit">✓ A seleccionados (<span id="db-sel-count">0</span>)</button>'
