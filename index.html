@@ -1356,7 +1356,7 @@ body.modo-oscuro .topbar{background:#141824}
 <body>
 <div id="sync-indicator" class="sync-indicator ok" style="display:none"></div>
 <div id="app-version-chip" title="Versión de la app en este equipo — toca para buscar actualización" onclick="try{_tapVersionChip()}catch(e){}"></div>
-<script>/* VERSIÓN VISIBLE: refleja el index.html realmente cargado en ESTE equipo (se bumpea junto con sw.js). Así un iPad con versión vieja se ve de un vistazo. */window.APP_VERSION='v1-2026-10-30b';(function(){try{var c=document.getElementById('app-version-chip');if(c)c.textContent=window.APP_VERSION;}catch(e){}})();</script>
+<script>/* VERSIÓN VISIBLE: refleja el index.html realmente cargado en ESTE equipo (se bumpea junto con sw.js). Así un iPad con versión vieja se ve de un vistazo. */window.APP_VERSION='v1-2026-10-30c';(function(){try{var c=document.getElementById('app-version-chip');if(c)c.textContent=window.APP_VERSION;}catch(e){}})();</script>
 <div class="toast" id="toast" aria-live="polite" aria-atomic="true"></div>
 
 <!-- LOGIN -->
@@ -5176,6 +5176,21 @@ function esSeguroRecargar(){
     return true;
   }catch(e){ return false; } // ante cualquier error, NO recargar
 }
+// [NO-INTERRUMPIR] La recarga AUTOMÁTICA (auto-update) solo debe ocurrir en pantallas "de paso"
+// donde NO se pierde navegación ni trabajo a medias: agenda (home), login, o ninguna. En cualquier
+// otra (pacientes, expediente, SOAP, nuevo, etc.) se DIFIERE al banner — pedido de Carlos
+// (2026-10-30): "ya estás navegando, encuentras al paciente y se vuelve a abrir y tienes que volver
+// a buscar". Así una versión nueva (o un FALSO positivo por desalojo de caché en iOS) jamás te saca
+// de donde estás a mitad de la navegación; el banner discreto se aplica solo al volver a home o al
+// tocarlo. NO afecta el botón/banner/chip MANUAL (esos sí recargan a demanda desde donde estés, con
+// las mismas guardas de datos de esSeguroRecargar). Al ARRANCAR la app aterriza en agenda, así que
+// la actualización de arranque (cuando de verdad cambió la versión) se sigue aplicando al instante.
+function _pantallaDePasoParaAutoReload(){
+  try{
+    var scr=(document.querySelector('.screen.active')||{}).id||'';
+    return scr==='' || scr==='screen-login' || scr==='screen-agenda';
+  }catch(e){ return false; }
+}
 // WATCHDOG anti-atoro: la bandera _dirty ("cambios sin guardar") a veces se queda en true y ya no se
 // limpia (p.ej. un guardado que falló) → "guarda tu nota primero" para SIEMPRE y no se puede Forzar
 // actualización. Si NO hay una pantalla de edición abierta NI un campo de texto enfocado, no hay nada
@@ -5319,10 +5334,11 @@ function aplicarActualizacionSiSegura(){
   // —el flag en-vuelo ya cubre eso— sino por prudencia: si algo aún no cruzó, se espera al drenado.
   // El botón "Actualizar ahora" (abajo) NO aplica este extra: el usuario puede forzar (colas durables).
   var _colasVacias = (typeof _totalPendientesSync!=='function') || (_totalPendientesSync()===0);
-  if(esSeguroRecargar() && _colasVacias){
+  if(esSeguroRecargar() && _colasVacias && _pantallaDePasoParaAutoReload()){
     // [FIX-AUTOUPDATE p3] la recarga automática pasa por el freno anti-bucle (misma firma → banner).
     // [FIX-AUTOUPDATE p1] las guardas clínicas de arriba quedan EXACTAMENTE iguales: jamás se llega
     // aquí con nota a medio escribir, operación en vuelo, foco en textarea o colas con pendientes.
+    // [NO-INTERRUMPIR] + solo en pantalla de paso (agenda/login) → nunca a mitad de navegar.
     _recargarPorUpdate();
   } else {
     mostrarBannerActualizacion();
