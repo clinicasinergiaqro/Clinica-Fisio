@@ -1356,7 +1356,7 @@ body.modo-oscuro .topbar{background:#141824}
 <body>
 <div id="sync-indicator" class="sync-indicator ok" style="display:none"></div>
 <div id="app-version-chip" title="Versión de la app en este equipo — toca para buscar actualización" onclick="try{_tapVersionChip()}catch(e){}"></div>
-<script>/* VERSIÓN VISIBLE: refleja el index.html realmente cargado en ESTE equipo (se bumpea junto con sw.js). Así un iPad con versión vieja se ve de un vistazo. */window.APP_VERSION='v1-2026-10-30f';(function(){try{var c=document.getElementById('app-version-chip');if(c)c.textContent=window.APP_VERSION;}catch(e){}})();</script>
+<script>/* VERSIÓN VISIBLE: refleja el index.html realmente cargado en ESTE equipo (se bumpea junto con sw.js). Así un iPad con versión vieja se ve de un vistazo. */window.APP_VERSION='v1-2026-10-30g';(function(){try{var c=document.getElementById('app-version-chip');if(c)c.textContent=window.APP_VERSION;}catch(e){}})();</script>
 <div class="toast" id="toast" aria-live="polite" aria-atomic="true"></div>
 
 <!-- LOGIN -->
@@ -24031,23 +24031,31 @@ function renderNuevoEjercicioForm(){
       </div>
     </div>
     <div style="padding:0 14px 10px">
-      <div style="font-size:11px;color:var(--gray-400);font-weight:700;margin:8px 0 5px">⚡ Plantillas rápidas</div>
-      <div class="chip-row">
-        <button type="button" class="chip-quick" onclick="plantillaDosis('basico-diario')">Básico diario</button>
-        <button type="button" class="chip-quick" onclick="plantillaDosis('interdiario')">Interdiario</button>
-        <button type="button" class="chip-quick" onclick="plantillaDosis('fuerza-3x')">Fuerza 3x semana</button>
-        <button type="button" class="chip-quick" onclick="plantillaDosis('movilidad-diaria')">Movilidad diaria</button>
-        <button type="button" class="chip-quick" onclick="plantillaDosis('isometricos')">Isométricos</button>
-        <button type="button" class="chip-quick" onclick="plantillaDosis('estiramiento')">Estiramiento</button>
-      </div>
-      <div style="font-size:11px;color:var(--gray-400);margin:10px 0 4px">Series / reps</div>
-      <div class="chip-row">${['2x10','3x10','3x12','3x15','4x10','4x12'].map(t=>`<button type="button" class="chip-quick" onclick="agregarChipDosis('${t}')">${t}</button>`).join('')}</div>
-      <div style="font-size:11px;color:var(--gray-400);margin:8px 0 4px">Tiempo</div>
-      <div class="chip-row">${['30 seg','45 seg','60 seg','2 min'].map(t=>`<button type="button" class="chip-quick" onclick="agregarChipDosis('${t}')">${t}</button>`).join('')}</div>
-      <div style="font-size:11px;color:var(--gray-400);margin:8px 0 4px">Frecuencia</div>
-      <div class="chip-row">${['Diario','1 vez al día','2 veces al día','Un día sí y un día no','2 veces por semana','3 veces por semana','2–3 veces por semana','Lunes, miércoles y viernes'].map(t=>`<button type="button" class="chip-quick" onclick="agregarChipDosis('${t}')">${t}</button>`).join('')}</div>
-      <div style="font-size:11px;color:var(--gray-400);margin:8px 0 4px">Duración</div>
-      <div class="chip-row">${['1 semana','2 semanas','3 semanas','4 semanas','6 semanas'].map(t=>`<button type="button" class="chip-quick" onclick="agregarChipDosis('${t}')">${t}</button>`).join('')}</div>
+      <div style="font-size:11px;color:var(--gray-400);font-weight:700;margin:8px 0 5px">✍️ Escribe arriba, o toca un atajo y edítalo <span style="font-weight:600;color:var(--gray-300)">(los mismos que en Dosificación rápida)</span></div>
+      <div style="font-size:10.5px;font-weight:800;color:var(--gray-600);margin:4px 0 3px">Atajos</div>
+      <div class="chip-row">${_DB_DOSIS_PRESETS.map(v=>`<button type="button" class="chip-quick" data-v="${escapeAttr_(v)}" onclick="_ejDosisChip(this.dataset.v)">${escapeHTML(v)}</button>`).join('')}</div>
+      <div style="font-size:10.5px;font-weight:800;color:var(--gray-600);margin:6px 0 3px">Tendón · HSR (carga pesada-lenta)</div>
+      <div class="chip-row">${_DB_DOSIS_HSR.map(v=>`<button type="button" class="chip-quick" data-v="${escapeAttr_(v)}" onclick="_ejDosisChip(this.dataset.v)">${escapeHTML(v)}</button>`).join('')}</div>
+      <details style="margin-top:9px">
+        <summary style="font-size:11.5px;font-weight:800;color:var(--navy);cursor:pointer;padding:4px 0">➕ Armar por partes / plantillas clínicas de dosis</summary>
+        <div style="font-size:11px;color:var(--gray-400);font-weight:700;margin:8px 0 5px">⚡ Plantillas (dosis + indicaciones)</div>
+        <div class="chip-row">
+          <button type="button" class="chip-quick" onclick="plantillaDosis('basico-diario')">Básico diario</button>
+          <button type="button" class="chip-quick" onclick="plantillaDosis('interdiario')">Interdiario</button>
+          <button type="button" class="chip-quick" onclick="plantillaDosis('fuerza-3x')">Fuerza 3x semana</button>
+          <button type="button" class="chip-quick" onclick="plantillaDosis('movilidad-diaria')">Movilidad diaria</button>
+          <button type="button" class="chip-quick" onclick="plantillaDosis('isometricos')">Isométricos</button>
+          <button type="button" class="chip-quick" onclick="plantillaDosis('estiramiento')">Estiramiento</button>
+        </div>
+        <div style="font-size:11px;color:var(--gray-400);margin:10px 0 4px">Series / reps</div>
+        <div class="chip-row">${['2x10','3x10','3x12','3x15','4x10','4x12'].map(t=>`<button type="button" class="chip-quick" onclick="agregarChipDosis('${t}')">${t}</button>`).join('')}</div>
+        <div style="font-size:11px;color:var(--gray-400);margin:8px 0 4px">Tiempo</div>
+        <div class="chip-row">${['30 seg','45 seg','60 seg','2 min'].map(t=>`<button type="button" class="chip-quick" onclick="agregarChipDosis('${t}')">${t}</button>`).join('')}</div>
+        <div style="font-size:11px;color:var(--gray-400);margin:8px 0 4px">Frecuencia</div>
+        <div class="chip-row">${['Diario','1 vez al día','2 veces al día','Un día sí y un día no','2 veces por semana','3 veces por semana','2–3 veces por semana','Lunes, miércoles y viernes'].map(t=>`<button type="button" class="chip-quick" onclick="agregarChipDosis('${t}')">${t}</button>`).join('')}</div>
+        <div style="font-size:11px;color:var(--gray-400);margin:8px 0 4px">Duración</div>
+        <div class="chip-row">${['1 semana','2 semanas','3 semanas','4 semanas','6 semanas'].map(t=>`<button type="button" class="chip-quick" onclick="agregarChipDosis('${t}')">${t}</button>`).join('')}</div>
+      </details>
     </div>
   </div>
 
@@ -24635,6 +24643,14 @@ function agregarChipPrecaucion(txt){
   const actual=String(el.value||'').trim();
   if(actual.includes(txt)) return;
   el.value = actual ? actual+'. '+txt : txt;
+}
+// [UNIFICADO 2026-10-30] Mismos atajos que el dosificador rápido (_abrirDosisBloque): un toque llena el
+// campo de dosis y deja el cursor al final para editarlo (ej. agregar "y al finalizar mantén la postura").
+function _ejDosisChip(v){
+  var e=document.getElementById('ej-dosis'); if(!e) return;
+  e.value=v;
+  try{ e.focus(); e.setSelectionRange(e.value.length,e.value.length); }catch(_){}
+  try{ _dirty=true; }catch(_){}
 }
 function plantillaDosis(tipo){
   const dosis=document.getElementById('ej-dosis');
