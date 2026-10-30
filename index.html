@@ -1356,7 +1356,7 @@ body.modo-oscuro .topbar{background:#141824}
 <body>
 <div id="sync-indicator" class="sync-indicator ok" style="display:none"></div>
 <div id="app-version-chip" title="Versión de la app en este equipo — toca para buscar actualización" onclick="try{_tapVersionChip()}catch(e){}"></div>
-<script>/* VERSIÓN VISIBLE: refleja el index.html realmente cargado en ESTE equipo (se bumpea junto con sw.js). Así un iPad con versión vieja se ve de un vistazo. */window.APP_VERSION='v1-2026-10-30g';(function(){try{var c=document.getElementById('app-version-chip');if(c)c.textContent=window.APP_VERSION;}catch(e){}})();</script>
+<script>/* VERSIÓN VISIBLE: refleja el index.html realmente cargado en ESTE equipo (se bumpea junto con sw.js). Así un iPad con versión vieja se ve de un vistazo. */window.APP_VERSION='v1-2026-10-30h';(function(){try{var c=document.getElementById('app-version-chip');if(c)c.textContent=window.APP_VERSION;}catch(e){}})();</script>
 <div class="toast" id="toast" aria-live="polite" aria-atomic="true"></div>
 
 <!-- LOGIN -->
@@ -24405,6 +24405,17 @@ function _dbMarcar(todos){
   (window._dbIds||[]).forEach(function(id){ var c=document.getElementById('db-sel-'+id); if(c) c.checked=!!todos; });
   _dbActualizarContadorSel();
 }
+// [DB-TAP-TO-VIEW] Carga el video SOLO al tocar el placeholder ▶ (para tandas sin copia local, sin
+// forzar la descarga del original pesado que podría colgarse). Global porque el onclick es inline.
+window._dbPlayVid=function(el){
+  try{
+    var src=el && el.dataset && el.dataset.src; if(!src) return;
+    var v=document.createElement('video');
+    v.src=src; v.controls=true; v.autoplay=true; v.setAttribute('playsinline',''); v.preload='auto';
+    v.style.cssText='width:100%;max-height:190px;object-fit:cover;border-radius:10px;background:#000;margin-bottom:6px;display:block';
+    if(el.parentNode) el.parentNode.replaceChild(v,el);
+  }catch(_){}
+};
 function _abrirDosisBloque(ids){
   if(!currentPatient){ showToast('No hay paciente activo','error'); return; }
   var todos=Array.isArray(currentPatient.ejercicios)?currentPatient.ejercicios:[];
@@ -24427,9 +24438,10 @@ function _abrirDosisBloque(ids){
     // ORIGINAL sin faststart; bajarlo para el póster sería lento). Si no hay blob local (reabrir después),
     // cae a la URL de la nube (que para entonces ya está optimizada por el servidor).
     var src=e.media?(e.media.url||e.media.data||''):'';
+    var _hasBlob=false;
     try{
       var _lb=window._dbLocalBlobs&&window._dbLocalBlobs[e.id];
-      if(_lb){ if(!window._dbBlobURLs[e.id]) window._dbBlobURLs[e.id]=URL.createObjectURL(_lb); src=window._dbBlobURLs[e.id]; }
+      if(_lb){ if(!window._dbBlobURLs[e.id]) window._dbBlobURLs[e.id]=URL.createObjectURL(_lb); src=window._dbBlobURLs[e.id]; _hasBlob=true; }
     }catch(_){}
     var ver=src?('<button type="button" onclick="window.open(\''+escapeAttr_(src)+'\',\'_blank\')" style="background:none;border:none;font-size:13px;color:var(--navy);cursor:pointer;padding:2px 4px;white-space:nowrap">👁 ver</button>'):'';
     // [DB-PREVIEW] SIEMPRE SE VE el video/la foto en la fila (feedback de Carlos 2026-10-30: con puro
@@ -24437,9 +24449,19 @@ function _abrirDosisBloque(ids){
     // ejercicios: #t=0.1 + preload=metadata solo baja el primer cuadro (los videos van con faststart,
     // es barato) y controls → le das play ahí mismo para confirmar cuál es ANTES de nombrar/dosificar.
     var prev='';
-    if(src && isVid) prev='<video src="'+escapeAttr_(src)+'#t=0.1" controls playsinline preload="metadata" style="width:100%;max-height:190px;object-fit:cover;border-radius:10px;background:#000;margin-bottom:6px;display:block"></video>';
-    else if(src && isImg) prev='<img src="'+escapeAttr_(src)+'" loading="lazy" decoding="async" style="width:100%;max-height:190px;object-fit:cover;border-radius:10px;margin-bottom:6px;display:block">';
-    else if(e.media) prev='<div style="padding:14px;text-align:center;color:#9BA3B5;background:#F4F6F9;border-radius:10px;margin-bottom:6px;font-size:12.5px">'+ic+' El video aún está subiendo — cierra y vuelve a abrir en un momento</div>';
+    if(src && isVid && _hasBlob){
+      // Copia LOCAL (recién subido): se ve AL INSTANTE desde el teléfono, sin bajar nada.
+      prev='<video src="'+escapeAttr_(src)+'#t=0.1" controls playsinline preload="metadata" style="width:100%;max-height:190px;object-fit:cover;border-radius:10px;background:#000;margin-bottom:6px;display:block"></video>';
+    } else if(src && isVid){
+      // Sin copia local (tanda anterior): NO forzamos descarga del original pesado (podría no tener
+      // faststart y colgarse). Botón ▶ que carga el video SOLO al tocarlo (_dbPlayVid). Nunca se cuelga.
+      prev='<div class="db-vidph" data-src="'+escapeAttr_(src)+'" onclick="_dbPlayVid(this)" style="position:relative;width:100%;height:150px;border-radius:10px;background:#111;margin-bottom:6px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#fff">'
+        +'<div style="text-align:center"><div style="font-size:34px;line-height:1">▶</div><div style="font-size:12px;opacity:.85;margin-top:2px">Toca para ver el video</div></div></div>';
+    } else if(src && isImg){
+      prev='<img src="'+escapeAttr_(src)+'" loading="lazy" decoding="async" style="width:100%;max-height:190px;object-fit:cover;border-radius:10px;margin-bottom:6px;display:block">';
+    } else if(e.media){
+      prev='<div style="padding:14px;text-align:center;color:#9BA3B5;background:#F4F6F9;border-radius:10px;margin-bottom:6px;font-size:12.5px">'+ic+' El video aún está subiendo — cierra y vuelve a abrir en un momento</div>';
+    }
     var dosisVal=_ejValEditable(e.dosis)||[e.series,e.repeticiones,e.tiempo,e.frecuencia,e.duracion].filter(Boolean).join(' · ');
     return '<div style="border:1px solid var(--gray-100);border-radius:12px;padding:10px;margin-bottom:8px">'
       +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">'
