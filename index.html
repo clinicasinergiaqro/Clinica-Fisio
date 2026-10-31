@@ -1356,7 +1356,7 @@ body.modo-oscuro .topbar{background:#141824}
 <body>
 <div id="sync-indicator" class="sync-indicator ok" style="display:none"></div>
 <div id="app-version-chip" title="Versión de la app en este equipo — toca para buscar actualización" onclick="try{_tapVersionChip()}catch(e){}"></div>
-<script>/* VERSIÓN VISIBLE: refleja el index.html realmente cargado en ESTE equipo (se bumpea junto con sw.js). Así un iPad con versión vieja se ve de un vistazo. */window.APP_VERSION='v1-2026-10-31a';(function(){try{var c=document.getElementById('app-version-chip');if(c)c.textContent=window.APP_VERSION;}catch(e){}})();</script>
+<script>/* VERSIÓN VISIBLE: refleja el index.html realmente cargado en ESTE equipo (se bumpea junto con sw.js). Así un iPad con versión vieja se ve de un vistazo. */window.APP_VERSION='v1-2026-10-31b';(function(){try{var c=document.getElementById('app-version-chip');if(c)c.textContent=window.APP_VERSION;}catch(e){}})();</script>
 <div class="toast" id="toast" aria-live="polite" aria-atomic="true"></div>
 
 <!-- LOGIN -->
@@ -2057,6 +2057,7 @@ async function qaFetchPrivado(action, extra={}){
 // localStorage para datos del paciente (persiste al cerrar sesión)
 // IndexedDB para imágenes base64 (grandes, no caben en localStorage)
 function saveLocal(k,v){
+  var _idbBackupP = null;   // promesa del espejo durable en IndexedDB (solo 'pts'): decide si un error de cuota es grave
   try{
     let toSave=v;
     // Para pacientes: quitar base64 (ya está en IndexedDB), guardar solo mediaId
@@ -2071,30 +2072,43 @@ function saveLocal(k,v){
       }));
       // [RESPALDO IDB] Espejo DURABLE del backup de pacientes en IndexedDB. localStorage tiene cuota
       // chica (Safari/iOS lo desaloja) → un alta creada y aún no subida podía perderse al desalojarse.
-      // IndexedDB tiene mucho más margen y sobrevive mejor. Se escribe SIEMPRE (fire-and-forget, antes
-      // del setItem) para que quede respaldado aunque localStorage reviente por cuota. loadFromCloud
-      // recupera de aquí si localStorage quedó vacío → ningún paciente no-sincronizado se pierde.
-      try{ if(typeof idbSet==='function') idbSet('__pts_backup__', toSave); }catch(_){}
+      // IndexedDB tiene mucho más margen y sobrevive mejor. Se escribe SIEMPRE (antes del setItem) para
+      // que quede respaldado aunque localStorage reviente por cuota. loadFromCloud recupera de aquí si
+      // localStorage quedó vacío → ningún paciente no-sincronizado se pierde. idbSet resuelve true si
+      // guardó, false/undefined si no → se guarda la promesa para saber si el respaldo durable sí entró.
+      try{ if(typeof idbSet==='function') _idbBackupP = idbSet('__pts_backup__', toSave); }catch(_){ _idbBackupP = null; }
     }
     localStorage.setItem('sinergia_'+k, JSON.stringify(toSave));
   }catch(e){
     var esCuota = !!(e && (e.name==='QuotaExceededError' || e.code===22 || e.code===1014
       || /quota/i.test((e.name||'')+' '+(e.message||''))));
     if(esCuota){
-      // Respaldo local (localStorage) lleno: el límite chico por sitio se satura con muchos pacientes.
-      // El respaldo durable en IndexedDB (arriba) SÍ se escribió, así que el dato no se pierde aquí.
-      // FIX silencio peligroso (caso Dulce): el toast se había quitado por ruido (decisión Carlos), pero
-      // si además la nube falló (alta no sincronizada) el expediente se perdía MUDO. Se avisa UNA sola
-      // vez por sesión (no en cada guardado, para no volver al ruido) para que liberen espacio.
-      if(!window._quotaAvisado){
-        try{ showToastCritico_('⚠️ Memoria local llena en este equipo. Libera espacio o avisa al administrador — puede fallar el guardado local.'); }catch(_){}
+      console.warn('saveLocal QUOTA (localStorage lleno):', e && e.message);
+      // FALSO "memoria llena": la base COMPLETA de pacientes ya no cabe en el cupo CHICO de localStorage
+      // de iOS (~5MB) aunque el teléfono tenga 100+GB libres → este setItem truena en CADA sesión. Eso
+      // por sí solo NO pierde datos: el espejo durable en IndexedDB (cupo grande) sí se escribió arriba.
+      // Alarmar ahí es gritar lobo (asusta de más y hace que ignoren el aviso REAL). Por eso el aviso rojo
+      // SOLO sale si el respaldo durable TAMBIÉN falló. Integridad respetada: NUNCA se calla una pérdida
+      // real; solo se deja de gritar en falso cuando el dato quedó a salvo en IndexedDB.
+      if(k==='pts' && _idbBackupP && typeof _idbBackupP.then==='function'){
+        _idbBackupP.then(function(ok){ if(!ok) _avisarRespaldoLocalCritico_(); })   // idbSet resolvió false/undefined → NO guardó
+                   .catch(function(){ _avisarRespaldoLocalCritico_(); });           // initIDB rechazó → sin respaldo durable
+      } else {
+        // 'pts' sin red IDB disponible, o claves chicas (colas/flags) sin espejo durable: riesgo real.
+        _avisarRespaldoLocalCritico_();
       }
-      window._quotaAvisado = true;
-      console.warn('saveLocal QUOTA (respaldo local lleno):', e && e.message);
     } else {
       console.warn('saveLocal error:', e.message);   // otros errores: comportamiento igual que hoy
     }
   }
+}
+// Aviso crítico de respaldo local: UNA sola vez por sesión, y SOLO ante riesgo REAL (ni localStorage ni el
+// espejo durable en IndexedDB pudieron guardar). Mensaje honesto: NO dice "libera espacio del teléfono"
+// (confundía — el cupo chico es del navegador/PWA, no del disco del equipo, que puede tener 100GB libres).
+function _avisarRespaldoLocalCritico_(){
+  if(window._quotaAvisado) return;
+  window._quotaAvisado = true;
+  try{ showToastCritico_('⚠️ Este equipo no pudo respaldar localmente (ni en el navegador ni en el respaldo durable). Avisa al administrador antes de seguir capturando.'); }catch(_){}
 }
 function loadLocal(k){
   try{ const v=localStorage.getItem('sinergia_'+k); return v?JSON.parse(v):null; }
