@@ -1356,7 +1356,7 @@ body.modo-oscuro .topbar{background:#141824}
 <body>
 <div id="sync-indicator" class="sync-indicator ok" style="display:none"></div>
 <div id="app-version-chip" title="Versión de la app en este equipo — toca para buscar actualización" onclick="try{_tapVersionChip()}catch(e){}"></div>
-<script>/* VERSIÓN VISIBLE: refleja el index.html realmente cargado en ESTE equipo (se bumpea junto con sw.js). Así un iPad con versión vieja se ve de un vistazo. */window.APP_VERSION='v1-2026-10-31b';(function(){try{var c=document.getElementById('app-version-chip');if(c)c.textContent=window.APP_VERSION;}catch(e){}})();</script>
+<script>/* VERSIÓN VISIBLE: refleja el index.html realmente cargado en ESTE equipo (se bumpea junto con sw.js). Así un iPad con versión vieja se ve de un vistazo. */window.APP_VERSION='v1-2026-10-31c';(function(){try{var c=document.getElementById('app-version-chip');if(c)c.textContent=window.APP_VERSION;}catch(e){}})();</script>
 <div class="toast" id="toast" aria-live="polite" aria-atomic="true"></div>
 
 <!-- LOGIN -->
@@ -3534,27 +3534,48 @@ async function _mostrarSaludSyncEquipo(){
     var ahora=Date.now();
     var _hace=function(ts){ try{ var t=(ts&&ts.toMillis)?ts.toMillis():((ts&&ts.seconds)?ts.seconds*1000:0); if(!t) return ''; var ms=ahora-t; if(ms<0) ms=0; var m=Math.round(ms/60000); if(m<1) return 'hace segundos'; if(m<60) return 'hace '+m+' min'; var h=Math.round(m/60); if(h<24) return 'hace '+h+' h'; return 'hace '+Math.round(h/24)+' d'; }catch(_){ return ''; } };
     devs.sort(function(a,b){ var as=(a.sinRespaldo||0), bs=(b.sinRespaldo||0); if(as!==bs) return bs-as; var af=(a.totalFall||0), bf=(b.totalFall||0); if(af!==bf) return bf-af; return (b.totalPend||0)-(a.totalPend||0); });
+    // [SALUD v2] Referencia de versión = la MÁS NUEVA vista (incluye la del supervisor) → cualquier equipo
+    // por debajo corre una PWA vieja SIN los candados anti-pérdida (riesgo #1 hoy). Formato fijo
+    // v1-YYYY-MM-DD<letra> → comparación lexicográfica = cronológica.
+    var _reVer=/^v1-\d{4}-\d{2}-\d{2}[a-z]$/;
+    var _verStr=function(v){ return String((v&&v.versionApp)||'').replace('sinergia-shell-',''); };
+    var refVer=''; try{ if(_reVer.test(String(window.APP_VERSION||''))) refVer=String(window.APP_VERSION); }catch(_){}
+    devs.forEach(function(v){ var s=_verStr(v); if(_reVer.test(s) && s>refVer) refVer=s; });
+    var _esVieja=function(v){ var s=_verStr(v); return !!(refVer && _reVer.test(s) && _reVer.test(refVer) && s<refVer); };
+    var STALE_MS=2*24*60*60*1000;   // "no reporta" = no se ve hace >2 días (equipo apagado/roto/que no abren)
+    var _tsMs=function(ts){ try{ return (ts&&ts.toMillis)?ts.toMillis():((ts&&ts.seconds)?ts.seconds*1000:0); }catch(_){ return 0; } };
+    var _esStale=function(v){ var t=_tsMs(v.updatedAt); return t>0 && (ahora-t)>STALE_MS; };
+    // Resumen de arriba: cuántos bien / con pendientes / en versión vieja / sin reportar.
+    var nTot=devs.length, nVieja=0, nStale=0, nProb=0, nOK=0;
+    devs.forEach(function(v){ var vv=_esVieja(v), st=_esStale(v), prob=((v.sinRespaldo||0)+(v.totalFall||0)+(v.totalPend||0))>0; if(vv)nVieja++; if(st)nStale++; if(prob)nProb++; if(!vv&&!st&&!prob)nOK++; });
+    var resumen=nTot?('<div style="background:#F4F7FC;border:1px solid #DCE6F4;border-radius:10px;padding:9px 12px;margin-bottom:10px;font-size:12px;color:var(--navy);line-height:1.6"><b>'+nTot+' equipo'+(nTot!==1?'s':'')+'</b> · 🟢 '+nOK+' bien'+(nProb?(' · 🟠 '+nProb+' con pendientes'):'')+(nVieja?(' · <span style="color:#B91C1C;font-weight:800">🔴 '+nVieja+' en versión vieja</span>'):'')+(nStale?(' · ⚫ '+nStale+' no reportan'):'')+'<br><span style="font-size:10.5px;color:var(--gray-500)">Versión al día: <b>'+escapeHTML(refVer||'?')+'</b> — los equipos por debajo no tienen los candados anti-pérdida; que actualicen.</span></div>'):'';
     var filas=devs.map(function(v){
       var tf=v.totalFall||0, tp=v.totalPend||0, sr=v.sinRespaldo||0;
-      // Sin respaldo = lo MÁS grave (expediente que puede perderse del todo, caso Ana Lilia) → rojo fuerte.
-      var color= sr>0?'#7C2D12':(tf>0?'#B91C1C':(tp>0?'#B45309':'#2E7D52'));
-      var estado= sr>0?('🆘 '+sr+' SIN RESPALDO'+((tf+tp)>0?(' · +'+(tf+tp)+' sin subir'):'')) : (tf>0?('🔴 '+tf+' rendida'+(tf!==1?'s':'')+(tp>0?(' · '+tp+' pend.'):'')) : (tp>0?('🟠 '+tp+' pendiente'+(tp!==1?'s':'')):'🟢 al día'));
+      var vv=_esVieja(v), st=_esStale(v);
+      // Sin respaldo = lo MÁS grave (expediente que puede perderse del todo) → rojo fuerte. Versión vieja
+      // también va rojo (equipo SIN candados), aunque sus colas estén vacías → no es "al día" de verdad.
+      var color= sr>0?'#7C2D12':((tf>0||vv)?'#B91C1C':(tp>0?'#B45309':(st?'#4B5563':'#2E7D52')));
+      var estado= sr>0?('🆘 '+sr+' SIN RESPALDO'+((tf+tp)>0?(' · +'+(tf+tp)+' sin subir'):'')) : (tf>0?('🔴 '+tf+' rendida'+(tf!==1?'s':'')+(tp>0?(' · '+tp+' pend.'):'')) : (tp>0?('🟠 '+tp+' pendiente'+(tp!==1?'s':'')):(vv?'🔴 versión vieja':(st?'⚫ no reporta':'🟢 al día'))));
+      var badges=(vv?'<span style="background:#B91C1C;color:#fff;border-radius:6px;padding:1px 6px;font-size:9.5px;font-weight:800;margin-left:6px">⚠️ VERSIÓN VIEJA</span>':'')+(st?'<span style="background:#4B5563;color:#fff;border-radius:6px;padding:1px 6px;font-size:9.5px;font-weight:800;margin-left:6px">⚫ NO REPORTA</span>':'');
       var mu=(Array.isArray(v.muestras)?v.muestras:[]);
       var srMu=(Array.isArray(v.sinRespaldoMuestras)?v.sinRespaldoMuestras:[]);
       var listaSR=sr>0?('<div style="margin-top:7px;background:#FEF2F2;border:1px solid #FCA5A5;border-radius:8px;padding:7px 9px"><div style="font-size:11px;font-weight:800;color:#7C2D12">🆘 Expediente(s) que solo existen en este cel (aún NO en la nube):</div>'+(srMu.length?srMu.map(function(m){ return '<div style="font-size:11.5px;color:#7C2D12;margin-top:2px">• <b>'+escapeHTML(m.n||('id '+(m.id||'')))+'</b></div>'; }).join(''):'')+'<div style="font-size:10.5px;color:#991B1B;margin-top:4px">Que esta persona abra la app CON señal (WiFi/datos) para que suban. Si el cel se limpia antes, se pierden.</div></div>'):'';
       var lista=mu.length?('<div style="margin-top:7px;display:flex;flex-direction:column;gap:3px">'+mu.map(function(m){ return '<div style="font-size:11.5px;color:#374151"><b>'+escapeHTML(m.n||'')+'</b> <span style="color:var(--gray-400)">· '+escapeHTML(m.q||'')+'</span>'+(m.e?(' <span style="color:#B91C1C">· '+escapeHTML(m.e)+'</span>'):'')+'</div>'; }).join('')+'</div>'):'';
+      var avisoVieja=vv?('<div style="font-size:11px;color:#B91C1C;margin-top:7px">→ Equipo en <b>versión vieja</b> ('+escapeHTML(_verStr(v)||'?')+'). Que toque el chip de versión (abajo-izq) para actualizar, o quite y re-agregue la app desde Safari.</div>'):'';
       return '<div style="border:1px solid var(--gray-200);border-left:4px solid '+color+';border-radius:12px;padding:11px 13px;margin-bottom:9px">'
         +'<div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px"><div style="font-weight:800;color:var(--navy);font-size:14px">'+escapeHTML(v.terapeuta||v.correo||'(dispositivo)')+'</div><div style="font-size:12px;font-weight:800;color:'+color+';white-space:nowrap">'+estado+'</div></div>'
-        +'<div style="font-size:10.5px;color:var(--gray-400);margin-top:2px">'+escapeHTML(v.correo||'')+' · '+_hace(v.updatedAt)+(v.versionApp?(' · '+escapeHTML(String(v.versionApp).replace('sinergia-shell-',''))):'')+'</div>'
+        +'<div style="font-size:10.5px;color:var(--gray-400);margin-top:2px">'+escapeHTML(v.correo||'')+' · '+_hace(v.updatedAt)+(v.versionApp?(' · '+escapeHTML(_verStr(v))):'')+badges+'</div>'
         +listaSR
         +lista
+        +avisoVieja
         +((tp+tf)>0?'<div style="font-size:11px;color:var(--gray-500);margin-top:7px">→ Que esta persona abra <b>🔍 Revisión de este dispositivo</b> → <b>🔧 Reconectar y subir</b>.</div>':'')
         +'</div>';
     }).join('');
     box.innerHTML='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px"><div style="font-size:16px;font-weight:800;color:var(--navy)">🛰️ Salud de sincronización del equipo</div><button onclick="var o=this.closest(\'[data-saludsync]\');if(o)o.remove()" style="background:none;border:none;font-size:22px;color:var(--gray-400);cursor:pointer">×</button></div>'
-      +'<div style="font-size:11.5px;color:var(--gray-500);margin-bottom:10px">Cada dispositivo reporta lo que tiene sin subir. 🔴 = notas/expedientes rendidos (avisar a esa persona), 🟠 = pendientes que se reintentan solos, 🟢 = al día.</div>'
+      +'<div style="font-size:11.5px;color:var(--gray-500);margin-bottom:10px">Cada dispositivo reporta su estado. 🔴 = rendidas o <b>versión vieja</b> (avisar), 🟠 = pendientes que se reintentan solos, ⚫ = no reporta hace días, 🟢 = bien.</div>'
+      +resumen
       +'<div style="margin-bottom:10px"><button onclick="_mostrarSaludSyncEquipo()" style="font-size:11px;font-weight:700;border:none;border-radius:10px;padding:6px 12px;cursor:pointer;font-family:inherit;background:#EEF1F6;color:var(--navy)">🔄 Actualizar</button></div>'
-      +(devs.length?filas:'<div style="color:var(--gray-400);padding:24px;text-align:center">Aún no hay reportes. Aparecerán cuando cada terapeuta abra la app (con esta versión) con internet.</div>');
+      +(devs.length?filas:'<div style="color:var(--gray-400);padding:24px;text-align:center">Aún no hay reportes. Aparecerán cuando cada terapeuta abra la app (con esta versión) con internet.<br><span style="font-size:11px">Si no aparece nada, confirma que la regla <b>syncHealth</b> esté publicada en Firestore.</span></div>');
   }catch(e){ box.innerHTML='⚠️ No se pudo leer el tablero: '+((e&&e.message)||'')+'<div style="font-size:11px;color:var(--gray-500);margin-top:8px">¿Ya publicaste la regla <b>syncHealth</b> en Firestore?</div>'; }
 }
 // [AUTO-RESCATE] Rescata TODO solo, sin que la terapeuta toque nada. Cuando la app abre/vuelve a foco
