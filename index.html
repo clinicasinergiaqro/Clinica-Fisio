@@ -1356,7 +1356,7 @@ body.modo-oscuro .topbar{background:#141824}
 <body>
 <div id="sync-indicator" class="sync-indicator ok" style="display:none"></div>
 <div id="app-version-chip" title="Versión de la app en este equipo — toca para buscar actualización" onclick="try{_tapVersionChip()}catch(e){}"></div>
-<script>/* VERSIÓN VISIBLE: refleja el index.html realmente cargado en ESTE equipo (se bumpea junto con sw.js). Así un iPad con versión vieja se ve de un vistazo. */window.APP_VERSION='v1-2026-10-30l';(function(){try{var c=document.getElementById('app-version-chip');if(c)c.textContent=window.APP_VERSION;}catch(e){}})();</script>
+<script>/* VERSIÓN VISIBLE: refleja el index.html realmente cargado en ESTE equipo (se bumpea junto con sw.js). Así un iPad con versión vieja se ve de un vistazo. */window.APP_VERSION='v1-2026-10-31a';(function(){try{var c=document.getElementById('app-version-chip');if(c)c.textContent=window.APP_VERSION;}catch(e){}})();</script>
 <div class="toast" id="toast" aria-live="polite" aria-atomic="true"></div>
 
 <!-- LOGIN -->
@@ -2549,12 +2549,30 @@ function _altaNubeInmediata(p){
         try{ if(typeof _sinRespaldoDel==='function') _sinRespaldoDel(p.id); }catch(_){}
         try{ _altaPendienteDel(p.id); }catch(_){}
         try{ if(typeof window._FST_invalidarIndicePacientes==='function') window._FST_invalidarIndicePacientes(); }catch(_){}
-        // El Sheet ya había reportado fallo → corregir el mensaje: el expediente SÍ está en la nube.
-        if(est.sheetDone && !est.sheetOk){ try{ showToast('☁️ Expediente SUBIDO a la nube (respaldo seguro). El registro principal se completará solo.','success'); }catch(_){} }
       }
-    }).catch(function(){ est.fsDone=true; });
+      try{ _reconciliarMsgAlta(est, p); }catch(_){}   // mensaje único y honesto cuando Sheet Y FS resolvieron
+    }).catch(function(){ est.fsDone=true; try{ _reconciliarMsgAlta(est, p); }catch(_){} });
   }catch(_e){ est.fsDone=true; }
   return est;
+}
+// MENSAJE ÚNICO Y HONESTO del alta (anti doble-toast): el alta tiene DOS caminos a la nube (Sheet y
+// Firestore directo) que resuelven en cualquier orden. Antes, si el Sheet fallaba rápido se mostraba
+// "📴 solo en este equipo" y, al confirmar FS después, un 2º toast "☁️ subido" → alarmaba de más. Ahora
+// el mensaje del caso "Sheet NO confirmó" se emite UNA sola vez, cuando AMBOS caminos resolvieron, con el
+// estado definitivo. El caso Sheet OK muestra su "✅" de inmediato (no espera a FS) y marca _msgEmitido.
+function _reconciliarMsgAlta(est, nuevo){
+  try{
+    if(!est || est._msgEmitido) return;
+    if(!est.sheetDone || !est.fsDone) return;   // esperar a que Sheet Y Firestore resuelvan
+    est._msgEmitido=true;
+    if(est.sheetOk) return;                      // el Sheet ya mostró "✅ ... subida a la nube"
+    if(est.fsOk){
+      try{ showToast('☁️ Expediente SUBIDO a la nube (respaldo seguro). El registro principal se completará solo.','success'); }catch(_){}
+    } else {
+      try{ _altaPendienteAdd(nuevo.id, nuevo.name); }catch(_){}
+      try{ showToast('📴 Guardado SOLO en este equipo — se subirá solo en cuanto haya señal. No cierres la app sin internet.','warning'); }catch(_){}
+    }
+  }catch(_){}
 }
 // ── Vigilancia de ALTAS atoradas: un paciente NUEVO sin subir es más grave que una edición ──
 // Se registra al fallar la subida del alta; se limpia al confirmar Sheet o Firestore. Si a los
@@ -20600,7 +20618,7 @@ async function guardarNuevoPaciente(){
   if (typeof window._FST_invalidarIndicePacientes === 'function') { window._FST_invalidarIndicePacientes(); }
   saveDB('pts', [nuevo]).then(res => {
     if(res && res.ok){
-      _nube.sheetDone=true; _nube.sheetOk=true;
+      _nube.sheetDone=true; _nube.sheetOk=true; _nube._msgEmitido=true;   // el Sheet (nube durable) confirmó → su ✅ es el mensaje final
       try{ _altaPendienteDel(nuevo.id); }catch(_){}
       borrarBorradorNuevoSiGuardado();
       if(typeof _sinRespaldoDel==='function') _sinRespaldoDel(nuevo.id);   // [RESPALDO] Sheets confirmó → respaldado
@@ -20613,15 +20631,10 @@ async function guardarNuevoPaciente(){
       // solo se recuperaba al reabrir, vía loadFromCloud). Además el indicador "N sin sincronizar" ya la
       // cuenta, así que el fisio ve que sigue pendiente. El dato local ya es durable (_flushGuardadoLocalPts).
       try{ encolarSync(nuevo.id); }catch(_){}
-      // Mensaje HONESTO según dónde esté de verdad: si Firestore ya confirmó, el expediente SÍ
-      // está en la nube (solo falta la fila del Sheet, que se completa sola). Si no, decir claro
-      // que solo vive en este equipo y registrarlo en la vigilancia de altas atoradas.
-      if(_nube.fsOk){
-        showToast('☁️ Expediente SUBIDO a la nube (respaldo seguro). El registro principal se completará solo.','success');
-      } else {
-        try{ _altaPendienteAdd(nuevo.id, nuevo.name); }catch(_){}
-        showToast('📴 Guardado SOLO en este equipo — se subirá solo en cuanto haya señal. No cierres la app sin internet.','warning');
-      }
+      // Mensaje HONESTO y ÚNICO: se emite cuando AMBOS caminos (Sheet y Firestore) resolvieron, para no
+      // mostrar "📴 solo en este equipo" y después un 2º toast correctivo "☁️ subido" (alarmaba de más).
+      // Si FS aún está en vuelo, el reconciliador lo emite al resolver FS; si ya resolvió, lo emite ya.
+      try{ _reconciliarMsgAlta(_nube, nuevo); }catch(_){}
     }
     // ETAPA 2: los estudios capturados en la valoración van a su almacén propio en Firestore
     // (estudiosDocs; saveDB a Sheets no los lleva). Reutiliza la ruta probada _persistirEstudios,
@@ -20639,12 +20652,7 @@ async function guardarNuevoPaciente(){
     // (no esperar a reabrir la app). El alta vive durable en local/IndexedDB mientras tanto.
     try{ encolarSync(nuevo.id); }catch(_){}
     _nube.sheetDone=true;
-    if(_nube.fsOk){
-      showToast('☁️ Expediente SUBIDO a la nube (respaldo seguro). El registro principal se completará solo.','success');
-    } else {
-      try{ _altaPendienteAdd(nuevo.id, nuevo.name); }catch(_){}
-      showToast('📴 Guardado SOLO en este equipo — se subirá solo en cuanto reconectes. No cierres la app sin internet.','warning');
-    }
+    try{ _reconciliarMsgAlta(_nube, nuevo); }catch(_){}   // mensaje único y honesto cuando Sheet y FS resolvieron
   });
   // Ir directo al expediente del paciente nuevo
   setTimeout(()=>{
