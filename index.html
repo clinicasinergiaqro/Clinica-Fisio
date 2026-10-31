@@ -1356,7 +1356,7 @@ body.modo-oscuro .topbar{background:#141824}
 <body>
 <div id="sync-indicator" class="sync-indicator ok" style="display:none"></div>
 <div id="app-version-chip" title="Versión de la app en este equipo — toca para buscar actualización" onclick="try{_tapVersionChip()}catch(e){}"></div>
-<script>/* VERSIÓN VISIBLE: refleja el index.html realmente cargado en ESTE equipo (se bumpea junto con sw.js). Así un iPad con versión vieja se ve de un vistazo. */window.APP_VERSION='v1-2026-10-31e';(function(){try{var c=document.getElementById('app-version-chip');if(c)c.textContent=window.APP_VERSION;}catch(e){}})();</script>
+<script>/* VERSIÓN VISIBLE: refleja el index.html realmente cargado en ESTE equipo (se bumpea junto con sw.js). Así un iPad con versión vieja se ve de un vistazo. */window.APP_VERSION='v1-2026-10-31f';(function(){try{var c=document.getElementById('app-version-chip');if(c)c.textContent=window.APP_VERSION;}catch(e){}})();</script>
 <div class="toast" id="toast" aria-live="polite" aria-atomic="true"></div>
 
 <!-- LOGIN -->
@@ -3449,10 +3449,25 @@ function _totalFallidosSync(){ return _contarColaLS('COLA_SOAP_ACT_FALLIDOS') + 
 // respuesta a "se perdió un expediente en el cel de X": el tablero dice qué cel tiene qué atorado.
 // Requiere regla firestore.rules → match /syncHealth (publicar). Write best-effort: si falla, no pasa nada.
 function _deviceId(){
-  try{ var d=localStorage.getItem('sinergia_device_id'); if(d) return d;
-    d='dev_'+Math.random().toString(36).slice(2,10)+Math.random().toString(36).slice(2,6);
-    localStorage.setItem('sinergia_device_id', d); return d;
+  try{ var d=localStorage.getItem('sinergia_device_id');
+    if(!d){ d='dev_'+Math.random().toString(36).slice(2,10)+Math.random().toString(36).slice(2,6);
+      try{ localStorage.setItem('sinergia_device_id', d); }catch(_){} }
+    // DURABLE: espejo en IndexedDB (cupo grande, sobrevive al desalojo de localStorage por iOS)
+    // → el MISMO equipo conserva su id y no genera docs syncHealth fantasma al reinstalar/desalojar.
+    try{ if(typeof idbSet==='function') idbSet('__device_id__', d); }catch(_){}
+    return d;
   }catch(_){ return 'dev_temp'; }
+}
+// Recupera el deviceId desde IndexedDB si localStorage lo perdió (iOS desaloja el cupo chico).
+// Corre 1 vez al boot ANTES del 1er reporte de salud → el equipo re-usa su id anterior en vez de
+// crear uno nuevo (que saldría como "equipo" extra en el tablero). Raíz del problema de fantasmas.
+async function _rehidratarDeviceIdDesdeIDB(){
+  try{
+    var ls=null; try{ ls=localStorage.getItem('sinergia_device_id'); }catch(_){}
+    var idb=null; try{ if(typeof idbGet==='function') idb=await idbGet('__device_id__'); }catch(_){}
+    if(idb && !ls){ try{ localStorage.setItem('sinergia_device_id', idb); }catch(_){} }
+    else if(ls && typeof idbSet==='function' && idb!==ls){ try{ idbSet('__device_id__', ls); }catch(_){} }
+  }catch(_){}
 }
 function _nombrePacPorId(id){
   id=String(id||''); if(!id) return '';
@@ -3490,6 +3505,7 @@ function _sinRespaldoTiene(id){ return _sinRespaldoGet().indexOf(String(id||''))
 var _saludSyncUltimo=0, _saludSyncTimer=null;
 async function _reportarSaludSync(forzar){
   try{
+    if(!window._deviceIdRehidratado){ window._deviceIdRehidratado=true; try{ await _rehidratarDeviceIdDesdeIDB(); }catch(_){} }
     if(!navigator.onLine) return;
     if(!(currentUser && (currentUser.email||currentUser.username))) return;
     if(!forzar && (Date.now()-_saludSyncUltimo)<25000){ clearTimeout(_saludSyncTimer); _saludSyncTimer=setTimeout(function(){ _reportarSaludSync(true); }, 26000); return; }
@@ -3576,7 +3592,7 @@ async function _mostrarSaludSyncEquipo(){
     box.innerHTML='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px"><div style="font-size:16px;font-weight:800;color:var(--navy)">🛰️ Salud de sincronización del equipo</div><button onclick="var o=this.closest(\'[data-saludsync]\');if(o)o.remove()" style="background:none;border:none;font-size:22px;color:var(--gray-400);cursor:pointer">×</button></div>'
       +'<div style="font-size:11.5px;color:var(--gray-500);margin-bottom:10px">Cada dispositivo reporta su estado. 🔴 = rendidas o <b>versión vieja</b> (avisar), 🟠 = pendientes que se reintentan solos, ⚫ = no reporta hace días, 🟢 = bien.</div>'
       +resumen
-      +'<div style="margin-bottom:10px"><button onclick="_mostrarSaludSyncEquipo()" style="font-size:11px;font-weight:700;border:none;border-radius:10px;padding:6px 12px;cursor:pointer;font-family:inherit;background:#EEF1F6;color:var(--navy)">🔄 Actualizar</button></div>'
+      +'<div style="margin-bottom:10px;display:flex;gap:6px;flex-wrap:wrap"><button onclick="_mostrarSaludSyncEquipo()" style="font-size:11px;font-weight:700;border:none;border-radius:10px;padding:6px 12px;cursor:pointer;font-family:inherit;background:#EEF1F6;color:var(--navy)">🔄 Actualizar</button>'+(_saludOcultos>0?('<button onclick="_limpiarSaludSyncViejos()" style="font-size:11px;font-weight:700;border:none;border-radius:10px;padding:6px 12px;cursor:pointer;font-family:inherit;background:#FDECEC;color:#B91C1C">🧹 Limpiar '+_saludOcultos+' viejo'+(_saludOcultos!==1?'s':'')+'</button>'):'')+'</div>'
       +(devs.length?filas:'<div style="color:var(--gray-400);padding:24px;text-align:center">Aún no hay reportes. Aparecerán cuando cada terapeuta abra la app (con esta versión) con internet.<br><span style="font-size:11px">Si no aparece nada, confirma que la regla <b>syncHealth</b> esté publicada en Firestore.</span></div>');
   }catch(e){ box.innerHTML='⚠️ No se pudo leer el tablero: '+((e&&e.message)||'')+'<div style="font-size:11px;color:var(--gray-500);margin-top:8px">¿Ya publicaste la regla <b>syncHealth</b> en Firestore?</div>'; }
 }
@@ -3601,6 +3617,33 @@ function _saludDedupePorPersona(devs){
     if(!by[k]){ by[k]={v:v,t:t}; } else { ocultos++; if(t>by[k].t) by[k]={v:v,t:t}; }
   });
   return { lista:Object.keys(by).map(function(k){ return by[k].v; }), ocultos:ocultos };
+}
+// 🧹 Supervisor: borra los reportes VIEJOS (ids anteriores del MISMO equipo por reinstalar/desalojar).
+// Conserva el reporte MÁS RECIENTE de cada persona; solo borra los NO-más-recientes que además estén
+// estancados (>7 días sin reportar) → nunca toca el equipo que alguien usa hoy. Regla ya permite delete a supervisor.
+async function _limpiarSaludSyncViejos(){
+  if(!(typeof esSupervisorUI==='function'&&esSupervisorUI())){ showToast('Solo supervisor'); return; }
+  if(!navigator.onLine){ showToast('Sin conexión'); return; }
+  try{
+    var ok=await FST_init(); if(!ok||!window._fstDb){ showToast('Sin conexión a la nube'); return; }
+    var snap=await window._fstDb.collection('syncHealth').get();
+    var docs=[]; snap.forEach(function(d){ docs.push({ id:d.id, data:d.data()||{} }); });
+    if(!docs.length){ showToast('No hay reportes'); return; }
+    var latest={};
+    docs.forEach(function(d){ var k=String((d.data.correo||d.data.deviceId)||'').toLowerCase().trim()||d.id; var t=_saludTsMs(d.data.updatedAt); if(!latest[k]||t>latest[k].t) latest[k]={id:d.id,t:t}; });
+    var ahora=Date.now(), VIEJO=7*24*60*60*1000;
+    var borrar=docs.filter(function(d){ var k=String((d.data.correo||d.data.deviceId)||'').toLowerCase().trim()||d.id; var esKeeper=(latest[k]&&latest[k].id===d.id); var stale=(ahora-_saludTsMs(d.data.updatedAt))>VIEJO; return !esKeeper && stale; });
+    if(!borrar.length){ showToast('No hay reportes viejos que limpiar ✓'); return; }
+    if(!confirm('Se borrarán '+borrar.length+' reporte(s) viejo(s) de equipos reemplazados (ids anteriores que ya no reportan). Se CONSERVA el reporte más reciente de cada persona. ¿Continuar?')) return;
+    var n=0;
+    for(var i=0;i<borrar.length;i+=400){
+      var batch=window._fstDb.batch();
+      borrar.slice(i,i+400).forEach(function(d){ batch.delete(window._fstDb.collection('syncHealth').doc(d.id)); n++; });
+      await batch.commit();
+    }
+    showToast('🧹 '+n+' reporte(s) viejo(s) borrado(s)');
+    try{ _mostrarSaludSyncEquipo(); }catch(_){}
+  }catch(e){ showToast('No se pudo limpiar: '+((e&&e.message)||'error')); }
 }
 var _saludAlertaCache=null, _saludAlertaTs=0;
 async function _refrescarAlertaSaludEquipos(forzar){
