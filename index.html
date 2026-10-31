@@ -1356,7 +1356,7 @@ body.modo-oscuro .topbar{background:#141824}
 <body>
 <div id="sync-indicator" class="sync-indicator ok" style="display:none"></div>
 <div id="app-version-chip" title="Versión de la app en este equipo — toca para buscar actualización" onclick="try{_tapVersionChip()}catch(e){}"></div>
-<script>/* VERSIÓN VISIBLE: refleja el index.html realmente cargado en ESTE equipo (se bumpea junto con sw.js). Así un iPad con versión vieja se ve de un vistazo. */window.APP_VERSION='v1-2026-10-31d';(function(){try{var c=document.getElementById('app-version-chip');if(c)c.textContent=window.APP_VERSION;}catch(e){}})();</script>
+<script>/* VERSIÓN VISIBLE: refleja el index.html realmente cargado en ESTE equipo (se bumpea junto con sw.js). Así un iPad con versión vieja se ve de un vistazo. */window.APP_VERSION='v1-2026-10-31e';(function(){try{var c=document.getElementById('app-version-chip');if(c)c.textContent=window.APP_VERSION;}catch(e){}})();</script>
 <div class="toast" id="toast" aria-live="polite" aria-atomic="true"></div>
 
 <!-- LOGIN -->
@@ -3530,6 +3530,8 @@ async function _mostrarSaludSyncEquipo(){
     var ok=await FST_init(); if(!ok||!window._fstDb){ box.innerHTML='Sin conexión a la nube'; return; }
     var snap=await window._fstDb.collection('syncHealth').get();
     var devs=[]; snap.forEach(function(d){ devs.push(d.data()||{}); });
+    // COLAPSAR FANTASMAS: 1 reporte por persona (el más reciente) — cada equipo acumula deviceIds viejos.
+    var _dd=_saludDedupePorPersona(devs); var _saludOcultos=_dd.ocultos; devs=_dd.lista;
     devs.sort(function(a,b){ var af=(a.totalFall||0), bf=(b.totalFall||0); if(af!==bf) return bf-af; return (b.totalPend||0)-(a.totalPend||0); });
     var ahora=Date.now();
     var _hace=function(ts){ try{ var t=(ts&&ts.toMillis)?ts.toMillis():((ts&&ts.seconds)?ts.seconds*1000:0); if(!t) return ''; var ms=ahora-t; if(ms<0) ms=0; var m=Math.round(ms/60000); if(m<1) return 'hace segundos'; if(m<60) return 'hace '+m+' min'; var h=Math.round(m/60); if(h<24) return 'hace '+h+' h'; return 'hace '+Math.round(h/24)+' d'; }catch(_){ return ''; } };
@@ -3541,14 +3543,14 @@ async function _mostrarSaludSyncEquipo(){
     var _verStr=function(v){ return String((v&&v.versionApp)||'').replace('sinergia-shell-',''); };
     var refVer=''; try{ if(_reVer.test(String(window.APP_VERSION||''))) refVer=String(window.APP_VERSION); }catch(_){}
     devs.forEach(function(v){ var s=_verStr(v); if(_reVer.test(s) && s>refVer) refVer=s; });
-    var _esVieja=function(v){ var s=_verStr(v); return !!(refVer && _reVer.test(s) && _reVer.test(refVer) && s<refVer); };
+    var _esVieja=function(v){ return _saludEsVieja(_verStr(v), refVer); };   // vieja = estancada +7 días atrás
     var STALE_MS=2*24*60*60*1000;   // "no reporta" = no se ve hace >2 días (equipo apagado/roto/que no abren)
     var _tsMs=function(ts){ try{ return (ts&&ts.toMillis)?ts.toMillis():((ts&&ts.seconds)?ts.seconds*1000:0); }catch(_){ return 0; } };
     var _esStale=function(v){ var t=_tsMs(v.updatedAt); return t>0 && (ahora-t)>STALE_MS; };
     // Resumen de arriba: cuántos bien / con pendientes / en versión vieja / sin reportar.
     var nTot=devs.length, nVieja=0, nStale=0, nProb=0, nOK=0;
     devs.forEach(function(v){ var vv=_esVieja(v), st=_esStale(v), prob=((v.sinRespaldo||0)+(v.totalFall||0)+(v.totalPend||0))>0; if(vv)nVieja++; if(st)nStale++; if(prob)nProb++; if(!vv&&!st&&!prob)nOK++; });
-    var resumen=nTot?('<div style="background:#F4F7FC;border:1px solid #DCE6F4;border-radius:10px;padding:9px 12px;margin-bottom:10px;font-size:12px;color:var(--navy);line-height:1.6"><b>'+nTot+' equipo'+(nTot!==1?'s':'')+'</b> · 🟢 '+nOK+' bien'+(nProb?(' · 🟠 '+nProb+' con pendientes'):'')+(nVieja?(' · <span style="color:#B91C1C;font-weight:800">🔴 '+nVieja+' en versión vieja</span>'):'')+(nStale?(' · ⚫ '+nStale+' no reportan'):'')+'<br><span style="font-size:10.5px;color:var(--gray-500)">Versión al día: <b>'+escapeHTML(refVer||'?')+'</b> — los equipos por debajo no tienen los candados anti-pérdida; que actualicen.</span></div>'):'';
+    var resumen=nTot?('<div style="background:#F4F7FC;border:1px solid #DCE6F4;border-radius:10px;padding:9px 12px;margin-bottom:10px;font-size:12px;color:var(--navy);line-height:1.6"><b>'+nTot+' equipo'+(nTot!==1?'s':'')+'</b> · 🟢 '+nOK+' bien'+(nProb?(' · 🟠 '+nProb+' con pendientes'):'')+(nVieja?(' · <span style="color:#B91C1C;font-weight:800">🔴 '+nVieja+' en versión vieja</span>'):'')+(nStale?(' · ⚫ '+nStale+' no reportan'):'')+'<br><span style="font-size:10.5px;color:var(--gray-500)">Versión al día: <b>'+escapeHTML(refVer||'?')+'</b>. 🔴 versión vieja = equipo estancado +7 días atrás (no se actualiza solo).</span>'+(_saludOcultos>0?('<br><span style="font-size:10px;color:var(--gray-400)">Se ocultaron '+_saludOcultos+' reporte(s) viejo(s) del MISMO equipo (ids anteriores por reinstalar/limpiar la app).</span>'):'')+'</div>'):'';
     var filas=devs.map(function(v){
       var tf=v.totalFall||0, tp=v.totalPend||0, sr=v.sinRespaldo||0;
       var vv=_esVieja(v), st=_esStale(v);
@@ -3582,6 +3584,24 @@ async function _mostrarSaludSyncEquipo(){
 // equipos están en VERSIÓN VIEJA / SIN RESPALDO / con FALLIDOS → renderAgenda pinta un banner si hay algo
 // (así NO hay que abrir el tablero para enterarse). Supervisor-only (solo él puede leer syncHealth);
 // best-effort: si la regla no está publicada o no hay red, cae en el catch y no pasa nada.
+// Helpers compartidos del tablero/aviso de salud de equipos.
+function _saludTsMs(ts){ try{ return (ts&&ts.toMillis)?ts.toMillis():((ts&&ts.seconds)?ts.seconds*1000:0); }catch(_){ return 0; } }
+function _saludDiasVer(s){ var m=/^(?:sinergia-shell-)?v1-(\d{4})-(\d{2})-(\d{2})/.exec(String(s||'')); return m?Date.UTC(+m[1],+m[2]-1,+m[3]):null; }
+// VIEJA solo si está +7 días atrás de la más nueva. NO por 1 letra/1 día: el auto-update de 1-2 días es
+// normal; lo que importa es un equipo ESTANCADO semanas atrás (no se actualiza / sin candados).
+function _saludEsVieja(devVer, refVer){ var d=_saludDiasVer(devVer), r=_saludDiasVer(refVer); return (d!=null&&r!=null)&&((r-d)>7*86400000); }
+// COLAPSAR FANTASMAS: un MISMO equipo/persona genera varios deviceId con el tiempo (iOS desaloja
+// localStorage, reinstalan la PWA, otro navegador) → docs syncHealth duplicados que inflan el conteo
+// (39 "equipos" cuando son 6). Se deja el reporte MÁS RECIENTE por PERSONA (correo); se cuentan los ocultos.
+function _saludDedupePorPersona(devs){
+  var by={}, ocultos=0, i=0;
+  (devs||[]).forEach(function(v){
+    var k=String((v&&(v.correo||v.deviceId))||'').toLowerCase().trim(); if(!k) k='_'+(i++);
+    var t=_saludTsMs(v&&v.updatedAt);
+    if(!by[k]){ by[k]={v:v,t:t}; } else { ocultos++; if(t>by[k].t) by[k]={v:v,t:t}; }
+  });
+  return { lista:Object.keys(by).map(function(k){ return by[k].v; }), ocultos:ocultos };
+}
 var _saludAlertaCache=null, _saludAlertaTs=0;
 async function _refrescarAlertaSaludEquipos(forzar){
   try{
@@ -3592,14 +3612,16 @@ async function _refrescarAlertaSaludEquipos(forzar){
     var ok=await FST_init(); if(!ok||!window._fstDb) return;
     var snap=await window._fstDb.collection('syncHealth').get();
     var devs=[]; snap.forEach(function(d){ devs.push(d.data()||{}); });
+    devs=_saludDedupePorPersona(devs).lista;   // 1 reporte por persona (el más reciente) → colapsa fantasmas
     var _reVer=/^v1-\d{4}-\d{2}-\d{2}[a-z]$/;
     var _verStr=function(v){ return String((v&&v.versionApp)||'').replace('sinergia-shell-',''); };
     var refVer=''; try{ if(_reVer.test(String(window.APP_VERSION||''))) refVer=String(window.APP_VERSION); }catch(_){}
     devs.forEach(function(v){ var s=_verStr(v); if(_reVer.test(s) && s>refVer) refVer=s; });
-    var nVieja=0, nSR=0, nFall=0;
+    var nVieja=0, nSR=0, nFall=0, _ahoraA=Date.now(), _ACT=14*24*60*60*1000;
     devs.forEach(function(v){
-      var s=_verStr(v);
-      if(refVer && _reVer.test(s) && _reVer.test(refVer) && s<refVer) nVieja++;
+      // solo equipos ACTIVOS (reportaron en los últimos 14 días): uno reemplazado/abandonado no alarma.
+      if((_ahoraA-_saludTsMs(v.updatedAt))>_ACT) return;
+      if(_saludEsVieja(_verStr(v), refVer)) nVieja++;   // vieja = +7 días atrás (no por 1 día)
       if((v.sinRespaldo||0)>0) nSR++;
       if((v.totalFall||0)>0) nFall++;
     });
