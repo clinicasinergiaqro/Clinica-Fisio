@@ -1356,7 +1356,7 @@ body.modo-oscuro .topbar{background:#141824}
 <body>
 <div id="sync-indicator" class="sync-indicator ok" style="display:none"></div>
 <div id="app-version-chip" title="Versión de la app en este equipo — toca para buscar actualización" onclick="try{_tapVersionChip()}catch(e){}"></div>
-<script>/* VERSIÓN VISIBLE: refleja el index.html realmente cargado en ESTE equipo (se bumpea junto con sw.js). Así un iPad con versión vieja se ve de un vistazo. */window.APP_VERSION='v1-2026-11-01a';(function(){try{var c=document.getElementById('app-version-chip');if(c)c.textContent=window.APP_VERSION;}catch(e){}})();</script>
+<script>/* VERSIÓN VISIBLE: refleja el index.html realmente cargado en ESTE equipo (se bumpea junto con sw.js). Así un iPad con versión vieja se ve de un vistazo. */window.APP_VERSION='v1-2026-11-01b';(function(){try{var c=document.getElementById('app-version-chip');if(c)c.textContent=window.APP_VERSION;}catch(e){}})();</script>
 <div class="toast" id="toast" aria-live="polite" aria-atomic="true"></div>
 
 <!-- LOGIN -->
@@ -19814,6 +19814,10 @@ function renderNuevoPaciente(){
         <div class="form-field"><div class="form-label">Microvárices / telangiectasias</div>
           <select class="form-input" id="n-derma-microvarices"><option value="">No evaluadas</option><option>Ausentes</option><option>Microvárices</option><option>Telangiectasias</option><option>Ambas</option></select></div>
         <div class="form-field"><div class="form-label">Alteraciones posturales <span style="font-weight:400;color:var(--gray-400);font-size:11px">· influyen en celulitis/edema (PAFEG)</span></div><input class="form-input" id="n-derma-posturales" type="text" placeholder="Vacío = sin alteraciones. Ej: hiperlordosis lumbar, valgo de rodillas"></div>
+        <div class="form-field"><div class="form-label">Calidad del sueño <span style="font-weight:400;color:var(--gray-400);font-size:11px">· el mal sueño (cortisol) favorece adiposidad/celulitis — PAFAL</span></div>
+          <select class="form-input" id="n-derma-sueno"><option value="">No evaluada</option><option>Buena</option><option>Moderada</option><option>Mala</option></select></div>
+        <div class="form-field"><div class="form-label">Nivel de estrés <span style="font-weight:400;color:var(--gray-400);font-size:11px">· PAFAL</span></div>
+          <select class="form-input" id="n-derma-estres"><option value="">No evaluado</option><option>Saludable</option><option>Controlable</option><option>Excesivo</option></select></div>
         </div>
         <div data-db="facial" style="display:none">
         <div style="font-size:12.5px;font-weight:700;color:#7A2F5D;margin:14px 0 4px">Facial <span style="font-weight:400;color:var(--gray-400);font-size:11px">· protocolo PAF</span></div>
@@ -20266,6 +20270,7 @@ function _dermaCollectAlta(){
       pielNaranja:g('n-derma-pielnaranja'), depresiones:g('n-derma-depresiones'),
       flacidezPiel:g('n-derma-flacpiel'), flacidezMuscular:g('n-derma-flacmusc'),
       microvarices:g('n-derma-microvarices'), posturales:g('n-derma-posturales'),
+      sueno:g('n-derma-sueno'), estres:g('n-derma-estres'),
       tipoPiel:g('n-derma-tipopiel'), glogau:g('n-derma-goglau'), acne:g('n-derma-acne'),
       alteracionesFaciales:checks('derma-altfac'),
       arrugasLoc:checks('derma-arrloc'), arrugasTipo:g('n-derma-arrtipo'), arrugasTsuji:g('n-derma-tsuji'), arrugasGrado:g('n-derma-lapiere'),
@@ -20276,7 +20281,7 @@ function _dermaCollectAlta(){
       equipos:checks('derma-eq'),
       frecuencia:g('n-derma-frec')||'',
       planEstetico:g('n-derma-plan')||'',
-      capturadoEn:(typeof todayISO!=='undefined'?todayISO:''), version:5 };
+      capturadoEn:(typeof todayISO!=='undefined'?todayISO:''), version:6 };
     // IMC y WHR calculados — se guardan como texto para el expediente y las revaloraciones
     var nf=function(x){ var n=parseFloat(String(x).replace(',','.')); return (isFinite(n)&&n>0)?n:null; };
     var _p=nf(o.peso), _t=nf(o.talla), _ci=nf(o.cintura), _ca=nf(o.cadera); var _tm=(_t&&_t>3)?_t/100:_t;
@@ -20329,6 +20334,7 @@ function _dermaPrefill(d){
     S('n-derma-pielnaranja',d.pielNaranja||''); S('n-derma-depresiones',d.depresiones||'');
     S('n-derma-flacpiel',d.flacidezPiel||''); S('n-derma-flacmusc',d.flacidezMuscular||'');
     S('n-derma-microvarices',d.microvarices||''); S('n-derma-posturales',d.posturales||'');
+    S('n-derma-sueno',d.sueno||''); S('n-derma-estres',d.estres||'');
     S('n-derma-tipopiel',d.tipoPiel||''); S('n-derma-goglau',d.glogau||''); S('n-derma-acne',d.acne||'');
     S('n-derma-arrtipo',d.arrugasTipo||''); S('n-derma-tsuji',d.arrugasTsuji||''); S('n-derma-lapiere',d.arrugasGrado||'');
     S('n-derma-flacfacial',d.flacidezFacial||''); S('n-derma-botox',d.botoxPrevio||'');
@@ -20393,7 +20399,7 @@ function _dermaCardHTML(v){
       +row('Medidas',medidasTxt)
       +row('Perímetros (D/I)',d.perimetros,' narrative')
       +row('Diástasis de rectos',d.diastasis)
-      +((d.adiposidad||d.celulitisTipo||d.celulitisGrado||d.pielNaranja||d.depresiones||d.flacidezPiel||d.flacidezMuscular||d.microvarices||d.posturales)?sub('🍊 Corporal'):'')
+      +((d.adiposidad||d.celulitisTipo||d.celulitisGrado||d.pielNaranja||d.depresiones||d.flacidezPiel||d.flacidezMuscular||d.microvarices||d.posturales||d.sueno||d.estres)?sub('🍊 Corporal'):'')
       +row('Adiposidad localizada',d.adiposidad)
       +row('Celulitis',[d.celulitisTipo,d.celulitisGrado].filter(Boolean).join(' · '))
       +row('Piel de naranja',d.pielNaranja)
@@ -20402,6 +20408,8 @@ function _dermaCardHTML(v){
       +row('Flacidez muscular',d.flacidezMuscular)
       +row('Microvárices / telangiectasias',d.microvarices)
       +row('Alteraciones posturales',d.posturales)
+      +row('Calidad del sueño',d.sueno)
+      +row('Nivel de estrés',d.estres)
       +((d.tipoPiel||d.glogau||d.acne||d.alteracionesFaciales||d.arrugasLoc||d.arrugasTipo||d.flacidezFacial||d.botoxPrevio||d.fotoproteccion||d.lesionPiel)?sub('✨ Facial'):'')
       +row('Tipo de piel',d.tipoPiel)
       +row('Envejecimiento (Glogau)',d.glogau)
