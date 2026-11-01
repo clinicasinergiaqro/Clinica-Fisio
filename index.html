@@ -1356,7 +1356,7 @@ body.modo-oscuro .topbar{background:#141824}
 <body>
 <div id="sync-indicator" class="sync-indicator ok" style="display:none"></div>
 <div id="app-version-chip" title="Versión de la app en este equipo — toca para buscar actualización" onclick="try{_tapVersionChip()}catch(e){}"></div>
-<script>/* VERSIÓN VISIBLE: refleja el index.html realmente cargado en ESTE equipo (se bumpea junto con sw.js). Así un iPad con versión vieja se ve de un vistazo. */window.APP_VERSION='v1-2026-10-31f';(function(){try{var c=document.getElementById('app-version-chip');if(c)c.textContent=window.APP_VERSION;}catch(e){}})();</script>
+<script>/* VERSIÓN VISIBLE: refleja el index.html realmente cargado en ESTE equipo (se bumpea junto con sw.js). Así un iPad con versión vieja se ve de un vistazo. */window.APP_VERSION='v1-2026-11-01a';(function(){try{var c=document.getElementById('app-version-chip');if(c)c.textContent=window.APP_VERSION;}catch(e){}})();</script>
 <div class="toast" id="toast" aria-live="polite" aria-atomic="true"></div>
 
 <!-- LOGIN -->
@@ -19715,6 +19715,24 @@ function renderNuevoPaciente(){
           <select class="form-input" id="n-derma-autoriza"><option value="">No referida</option><option>Sí — sin restricciones</option><option>Sí — con restricciones</option><option>Pendiente de autorización</option><option>Viene por su cuenta (sin contacto con cirujano)</option></select>
           <input class="form-input" id="n-derma-autorizadet" type="text" style="margin-top:7px" placeholder="Qué autorizó / restricciones / retiro de puntos (fecha)"></div>
         <div class="form-field"><div class="form-label">Posición antálgica / postura de defensa <span style="font-weight:400;color:var(--gray-400);font-size:11px">· PANFIC</span></div><input class="form-input" id="n-derma-antalgica" type="text" placeholder="Vacío = no. Ej: camina en flexión de tronco (post-abdomino), protege hombro"></div>
+        <div style="font-size:12.5px;font-weight:700;color:#7A2F5D;margin:14px 0 4px">Técnica quirúrgica <span style="font-weight:400;color:var(--gray-400);font-size:11px">· define precauciones y zonas a tratar</span></div>
+        <div class="form-field"><div class="form-label">¿Hicieron marcación? <span style="font-weight:400;color:var(--gray-400);font-size:11px">· definición HD / etching</span></div>
+          <select class="form-input" id="n-derma-marcacion"><option value="">No referido</option><option>No</option><option>Sí — marcación / definición HD</option></select></div>
+        <div class="form-field"><div class="form-label">¿Plicatura? <span style="font-weight:400;color:var(--gray-400);font-size:11px">· reparación de la diástasis de rectos</span></div>
+          <select class="form-input" id="n-derma-plicatura"><option value="">No referido</option><option>No</option><option>Sí — plicatura de rectos</option></select>
+          <div style="background:#FDECEC;border:1px solid #F3C9C9;border-radius:10px;padding:8px 11px;font-size:11px;color:#B91C1C;margin-top:7px;line-height:1.6">Si hubo plicatura: las primeras semanas NO forzar el abdomen (tos/esfuerzo), postura en ligera flexión de tronco, cuidado con tracción y ejercicio abdominal.</div></div>
+        <div class="form-field"><div class="form-label">Tecnología de retracción de piel <span style="font-weight:400;color:var(--gray-400);font-size:11px">· tensado</span></div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:7px">
+            ${['Renuvion / J-Plasma','BodyTite / FaceTite (RFAL)','Morpheus8','Radiofrecuencia','HIFU / ultrasonido focalizado','Ninguna'].map(function(x){ return '<button type="button" class="chip-quick" onclick="_dermaChipAdd(\'n-derma-retraccion\',this.textContent)">'+x+'</button>'; }).join('')}
+          </div>
+          <input class="form-input" id="n-derma-retraccion" type="text" placeholder="La que usó el cirujano en la cirugía y/o la que se planea en terapia"></div>
+        <div style="font-size:12.5px;font-weight:700;color:#7A2F5D;margin:14px 0 4px">Recuperación post-operatoria <span style="font-weight:400;color:var(--gray-400);font-size:11px">· estado general tras la cirugía/anestesia</span></div>
+        <div class="form-field"><div class="form-label">Medicamentos que está tomando</div><input class="form-input" id="n-derma-medicamentos" type="text" placeholder="Analgésicos, antibióticos, anticoagulantes, hierro, hormonales…"></div>
+        <div class="form-field"><div class="form-label">Náusea / vómito <span style="font-weight:400;color:var(--gray-400);font-size:11px">· post-anestesia</span></div>
+          <select class="form-input" id="n-derma-vomitos"><option value="">No referido</option><option>Sin náusea ni vómito</option><option>Náusea sin vómito</option><option>Vómito — tolera mal la vía oral</option></select></div>
+        <div class="form-field"><div class="form-label">Evacuación intestinal</div>
+          <select class="form-input" id="n-derma-evacuacion"><option value="">No referido</option><option>Normal / ya evacuó</option><option>Aún no evacúa (post-anestesia/opioides)</option><option>Estreñimiento</option><option>Diarrea</option></select>
+          <div style="font-size:11px;color:var(--gray-500);margin-top:5px;line-height:1.5">Tras abdominoplastia/lipo con anestesia y opioides es común el estreñimiento/íleo; conviene saberlo antes de presoterapia o trabajo abdominal.</div></div>
         </div>
         <div style="font-size:12.5px;font-weight:700;color:#7A2F5D;margin:14px 0 4px">Factores de riesgo y hábitos <span style="font-weight:400;color:var(--gray-400);font-size:11px">· condicionan cicatrización y elección de equipos</span></div>
         <div style="display:flex;flex-wrap:wrap;gap:8px 14px;padding:4px 2px">
@@ -20179,6 +20197,14 @@ function _dermaDolorChip(btn){
     try{ marcarDirty(); }catch(_){}
   }catch(_e){}
 }
+// DERMATO: appender genérico de chips de 1 toque a un input de texto (sin duplicar). Lo usa la retracción.
+function _dermaChipAdd(id,txt){
+  try{ var el=document.getElementById(id); if(!el) return;
+    var cur=String(el.value||'').trim(); var parts=cur?cur.split(/,\s*/):[];
+    if(parts.indexOf(txt)===-1){ parts.push(txt); el.value=parts.join(', '); }
+    try{ marcarDirty(); }catch(_){}
+  }catch(_e){}
+}
 // IMC y relación cintura/cadera en vivo (PAFAL). Talla acepta cm o m.
 function _dermaCalcMedidas(){
   try{
@@ -20210,6 +20236,8 @@ function _dermaCollectAlta(){
       faja:g('n-derma-faja'),
       autorizacionCirujano:g('n-derma-autoriza'), autorizacionDet:g('n-derma-autorizadet'),
       posicionAntalgica:g('n-derma-antalgica'),
+      marcacion:g('n-derma-marcacion'), plicatura:g('n-derma-plicatura'), retraccionTec:g('n-derma-retraccion'),
+      medicamentos:g('n-derma-medicamentos'), vomitos:g('n-derma-vomitos'), evacuacion:g('n-derma-evacuacion'),
       riesgos:checks('derma-riesgo'),
       riesgosDetalle:g('n-derma-riesgosdet'),
       gineco:g('n-derma-gineco'),
@@ -20248,7 +20276,7 @@ function _dermaCollectAlta(){
       equipos:checks('derma-eq'),
       frecuencia:g('n-derma-frec')||'',
       planEstetico:g('n-derma-plan')||'',
-      capturadoEn:(typeof todayISO!=='undefined'?todayISO:''), version:4 };
+      capturadoEn:(typeof todayISO!=='undefined'?todayISO:''), version:5 };
     // IMC y WHR calculados — se guardan como texto para el expediente y las revaloraciones
     var nf=function(x){ var n=parseFloat(String(x).replace(',','.')); return (isFinite(n)&&n>0)?n:null; };
     var _p=nf(o.peso), _t=nf(o.talla), _ci=nf(o.cintura), _ca=nf(o.cadera); var _tm=(_t&&_t>3)?_t/100:_t;
@@ -20272,6 +20300,8 @@ function _dermaPrefill(d){
     S('n-derma-faja',d.faja||'');
     S('n-derma-autoriza',d.autorizacionCirujano||''); S('n-derma-autorizadet',d.autorizacionDet||'');
     S('n-derma-antalgica',d.posicionAntalgica||'');
+    S('n-derma-marcacion',d.marcacion||''); S('n-derma-plicatura',d.plicatura||''); S('n-derma-retraccion',d.retraccionTec||'');
+    S('n-derma-medicamentos',d.medicamentos||''); S('n-derma-vomitos',d.vomitos||''); S('n-derma-evacuacion',d.evacuacion||'');
     S('n-derma-riesgosdet',d.riesgosDetalle||''); S('n-derma-gineco',d.gineco||'');
     S('n-derma-prev',d.tratamientosPrevios||''); S('n-derma-expectativas',d.expectativas||'');
     S('n-derma-piel',d.pielApariencia||''); S('n-derma-testpresion',d.dolorPresion||'');
@@ -20337,6 +20367,12 @@ function _dermaCardHTML(v){
       +row('Faja / compresión',d.faja)
       +((d.autorizacionCirujano||d.autorizacionDet)?('<div class="field-row"><div class="field-label">Autorización del cirujano</div><div class="field-value" style="font-weight:600;color:'+((String(d.autorizacionCirujano||'').indexOf('Sí')===0)?'var(--green)':'var(--red)')+'">'+valorSeguroHTML([d.autorizacionCirujano,d.autorizacionDet].filter(Boolean).join(' — '))+'</div></div>'):'')
       +row('Posición antálgica',d.posicionAntalgica)
+      +row('Marcación (definición HD)',d.marcacion)
+      +row('Plicatura de rectos',d.plicatura)
+      +row('Tecnología de retracción',d.retraccionTec)
+      +row('Medicamentos actuales',d.medicamentos)
+      +row('Náusea / vómito post-op',d.vomitos)
+      +row('Evacuación intestinal',d.evacuacion)
       +row('Factores de riesgo',[d.riesgos,d.riesgosDetalle].filter(Boolean).join(' — '))
       +row('Gineco / hormonal',d.gineco)
       +row('Tratamientos previos',d.tratamientosPrevios)
@@ -20732,7 +20768,7 @@ async function guardarNuevoPaciente(){
     // DERMATO: resumen en la O de la nota de valoración (fail-safe, no rompe el alta)
     try{ var _dmx=nuevo.valoracion&&nuevo.valoracion.dermato;
       if(_dmx&&_dmx.es){ var _dmv=function(l,x){ x=String(x==null?'':x); return (x&&x.indexOf('No evaluad')!==0&&x!=='No especificado')?(l+x):''; };
-        _oExtra+=' · DERMATO FUNCIONAL: '+[(_dmx.tipos?('Caso: '+_dmx.tipos):''),_dmv('',_dmx.procedimiento),(_dmx.fechaCirugia?('Qx '+_dmx.fechaCirugia):''),_dmv('Autorización cirujano: ',_dmx.autorizacionCirujano),_dmv('Drenajes: ',_dmx.drenajes),_dmv('Faja: ',_dmx.faja),_dmv('Riesgos: ',_dmx.riesgos),_dmv('Dolor: ',_dmx.dolorTipo),_dmv('Edema: ',_dmx.edema),_dmv('Stemmer: ',_dmx.stemmer),_dmv('Fibrosis: ',_dmx.fibrosis),_dmv('Cicatriz: ',_dmx.cicatriz),('Complicaciones: '+_dmx.complicaciones)].filter(Boolean).join(' · '); }
+        _oExtra+=' · DERMATO FUNCIONAL: '+[(_dmx.tipos?('Caso: '+_dmx.tipos):''),_dmv('',_dmx.procedimiento),(_dmx.fechaCirugia?('Qx '+_dmx.fechaCirugia):''),_dmv('Autorización cirujano: ',_dmx.autorizacionCirujano),_dmv('Drenajes: ',_dmx.drenajes),_dmv('Faja: ',_dmx.faja),_dmv('Marcación: ',_dmx.marcacion),_dmv('Plicatura: ',_dmx.plicatura),_dmv('Retracción: ',_dmx.retraccionTec),_dmv('Medicamentos: ',_dmx.medicamentos),_dmv('Náusea/vómito: ',_dmx.vomitos),_dmv('Evacuación: ',_dmx.evacuacion),_dmv('Riesgos: ',_dmx.riesgos),_dmv('Dolor: ',_dmx.dolorTipo),_dmv('Edema: ',_dmx.edema),_dmv('Stemmer: ',_dmx.stemmer),_dmv('Fibrosis: ',_dmx.fibrosis),_dmv('Cicatriz: ',_dmx.cicatriz),('Complicaciones: '+_dmx.complicaciones)].filter(Boolean).join(' · '); }
     }catch(_){}
     var notaVal={
       id:generarIdSeguro_('s'), num:1, fecha:_fvFmt,
