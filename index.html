@@ -1356,7 +1356,7 @@ body.modo-oscuro .topbar{background:#141824}
 <body>
 <div id="sync-indicator" class="sync-indicator ok" style="display:none"></div>
 <div id="app-version-chip" title="Versión de la app en este equipo — toca para buscar actualización" onclick="try{_tapVersionChip()}catch(e){}"></div>
-<script>/* VERSIÓN VISIBLE: refleja el index.html realmente cargado en ESTE equipo (se bumpea junto con sw.js). Así un iPad con versión vieja se ve de un vistazo. */window.APP_VERSION='v1-2026-11-02b';(function(){try{var c=document.getElementById('app-version-chip');if(c)c.textContent=window.APP_VERSION;}catch(e){}})();</script>
+<script>/* VERSIÓN VISIBLE: refleja el index.html realmente cargado en ESTE equipo (se bumpea junto con sw.js). Así un iPad con versión vieja se ve de un vistazo. */window.APP_VERSION='v1-2026-11-02c';(function(){try{var c=document.getElementById('app-version-chip');if(c)c.textContent=window.APP_VERSION;}catch(e){}})();</script>
 <div class="toast" id="toast" aria-live="polite" aria-atomic="true"></div>
 
 <!-- LOGIN -->
@@ -1530,9 +1530,9 @@ body.modo-oscuro .topbar{background:#141824}
 
 <!-- BIBLIOTECA DE PROTOCOLOS (lector de docs/biblioteca_*.md vía protocolos.json; solo lectura) -->
 <style id="bib-style">
-#screen-biblioteca .content{padding:0}
+#screen-biblioteca .content{padding:0;background:var(--gray-50)}
 .bib-wrap{padding:14px 16px 46px;max-width:760px;margin:0 auto}
-.bib-intro{font-size:12.5px;line-height:1.55;color:var(--gray-600);background:var(--gray-50);border:1px solid var(--gray-100);border-radius:12px;padding:11px 13px;margin-bottom:12px}
+.bib-intro{font-size:12.5px;line-height:1.55;color:var(--gray-600);background:var(--white);border:1px solid var(--gray-200);border-left:3px solid var(--gold);border-radius:10px;padding:11px 13px;margin-bottom:14px}
 .bib-q{width:100%;padding:11px 13px;border:1px solid var(--gray-200);border-radius:12px;font-size:15px;margin-bottom:4px;box-sizing:border-box;background:var(--white);color:var(--gray-800)}
 .bib-lib{font-size:11.5px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--navy-light);margin:18px 2px 8px}
 .bib-card{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;text-align:left;background:var(--white);border:1px solid var(--gray-200);border-radius:12px;padding:13px 14px;margin-bottom:8px;cursor:pointer;font-family:inherit}
@@ -1542,10 +1542,24 @@ body.modo-oscuro .topbar{background:#141824}
 .bib-empty,.bib-loading,.bib-err{padding:28px 14px;text-align:center;color:var(--gray-600);font-size:13.5px;line-height:1.55}
 .bib-retry{margin-top:12px;background:var(--navy);color:#fff;border:none;border-radius:10px;padding:10px 18px;font-size:14px;font-weight:600;cursor:pointer}
 .bib-foot{margin-top:22px;font-size:11px;color:var(--gray-400);line-height:1.5;text-align:center;border-top:1px solid var(--gray-100);padding-top:12px}
-.bib-back2{background:none;border:none;color:var(--navy-light);font-size:14px;font-weight:600;cursor:pointer;padding:2px 0 10px;font-family:inherit}
-.bib-art-h{font-size:18px;font-weight:800;color:var(--navy);margin:2px 0 14px;line-height:1.3}
-.bib-art{font-size:13.5px;line-height:1.6;color:var(--gray-800)}
-.bib-art h3{font-size:15.5px;font-weight:800;color:var(--navy);margin:20px 0 8px;line-height:1.3}
+.bib-back2{background:none;border:none;color:var(--navy-light);font-size:14px;font-weight:600;cursor:pointer;padding:2px 0 12px;font-family:inherit}
+/* ÁREA = hoja de documento (lectura tipo PDF) */
+.bib-page{background:var(--white);border:1px solid var(--gray-200);border-radius:16px;box-shadow:0 6px 22px rgba(21,50,91,.07),0 1px 3px rgba(21,50,91,.05);padding:26px 22px 30px}
+.bib-eyebrow{font-size:10.5px;font-weight:800;letter-spacing:.13em;text-transform:uppercase;color:var(--navy-light);margin:0 0 7px}
+.bib-art-h{font-size:22px;font-weight:800;color:var(--navy);margin:0 0 13px;line-height:1.22;letter-spacing:-.01em;text-wrap:balance}
+.bib-doc-rule{height:3px;background:linear-gradient(90deg,var(--gold),rgba(196,154,46,0));border-radius:3px;margin:0 0 18px}
+.bib-toc{background:var(--gray-50);border:1px solid var(--gray-200);border-radius:12px;margin:0 0 20px;overflow:hidden}
+.bib-toc>summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:8px;font-size:11px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:var(--navy);padding:11px 14px}
+.bib-toc>summary::-webkit-details-marker{display:none}
+.bib-toc>summary::after{content:'▾';margin-left:auto;color:var(--gray-400);font-size:11px}
+.bib-toc[open]>summary::after{content:'▴'}
+.bib-toc ul{list-style:none;margin:0;padding:0 0 4px}
+.bib-toc li:not(:last-child) a{border-bottom:1px solid var(--gray-100)}
+.bib-toc a{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:9px 14px;cursor:pointer;color:var(--navy);font-size:13.5px;line-height:1.35;text-decoration:none;font-weight:500}
+.bib-toc a:active{background:var(--gray-100)}
+.bib-toc a::after{content:'›';flex:none;color:var(--gray-400);font-size:17px;font-weight:300}
+.bib-art{font-size:13.5px;line-height:1.62;color:var(--gray-800)}
+.bib-art h3{font-size:16px;font-weight:800;color:var(--navy);margin:24px 0 9px;line-height:1.3;scroll-margin-top:14px;padding-top:16px;border-top:1px solid var(--gray-100)}
 .bib-art h4{font-size:14px;font-weight:700;color:var(--navy-light);margin:16px 0 6px;line-height:1.3}
 .bib-art h5,.bib-art h6{font-size:13px;font-weight:700;color:var(--gray-800);margin:12px 0 5px}
 .bib-art p{margin:8px 0}
@@ -27000,11 +27014,23 @@ function _bibFiltrar(){
   if(!total) h.push('<div class="bib-empty">Sin resultados. Prueba otra palabra (ej. «aquiles», «SLAP», «cadera»).</div>');
   res.innerHTML=h.join('');
 }
+function _bibScrollTo(id){ try{ var el=document.getElementById(id); if(el){ el.scrollIntoView({behavior:'smooth',block:'start'}); } }catch(_){ try{ var e2=document.getElementById(id); if(e2) e2.scrollIntoView(); }catch(__){} } }
 function _bibAbrirArea(li,ai){
   var d=window._bibData; if(!d) return; var lib=(d.bibliotecas||[])[li]; if(!lib) return; var a=(lib.areas||[])[ai]; if(!a) return;
   window._bibView={li:li,ai:ai};
   var c=document.getElementById('content-biblioteca'); if(!c) return;
-  c.innerHTML='<div class="bib-wrap"><button class="bib-back2" onclick="_bibBack()">‹ Todos los protocolos</button><div class="bib-art-h">'+_bibEsc(a.titulo)+'</div><div class="bib-art">'+a.html+'</div></div>';
+  var toc=a.toc||[], tocHtml='';
+  if(toc.length>=2){
+    var items=toc.map(function(t){ return '<li><a onclick="_bibScrollTo(\''+t.id+'\')">'+_bibEsc(t.name)+'</a></li>'; }).join('');
+    tocHtml='<details class="bib-toc" open><summary>📑 Índice · '+toc.length+' secciones</summary><ul>'+items+'</ul></details>';
+  }
+  var eyebrow=_bibEsc((lib.emoji?lib.emoji+' ':'')+lib.titulo);
+  c.innerHTML='<div class="bib-wrap">'
+    +'<button class="bib-back2" onclick="_bibBack()">‹ Todos los protocolos</button>'
+    +'<div class="bib-page"><div class="bib-eyebrow">'+eyebrow+'</div>'
+    +'<div class="bib-art-h">'+_bibEsc(a.titulo)+'</div><div class="bib-doc-rule"></div>'
+    +tocHtml
+    +'<div class="bib-art">'+a.html+'</div></div></div>';
   try{ c.scrollTop=0; }catch(_){}
 }
 // ── B1: Gráfica EVA en SVG puro (sin librerías) ──
