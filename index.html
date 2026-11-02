@@ -1356,7 +1356,7 @@ body.modo-oscuro .topbar{background:#141824}
 <body>
 <div id="sync-indicator" class="sync-indicator ok" style="display:none"></div>
 <div id="app-version-chip" title="Versión de la app en este equipo — toca para buscar actualización" onclick="try{_tapVersionChip()}catch(e){}"></div>
-<script>/* VERSIÓN VISIBLE: refleja el index.html realmente cargado en ESTE equipo (se bumpea junto con sw.js). Así un iPad con versión vieja se ve de un vistazo. */window.APP_VERSION='v1-2026-11-02a';(function(){try{var c=document.getElementById('app-version-chip');if(c)c.textContent=window.APP_VERSION;}catch(e){}})();</script>
+<script>/* VERSIÓN VISIBLE: refleja el index.html realmente cargado en ESTE equipo (se bumpea junto con sw.js). Así un iPad con versión vieja se ve de un vistazo. */window.APP_VERSION='v1-2026-11-02b';(function(){try{var c=document.getElementById('app-version-chip');if(c)c.textContent=window.APP_VERSION;}catch(e){}})();</script>
 <div class="toast" id="toast" aria-live="polite" aria-atomic="true"></div>
 
 <!-- LOGIN -->
@@ -1408,6 +1408,10 @@ body.modo-oscuro .topbar{background:#141824}
     <button class="nav-item" onclick="showPacientes()">
       <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="9" cy="7" r="4"/><path d="M3 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/><path d="M21 21v-2a4 4 0 0 0-3-3.87"/></svg>
       Pacientes
+    </button>
+    <button class="nav-item" onclick="showBiblioteca()">
+      <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+      Protocolos
     </button>
     <button class="nav-item" id="nav-supervision" onclick="showSupervision()" style="display:none">
       <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
@@ -1522,6 +1526,51 @@ body.modo-oscuro .topbar{background:#141824}
     </div>
   </div>
   <div class="content" id="content-supervision"></div>
+</div>
+
+<!-- BIBLIOTECA DE PROTOCOLOS (lector de docs/biblioteca_*.md vía protocolos.json; solo lectura) -->
+<style id="bib-style">
+#screen-biblioteca .content{padding:0}
+.bib-wrap{padding:14px 16px 46px;max-width:760px;margin:0 auto}
+.bib-intro{font-size:12.5px;line-height:1.55;color:var(--gray-600);background:var(--gray-50);border:1px solid var(--gray-100);border-radius:12px;padding:11px 13px;margin-bottom:12px}
+.bib-q{width:100%;padding:11px 13px;border:1px solid var(--gray-200);border-radius:12px;font-size:15px;margin-bottom:4px;box-sizing:border-box;background:var(--white);color:var(--gray-800)}
+.bib-lib{font-size:11.5px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--navy-light);margin:18px 2px 8px}
+.bib-card{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;text-align:left;background:var(--white);border:1px solid var(--gray-200);border-radius:12px;padding:13px 14px;margin-bottom:8px;cursor:pointer;font-family:inherit}
+.bib-card:active{background:var(--gray-50)}
+.bib-card-t{font-size:14px;font-weight:600;color:var(--navy);line-height:1.35}
+.bib-card-ar{color:var(--gray-400);font-size:22px;font-weight:300;flex:none;line-height:1}
+.bib-empty,.bib-loading,.bib-err{padding:28px 14px;text-align:center;color:var(--gray-600);font-size:13.5px;line-height:1.55}
+.bib-retry{margin-top:12px;background:var(--navy);color:#fff;border:none;border-radius:10px;padding:10px 18px;font-size:14px;font-weight:600;cursor:pointer}
+.bib-foot{margin-top:22px;font-size:11px;color:var(--gray-400);line-height:1.5;text-align:center;border-top:1px solid var(--gray-100);padding-top:12px}
+.bib-back2{background:none;border:none;color:var(--navy-light);font-size:14px;font-weight:600;cursor:pointer;padding:2px 0 10px;font-family:inherit}
+.bib-art-h{font-size:18px;font-weight:800;color:var(--navy);margin:2px 0 14px;line-height:1.3}
+.bib-art{font-size:13.5px;line-height:1.6;color:var(--gray-800)}
+.bib-art h3{font-size:15.5px;font-weight:800;color:var(--navy);margin:20px 0 8px;line-height:1.3}
+.bib-art h4{font-size:14px;font-weight:700;color:var(--navy-light);margin:16px 0 6px;line-height:1.3}
+.bib-art h5,.bib-art h6{font-size:13px;font-weight:700;color:var(--gray-800);margin:12px 0 5px}
+.bib-art p{margin:8px 0}
+.bib-art ul,.bib-art ol{margin:8px 0;padding-left:20px}
+.bib-art li{margin:4px 0;line-height:1.55}
+.bib-art strong{font-weight:700}
+.bib-art code{background:var(--gray-100);padding:1px 5px;border-radius:5px;font-size:12px;font-family:ui-monospace,Menlo,Consolas,monospace;word-break:break-word}
+.bib-art pre{background:var(--navy);color:#E8EEF7;padding:12px 13px;border-radius:10px;overflow-x:auto;font-size:11.5px;line-height:1.45;margin:10px 0}
+.bib-art pre code{background:none;color:inherit;padding:0;font-size:inherit}
+.bib-art blockquote{border-left:3px solid var(--navy-light);background:var(--gray-50);margin:10px 0;padding:8px 12px;border-radius:0 8px 8px 0}
+.bib-art blockquote p{margin:4px 0;font-size:13px}
+.bib-art hr{border:none;border-top:1px solid var(--gray-200);margin:16px 0}
+.bib-art a{color:#2563EB;word-break:break-word}
+.bib-art table{width:100%;border-collapse:collapse;margin:10px 0;font-size:12px;display:block;overflow-x:auto}
+.bib-art th,.bib-art td{border:1px solid var(--gray-200);padding:6px 8px;text-align:left;vertical-align:top}
+.bib-art th{background:var(--gray-50);font-weight:700;color:var(--navy)}
+</style>
+<div class="screen" id="screen-biblioteca">
+  <div class="topbar">
+    <div class="topbar-left">
+      <button class="back-btn" onclick="_bibBack()">‹</button>
+      <div class="topbar-title" id="bib-title">📋 Protocolos</div>
+    </div>
+  </div>
+  <div class="content" id="content-biblioteca"></div>
 </div>
 
 <!-- EJERCICIOS DEL PACIENTE -->
@@ -26906,6 +26955,57 @@ async function qaProbarCiclo7(){
 function showSupervision(){
   if(currentUser.role!=='supervisor') return;
   screenStack.push('screen-supervision');showScreen('screen-supervision',false);renderSupervision();
+}
+
+// ===== 📋 BIBLIOTECA DE PROTOCOLOS — lector de docs/biblioteca_*.md → ./protocolos.json =====
+// SOLO LECTURA: no toca saveDB ni ningún guardado. Visible para TODOS (fisios + supervisor).
+// Datos estáticos en ./protocolos.json (precacheado por el SW, funciona offline). activo=migrado
+// irrelevante (contenido de referencia, no por paciente). Android+iOS+laptop (DOM/CSS puro).
+window._bibData=window._bibData||null; window._bibView=null;
+function _bibEsc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function _bibNorm(s){ try{ return String(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase(); }catch(_){ return String(s||'').toLowerCase(); } }
+function showBiblioteca(){ screenStack.push('screen-biblioteca'); showScreen('screen-biblioteca',false); renderBiblioteca(); }
+function _bibBack(){ if(window._bibView){ window._bibView=null; _bibRenderLista(); return; } goBack(); }
+function renderBiblioteca(){
+  window._bibView=null;
+  var c=document.getElementById('content-biblioteca'); if(!c) return;
+  if(window._bibData){ _bibRenderLista(); return; }
+  c.innerHTML='<div class="bib-wrap"><div class="bib-loading">⏳ Cargando protocolos…</div></div>';
+  fetch('./protocolos.json').then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
+    .then(function(d){ window._bibData=d; if(((document.querySelector('.screen.active')||{}).id)==='screen-biblioteca') _bibRenderLista(); })
+    .catch(function(e){ var cc=document.getElementById('content-biblioteca'); if(cc) cc.innerHTML='<div class="bib-wrap"><div class="bib-err">No se pudo cargar la biblioteca de protocolos.<br>Revisa tu conexión e inténtalo de nuevo.<br><button class="bib-retry" onclick="window._bibData=null;renderBiblioteca()">Reintentar</button></div></div>'; });
+}
+function _bibRenderLista(){
+  var d=window._bibData, c=document.getElementById('content-biblioteca'); if(!d||!c) return;
+  window._bibView=null;
+  var h=['<div class="bib-wrap">'];
+  h.push('<div class="bib-intro">📚 Material de <b>referencia</b>: progresa por <b>criterios</b>, no por calendario; en post-quirúrgico manda el cirujano. Toca una lesión para leer sus fases, qué sí / qué no, criterios de retorno y pruebas diagnósticas.</div>');
+  h.push('<input id="bib-q" class="bib-q" type="search" inputmode="search" autocomplete="off" placeholder="🔎 Buscar (rodilla, hombro, lumbar, menisco, prótesis…)" oninput="_bibFiltrar()">');
+  h.push('<div id="bib-results"></div>');
+  h.push('<div class="bib-foot">Generado '+_bibEsc(d.generado||'')+' · evidencia internacional 2021–2026 · los números finos marcados [verificar] los afina el fisio contra la fuente. No sustituye el criterio clínico.</div>');
+  h.push('</div>');
+  c.innerHTML=h.join(''); try{ c.scrollTop=0; }catch(_){}
+  _bibFiltrar();
+}
+function _bibFiltrar(){
+  var d=window._bibData; var res=document.getElementById('bib-results'); if(!d||!res) return;
+  var q=_bibNorm((document.getElementById('bib-q')||{}).value||'').trim();
+  var h=[], total=0;
+  (d.bibliotecas||[]).forEach(function(lib,li){
+    var hits=[]; (lib.areas||[]).forEach(function(a,ai){ if(!q || _bibNorm(a.titulo).indexOf(q)>=0) hits.push({a:a,ai:ai}); });
+    if(!hits.length) return;
+    h.push('<div class="bib-lib">'+_bibEsc((lib.emoji?lib.emoji+' ':'')+lib.titulo)+'</div>');
+    hits.forEach(function(o){ total++; h.push('<button class="bib-card" onclick="_bibAbrirArea('+li+','+o.ai+')"><span class="bib-card-t">'+_bibEsc(o.a.titulo)+'</span><span class="bib-card-ar">›</span></button>'); });
+  });
+  if(!total) h.push('<div class="bib-empty">Sin resultados. Prueba otra palabra (ej. «aquiles», «SLAP», «cadera»).</div>');
+  res.innerHTML=h.join('');
+}
+function _bibAbrirArea(li,ai){
+  var d=window._bibData; if(!d) return; var lib=(d.bibliotecas||[])[li]; if(!lib) return; var a=(lib.areas||[])[ai]; if(!a) return;
+  window._bibView={li:li,ai:ai};
+  var c=document.getElementById('content-biblioteca'); if(!c) return;
+  c.innerHTML='<div class="bib-wrap"><button class="bib-back2" onclick="_bibBack()">‹ Todos los protocolos</button><div class="bib-art-h">'+_bibEsc(a.titulo)+'</div><div class="bib-art">'+a.html+'</div></div>';
+  try{ c.scrollTop=0; }catch(_){}
 }
 // ── B1: Gráfica EVA en SVG puro (sin librerías) ──
 function generarGraficaEVA(p){
