@@ -15,14 +15,14 @@
 | Daf | DA / DAF | `dafnend26@gmail.com` | fisioterapeuta |
 | Zara | ZA / ZARA | `gutierrezgarciazaray96@gmail.com` | fisioterapeuta |
 | Camila | CA / CAMI | `camislerma26@gmail.com` | fisioterapeuta |
-| Gore | GO / GORE | `agoretti.mr@gmail.com` | fisioterapeuta |
 | Jess | JE / JESS | `jriveare2000@hotmail.com` | fisioterapeuta |
 | Dulce | DU / DUL | `dulcesalazar_1799@hotmail.com` | fisioterapeuta |
 
 - El **supervisor** (único que borra/administra) es SOLO `lftaranda@gmail.com`.
 - Los correos van **en minúsculas**; las reglas comparan con `.lower()`, así que un correo
   con mayúsculas (p. ej. `Jriveare2000@hotmail.com`) igual entra, pero **guárdalos en minúsculas**.
-- Última auditoría de consistencia: **2026-09-18 → los 4 lugares coinciden (sin desfase).**
+- **Goretti (`agoretti.mr@gmail.com`) dada de BAJA el 2026-11-02** (ya no atiende). Se quitó de los 4 lugares. Su historia (notas migradas, parsing de calendario `G`/`GORE`, color, nombre) se CONSERVA a propósito para que sus expedientes viejos sigan resolviéndose. **Falta que Carlos redespliegue Storage y Backend (Codigo.gs); Firestore vivo ya estaba sin ella.**
+- Última auditoría de consistencia: **2026-11-02 → los 4 lugares coinciden con 6 correos (Carlos + 5 fisios).**
 
 ---
 
@@ -36,7 +36,7 @@
    **Autoridad real** de fotos/estudios/archivos.
 4. **Backend** — `config/Codigo.gs`, `const ROLES_BACKEND` (~L18): correo → rol. Autoriza el Apps Script.
 
-> Los 3 backends (2, 3, 4) DEBEN tener exactamente los mismos 7 correos. El front (1) los mismos,
+> Los 3 backends (2, 3, 4) DEBEN tener exactamente los mismos 6 correos. El front (1) los mismos,
 > más nombre/inicial.
 
 ---

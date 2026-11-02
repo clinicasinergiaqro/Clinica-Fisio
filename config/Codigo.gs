@@ -21,7 +21,6 @@ const ROLES_BACKEND = {
   // Fisioterapeutas autorizadas
   'gutierrezgarciazaray96@gmail.com': 'fisioterapeuta', // Zara
   'camislerma26@gmail.com': 'fisioterapeuta',           // Camila
-  'agoretti.mr@gmail.com': 'fisioterapeuta',            // Gore
   'dafnend26@gmail.com': 'fisioterapeuta',              // Daf
   'jriveare2000@hotmail.com': 'fisioterapeuta',          // Jess
   'dulcesalazar_1799@hotmail.com': 'fisioterapeuta'     // Dulce
