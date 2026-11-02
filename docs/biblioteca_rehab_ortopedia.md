@@ -289,6 +289,14 @@ Los hallazgos "degenerativos" en RM son **enormemente frecuentes en personas SIN
 
 ### 7. CUADRO A — Lumbalgia INESPECÍFICA (aguda / subacuta / crónica)
 
+> **📋 Encuadre**
+>
+> **🎯 Indicaciones:** Dolor lumbar común sin radiculopatía ni bandera roja (~90–95% de los casos); se clasifica por tiempo (aguda <6 sem · subaguda 6–12 sem · crónica ≥12 sem) y se estratifica el riesgo (STarT Back).
+>
+> **⛔ Contraindicaciones / cuándo derivar:** No tratarlo como inespecífico si hay banderas rojas (cauda equina → urgencias HOY, fractura, cáncer, infección, AAA, déficit neurológico progresivo/pie caído — §3), ni si hay componente radicular (→ §8) o claudicación neurógena (→ §9).
+>
+> **⚠️ Precauciones:** Progresar por CRITERIOS, no por calendario. NO reposo en cama, NO imagen de rutina, NO lenguaje nocebo, NO opioides de rutina. La carga/ejercicio es el motor; agentes físicos y terapia manual solo como coadyuvantes. En crónico, abordaje biopsicosocial (CFT, educación en dolor). Respetar seguridad de agentes físicos (§11, `seguridadClinica`).
+
 **Definiciones de tiempo** (varían): aguda <6 sem · subaguda 6–12 sem · persistente/crónica ≥12 sem (algunos usan agudo <4 sem) `[verificar]`.
 
 **Historia natural (tranquilizar con datos reales):** la mayor mejoría ocurre en las **primeras ~6 semanas**; sigue mejorando hasta ~3 meses y luego se estabiliza. PERO la **recurrencia es común** (~69–73% tiene ≥1 recaída en 12 meses) — por eso se educa en manejo de recaídas y se construye hábito de ejercicio. El paso a dolor crónico persistente es menor pero real (estimaciones 2–56% según definición) `[verificar]`.
@@ -324,6 +332,14 @@ Los hallazgos "degenerativos" en RM son **enormemente frecuentes en personas SIN
 
 ### 8. CUADRO B — Hernia discal lumbar con RADICULOPATÍA / ciática
 
+> **📋 Encuadre**
+>
+> **🎯 Indicaciones:** Dolor radicular / ciática por hernia discal lumbar (dolor de pierna dominante, patrón de raíz). Historia natural muy favorable: la mayoría mejora sin cirugía en ~4–6 semanas y la hernia tiende a reabsorberse.
+>
+> **⛔ Contraindicaciones / cuándo derivar:** URGENTE si cauda equina (§3.1 → quirófano) o déficit motor severo/rápidamente progresivo o pie caído (valoración en días). Electiva: dolor radicular invalidante que NO mejora tras ~6–12 sem de conservador bien conducido con hernia concordante. Vigilar siempre el déficit neurológico progresivo.
+>
+> **⚠️ Precauciones:** Progresar por CRITERIOS (centralización, §6.3). Evitar posturas/movimientos que **periferalizan** y el reposo prolongado; favorecer los que **centralizan**. Ejercicio + educación como base; terapia manual coadyuvante; analgesia según médico. Respetar seguridad de agentes físicos (§11).
+
 #### 8.1 Historia natural (muy favorable — tranquilizar)
 - **La mayoría mejora SIN cirugía.** La ciática por hernia suele mejorar sustancialmente en **~4–6 semanas** con manejo conservador.
 - **Reabsorción espontánea** de la hernia es frecuente: más probable cuanto más **extruido/secuestrado** el fragmento (secuestrado > extrusión amplia > protrusión contenida), y más temprano (reabsorción significativa ≥50% en ~1/3 de pacientes dentro del 1er año) `[verificar]`.
@@ -352,6 +368,14 @@ Los hallazgos "degenerativos" en RM son **enormemente frecuentes en personas SIN
   - Mensaje clínico: operar **acelera** el alivio del dolor de pierna en el subgrupo que no mejora; no "repara" más que el tiempo en quienes iban a mejorar. Pacientes que claramente mejoran NO deben operarse.
 
 #### 8.4 Rehabilitación POST-microdiscectomía
+
+> **📋 Encuadre**
+>
+> **🎯 Indicaciones:** Rehabilitación tras microdiscectomía lumbar. El ejercicio suele iniciar ~4–6 semanas (sin consenso del momento óptimo); el programa domiciliario ≈ supervisado en eficacia.
+>
+> **⛔ Contraindicaciones / cuándo derivar:** Los protocolos y restricciones los fija el equipo quirúrgico — confírmalos antes de progresar. Avisar al cirujano ante déficit neurológico nuevo o progresivo.
+>
+> **⚠️ Precauciones:** Fase de protección (~0–4/6 sem): evitar flexión repetida/cargada, levantamiento y rotación cargada. Retorno laboral: sedentario ~2 sem, manual/pesado ~6–8 sem [verificar]. "Manda el cirujano": confirmar restricciones. Respetar seguridad de agentes físicos (§11).
 > Protocolos varían por cirujano. Confirma restricciones con el equipo quirúrgico.
 - **Inicio de ejercicio:** la evidencia (Cochrane 2003) respalda que **programas de ejercicio que inician a las ~4–6 semanas** mejoran función y retorno al trabajo a corto plazo, sin diferencia a largo plazo vs programas suaves; algunos protocolos inician **ejercicio suave/movilidad inmediato** (mejora movilidad y retorno más temprano) y otros sugieren mejores resultados iniciando ~12 sem — **no hay consenso del momento óptimo** `[verificar]`. Programas **domiciliarios = supervisados** en eficacia.
 - **Fases (criterio-dependientes):**
@@ -361,6 +385,14 @@ Los hallazgos "degenerativos" en RM son **enormemente frecuentes en personas SIN
 - **Retorno al trabajo:** sedentario ~2 semanas; manual/pesado ~**6–8 semanas**; restricción de levantamiento pesado hasta ~6–8 sem `[verificar]`.
 
 #### 8.5 Rehabilitación POST-FUSIÓN lumbar (artrodesis)
+
+> **📋 Encuadre**
+>
+> **🎯 Indicaciones:** Rehabilitación tras fusión lumbar (artrodesis). Más conservadora que la microdiscectomía porque hay que proteger la consolidación ósea; la fisioterapia formal suele iniciar ~6–12 semanas.
+>
+> **⛔ Contraindicaciones / cuándo derivar:** MUY dependiente del cirujano, número de niveles y consolidación — confirma SIEMPRE las restricciones con el equipo quirúrgico. Avisar ante déficit neurológico nuevo o signos de no-unión.
+>
+> **⚠️ Precauciones:** Precauciones BLT (flexionar/levantar/rotar) restringidas ~6–12 sem. Fase temprana: levantamiento limitado (~2–4.5 kg [verificar]), evitar flexión/rotación cargadas e impacto; sin correr/saltar/alto impacto hasta ~3 meses. Faja, restricción de NSAIDs y estimulador óseo según cirujano. "Manda el cirujano". Respetar seguridad de agentes físicos (§11).
 > **MUY dependiente del cirujano, número de niveles y consolidación ósea. Confirma SIEMPRE las restricciones.** Más conservador que la microdiscectomía porque hay que proteger la consolidación.
 - **Precauciones BLT** (Bending/Lifting/Twisting — flexionar, levantar, rotar): se restringen típicamente **~6 a 12 semanas** `[verificar por protocolo]`.
 - **Fase temprana (≈0–6/12 sem):** caminar + programa domiciliario suave; **levantamiento limitado ~2–4.5 kg (5–10 lb)** `[verificar]`; evitar flexión/rotación cargadas e impacto; conducir cuando esté sin opioides y sin debilidad de pierna (~2–4 sem). Fisioterapia formal suele iniciar **6–12 sem**.
@@ -371,6 +403,14 @@ Los hallazgos "degenerativos" en RM son **enormemente frecuentes en personas SIN
 ---
 
 ### 9. CUADRO C — ESTENOSIS del canal lumbar (claudicación neurógena)
+
+> **📋 Encuadre**
+>
+> **🎯 Indicaciones:** Adulto mayor con dolor/pesadez/adormecimiento en glúteos y piernas al caminar o estar de pie (extensión) que **alivia al sentarse o inclinarse adelante (flexión)**. Manejo conservador multimodal (terapia manual + ejercicio) antes de cirugía.
+>
+> **⛔ Contraindicaciones / cuándo derivar:** Diferenciar de claudicación vascular (ésta no alivia con flexión; valorar pulsos, prueba de la bicicleta §6.4). Derivar a valoración quirúrgica si claudicación invalidante que no responde o déficit neurológico progresivo; cauda equina = urgencia. Los esteroides epidurales NO son efectivos.
+>
+> **⚠️ Precauciones:** Progresar por criterios. Trabajar en **FLEXIÓN** (flexión lumbar, bicicleta estática, marcha inclinada); **evitar extensión lumbar sostenida/provocadora y cargas en extensión**. Respetar seguridad de agentes físicos (§11).
 
 **Cuadro clínico:** adulto mayor; dolor/pesadez/adormecimiento en glúteos y piernas **al caminar o estar de pie (extensión)**, que **alivia al sentarse o inclinarse adelante (flexión)**. Diferenciar de claudicación vascular (ésta alivia solo con detenerse, no con flexión; pulsos; prueba de bicicleta §6.4).
 
@@ -391,6 +431,14 @@ Los hallazgos "degenerativos" en RM son **enormemente frecuentes en personas SIN
 ---
 
 ### 10. CUADRO D — ESPONDILÓLISIS / ESPONDILOLISTESIS (deportista adolescente)
+
+> **📋 Encuadre**
+>
+> **🎯 Indicaciones:** Lumbalgia del adolescente deportista por gestos de **extensión + rotación repetida** (gimnasia, clavados, fútbol americano, tenis, danza, vóley). Espondilólisis (defecto de la pars) ± espondilolistesis; la mayoría se maneja sin cirugía y regresa a su deporte (retorno ~4–5 meses [verificar]).
+>
+> **⛔ Contraindicaciones / cuándo derivar:** No volver al deporte con dolor. Valorar/derivar ante dolor persistente que no responde o progresión del deslizamiento; descartar banderas rojas de la región (§3). Mandan los **criterios clínicos**, no la curación radiográfica.
+>
+> **⚠️ Precauciones:** Progresar por criterios. Fase temprana: suspender el gesto provocador (extensión/rotación), trabajar control motor en posición **neutra/antilordótica**; evitar extensión/rotación cargada. Ortesis (TLSO) según equipo (evidencia inconsistente). Respetar seguridad de agentes físicos (§11).
 
 **Contexto:** causa frecuente de lumbalgia en adolescente deportista (gestos de **extensión + rotación repetida**: gimnasia, clavados, fútbol americano, tenis, danza, vóley). Espondilólisis = defecto de la pars; puede progresar a espondilolistesis (deslizamiento). **La mayoría se maneja sin cirugía y regresa a su deporte.**
 
@@ -597,9 +645,25 @@ Hoffmann, Babinski, clonus, hiperreflexia, marcha en tándem, supinador invertid
 ### Región CERVICAL
 ### 3. Cervicalgia mecánica inespecífica y clasificación por el *Neck Pain CPG* (Blanpied et al. 2017, JOSPT)
 
+> **📋 Encuadre**
+>
+> **🎯 Indicaciones:** Dolor de cuello mecánico (modula con movimiento/postura), sin signos radiculares ni banderas rojas; cae casi siempre en la categoría 1 (déficit de movilidad, §3.1) o 2 (control motor/coordinación, §3.2) del *Neck Pain CPG*.
+>
+> **⛔ Contraindicaciones / cuándo derivar:** Descartar primero banderas rojas (§1): mielopatía, patología vascular/disección, fractura/inestabilidad, cáncer/infección → derivar, no tratar. Si hay dolor radiante (radicular) → §10; cefalea cervicogénica → §5.
+>
+> **⚠️ Precauciones:** Cribado de seguridad OBLIGATORIO antes de cualquier manipulación/tracción cervical (§1, §11). NO collarín/inmovilización ni reposo (empeoran). La FUERZA cérvico-escápulo-torácica es el motor; agentes físicos coadyuvantes. Progresar por criterios y tolerancia a 24 h. Respetar `seguridadClinica` (metal, marcapaso, embarazo, anticoagulación, cáncer).
+
 El *Neck Pain Clinical Practice Guideline* (revisión 2017, JOSPT 47(7):A1-A83) clasifica el dolor de cuello en **4 categorías** ligadas a la CIF, cruzadas por **agudeza** (agudo/subagudo/crónico). Cada categoría tiene intervenciones emparejadas. **La cervicalgia mecánica inespecífica cae casi siempre en la categoría 1 o 2.**
 
 #### 3.1 Cuello con DÉFICIT DE MOVILIDAD
+
+> **📋 Encuadre**
+>
+> **🎯 Indicaciones:** Dolor de cuello localizado con limitación de ROM y patrón mecánico, **sin signos radiculares ni rojos** (categoría 1 del *Neck Pain CPG*). Base: terapia manual cervical Y torácica + ejercicio de movilidad y fortalecimiento cérvico-escápulo-torácico.
+>
+> **⛔ Contraindicaciones / cuándo derivar:** Si aparecen signos radiculares, de mielopatía o banderas rojas (§1) → reevaluar y derivar antes de manipular/traccionar.
+>
+> **⚠️ Precauciones:** Cribado de seguridad antes de terapia manual/manipulación cervical y torácica (§1, §11). En irritabilidad alta: movilización suave, ROM tolerable, isométricos; evitar estiramiento agresivo y cargas altas. NO reposo, collarín ni pasividad total. Avanzar por criterios (sin recaída a 24 h). `seguridadClinica`.
 Dolor localizado, limitación de ROM, patrón mecánico, sin signos radiculares ni rojos.
 - **Qué SÍ:** **terapia manual cervical Y torácica** (movilización/manipulación — con cribado de seguridad §1) + **ejercicio de movilidad y fortalecimiento cérvico-escápulo-torácico**; educación para mantenerse activo. En agudo, manipulación/movilización torácica + ejercicio es razonable.
 - **Qué NO:** reposo, collarín, pasividad total, apoyarse solo en agentes físicos.
@@ -610,6 +674,14 @@ Dolor localizado, limitación de ROM, patrón mecánico, sin signos radiculares 
 - **Hitos orientativos:** la mayoría de las cervicalgias agudas mejoran en **semanas**; si no hay progreso a ~6 semanas, reevaluar clasificación y banderas.
 
 #### 3.2 Cuello con ALTERACIONES DEL CONTROL MOTOR Y LA COORDINACIÓN (incluye WAD — latigazo; ver §4)
+
+> **📋 Encuadre**
+>
+> **🎯 Indicaciones:** Dolor de cuello con pobre control cérvico-escapular, hipersensibilidad y a veces mareo cervicogénico; típico tras latigazo (categoría 2 del *Neck Pain CPG*; WAD → §4).
+>
+> **⛔ Contraindicaciones / cuándo derivar:** Descartar banderas rojas (§1) y fractura/inestabilidad en el contexto traumático (WAD IV → urgencia, §4). No sobre-estudiar con imagen en ausencia de banderas.
+>
+> **⚠️ Precauciones:** NO collarín/inmovilización, reposo ni mensajes alarmistas (empeoran el pronóstico). Peso en control motor (CCFT/flexores profundos), exposición gradual al movimiento y manejo de la hipersensibilidad/factores psicosociales. Avanzar por tolerancia y control, no por tiempo. Cribado de seguridad antes de manual/tracción (§1, §11).
 Dolor con pobre control cérvico-escapular, hipersensibilidad, a veces mareo cervicogénico; típico tras latigazo.
 - **Qué SÍ:** **educación y tranquilización** (recuperación esperada, mantenerse activo, volver a la actividad normal), **ejercicio de coordinación/control motor** (flexores profundos — CCFT), **fortalecimiento**; en crónico, abordaje **multimodal** (manual + ejercicio ± TENS), y educación en dolor.
 - **Qué NO:** collarín/inmovilización, reposo, mensajes alarmistas (empeoran el pronóstico), sobre-estudiar con imagen en ausencia de banderas.
@@ -624,6 +696,14 @@ Dolor con pobre control cérvico-escapular, hipersensibilidad, a veces mareo cer
 ---
 
 ### 4. Latigazo cervical / Whiplash-Associated Disorders (WAD)
+
+> **📋 Encuadre**
+>
+> **🎯 Indicaciones:** Trastornos asociados al latigazo cervical, grados I–III de la Quebec Task Force (dolor/rigidez cervical ± signos músculo-esqueléticos o neurológicos tras aceleración-desaceleración). Manejo **activo y temprano**.
+>
+> **⛔ Contraindicaciones / cuándo derivar:** **WAD IV** (fractura/luxación) = urgencia → inmovilizar y derivar; aplicar reglas de trauma (Canadian C-Spine Rule / NEXUS, §1.3) ante mecanismo de alto riesgo, déficit neurológico o dolor axial intenso. Estratificar riesgo temprano (WhipPredict) e intensificar en alto riesgo.
+>
+> **⚠️ Precauciones:** NO collarín/inmovilización (empeora), reposo prolongado ni mensajes catastrofistas. Base: educación + tranquilización ("act as usual"), ejercicio específico de cuello y de coordinación/control motor, ejercicio para el mareo si lo hay, analgesia simple. En crónico, abordar factores psicosociales. Cribado de seguridad antes de manual/tracción (§1, §11).
 
 #### 4.1 Clasificación de la Quebec Task Force (Spitzer 1995)
 | Grado | Hallazgos |
@@ -653,6 +733,14 @@ En WAD IV (y sospecha de fractura) aplicar reglas de trauma (**Canadian C-Spine 
 
 ### 5. Cefalea cervicogénica (breve)
 
+> **📋 Encuadre**
+>
+> **🎯 Indicaciones:** Cefalea referida desde estructuras cervicales altas (**C1–C3**), típicamente unilateral "de lado fijo", que se reproduce con posturas/movimientos del cuello o presión sobre la columna cervical alta. Evaluar con CFRT (§2.2) y CCFT (§2.3).
+>
+> **⛔ Contraindicaciones / cuándo derivar:** No tratar como migraña/cefalea tensional sin examinar el cuello. Si no responde, replantear el diagnóstico. Descartar banderas rojas y vasculares/mielopáticas antes de tratar la cervical alta (§1).
+>
+> **⚠️ Precauciones:** NO manipular sin cribado vascular/mielopático (§1, §11). Combinar **terapia manual de columna cervical alta** (movilización/SNAG C1–C2) **+ ejercicio** (fortalecimiento/resistencia cérvico-escapular y flexores profundos) — la combinación supera a cualquiera sola. `seguridadClinica`.
+
 Cefalea referida desde estructuras cervicales altas (**C1-C3**), típicamente unilateral, "de lado fijo", que se desencadena/reproduce con posturas o movimientos del cuello y con presión sobre la columna cervical alta.
 - **Evaluación clave:** **CFRT** (§2.2, restricción C1-C2), examen de columna cervical alta, **CCFT** (control de flexores profundos frecuentemente deficiente).
 - **Qué SÍ (Neck Pain CPG, categoría "con cefalea"):** **terapia manual de columna cervical alta** (movilización/SNAG C1-C2 — con cribado de seguridad §1) **+ ejercicio** (fortalecimiento/resistencia cérvico-escapular y flexores profundos). La combinación manual + ejercicio tiene mejor soporte que cualquiera sola.
@@ -662,6 +750,14 @@ Cefalea referida desde estructuras cervicales altas (**C1-C3**), típicamente un
 ---
 
 ### 6. Rehabilitación post-quirúrgica cervical (breve) — ACDF / discectomía
+
+> **📋 Encuadre**
+>
+> **🎯 Indicaciones:** Rehabilitación tras cirugía cervical (ACDF / discectomía). Rol del fisio: control motor de flexores profundos, movilidad torácica y escapular, reacondicionamiento, ergonomía y educación.
+>
+> **⛔ Contraindicaciones / cuándo derivar:** Las restricciones exactas las fija el cirujano (patrón general de educación al paciente, NO guía formal — [verificar] con su protocolo). Vigilar y avisar al cirujano ante déficit neurológico nuevo, disfagia persistente o signos de no-unión.
+>
+> **⚠️ Precauciones:** Fase temprana (~0–4 sem): proteger la fusión, collarín según indicación, evitar flexión/rotación brusca, no cargar peso; caminar y movilidad suave desde temprano. Deportes de contacto/alto impacto varios meses después y con autorización del cirujano; fusiones multinivel se prolongan. "Manda el cirujano". Respetar seguridad de agentes físicos (§11).
 
 > **Las restricciones exactas las fija el cirujano; lo de abajo es un patrón general de fuentes de educación al paciente, NO una guía formal — [verificar] con el protocolo del cirujano.**
 
@@ -675,6 +771,14 @@ Cefalea referida desde estructuras cervicales altas (**C1-C3**), típicamente un
 ### Región DORSAL / TORÁCICA
 ### 7. Dorsalgia mecánica y disfunción costovertebral
 
+> **📋 Encuadre**
+>
+> **🎯 Indicaciones:** Dolor torácico de patrón mecánico (modula con movimiento, postura y respiración profunda), reproducible a la palpación de articulaciones costovertebrales/costotransversas o segmentos torácicos.
+>
+> **⛔ Contraindicaciones / cuándo derivar:** **Primero descartar dolor visceral referido y fractura (§1.5):** cardíaco, aórtico, pulmonar/pleural, gastrointestinal, herpes zóster, fractura por compresión osteoporótica → derivar/urgencia según el caso. No manipular sin descartar osteoporosis/fractura/causa visceral.
+>
+> **⚠️ Precauciones:** Cribado de seguridad antes de movilización/manipulación torácica (§1, §11). Combinar **terapia manual torácica + ejercicio activo** (la manual sola no supera al placebo). No apoyarse solo en terapia manual pasiva ni en reposo prolongado. Avanzar por tolerancia e ↓ irritabilidad. `seguridadClinica`.
+
 Dolor torácico de patrón mecánico (modula con movimiento, postura, respiración profunda), reproducible a la palpación de articulaciones costovertebrales/costotransversas o segmentos torácicos. **Primero descartar dolor visceral referido y fractura (§1.5).**
 - **Evidencia (baja certeza):** datos específicos de dorsalgia son escasos. Lo mejor soportado es la **combinación de terapia manual torácica + ejercicio activo a corto plazo** (la terapia manual **sola** no supera claramente al placebo; **añadida al ejercicio** sí mejora sobre ejercicio solo). La terapia manual torácica también ayuda a corto plazo en dolor de cuello y hombro (síndrome subacromial) como coadyuvante.
 - **Qué SÍ:** movilización/manipulación torácica (con cribado), **ejercicio de movilidad torácica** (extensión, rotación), **fortalecimiento de extensores y estabilizadores escapulares**, reeducación respiratoria/costal, educación postural y de actividad.
@@ -682,6 +786,14 @@ Dolor torácico de patrón mecánico (modula con movimiento, postura, respiraci�
 - **Fases/criterios:** (1) control del dolor + movilidad indolora → (2) control motor y carga progresiva de extensores/escápula → (3) fuerza y gesto funcional/laboral. **Avance** por tolerancia y ↓ irritabilidad; **alta** con dolor mínimo, movilidad y fuerza funcionales, autogestión.
 
 ### 8. Hipercifosis postural
+
+> **📋 Encuadre**
+>
+> **🎯 Indicaciones:** Aumento de la cifosis torácica (postural en jóvenes; en adultos mayores, hipercifosis senil por debilidad de extensores ± fracturas vertebrales). Base del tratamiento: fortalecimiento de extensores + entrenamiento postural (evidencia SHEAF, 6 meses).
+>
+> **⛔ Contraindicaciones / cuándo derivar:** Distinguir **postural reductible** de **estructural** (Scheuermann, fracturas, degenerativa) — no suponer que siempre es reductible sin examinar. Descartar osteoporosis/fractura (§6.4/§1.5) y malignidad si hay banderas.
+>
+> **⚠️ Precauciones:** No cargar en flexión agresiva si hay sospecha de osteoporosis/fractura. En adulto mayor, integrar prevención de caídas. La cifosis recidiva si se abandona el ejercicio (sostener la autogestión). Respetar seguridad de agentes físicos (§11).
 
 Aumento de la cifosis torácica (postural en jóvenes; en adultos mayores, hipercifosis senil asociada a debilidad de extensores ± fracturas vertebrales). Distinguir **postural reductible** de **estructural** (Scheuermann, fracturas, degenerativa).
 - **Evidencia:** **ensayo SHEAF (Katzman et al. 2017, Osteoporos Int):** programa de **6 meses de fortalecimiento espinal + entrenamiento postural** redujo medidas radiográficas y clínicas de cifosis en adultos mayores. Programas más cortos (3 meses) mejoran la medida clínica pero no siempre la radiográfica. Revisión sistemática: **ejercicio de extensores espinales (y yoga) puede reducir la cifosis**; evidencia aún limitada, datos de caídas preliminares.
@@ -691,9 +803,25 @@ Aumento de la cifosis torácica (postural en jóvenes; en adultos mayores, hiper
 
 ### 9. Escoliosis
 
+> **📋 Encuadre**
+>
+> **🎯 Indicaciones:** Desviación lateral de la columna confirmada por radiografía (ángulo de Cobb). El fisio trabaja en **equipo con el ortopedista** (SOSORT): cribado/derivación, ejercicios específicos (PSSE), apoyo durante el corsé, educación y adherencia. Ver EIA (§9.1) y adulto (§9.2).
+>
+> **⛔ Contraindicaciones / cuándo derivar:** El fisio **no sustituye** la vigilancia ortopédica. Derivar a valoración quirúrgica según umbrales de Cobb/madurez (§9.1) o ante déficit neurológico progresivo/claudicación. Cribado con escoliómetro ≥7° (§2.5) → derivar.
+>
+> **⚠️ Precauciones:** Mantener la vigilancia radiográfica de progresión (Cobb, Risser). No prometer "corrección" en curvas estructurales rígidas; no usar ejercicios genéricos simétricos como si fueran PSSE. Respetar seguridad de agentes físicos (§11).
+
 > **Diagnóstico y seguimiento por radiografía (ángulo de Cobb) y madurez esquelética (Risser).** El fisio **no sustituye** la vigilancia ortopédica; trabaja en equipo. Sociedad de referencia: **SOSORT** (*Society on Scoliosis Orthopaedic and Rehabilitation Treatment*).
 
 #### 9.1 Escoliosis idiopática del adolescente (EIA)
+
+> **📋 Encuadre**
+>
+> **🎯 Indicaciones:** Escoliosis idiopática en el adolescente **en crecimiento**. Conducta por Cobb y madurez (SOSORT 2016 [verificar cortes]): <15–20° observación ± PSSE; ~20–40° (Risser 0–3, con progresión/riesgo) corsé + PSSE. Ejercicios específicos (PSSE): Schroth, SEAS.
+>
+> **⛔ Contraindicaciones / cuándo derivar:** Derivar a cirugía (valoración) con Cobb >40–45° en crecimiento o curva progresiva; ~45–60° corsé muy rígido/yeso para intentar evitar cirugía. El fisio no sustituye la vigilancia ortopédica.
+>
+> **⚠️ Precauciones:** Mantener la vigilancia radiográfica de progresión; el alta del corsé la marca el ortopedista (por madurez: Risser/menarquia + estabilidad de la curva). No prometer corrección en curvas rígidas; no usar ejercicios genéricos simétricos como PSSE. Trabajar con el ortesista durante el corsé; cuidar adherencia y soporte psicosocial (imagen corporal).
 **Umbrales de manejo (SOSORT 2016, Negrini et al.; marco orientativo por Cobb y madurez) [verificar cortes exactos]:**
 | Cobb (de pie) | Conducta general |
 |---|---|
@@ -710,6 +838,14 @@ Aumento de la cifosis torácica (postural en jóvenes; en adultos mayores, hiper
 - **Criterios de avance/alta:** por madurez esquelética (Risser, menarquia) y estabilidad de la curva en radiografías seriadas; el alta del componente de corsé la marca el ortopedista.
 
 #### 9.2 Escoliosis del adulto (idiopática evolucionada y **degenerativa "de novo"**)
+
+> **📋 Encuadre**
+>
+> **🎯 Indicaciones:** Escoliosis del adulto (idiopática evolucionada o **degenerativa "de novo"**). El objetivo es **controlar dolor y discapacidad y preservar función**, no frenar una curva en crecimiento; el balance sagital suele correlacionar más con los síntomas que la curva coronal. Programa individualizado.
+>
+> **⛔ Contraindicaciones / cuándo derivar:** No esperar corrección estructural. Derivar a cirugía si dolor/discapacidad refractarios, déficit neurológico progresivo o desbalance sagital marcado. No ignorar banderas rojas (claudicación neurógena, déficit progresivo).
+>
+> **⚠️ Precauciones:** Con desbalance sagital, fortalecimiento de extensores con énfasis en **resistencia** + reeducación de la marcha; PSSE (Schroth/SEAS) como complemento. Corsé solo en casos dolorosos seleccionados (adherencia baja). Avanzar/dar de alta por **mejoría funcional y de síntomas**, no por el ángulo. Respetar seguridad de agentes físicos (§11).
 El objetivo cambia: **no es frenar una curva en crecimiento sino controlar dolor y discapacidad y preservar función**; el **balance sagital** suele correlacionar más con los síntomas que la curva coronal.
 - **Evidencia:** limitada, estudios pequeños/heterogéneos; éxito del tratamiento conservador modesto (cifra histórica ~27% [verificar]). Cohorte prospectiva: ejercicio/fisioterapia **↓ dolor y ↑ calidad de vida/función** en escoliosis degenerativa del adulto.
 - **Qué SÍ:** programa **individualizado**; cuando hay **desbalance sagital**, **fortalecimiento de extensores con énfasis en resistencia** y reeducación de la marcha; PSSE (Schroth/SEAS) como complemento; manejo del dolor, acondicionamiento general, educación. Corsé en casos dolorosos seleccionados (adherencia suele ser baja).
@@ -717,6 +853,14 @@ El objetivo cambia: **no es frenar una curva en crecimiento sino controlar dolor
 - **Criterios de avance/alta:** por **mejoría funcional y de síntomas** (no por el ángulo). Derivar a cirugía si dolor/discapacidad refractarios, déficit neurológico progresivo o desbalance sagital marcado.
 
 ### 10. Radiculopatía cervical (ubicada aquí por completitud; es cuadro CERVICAL)
+
+> **📋 Encuadre**
+>
+> **🎯 Indicaciones:** Compresión/irritación de raíz cervical (hernia discal, espondilosis/estenosis foraminal): dolor radicular ± signos sensitivos/motores/reflejos en el dermatoma/miotoma. Historia natural generalmente favorable con manejo conservador multimodal. Evaluar con el clúster de Wainner (§2.1).
+>
+> **⛔ Contraindicaciones / cuándo derivar:** **SIEMPRE cribar mielopatía (§1.1)** — puede coexistir; NO traccionar/manipular sin descartar mielopatía y banderas vasculares. Derivar/cirugía ante déficit neurológico progresivo, signos de mielopatía o dolor intratable pese a ~6–12 sem de conservador adecuado; urgente si marcha nueva alterada, disfunción esfinteriana o progresión rápida.
+>
+> **⚠️ Precauciones:** Progresar por criterios monitoreando **centralización vs. periferización** e irritabilidad. Fase irritable: posturas/ejercicios que **centralizan**, "sliders" suaves, tracción suave si alivia; evitar "tensioners" agresivos y maniobras que **periferizan**; NO reposo/collarín. Cribado de seguridad antes de manual/tracción (§1, §11). `seguridadClinica`.
 
 Compresión/irritación de raíz cervical (hernia discal, espondilosis/estenosis foraminal). Dolor radicular + posibles signos sensitivos/motores/reflejos en el dermatoma/miotoma.
 - **Evaluación:** clúster de Wainner (§2.1); **siempre cribar mielopatía (§1.1)** — radiculopatía y mielopatía pueden coexistir.
@@ -838,6 +982,14 @@ Los agentes son **coadyuvantes**. Respetar siempre `seguridadClinica` (la alerta
 
 ### 1. Reparación de SLAP tipo II (quirúrgico)
 
+> **📋 Encuadre**
+>
+> **🎯 Indicaciones:** Rehabilitación tras reparación quirúrgica de lesión SLAP tipo II (típicamente atleta overhead/lanzador); diagnóstico por clúster O'Brien + Biceps Load II, con estándar de referencia RM-artrografía o artroscopia.
+>
+> **⛔ Contraindicaciones / cuándo derivar:** Dolor del anclaje con contracción de bíceps o RE pasiva forzada → retroceder, no progresar. Pérdida súbita de ROM o chasquido doloroso nuevo → sospecha de fallo de reparación, derivar. Signos de infección (fiebre, eritema/calor/drenaje), TVP, parestesias nuevas o déficit neurológico.
+>
+> **⚠️ Precauciones:** Invariante = proteger el anclaje del bíceps: NO contracción activa/aislada del bíceps ni RE pasiva forzada temprano. Fase 1 con cabestrillo 4 sem, RE pasiva ~10–15° (hasta ~30° según protocolo) [verificar], sin elevación activa/extensión/abducción+RE. Bíceps resistido se reintroduce ligero ~sem 12 (pleno sem 16–20). Progresar por criterios; manda el protocolo del cirujano (variabilidad alta, no hay GPC JOSPT post-qx).
+
 #### Diagnóstico — pruebas especiales
 - **O'Brien (compresión activa):** hombro en flexión 90° + aducción 10°, pulgar abajo, resistir descenso → dolor profundo que se alivia con pulgar arriba = + · Sens ~50–67% / Esp ~30–50% (revisiones/meta-análisis; original O'Brien 1998 reportó 100%/98.5%, NO reproducido) · (O'Brien 1998; rev. sistemática Active Compression, PMC 2019)
 - **Biceps Load II:** supino, abducción 120° + rotación externa máxima, antebrazo supinado; resistir flexión de codo → dolor = + · Sens ~90% / Esp ~97% en el estudio original; cohortes independientes bajan la especificidad pero mantienen VPN alto (~90%) · (Kim et al. 2001)
@@ -900,6 +1052,14 @@ Los agentes son **coadyuvantes**. Respetar siempre `seguridadClinica` (la alerta
 ---
 
 ### 2. Reparación de manguito rotador (quirúrgico)
+
+> **📋 Encuadre**
+>
+> **🎯 Indicaciones:** Post-operatorio de reparación de manguito rotador; la progresión cambia según el TAMAÑO del desgarro (pequeño/mediano/grande/masivo) y según si se reparó el SUBESCAPULAR.
+>
+> **⛔ Contraindicaciones / cuándo derivar:** Pérdida súbita de fuerza/ROM activo, chasquido o dolor nuevo → sospecha de re-ruptura → suspender fortalecimiento y derivar. Infección (fiebre, calor/eritema/drenaje), TVP, déficit del nervio axilar (deltoides/sensibilidad en "charretera"), parestesias nuevas, rigidez progresiva/capsulitis.
+>
+> **⚠️ Precauciones:** Fase 1 solo PROM, cabestrillo 4 sem (pequeño) a 6–8 sem (grande/masivo). Si se reparó subescapular → RE solo hasta neutro (0°) × 6 sem y SIN RI resistida × 6 sem. Nada de RE/elevación activa ni RE pasiva más allá del tope en fase 1. Fortalecimiento resistido ~sem 12 (antes en grandes/masivos = riesgo de re-ruptura). Retorno por CRITERIOS, no por calendario; manda el cirujano. (La JOSPT 2025 de manguito es para tendinopatía NO quirúrgica, no aplicar post-qx.)
 
 #### Diagnóstico — pruebas especiales
 - **Jobe / empty can (supraespinoso):** abducción 90° en plano escapular + RI (pulgar abajo), resistir → debilidad/dolor = + · Sens ~74–88% / Esp ~30–62% (la DEBILIDAD es más informativa que el dolor; pooled Hegedus 2012 ~74%/30%) · (Hegedus et al. 2012; Itoi 1999)
@@ -970,6 +1130,14 @@ Los agentes son **coadyuvantes**. Respetar siempre `seguridadClinica` (la alerta
 ---
 
 ### 3. Inestabilidad anterior / reparación de Bankart artroscópica (quirúrgico)
+
+> **📋 Encuadre**
+>
+> **🎯 Indicaciones:** Post-operatorio de reparación de Bankart artroscópica por inestabilidad anterior (traumática); diagnóstico por clúster aprensión + reubicación + sorpresa (patrón muy específico).
+>
+> **⛔ Contraindicaciones / cuándo derivar:** Sensación de subluxación/luxación o aprensión persistente con la actividad → suspender provocación y derivar (posible recidiva/fallo). Déficit del nervio axilar (deltoides/sensibilidad charretera), parestesias nuevas. Infección (fiebre, calor/eritema/drenaje), TVP. Sulcus marcado + hiperlaxitud generalizada → considerar componente multidireccional.
+>
+> **⚠️ Precauciones:** Invariante = proteger la cápsula anterior: evitar abducción + RE (posición de aprensión) y RE pasiva forzada las primeras semanas/meses. Fase 1 cabestrillo 4–6 sem, RE 0°→~30° según protocolo [verificar]; si subescapular reparado (abierto) RE <20° × 6 sem. NO RE activa, abducción+RE, extensión ni mano-a-la-espalda en fase 1; sin estiramiento forzado en RE × 3 meses. Forzar RE/abd+RE antes de ~12 sem = riesgo de recidiva. Progresar por criterios; manda el cirujano (variabilidad alta).
 
 #### Diagnóstico — pruebas especiales
 - **Aprensión (apprehension):** supino, abducción 90° + RE progresiva → sensación de que "se va a salir" (aprensión, NO dolor) = + · Sens ~66% / Esp ~95% (cuando el criterio + es aprensión, no dolor) · (Hegedus et al. 2012; Lo et al. 2004)
@@ -1060,6 +1228,14 @@ Este es material de referencia para revisión clínica, no prescripción automá
 
 ### 1. Epicondilalgia LATERAL (codo de tenista; tendinopatía del extensor radial corto del carpo / ECRB)
 
+> **📋 Encuadre**
+>
+> **🎯 Indicaciones:** Tendinopatía lateral de codo / epicondilalgia lateral (codo de tenista, tendinopatía del ECRB); el cuadro de codo más frecuente, de manejo conservador. Proceso degenerativo-reparativo, no inflamatorio puro.
+>
+> **⛔ Contraindicaciones / cuándo derivar:** El corticoide NO es primera línea: alivia a corto plazo pero empeora el resultado a largo plazo y aumenta la recurrencia (Coombes JAMA 2013). Descartar banderas rojas del codo (sección 9): compromiso neurovascular (radial/PIN), fractura oculta, infección, masa o dolor nocturno/en reposo progresivo. PRP solo en refractarios tras fallar carga bien dosificada.
+>
+> **⚠️ Precauciones:** Pilar = EJERCICIO DE CARGA PROGRESIVA (excéntrico + concéntrico / HSR); agentes físicos, ortesis y terapia manual son COADYUVANTES y no sustituyen la carga. Avanzar por el termómetro del dolor (estable ≤3–5/10 que no empeora a 24 h = progresar; creciente/hinchazón/pérdida de ROM = retroceder). El isométrico sirve en fase irritable pero es dudoso como tratamiento único. ESWT razonable en crónico que no cede, con consentimiento.
+
 El cuadro más frecuente. Terminología moderna preferida: **tendinopatía lateral de codo / epicondilalgia lateral** (evita "epicondilitis": el proceso es degenerativo-reparativo, no inflamatorio puro).
 
 #### Modelo de comprensión (Coombes, Bisset & Vicenzino — Br J Sports Med 2009)
@@ -1107,6 +1283,14 @@ A menudo descrito como **autolimitado** (tiende a resolver), pero con **alta rec
 
 ### 2. Epicondilalgia MEDIAL (codo de golfista; tendinopatía de la masa flexora-pronadora)
 
+> **📋 Encuadre**
+>
+> **🎯 Indicaciones:** Tendinopatía de la masa flexora-pronadora (codo de golfista, epicondilalgia medial), en el origen flexor-pronador común; análoga a la lateral pero menos frecuente. Diagnóstico principalmente clínico; ~85–95% responden a conservador [verificar].
+>
+> **⛔ Contraindicaciones / cuándo derivar:** Clave diferencial = coexistencia frecuente con neuropatía del nervio cubital → SIEMPRE explorar el cubital; si hay síntomas cubitales, tratar también el túnel cubital (sección 7). Corticoide con las mismas reservas que en la lateral (empeora a largo plazo). Imagen/electrodiagnóstico reservados a duda, sospecha de cubital o fracaso terapéutico.
+>
+> **⚠️ Precauciones:** Mismo esquema que la lateral = carga progresiva de flexores-pronadores (isométrico → excéntrico → concéntrico-excéntrico → HSR) + abordar contribuyentes proximales. NO estiramiento ni valgo provocador agresivo si hay irritación cubital; evitar maniobras que compriman el cubital. No retornar al swing/lanzamiento antes de fuerza simétrica (prensión indolora ≥90% contralateral).
+
 Análoga a la lateral pero en el origen flexor-pronador común (epicóndilo medial). Menos frecuente. **Clave diferencial: coexistencia frecuente con afectación del nervio cubital** (síndrome del túnel cubital) → siempre explorar el cubital.
 
 #### Diagnóstico clínico
@@ -1125,6 +1309,14 @@ Idénticas en lógica a la lateral: **Fase 1** control de síntomas (isométrico
 ---
 
 ### 3. Rehabilitación POST-FRACTURA y POST-LUXACIÓN de codo + RIGIDEZ
+
+> **📋 Encuadre**
+>
+> **🎯 Indicaciones:** Rehabilitación tras fractura y/o luxación de codo —simple (conservadora) o compleja/fractura-luxación incl. tríada terrible (dirigida por cirujano)— y del codo rígido post-traumático. El codo es la articulación más propensa a rigidez post-traumática.
+>
+> **⛔ Contraindicaciones / cuándo derivar:** Osificación heterotópica (OH) = pérdida PROGRESIVA de ROM, dolor al final del rango, calor local o plateau que retrocede → NO forzar, imagen (Rx), valorar con cirujano. Compromiso neurovascular / sospecha de síndrome compartimental (dolor al estiramiento pasivo, parestesias, tensión, alteración de pulso/palidez) → urgente. Fractura oculta, infección (artritis séptica), rotura tendinosa completa (bíceps/tríceps distal).
+>
+> **⚠️ Precauciones:** Principio rector = movilización activa temprana controlada, recuperar la EXTENSIÓN (el codo tiende al flexo, lo más incapacitante) y NO forzar. PROHIBIDO el estiramiento pasivo agresivo / forzar la extensión (agravan OH y rigidez). En inestabilidad, evitar los últimos ~30° de extensión (zona vulnerable) [verificar] y valgo/varo. En luxación compleja/tríada la rehab la dirige el cirujano según la estabilidad lograda (límites de brida por protocolo). Férulas estáticas progresivas solo en plateau, con tensión baja y mantenida.
 
 El codo es la articulación más propensa a rigidez post-traumática. **Principio rector: movilización activa temprana controlada; recuperar extensión; NO forzar.**
 
@@ -1158,6 +1350,14 @@ El codo es la articulación más propensa a rigidez post-traumática. **Principi
 
 ### 4. Inestabilidad del LIGAMENTO COLATERAL CUBITAL (LCU/UCL) / valgo en lanzadores
 
+> **📋 Encuadre**
+>
+> **🎯 Indicaciones:** Inestabilidad del ligamento colateral cubital (LCU/UCL) por sobrecarga en valgo repetitiva (béisbol, lanzadores, jabalina, voleibol). Parciales / grado I–II → conservador; roturas completas o alta demanda (lanzador) → reconstrucción del LCU (cirugía de Tommy John).
+>
+> **⛔ Contraindicaciones / cuándo derivar:** Cirugía indicada tras inestabilidad recurrente o fracaso de ≥12 semanas de rehab integral. Dolor medial en valgo o inestabilidad que no cede → derivar (la RM con artrografía tiene la mayor exactitud por imagen para roturas del LCU). Descartar banderas rojas del codo (sección 9).
+>
+> **⚠️ Precauciones:** La causa más común de fracaso es el retorno prematuro al lanzamiento. El programa de lanzamiento por intervalos es una progresión por CRITERIOS (tolerancia, mecánica, ausencia de dolor), no una fecha fija. En reconstrucción: proteger el injerto (brida) en fase 1, dirigido por cirujano; lanzamiento por intervalos ~4–5 meses, retorno a competición ~12–18 meses [verificar]. Fortalecer cadena cinética y flexores-pronadores (Thrower's Ten).
+
 Sobrecarga en **valgo** repetitiva (béisbol, lanzadores, jabalina, voleibol). El LCU (fascículo anterior) es el estabilizador primario al valgo entre ~20°–120° de flexión.
 
 #### Manejo conservador vs reconstrucción (Tommy John)
@@ -1178,6 +1378,14 @@ Sobrecarga en **valgo** repetitiva (béisbol, lanzadores, jabalina, voleibol). E
 
 ### 5. Bursitis olecraniana
 
+> **📋 Encuadre**
+>
+> **🎯 Indicaciones:** Inflamación de la bursa del olécranon. Primera decisión clínica obligada: ¿SÉPTICA o aséptica?
+>
+> **⛔ Contraindicaciones / cuándo derivar:** Sospechar SÉPTICA ante calor, eritema, dolor marcado, fiebre, fluctuación o antecedente de trauma/herida/break de piel → aspiración con análisis del líquido (Gram, cultivo, recuento) y manejar como séptica hasta descartar; séptica = antibiótico (cobertura Staphylococcus/Streptococcus), no tratar con agentes físicos. La infiltración de corticoide es controvertida y poco recomendada (riesgo de bursitis séptica iatrogénica, atrofia y despigmentación cutánea).
+>
+> **⚠️ Precauciones:** Aséptica = conservador de primera línea: reposo relativo, EVITAR apoyar/recargar el codo, compresión/acolchado, hielo, AINE si precisa. Cirugía (bursectomía) reservada al fracaso del tratamiento conservador, incluso en sépticas. Evidencia robusta escasa en la aséptica.
+
 Inflamación de la bursa del olécranon. **Primera decisión clínica: ¿SÉPTICA o aséptica?**
 
 #### Diferenciar séptica de aséptica (bandera roja)
@@ -1190,6 +1398,14 @@ Sospechar **séptica** ante **calor, eritema, dolor marcado, fiebre, fluctuació
 ---
 
 ### 7. Atrapamiento del nervio cubital en el codo (síndrome del túnel cubital)
+
+> **📋 Encuadre**
+>
+> **🎯 Indicaciones:** Atrapamiento del nervio cubital en el codo (síndrome del túnel cubital), 2ª neuropatía por compresión más frecuente del miembro superior: parestesias/entumecimiento en 4º–5º dedos, dolor medial, debilidad de intrínsecos en casos avanzados; se agrava con la flexión mantenida del codo y al apoyarse en el codo. Conservador = primera línea en leve/moderado.
+>
+> **⛔ Contraindicaciones / cuándo derivar:** Cirugía (descompresión ± transposición) si falla el conservador, hay debilidad/atrofia o compromiso axonal en electrodiagnóstico. El estudio de neuroconducción (enlentecimiento a través del codo) es el hallazgo distintivo.
+>
+> **⚠️ Precauciones:** La educación + modificación de actividad (evitar la flexión sostenida del codo y el apoyo sobre el codo) es probablemente el componente más eficaz / el motor del tratamiento. Férula nocturna en extensión relativa (~45°, evitando la flexión completa) × ~3 meses. Deslizamientos neurales del cubital SUAVES, SIN provocar síntomas.
 
 Segunda neuropatía por compresión más frecuente del miembro superior. Síntomas: parestesias/entumecimiento en **4º–5º dedos**, dolor medial del codo, debilidad de intrínsecos en casos avanzados; se agravan con la **flexión mantenida del codo** y con apoyarse en el codo.
 
@@ -1360,6 +1576,14 @@ Son **valores de referencia convencionales**, no normas poblacionales ni "rango 
 
 ### 🖐️ SÍNDROME DEL TÚNEL CARPIANO (STC)
 
+> **📋 Encuadre**
+>
+> **🎯 Indicaciones:** Compresión del nervio mediano en el túnel carpiano; la fisioterapia es el manejo inicial del STC leve-moderado confirmado o sospechado (JOSPT CPG, revisión 2026).
+>
+> **⛔ Contraindicaciones / cuándo derivar:** STC severo (atrofia tenar, déficit sensitivo fijo, hallazgos electrodiagnósticos severos) → derivar a cirugía sin demorar (la ventana de recuperación del nervio se cierra). Fracaso del conservador bien hecho (~6–12 sem) o síntomas incapacitantes progresivos → derivar.
+>
+> **⚠️ Precauciones:** La CPG recomienda EN CONTRA de láser de baja potencia (LLLT), iontoforesis e imanes. Férula en posición neutra de uso nocturno, sin sobre-inmovilizar de día si limita la función; deslizamientos sin provocar síntomas; progresar por criterios. Post-liberación quirúrgica: terapia supervisada NO de rutina (AAOS 2024), reservar para los que se estancan.
+
 > **Enfoque:** compresión del nervio mediano en el túnel carpiano. **La fisioterapia es el manejo inicial del STC leve-moderado** confirmado o sospechado (JOSPT CPG, revisión 2026). En STC **severo** (atrofia tenar / hallazgos electrodiagnósticos severos) → derivar a valoración quirúrgica.
 
 #### Pruebas / evaluación
@@ -1399,6 +1623,14 @@ Phalen, Tinel, **Durkan/compresión del carpo** (el más útil, combinar con Pha
 
 ### 👍 TENOSINOVITIS DE DE QUERVAIN
 
+> **📋 Encuadre**
+>
+> **🎯 Indicaciones:** Tenosinovitis estenosante del 1er compartimento dorsal (abductor largo + extensor corto del pulgar); ligada a sobreuso y a mujeres en posparto/cuidado de bebé. Manejo escalonado: ortesis + modificación + ejercicio.
+>
+> **⛔ Contraindicaciones / cuándo derivar:** Descartar rizartrosis concomitante (grind test, dolor en la base del pulgar). Fracaso del conservador + infiltraciones (típicamente ≥1–2) → valorar liberación quirúrgica del 1er compartimento.
+>
+> **⚠️ Precauciones:** La infiltración de corticoide es la de mayor evidencia de éxito (primera línea, combinar con férula). Fase irritable: evitar gestos provocadores repetidos con carga y estiramientos agresivos. Diabéticos: peores resultados, expectativas ajustadas. Excéntrico extrapolado de tendinopatía, evidencia directa de bajo nivel [verificar]; US/láser/crioterapia solo coadyuvantes.
+
 > **Enfoque:** tendinopatía/tenosinovitis estenosante del **1er compartimento dorsal** (abductor largo + extensor corto del pulgar). Muy ligada a sobreuso y a mujeres en posparto/cuidado de bebé ("tenosinovitis de las madres"). Manejo escalonado: ortesis + modificación + ejercicio; **la infiltración de corticoide es la de mayor evidencia de éxito**.
 
 #### Pruebas / evaluación
@@ -1430,6 +1662,14 @@ Ultrasonido/láser sobre el 1er compartimento y crioterapia como **coadyuvantes 
 ---
 
 ### 🦴 FRACTURA DE RADIO DISTAL
+
+> **📋 Encuadre**
+>
+> **🎯 Indicaciones:** Rehabilitación post-inmovilización (yeso) o post-fijación (ORIF con placa volar bloqueada / agujas / fijador externo); muy frecuente. Prioridades: edema → ROM (incl. prono-supinación) → fuerza de prensión progresiva.
+>
+> **⛔ Contraindicaciones / cuándo derivar:** Vigilar SDRC tipo I desde el día 1 (dolor desproporcionado + criterios de Budapest). Rotura tendinosa tardía (extensor largo del pulgar: pérdida súbita de extensión del pulgar) → derivar. Síndrome compartimental agudo / compromiso vascular post-reducción → urgencia quirúrgica.
+>
+> **⚠️ Precauciones:** El cirujano marca el retiro de yeso e inicio de carga (manda la consolidación). Desde el día 0: movilidad activa de dedos/pulgar/codo/hombro (prevenir rigidez y hombro congelado); NO cargar ni levantar con la muñeca hasta autorización. Con placa volar/tornillos aplica la regla de metal (agentes atérmicos, lejos del implante); en SDRC, máxima precaución con térmicos.
 
 > **Enfoque:** post-inmovilización (yeso) o **post-fijación (ORIF con placa volar bloqueada / agujas / fijador externo)**. Es **muy frecuente** en la clínica. Prioridades: **edema → ROM (flexo-extensión, prono-supinación, desviaciones) → fuerza de prensión progresiva**. **El cirujano marca retiro de yeso e inicio de carga.** **Vigilar SDRC tipo I** desde el día 1.
 
@@ -1468,6 +1708,14 @@ Con **placa volar/tornillos**, aplica la regla de metal (atérmicos, lejos del i
 
 ### 🦴 FRACTURA DE ESCAFOIDES
 
+> **📋 Encuadre**
+>
+> **🎯 Indicaciones:** Fractura con inmovilización larga por la irrigación retrógrada (polo proximal) → alto riesgo de no-unión y necrosis avascular (NAV), mayor cuanto más proximal el trazo. La rehabilitación activa solo TRAS consolidación confirmada por imagen/cirujano.
+>
+> **⛔ Contraindicaciones / cuándo derivar:** Dolor en la tabaquera anatómica tras caída = tratar como fractura aunque la Rx inicial sea negativa (NO dar de alta; inmovilizar y reimagen/RM). Dolor persistente en tabaquera + pérdida de fuerza/ROM semanas-meses después → reimagen por no-unión (SNAC wrist). Polo proximal: umbral quirúrgico más bajo.
+>
+> **⚠️ Precauciones:** Antes de la consolidación, solo dedos/codo/hombro activos + control de edema; nada de carga ni muñeca mientras inmoviliza. Con tornillo (Herbert) o agujas, regla de metal (atérmicos, nada térmico sobre el implante). El tabaquismo deteriora la consolidación → consejo de cese.
+
 > **Enfoque:** **inmovilización larga** por la **irrigación retrógrada** (la rama carpiana dorsal de la arteria radial irriga el polo proximal) → **alto riesgo de no-unión y necrosis avascular (NAV)**, mayor cuanto más proximal el trazo. **Bandera:** dolor en la **tabaquera anatómica** tras caída sobre la mano = tratar como fractura aunque la radiografía inicial sea negativa.
 
 #### Pruebas / evaluación
@@ -1500,6 +1748,14 @@ Con **tornillo (Herbert) o agujas**, regla de metal (atérmicos, nada térmico s
 
 ### 🤚 ESGUINCE DE MUÑECA / TFCC / INESTABILIDAD ESCAFOLUNAR
 
+> **📋 Encuadre**
+>
+> **🎯 Indicaciones:** Manejo conservador guiado por estabilidad del esguince de muñeca, lesión del TFCC (dolor cubital) e inestabilidad escafolunar parcial/dinámica/reducible (dolor dorso-radial, Watson+).
+>
+> **⛔ Contraindicaciones / cuándo derivar:** Antes de etiquetar "esguince", descartar fractura oculta (escafoides/radio distal). TFCC inestable / disrupción foveal con inestabilidad del DRUJ → consulta quirúrgica (reparación foveal). Inestabilidad escafolunar completa/estática (DISI)/crónica → cirugía.
+>
+> **⚠️ Precauciones:** La inestabilidad cambia el pronóstico y la conducta. TFCC en fase de protección: evitar carga en desviación cubital y rotación resistida; férula tipo Muenster para limitar prono-supinación. Escafolunar: reentrenar el "dart-thrower's motion", evitar cargas en extensión + desviación radial agresiva (evidencia de bajo nivel/consenso [verificar]). Post-quirúrgico: regla de metal.
+
 > **Enfoque:** conservador guiado por **estabilidad**. El "esguince de muñeca" es un cajón de sastre: antes de etiquetarlo, descartar fractura oculta (escafoides/radio distal), lesión del **TFCC** (dolor cubital) y **disociación escafolunar** (dolor dorso-radial, Watson+). La **inestabilidad** cambia el pronóstico y la conducta.
 
 #### Pruebas / evaluación
@@ -1528,6 +1784,14 @@ Coadyuvantes de dolor/edema (crio, US/láser atérmico, TENS). Sin material salv
 
 ### 🔒 DEDO EN GATILLO (tenosinovitis estenosante — polea A1)
 
+> **📋 Encuadre**
+>
+> **🎯 Indicaciones:** Desproporción tendón–polea A1 con bloqueo/chasquido al flexo-extender el dedo; conservador razonable en grados bajos. Ortesis + modificación de actividad + infiltración.
+>
+> **⛔ Contraindicaciones / cuándo derivar:** Grado IV (contractura fija en flexión de la IFP), grados altos que no ceden, o fracaso de ortesis ± infiltraciones → liberación quirúrgica de A1. Diabéticos: peor respuesta al conservador/infiltración (expectativas ajustadas).
+>
+> **⚠️ Precauciones:** La infiltración de corticoide es el pilar médico de primera línea; la ortesis es efectiva a corto plazo (de bloqueo, tiempo completo ~6 sem; articulación a elegir por comodidad/adherencia). Modificar actividad (evitar agarres sostenidos con fuerza); el ejercicio está menos respaldado que la ortesis.
+
 > **Enfoque:** desproporción tendón–polea **A1** → bloqueo/chasquido al flexo-extender el dedo. Conservador razonable en grados bajos; la **infiltración de corticoide** es el pilar médico de primera línea; **la ortesis es efectiva a corto plazo**.
 
 #### Pruebas / evaluación / estadiaje
@@ -1551,6 +1815,14 @@ Coadyuvantes de dolor/edema (crio, US/láser atérmico, TENS). Sin material salv
 ---
 
 ### 👍 RIZARTROSIS (artrosis trapeciometacarpiana / de la base del pulgar)
+
+> **📋 Encuadre**
+>
+> **🎯 Indicaciones:** Artrosis de la articulación trapeciometacarpiana (CMC del pulgar); el conservador es el pilar (ejercicio + ortesis + protección articular), con mejor respuesta en estadios tempranos (Eaton I–II). Frecuente en mujeres mayores; impacta pinza y agarre.
+>
+> **⛔ Contraindicaciones / cuándo derivar:** Dolor refractario y/o Eaton III–IV con fallo del conservador (± infiltración) → valoración quirúrgica (trapecectomía/artroplastia/reconstrucción de Eaton-Littler en inestabilidad). Descartar De Quervain concomitante.
+>
+> **⚠️ Precauciones:** Fase dolorosa: evitar cargas máximas de pinza y la inmovilización rígida prolongada innecesaria. Ortesis de pulgar + educación en protección articular + terapia manual y ejercicio (reducen dolor, calidad moderada). Calor/parafina, TENS/US/láser solo coadyuvantes de bajo nivel.
 
 > **Enfoque:** artrosis de la articulación **trapeciometacarpiana (CMC del pulgar)**. **El conservador es el pilar** (ejercicio + ortesis + protección articular), con **mejor respuesta en estadios tempranos**. Muy frecuente en mujeres mayores; impacta pinza y agarre.
 
@@ -1646,6 +1918,14 @@ Calor/parafina antes del ejercicio, TENS/US/láser para dolor como coadyuvantes 
 ---
 
 ## 🕺 CADERA — prótesis / artroplastia total (THA)
+
+> **📋 Encuadre**
+>
+> **🎯 Indicaciones:** Paciente tras artroplastia total de cadera (PTC/THA) — por coxartrosis o fractura. Sirve para ubicar la fase, aplicar las restricciones según ABORDAJE y FIJACIÓN y detectar si va "en tiempo"; el plan lo manda el cirujano.
+>
+> **⛔ Contraindicaciones / cuándo derivar:** Luxación protésica (dolor súbito, acortamiento y rotación anómala del miembro, "clunk", imposibilidad de cargar) → URGENCIA/reducción. Signos de TVP/TEP (dolor/edema de pantorrilla que no cede con elevación; disnea súbita/dolor torácico) → URGENCIA. Infección periprotésica (herida que drena, eritema, fiebre, dolor que no mejora) → evaluación ortopédica urgente, no "esperar a ver". Fractura periprotésica, aflojamiento del vástago (dolor de muslo de "arranque" a la carga) y lesión nerviosa (pie caído, parestesias) → cirujano.
+>
+> **⚠️ Precauciones:** Precauciones por ABORDAJE (lo más importante): posterior → no flexión > 90°, no aducción cruzando la línea media, no rotación interna; anterior directo (DAA) / lateral → evitar extensión + rotación externa combinadas. Carga según FIJACIÓN: cementada = carga total inmediata; no cementada/press-fit = carga según tolerancia (WBAT) en la mayoría; fractura/injerto/revisión según cirujano. Relajar las precauciones lo decide el CIRUJANO. Mayor riesgo de luxación en las primeras ~6 semanas. Vigilar Trendelenburg (abordaje lateral/posterior). Implante metálico → NO radiofrecuencia/diatermia/tecarterapia térmica/ultrasonido térmico sobre el material (cruzar con `seguridadClinica`); no agentes ni masaje sobre pantorrilla con sospecha de TVP. Progresar por CRITERIOS, no por calendario.
 
 > **Qué es esto:** un andamio para que el fisio ubique en qué FASE va el paciente, qué RESTRICCIONES aplican según el ABORDAJE y la FIJACIÓN, y si va "en tiempo". **No es una prescripción automática: el plan lo manda el cirujano.** La progresión es por CRITERIOS cumplidos, no por semanas del calendario; las semanas que aparecen son promedios orientativos para detectar desfase, no metas rígidas.
 > **Regla de oro de esta clínica para esta función:** PTC = implante metálico. Antes de cualquier agente físico, leer la Sección 10 (seguridad con metal) y cruzarla con `seguridadClinica`.
@@ -1916,6 +2196,14 @@ Números/afirmaciones que NO pude confirmar en el texto completo (WebFetch bloqu
 
 ## 🕺 CADERA — labrum acetabular / pinzamiento femoroacetabular (FAI)
 
+> **📋 Encuadre**
+>
+> **🎯 Indicaciones:** FAI sintomático (tríada de Warwick: síntomas + signos clínicos + morfología CAM/PINCER/mixto en imagen) y lesión del labrum acetabular. Cubre el MANEJO CONSERVADOR (ejercicio/PHT) y la REHABILITACIÓN POST-ARTROSCOPIA con reparación del labrum (± femoroplastia/acetabuloplastia).
+>
+> **⛔ Contraindicaciones / cuándo derivar:** Artrosis avanzada / condromalacia (p. ej. Tönnis ≥ 2, espacio articular < 2 mm [verificar]) → peor resultado de la artroscopia y contraindicación relativa (manejo conservador o protésico). Displasia significativa no corregida (LCEA bajo) → la artroscopia aislada puede empeorar la inestabilidad; requiere osteotomía/valoración especializada. Post-op: TVP (dolor/edema/calor de pantorrilla) → urgente; inestabilidad/microinestabilidad, infección o lesión neurológica por tracción (parestesias/déficit) → cirujano.
+>
+> **⚠️ Precauciones:** Respetar el tejido en reparación: el labrum reinsertado con anclas y la cápsula suturada necesitan protección — evitar extensión + rotación externa (combinadas y forzadas) y flexión > 90° temprana. Ojo con el PSOAS: la sobreactivación → tendinitis del iliopsoas iatrogénica (la complicación de rehab más frecuente); priorizar glúteos y control. Carga según indicación del cirujano, mucho más conservadora si hubo microfractura/condral. Anclas metálicas → NO radiofrecuencia/diatermia/tecar térmica/US térmico sobre el material (ante anclas bioabsorbibles, tratar como metal salvo confirmación). Manda la hoja del cirujano; progresar por CRITERIOS.
+
 > **Para qué sirve este documento.** Es **material de referencia** para que el fisioterapeuta ubique **en qué fase va el paciente, qué restricciones aplican y si va en tiempo o desfasado** tras una artroscopia de cadera por pinzamiento femoroacetabular (FAI) con reparación del labrum (± femoroplastia / acetabuloplastia), y para encuadrar el **manejo conservador** del FAI/labrum.
 > **NO es una prescripción automática.** El protocolo quirúrgico, las restricciones de carga y los límites de rango los **define el cirujano** (dependen de la técnica exacta: tamaño de la resección, calidad del labrum, cierre capsular, microfractura/condroplastia concomitante). Ante duda o discrepancia, **manda la hoja del cirujano**. Progresión **por criterios, no por calendario**: las semanas son guía.
 
@@ -1978,6 +2266,14 @@ Números/afirmaciones que NO pude confirmar en el texto completo (WebFetch bloqu
 
 ### 3. Manejo CONSERVADOR del FAI/labrum (ejercicio vs cirugía)
 
+> **📋 Encuadre**
+>
+> **🎯 Indicaciones:** FAI sintomático que se trata PRIMERO sin cirugía (razonable en muchos casos, sobre todo con cartílago conservado): ensayo de fisioterapia estructurada y progresiva (Personalised Hip Therapy / PHT, ~12–26 semanas). En FASHIoN ambos (artroscopia y PHT) mejoraron; la artroscopia aventaja sobre todo en morfología CAM.
+>
+> **⛔ Contraindicaciones / cuándo derivar:** La decisión cirugía vs conservador es COMPARTIDA con el cirujano. Si el ensayo conservador estructurado no mejora → revalorar con el cirujano. No olvidar el diagnóstico diferencial (microinestabilidad/displasia, tendinopatía del glúteo, pubalgia/aductores, patología del psoas, dolor lumbar referido, cadera "en resorte").
+>
+> **⚠️ Precauciones:** Ejercicio dentro de rango NO provocativo: evitar forzar la flexión-rotación interna que reproduce el pinzamiento. Modificar la actividad: reducir posiciones de pinzamiento sostenidas (sentado profundo prolongado, flexión-RI repetida, sentadilla muy profunda). Centrar el programa en control lumbopélvico, fuerza de abductores/extensores/rotadores externos y core; progresar a movimientos compuestos funcionales/gesto cuando tolera.
+
 El FAI sintomático **se puede tratar primero sin cirugía** en muchos casos. La evidencia principal:
 
 - **UK FASHIoN (Griffin et al., *Lancet* 2018):** ECA multicéntrico (23 hospitales del NHS, **348 pacientes**, artroscopia vs **Personalised Hip Therapy / PHT**). A 12 meses, la **artroscopia** dio una mejoría mayor de calidad de vida de la cadera (**iHOT-33: diferencia media de ~6.8 puntos** a favor, por encima de la MCID), **pero AMBOS tratamientos mejoraron**. El beneficio de la cirugía fue claro en **morfología CAM** (~8.3 puntos) y **mínimo en mixto** (~1.1). La artroscopia tuvo **más eventos adversos** y fue **menos costo-efectiva** a 12 meses. **[verificar cifras finas]**
@@ -2001,6 +2297,14 @@ El FAI sintomático **se puede tratar primero sin cirugía** en muchos casos. La
 ---
 
 ### 4. Fases de rehabilitación POST-ARTROSCOPIA (por criterios)
+
+> **📋 Encuadre**
+>
+> **🎯 Indicaciones:** Rehabilitación tras ARTROSCOPIA de cadera por FAI con reparación del labrum (± femoroplastia/acetabuloplastia; ± microfractura/condroplastia). Estructura de 4 fases por criterios; tasa de retorno al deporte ~90%. Las semanas son orientativas para un labrum reparado aislado SIN microfractura.
+>
+> **⛔ Contraindicaciones / cuándo derivar:** Tendinitis del iliopsoas iatrogénica (dolor anterior de ingle, chasquido doloroso con la flexión activa) → bajar flexión, reforzar glúteos. Inestabilidad/microinestabilidad (aprensión anterior, sensación de fallo, RE pasiva aumentada sin tope firme) → no forzar extensión + RE. Adherencias capsulares, osificación heterotópica, infección o lesión neurológica por tracción → cirujano. TVP → URGENTE. Dolor de ingle que no cede → reevaluar.
+>
+> **⚠️ Precauciones:** Carga según indicación del cirujano: parcial/de contacto ~2–4 sem en labrum reparado aislado; NWB o carga muy protegida ~6–8 sem si hubo microfractura/condral (dato decisivo) [verificar por técnica]. Límites de rango: evitar RE pasiva y extensión de rango final, y sobre todo la COMBINACIÓN extensión + RE; evitar flexión > 90° temprana; no distracción axial de rango largo. Psoas: no SLR resistido ni flexión activa de cadena abierta temprana. Bicicleta estática: sillín alto, sin resistencia, no recumbente, sin correas. Anclas metálicas → no RF/diatermia/tecar térmica/US térmico. Retirar muletas solo con carga completa y sin cojera/Trendelenburg. Manda la hoja del cirujano; progresar por CRITERIOS.
 
 > Estructura de **4 fases** (la más consensuada en la literatura: revisión sistemática *State of the Art* 2024, JCM; 14 estudios, 1105 pacientes; tasa de retorno al deporte ~90%). Hay **uniformidad en las 4 fases** pero **inconsistencia en tiempos y criterios de retorno** — por eso se gobierna por criterios y por la hoja del cirujano. Las semanas de abajo son **orientativas para un labrum reparado aislado sin microfractura**; ajustar al caso.
 
@@ -2237,6 +2541,14 @@ Termómetros clave en cadera: **dolor anterior de ingle** (reparación/psoas), *
 
 ### Reconstrucción de LCA (quirúrgico)
 
+> **📋 Encuadre**
+>
+> **🎯 Indicaciones:** Post-reconstrucción de LCA (quirúrgico). Progresión por prehabilitación + 3 fases postop (van Melick 2016); timeline global 9-12 meses, por CRITERIOS no calendario; ajustar según injerto (BPTB/QT/HT/aloinjerto).
+>
+> **⛔ Contraindicaciones / cuándo derivar:** Pérdida de extensión que no recupera → cyclops/artrofibrosis (RM; suele requerir cirugía). Giving way con laxitud brusca → re-rotura del injerto. Bloqueo/clunk → cyclops o lesión meniscal. Derrame caliente + fiebre → infección articular (urgencia). Dolor/edema unilateral de pantorrilla → TVP.
+>
+> **⚠️ Precauciones:** Extensión completa 0° temprana = prioridad #1 (previene cyclops/artrofibrosis); no sacrificarla por perseguir flexión. Carga WBAT en LCA aislado, pero restringida si hay reparación meniscal concomitante. OKC de cuádriceps: evitar arco terminal 0-45° temprano (tensa el injerto), introducir ~6 sem en arco protegido. El LSI sobreestima la recuperación → comparar con basal pre-lesión. Manda el cirujano sobre carga/ROM.
+
 #### Diagnóstico — pruebas especiales
 Mejor usarlas en combinación; ningún test aislado confirma/descarta. Cifras de metaanálisis 2022 (Sokal et al., KSSTA) salvo donde se indique:
 - **Lachman:** rodilla ~20-30° flexión, traslación tibial anterior con tope blando = positivo · **Sens ~79% / Esp ~91%** (Sokal 2022; el metaanálisis concluye que la sensibilidad del Lachman **se había sobreestimado** históricamente —antes se citaba 85-87%). Es el más sensible de los tres.
@@ -2314,6 +2626,14 @@ Marco: van Melick 2016 (BJSM, guía KNGF multidisciplinar, 90 estudios) = **preh
 ---
 
 ### Menisco — reparación vs meniscectomía parcial (quirúrgico; distinguir siempre cuál)
+
+> **📋 Encuadre**
+>
+> **🎯 Indicaciones:** Post-quirúrgico de menisco; distinguir SIEMPRE la ruta porque son opuestas — meniscectomía parcial = progresión rápida (carga día 0, deporte ~4-12 sem) vs reparación = restricciones estrictas (arco 0-90° + carga limitada 4-6 sem, deporte ~6-9 meses). Marco EU-US 2024 por hitos + tiempo (evidencia GRADE C-D).
+>
+> **⛔ Contraindicaciones / cuándo derivar:** Bloqueo verdadero / no extiende → asa de balde desplazada (posible cirugía urgente). En reparación, dolor agudo en interlínea + derrame al avanzar flexión/carga → fallo de la sutura (retroceder y avisar al cirujano). Derrame caliente + fiebre → infección. Dolor/edema unilateral de pantorrilla → TVP.
+>
+> **⚠️ Precauciones:** Confundir las dos rutas es el error típico. Reparación: proteger la sutura — sin flexión profunda cargada, cuclillas, pivote ni rotación con carga; evitar sentadilla profunda <4 meses; las restricciones varían por tipo de rotura (vertical estable vs horizontal/radial/compleja/raíz). Umbrales de retorno extrapolados de LCA (~≥90% LSI; el consenso no fija umbral propio) [verificar]. Manda el cirujano sobre carga/ROM según el patrón de rotura.
 
 > **Clave:** las dos rutas son OPUESTAS. **Meniscectomía parcial = progresión rápida** (se quitó tejido, no hay que proteger cicatrización). **Reparación = restricciones estrictas de flexión y carga** (hay que proteger la sutura). Confundirlas es el error típico. Marco: **Consenso EU-US 2024 (ESSKA-AOSSM-AASPT)**, Partes I y II — la mejor guía actual, aunque la mayoría de recomendaciones son **GRADE C-D** (evidencia débil); el consenso mismo dice que **no existe protocolo estandarizado validado** y recomienda enfoque por **hitos + tiempo**.
 
@@ -2403,6 +2723,14 @@ Para menisco ningún test aislado es fiable; combinar historia + interlínea + p
 ---
 
 ## 🦵 RODILLA — prótesis / artroplastia (TKA · nota de UKA)
+
+> **📋 Encuadre**
+>
+> **🎯 Indicaciones:** Post-artroplastia de rodilla — TKA primaria (caso base: cementada, WBAT) e, incluida aquí, la nota de UKA (unicompartimental: mismos principios pero comprimidos/acelerados). Progresión por criterios en 4 fases; AVD hacia ~3 meses, recuperación plena 6-12 meses [verificar].
+>
+> **⛔ Contraindicaciones / cuándo derivar:** Rigidez (flexión <90° hacia ~6 sem o flexo persistente) → artrofibrosis, consultar cirujano por posible MUA. Infección periprotésica (dolor/calor/eritema que persiste o empeora >3-4 sem, drenaje turbio, fiebre) → cirujano urgente. TVP (no masaje/drenaje) / TEP, fractura periprotésica → urgencia. Déficit del mecanismo extensor, inestabilidad, dehiscencia de herida, sospecha de SDRC → cirujano.
+>
+> **⚠️ Precauciones:** Extensión completa 0° temprana = prioridad #1 (evita flexo); no descuidarla por perseguir flexión. Déficit de cuádriceps por inhibición artrogénica (AMI) → activación desde día 1; NMES de superficie SÍ (no térmica), fuera del implante. Implante metálico + cemento + polietileno → NO radiofrecuencia/diatermia/tecar térmica/US térmico sobre el material; marcapaso/DAI = diatermia contraindicada; SÍ crioterapia y NMES/TENS fuera del implante. CPM NO de rutina. Carga WBAT en cementada pero restringida en press-fit/injerto óseo/osteotomía/fractura periprotésica → lo define el cirujano. UKA: no extrapolar a TKA sus permisos de deporte vigoroso.
 
 > **Para qué sirve este documento:** material de referencia para que el fisio **ubique la fase del paciente, las restricciones, y si va EN TIEMPO** (o si hay desfase/bandera). **NO es prescripción automática.** El plan de cada paciente lo **manda el cirujano** (tipo de prótesis, fijación, estabilidad, restricciones de carga y arco, tiempos). Ante duda o bandera roja → consultar al cirujano antes de progresar. Progresión **por CRITERIOS cumplidos, no por calendario**; las semanas son solo un mapa para detectar desfase.
 
@@ -2835,6 +3163,14 @@ Las fechas son orientativas para detectar desfase; **el avance se decide por cri
 
 #### 4.1 Microfractura / estimulación de médula ósea (BMS) — el coágulo es frágil
 
+> **📋 Encuadre**
+>
+> **🎯 Indicaciones:** Tras microfractura / estimulación de médula ósea (coágulo → fibrocartílago; la rehab más protectora al inicio). Carga típica: touch-down/NWB ~2 sem → carga parcial +~25%/sem → carga total ~6-8 sem [verificar] (lesiones >4 cm² se protegen más). Trote ~4-6 meses, impacto/deporte ~6-9 meses [verificar].
+>
+> **⛔ Contraindicaciones / cuándo derivar:** Derrame y/o dolor que aparecen o aumentan con la carga = sobrecarga/falla del relleno → retroceder y avisar. Bloqueo o resalto mecánico → coágulo/fragmento suelto, referir urgente. TVP (pantorrilla) o infección (fiebre, derrame turbio) → referir urgente.
+>
+> **⚠️ Precauciones:** Separar CARGA de ROM — el coágulo frágil no debe recibir cizalla al apoyar, pero SÍ movimiento sin carga que lo nutre. Zona de carga (cóndilo/platillo): restringir PESO semanas, ROM/CPM sin carga temprano, rodillera bloqueada en extensión para marcha. Patelofemoral (inverso): apoyar en extensión OK, restringir FLEXIÓN cargada (cadena cerrada solo en arco corto cercano a extensión). En cartílago el CPM SÍ se usa (nutre; ~6 h/día × 6-8 sem) [verificar]. Manda el cirujano.
+
 **Cóndilo femoral / platillo tibial (zona de carga):**
 - **Carga:** descarga protegida prolongada. Típico **touch-down/NWB las primeras ~2 semanas**, luego **carga parcial progresiva ~+25% del peso/semana**, llegando a carga total hacia **~6–8 semanas** [verificar]. Lesiones grandes (**>4 cm²**) se protegen más (4–6+ sem de carga restringida) [verificar].
 - **ROM/CPM:** **temprano y sin carga** desde el día 1 (CPM ~6 h/día × 6–8 sem). Rodillera a menudo **bloqueada en 0° para la marcha ~6–8 sem** [verificar], abierta para ROM.
@@ -2846,12 +3182,28 @@ Las fechas son orientativas para detectar desfase; **el avance se decide por cri
 
 #### 4.2 OAT / OATS / mosaicoplastia (autoinjerto osteocondral) — manda la integración del hueso
 
+> **📋 Encuadre**
+>
+> **🎯 Indicaciones:** Tras autoinjerto osteocondral (cilindros de hueso + cartílago hialino propio). Carga en cóndilo: NWB/touch-down 0-3/0-4 sem → PWB 25-50% sem 3-6 → carga total ~8 sem (algunos 10-12) [verificar]; ROM temprano permitido. Impacto diferido ~6 meses, deporte ~6-9 meses [verificar].
+>
+> **⛔ Contraindicaciones / cuándo derivar:** Derrame/dolor que aparecen o aumentan con la carga = sobrecarga del injerto → retroceder y avisar. Bloqueo/resalto → tapón desprendido o cuerpo libre, referir urgente. TVP o infección → referir urgente.
+>
+> **⚠️ Precauciones:** La progresión de carga sigue la INTEGRACIÓN del tapón ÓSEO (~6-12 sem [verificar]), no la maduración del cartílago. ROM temprano permitido (cartílago hialino propio); rodillera bloqueada en extensión para marcha/sueño ~2-4 sem. Patelofemoral: carga en extensión OK, flexión cargada restringida y rodillera en extensión más tiempo. Varía por tamaño y nº de tapones → manda el cirujano.
+
 - **Carga (cóndilo):** varía por tamaño y nº de tapones. Rango de protocolos: **NWB/touch-down 0–3/0–4 sem → PWB 25–50% sem 3–6 → FWB ~8 sem** (algunos cirujanos más lentos: FWB 10–12 sem) [verificar]. La progresión sigue la **consolidación del tapón óseo**.
 - **ROM:** generalmente **movilización temprana** permitida (el cartílago es hialino propio); rodillera bloqueada en extensión para marcha/sueño ~2–4 sem en algunos protocolos [verificar].
 - **Impacto/deporte:** impacto diferido a **~6 meses**; retorno al deporte ~6–9 meses según demanda [verificar].
 - **Patelofemoral:** mismo principio PF — carga en extensión OK, flexión cargada restringida; rodillera en extensión más tiempo.
 
 #### 4.3 ACI / MACI (condrocitos autólogos) — maduración lenta, fases largas
+
+> **📋 Encuadre**
+>
+> **🎯 Indicaciones:** Tras implante de condrocitos autólogos (ACI / MACI sobre matriz de colágeno); maduración la MÁS lenta (adhesión 0-6 sem → transición 7-12 sem → remodelación 3-6 m → maduración 9-12 m, remodelado hasta 1-3 años [verificar]). Carga a total ~6(-8) sem; retorno a impacto el más tardío de la biblioteca.
+>
+> **⛔ Contraindicaciones / cuándo derivar:** Derrame/dolor que aparecen o aumentan con la carga = sobrecarga del injerto → retroceder y avisar. Bloqueo/resalto → injerto desprendido o cuerpo libre, referir urgente. TVP o infección → referir urgente.
+>
+> **⚠️ Precauciones:** Fases largas por maduración lenta → NO acelerar (frenar al paciente que quiere correr a los 3 meses); impacto/pivote NO antes de ~9 meses, frecuentemente 12-18 meses (PF y lesiones grandes lo más tardío) [verificar]. Extensión bloqueada ~48 h, luego ROM pasivo progresivo + CPM temprano. Patelofemoral: carga más lenta + rodillera con FLEXIÓN LIMITADA bajo carga (~60° en protocolos acelerados [verificar]); marcha en extensión, fortalecimiento en arco corto. Manda el cirujano.
 
 - **Carga (cóndilo/tibiofemoral):** descarga protegida con **progresión ~+25%/semana a carga total hacia ~6(–8) semanas**; destete de rodillera ~sem 6 [verificar]. (Guía clínica JOSPT recomienda **progresión escalonada a carga total en 6–8 semanas** para lesiones de cartílago articular.)
 - **ROM/CPM:** **extensión bloqueada las primeras ~48 h**, luego ROM pasivo progresivo + **CPM** temprano; recuperar extensión completa pronto.
@@ -2861,11 +3213,27 @@ Las fechas son orientativas para detectar desfase; **el avance se decide por cri
 
 #### 4.4 Aloinjerto osteocondral (OCA) — más conservador por incorporación ósea lenta
 
+> **📋 Encuadre**
+>
+> **🎯 Indicaciones:** Tras aloinjerto osteocondral (cartílago hialino + hueso de donante). Más conservador que el autoinjerto porque el hueso del donante se incorpora más lento: touch-down/PWB ~2 sem → ~50% sem 2-8 → carga total ~8-12 sem [verificar]; deporte ~9-12 meses o más (profesionales ~1.2 años [verificar]).
+>
+> **⛔ Contraindicaciones / cuándo derivar:** Derrame/dolor que aparecen o aumentan con la carga = sobrecarga del injerto → retroceder y avisar. Bloqueo/resalto → injerto desprendido o cuerpo libre, referir urgente. TVP o infección → referir urgente.
+>
+> **⚠️ Precauciones:** La incorporación del hueso del donante es MÁS LENTA que en autoinjerto → carga más conservadora y retorno tardío. Alta variabilidad entre cirujanos en los tiempos de carga → confirmar el protocolo. Patelofemoral más lento aún (carga en extensión OK, flexión cargada restringida). ROM temprano con rodillera en extensión para marcha. Manda el cirujano.
+
 - **Carga:** **más conservadora que autoinjerto** porque la incorporación del hueso del donante tarda más. Rango de protocolos: **touch-down/PWB ~2 sem → ~50% sem 2–8 → FWB ~8–12 sem** [verificar]. **Alta variabilidad entre cirujanos** (encuesta de 76 cirujanos: desde NWB con FWB a las 12 sem hasta carga según tolerancia inmediata; los de mayor volumen tienden a ser menos restrictivos).
 - **ROM:** movilización temprana habitual; rodillera en extensión para marcha.
 - **Deporte:** **~9–12 meses o más** (profesionales: tiempo medio de retorno **~1.2 años** [verificar]); PF más lento.
 
 #### 4.5 Lesión osteocondral del ASTRÁGALO (OLT) — zona de carga del tobillo
+
+> **📋 Encuadre**
+>
+> **🎯 Indicaciones:** Tras cirugía de lesión osteocondral del astrágalo (OLT, zona de carga del tobillo). BMS/microfractura: clásico NWB estricto 6-8 sem [verificar] + ROM de tobillo sin carga temprano; OAT/aloinjerto suele requerir osteotomía maleolar (NWB ~5-6 sem [verificar]). Retorno: BMS ~15 sem a ~5.5 meses (retorno ~76%); AMIC deporte ~6 m, medio ~12 m en >1.5 cm² [verificar].
+>
+> **⛔ Contraindicaciones / cuándo derivar:** Derrame/dolor que aparecen o aumentan con la carga = sobrecarga → retroceder y avisar. Bloqueo/resalto → fragmento suelto, referir urgente. TVP (riesgo alto por inmovilización/descarga) o infección → referir urgente.
+>
+> **⚠️ Precauciones:** Zona de carga del tobillo → restringir PESO (NWB) pero ROM de tobillo (dorsi/plantiflexión) sin carga temprano para nutrir y evitar rigidez. Si hay osteotomía maleolar → respetar su consolidación + hardware metálico: capturar en `seguridadClinica`, nada de calor profundo (RF/tecar térmica/onda corta/US térmico) sobre el material. Duración óptima de NWB sin consenso (6-8 sem es tradición, no verdad establecida) [verificar]. Manda el cirujano.
 
 - **BMS/microfractura del astrágalo:** clásico **NWB estricto 6–8 semanas** para proteger el fibrocartílago [verificar]. **Debate actual:** carga temprana vs. tardía — el ECA de **Deal (2019)** mostró mejores puntajes a corto plazo con carga temprana pero **sin diferencia significativa a 2 años**; metaanálisis: **no concluyente**. Tendencia reciente a reanudar carga algo antes, pero muchas series mantienen 6 sem. **ROM de tobillo temprano sin carga** (dorsi/plantiflexión) para nutrir y evitar rigidez.
 - **OAT/aloinjerto en astrágalo:** frecuentemente requiere **osteotomía maleolar** para acceder → la rehab también respeta la **consolidación de la osteotomía** (hardware metálico, ver sección 8). NWB ~**5–6 sem** [verificar], luego progresión.
@@ -2873,6 +3241,14 @@ Las fechas son orientativas para detectar desfase; **el avance se decide por cri
 - **Retorno al deporte (OLT):** BMS/microfractura **~15 semanas a ~5.5 meses** (tasa de retorno ~**76%**, muchos no al nivel previo); pediátricos con lesiones pequeñas (<10 mm) hasta 100% de retorno [verificar]. OATS: la mayoría retorna pero con menor frecuencia de práctica. **Guía DGOU 2024:** sin ventaja clara de microfractura sobre micro-perforación; trasplante osteocondral para lesiones que fallaron a BMS.
 
 #### 4.6 Osteocondritis disecante (OCD) de rodilla — ESTABLE vs INESTABLE, JUVENIL vs ADULTO
+
+> **📋 Encuadre**
+>
+> **🎯 Indicaciones:** OCD de rodilla; la distinción ESTABLE/INESTABLE y JUVENIL/ADULTO define todo. Juvenil estable (fisis abiertas) → NO quirúrgico primero (restricción ± descarga/rodillera descargadora ~4-6 sem → carga según tolerancia 6-12 sem). Adulto inestable (fisis cerradas) → fijación del fragmento (tornillos/pins); carga protegida ~6-8 sem, deporte excluido ≥8 meses [verificar].
+>
+> **⛔ Contraindicaciones / cuándo derivar:** Fragmento inestable/suelto → BLOQUEO articular (referir urgente, posible cirugía). Derrame/dolor que aumentan con la carga → retroceder y avisar. TVP o infección → referir urgente.
+>
+> **⚠️ Precauciones:** Clasificar bien (estable vs inestable, juvenil vs adulto) porque cambia todo el manejo. Tras fijación: flexión a menudo limitada <90° ~6 sem para proteger la fijación [verificar]; fijación metálica → capturar en `seguridadClinica`, nada de calor profundo (RF/tecar térmica/onda corta/US térmico) sobre el material. Corregir malalineación u inestabilidad ligamentaria concomitante si existe. Evidencia mayormente de bajo nivel. Manda el cirujano.
 
 **Distinción que define todo:**
 - **Juvenil (fisis abiertas):** mayoría **estables** → suelen cicatrizar; **tratamiento NO quirúrgico** primero.
@@ -3007,6 +3383,14 @@ Este documento es análogo a `docs/biblioteca_protocolos.md` (MSK) y `docs/bibli
 
 ### 1) Esguince LATERAL de tobillo — agudo (conservador) — grados I–III
 
+> **📋 Encuadre**
+>
+> **🎯 Indicaciones:** Esguince lateral agudo de manejo conservador, grados I–III (lesión de LPAA/ATFL ± ligamento peroneocalcáneo/CFL), una vez descartada fractura.
+>
+> **⛔ Contraindicaciones / cuándo derivar:** Ottawa positivo no estudiado, dolor óseo focal o incapacidad de carga persistente → sospecha de fractura, estudiar antes de rehabilitar. Dolor proximal/anterolateral o dolor con rotación externa → sospecha sindesmal (tratar como cuadro #2, más lento). Dolor en seno del tarso, bloqueos o derrame persistente → lesión osteocondral del astrágalo. Dolor retromaleolar/subluxación de peroneos o dolor en base del 5º MTT (fractura por avulsión).
+>
+> **⚠️ Precauciones:** Carga óptima/temprana preferida sobre reposo; en grado III o dolor marcado, apoyo breve con bota CAM/muletas los primeros días. Soporte funcional (tobillera semirrígida/vendaje) preferido sobre inmovilización rígida prolongada. Evitar inversión forzada/pasiva máxima en fase temprana. No correr/pliometría hasta equilibrio monopodal estable. Progresar por CRITERIOS (no calendario); tobillera/taping profiláctico al retorno.
+
 #### Diagnóstico — pruebas especiales
 - **Cajón anterior de tobillo** (integridad LPAA/ATFL): tobillo ~10–15° flexión plantar, se traslada el talón/pie hacia anterior sobre la tibia fija; positivo = desplazamiento aumentado ± "succión/hoyuelo". · **Sens ~54–74% / Esp ~38–87%** (muy variable; Croy 2013 Sens 74%/Esp 38%). · **Clave temporal:** en agudo la Sens es baja (~21%); a los **4–5 días** sube a ~61% → **reexplorar diferido** (van Dijk, 1996). Mejor para "rule-in".
 - **Talar tilt / inversión forzada** (LPAA + ligamento peroneocalcáneo/CFL): inversión pasiva comparando bostezo astragalino con el lado sano. · **Esp alta ~82–100% (rule-in) / Sens baja ~17–66%** (fuentes secundarias; confirmar). Un talar tilt negativo no descarta.
@@ -3059,6 +3443,14 @@ Este documento es análogo a `docs/biblioteca_protocolos.md` (MSK) y `docs/bibli
 
 ### 2) Esguince SINDESMAL / "high ankle sprain" (ambos: conservador si estable · quirúrgico si inestable)
 
+> **📋 Encuadre**
+>
+> **🎯 Indicaciones:** Lesión de la sindesmosis ("high ankle sprain"). Conservador estructurado si ESTABLE (West Point/Calder I–IIA); estabilización quirúrgica si INESTABLE (IIB–III o diástasis en imagen).
+>
+> **⛔ Contraindicaciones / cuándo derivar:** Diástasis en imagen / inestabilidad → no rehabilitar como estable, valorar cirugía. Dolor proximal en peroné → descartar fractura de Maisonneuve. Ningún test clínico es a la vez sensible y específico → ante sospecha, imagen (Rx en carga/estrés, TC/RM) para medir diástasis y estabilidad.
+>
+> **⚠️ Precauciones:** ~2× más lento que el esguince lateral. Fase 1 con inmovilización en bota, frecuentemente sin carga o carga parcial protegida ~2–3 sem. Evitar rotación externa y dorsiflexión forzada (reproducen el mecanismo); dorsiflexión progresiva solo al final. No pliometría/cambios de dirección hasta tener fuerza y dorsiflexión funcionales. En post-qx (tornillo/suture-button) manda el cirujano; nada térmico (RF/diatermia/tecar/US térmico) sobre el material.
+
 #### Diagnóstico — pruebas especiales
 - **Squeeze test** (compresión de tibia-peroné a mitad de pantorrilla reproduce dolor distal en sindesmosis): · **Esp ~85% (IC 81–89) / Sens baja ~30%** (metaanálisis 2021; estudio individual Sens 30%/Esp 93.5%). Rule-in.
 - **Prueba de estrés en rotación externa (ER test)** (rodilla 90°, tobillo neutro, rotación externa del pie reproduce dolor en sindesmosis): · **Esp ~78% (IC 73–82) / Sens baja ~20%** (metaanálisis 2021; estudio individual Sens 20%/Esp 84.8%). Rule-in.
@@ -3109,6 +3501,14 @@ Este documento es análogo a `docs/biblioteca_protocolos.md` (MSK) y `docs/bibli
 
 ### 3) Reparación/reconstrucción de ligamento lateral — Broström-Gould (quirúrgico, post-op)
 
+> **📋 Encuadre**
+>
+> **🎯 Indicaciones:** Post-operatorio de reparación/reconstrucción lateral (Broström-Gould); indicación quirúrgica = inestabilidad lateral crónica sintomática que falló a rehabilitación.
+>
+> **⛔ Contraindicaciones / cuándo derivar:** No hay protocolo único (varía por técnica —reparación simple vs aumentada con suture tape/InternalBrace— y por cirujano) → manda el protocolo del cirujano. Dehiscencia/infección de herida, dolor neuropático (nervio sural) o rigidez marcada persistente → revalorar.
+>
+> **⚠️ Precauciones:** Evitar inversión y flexión plantar forzadas sem 0–2 (tensan la reparación); restringir inversión hasta ~sem 4–6. Carga según protocolo (convencional: sin carga sem 0–2; acelerado/aumentado: carga en bota desde el inicio). Caída/torcedura en fase protegida = riesgo de fallo de la reparación. Anclas = metal → agentes atérmicos y lejos del implante. Progresar por criterios.
+
 > ⚠ **No hay protocolo único**: los tiempos difieren por técnica (reparación simple vs **aumentada con suture tape / InternalBrace**) y por cirujano. Manda el protocolo del cirujano. Abajo, el rango convencional vs acelerado.
 
 #### Diagnóstico — pruebas especiales (contexto pre-qx: inestabilidad crónica)
@@ -3155,6 +3555,14 @@ Este documento es análogo a `docs/biblioteca_protocolos.md` (MSK) y `docs/bibli
 ---
 
 ### 4) Ruptura del tendón de AQUILES (ambos: quirúrgico y conservador — rehab funcional temprana en ambos)
+
+> **📋 Encuadre**
+>
+> **🎯 Indicaciones:** Ruptura aguda del tendón de Aquiles, vía quirúrgica o conservadora. Con rehabilitación funcional temprana ambas dan resultados similares (incluida re-ruptura); lo que más importa es la rehab funcional temprana, sea cual sea la vía.
+>
+> **⛔ Contraindicaciones / cuándo derivar:** Dorsiflexión forzada/caída en fase temprana = riesgo de RE-RUPTURA (urgencia relativa). Signos de TVP (pantorrilla dolorosa, edema, calor). Infección de herida (post-op) o lesión del nervio sural. Tendón que se "alarga" (brecha de dorsiflexión excesiva, incapacidad de heel-rise) → revalorar.
+>
+> **⚠️ Precauciones:** Fase 1 en equino con bota walker + cuñas de talón ~3 cm; carga según tolerancia desde ~las 2 primeras sem. NO dorsiflexión más allá de neutro ni estiramiento pasivo del tríceps sural precoz [verificar umbral con el cirujano]. Destete de cuñas sem 4→8. Iniciar carrera por criterios de fuerza (heel-rise monopodal), no por fecha. Vigilar TVP en inmovilización. Progresar por criterios.
 
 > **Mensaje central (AOFAS 2024 + metaanálisis):** con **rehabilitación funcional temprana** (movilización y carga precoces), el tratamiento **quirúrgico y el no operatorio dan resultados similares, incluida la re-ruptura.** La decisión qx vs conservador se individualiza; **lo que más importa es la rehab funcional temprana, sea cual sea la vía.**
 
@@ -3241,6 +3649,14 @@ Rige la **seguridad transversal (PARTE 0b)** — anticoagulación, embarazo, cá
 
 ### 1. Fasciopatía / fascitis plantar (dolor de talón plantar)
 
+> **📋 Encuadre**
+>
+> **🎯 Indicaciones:** Dolor plantar del talón por sobrecarga de la fascia en su origen (tubérculo calcáneo medial); cuadro degenerativo/no inflamatorio ("fasciopatía"). Hallmark = dolor del primer paso matutino/tras reposo. Muy frecuente en la clínica (~65 pacientes).
+>
+> **⛔ Contraindicaciones / cuándo derivar:** Fractura por estrés del calcáneo (dolor que empeora con la carga, dolor nocturno/en reposo, compresión del calcáneo dolorosa en los lados) → no cargar agresivamente, derivar. Túnel del tarso (dolor quemante/irradiado, dolor en reposo, Tinel+). Artropatía inflamatoria (multiarticular, rigidez matutina prolongada, síntomas sistémicos). Rotura de fascia post-infiltración (dolor súbito con chasquido/equimosis/caída del arco). Pie de riesgo diabético (neuropático/vascular).
+>
+> **⚠️ Precauciones:** No reposo absoluto prolongado ni perseguir "0 dolor" antes de cargar. Carga progresiva por fases (Rathleff), respetando la regla de las 24 h / semáforo del dolor; no progresar en ámbar. Cuidado con corticoide repetido (riesgo de rotura de fascia y atrofia de la almohadilla grasa). ESWT solo en crónicos/refractarios (contraindicada en tumor local, marcapaso/implantes, coagulopatía/anticoagulación, embarazo, fisis abiertas, infección/lesión cutánea). En diabético con neuropatía, precaución con agentes térmicos (riesgo de quemadura); el ejercicio no está contraindicado. Cuadro lento (semanas a meses; crónicos 3–6 meses).
+
 #### 1.1 Terminología y concepto
 Dolor en la cara plantar del talón por sobrecarga de la fascia plantar en su origen (tubérculo calcáneo medial). Histológicamente es **degenerativo/no inflamatorio** más que "itis" → se prefiere **fasciopatía** o **dolor de talón plantar**; "fascitis plantar" sigue siendo el término clínico más usado. Guía de referencia: **CPG de JOSPT "Heel Pain—Plantar Fasciitis"** (McPoil/Martin et al., Revisión 2014; **Revisión 2023** de Koc, Bise, Neville, Carreira, Martin y McDonough).
 
@@ -3314,6 +3730,14 @@ Opción para **fasciopatía crónica/recalcitrante** que no cede con carga + med
 
 ### 2. Tendinopatía del tibial posterior (disfunción del tibial posterior / pie plano adquirido del adulto, PPAA)
 
+> **📋 Encuadre**
+>
+> **🎯 Indicaciones:** Insuficiencia del tibial posterior con pérdida del arco longitudinal medial / pie plano adquirido del adulto (clasificación Johnson y Strom). El conservador es más eficaz en estadios I–II (deformidad flexible); el estadio II es el clave para el fisio.
+>
+> **⛔ Contraindicaciones / cuándo derivar:** Deformidad RÍGIDA (estadio III–IV, suelen ser quirúrgicos), fracaso de 3–6 meses de conservador bien hecho, dolor incapacitante persistente o colapso progresivo del arco → valoración de cirugía ortopédica.
+>
+> **⚠️ Precauciones:** No cargar en valgo sin soporte; evitar impacto repetitivo en fase irritable. Ortesis (soporte de arco medial / AFO corta) más eficaz mientras la deformidad es flexible. Fortalecimiento excéntrico/progresivo del tibial posterior y control del arco; progresar por criterios (heel-rise unipodal controlado, sin flare a 24 h). Agentes físicos según `seguridadClinica`.
+
 #### 2.1 Concepto y estadios
 Insuficiencia progresiva del tibial posterior → pérdida del arco longitudinal medial, retropié en valgo y antepié en abducción. Clasificación de referencia: **Johnson y Strom (1989)**, con el **Estadio IV de Myerson (1996)**. Terminología moderna propone "tendinopatía del tibial posterior" para estadios iniciales.
 - **Estadio I:** tendón intacto pero doloroso/engrosado, **sin deformidad**, pie aún móvil. Dolor/edema posteromedial.
@@ -3347,6 +3771,14 @@ Deformidad **rígida** (estadio III-IV), fracaso de 3-6 meses de manejo conserva
 
 ### 3. Tendinopatía de los peroneos (breve)
 
+> **📋 Encuadre**
+>
+> **🎯 Indicaciones:** Sobrecarga del peroneo largo/corto en la cara lateral del tobillo/pie, a menudo tras inestabilidad lateral (nexo con el cuadro de esguince lateral).
+>
+> **⛔ Contraindicaciones / cuándo derivar:** Diferenciar de subluxación/luxación de peroneos (chasquido, inestabilidad del tendón) y de esguince lateral. Fracaso de 3–6 meses de conservador, o sospecha de inestabilidad/luxación tendinosa → ortopedia. Evidencia débil (consenso nivel V, sin protocolo de carga validado específico).
+>
+> **⚠️ Precauciones:** Control de carga inicial → progresión isométrico → concéntrico → excéntrico de eversión/flexión plantar. Evitar impacto lateral agresivo en fase irritable. Corregir el déficit de estabilidad lateral asociado; vendaje/órtesis en deporte de contacto. Recuperación estimada ~6–12 sem en casos no complicados [verificar].
+
 - **Concepto:** sobrecarga de peroneo largo/corto en la cara **lateral** del tobillo/pie (a menudo tras inestabilidad lateral — nexo con la sección de tobillo). Diferenciar de subluxación/luxación de peroneos (chasquido, inestabilidad del tendón) y de esguince lateral.
 - **Evidencia:** **débil** (consenso ESSKA-AFAS 2018 clasifica el manejo conservador como nivel V, opinión de experto; no hay protocolo de carga validado específico para peroneos).
 - **Manejo (por criterios):** control de carga inicial → **progresión isométrico → concéntrico → excéntrico** de eversión/flexión plantar, control del retropié y propiocepción; vendaje/órtesis en deporte de contacto; corregir el déficit de estabilidad lateral asociado.
@@ -3358,6 +3790,14 @@ Deformidad **rígida** (estadio III-IV), fracaso de 3-6 meses de manejo conserva
 
 ### 4. Metatarsalgia / neuroma de Morton (breve)
 
+> **📋 Encuadre**
+>
+> **🎯 Indicaciones:** Neuroma de Morton = fibrosis perineural del nervio interdigital (típico 3er espacio): dolor plantar en antepié, sensación de "piedra en el zapato", disestesias a los dedos, peor con calzado estrecho/tacón. Metatarsalgia general = dolor por sobrecarga del antepié.
+>
+> **⛔ Contraindicaciones / cuándo derivar:** Descartar fractura por estrés metatarsiana (bandera roja) y artropatía inflamatoria. Derivar si persiste >6 semanas; escalones siguientes: corticoide → excisión quirúrgica.
+>
+> **⚠️ Precauciones:** Modificación de calzado (puntera ancha, bajar tacón); almohadilla metatarsiana colocada PROXIMAL a las cabezas (no justo bajo el punto doloroso) para abrir el espacio; descarga/modificación de actividad. Apoyar el dx con imagen (ecografía/RM) si hay duda (prueba de Mulder de sensibilidad muy variable).
+
 - **Neuroma de Morton:** fibrosis perineural del nervio interdigital (típico 3er espacio), dolor plantar en antepié, "piedra en el zapato", disestesias a los dedos, peor con calzado estrecho/tacón.
 - **Prueba de Mulder (click):** compresión latero-lateral de las cabezas metatarsianas ± presión plantar → dolor/click palpable reproducible. Sensibilidad reportada muy variable (desde ~60-70% hasta 94-98% según fuente; especificidad alta ~90%) [verificar: discrepancia no resuelta entre fuentes]; apoyar con imagen (ecografía/RM) si duda.
 - **Manejo conservador:** **modificación de calzado** (puntera ancha, bajar tacón), **almohadilla metatarsiana colocada PROXIMAL a las cabezas** (no justo bajo el punto doloroso) para abrir el espacio, modificación de actividad/descarga. Derivar si persiste >6 semanas; escalón siguiente: corticoide, luego excisión quirúrgica.
@@ -3368,10 +3808,26 @@ Deformidad **rígida** (estadio III-IV), fracaso de 3-6 meses de manejo conserva
 ### 5. Hallux valgus y hallux rigidus (breve, conservador)
 
 #### 5.1 Hallux valgus ("juanete")
+
+> **📋 Encuadre**
+>
+> **🎯 Indicaciones:** Deformidad en valgo del hallux ("juanete"); manejo conservador de 1ª línea en casos leve-moderados.
+>
+> **⛔ Contraindicaciones / cuándo derivar:** Fracaso de medidas conservadoras adecuadas tras ~3 meses con dolor/discapacidad persistente (umbral NICE) → cirugía (p. ej. osteotomía en chevron), que supera a la ortesis cuando el síntoma principal es dolor al caminar y no garantiza evitar recurrencia.
+>
+> **⚠️ Precauciones:** La evidencia de la fisioterapia aislada es limitada; el soporte da alivio sintomático solo a corto plazo. Ejercicio combinado con soporte externo (separador interdigital / férula nocturna / taping), pauta ~3×/semana ≥8 semanas; calzado ancho y analgesia.
 - **Conservador de 1ª línea:** ortesis/plantillas, **ejercicio** (combinado con **separador interdigital**, férula nocturna o taping; una red de metaanálisis sugiere que ejercicio + soporte externo reduce ángulo/dolor; pauta ~**3×/semana ≥8 semanas** para leve-moderado), analgesia, calzado ancho. El soporte da alivio sintomático a corto plazo; la evidencia de la fisioterapia **aislada** es limitada.
 - **Cuándo derivar (umbral NICE):** fracaso de medidas conservadoras adecuadas tras **~3 meses** con dolor/discapacidad persistente. La cirugía (p. ej. osteotomía en chevron) supera a la ortesis cuando el síntoma principal es **dolor al caminar**; no garantiza evitar recurrencia.
 
 #### 5.2 Hallux rigidus (artrosis de la 1ª metatarsofalángica)
+
+> **📋 Encuadre**
+>
+> **🎯 Indicaciones:** Artrosis de la 1ª articulación metatarsofalángica; manejo conservador (evidencia débil-moderada).
+>
+> **⛔ Contraindicaciones / cuándo derivar:** Dolor/limitación persistente → queilectomía (enfermedad moderada) o artrodesis (avanzada), con evidencia moderada.
+>
+> **⚠️ Precauciones:** Calzado de suela rígida/rocker (balancín que limita la dorsiflexión del hallux), modificación de actividad, movilidad articular tolerada / terapia manual (evidencia débil) y control del dolor. AINEs con evidencia insuficiente.
 - **Conservador (evidencia débil-moderada):** moderada para **ortesis/calzado a medida** (suela rígida/balancín que limita la dorsiflexión del hallux) e infiltración de ácido hialurónico; **movilidad/terapia manual** con evidencia débil; AINEs insuficiente.
 - **Qué SÍ:** calzado de suela rígida/rocker, modificación de actividad, movilidad articular tolerada, control del dolor.
 - **Derivación:** dolor/limitación persistente → **queilectomía** (enfermedad moderada) o **artrodesis** (avanzada) con evidencia moderada.
@@ -3476,6 +3932,14 @@ Deformidad **rígida** (estadio III-IV), fracaso de 3-6 meses de manejo conserva
 
 ### 1. Lesión de ISQUIOTIBIALES / hamstring strain (conservador)
 
+> **📋 Encuadre**
+>
+> **🎯 Indicaciones:** Lesión muscular de isquiotibiales (hamstring strain) de manejo conservador; clasificación por BAMIC (RMN). Rehabilitación por criterios con excéntricos tempranos guiados por dolor + agilidad/estabilización de tronco (CPG JOSPT 2022, L-protocol de Askling, vía Aspetar).
+>
+> **⛔ Contraindicaciones / cuándo derivar:** Dolor proximal muy cercano a la tuberosidad isquiática + equimosis extensa / "gap" palpable / debilidad marcada → sospechar avulsión proximal / rotura de tendón libre (puede ser quirúrgica) → derivar. Dolor que no cede, parestesias/ciática o dolor nocturno óseo → descartar referido lumbar o patología ósea.
+>
+> **⚠️ Precauciones:** Fase aguda: evitar estiramiento agresivo, carrera, contracción máxima dolorosa y excéntrico en rango largo doloroso. Dosis que no deje dolor residual >2/10 al día siguiente; progresar por criterios. Afectación intratendinosa ("c") con más cautela, pero NO como timeline fijo. No competir hasta superar el H-test y pruebas de campo; antecedente de lesión previa sube el riesgo de re-lesión.
+
 #### Diagnóstico — pruebas / clasificación
 - **BAMIC (British Athletics Muscle Injury Classification):** clasificación por RMN; grados 0–4, y cada grado 1–4 se subdivide en **a** (miofascial/periférico), **b** (unión miotendinosa) y **c** (intratendinoso). Grado 0 = RMN normal o edema difuso sin desgarro. Es el sistema más usado y confiable hoy · (Pollock et al., 2014; revisiones 2022–2023). Ojo: algunas fuentes describen 0–3 y otras 0–4 — **[verificar la escala exacta en Pollock 2014]**.
 - **Significado pronóstico del sufijo "c" (intratendinoso):** evidencia MODERADA e inconsistente de que la afectación del tendón intramuscular prolonga el RTP y sube el riesgo de re-lesión · (revisión sistemática JSAMS 2023). Donde difieren: un estudio en fútbol 2022 halló 36 vs 24 días con/sin tendón; otros estudios no hallaron diferencia 2b vs 2c ni efecto sobre re-lesión (Vermeulen; cohortes retrospectivas). → **tratar "c" con más cautela pero NO como timeline fijo.**
@@ -3533,6 +3997,14 @@ Síntesis de la vía Aspetar (6 estadios: 3 de fisioterapia + 3 específicos del
 ---
 
 ### 2. Dolor INGUINAL del deporte / ADUCTORES (pubalgia del deportista) (conservador)
+
+> **📋 Encuadre**
+>
+> **🎯 Indicaciones:** Dolor inguinal del deportista relacionado con aductores (y demás entidades de Doha: iliopsoas, inguinal, púbica); manejo conservador. Aguda de aductor por protocolo criteria-based de Aspetar/Serner; larga evolución (LSAGP) con el programa activo de Hölmich (± Copenhagen).
+>
+> **⛔ Contraindicaciones / cuándo derivar:** Hernia inguinal palpable, masa, o dolor que aumenta con Valsalva/tos → valoración quirúrgica. Dolor de cadera con bloqueo/chasquido o pérdida de rango → cadera-relacionado (FAI/labrum), imagen de cadera. Dolor óseo nocturno/en reposo, fiebre, pérdida de peso, o dolor púbico desproporcionado en adolescente → descartar fractura por estrés/avulsión apofisaria, infección, tumor.
+>
+> **⚠️ Precauciones:** Fase aguda: evitar estiramiento provocador del aductor, aducción resistida máxima dolorosa, carrera y Copenhagen de palanca larga. Progresar por criterios "clínicamente pain-free" antes del entrenamiento específico (Serner 2020). En crónicos (LSAGP) el retorno es LENTO (mediana ~18.5 semanas) aun con ejercicio — esperable, no necesariamente falla del tratamiento.
 
 #### Diagnóstico — pruebas / clasificación
 - **Acuerdo de Doha (taxonomía clínica):** 3 grandes categorías → (A) **4 entidades definidas**: relacionada con **aductores**, con **iliopsoas**, **inguinal**, y **púbica**; (B) dolor **relacionado con la cadera**; (C) **otras causas**. Reemplaza términos viejos ("tendinopatía del aductor", "osteítis del pubis", "pubalgia") por el formato "-relacionado con" · (Weir/Brukner/Hölmich et al., Doha agreement, BJSM 2015).
