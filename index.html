@@ -1356,7 +1356,7 @@ body.modo-oscuro .topbar{background:#141824}
 <body>
 <div id="sync-indicator" class="sync-indicator ok" style="display:none"></div>
 <div id="app-version-chip" title="Versión de la app en este equipo — toca para buscar actualización" onclick="try{_tapVersionChip()}catch(e){}"></div>
-<script>/* VERSIÓN VISIBLE: refleja el index.html realmente cargado en ESTE equipo (se bumpea junto con sw.js). Así un iPad con versión vieja se ve de un vistazo. */window.APP_VERSION='v1-2026-11-02d';(function(){try{var c=document.getElementById('app-version-chip');if(c)c.textContent=window.APP_VERSION;}catch(e){}})();</script>
+<script>/* VERSIÓN VISIBLE: refleja el index.html realmente cargado en ESTE equipo (se bumpea junto con sw.js). Así un iPad con versión vieja se ve de un vistazo. */window.APP_VERSION='v1-2026-11-02e';(function(){try{var c=document.getElementById('app-version-chip');if(c)c.textContent=window.APP_VERSION;}catch(e){}})();</script>
 <div class="toast" id="toast" aria-live="polite" aria-atomic="true"></div>
 
 <!-- LOGIN -->
@@ -1599,6 +1599,23 @@ body.modo-oscuro .topbar{background:#141824}
 .bib-art tbody tr:nth-child(even){background:var(--gray-50)}
 .bib-soap{margin:22px 0 2px;background:#E9F1F3;border:1px solid #CBDFE3;border-left:4px solid #2A6B74;border-radius:0 10px 10px 0;padding:11px 14px;font-size:13px;line-height:1.65;color:#2B3B40}
 .bib-soap b{color:#17484F}
+.bib-toprow{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.bib-pdfbtn{flex:none;background:var(--navy);color:#fff;border:none;border-radius:9px;padding:7px 13px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit}
+.bib-pdfbtn:active{opacity:.85}
+.bib-find{display:flex;align-items:center;gap:6px;margin:0 0 14px;background:var(--white);border:1px solid var(--gray-200);border-radius:10px;padding:4px 8px}
+.bib-find input{flex:1;min-width:0;border:none;outline:none;background:none;font-size:14px;color:var(--gray-800);font-family:inherit;padding:6px 2px}
+.bib-find-n{flex:none;font-size:12px;color:var(--gray-600);font-variant-numeric:tabular-nums;min-width:34px;text-align:right}
+.bib-find-nav{flex:none;background:var(--gray-100);border:none;border-radius:7px;width:28px;height:28px;font-size:12px;color:var(--navy);cursor:pointer}
+.bib-find-nav:active{background:var(--gray-200)}
+.bib-art mark.bib-mark{background:#FFE9A8;color:inherit;border-radius:3px;padding:0 1px}
+.bib-art mark.bib-mark.on{background:#FFC53D;box-shadow:0 0 0 2px rgba(201,168,76,.55)}
+.bib-art blockquote.bib-encuadre{background:linear-gradient(180deg,#EEF3FB,#F7FAFE);border:1px solid #D4E0F0;border-left:5px solid var(--navy);border-radius:12px;padding:12px 16px 13px;margin:0 0 18px}
+.bib-art blockquote.bib-encuadre .enc-h strong{display:inline-block;color:var(--navy);font-size:11px;letter-spacing:.09em;text-transform:uppercase;margin-bottom:1px}
+.bib-art blockquote.bib-encuadre p{margin:7px 0;font-size:13.5px;line-height:1.6;color:var(--gray-800)}
+.bib-art blockquote.bib-encuadre p.enc-h{margin:0 0 2px}
+.bib-art blockquote.bib-encuadre .enc-ind strong{color:#1F7A4D}
+.bib-art blockquote.bib-encuadre .enc-ci strong{color:#B42318}
+.bib-art blockquote.bib-encuadre .enc-prec strong{color:#B25E09}
 </style>
 <div class="screen" id="screen-biblioteca">
   <div class="topbar">
@@ -27017,7 +27034,7 @@ function _bibRenderLista(){
   window._bibView=null;
   var h=['<div class="bib-wrap">'];
   h.push('<div class="bib-intro">📚 Material de <b>referencia</b>: progresa por <b>criterios</b>, no por calendario; en post-quirúrgico manda el cirujano. Toca una lesión para leer sus fases, qué sí / qué no, criterios de retorno y pruebas diagnósticas.</div>');
-  h.push('<input id="bib-q" class="bib-q" type="search" inputmode="search" autocomplete="off" placeholder="🔎 Buscar (rodilla, hombro, lumbar, menisco, prótesis…)" oninput="_bibFiltrar()">');
+  h.push('<input id="bib-q" class="bib-q" type="search" inputmode="search" autocomplete="off" placeholder="🔎 Buscar en todo (lumbar, Lachman, cauda equina, tecar…)" oninput="_bibFiltrar()">');
   h.push('<div id="bib-results"></div>');
   h.push('<div class="bib-foot">Generado '+_bibEsc(d.generado||'')+' · evidencia internacional 2021–2026 · los números finos marcados [verificar] los afina el fisio contra la fuente. No sustituye el criterio clínico.</div>');
   h.push('</div>');
@@ -27029,7 +27046,7 @@ function _bibFiltrar(){
   var q=_bibNorm((document.getElementById('bib-q')||{}).value||'').trim();
   var h=[], total=0;
   (d.bibliotecas||[]).forEach(function(lib,li){
-    var hits=[]; (lib.areas||[]).forEach(function(a,ai){ if(!q || _bibNorm(a.titulo).indexOf(q)>=0) hits.push({a:a,ai:ai}); });
+    var hits=[]; (lib.areas||[]).forEach(function(a,ai){ if(!q || _bibNorm(a.titulo).indexOf(q)>=0 || _bibAreaTxt(a).indexOf(q)>=0) hits.push({a:a,ai:ai}); });
     if(!hits.length) return;
     h.push('<div class="bib-lib">'+_bibEsc((lib.emoji?lib.emoji+' ':'')+lib.titulo)+'</div>');
     hits.forEach(function(o){ total++; h.push('<button class="bib-card" onclick="_bibAbrirArea('+li+','+o.ai+')"><span class="bib-card-t">'+_bibEsc(o.a.titulo)+'</span><span class="bib-card-ar">›</span></button>'); });
@@ -27050,14 +27067,88 @@ function _bibAbrirArea(li,ai){
   var eyebrow=_bibEsc((lib.emoji?lib.emoji+' ':'')+lib.titulo);
   var soap=(lib.id!=='derma')?'<div class="bib-soap">💬 <b>Cómo registrarlo en el SOAP:</b> <b>S</b> síntomas y EVA, qué agrava/alivia · <b>O</b> ROM, fuerza y las pruebas de la fase · <b>A</b> fase actual + criterios cumplidos (¿va en tiempo o desfasado?) · <b>P</b> ejercicios/carga de la fase + agentes coadyuvantes y educación.</div>':'';
   c.innerHTML='<div class="bib-wrap">'
-    +'<button class="bib-back2" onclick="_bibBack()">‹ Todos los protocolos</button>'
+    +'<div class="bib-toprow"><button class="bib-back2" onclick="_bibBack()">‹ Todos los protocolos</button>'
+    +'<button class="bib-pdfbtn" onclick="_bibPDF()">📄 PDF</button></div>'
+    +'<div class="bib-find"><input id="bib-find-q" type="search" inputmode="search" autocomplete="off" placeholder="🔎 Buscar en este protocolo…" oninput="_bibFind()"><span id="bib-find-n" class="bib-find-n"></span><button class="bib-find-nav" onclick="_bibFindNav(-1)" aria-label="anterior">▲</button><button class="bib-find-nav" onclick="_bibFindNav(1)" aria-label="siguiente">▼</button></div>'
     +'<div class="bib-page"><div class="bib-eyebrow">'+eyebrow+'</div>'
     +'<div class="bib-art-h">'+_bibEsc(a.titulo)+'</div><div class="bib-doc-rule"></div>'
     +tocHtml
     +'<div class="bib-art" lang="es">'+a.html+'</div>'
     +soap
     +'</div></div>';
-  try{ c.scrollTop=0; }catch(_){}
+  try{ c.scrollTop=0; window._bibFindHits=[]; window._bibFindI=-1; }catch(_){}
+}
+// Texto plano normalizado de un área (cache) para la búsqueda GLOBAL por contenido.
+function _bibAreaTxt(a){
+  if(a._txt==null){ try{ var dv=document.createElement('div'); dv.innerHTML=a.html||''; a._txt=_bibNorm((a.titulo||'')+' '+(dv.textContent||dv.innerText||'')); }catch(_){ a._txt=_bibNorm(a.titulo||''); } }
+  return a._txt;
+}
+// Quita acentos CONSERVANDO la longitud (para mapear índices de coincidencia al texto original).
+function _bibDeacc(s){ s=String(s==null?'':s); var m={'á':'a','à':'a','ä':'a','â':'a','é':'e','è':'e','ë':'e','ê':'e','í':'i','ì':'i','ï':'i','î':'i','ó':'o','ò':'o','ö':'o','ô':'o','ú':'u','ù':'u','ü':'u','û':'u','ñ':'n','Á':'a','À':'a','Ä':'a','Â':'a','É':'e','È':'e','Ë':'e','Ê':'e','Í':'i','Ì':'i','Ï':'i','Î':'i','Ó':'o','Ò':'o','Ö':'o','Ô':'o','Ú':'u','Ù':'u','Ü':'u','Û':'u','Ñ':'n'}; var o=''; for(var i=0;i<s.length;i++){ var c=s[i]; o+=(m[c]||c).toLowerCase(); } return o; }
+// BUSCAR DENTRO del protocolo abierto: resalta coincidencias (acento/mayúscula-insensible) y salta a ellas.
+function _bibClearMarks(){ var cont=document.querySelector('#content-biblioteca .bib-art'); if(!cont) return; var mk=cont.querySelectorAll('mark.bib-mark'); for(var i=0;i<mk.length;i++){ var m=mk[i]; var t=document.createTextNode(m.textContent); m.parentNode.replaceChild(t,m); } try{ cont.normalize(); }catch(_){} window._bibFindHits=[]; window._bibFindI=-1; }
+function _bibFind(){ clearTimeout(window._bibFindT); window._bibFindT=setTimeout(_bibFindDo,180); }
+function _bibFindDo(){
+  var inp=document.getElementById('bib-find-q'), cont=document.querySelector('#content-biblioteca .bib-art'), cnt=document.getElementById('bib-find-n');
+  if(!inp||!cont) return;
+  _bibClearMarks();
+  var q=_bibDeacc((inp.value||'').trim());
+  if(q.length<2){ if(cnt) cnt.textContent=''; return; }
+  var walker=document.createTreeWalker(cont, NodeFilter.SHOW_TEXT, null), nodes=[], nd;
+  while(nd=walker.nextNode()){ if(nd.nodeValue && nd.nodeValue.trim() && !(nd.parentNode&&nd.parentNode.nodeName==='MARK')) nodes.push(nd); }
+  var hits=[];
+  nodes.forEach(function(node){
+    var txt=node.nodeValue, low=_bibDeacc(txt), idx=0, pos, last=0, frag=null;
+    while((pos=low.indexOf(q,idx))>=0){
+      if(!frag) frag=document.createDocumentFragment();
+      if(pos>last) frag.appendChild(document.createTextNode(txt.slice(last,pos)));
+      var mk=document.createElement('mark'); mk.className='bib-mark'; mk.textContent=txt.slice(pos,pos+q.length);
+      frag.appendChild(mk); hits.push(mk); last=pos+q.length; idx=pos+q.length;
+    }
+    if(frag){ if(last<txt.length) frag.appendChild(document.createTextNode(txt.slice(last))); node.parentNode.replaceChild(frag,node); }
+  });
+  window._bibFindHits=hits; window._bibFindI=hits.length?0:-1;
+  if(cnt) cnt.textContent=hits.length?('1/'+hits.length):'0';
+  if(hits.length){ hits[0].classList.add('on'); try{ hits[0].scrollIntoView({behavior:'smooth',block:'center'}); }catch(_){ hits[0].scrollIntoView(); } }
+}
+function _bibFindNav(d){ var h=window._bibFindHits||[]; if(!h.length) return; if(window._bibFindI>=0&&h[window._bibFindI]) h[window._bibFindI].classList.remove('on'); window._bibFindI=(window._bibFindI+d+h.length)%h.length; var cur=h[window._bibFindI]; cur.classList.add('on'); try{ cur.scrollIntoView({behavior:'smooth',block:'center'}); }catch(_){ cur.scrollIntoView(); } var cnt=document.getElementById('bib-find-n'); if(cnt) cnt.textContent=(window._bibFindI+1)+'/'+h.length; }
+// PDF del protocolo abierto (html2canvas + jsPDF, por trozos h3 → multipágina robusta a cualquier largo).
+async function _bibPDF(){
+  var v=window._bibView, d=window._bibData; if(!v||!d) return;
+  var lib=(d.bibliotecas||[])[v.li], a=lib&&(lib.areas||[])[v.ai]; if(!a) return;
+  var jsPDF=(window.jspdf&&window.jspdf.jsPDF)||window.jsPDF;
+  if(!jsPDF){ showToast('jsPDF no disponible — abre con señal','error'); return; }
+  showToast('⏳ Generando PDF…','');
+  if(!window.html2canvas){ try{ await new Promise(function(res,rej){ var sc=document.createElement('script'); sc.src='https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js'; sc.onload=res; sc.onerror=rej; document.head.appendChild(sc); }); }catch(_){} }
+  if(!window.html2canvas){ showToast('Sin conexión para preparar el PDF — conéctate un momento','error'); return; }
+  var host=document.getElementById('content-biblioteca')||document.body;
+  var tmp=document.createElement('div'); tmp.className='bib-art'; tmp.setAttribute('lang','es');
+  tmp.style.cssText='position:fixed;left:-10000px;top:0;width:760px;box-sizing:border-box;background:#fff;z-index:-1;padding:24px';
+  host.appendChild(tmp);
+  var doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
+  var pw=210,ph=297,m=10,iw=pw-m*2,pageH=ph-m*2,y=m,first=true;
+  var header='<div class="bib-eyebrow">'+_bibEsc((lib.emoji?lib.emoji+' ':'')+lib.titulo)+'</div><div class="bib-art-h">'+_bibEsc(a.titulo)+'</div><div class="bib-doc-rule"></div>';
+  var chunks=String(a.html||'').split(/(?=<h3)/g); chunks[0]=header+(chunks[0]||'');
+  if(lib.id!=='derma') chunks.push('<div class="bib-soap">💬 <b>Cómo registrarlo en el SOAP:</b> <b>S</b> síntomas/EVA · <b>O</b> ROM/fuerza/pruebas de la fase · <b>A</b> fase actual + criterios cumplidos · <b>P</b> ejercicios/carga de la fase + agentes y educación.</div>');
+  try{
+    for(var k=0;k<chunks.length;k++){
+      if(!chunks[k]||!chunks[k].trim()) continue;
+      tmp.innerHTML=chunks[k];
+      var canvas=await window.html2canvas(tmp,{scale:2,backgroundColor:'#ffffff',useCORS:true,width:760,windowWidth:980});
+      if(!canvas.height) continue;
+      var img=canvas.toDataURL('image/jpeg',0.92), ih=canvas.height*iw/canvas.width;
+      if(ih<=pageH){ if(!first && y+ih>ph-m){ doc.addPage(); y=m; } doc.addImage(img,'JPEG',m,y,iw,ih,'','FAST'); y+=ih+3; first=false; }
+      else { if(!first){ doc.addPage(); y=m; } var sy=0,rest=ih; while(rest>0){ doc.addImage(img,'JPEG',m,m-sy,iw,ih,'','FAST'); rest-=pageH; sy+=pageH; if(rest>0) doc.addPage(); } y=ph; first=false; }
+    }
+    var nom=_bibNorm(a.titulo).replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'').slice(0,46)||'protocolo';
+    var f=new Date(), fecha=f.getFullYear()+'-'+('0'+(f.getMonth()+1)).slice(-2)+'-'+('0'+f.getDate()).slice(-2);
+    var arch='Protocolo_'+nom+'_'+fecha+'.pdf';
+    var blob=doc.output('blob'), file=new File([blob],arch,{type:'application/pdf'});
+    if(navigator.canShare&&navigator.canShare({files:[file]})){ try{ await navigator.share({files:[file],title:arch,text:'Protocolo — Clínica Sinergia'}); showToast('✅ Elige dónde guardar/enviar','success'); return; }catch(e){ if(e&&e.name==='AbortError') return; } }
+    try{ doc.save(arch); }catch(e2){ var url=URL.createObjectURL(blob); window.open(url,'_blank'); setTimeout(function(){ URL.revokeObjectURL(url); },60000); }
+    showToast('✅ PDF generado','success');
+  }catch(err){ showToast('No se pudo generar el PDF: '+((err&&err.message)||''),'error'); }
+  finally{ try{ tmp.remove(); }catch(_){} }
 }
 // ── B1: Gráfica EVA en SVG puro (sin librerías) ──
 function generarGraficaEVA(p){
