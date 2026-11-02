@@ -15,7 +15,7 @@ Autor clínico de referencia: Carlos Fernando Aranda González. Este documento *
 ### Índice de secciones (orden cabeza → pie)
 - **PARTE 0** — Perfil de diagnósticos de la clínica (auditoría 2026-11-02)
 - **PARTE 0b** — Seguridad clínica transversal (agentes físicos / implantes)
-- **🔙 COLUMNA LUMBAR** — lumbalgia · radiculopatía/ciática · estenosis · espondilólisis · post-qx
+- **🧍 COLUMNA LUMBAR** — lumbalgia · radiculopatía/ciática · estenosis · espondilólisis · post-qx
 - **🦴 COLUMNA CERVICAL Y DORSAL** — cervicalgia · latigazo (WAD) · radiculopatía · cefalea cervicogénica · dorsalgia · hipercifosis · escoliosis
 - **💪 HOMBRO** — SLAP · manguito rotador · inestabilidad / Bankart
 - **🦾 CODO** — epicondilalgia lateral/medial · post-fractura/luxación · LCU/Tommy John · túnel cubital
@@ -89,7 +89,7 @@ Vale para TODO post-quirúrgico con material y para cualquier paciente con los f
 
 ---
 
-## 🔙 COLUMNA LUMBAR (lumbalgia, radiculopatía, estenosis, espondilólisis y post-quirúrgico)
+## 🧍 COLUMNA LUMBAR (lumbalgia, radiculopatía, estenosis, espondilólisis y post-quirúrgico)
 
 > **Qué es esto:** material de REFERENCIA para el fisio. Sirve para ubicar en qué **fase/clasificación** va el paciente, qué **restricciones** aplican, qué **banderas rojas** vigilar y si el paciente **va en tiempo**. NO es prescripción automática ni reemplaza el razonamiento clínico: cada plan se individualiza (edad, deporte/gesto, comorbilidades, seguridad clínica) y la progresión es **por CRITERIOS, no por calendario**. El diagnóstico lumbar es el más frecuente de la clínica (~439 expedientes), por eso se documenta a fondo.
 >
@@ -127,7 +127,6 @@ Coinciden NICE NG59, ACP 2017, JOSPT/APTA CPG 2012/2021, WHO 2023 y la serie del
 - **Terapia manual** (manipulación, movilización, masaje) solo **como COADYUVANTE dentro de un paquete que incluye ejercicio** (NICE NG59), nunca sola ni como tratamiento principal.
 - **Enfoque biopsicosocial** y estratificado por riesgo: menos es más en bajo riesgo; intensificar en alto riesgo (ACP 2017: empezar por lo no farmacológico; WHO 2023: cuidado holístico, centrado en la persona, no estigmatizante).
 - **Agentes físicos electrofísicos NO son el motor** (ver §11): las guías NO respaldan ultrasonido, TENS, interferencial, tracción ni fajas como tratamiento efectivo del dolor lumbar común (NICE NG59 recomienda NO ofrecerlos; WHO 2023 recomendación condicional en contra de US y TENS). **La carga/ejercicio es el motor; los agentes físicos son coadyuvantes de analgesia de corto plazo, nunca sustituto del rehab activo.**
-- **Progresión por CRITERIOS, no por calendario.** Las semanas que se citan son HITOS para detectar desfase, no reglas.
 
 ---
 
@@ -473,13 +472,13 @@ Los hallazgos "degenerativos" en RM son **enormemente frecuentes en personas SIN
 
 ### 13. Incertidumbres [verificar]
 
-Marcado así porque WebFetch/curl estuvo **bloqueado** (DNS no resolvía hosts fuera de dominios permitidos) y estos números vienen de **resúmenes de búsqueda**, no de las tablas originales de los PDF:
+Números a confirmar contra la fuente primaria antes de fijarlos como estándar de la clínica (metodología en la «Nota de método» del inicio):
 
 1. **NICE NG59 — enmienda 2026** (retiro de recomendaciones de terapia psicológica, enfoque estratificado por riesgo): proviene de un resumen de búsqueda; contrasta con que ACP/WHO/Lancet respaldan el modelo biopsicosocial para dolor crónico. **Verificar el texto vigente en nice.org.uk/guidance/ng59** antes de citar el retiro como definitivo.
 2. **Cortes exactos de STarT Back** (≤3 bajo; subpuntaje ≥4 alto) y sus odds de discapacidad.
 3. **Sens/esp finas de SLR, SLR cruzado, Slump** (varían mucho entre estudios; el metanálisis 2026 baja la precisión del SLR). Rango dado, no valor único.
 4. **Banda sin fin 2 etapas** (sens ~0.50–0.77, esp ~0.92–0.95) y **bicicleta/stoop test** (no obtuve sens/esp).
-5. **Likelihood ratios de banderas rojas de Downie 2013** (no pude abrir el PDF); prevalencias de fractura/cáncer citadas por rango.
+5. **Likelihood ratios de banderas rojas de Downie 2013**; prevalencias de fractura/cáncer citadas por rango.
 6. **Cifras exactas de Brinjikji** por década (degeneración 37→96%, bulge 30→84%).
 7. **Timings post-microdiscectomía y post-fusión** (semanas, kg/lb de levantamiento, BLT 6–12 sem): **altamente dependientes de cirujano/protocolo**; confirmar con el equipo quirúrgico de cada paciente. Conversiones lb→kg aproximadas.
 8. **Tiempos de retorno al deporte en espondilólisis** (~4–5 meses) y utilidad real del bracing: evidencia mayormente de estudios narrativos/retrospectivos, sin ECA fuertes.
@@ -497,11 +496,12 @@ Marcado así porque WebFetch/curl estuvo **bloqueado** (DNS no resolvía hosts f
 
 ### 0. Principios transversales (aplican a TODO el documento)
 
-- **Progresión por CRITERIOS, no por calendario.** Los "hitos de tiempo" que aparecen abajo son orientativos; el avance de fase lo decide la respuesta clínica (dolor, irritabilidad, control motor, tolerancia a la carga), no el día del almanaque.
-- **La CARGA/el ejercicio es el motor del tratamiento; los agentes físicos son COADYUVANTES** (analgesia, preparar tejido, control de síntomas), nunca el eje. Para cuello crónico, la evidencia más sólida es el **entrenamiento de fuerza cérvico-escápulo-torácica y de MMSS** (Cochrane, Gross 2015).
-- **No reposo, no inmovilización rutinaria.** El collarín cervical blando prolongado empeora el pronóstico en cervicalgia y latigazo. El mensaje central es **mantenerse activo, tranquilizar y recuperar movimiento temprano**.
-- **Monitoreo del dolor transversal.** En cuadros radiculares se vigila **centralización vs. periferización** (el síntoma que "sube" hacia la columna = buena señal; el que "baja" por el brazo/pierna = mala señal) y la **respuesta a 24 h**. Se puede traducir a un "semáforo" simple para el paciente (verde: molestia tolerable que no deja secuela al día siguiente; ámbar: dolor que sube pero cede; rojo: dolor que irradia más lejos, parestesias nuevas o empeora al día siguiente → bajar carga y avisar).
-- **Seguridad clínica primero.** Antes de manipular/traccionar columna cervical, **descartar banderas vasculares y mielopatía** (ver §1-§2). Respetar implantes/metal, marcapaso, embarazo, anticoagulación, cáncer (ver §8 y el campo `seguridadClinica`).
+> **Aplican las reglas de oro del inicio del documento** (progresar por criterios > calendario · la carga/ejercicio es el motor · semáforo del dolor · banderas rojas primero). Lo **específico de cuello y dorsal**:
+
+- **En cuello crónico el motor es la FUERZA** cérvico-escápulo-torácica y de MMSS (la evidencia más sólida — Cochrane, Gross 2015); los agentes físicos son coadyuvantes.
+- **No collarín prolongado ni inmovilización rutinaria:** el collarín blando prolongado **empeora** el pronóstico en cervicalgia y latigazo. Mantenerse activo, tranquilizar y recuperar movimiento temprano.
+- **Monitoreo del dolor:** en cuadros radiculares, vigilar **centralización vs. periferización** (el síntoma que "sube" hacia la columna = buena señal; el que "baja" por el brazo = mala) y la **respuesta a 24 h**.
+- **Seguridad primero:** antes de manipular/traccionar columna cervical, **descartar banderas vasculares y mielopatía** (§1-§2); respetar implantes/metal, marcapaso, embarazo, anticoagulación, cáncer (`seguridadClinica`, §8/§11).
 
 ---
 
@@ -537,7 +537,7 @@ Compresión de la médula espinal. **Es la bandera roja que más se escapa en fi
 - El **mareo** aparece en una proporción relevante de disecciones vertebrales/carotídeas [verificar % exacto].
 - **Mareo cervicogénico vs. vascular:** el vascular aparece con la **rotación/extensión** mantenida y **no mejora** con movimiento repetido; se acompaña de otras D/N. Ante duda → derivar.
 
-**Conducta:** sospecha de disección/evento vascular en curso → **urgencia médica**, no manipular/traccionar. El marco **ya no recomienda** las pruebas pre-manipulativas de posición sostענida (rotación-extensión) por su pobre valor predictivo; el cribado es por **historia + factores de riesgo + examen neurológico**, no por una maniobra provocadora.
+**Conducta:** sospecha de disección/evento vascular en curso → **urgencia médica**, no manipular/traccionar. El marco **ya no recomienda** las pruebas pre-manipulativas de posición sostenida (rotación-extensión) por su pobre valor predictivo; el cribado es por **historia + factores de riesgo + examen neurológico**, no por una maniobra provocadora.
 
 #### 1.3 Fractura / inestabilidad cervical
 - **Trauma:** usar reglas de decisión validadas para decidir imagen: **Canadian C-Spine Rule** (Stiell) — sensibilidad ~**99%** (90-100%), especificidad baja (~1-77%) [verificar]; y **NEXUS** (Hoffman) — sensibilidad ~**90%** (83-100%), especificidad menor. Ambas son muy sensibles (un negativo bien aplicado descarta lesión clínicamente importante). Ante mecanismo de alto riesgo, déficit neurológico o dolor axial intenso post-trauma → **inmovilizar y derivar** (equivale a WAD grado IV, ver §4).
@@ -716,7 +716,7 @@ El objetivo cambia: **no es frenar una curva en crecimiento sino controlar dolor
 - **Qué NO:** esperar corrección estructural; ignorar banderas rojas (claudicación neurógena, déficit progresivo → derivar).
 - **Criterios de avance/alta:** por **mejoría funcional y de síntomas** (no por el ángulo). Derivar a cirugía si dolor/discapacidad refractarios, déficit neurológico progresivo o desbalance sagital marcado.
 
-### 10. Radiculopatía cervical (ubicada aquí por completитud; es cuadro CERVICAL)
+### 10. Radiculopatía cervical (ubicada aquí por completitud; es cuadro CERVICAL)
 
 Compresión/irritación de raíz cervical (hernia discal, espondilosis/estenosis foraminal). Dolor radicular + posibles signos sensitivos/motores/reflejos en el dermatoma/miotoma.
 - **Evaluación:** clúster de Wainner (§2.1); **siempre cribar mielopatía (§1.1)** — radiculopatía y mielopatía pueden coexistir.
@@ -734,11 +734,7 @@ Compresión/irritación de raíz cervical (hernia discal, espondilosis/estenosis
 ### 11. Seguridad de agentes físicos y precaución con MANIPULACIÓN/TRACCIÓN CERVICAL
 
 #### 11.1 Manipulación y tracción cervical — precauciones (ligar a `seguridadClinica`)
-**Antes de cualquier terapia manual de alta velocidad o tracción cervical, cribar OBLIGATORIAMENTE:**
-1. **Mielopatía (§1.1)** → **contraindicada** la manipulación; evitar tracción y extensión forzada. Derivar.
-2. **Patología vascular del cuello / disección (§1.2, marco IFOMPT 2020)** → si hay sospecha, **NO manipular/traccionar**, urgencia médica. El marco **ya no recomienda** pruebas pre-manipulativas posicionales; el cribado es por historia + riesgo + examen neurológico.
-3. **Fractura/inestabilidad (§1.3):** trauma reciente, **AR con subluxación C1-C2**, osteoporosis severa, espondilitis anquilosante, Down → **no manipular**.
-4. Cáncer/infección/dolor no mecánico (§1.4) → derivar antes de tratar.
+**Antes de cualquier terapia manual de alta velocidad o tracción cervical, cribar OBLIGATORIAMENTE las banderas rojas de §1:** **mielopatía (§1.1)** y **patología vascular / disección (§1.2)** son **contraindicación** de manipulación (evitar también tracción y extensión forzada → urgencia médica); **fractura/inestabilidad (§1.3)** (trauma reciente, AR con subluxación C1-C2, osteoporosis severa, EA, Down) y **cáncer/infección (§1.4)** → **no manipular**, derivar antes de tratar. El marco **IFOMPT 2020 ya no recomienda** pruebas pre-manipulativas posicionales: el cribado es por historia + riesgo + examen neurológico.
 
 **Sobre el riesgo de la manipulación cervical (manipulación de alta velocidad, HVLA):**
 - Los **eventos adversos benignos** (dolor transitorio, rigidez) son **frecuentes**; los **graves (ACV por disección) son raros** (revisión de alcance 2017).
@@ -1052,13 +1048,13 @@ Este es material de referencia para revisión clínica, no prescripción automá
 
 ### 0. Principios transversales de la rehabilitación de codo
 
-- **La CARGA es el motor** en las tendinopatías (epicondilalgias); los agentes físicos son **coadyuvantes**, no el tratamiento. En trauma (fractura/luxación) el motor es el **movimiento activo temprano controlado**.
-- **El codo es muy propenso a la RIGIDEZ** y a la **osificación heterotópica (OH)**. Dos consecuencias prácticas: (1) movilizar pronto y de forma controlada tras trauma; (2) **NO forzar con estiramiento pasivo agresivo** (empeora la OH y la rigidez).
-- **Recuperar la EXTENSIÓN es prioridad** tras trauma: el codo tiende a quedar en **flexo** (déficit de extensión), que es lo más incapacitante funcionalmente.
-- **Dosificar respetando el tejido:** tendón ≠ ligamento ≠ hueso ≠ post-qx. En tendinopatía, la **rigidez/dolor matutino** y el dolor a las 24 h post-carga son el termómetro (semáforo del dolor).
-- **Monitoreo del dolor transversal** (semáforo): el dolor **estable ≤3–5/10 que no empeora a las 24 h** permite progresar; dolor creciente, hinchazón o pérdida de ROM = retroceder.
-- **Progresión por criterios** en todos los cuadros: no se avanza de fase si no se cumplen los criterios de salida, aunque "toque" por calendario.
-- **ROM normal del codo (goniometría):** extensión 0° / flexión ~140–150°; pronación ~80–85° / supinación ~85–90°. **Arco funcional (Morrey):** flexión 30°–130° y 50°–50° pronosupinación cubren la mayoría de las AVD → el objetivo mínimo realista suele ser ese arco.
+> **Aplican las reglas de oro del inicio** (criterios > calendario · la carga es el motor · semáforo del dolor). Lo **específico del codo**:
+
+- **El motor cambia por cuadro:** en las tendinopatías (epicondilalgias) es la **CARGA progresiva**; en trauma (fractura/luxación) es el **movimiento activo temprano controlado**. Los agentes físicos son coadyuvantes.
+- **El codo es muy propenso a la RIGIDEZ y a la osificación heterotópica (OH):** (1) movilizar pronto y de forma controlada tras trauma; (2) **NO forzar con estiramiento pasivo agresivo** (empeora la OH y la rigidez).
+- **Recuperar la EXTENSIÓN es prioridad** tras trauma: el codo tiende a quedar en **flexo** (déficit de extensión), lo más incapacitante funcionalmente.
+- **Termómetro de la tendinopatía:** la **rigidez/dolor matutino** y el dolor a las 24 h post-carga mandan; dolor **estable ≤3–5/10 que no empeora a las 24 h** = progresar; dolor creciente, hinchazón o pérdida de ROM = retroceder.
+- **ROM normal del codo (goniometría):** extensión 0° / flexión ~140–150°; pronación ~80–85° / supinación ~85–90°. **Arco funcional (Morrey):** flexión 30°–130° y 50°–50° de pronosupinación cubren la mayoría de las AVD → objetivo mínimo realista.
 
 ---
 
@@ -1193,8 +1189,6 @@ Sospechar **séptica** ante **calor, eritema, dolor marcado, fiebre, fluctuació
 
 ---
 
-### 6. (incluido arriba — ver 5)
-
 ### 7. Atrapamiento del nervio cubital en el codo (síndrome del túnel cubital)
 
 Segunda neuropatía por compresión más frecuente del miembro superior. Síntomas: parestesias/entumecimiento en **4º–5º dedos**, dolor medial del codo, debilidad de intrínsecos en casos avanzados; se agravan con la **flexión mantenida del codo** y con apoyarse en el codo.
@@ -1243,9 +1237,9 @@ Segunda neuropatía por compresión más frecuente del miembro superior. Síntom
 
 ### 10. Seguridad de agentes físicos (liga con `seguridadClinica`)
 
-Los agentes físicos son **coadyuvantes**. Antes de aplicarlos, revisar `seguridadClinica` (implantes/osteosíntesis, marcapaso/DAI, anticoagulación, cáncer, embarazo) y la **alerta de metal** del expediente.
+Los agentes físicos son **coadyuvantes**. Rige la **seguridad transversal (PARTE 0b)** y el campo `seguridadClinica`/alerta de metal del expediente. **Específico del codo:**
 
-- **Material de osteosíntesis / implante metálico:** **NO** diatermia térmica (onda corta/microondas), **NO tecar/radiofrecuencia térmica** ni **US térmico sobre el material** (calentamiento del metal → quemadura profunda, daño óseo/periimplante). *Matiz de la literatura:* el **US terapéutico no está absolutamente contraindicado sobre metal** según revisiones basadas en evidencia (precauciones por ondas estacionarias), pero **la regla conservadora de la clínica se mantiene: no aplicar modalidad térmica sobre la osteosíntesis.** Tecar/RF **atérmica** y láser pueden usarse **lejos del material** con criterio.
+- **Material de osteosíntesis / implante metálico:** aplica la regla de metal (nada térmico —RF/diatermia/tecar/US térmico— sobre el material; el metal se sobrecalienta → quemadura profunda, daño óseo/periimplante). *Matiz de la literatura:* el **US terapéutico no está absolutamente contraindicado sobre metal** según revisiones basadas en evidencia (precauciones por ondas estacionarias), pero **la regla conservadora de la clínica se mantiene: no aplicar modalidad térmica sobre la osteosíntesis.** Tecar/RF **atérmica** y láser pueden usarse **lejos del material** con criterio.
 - **Riesgo de OH con calor agresivo:** en el periodo post-traumático temprano, **evitar calor profundo agresivo y estiramiento pasivo vigoroso** (ambos favorecen la OH). Preferir movimiento activo controlado.
 - **Marcapaso / DAI / neuroestimulador / implante coclear:** **NUNCA** diatermia (onda corta/microondas) ni **tecar/RF**; **electroterapia (TENS/EEM) y US cerca del dispositivo contraindicados/con cautela extrema**; **ESWT: no dentro de ~3 m de una persona con implante electrónico** [verificar].
 - **Ondas de choque (ESWT):** la no térmica puede aplicarse **cerca de** metal, pero **evitar sobre pulmón, grandes vasos/nervios, placas de crecimiento abiertas**, en **rotura tendinosa aguda**, **embarazo**, **coagulopatía/anticoagulación**, **malignidad** en la zona.
@@ -1293,8 +1287,6 @@ Los agentes físicos son **coadyuvantes**. Antes de aplicarlos, revisar `segurid
 - **Tiempos de retorno en LCU/Tommy John** (3–4 meses conservador; 12–18 meses post-reconstrucción) provienen de protocolos de clínicas, no de un protocolo único validado; el programa de lanzamiento por intervalos es por criterios.
 - **US terapéutico sobre metal:** la literatura basada en evidencia (Houghton/PMC3031347) indica que **no está absolutamente contraindicado**, lo que **difiere de la regla conservadora de la clínica** (no US térmico sobre osteosíntesis). Mantener la regla de la clínica por seguridad y documentar la decisión; verificar con la política interna.
 - **Protocolos de fractura-luxación / tríada terrible:** no hay estándar universal; los límites de brida (30°–120°), "evitar últimos 30° de extensión × 4 sem" y "~10°/semana" son de protocolos quirúrgicos individuales → **siempre según el cirujano tratante**.
-
-(Archivos relevantes: este material está pensado para `docs/` como biblioteca de referencia de codo, análogo a `docs/biblioteca_protocolos.md`. No se escribió ningún archivo, según lo pedido.)
 
 ---
 
@@ -1371,7 +1363,7 @@ Son **valores de referencia convencionales**, no normas poblacionales ni "rango 
 > **Enfoque:** compresión del nervio mediano en el túnel carpiano. **La fisioterapia es el manejo inicial del STC leve-moderado** confirmado o sospechado (JOSPT CPG, revisión 2026). En STC **severo** (atrofia tenar / hallazgos electrodiagnósticos severos) → derivar a valoración quirúrgica.
 
 #### Pruebas / evaluación
-Phalen, Tinel, **Durkan/compresión del carpo** (el más útil, combinar con Phalen) — cifras en PARTE 0c. Boston Questionnaire para síntomas/función; electrodiagnóstico para severidad y decisión quirúrgica. Buscar **atrofia tenar** y déficit sensitivo fijo (bandera de severidad).
+Phalen, Tinel, **Durkan/compresión del carpo** (el más útil, combinar con Phalen) — cifras en «Evaluación transversal» (arriba). Boston Questionnaire para síntomas/función; electrodiagnóstico para severidad y decisión quirúrgica. Buscar **atrofia tenar** y déficit sensitivo fijo (bandera de severidad).
 
 #### A) Manejo CONSERVADOR (leve-moderado) — por criterios
 
@@ -1470,7 +1462,7 @@ Goniometría seriada de muñeca **y prono-supinación** (clave y a menudo lo má
 - **Vitamina C profiláctica:** **evidencia MIXTA/no concluyente.** Algunos estudios positivos (Sane 2021: 500 mg/día ~90 días redujo casos Budapest+); metaanálisis y otros ECA **sin efecto significativo**. Orthobullets cita **500 mg/día ~50 días** en fractura de radio distal (dosis menor si función renal comprometida). **Decisión médica**, no de fisioterapia; sin consenso.
 
 #### Agentes físicos / seguridad
-Con **placa volar/tornillos**: **sin tecar térmica/RF/US térmico sobre el metal**; usar atérmicos y lejos del implante. En SDRC, precaución máxima con térmicos; parafina/baños de contraste como coadyuvantes suaves.
+Con **placa volar/tornillos**, aplica la regla de metal (atérmicos, lejos del implante). En SDRC, **máxima precaución con térmicos**; parafina/baños de contraste como coadyuvantes suaves.
 
 ---
 
@@ -1502,7 +1494,7 @@ Con **placa volar/tornillos**: **sin tecar térmica/RF/US térmico sobre el meta
 - **Vigilancia:** dolor persistente en tabaquera + pérdida de fuerza/ROM semanas-meses después → **reimagen por no-unión** (SNAC wrist si evoluciona).
 
 #### Agentes físicos / seguridad
-Con **tornillo (Herbert) o agujas**: atérmicos, sin RF/tecar térmica/US térmico sobre el metal. (Nota: algunos usan estimulación de consolidación ósea en no-unión; eso es indicación médica, no estándar de fisioterapia aquí.)
+Con **tornillo (Herbert) o agujas**, regla de metal (atérmicos, nada térmico sobre el implante). (La estimulación de consolidación ósea en no-unión es indicación médica, no estándar de fisioterapia aquí.)
 
 ---
 
@@ -1647,7 +1639,7 @@ Calor/parafina antes del ejercicio, TENS/US/láser para dolor como coadyuvantes 
 ---
 
 #### Notas para quien integre esto a la app
-- Este documento es el candidato natural a **`docs/biblioteca_muneca_mano.md`** (no lo escribí a archivo por instrucción; se entrega aquí en markdown). Encaja con la pestaña **📋 Protocolo**: los cuadros ya están en formato "fases por criterios + qué falta" reutilizable como `PROTO_LIB` de mano/muñeca, igual que la biblioteca MSK.
+- Este material alimenta la biblioteca de **muñeca/mano**. Encaja con la pestaña **📋 Protocolo**: los cuadros ya están en formato "fases por criterios + qué falta" reutilizable como `PROTO_LIB` de mano/muñeca, igual que la biblioteca MSK.
 - Agentes físicos descritos "solo cuál y cuándo" (sin dosimetría), para ligar con `_protoSegFlags`/`seguridadClinica`. La **caja roja de metal** (placa de radio distal, tornillo de escafoides) y la **precaución de SDRC** deben saltar automáticamente vía `_soapSeguridadHTML`.
 - La **dinamometría de prensión/pinza vs lado sano** es la medida de resultado objetiva de toda la región → buen candidato a capturarse estructurado en valoración/revaloración para alimentar el semáforo de alta.
 
@@ -1876,8 +1868,8 @@ Evidencia obtenida vía WebSearch (resúmenes); WebFetch a sitios externos qued�
 - Chan PHA et al. "Scoping review on recommendations of hip precautions after posterior THA." *J Orthop Trauma Rehabil* (SAGE), 2025. https://journals.sagepub.com/doi/10.1177/22104917251336772
 - ECA estabilidad intraoperatoria 90°/45°/0° sin precauciones (posterior). *J Arthroplasty*, 2022 (ScienceDirect S0883540322000456). https://www.sciencedirect.com/science/article/abs/pii/S0883540322000456
 - ECA 2025: precauciones vs reparación capsular en posterior (sin diferencia en luxación; menor satisfacción con precauciones). ScienceDirect S0883540326004146. https://www.sciencedirect.com/science/article/pii/S0883540326004146
-- "Rehabilitation Phases, Precautions, and Mobility Goals Following THA." PMC10626929 (no pude abrirlo; fases y criterios). https://pmc.ncbi.nlm.nih.gov/articles/PMC10626929/
-- Ohio State University — Total Hip Arthroplasty Post-op Clinical Practice Guideline, update 2022 (precauciones por abordaje; no pude abrir el PDF). https://medicine.osu.edu/-/media/files/medicine/departments/sports-medicine/medical-professionals/hip/total-hip-arthroplasty-cpg-update-2022.pdf
+- "Rehabilitation Phases, Precautions, and Mobility Goals Following THA." PMC10626929 (fases y criterios por abordaje). https://pmc.ncbi.nlm.nih.gov/articles/PMC10626929/
+- Ohio State University — Total Hip Arthroplasty Post-op Clinical Practice Guideline, update 2022 (precauciones por abordaje). https://medicine.osu.edu/-/media/files/medicine/departments/sports-medicine/medical-professionals/hip/total-hip-arthroplasty-cpg-update-2022.pdf
 - Salina Regional Orthopedic Clinic — THA (Anterior Approach) Rehab Protocol, rev. mayo 2024. https://www.salinaregionalorthopedicclinic.com/documents/47/THA_Anterior_Approach_Protocol.pdf
 - Lahey Hospital — Rehabilitation Protocol: Total Hip Arthroplasty. https://www.lahey.org/-/media/files/lhmc/orthopedics/hip/lhmc-total-hip-arthroplasty.pdf
 - UW Health — Rehabilitation Guideline for Traditional THA (criterio-based), act. 2024. https://bynder.uwhealth.org/m/918ed4c21dc7de54/original/Rehab-Guideline-Traditional-Total-Hip-Arthroplasty.pdf
@@ -1905,7 +1897,7 @@ Evidencia obtenida vía WebSearch (resúmenes); WebFetch a sitios externos qued�
 
 Números/afirmaciones que NO pude confirmar en el texto completo (WebFetch bloqueado) o que vienen de fuentes secundarias con cifras en conflicto. Verificar contra el PDF/artículo original o la orden del cirujano antes de usarlos como absolutos:
 
-- Topes numéricos del abordaje ANTERIOR/lateral (extensión ~20°, rotación externa ~50°, 6 semanas): provienen de protocolos institucionales (OSU 2022, Salina 2024) que no pude abrir; no son estándar único y varían por centro.
+- Topes numéricos del abordaje ANTERIOR/lateral (extensión ~20°, rotación externa ~50°, 6 semanas): provienen de protocolos institucionales (OSU 2022, Salina 2024); no son estándar único y varían por centro.
 - Tasas de luxación por abordaje (anterior ~0.8% vs posterior ~1.4%; rango global 0–4.1%): cifras de resúmenes; confirmar contra el registro/estudio citado.
 - Cronología de luxación (~59% a 3 meses, ~77% a 1 año; reluxación hasta ~60% si la primera es > 5 semanas): mezcla de series antiguas y un abstract de congreso 2025.
 - ECA 2025 de reparación capsular vs precauciones: por ahora resumen/abstract; confirmar publicación completa.
@@ -1924,8 +1916,6 @@ Números/afirmaciones que NO pude confirmar en el texto completo (WebFetch bloqu
 
 ## 🕺 CADERA — labrum acetabular / pinzamiento femoroacetabular (FAI)
 
-#### Documento de referencia para la biblioteca clínica · Clínica Sinergia
-
 > **Para qué sirve este documento.** Es **material de referencia** para que el fisioterapeuta ubique **en qué fase va el paciente, qué restricciones aplican y si va en tiempo o desfasado** tras una artroscopia de cadera por pinzamiento femoroacetabular (FAI) con reparación del labrum (± femoroplastia / acetabuloplastia), y para encuadrar el **manejo conservador** del FAI/labrum.
 > **NO es una prescripción automática.** El protocolo quirúrgico, las restricciones de carga y los límites de rango los **define el cirujano** (dependen de la técnica exacta: tamaño de la resección, calidad del labrum, cierre capsular, microfractura/condroplastia concomitante). Ante duda o discrepancia, **manda la hoja del cirujano**. Progresión **por criterios, no por calendario**: las semanas son guía.
 
@@ -1933,10 +1923,10 @@ Números/afirmaciones que NO pude confirmar en el texto completo (WebFetch bloqu
 
 ### 0. Encuadre y reglas de oro
 
-- **Progresar por CRITERIOS, no por calendario.** Las semanas orientan; se avanza cuando se cumple el criterio de la fase (dolor controlado, rango objetivo, patrón de marcha normal, control neuromuscular).
-- **La carga es el motor** (ejercicio terapéutico progresivo: glúteos, control lumbopélvico, cadena); los **agentes físicos son coadyuvantes** (acompañan, no sustituyen).
+> **Aplican las reglas de oro del inicio** (criterios > calendario · la carga es el motor · semáforo del dolor); en post-qx **manda la hoja del cirujano**. Lo **específico de la cadera de preservación**:
+
 - **Respetar el tejido en reparación.** El labrum reinsertado con anclas y la cápsula suturada necesitan protección temprana de los rangos que los tensan (ver §5). Microfractura/condral concomitante = plazos de descarga mucho más largos.
-- **El error más común de esta cirugía es la sobreactivación del psoas/flexores** → tendinitis del iliopsoas iatrogénica. Es la bandera clínica más repetida (ver §5 y §7).
+- **Ojo con el psoas:** la sobreactivación del psoas/flexores → **tendinitis del iliopsoas iatrogénica** es la complicación de rehab más frecuente de esta cirugía (manejo en §5 y §7).
 - **Individualizar:** edad, deporte/gesto, displasia o laxitud de base (microinestabilidad), estado del cartílago (artrosis = peor pronóstico), comorbilidades y **seguridad clínica** (anclas metálicas, ver §8).
 
 ---
@@ -2087,7 +2077,7 @@ FASE 4 · Retorno a carrera/deporte   mes ~4–6+   carrera → pliometría → 
 
 **Clave de esta fase (y bandera a vigilar):**
 - **Priorizar glúteos** (medio = estabilidad frontal de pelvis / corrige Trendelenburg; mayor = extensión/potencia) y **control del core**.
-- **Evitar la tendinitis del flexor/psoas por sobreactivación**: es la complicación "de rehab" más común. Si el psoas se vuelve el motor de la flexión (dolor anterior con flexión resistida, chasquido doloroso), **reducir trabajo de flexión activa, reforzar glúteos y control**, y revalorar.
+- **Vigilar el psoas:** si se vuelve el motor de la flexión (dolor anterior con flexión resistida, chasquido doloroso), **reducir trabajo de flexión activa, reforzar glúteos y control**, y revalorar (ver §7).
 
 **Qué SÍ:**
 - Fuerza progresiva **bilateral → unilateral**: sentadilla, peso muerto, zancadas, prensa, puentes cargados, abducción cargada; **énfasis en abductores y extensores**.
@@ -2236,9 +2226,6 @@ Termómetros clave en cadera: **dolor anterior de ingle** (reparación/psoas), *
 - **Pauta de profilaxis de osificación (AINE):** es **indicación médica**; el esquema (naproxeno 500 mg c/12 h ×3 sem, u otros) debe confirmarlo el cirujano.
 - **Tipo de ancla (metálica vs bioabsorbible):** determina la restricción de agentes térmicos; **confirmar con el cirujano**. Ante la duda, tratar como metal.
 - **Umbral de artrosis como contraindicación relativa** (Tönnis ≥2 / espacio <2 mm): citado en la literatura pero con variación; decisión del cirujano.
-
----
-*Material de referencia; no sustituye el criterio del fisioterapeuta tratante ni las indicaciones del cirujano. Progresión por criterios. Individualizar por edad, deporte, cartílago, displasia/laxitud de base y comorbilidades.*
 
 ---
 
@@ -2413,13 +2400,9 @@ Para menisco ningún test aislado es fiable; combinar historia + interlínea + p
 5. **Menisco:** evidencia mayormente GRADE C-D; el cirujano define carga/ROM por el TIPO y PATRÓN de rotura. No aplicar un protocolo genérico de reparación sin saber el tipo.
 6. **Thessaly:** amplio rango de sens/esp entre el estudio original y los pragmáticos — no tratarlo como test definitivo.
 7. No encontré una guía de práctica clínica JOSPT 2023-2024 formal y completa solo de fases de LCA; la referencia de fases más sólida sigue siendo van Melick 2016 + MOON + Grindem 2016 para retorno.
-8. **Limitación técnica de esta investigación:** WebFetch no resolvió varios hosts (bpb-us-w2.wpmucdn.com, salinaortho.com, pmc.ncbi.nlm.nih.gov quedaron fuera del dominio de red permitido de la sesión); las cifras provienen de la síntesis de búsqueda extendida de fuentes primarias. Si Carlos quiere, se pueden habilitar esos dominios y extraer las tablas semana-a-semana textuales de los PDFs de Delaware/MOON/consenso EU-US para la versión definitiva de la biblioteca.
-
 ---
 
 ## 🦵 RODILLA — prótesis / artroplastia (TKA · nota de UKA)
-
-#### Documento de referencia para la biblioteca clínica · fisioterapia
 
 > **Para qué sirve este documento:** material de referencia para que el fisio **ubique la fase del paciente, las restricciones, y si va EN TIEMPO** (o si hay desfase/bandera). **NO es prescripción automática.** El plan de cada paciente lo **manda el cirujano** (tipo de prótesis, fijación, estabilidad, restricciones de carga y arco, tiempos). Ante duda o bandera roja → consultar al cirujano antes de progresar. Progresión **por CRITERIOS cumplidos, no por calendario**; las semanas son solo un mapa para detectar desfase.
 
@@ -3108,7 +3091,7 @@ Este documento es análogo a `docs/biblioteca_protocolos.md` (MSK) y `docs/bibli
 #### Timeline típico (para detectar desfase)
 - **Clave: ~2× más lento que el lateral.** Esguince lateral típico vuelve en ~2–6 sem; el sindesmal tarda notablemente más.
 - **No operatorio (estable):** retorno medio **~29–39 días** (algunas series) a **~46 días** (metaanálisis, no-op 41.7 vs op 55.2 días).
-- **Quirúrgico (inestable):** protocolos **~12–16 sem**; **tornillo** clásico 3–6 meses vs **suture-button/tightrope + rehab acelerada <2 meses** (comentario 2024). Fútbol profesional post-qgrado IIB/III: **~72±28 días** a entrenamiento con equipo (D'Hooghe et al.). Tasa de retorno agrupada en élite **~96%**.
+- **Quirúrgico (inestable):** protocolos **~12–16 sem**; **tornillo** clásico 3–6 meses vs **suture-button/tightrope + rehab acelerada <2 meses** (comentario 2024). Fútbol profesional post-qx grado IIB/III: **~72±28 días** a entrenamiento con equipo (D'Hooghe et al.). Tasa de retorno agrupada en élite **~96%**.
 - Grado III, lesión condral asociada y mayor edad → retornos más largos.
 
 #### Clasificación / indicación quirúrgica (para encuadrar el caso)
@@ -3225,17 +3208,15 @@ Este documento es análogo a `docs/biblioteca_protocolos.md` (MSK) y `docs/bibli
 ---
 
 ### Avisos transversales de seguridad clínica (ligar con `seguridadClinica` de la app)
-- **Metal/osteosíntesis/tornillos de sindesmosis o fijación:** NO radiofrecuencia/diatermia/tecar térmica/US térmico sobre el material. En post-Broström con anclas y post-sindesmosis con tornillo/suture-button, aplicar agentes atérmicos y lejos del implante.
+Rige la **seguridad transversal (PARTE 0b)** — anticoagulación, embarazo, cáncer, marcapaso/DAI. Específico de tobillo/pie:
+- **Metal/osteosíntesis/tornillos de sindesmosis o fijación:** nada térmico (RF/diatermia/tecar/US térmico) sobre el material. En post-Broström con anclas y post-sindesmosis con tornillo/suture-button, agentes atérmicos y lejos del implante.
 - **TVP:** vigilar en inmovilización prolongada (sobre todo Aquiles).
-- Anticoagulación, embarazo, cáncer, marcapaso/DAI → precauciones estándar de agentes físicos.
 
 ### Incertidumbres marcadas (revisar antes de fijar)
 1. ⚠ "No dorsiflexión más allá de neutro / no estiramiento del tríceps sural precoz" en Aquiles: convención muy usada, pero **no encontré un umbral con cita primaria directa**; la tendencia moderna admite movilidad activa temprana a neutro. Confirmar con el cirujano/protocolo local.
 2. ⚠ Grados exactos de recomendación (A/B/C) de la CPG JOSPT 2021 para inmovilización vs movilización, terapia manual, equilibrio y bracing: necesité el texto completo de la tabla de recomendaciones (no accesible en esta sesión). La dirección (favorecer carga óptima, terapia manual para DF, entrenamiento neuromuscular grado A, bracing grado A para prevención) es consistente, pero confirmar las letras.
 3. ⚠ Sens/Esp de varias pruebas provienen de fuentes secundarias (Physiopedia/blogs) que repiten estudios primarios; verificar van Dijk 1996, Croy 2013, Wang 2013 y el metaanálisis de sindesmosis 2021 antes de citar cifras exactas.
 4. Protocolos post-op (Broström, sindesmosis qx) **varían mucho**; presenté el rango convencional vs acelerado. Siempre manda el cirujano.
-
-**Acceso:** si quieren que extraiga las cifras exactas y los grados A/B/C de los PDF primarios (JOSPT 2021, AOFAS 2024, metaanálisis), habría que **habilitar esos dominios en la red de la sesión** (hoy orthopt.org, ifspt.org, aofas.org, pmc.ncbi.nlm.nih.gov y clinicaltrials.gov devuelven 403/DNS vía WebFetch/curl; solo WebSearch funciona).
 
 ---
 
@@ -3247,8 +3228,8 @@ Este documento es análogo a `docs/biblioteca_protocolos.md` (MSK) y `docs/bibli
 
 ### Principios transversales (aplican a todos los cuadros)
 
-- **La carga es el motor; los agentes físicos son coadyuvantes.** El ejercicio terapéutico progresivo (del estiramiento/isométrico a la carga pesada lenta) es la intervención con mayor respaldo; los agentes físicos alivian síntomas y permiten cargar, pero no sustituyen la carga.
-- **Progresar por criterios, no por fecha.** Se avanza cuando se cumple el criterio (dolor tolerado, control, fuerza/rango), no cuando "toca por calendario".
+> **Aplican las reglas de oro del inicio** (la carga es el motor · criterios > calendario). Lo **específico del pie** (patología mayormente tendinopática/por sobreuso):
+
 - **Monitoreo del dolor transversal (semáforo tipo Silbernagel).** Regla práctica usada en tendinopatías y aplicable aquí:
   - **Verde (seguir):** dolor durante el ejercicio ≤3/10 **y** sin empeorar a las 24 h (rigidez/dolor del primer paso de la mañana igual o mejor que la semana previa).
   - **Ámbar (con calma):** dolor 4-5/10 o ligero aumento que cede en 24 h → mantener carga, no progresar.
@@ -3397,10 +3378,6 @@ Deformidad **rígida** (estadio III-IV), fracaso de 3-6 meses de manejo conserva
 
 ---
 
-### 6. (sin contenido — numeración reservada para alinear con tabla de pruebas)
-
----
-
 ### 7. Pruebas / evaluación (resumen con sensibilidad/especificidad donde existe)
 
 | Prueba | Para qué | Técnica (resumen) | Rendimiento diagnóstico |
@@ -3422,7 +3399,7 @@ Deformidad **rígida** (estadio III-IV), fracaso de 3-6 meses de manejo conserva
 - **Atrapamiento del nervio tibial posterior (síndrome del túnel del tarso):** dolor **quemante/hormigueo/irradiado** posteromedial y plantar, **dolor en reposo** (ayuda a distinguir de FP), a veces **sensibilidad del talón preservada** (lesión distal), Tinel positivo. Confirmar con NCS/EMG + RM (descartar masa ocupante). Diferenciar de FP y de neuroma de Morton.
 - **Artropatía inflamatoria** (espondiloartritis, AR): dolor **multiarticular**, **rigidez matutina prolongada**, entesitis en varios sitios, síntomas sistémicos → derivar a reumatología.
 - **Rotura de la fascia plantar** (clásicamente **post-infiltración** de corticoide): dolor súbito plantar con chasquido/equimosis/caída del arco. Diferente del dolor insidioso de la FP.
-- **Pie de riesgo en diabético:** signos neuropáticos (pérdida de sensibilidad protectora) y/o **vasculares** (ausencia de pulsos, piel fría, úlcera, cambios tróficos) → precaución máxima; valorar pie diabético antes de cualgar agente/ejercicio de impacto (ver sección 9).
+- **Pie de riesgo en diabético:** signos neuropáticos (pérdida de sensibilidad protectora) y/o **vasculares** (ausencia de pulsos, piel fría, úlcera, cambios tróficos) → precaución máxima; valorar pie diabético antes de cargar agente/ejercicio de impacto (ver sección 9).
 
 ---
 
@@ -3671,6 +3648,6 @@ Para lesión **AGUDA de aductor** se usa el protocolo criteria-based de Aspetar/
 
 ---
 
-Observación para la integración en la app: esto encaja con el modelo de `docs/biblioteca_protocolos.md` y `PROTO_LIB` (periodización por criterios, carga como motor, agentes físicos coadyuvantes, semáforo del dolor transversal). Estas 2 condiciones conservadoras (isquios P8, aductor/ingle P9) y las 4 notas breves son candidatas a nuevas entradas de la biblioteca MSK. No escribí ningún archivo (era reporte de investigación).
+Observación para la integración en la app: esto encaja con el modelo de `docs/biblioteca_protocolos.md` y `PROTO_LIB` (periodización por criterios, carga como motor, agentes físicos coadyuvantes, semáforo del dolor transversal). Estas 2 condiciones conservadoras (isquios P8, aductor/ingle P9) y las 4 notas breves son candidatas a nuevas entradas de la biblioteca MSK.
 
 ---
