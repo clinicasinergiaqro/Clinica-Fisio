@@ -81,8 +81,9 @@ Para que la biblioteca apunte a lo que de verdad se trata, se auditó la base co
 ## PARTE 0b — Seguridad clínica transversal (agentes físicos / implantes)
 
 Vale para TODO post-quirúrgico con material y para cualquier paciente con los flags de `seguridadClinica`. **Ligar siempre con `_soapSeguridadHTML`/`seguridadClinica` de la app** (alerta de metal ya existe, PR #419):
-- **Metal / osteosíntesis / prótesis / tornillos / anclas / placas:** **NO** radiofrecuencia, diatermia, **tecarterapia térmica**, ni **ultrasonido térmico** sobre el material. Usar agentes **atérmicos** y **lejos** del implante. (La electroestimulación de superficie — TENS/NMES para activar músculo — es distinta de la diatermia térmica y sí se usa, no directamente sobre el metal con modalidad térmica.)
+- **Metal / osteosíntesis / prótesis / tornillos / anclas / placas:** **NO** radiofrecuencia, diatermia, **tecarterapia térmica**, ni **ultrasonido térmico** sobre el material. Usar agentes **atérmicos** y **lejos** del implante. (La electroestimulación de superficie — TENS/NMES para activar músculo o analgesia — **NO** es diatermia térmica y **sí puede usarse**; basta con no colocar los electrodos directamente sobre el implante.)
 - **Marcapaso / DAI / neuroestimulador:** NO diatermia/onda corta/RF/tecar ni electroterapia cerca del dispositivo (crítico en columna cervical/dorsal por la cercanía torácica).
+- **Esqueleto inmaduro / placas de crecimiento (fisis) abiertas (niños y adolescentes):** NO ultrasonido terapéutico ni diatermia/onda corta sobre la fisis abierta (precaución clásica de electroterapia en menores); preferir agentes atérmicos y el ejercicio. Aplica p. ej. a la espondilólisis del adolescente y a la OCD juvenil.
 - **TVP / TEP:** vigilancia ALTA en inmovilización y post-op de miembro inferior (cadera, rodilla, Aquiles). Pantorrilla dolorosa + edema + calor → descartar TVP (urgencia).
 - **Anticoagulación** (frecuente post-op), **embarazo**, **cáncer/oncológico** → precauciones estándar de agentes físicos (ver tamiz de contraindicaciones y la caja de seguridad del expediente).
 - **Infección periprotésica / articular:** fiebre + calor/eritema/drenaje → urgencia, suspender y derivar.
@@ -269,7 +270,7 @@ Agrupa por hallazgos de exploración, no por tiempo. Cuatro categorías; cuando 
 | **Prueba de banda sin fin en 2 etapas** (nivel vs 15° inclinación) | Síntomas antes al caminar en plano; más tiempo y mejor tolerancia en inclinación (flexión); recuperación lenta tras plano | Sens ~0.50 (revisión) a ~0.77 (estudio original); **Esp ~0.92–0.95** → buena para confirmar `[verificar]` |
 | **Signo del "carrito de súper"** / mejora al inclinarse adelante o sentarse | Alivio en flexión, peor en extensión/bipedestación | Clínico, apoya el dx |
 | **Prueba de la bicicleta (Van Gelderen)** | Pedalear inclinado tolera más que caminar erguido (dato clásico para diferenciar de claudicación vascular) | `[verificar sens/esp — no obtenida]` |
-| Más útiles combinados | Sin dolor al sentarse, adormecimiento perineal, banda en 2 etapas, Romberg anormal | Ninguno fuerte aislado |
+| Más útiles combinados | Sin dolor al sentarse, banda en 2 etapas, Romberg anormal (⚠️ el adormecimiento **perineal/en silla de montar** NO es signo de estenosis: es bandera de **cauda equina** → §3.1) | Ninguno fuerte aislado |
 
 #### 6.5 Control motor / inestabilidad clínica
 - **Prueba de inestabilidad en prono (PIT):** sens ~0.61, esp ~0.57 (débil para "diagnosticar" inestabilidad estructural), **pero útil como parte de la regla para predecir respuesta a estabilización** (§5.2). `[verificar]`
@@ -350,7 +351,7 @@ Los hallazgos "degenerativos" en RM son **enormemente frecuentes en personas SIN
 
 - **FASE 1 — Protección relativa / control del dolor radicular** (criterio: dolor de pierna dominante, irritable). Metas: bajar dolor neural, centralizar, mantener movilidad. ✅ Posiciones y movimientos que **centralizan**; caminar; neurodeslizamientos suaves; educación. ❌ Posturas/movimientos que **periferalizan**; reposo prolongado; flexión sostenida provocadora si periferaliza.
 - **FASE 2 — Recuperación activa** (criterio: síntomas centralizados, dolor de pierna cede). Metas: restaurar control motor y carga, resistencia del tronco, tolerancia a sedestación/flexión según tolerancia. ✅ Ejercicio progresivo (control motor + fuerza + aeróbico), exposición gradual. 
-- **FASE 3 — Reacondicionamiento y retorno** (criterio: sin dolor de pierna, fuerza normalizándose). Metas: fuerza/resistencia completas, patrón de carga (bisagra de cadera), retorno a trabajo/deporte/gesto. En tendón/deportista ver §10 y biblioteca MSK (HSR).
+- **FASE 3 — Reacondicionamiento y retorno** (criterio: sin dolor de pierna, fuerza normalizándose). Metas: fuerza/resistencia completas, patrón de carga (bisagra de cadera), retorno a trabajo/deporte/gesto. En tendón/deportista ver la biblioteca MSK (HSR); para el adolescente con espondilólisis, §10.
 
 #### Timeline de hitos — ¿va en tiempo? (radiculopatía)
 | Momento | Hito esperado | Si NO → |
@@ -549,7 +550,7 @@ Números a confirmar contra la fuente primaria antes de fijarlos como estándar 
 - **En cuello crónico el motor es la FUERZA** cérvico-escápulo-torácica y de MMSS (la evidencia más sólida — Cochrane, Gross 2015); los agentes físicos son coadyuvantes.
 - **No collarín prolongado ni inmovilización rutinaria:** el collarín blando prolongado **empeora** el pronóstico en cervicalgia y latigazo. Mantenerse activo, tranquilizar y recuperar movimiento temprano.
 - **Monitoreo del dolor:** en cuadros radiculares, vigilar **centralización vs. periferización** (el síntoma que "sube" hacia la columna = buena señal; el que "baja" por el brazo = mala) y la **respuesta a 24 h**.
-- **Seguridad primero:** antes de manipular/traccionar columna cervical, **descartar banderas vasculares y mielopatía** (§1-§2); respetar implantes/metal, marcapaso, embarazo, anticoagulación, cáncer (`seguridadClinica`, §8/§11).
+- **Seguridad primero:** antes de manipular/traccionar columna cervical, **descartar banderas vasculares y mielopatía** (§1-§2); respetar implantes/metal, marcapaso, embarazo, anticoagulación, cáncer (`seguridadClinica`, §11).
 
 ---
 
@@ -571,7 +572,7 @@ Compresión de la médula espinal. **Es la bandera roja que más se escapa en fi
 | Hiperreflexia | ~85% | moderada |
 | Signo de Hoffmann | ~31-89% (meta: ~83-89%) | ~41-100% |
 | Signo de Babinski | ~7-36% | ~93-100% (muy específico) |
-| Clonus / marcha en tándem | ~66% | ~84% |
+| Marcha en tándem | ~66% | ~84% |
 
 > **Lectura:** Babinski y clonus son **muy específicos** (positivo = fuerte sospecha) pero poco sensibles (negativo NO descarta). La **marcha** y la **hiperreflexia** son lo más sensible. Un **clúster** (desviación de marcha + Hoffmann + supinador invertido + Babinski + edad >45 años) es útil para apoyar el diagnóstico (Cook et al.).
 
@@ -580,7 +581,7 @@ Compresión de la médula espinal. **Es la bandera roja que más se escapa en fi
 #### 1.2 Patología vascular del cuello (disección de arteria cervical / insuficiencia vertebrobasilar)
 **Marco de referencia:** *IFOMPT International Framework* (2020, publicado en JOSPT 2022, Rushton et al.). Reemplazó el término "disfunción arterial cervical (CAD)" por **"patologías vasculares del cuello"**. Es **informativo, no prescriptivo**: obliga a razonamiento clínico antes de cualquier terapia manual/tracción cervical.
 
-**Las "5 D y 3 N" (signos clásicos):** *Dizziness* (mareo/vértigo), *Diplopía*, *Disartria*, *Disfagia*, *Drop attacks* (caídas súbitas sin pérdida de conciencia) + *Nistagmo*, *Náusea*, *Nedacciones/entumecimiento facial* (adormecimiento perioral). **Advertencia del marco:** estos signos suelen ser **tardíos y poco específicos**; no esperar a tenerlos todos.
+**Las "5 D y 3 N" (signos clásicos):** *Dizziness* (mareo/vértigo), *Diplopía*, *Disartria*, *Disfagia*, *Drop attacks* (caídas súbitas sin pérdida de conciencia) + *Nistagmo*, *Náusea*, *Numbness* (entumecimiento facial / adormecimiento perioral). **Advertencia del marco:** estos signos suelen ser **tardíos y poco específicos**; no esperar a tenerlos todos.
 - Pista temprana de disección: **cefalea/cervicalgia nueva, intensa, inusual** ("la peor de mi vida", en latigazo o tras trauma menor), a veces con Horner.
 - El **mareo** aparece en una proporción relevante de disecciones vertebrales/carotídeas [verificar % exacto].
 - **Mareo cervicogénico vs. vascular:** el vascular aparece con la **rotación/extensión** mantenida y **no mejora** con movimiento repetido; se acompaña de otras D/N. Ante duda → derivar.
@@ -602,7 +603,7 @@ La región torácica es **zona de referencia de dolor visceral**: ante dolor dor
 - **Pulmonar/pleural:** dolor pleurítico (aumenta con la inspiración), disnea, tos, hemoptisis (TEP, neumotórax, neumonía).
 - **Gastrointestinal:** esofágico, biliar (refiere a escápula derecha), pancreático (dorso), úlcera.
 - **Herpes zóster:** dolor en banda dermatómica antes de la erupción.
-- **Fractura por compresión osteoporótica** (ver §6.4): dolor dorsal agudo en mujer posmenopáusica/adulto mayor, a veces tras esfuerzo trivial; dificultad para acostarse en decúbito supino o sentarse en silla dura; pérdida de talla/cifosis progresiva. Buscar también malignidad si hay banderas de §1.4.
+- **Fractura por compresión osteoporótica** (ver §1.5): dolor dorsal agudo en mujer posmenopáusica/adulto mayor, a veces tras esfuerzo trivial; dificultad para acostarse en decúbito supino o sentarse en silla dura; pérdida de talla/cifosis progresiva. Buscar también malignidad si hay banderas de §1.4.
 
 ---
 
@@ -689,7 +690,7 @@ Dolor con pobre control cérvico-escapular, hipersensibilidad, a veces mareo cer
 
 #### 3.3 Cuello con CEFALEA (cervicogénica) → ver §5
 
-#### 3.4 Cuello con DOLOR RADIANTE (radicular) → ver §4 (radiculopatía)
+#### 3.4 Cuello con DOLOR RADIANTE (radicular) → ver §10 (radiculopatía)
 
 > **Ejercicio para cervicalgia — qué dice Cochrane (Gross et al. 2015, CD004250):** evidencia de **calidad moderada** a favor del **fortalecimiento** cérvico-escápulo-torácico y de MMSS (mejoría de dolor moderada-grande a corto plazo); la **resistencia aislada** da efecto leve; **estiramiento o resistencia como única intervención** tienen efecto mínimo. **Combinar fuerza + resistencia/estiramiento** es beneficioso. **La dosis óptima es desconocida** (JOSPT 2020: aumentar volumen en clínica no mejora claramente el resultado) → dosificar por tolerancia y progresión.
 
@@ -791,14 +792,14 @@ Dolor torácico de patrón mecánico (modula con movimiento, postura, respiraci�
 >
 > **🎯 Indicaciones:** Aumento de la cifosis torácica (postural en jóvenes; en adultos mayores, hipercifosis senil por debilidad de extensores ± fracturas vertebrales). Base del tratamiento: fortalecimiento de extensores + entrenamiento postural (evidencia SHEAF, 6 meses).
 >
-> **⛔ Contraindicaciones / cuándo derivar:** Distinguir **postural reductible** de **estructural** (Scheuermann, fracturas, degenerativa) — no suponer que siempre es reductible sin examinar. Descartar osteoporosis/fractura (§6.4/§1.5) y malignidad si hay banderas.
+> **⛔ Contraindicaciones / cuándo derivar:** Distinguir **postural reductible** de **estructural** (Scheuermann, fracturas, degenerativa) — no suponer que siempre es reductible sin examinar. Descartar osteoporosis/fractura (§1.5) y malignidad si hay banderas.
 >
 > **⚠️ Precauciones:** No cargar en flexión agresiva si hay sospecha de osteoporosis/fractura. En adulto mayor, integrar prevención de caídas. La cifosis recidiva si se abandona el ejercicio (sostener la autogestión). Respetar seguridad de agentes físicos (§11).
 
 Aumento de la cifosis torácica (postural en jóvenes; en adultos mayores, hipercifosis senil asociada a debilidad de extensores ± fracturas vertebrales). Distinguir **postural reductible** de **estructural** (Scheuermann, fracturas, degenerativa).
 - **Evidencia:** **ensayo SHEAF (Katzman et al. 2017, Osteoporos Int):** programa de **6 meses de fortalecimiento espinal + entrenamiento postural** redujo medidas radiográficas y clínicas de cifosis en adultos mayores. Programas más cortos (3 meses) mejoran la medida clínica pero no siempre la radiográfica. Revisión sistemática: **ejercicio de extensores espinales (y yoga) puede reducir la cifosis**; evidencia aún limitada, datos de caídas preliminares.
 - **Qué SÍ:** **fortalecimiento de extensores torácicos**, entrenamiento postural, movilidad torácica en extensión, estiramiento de pectorales/flexores, propiocepción postural; en adulto mayor, integrar prevención de caídas.
-- **Qué NO:** suponer que es siempre reductible sin examinar; cargar en flexión agresiva si hay sospecha de osteoporosis/fractura (§6.4/§1.5).
+- **Qué NO:** suponer que es siempre reductible sin examinar; cargar en flexión agresiva si hay sospecha de osteoporosis/fractura (§1.5).
 - **Criterios de avance/alta:** ↑ fuerza de extensores, ↑ conciencia y control postural, ↓ cifosis clínica, autogestión mantenida (la cifosis recidiva si se abandona el ejercicio).
 
 ### 9. Escoliosis
@@ -1059,7 +1060,7 @@ Los agentes son **coadyuvantes**. Respetar siempre `seguridadClinica` (la alerta
 >
 > **⛔ Contraindicaciones / cuándo derivar:** Pérdida súbita de fuerza/ROM activo, chasquido o dolor nuevo → sospecha de re-ruptura → suspender fortalecimiento y derivar. Infección (fiebre, calor/eritema/drenaje), TVP, déficit del nervio axilar (deltoides/sensibilidad en "charretera"), parestesias nuevas, rigidez progresiva/capsulitis.
 >
-> **⚠️ Precauciones:** Fase 1 solo PROM, cabestrillo 4 sem (pequeño) a 6–8 sem (grande/masivo). Si se reparó subescapular → RE solo hasta neutro (0°) × 6 sem y SIN RI resistida × 6 sem. Nada de RE/elevación activa ni RE pasiva más allá del tope en fase 1. Fortalecimiento resistido ~sem 12 (antes en grandes/masivos = riesgo de re-ruptura). Retorno por CRITERIOS, no por calendario; manda el cirujano. (La JOSPT 2025 de manguito es para tendinopatía NO quirúrgica, no aplicar post-qx.)
+> **⚠️ Precauciones:** Fase 1 PROM (sin ROM activo; isométricos submáximos NO-manguito y escápula suave sí permitidos), cabestrillo 4 sem (pequeño) a 6–8 sem (grande/masivo). Si se reparó subescapular → RE solo hasta neutro (0°) × 6 sem y SIN RI resistida × 6 sem. Nada de RE/elevación activa ni RE pasiva más allá del tope en fase 1. Fortalecimiento resistido ~sem 12 (antes en grandes/masivos = riesgo de re-ruptura). Retorno por CRITERIOS, no por calendario; manda el cirujano. (La JOSPT 2025 de manguito es para tendinopatía NO quirúrgica, no aplicar post-qx.)
 
 #### Diagnóstico — pruebas especiales
 - **Jobe / empty can (supraespinoso):** abducción 90° en plano escapular + RI (pulgar abajo), resistir → debilidad/dolor = + · Sens ~74–88% / Esp ~30–62% (la DEBILIDAD es más informativa que el dolor; pooled Hegedus 2012 ~74%/30%) · (Hegedus et al. 2012; Itoi 1999)
@@ -1201,7 +1202,7 @@ Los agentes son **coadyuvantes**. Respetar siempre `seguridadClinica` (la alerta
 
 ### Notas de incertidumbre / dónde difieren los protocolos (para el clínico que afine)
 1. **Límites de RE son el punto de mayor desacuerdo** en los tres (SLAP, manguito, Bankart): varían de 0° (neutro) a 30° en fase 1 según cirujano y según si hubo reparación de subescapular o base anterior/posterior. Marcados [verificar] arriba — definir el estándar de la clínica con el/los cirujanos de referencia.
-2. **Cabestrillo:** 4 sem (pequeño/SLAP) hasta 6–8 sem (manguito grande/masivo, Bankart). 
+2. **Cabestrillo:** 4 sem (pequeño/SLAP) hasta 6–8 sem (manguito grande/masivo); Bankart ~4–6 sem (hasta 8 en entornos no controlados). 
 3. **Inicio de fuerza:** converge en ~sem 12 en los tres; AROM converge 4–6 sem (pequeño) vs 8 sem (masivo).
 4. **Cifras de pruebas especiales:** dar rangos (no un valor único) es lo honesto; las cifras originales están infladas. Hegedus 2012 es la mejor referencia neutral.
 5. **No existe GPC JOSPT post-quirúrgica** para estas 3 (la JOSPT 2025 de manguito es para tendinopatía no quirúrgica). La mejor evidencia de consenso quirúrgico es el Consenso Internacional de Manguito 2025 (criterios, no tiempos) y, para retorno, revisiones sistemáticas que coinciden en "por criterios, no por calendario" — lo cual encaja perfectamente con el modelo de semáforo/"qué falta" de la pestaña Protocolo de la app.
@@ -1210,7 +1211,7 @@ Este es material de referencia para revisión clínica, no prescripción automá
 
 ---
 
-## 🦾 CODO — epicondilalgia, post-fractura/luxación, LCU/Tommy John y túnel cubital
+## 🦾 CODO — epicondilalgia, post-fractura/luxación, LCU/Tommy John, bursitis olecraniana y túnel cubital
 
 > **Material de referencia, NO prescripción automática.** Las fases se avanzan por **CRITERIOS** (dolor, ROM, fuerza, tolerancia a la carga), no por calendario; los tiempos son hitos orientativos. Individualizar por edad, demanda deportiva/laboral, tipo de tejido, manejo conservador vs post-quirúrgico y `seguridadClinica`. Evidencia 2021–2026 + fundacionales citados por nombre. Los números finos marcados **[verificar]** provienen de resúmenes y deben cotejarse con el texto completo.
 
@@ -1428,7 +1429,7 @@ Segunda neuropatía por compresión más frecuente del miembro superior. Síntom
 | **Cozen** | Epicondilalgia lateral | Extensión resistida de muñeca (puño, desv. radial), codo ~90° | Sens alta ~84–91%; espec baja → **descartar** |
 | **Maudsley** | Epicondilalgia lateral | Extensión resistida del 3er dedo | Sens ~70–88% |
 | **Mill** | Epicondilalgia lateral | Estiramiento pasivo: codo extendido, antebrazo pronado, flexión de muñeca | **Espec alta ~100%**, sens ~53–76% → **confirmar (rule-in)** |
-| **Test epicondilitis medial** | Epicondilalgia medial | **Flexión resistida de muñeca + pronación resistida** del antebrazo; tenderness 5–10 mm distal/anterior al epicóndilo medial | Clínico; sin validación estandarizada |
+| **Test de epicondilalgia medial** | Epicondilalgia medial | **Flexión resistida de muñeca + pronación resistida** del antebrazo; dolor a la palpación 5–10 mm distal/anterior al epicóndilo medial | Clínico; sin validación estandarizada |
 | **Polk** | Medial vs lateral | Diferencia por dirección de carga que reproduce dolor | Diferencial, no de exactitud |
 | **Moving valgus stress (O'Driscoll 2005)** | LCU/valgo | Valgo mantenido + flexión→extensión; dolor medial ~120°→70° | Sens ~100%, espec ~75% (n pequeño) |
 | **Valgus stress estático / milking** | LCU/valgo | Valgo a ~20–30° flexión / traccionar pulgar con codo flexionado+supinado | Variable, puede ser poco específico |
@@ -1528,7 +1529,7 @@ Vale para TODO lo de esta región. **Ligar siempre con `_soapSeguridadHTML`/`seg
 Son **valores de referencia convencionales**, no normas poblacionales ni "rango estadístico normal"; medir siempre con el **mismo goniómetro/método** y comparar contra el **lado sano** del propio paciente:
 - **Flexión:** ~60–80° · **Extensión (dorsiflexión):** ~60–70° · **Desviación radial:** ~20° · **Desviación cubital:** ~30° (valores AAOS reportados por Physiopedia; rangos entre estándares) **[verificar]**.
 - **Prono-supinación del antebrazo** (clave en radio distal y TFCC): no hubo cifra fiable en la búsqueda; convención clínica ~80–90° cada una **[verificar]**.
-- **Motion funcional** (Palmer 1985, biomecánico, n=10): la mano usa arcos mucho menores en actividades de la vida diaria (~5° flexión, ~30° extensión, ~10° radial, ~15° cubital; y el "dart-thrower's motion" —extensión-radial a flexión-cubital— es el arco funcional dominante). Útil para fijar **metas funcionales realistas** antes de perseguir el ROM máximo.
+- **Movimiento/arco funcional** (Palmer 1985, biomecánico, n=10): la mano usa arcos mucho menores en actividades de la vida diaria (~5° flexión, ~30° extensión, ~10° radial, ~15° cubital; y el "dart-thrower's motion" —extensión-radial a flexión-cubital— es el arco funcional dominante). Útil para fijar **metas funcionales realistas** antes de perseguir el ROM máximo.
 
 #### Dinamometría de prensión (Jamar) y pinza — la medida de resultado objetiva de la mano
 - **Método estandarizado (ASHT):** sentado, hombro aducido y en rotación neutra, **codo a 90°**, antebrazo y muñeca neutros. Promediar **3 intentos**; el **mango en la 2ª posición** es el más usado. El codo y la posición alteran el valor → estandarizar entre sesiones.
@@ -1681,7 +1682,7 @@ Goniometría seriada de muñeca **y prono-supinación** (clave y a menudo lo má
 
 **Fase 0 — Inmovilización (sem ~0–4/6, mientras consolida):**
 - **Yeso/férula:** no desplazadas suelen ~**4 semanas** (según posición/severidad); retiro guiado por imagen/clínica, a menudo entre **3–8 semanas [verificar; riesgo real de retiro prematuro]**.
-- **SÍ desde el día 0 (CPG JOSPT 2024 Distal Radius):** **movilidad activa de DEDOS, pulgar, codo y HOMBRO** de inmediato (prevenir rigidez y "hombro congelado" por desuso); elevación y **control de edema**; en **reparación quirúrgica, iniciar ROM activo de mano/muñeca/hombro dentro de las primeras ~3 semanas**, y **fortalecimiento ligero** (apretar toalla/putty) **desde ~sem 2** en casos no complicados → mejor ROM y prensión a corto y largo plazo.
+- **SÍ desde el día 0 (CPG JOSPT 2024 Distal Radius):** **movilidad activa de DEDOS, pulgar, codo y HOMBRO** de inmediato (prevenir rigidez y "hombro congelado" por desuso); elevación y **control de edema**; en **reparación con PLACA VOLAR estable, iniciar ROM activo de MUÑECA dentro de las primeras ~3 semanas** (con agujas-K o fijador externo la muñeca sigue inmovilizada hasta el retiro del material según el cirujano; dedos/pulgar/codo/hombro sí se movilizan desde el día 0 en todos), y **fortalecimiento ligero** (apretar toalla/putty) **desde ~sem 2** en casos no complicados → mejor ROM y prensión a corto y largo plazo.
 - **NO:** carga/levantamiento con la muñeca; forzar ROM de muñeca si aún inmovilizada; descuidar el hombro.
 
 **Fase 1 — Movilidad (tras retiro de yeso, sem ~6–12):**
@@ -1723,7 +1724,7 @@ Con **placa volar/tornillos**, aplica la regla de metal (atérmicos, lejos del i
 
 #### Manejo e inmovilización
 - **Sospecha con Rx negativa:** inmovilizar (férula de escafoides) y reevaluar/reimagen — **no dar de alta** por una Rx inicial negativa.
-- **Fractura no desplazada de cintura (waist):** **yeso ~8–12 semanas** es el estándar inicial de primera línea. La **fijación quirúrgica precoz** reduce el riesgo relativo de no-unión vs yeso en fracturas de cintura, pero **el yeso sigue siendo primera línea**; en desplazamiento **≤2 mm**, **sin diferencia funcional a 12 meses** entre cirugía y yeso (ECA/meta 2022, SWIFFT). **Polo proximal:** más riesgo de NAV/no-unión → inmovilización más larga y umbral quirúrgico más bajo.
+- **Fractura no desplazada de cintura (waist):** **yeso ~8–12 semanas** es el estándar inicial de primera línea. La **fijación quirúrgica precoz** reduce el riesgo relativo de no-unión vs yeso en fracturas de cintura, pero **el yeso sigue siendo primera línea**; en desplazamiento **≤2 mm**, **sin diferencia funcional a 12 meses** entre cirugía y yeso (ECA SWIFFT, Dias et al., *Lancet* 2020; + metaanálisis 2022). **Polo proximal:** más riesgo de NAV/no-unión → inmovilización más larga y umbral quirúrgico más bajo.
 - **Riesgo de NAV por localización [verificar; cifras altas de fuente que cita datos antiguos]:** polo **proximal ~100%**, tercio distal ~33%.
 - **Tabaquismo:** **deteriora la consolidación** (asociado a más no-unión/NAV) → consejo de cese.
 
@@ -1875,7 +1876,7 @@ Calor/parafina antes del ejercicio, TENS/US/láser para dolor como coadyuvantes 
 
 **Escafoides:**
 - Simon et al. *Postoperative Immobilization of Scaphoid Fractures: Comprehensive Review* (J Hand Surg/HAND 2023). https://pubmed.ncbi.nlm.nih.gov/35575303/
-- SWIFFT y meta 2022: cirugía vs yeso en fracturas de cintura (Bone & Joint J 2022). https://boneandjoint.org.uk/Article/10.1302/0301-620X.104B8.BJJ-2022-0085.R2 · Meta cast vs fixation (PMC13222678).
+- SWIFFT (ECA, Dias et al., *Lancet* 2020) y meta 2022: cirugía vs yeso en fracturas de cintura (Bone & Joint J 2022). https://boneandjoint.org.uk/Article/10.1302/0301-620X.104B8.BJJ-2022-0085.R2 · Meta cast vs fixation (PMC13222678).
 - Irrigación retrógrada / NAV: Gelberman & Menon (1980, fundacional); clasificación de Herbert (no-unión/estadios).
 
 **TFCC / esguince / escafolunar:**
@@ -1928,18 +1929,18 @@ Calor/parafina antes del ejercicio, TENS/US/láser para dolor como coadyuvantes 
 > **⚠️ Precauciones:** Precauciones por ABORDAJE (lo más importante): posterior → no flexión > 90°, no aducción cruzando la línea media, no rotación interna; anterior directo (DAA) / lateral → evitar extensión + rotación externa combinadas. Carga según FIJACIÓN: cementada = carga total inmediata; no cementada/press-fit = carga según tolerancia (WBAT) en la mayoría; fractura/injerto/revisión según cirujano. Relajar las precauciones lo decide el CIRUJANO. Mayor riesgo de luxación en las primeras ~6 semanas. Vigilar Trendelenburg (abordaje lateral/posterior). Implante metálico → NO radiofrecuencia/diatermia/tecarterapia térmica/ultrasonido térmico sobre el material (cruzar con `seguridadClinica`); no agentes ni masaje sobre pantorrilla con sospecha de TVP. Progresar por CRITERIOS, no por calendario.
 
 > **Qué es esto:** un andamio para que el fisio ubique en qué FASE va el paciente, qué RESTRICCIONES aplican según el ABORDAJE y la FIJACIÓN, y si va "en tiempo". **No es una prescripción automática: el plan lo manda el cirujano.** La progresión es por CRITERIOS cumplidos, no por semanas del calendario; las semanas que aparecen son promedios orientativos para detectar desfase, no metas rígidas.
-> **Regla de oro de esta clínica para esta función:** PTC = implante metálico. Antes de cualquier agente físico, leer la Sección 10 (seguridad con metal) y cruzarla con `seguridadClinica`.
+> **Regla de oro de esta clínica para esta función:** PTC = implante metálico. Antes de cualquier agente físico, leer la Sección 9 (seguridad con metal) y cruzarla con `seguridadClinica`.
 
 ### 0. Lo primero: datos que hay que sacar de la nota quirúrgica (o preguntar)
 
 Sin estos datos NO se puede fijar la fase ni las precauciones. Capturarlos en el expediente (motivo/antecedentes/seguridadClinica):
 
-- **Abordaje quirúrgico** (posterior/posterolateral · anterior directo (DAA) · lateral directo o anterolateral). Define las precauciones de luxación (Sección 2). Es el dato más importante.
-- **Tipo de fijación** (cementada · no cementada/press-fit · híbrida). Define la carga permitida (Sección 3).
+- **Abordaje quirúrgico** (posterior/posterolateral · anterior directo (DAA) · lateral directo o anterolateral). Define las precauciones de luxación (Sección 1). Es el dato más importante.
+- **Tipo de fijación** (cementada · no cementada/press-fit · híbrida). Define la carga permitida (Sección 2).
 - **Reparación capsular / tipo de cabeza** (cabeza grande, cotilo de doble movilidad). Reduce riesgo de luxación y suele permitir precauciones más laxas.
 - **Restricciones explícitas del cirujano** (carga, rango, tiempo de precauciones). Mandan sobre este documento.
 - **Longitud de miembros** post-op (si hubo alargamiento intencional/no intencional).
-- **Profilaxis de TVP indicada** (aspirina, HBPM, anticoagulante oral) y hasta cuándo. Relevante para agentes físicos y para vigilancia (Secciones 8 y 10).
+- **Profilaxis de TVP indicada** (aspirina, HBPM, anticoagulante oral) y hasta cuándo. Relevante para agentes físicos y para vigilancia (Secciones 7 y 9).
 - **Diagnóstico de base y comorbilidades** (fractura vs coxartrosis; fusión lumbar previa; obesidad; cirugía de revisión) — suben el riesgo de luxación/complicación.
 
 ### 1. Precauciones por ABORDAJE quirúrgico (lo más importante)
@@ -1968,7 +1969,7 @@ Entra por delante entre planos musculares; la inestabilidad es ANTERIOR. Precauc
 
 #### 1.3 Abordaje LATERAL DIRECTO (Hardinge) / ANTEROLATERAL (Watson-Jones)
 
-Separa parte del glúteo medio (lateral) o pasa entre glúteo medio y tensor (anterolateral). Precauciones del lado anterior (como DAA): **evitar extensión + rotación externa combinadas**; algunos protocolos aplican los mismos topes de ~20° extensión / ~50° rotación externa [verificar]. Tasa de luxación baja, PERO mayor riesgo de **debilidad del glúteo medio / marcha de Trendelenburg** por la manipulación del abductor (vigilar y fortalecer; Sección 9).
+Separa parte del glúteo medio (lateral) o pasa entre glúteo medio y tensor (anterolateral). Precauciones del lado anterior (como DAA): **evitar extensión + rotación externa combinadas**; algunos protocolos aplican los mismos topes de ~20° extensión / ~50° rotación externa [verificar]. Tasa de luxación baja, PERO mayor riesgo de **debilidad del glúteo medio / marcha de Trendelenburg** por la manipulación del abductor (vigilar y fortalecer; Sección 8).
 
 #### 1.4 Tendencia actual: precauciones MÍNIMAS o SIN precauciones en abordaje posterior (controversia)
 
@@ -1989,7 +1990,7 @@ La carga permitida depende de cómo se ancló el implante al hueso, porque el ri
 - **Cementada → carga TOTAL inmediata (WBAT/FWB desde el día 0).** El cemento fija al instante; no hay que esperar osteointegración. Es el escenario sin conflicto.
 - **No cementada / press-fit → la evidencia actual tiende a permitir CARGA SEGÚN TOLERANCIA (WBAT) en la mayoría.** Metaanálisis recientes (incluida una síntesis de 17 estudios) **no hallaron daño adicional significativo** con carga inmediata sin restricción vs carga parcial; un metaanálisis de 2017 vio **mayor hundimiento (subsidencia) femoral a los 3 meses** con carga completa, pero **sin diferencia en Harris Hip Score a 1–2 años**. Algunos cirujanos aún indican carga parcial 6–12 semanas por precaución biológica.
 - **Híbrida** (un componente cementado, otro no): seguir la indicación del componente más restrictivo según el cirujano.
-- **Press-fit en paciente mayor / hueso osteoporótico:** mayor riesgo de **fractura periprotésica**; aquí muchos cirujanos prefieren cementar o protegen la carga. Si llega un press-fit en un anciano con dolor de muslo a la carga, pensar en fractura/subsidencia (Sección 8).
+- **Press-fit en paciente mayor / hueso osteoporótico:** mayor riesgo de **fractura periprotésica**; aquí muchos cirujanos prefieren cementar o protegen la carga. Si llega un press-fit en un anciano con dolor de muslo a la carga, pensar en fractura/subsidencia (Sección 7).
 - **Fractura intra-op, injerto, revisión, osteotomía:** la carga la define el cirujano (puede ser parcial o "toque"), caso por caso. No asumir WBAT.
 
 **Para el fisio:** confirmar siempre el estatus de carga en la orden. "WBAT" = carga según tolerancia con ayuda de marcha; no equivale a "sin andadera". El avance de la ayuda de marcha es por criterios (Sección 5), no por el estatus de carga.
@@ -1999,7 +2000,7 @@ La carga permitida depende de cómo se ancló el implante al hueso, porque el ri
 Entender esto justifica por qué las precauciones y la educación pesan tanto al inicio:
 
 - **~60–70% de las luxaciones ocurren en las primeras 6 semanas**, la mayoría en dirección posterior; hasta ~70% en el primer mes según algunas series.
-- Aproximadamente **59% en los primeros 3 meses** y **~77% en el primer año** [verificar: cifras de literatura citada en Proceedings of the Hip Society 2025].
+- En otras series (distinta definición/cohorte, **NO sumar ni comparar** con el dato de arriba): hasta **~77% en el primer año** [verificar: literatura citada en Proceedings of the Hip Society 2025]. *(El "~59% a 3 meses" que a veces se cita proviene de una serie distinta; no es la misma cohorte que el ~60–70% a 6 semanas, así que no deben leerse como acumulados.)*
 - Razón: en las primeras **6–8 semanas** la cápsula y los tejidos blandos aún cicatrizan (el "sobre" de tejido que estabiliza la prótesis todavía no madura). Por eso las precauciones clásicas se prescriben ~6 semanas.
 - Si una primera luxación ocurre TARDE (> 5 semanas), el riesgo de reluxación es mayor (hasta ~60% vs ~33% si fue temprana) [verificar]. Una cadena de luxaciones es señal de reevaluación quirúrgica.
 
@@ -2061,16 +2062,16 @@ No hay guía de práctica clínica formal revisada por pares para la rehabilitac
 - Fortalecimiento progresivo (el entrenamiento de resistencia progresiva es superior a cargas bajas para recuperación funcional) [verificar: fuente secundaria].
 - Resistencia cardiovascular de bajo impacto (bicicleta, elíptica, natación/agua una vez cerrada la herida).
 - Entrenamiento específico de la tarea/deporte permitido; equilibrio avanzado.
-- Retorno escalonado a deporte de bajo impacto (Sección 7), con alta del cirujano.
+- Retorno escalonado a deporte de bajo impacto (Sección 6), con alta del cirujano.
 
 **NO:**
-- Alto impacto/pivote salvo autorización explícita del cirujano (y aun así, controvertido; Sección 7).
+- Alto impacto/pivote salvo autorización explícita del cirujano (y aun así, controvertido; Sección 6).
 
 **Criterios de alta funcional:**
 - Fuerza y resistencia **~80–90% del lado sano** (umbral práctico frecuente) [verificar].
 - Marcha y AVD normales e indoloras; escaleras sin barandal si aplica.
 - Capacidad para la actividad/laboral o deportiva objetivo sin dolor ni inestabilidad.
-- Escalas de resultado en metas (Sección 9).
+- Escalas de resultado en metas (Sección 8).
 
 ### 5. Timeline típico de hitos (para detectar DESFASE, no como meta rígida)
 
@@ -2081,7 +2082,7 @@ Orientativo; varía por abordaje, fijación, edad y comorbilidad. Si el paciente
 - **Andadera → bastón:** cuando hay carga equitativa, equilibrio adecuado y Trendelenburg/cojera limitados (frecuentemente ~1–3 semanas, por criterios).
 - **Bastón → sin ayuda:** cuando la marcha es normal, simétrica y sin cojera (frecuentemente ~3–6 semanas, por criterios).
 - **Escaleras:** patrón de aprendizaje "sube con la pierna sana primero, baja con la operada primero" ("la buena sube al cielo, la mala baja al infierno"); patrón recíproco conforme mejora fuerza/equilibrio.
-- **Conducir** (ver Sección 7): cadera DERECHA ~4–6 semanas; IZQUIERDA con automático ~2 semanas; algunos DAA antes. Requisitos: sin opioides, prueba de frenado de emergencia, entrar/salir del auto respetando precauciones.
+- **Conducir** (ver Sección 6): cadera DERECHA ~4–6 semanas; IZQUIERDA con automático ~2 semanas; algunos DAA antes. Requisitos: sin opioides, prueba de frenado de emergencia, entrar/salir del auto respetando precauciones.
 - **Retorno al trabajo:** sedentario/ligero pocas semanas; media global reportada **~10–13 semanas** (p. ej. media 12.5 semanas THA; mediana 10 semanas, IQR 7–14 en vástago corto) [verificar]; trabajo pesado más tarde y según cirujano.
 - **Deporte de bajo impacto:** la mayoría de cirujanos lo permite **dentro de los primeros 3 meses**; AAHKS sugiere iniciar retorno deportivo en ese lapso.
 - **Fin de precauciones del abordaje:** típicamente ~6 semanas (10% de cirujanos hasta 12) [verificar], o según estabilidad intraoperatoria/reparación capsular.
@@ -2115,7 +2116,7 @@ El fisio suele ser quien más ve al paciente: reconocer y DERIVAR a tiempo salva
 - **Fractura periprotésica:** dolor agudo y falla para cargar tras caída o esfuerzo (o incluso atraumática en press-fit anciano); umbral bajo para imagen (Rx; a veces TC). Pensar en ella ante dolor nuevo a la carga, sobre todo press-fit en hueso frágil.
 - **Lesión nerviosa (ciático/femoral/peroneo):** el **ciático es el más afectado (~79% de las lesiones nerviosas), femoral ~13%** [verificar]. Signos: pie caído (peroneo/ciático), debilidad/parestesias, pérdida de dorsiflexión. Asociado a **alargamiento del miembro** (ciático con alargamiento > ~4 cm; peroneo > ~3.8 cm) [verificar] y a luxación (parálisis ciática hasta ~10% en luxaciones). Documentar fuerza/sensibilidad distal de base.
 - **Dolor de muslo / aflojamiento del vástago:** dolor de muslo con la carga o al iniciar la marcha (dolor de "arranque"), que mejora en reposo, sobre todo en no cementadas → sospecha de aflojamiento/subsidencia → Rx y cirujano.
-- **Discrepancia de longitud de miembros:** **causa #1 de insatisfacción y de litigio** tras PTC; 1–2 cm suelen tolerarse, más suele dar problemas (lumbalgia, marcha, sensación de cojera). Ojo con la discrepancia **aparente** por oblicuidad pélvica (contractura de cadera o patología lumbar). Medir (Sección 9) y manejar con alza si lo indica el cirujano.
+- **Discrepancia de longitud de miembros:** **causa #1 de insatisfacción y de litigio** tras PTC; 1–2 cm suelen tolerarse, más suele dar problemas (lumbalgia, marcha, sensación de cojera). Ojo con la discrepancia **aparente** por oblicuidad pélvica (contractura de cadera o patología lumbar). Medir (Sección 8) y manejar con alza si lo indica el cirujano.
 
 ### 8. Valoración relevante en consulta
 
@@ -2255,7 +2256,7 @@ Números/afirmaciones que NO pude confirmar en el texto completo (WebFetch bloqu
 | **Log roll** (rodamiento en supino) | Rotación pasiva de la pierna extendida; positivo = dolor/clic/pop | **De las más ESPECÍFICAS** para patología **intraarticular** (la cápsula/ligamentos no se tensan, solo gira la articulación). ER aumentada vs contralateral → **laxitud/microinestabilidad** | E relativamente alta; S baja **[verificar]** |
 | **Aprensión posterior / anterior** | Posterior: cadera en flexión-aducción-RI con carga posterior. **Anterior (hiperextensión-RE):** extensión + rotación externa reproduce dolor/aprensión anterior | Posterior → labrum/pared posterior; **anterior → microinestabilidad anterior** (laxitud capsular) | Evidencia escasa; usar en clúster **[verificar]** |
 | **Dial test** (variante del log roll) | ER pasiva: si supera a la contralateral o el ángulo pie-camilla es < ~20° / sin tope firme → **laxitud capsular anterior** | Sospecha de **microinestabilidad** (dx diferencial del FAI o coexistente) | Sin gold standard; apoyo clínico **[verificar]** |
-| **Thomas** | Decúbito, se abraza una rodilla al pecho; la pierna evaluada que no baja = **acortamiento de flexores / flexo de cadera** | **Flexibilidad de flexores de cadera** (psoas/recto anterior), no es prueba de labrum per se | Como prueba de labrum, débil (una serie: S 0.89 / E 0.92, estudio único **[verificar]**) |
+| **Thomas** | Decúbito, se abraza una rodilla al pecho; la pierna evaluada que no baja = **acortamiento de flexores / flexo de cadera** | **Flexibilidad de flexores de cadera** (psoas/recto anterior), no es prueba de labrum per se | Como prueba de labrum es **débil**: en realidad mide LONGITUD de flexores; la S 0.89/E 0.92 viene de un **estudio único atípico** y no debe tomarse como fuerte **[verificar]** |
 | **Trendelenburg** | Apoyo monopodal; positivo = la pelvis **cae del lado contrario** al de apoyo | **Debilidad de abductores (glúteo medio/menor)** — NO es intraarticular. Clave para el **objetivo de fuerza** de la rehab | Marcador de debilidad abductora, no diagnóstico de FAI |
 
 **Clúster recomendado (práctico):** **FADIR + FABER + log roll (± scour)** positivos juntos aumentan la probabilidad; combinar **pruebas de pinzamiento + limitación del rango** mejora la precisión diagnóstica (Reiman et al. y cols.). Un estudio 2026 (Halliwell et al., *Arthroscopy*) reportó que el **clúster FABER + FADIR + elevación de pierna recta resistida** concurrentemente positivo alcanzó **S 94% y exactitud 94%** para desgarro labral **[verificar — E y VPP al 100%, cifras "al techo", pendientes de replicación]**. Aun así, **la imagen (RM-artrografía) y la respuesta a la infiltración intraarticular siguen siendo el referente** para confirmar.
@@ -2566,7 +2567,7 @@ Marco: van Melick 2016 (BJSM, guía KNGF multidisciplinar, 90 estudios) = **preh
 - Criterios para AVANZAR: extensión 0° simétrica, flexión ≥90-100°, SLR sin lag, derrame ≤1+, marcha sin muletas con buen control.
 
 **Fase 2 — ROM completo y fuerza (sem ~2-12):**
-- Metas: ROM completo e indoloro a las 4-6 sem; marcha normal sin muletas (típico 2-4 sem al resolver el lag); recuperar cuádriceps progresivamente (IMC/QI >60% hacia sem 4-6, **>80% hacia sem 8** — Wilk/JOSPT, Delaware).
+- Metas: ROM completo e indoloro a las 4-6 sem; marcha normal sin muletas (típico 2-4 sem al resolver el lag); recuperar cuádriceps progresivamente (LSI del cuádriceps >60% hacia sem 4-6, **>80% hacia sem 8** — Wilk/JOSPT, Delaware).
 - Restricciones: introducir OKC de cuádriceps con cautela; evitar impacto/pivote.
 - SÍ: CKC (sentadilla parcial, prensa, step-ups), bici y elíptica, propiocepción/equilibrio, fortalecimiento de cadena posterior y cadera, **OKC de cuádriceps desde ~6 sem** (MOON) empezando en arco protegido 90-45° y progresando; natación/aqua-jogging. La evidencia actual (van Melick 2016) respalda combinar CKC **y** OKC —los protocolos antiguos eran más restrictivos con OKC.
 - NO: correr, saltar, pivotes, deporte; carga en hiperflexión profunda bajo resistencia si injerto de isquios (ver abajo).
@@ -2642,7 +2643,7 @@ Para menisco ningún test aislado es fiable; combinar historia + interlínea + p
 - **Dolor en interlínea articular (joint line tenderness):** palpación de la interlínea medial/lateral · **Sens ~63% / Esp ~77%** (metaanálisis). A menudo el más sensible, pero **poco específico** (en atención primaria la Esp cae a ~0.26-0.39, NIHR HTA 2015). Útil como cribado.
 - **McMurray:** flexión máxima + rotación tibial con extensión buscando clic/dolor · **Sens ~70% / Esp ~71%** agrupado (algunas series Esp hasta 89%). El clic palpable (no solo dolor) sube la especificidad.
 - **Thessaly (20° flexión, en apoyo monopodal con rotación del cuerpo):** **MUY variable según la fuente** — original Karachalios 2005: **Sens ~90% / Esp ~91%** (exactitud 94% medial/96% lateral); pero estudios pragmáticos en atención primaria (NIHR HTA 2015): **Sens ~66% / Esp ~39%** (mucho peor). Metaanálisis 2015 (JOSPT): exactitud similar o levemente superior a McMurray/interlínea. **INCIERTO:** no es el test casi perfecto que sugería el estudio original.
-- **Apley (compresión/distracción en prono a 90°):** compresión dolorosa (menisco) vs distracción dolorosa (ligamento) · **Sens ~60% / Esp ~70%** (metaanálisis). **El más específico pero el menos sensible** del grupo; un Apley de compresión positivo apoya menisco, pero un negativo no descarta.
+- **Apley (compresión/distracción en prono a 90°):** compresión dolorosa (menisco) vs distracción dolorosa (ligamento) · **Sens ~60% / Esp ~70%** (metaanálisis). **El menos sensible del grupo** (su especificidad ~70% es moderada, por debajo del dolor en interlínea ~77%); un Apley de compresión positivo apoya menisco, pero un negativo no descarta.
 
 #### Rehabilitación por fases
 
@@ -2667,7 +2668,7 @@ Para menisco ningún test aislado es fiable; combinar historia + interlínea + p
   - **Roturas horizontal / radial / compleja / raíz (root):** **carga restringida** (sin carga o toe-touch) **+ ROM limitado 4-6 sem**, típicamente **0-90° las primeras 4-6 sem**. Si se dañan las fibras circunferenciales (hoop) → **sin carga 6 sem** (revisión 2022). Las **roturas de raíz** y las combinadas con LCA llevan los protocolos **más restrictivos** (revisión sistemática 2025).
   - Rodillera: bloqueada 0° para marcha/sueño y liberada por rangos permitidos para ejercicio (práctica común; el consenso no fija ángulos exactos).
 - SÍ: isométricos de cuádriceps, SLR (con extensión completa lograda), movilización rotuliana, ROM en el arco permitido, carga en el % permitido.
-- NO: **flexión profunda bajo carga, sentadilla/cuclillas profundas, pivotes, rotación con carga** (tensan la reparación); **evitar sentadilla profunda ≥4 meses**; flexión >90° con carga en fase temprana.
+- NO: **flexión profunda bajo carga, sentadilla/cuclillas profundas, pivotes, rotación con carga** (tensan la reparación); **evitar sentadilla profunda hasta ~4 meses**; flexión >90° con carga en fase temprana.
 - Criterios para AVANZAR: cicatrización en tiempo protegido cumplido, extensión completa, flexión progresando sin dolor, derrame controlado.
 
 **Fase 2 — ROM completo y fuerza progresiva (sem ~6-12):**
@@ -3272,7 +3273,7 @@ Las fechas son orientativas para detectar desfase; **el avance se decide por cri
 | Hito | Microfractura cóndilo | OAT/OATS | OCA | ACI/MACI | OLT astrágalo (BMS) | OCD fijación |
 |---|---|---|---|---|---|---|
 | Extensión pasiva completa | ~2–4 sem | ~2–4 sem | ~2–4 sem | ~2–6 sem | n/a (tobillo) | ~ según flexión limitada |
-| Carga total sin muletas | ~6–8 sem | ~8 (–12) sem | ~8–12 sem | ~6–8 sem | ~6–8 sem | ~6 sem |
+| Carga total sin muletas | ~6–8 sem | ~8 (–12) sem | ~8–12 sem | ~6–8 sem | ~8–10 sem (tras NWB estricto 6–8 sem) | ~6 sem |
 | ROM completo | ~6–8 sem | ~6–8 sem | ~8 sem | ~8–12 sem | tobillo ~6–8 sem | tras liberar flexión |
 | Bici/elíptica | ~6–8 sem | ~6 sem | ~8 sem | ~8–12 sem | ~8–12 sem | ~8–12 sem |
 | **Trote/correr** | ~4–6 meses | ~4–6 meses | ~6–9 meses | **~7–12 meses** | ~3–4 meses | diferido |
@@ -3433,7 +3434,7 @@ Este documento es análogo a `docs/biblioteca_protocolos.md` (MSK) y `docs/bibli
 #### Contraindicaciones / banderas rojas
 - Ottawa positivo no estudiado (fractura), dolor óseo focal, incapacidad de carga persistente.
 - Sospecha de lesión **sindesmal** (dolor proximal/anterolateral, dolor con rotación externa) → tratar como #2 (más lento).
-- Dolor en seno del tarso, bloqueos, derrame persistente → sospechar lesión osteocondral del astrágalo.
+- Dolor en seno del tarso, bloqueos, derrame persistente → sospechar lesión osteocondral del astrágalo (ver 🧩 Cartílago §4.5 OLT).
 - Dolor retromaleolar/subluxación de peroneos; dolor en base 5º MTT (fractura por avulsión).
 
 #### Fuentes
@@ -3696,7 +3697,7 @@ Dolor en la cara plantar del talón por sobrecarga de la fascia plantar en su or
     - Sem 1-2: **3×12 RM**
     - Sem 3-4: **4×10 RM**
     - Sem 5-8: **5×8 RM**
-    - **Tempo lento:** ~3 s subida (concéntrico) / 2-3 s pausa isométrica arriba / 3 s bajada (excéntrico).
+    - **Tempo lento (3-2-3):** ~3 s subida (concéntrico) / 2 s pausa isométrica arriba / 3 s bajada (excéntrico).
     - Progresar la carga con mochila/libros conforme tolere.
   - **Fortalecimiento de intrínsecos ("short foot"/pie corto)** como coadyuvante (evidencia baja-moderada, razonable sumarlo).
   - Continuar estiramientos y ortesis/taping según respuesta.
@@ -3838,7 +3839,7 @@ Deformidad **rígida** (estadio III-IV), fracaso de 3-6 meses de manejo conserva
 
 | Prueba | Para qué | Técnica (resumen) | Rendimiento diagnóstico |
 |---|---|---|---|
-| **Windlass test** | Fasciopatía plantar | Dorsiflexión pasiva del hallux (mejor **en carga**, de pie sobre taburete) → dolor en origen de la fascia | **Muy específico, poco sensible**: ~**100% esp / ~32% sens** (en carga 31.8%); LR+ ~1.47 (De Garceau 2003). **Confirma, NO excluye**. Fiabilidad intra/inter-examinador alta (ICC ~96-99%). Variante "Windlass Shield" 2026 más sensible pero preliminar (n=45) |
+| **Windlass test** | Fasciopatía plantar | Dorsiflexión pasiva del hallux (mejor **en carga**, de pie sobre taburete) → dolor en origen de la fascia | **Muy específico, poco sensible**: ~**100% esp / ~32% sens** (en carga 31.8%; De Garceau 2003). **Confirma, NO excluye** (un negativo no descarta por su sensibilidad baja). Fiabilidad intra/inter-examinador alta (ICC ~96-99%). Variante "Windlass Shield" 2026 más sensible pero preliminar (n=45) |
 | **Palpación tubérculo calcáneo medial** | Fasciopatía plantar | Dolor focal plantar-medial en el origen | Dolor plantar (no lateral) orienta a fascia vs fractura |
 | **Test de dorsiflexión en carga (lunge/estocada)** | Rango de dorsiflexión (factor de FP; objetivo de tto) | Rodilla hacia la pared, talón apoyado; medir distancia dedo-pared o ángulo tibial | Sin cutoff único consensuado: ~**30°** o ~**9-10 cm** como referencia de normalidad; limitación = factor de riesgo de FP. Fiabilidad buena [verificar MDC] |
 | **Single-leg heel rise** | Tibial posterior / resistencia tríceps | Elevación de talón unipodal; observar nº de reps e **inversión del retropié** | Incapacidad o ausencia de inversión → disfunción del tibial posterior. Fiabilidad test-retest ICC ~**0.78-0.96** (sano) |
