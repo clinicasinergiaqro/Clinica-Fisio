@@ -1356,7 +1356,7 @@ body.modo-oscuro .topbar{background:#141824}
 <body>
 <div id="sync-indicator" class="sync-indicator ok" style="display:none"></div>
 <div id="app-version-chip" title="Versión de la app en este equipo — toca para buscar actualización" onclick="try{_tapVersionChip()}catch(e){}"></div>
-<script>/* VERSIÓN VISIBLE: refleja el index.html realmente cargado en ESTE equipo (se bumpea junto con sw.js). Así un iPad con versión vieja se ve de un vistazo. */window.APP_VERSION='v1-2026-11-03c';(function(){try{var c=document.getElementById('app-version-chip');if(c)c.textContent=window.APP_VERSION;}catch(e){}})();</script>
+<script>/* VERSIÓN VISIBLE: refleja el index.html realmente cargado en ESTE equipo (se bumpea junto con sw.js). Así un iPad con versión vieja se ve de un vistazo. */window.APP_VERSION='v1-2026-11-03d';(function(){try{var c=document.getElementById('app-version-chip');if(c)c.textContent=window.APP_VERSION;}catch(e){}})();</script>
 <div class="toast" id="toast" aria-live="polite" aria-atomic="true"></div>
 
 <!-- LOGIN -->
@@ -1531,11 +1531,16 @@ body.modo-oscuro .topbar{background:#141824}
 <!-- BIBLIOTECA DE PROTOCOLOS (lector de docs/biblioteca_*.md vía protocolos.json; solo lectura) -->
 <style id="bib-style">
 #screen-biblioteca .content{padding:0;background:var(--gray-50)}
-.bib-wrap{padding:14px 16px 76px;max-width:760px;margin:0 auto}
+.bib-wrap{padding:14px 16px 76px;max-width:720px;margin:0 auto}
+/* En laptop/iPad: columna de lectura "tipo documento" (prosa acotada ~72ch); tablas y bandas siguen anchas */
+@media (min-width:768px){
+  .bib-page{padding:30px 36px 34px}
+  .bib-art>p:not(.ph),.bib-art>ul,.bib-art>ol,.bib-art>blockquote{max-width:580px}
+}
 .bib-intro{font-size:12.5px;line-height:1.55;color:var(--gray-600);background:var(--white);border:1px solid var(--gray-200);border-left:3px solid var(--gold);border-radius:10px;padding:11px 13px;margin-bottom:14px}
 .bib-q{width:100%;padding:11px 13px;border:1px solid var(--gray-200);border-radius:12px;font-size:15px;margin-bottom:4px;box-sizing:border-box;background:var(--white);color:var(--gray-800)}
 .bib-lib{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:800;letter-spacing:.035em;text-transform:uppercase;color:var(--navy);margin:24px 2px 10px;padding-bottom:7px;border-bottom:2px solid var(--gray-100)}
-.bib-lib .bib-lib-n{margin-left:auto;font-size:11px;font-weight:700;color:var(--gray-400);letter-spacing:0;text-transform:none}
+.bib-lib .bib-lib-n{margin-left:auto;align-self:center;font-size:10.5px;font-weight:700;color:var(--gray-600);background:var(--gray-100);border-radius:999px;padding:1px 8px;letter-spacing:0;text-transform:none}
 .bib-card{display:flex;align-items:center;gap:11px;width:100%;text-align:left;background:var(--white);border:1px solid var(--gray-200);border-left:3px solid var(--gray-300);border-radius:12px;padding:11px 12px;margin-bottom:8px;cursor:pointer;font-family:inherit;transition:background .12s}
 .bib-card:active{background:var(--gray-50)}
 .bib-ic{flex:none;width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:19px;background:var(--gray-50);line-height:1}
@@ -1593,8 +1598,25 @@ body.modo-oscuro .topbar{background:#141824}
 .bib-art li.L-prec::before{content:'⚠'}
 .bib-art li.L-goal::before{content:'→';color:#2A4F8F}
 .bib-art li.L-meta::before{content:'🎯';left:8px}
+/* BANDERA ROJA embebida en lista — señal de seguridad, resalta fuerte */
+.bib-art li.L-flag{list-style:none;position:relative;margin:8px 0 8px -10px;padding:9px 13px 9px 36px;border-radius:8px;border-left:5px solid #C0392B;background:#FBE3E0;color:#8A2A20;font-weight:600;text-align:left}
+.bib-art li.L-flag::before{content:'🚩';position:absolute;left:10px;top:8px;font-size:14px}
+.bib-art li.L-flag strong{color:#7E251C}
+/* «Qué es / mecanismo» plegable: lo práctico (indicaciones/contraindicaciones) queda arriba */
+.bib-art details.bib-mech{margin:11px 0;border:1px solid #DCE5F2;border-radius:10px;background:#F3F6FB;overflow:hidden}
+.bib-art details.bib-mech>summary{cursor:pointer;list-style:none;min-height:44px;box-sizing:border-box;padding:6px 14px;font-weight:700;color:var(--navy);font-size:13.5px;display:flex;align-items:center;flex-wrap:wrap;gap:4px 8px;-webkit-user-select:none;user-select:none}
+.bib-art details.bib-mech>summary::-webkit-details-marker{display:none}
+.bib-art details.bib-mech .mech-hint{font-weight:600;font-size:11px;color:var(--navy-light);opacity:.85}
+.bib-art details.bib-mech>summary::after{content:'▾';margin-left:auto;color:var(--navy-light);font-size:13px;transition:transform .15s}
+.bib-art details.bib-mech[open]>summary::after{transform:rotate(180deg)}
+.bib-art details.bib-mech[open]>summary{border-bottom:1px solid #DCE5F2;background:#E9F0FB}
+.bib-art details.bib-mech[open] .mech-hint{display:none}
+.bib-art details.bib-mech>:not(summary){margin-left:14px;margin-right:14px}
+.bib-art details.bib-mech>:first-of-type{margin-top:10px}
+.bib-art details.bib-mech>:last-child{margin-bottom:11px}
 .bib-art code{background:var(--gray-50);color:var(--gray-500);padding:0 3px;border-radius:4px;font-size:11.5px;font-family:ui-monospace,Menlo,Consolas,monospace;word-break:break-word}
-.bib-art .bib-verif{background:#F6F0E0;color:#9A7B37;border-radius:4px;padding:0 4px;font-size:9.5px;font-weight:600;letter-spacing:.01em;font-family:inherit;-webkit-box-decoration-break:clone;box-decoration-break:clone}
+.bib-art .bib-verif{background:#F3ECCF;color:#6E5718;border-radius:4px;padding:0 4px;font-size:9.5px;font-weight:700;letter-spacing:.01em;font-family:inherit;-webkit-box-decoration-break:clone;box-decoration-break:clone}
+.bib-art .bib-urge{color:#B42318;font-weight:800}
 .bib-art a.bib-xref{color:#2A4F8F;font-weight:600;cursor:pointer;text-decoration:none;white-space:nowrap;border-bottom:1px dotted #9FB6DA}
 .bib-art a.bib-xref:active{color:#1A3566}
 .bib-art pre{background:var(--navy);color:#E8EEF7;padding:13px 14px;border-radius:10px;overflow-x:auto;font-size:11.5px;line-height:1.5;margin:12px 0;text-align:left}
@@ -1655,16 +1677,18 @@ body.modo-oscuro .topbar{background:#141824}
 .bib-art p.af-prec{background:#FBF4E4;border-color:#C49A2E}
 .bib-art p.af-ind:has(+ul),.bib-art p.af-ci:has(+ul),.bib-art p.af-prec:has(+ul){border-radius:10px 10px 0 0}
 .bib-art p.af-ind::before,.bib-art p.af-ci::before,.bib-art p.af-prec::before{position:absolute;left:11px;top:9px;font-weight:800;font-size:14px}
-.bib-art p.af-ind::before{content:'✓';color:#1F8A4C}
-.bib-art p.af-ci::before{content:'✕';color:#C0392B}
-.bib-art p.af-prec::before{content:'⚠';color:#B25E09}
+.bib-art p.af-ind::before{content:'🎯';font-size:13px;top:10px}
+.bib-art p.af-ci::before{content:'⛔';font-size:13px;top:10px}
+.bib-art p.af-prec::before{content:'⚠️';font-size:13px;top:10px}
 .bib-art p.af-ind strong{color:#1A6B40}
 .bib-art p.af-ci strong{color:#B42318}
-.bib-art p.af-prec strong{color:#9A6512}
+.bib-art p.af-prec strong{color:#8A5E0C}
 .bib-art p.af-ind+ul,.bib-art p.af-ci+ul,.bib-art p.af-prec+ul{margin-top:0;border-left:4px solid;border-radius:0 0 10px 10px;padding:9px 13px 11px 32px;list-style-position:outside}
-.bib-art p.af-ind+ul{background:#F3FBF6;border-color:#1F8A4C}
-.bib-art p.af-ci+ul{background:#FDF3F2;border-color:#C0392B}
-.bib-art p.af-prec+ul{background:#FDF8EE;border-color:#C49A2E}
+.bib-art p.af-ind+ul{background:#EAF7EF;border-color:#1F8A4C}
+.bib-art p.af-ci+ul{background:#FCEBE9;border-color:#C0392B}
+.bib-art p.af-prec+ul{background:#FBF4E4;border-color:#C49A2E}
+.bib-art p.af-prec+ul strong{color:#8A5E0C}
+.bib-art p.af-ci+ul em{font-style:italic;color:var(--gray-600)}
 </style>
 <div class="screen" id="screen-biblioteca">
   <div class="topbar">
@@ -27082,8 +27106,8 @@ function _bibRenderLista(){
   var d=window._bibData, c=document.getElementById('content-biblioteca'); if(!d||!c) return;
   window._bibView=null;
   var h=['<div class="bib-wrap">'];
-  h.push('<div class="bib-intro">📚 Material de <b>referencia</b>: progresa por <b>criterios</b>, no por calendario; en post-quirúrgico manda el cirujano. Toca una lesión para leer sus fases, qué sí / qué no, criterios de retorno y pruebas diagnósticas.</div>');
-  h.push('<input id="bib-q" class="bib-q" type="search" inputmode="search" autocomplete="off" placeholder="🔎 Buscar en todo (lumbar, Lachman, cauda equina, tecar…)" oninput="_bibFiltrar()">');
+  h.push('<div class="bib-intro">📚 Material de <b>referencia</b>: progresa por <b>criterios</b>, no por calendario; en post-quirúrgico manda el cirujano. Toca un tema o lesión para leer sus fases, qué sí / qué no, criterios de retorno y pruebas diagnósticas.</div>');
+  h.push('<input id="bib-q" class="bib-q" type="search" inputmode="search" autocomplete="off" placeholder="🔎 Buscar (lumbar, Lachman, tecar…)" oninput="_bibFiltrar()">');
   h.push('<div id="bib-results"></div>');
   h.push('<div class="bib-foot">Generado '+_bibEsc(d.generado||'')+' · evidencia internacional 2021–2026 · los números finos marcados [verificar] los afina el fisio contra la fuente. No sustituye el criterio clínico.</div>');
   h.push('</div>');

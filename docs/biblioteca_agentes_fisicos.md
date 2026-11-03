@@ -73,7 +73,15 @@ Vale para TODO agente físico y para cualquier paciente con flags de `seguridadC
   - **Fiebre o infección aguda** (sistémica, o local activa en la zona).
   - **Pérdida grave de sensibilidad** térmica/dolorosa en la zona (no puede avisar la quemadura) → tratar como contraindicación del modo térmico.
   - **Sobre los ojos.**
-- *RELATIVAS (valorar riesgo/beneficio, preferir atérmico):* anticoagulación o trastorno de la coagulación (riesgo de hematoma con la hiperemia); diabetes con neuropatía o vasculopatía; insuficiencia cardiaca/circulatoria grave; epilepsia (precaución en cabeza/cuello); piel dañada, dermatitis o cicatriz reciente; alteración leve-moderada de la sensibilidad; menstruación sobre pelvis; zonas con escaso tejido o prominencias óseas.
+- *RELATIVAS (valorar riesgo/beneficio, preferir atérmico):*
+  - anticoagulación o trastorno de la coagulación (riesgo de hematoma con la hiperemia)
+  - diabetes con neuropatía o vasculopatía
+  - insuficiencia cardiaca/circulatoria grave
+  - epilepsia (precaución en cabeza/cuello)
+  - piel dañada, dermatitis o cicatriz reciente
+  - alteración leve-moderada de la sensibilidad
+  - menstruación sobre pelvis
+  - zonas con escaso tejido o prominencias óseas
 
 **Precauciones:** **Sensibilidad alterada = riesgo de quemadura** → el paciente debe sentir **calor agradable, NUNCA doloroso**, con comunicación constante; ante la duda, atérmico. No aplicar sobre **piel lesionada / herida / dermatitis**. En **zonas con poco tejido o prominencias óseas** el calor se concentra → bajar potencia. **Mantener el aplicador en movimiento** y usar suficiente **crema/medio de acoplamiento**. Vigilar la **placa de retorno (neutra)** por calentamiento y buen contacto. **Retirar joyas, piercings y metales** del campo. Cuidar la **hidratación** del paciente (la conductividad del tejido depende del agua). **No sobre los ojos**; precaución en cuello anterior (seno carotídeo/tiroides).
 
