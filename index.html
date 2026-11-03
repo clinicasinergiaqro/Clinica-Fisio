@@ -1356,7 +1356,7 @@ body.modo-oscuro .topbar{background:#141824}
 <body>
 <div id="sync-indicator" class="sync-indicator ok" style="display:none"></div>
 <div id="app-version-chip" title="Versión de la app en este equipo — toca para buscar actualización" onclick="try{_tapVersionChip()}catch(e){}"></div>
-<script>/* VERSIÓN VISIBLE: refleja el index.html realmente cargado en ESTE equipo (se bumpea junto con sw.js). Así un iPad con versión vieja se ve de un vistazo. */window.APP_VERSION='v1-2026-11-03c';(function(){try{var c=document.getElementById('app-version-chip');if(c)c.textContent=window.APP_VERSION;}catch(e){}})();</script>
+<script>/* VERSIÓN VISIBLE: refleja el index.html realmente cargado en ESTE equipo (se bumpea junto con sw.js). Así un iPad con versión vieja se ve de un vistazo. */window.APP_VERSION='v1-2026-11-03d';(function(){try{var c=document.getElementById('app-version-chip');if(c)c.textContent=window.APP_VERSION;}catch(e){}})();</script>
 <div class="toast" id="toast" aria-live="polite" aria-atomic="true"></div>
 
 <!-- LOGIN -->
@@ -1593,6 +1593,19 @@ body.modo-oscuro .topbar{background:#141824}
 .bib-art li.L-prec::before{content:'⚠'}
 .bib-art li.L-goal::before{content:'→';color:#2A4F8F}
 .bib-art li.L-meta::before{content:'🎯';left:8px}
+/* BANDERA ROJA embebida en lista — señal de seguridad, resalta fuerte */
+.bib-art li.L-flag{list-style:none;position:relative;margin:8px 0 8px -10px;padding:9px 13px 9px 36px;border-radius:8px;border-left:5px solid #C0392B;background:#FBE3E0;color:#8A2A20;font-weight:600;text-align:left}
+.bib-art li.L-flag::before{content:'🚩';position:absolute;left:10px;top:8px;font-size:14px}
+.bib-art li.L-flag strong{color:#7E251C}
+/* «Qué es / mecanismo» plegable: lo práctico (indicaciones/contraindicaciones) queda arriba */
+.bib-art details.bib-mech{margin:11px 0;border:1px solid var(--gray-200);border-radius:10px;background:var(--gray-50);overflow:hidden}
+.bib-art details.bib-mech>summary{cursor:pointer;list-style:none;padding:10px 14px;font-weight:700;color:var(--navy);font-size:13.5px;display:flex;align-items:center;gap:7px;-webkit-user-select:none;user-select:none}
+.bib-art details.bib-mech>summary::-webkit-details-marker{display:none}
+.bib-art details.bib-mech>summary::after{content:'▾';margin-left:auto;color:var(--gray-400);font-size:12px;transition:transform .15s}
+.bib-art details.bib-mech[open]>summary::after{transform:rotate(180deg)}
+.bib-art details.bib-mech[open]>summary{border-bottom:1px solid var(--gray-200)}
+.bib-art details.bib-mech>:not(summary){margin-left:14px;margin-right:14px}
+.bib-art details.bib-mech>:last-child{margin-bottom:11px}
 .bib-art code{background:var(--gray-50);color:var(--gray-500);padding:0 3px;border-radius:4px;font-size:11.5px;font-family:ui-monospace,Menlo,Consolas,monospace;word-break:break-word}
 .bib-art .bib-verif{background:#F6F0E0;color:#9A7B37;border-radius:4px;padding:0 4px;font-size:9.5px;font-weight:600;letter-spacing:.01em;font-family:inherit;-webkit-box-decoration-break:clone;box-decoration-break:clone}
 .bib-art a.bib-xref{color:#2A4F8F;font-weight:600;cursor:pointer;text-decoration:none;white-space:nowrap;border-bottom:1px dotted #9FB6DA}

@@ -69,6 +69,9 @@ def _tag_li(m):
     inner=m.group(1)
     t=re.sub(r'^\s*(<strong>)?\s*','',inner).lower()
     def hit(*pats): return any(re.match(p,t) for p in pats)
+    # BANDERA ROJA embebida en lista (señal fuerte): 🚩 · "cauda equina" · "banderas rojas:" (listándolas)
+    if ('🚩' in inner) or re.search(r'cauda equina|banderas? rojas?\s*[:：]', t):
+        return '<li class="L-flag">%s</li>'%re.sub(r'^\s*(<strong>\s*)?🚩\s*',r'\1',inner)
     if hit(r'fase\s'):
         return '<li class="L-phase">%s</li>'%inner
     if hit(r's[íi]\s*[:：]', r'qu[ée]\s+s[íi]\s*[:：]'):
@@ -103,11 +106,52 @@ def enrich(html):
     # encabezados de FASE (p en negrita y h4/h5)
     html=re.sub(r'<p><strong>((?:Fase|FASE)\b[^<]*)</strong>', r'<p class="ph"><strong>\1</strong>', html)
     html=re.sub(r'<(h[3-5])([^>]*)>(\s*(?:Fase|FASE)\b[^<]*)</\1>', r'<\1\2 class="ph">\3</\1>', html)
-    # encabezados de peligro (banderas rojas / contraindicaciones)
-    html=re.sub(r'<(h[3-5])([^>]*)>([^<]*(?:andera|ontraindicac|🚩|🛑)[^<]*)</\1>', r'<\1\2 class="danger">\3</\1>', html)
+    # encabezados de peligro (banderas rojas / contraindicaciones) — insensible a may/min
+    html=re.sub(r'<(h[3-5])([^>]*)>([^<]*(?:bandera|contraindicac|🚩|🛑|⛔)[^<]*)</\1>', r'<\1\2 class="danger">\3</\1>', html, flags=re.I)
     # items de lista por etiqueta (evita los que contienen sub-listas)
     html=re.sub(r'<li>((?:(?!</li>|<[uo]l[ >]).)*?)</li>', _tag_li, html, flags=re.S)
     return html
+
+def _danger_zone(html):
+    """Propaga el rojo de peligro a las SUBsecciones dentro de una sección de banderas rojas /
+    contraindicaciones (p. ej. 3.1 Cauda equina, 3.2 Fractura… bajo «3. 🚩 BANDERAS ROJAS»),
+    para que toda la zona de seguridad resalte, no solo el encabezado padre."""
+    parts=re.split(r'(<h[1-6][^>]*>.*?</h[1-6]>)', html, flags=re.S)
+    zone=0
+    out=[]
+    for p in parts:
+        m=re.match(r'<h([1-6])([^>]*)>(.*?)</h\1>$', p, flags=re.S)
+        if m:
+            lvl=int(m.group(1)); attrs=m.group(2); inner=m.group(3)
+            is_d=('danger' in attrs)
+            if zone and lvl<=zone: zone=0
+            if is_d:
+                zone=lvl
+            elif zone and lvl>zone:
+                if 'class="' in attrs: attrs=re.sub(r'class="', 'class="danger ', attrs, count=1)
+                else: attrs=attrs+' class="danger"'
+                p='<h%d%s>%s</h%d>'%(lvl,attrs,inner,lvl)
+        out.append(p)
+    return ''.join(out)
+
+def _fold_mech(html):
+    """Acorta el bloque «Qué es / mecanismo» de los agentes físicos: lo mete en un <details>
+    plegado por defecto, para que lo PRÁCTICO (indicaciones/contraindicaciones) quede arriba.
+    Captura TODO el bloque (párrafo intro + lista/párrafos) hasta el siguiente marcador de sección
+    (Indicaciones/Precauciones/fase, un encabezado, hr o blockquote). Corre DESPUÉS de enrich,
+    así que 'Indicaciones' ya es <p class="af-ind">."""
+    pat=re.compile(
+        r'<p><strong>(Qué es\s*/\s*(?:mecanismo|c[óo]mo funciona)[^<]*)</strong>(.*?)</p>'
+        r'(.*?)'
+        r'(?=<p class="af-|<p class="ph"|<p><strong>|<h[2-6]|<hr|<blockquote|$)',
+        re.S)
+    def rep(m):
+        titulo=re.sub(r'\s*:\s*$','',m.group(1)).strip()
+        intro=m.group(2).strip()
+        resto=m.group(3).strip()
+        cuerpo=(('<p>'+intro+'</p>') if intro else '')+resto
+        return '<details class="bib-mech"><summary>🔬 '+titulo+'</summary>'+cuerpo+'</details>'
+    return pat.sub(rep, html)
 
 def _sep_lists(md):
     """sane_lists exige línea en blanco antes de una lista; muchas fases la omiten
@@ -247,7 +291,7 @@ def _link_xrefs(html):
 
 def md2html(body):
     _MD.reset()
-    html=_declutter(enrich(_MD.convert(_sep_lists(body))))
+    html=_fold_mech(_declutter(_danger_zone(enrich(_MD.convert(_sep_lists(body))))))
     html=re.sub(r'<pre><code>(.*?)</code></pre>', _conv_pre, html, flags=re.S)
     html=_add_table_labels(html)
     html=_color_semaforo(html)
@@ -259,6 +303,15 @@ def rename_area(t):
     n=norm(t)
     if n.startswith('parte 0b'):
         return '🛡️ Seguridad (agentes físicos / implantes)'
+    # "PARTE 0 — Cómo se arma un plan…" → título descriptivo (quita el prefijo "PARTE N —")
+    m=re.match(r'^PARTE\s+\d+\w?\s*[—–-]\s*(.+)$', t)
+    if m: t=m.group(1).strip()
+    # Limpieza de RUIDO de fuente en los títulos (lo ve el clínico en la lista):
+    t=re.sub(r'^\d+\.\s+','',t)              # numeración de orden ("0. ", "1. ") — el orden ya lo da la posición
+    t=re.sub(r'\s*\(Cap[^)]*\)','',t)        # referencias a capítulos del libro ("(Cap 2 — el núcleo)")
+    t=re.sub(r'\s*/\s*`[^`]+`','',t)         # "… / `seguridadClinica`" (identificador de código)
+    t=re.sub(r'`([^`]+)`',r'\1',t)           # backticks sueltos
+    t=re.sub(r'\s{2,}',' ',t).strip()
     return t
 
 LIBS=[
