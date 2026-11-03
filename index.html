@@ -1356,7 +1356,7 @@ body.modo-oscuro .topbar{background:#141824}
 <body>
 <div id="sync-indicator" class="sync-indicator ok" style="display:none"></div>
 <div id="app-version-chip" title="Versión de la app en este equipo — toca para buscar actualización" onclick="try{_tapVersionChip()}catch(e){}"></div>
-<script>/* VERSIÓN VISIBLE: refleja el index.html realmente cargado en ESTE equipo (se bumpea junto con sw.js). Así un iPad con versión vieja se ve de un vistazo. */window.APP_VERSION='v1-2026-11-03a';(function(){try{var c=document.getElementById('app-version-chip');if(c)c.textContent=window.APP_VERSION;}catch(e){}})();</script>
+<script>/* VERSIÓN VISIBLE: refleja el index.html realmente cargado en ESTE equipo (se bumpea junto con sw.js). Así un iPad con versión vieja se ve de un vistazo. */window.APP_VERSION='v1-2026-11-03c';(function(){try{var c=document.getElementById('app-version-chip');if(c)c.textContent=window.APP_VERSION;}catch(e){}})();</script>
 <div class="toast" id="toast" aria-live="polite" aria-atomic="true"></div>
 
 <!-- LOGIN -->
@@ -1531,14 +1531,22 @@ body.modo-oscuro .topbar{background:#141824}
 <!-- BIBLIOTECA DE PROTOCOLOS (lector de docs/biblioteca_*.md vía protocolos.json; solo lectura) -->
 <style id="bib-style">
 #screen-biblioteca .content{padding:0;background:var(--gray-50)}
-.bib-wrap{padding:14px 16px 46px;max-width:760px;margin:0 auto}
+.bib-wrap{padding:14px 16px 76px;max-width:760px;margin:0 auto}
 .bib-intro{font-size:12.5px;line-height:1.55;color:var(--gray-600);background:var(--white);border:1px solid var(--gray-200);border-left:3px solid var(--gold);border-radius:10px;padding:11px 13px;margin-bottom:14px}
 .bib-q{width:100%;padding:11px 13px;border:1px solid var(--gray-200);border-radius:12px;font-size:15px;margin-bottom:4px;box-sizing:border-box;background:var(--white);color:var(--gray-800)}
-.bib-lib{font-size:11.5px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--navy-light);margin:18px 2px 8px}
-.bib-card{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;text-align:left;background:var(--white);border:1px solid var(--gray-200);border-radius:12px;padding:13px 14px;margin-bottom:8px;cursor:pointer;font-family:inherit}
+.bib-lib{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:800;letter-spacing:.035em;text-transform:uppercase;color:var(--navy);margin:24px 2px 10px;padding-bottom:7px;border-bottom:2px solid var(--gray-100)}
+.bib-lib .bib-lib-n{margin-left:auto;font-size:11px;font-weight:700;color:var(--gray-400);letter-spacing:0;text-transform:none}
+.bib-card{display:flex;align-items:center;gap:11px;width:100%;text-align:left;background:var(--white);border:1px solid var(--gray-200);border-left:3px solid var(--gray-300);border-radius:12px;padding:11px 12px;margin-bottom:8px;cursor:pointer;font-family:inherit;transition:background .12s}
 .bib-card:active{background:var(--gray-50)}
-.bib-card-t{font-size:14px;font-weight:600;color:var(--navy);line-height:1.35}
-.bib-card-ar{color:var(--gray-400);font-size:22px;font-weight:300;flex:none;line-height:1}
+.bib-ic{flex:none;width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:19px;background:var(--gray-50);line-height:1}
+.bib-ct{flex:1;min-width:0}
+.bib-ct-n{display:block;font-size:14px;font-weight:700;color:var(--navy);line-height:1.3}
+.bib-ct-s{display:block;font-size:11.5px;color:var(--gray-500);line-height:1.38;margin-top:2px}
+.bib-card-ar{color:var(--gray-300);font-size:21px;font-weight:300;flex:none;line-height:1}
+.bib-card.lib-ortopedia{border-left-color:#1E467E}.bib-lib.lib-ortopedia{color:#1E467E;border-bottom-color:#1E467E26}.lib-ortopedia .bib-ic{background:#EAF0F8}
+.bib-card.lib-agentes{border-left-color:#2A7D8C}.bib-lib.lib-agentes{color:#216571;border-bottom-color:#2A7D8C26}.lib-agentes .bib-ic{background:#E5F2F4}
+.bib-card.lib-msk{border-left-color:#1C7A52}.bib-lib.lib-msk{color:#1C7A52;border-bottom-color:#1C7A5226}.lib-msk .bib-ic{background:#E7F4EC}
+.bib-card.lib-derma{border-left-color:#8E3B6E}.bib-lib.lib-derma{color:#8E3B6E;border-bottom-color:#8E3B6E26}.lib-derma .bib-ic{background:#F7EAF1}
 .bib-empty,.bib-loading,.bib-err{padding:28px 14px;text-align:center;color:var(--gray-600);font-size:13.5px;line-height:1.55}
 .bib-retry{margin-top:12px;background:var(--navy);color:#fff;border:none;border-radius:10px;padding:10px 18px;font-size:14px;font-weight:600;cursor:pointer}
 .bib-foot{margin-top:22px;font-size:11px;color:var(--gray-400);line-height:1.5;text-align:center;border-top:1px solid var(--gray-100);padding-top:12px}
@@ -1558,7 +1566,7 @@ body.modo-oscuro .topbar{background:#141824}
 .bib-toc a{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:9px 14px;cursor:pointer;color:var(--navy);font-size:13.5px;line-height:1.35;text-decoration:none;font-weight:500}
 .bib-toc a:active{background:var(--gray-100)}
 .bib-toc a::after{content:'›';flex:none;color:var(--gray-400);font-size:17px;font-weight:300}
-.bib-art{font-size:14px;line-height:1.72;color:var(--gray-800);text-align:justify;-webkit-hyphens:auto;hyphens:auto}
+.bib-art{font-size:14.5px;line-height:1.7;color:var(--gray-800);text-align:left;-webkit-hyphens:none;hyphens:none;overflow-wrap:break-word}
 .bib-art>h3:first-child{margin-top:4px;border-top:none;padding-top:0}
 .bib-art h3{font-size:16.5px;font-weight:800;color:var(--navy);margin:30px 0 11px;line-height:1.28;scroll-margin-top:14px;padding:16px 0 7px;border-top:1px solid var(--gray-100);text-align:left}
 .bib-art h3.danger,.bib-art h4.danger,.bib-art h5.danger{color:#B23B2E;background:#FCECEA;border-left:4px solid #C0392B;border-top:none;border-radius:0 8px 8px 0;padding:9px 12px;margin:22px 0 9px}
@@ -1585,7 +1593,10 @@ body.modo-oscuro .topbar{background:#141824}
 .bib-art li.L-prec::before{content:'⚠'}
 .bib-art li.L-goal::before{content:'→';color:#2A4F8F}
 .bib-art li.L-meta::before{content:'🎯';left:8px}
-.bib-art code{background:var(--gray-100);padding:1px 5px;border-radius:5px;font-size:12px;font-family:ui-monospace,Menlo,Consolas,monospace;word-break:break-word}
+.bib-art code{background:var(--gray-50);color:var(--gray-500);padding:0 3px;border-radius:4px;font-size:11.5px;font-family:ui-monospace,Menlo,Consolas,monospace;word-break:break-word}
+.bib-art .bib-verif{background:#F6F0E0;color:#9A7B37;border-radius:4px;padding:0 4px;font-size:9.5px;font-weight:600;letter-spacing:.01em;font-family:inherit;-webkit-box-decoration-break:clone;box-decoration-break:clone}
+.bib-art a.bib-xref{color:#2A4F8F;font-weight:600;cursor:pointer;text-decoration:none;white-space:nowrap;border-bottom:1px dotted #9FB6DA}
+.bib-art a.bib-xref:active{color:#1A3566}
 .bib-art pre{background:var(--navy);color:#E8EEF7;padding:13px 14px;border-radius:10px;overflow-x:auto;font-size:11.5px;line-height:1.5;margin:12px 0;text-align:left}
 .bib-art pre code{background:none;color:inherit;padding:0;font-size:inherit}
 .bib-art blockquote{border-left:4px solid var(--gold);background:var(--gray-50);margin:14px 0;padding:11px 14px;border-radius:0 10px 10px 0;text-align:left}
@@ -1597,6 +1608,10 @@ body.modo-oscuro .topbar{background:#141824}
 .bib-art th,.bib-art td{border:1px solid var(--gray-200);padding:7px 9px;text-align:left;vertical-align:top;hyphens:manual;overflow-wrap:break-word;word-break:normal}
 .bib-art th{background:var(--navy);color:#fff;font-weight:700;border-color:var(--navy)}
 .bib-art tbody tr:nth-child(even){background:var(--gray-50)}
+.bib-art table.bib-dtbl td:first-child{font-weight:700;color:var(--navy)}
+.bib-art tr.sem-g td:first-child{color:#1C7A45}
+.bib-art tr.sem-a td:first-child{color:#8A5E0C}
+.bib-art tr.sem-r td:first-child{color:#C0392B}
 @media (max-width:560px){
   .bib-art table,.bib-art tbody,.bib-art tr,.bib-art td{display:block;width:auto}
   .bib-art thead{display:none}
@@ -1605,7 +1620,12 @@ body.modo-oscuro .topbar{background:#141824}
   .bib-art tbody tr:nth-child(even){background:var(--white)}
   .bib-art td{border:none;border-top:1px solid var(--gray-100);padding:7px 13px;text-align:left}
   .bib-art td::before{content:attr(data-label);display:block;font-size:10.5px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:.04em;margin-bottom:1px;opacity:.8}
+  .bib-art td:not([data-label])::before{display:none}
   .bib-art td:first-child{border-top:none;background:var(--navy);color:#fff;font-weight:700;font-size:13.5px}
+  .bib-art table.bib-dtbl td:first-child{color:#fff}
+  .bib-art tr.sem-g td:first-child{background:#1F8A4C}
+  .bib-art tr.sem-a td:first-child{background:#8F6410}
+  .bib-art tr.sem-r td:first-child{background:#C0392B}
   .bib-art td:first-child::before{display:none}
   .bib-art td:empty{display:none}
 }
@@ -1628,9 +1648,23 @@ body.modo-oscuro .topbar{background:#141824}
 .bib-art blockquote.bib-encuadre .enc-ind strong{color:#1F7A4D}
 .bib-art blockquote.bib-encuadre .enc-ci strong{color:#B42318}
 .bib-art blockquote.bib-encuadre .enc-prec strong{color:#B25E09}
-.bib-art p.af-ind strong{color:#1F7A4D}
+/* Agentes físicos: Indicaciones / Contraindicaciones / Precauciones como paneles de color */
+.bib-art p.af-ind,.bib-art p.af-ci,.bib-art p.af-prec{margin:18px 0 0;padding:9px 13px 9px 34px;border-radius:10px;border-left:4px solid;position:relative;line-height:1.6}
+.bib-art p.af-ind{background:#EAF7EF;border-color:#1F8A4C}
+.bib-art p.af-ci{background:#FCEBE9;border-color:#C0392B}
+.bib-art p.af-prec{background:#FBF4E4;border-color:#C49A2E}
+.bib-art p.af-ind:has(+ul),.bib-art p.af-ci:has(+ul),.bib-art p.af-prec:has(+ul){border-radius:10px 10px 0 0}
+.bib-art p.af-ind::before,.bib-art p.af-ci::before,.bib-art p.af-prec::before{position:absolute;left:11px;top:9px;font-weight:800;font-size:14px}
+.bib-art p.af-ind::before{content:'✓';color:#1F8A4C}
+.bib-art p.af-ci::before{content:'✕';color:#C0392B}
+.bib-art p.af-prec::before{content:'⚠';color:#B25E09}
+.bib-art p.af-ind strong{color:#1A6B40}
 .bib-art p.af-ci strong{color:#B42318}
-.bib-art p.af-prec strong{color:#B25E09}
+.bib-art p.af-prec strong{color:#9A6512}
+.bib-art p.af-ind+ul,.bib-art p.af-ci+ul,.bib-art p.af-prec+ul{margin-top:0;border-left:4px solid;border-radius:0 0 10px 10px;padding:9px 13px 11px 32px;list-style-position:outside}
+.bib-art p.af-ind+ul{background:#F3FBF6;border-color:#1F8A4C}
+.bib-art p.af-ci+ul{background:#FDF3F2;border-color:#C0392B}
+.bib-art p.af-prec+ul{background:#FDF8EE;border-color:#C49A2E}
 </style>
 <div class="screen" id="screen-biblioteca">
   <div class="topbar">
@@ -27056,6 +27090,20 @@ function _bibRenderLista(){
   c.innerHTML=h.join(''); try{ c.scrollTop=0; }catch(_){}
   _bibFiltrar();
 }
+var _BIB_LIBCLS={ortopedia:'lib-ortopedia',agentes:'lib-agentes',msk:'lib-msk',derma:'lib-derma'};
+// Parte el título en: icono (emoji propio o de la biblioteca) · nombre corto · detalle (muted).
+function _bibSplitTitulo(t,libEmoji){
+  t=String(t||'').trim();
+  var ic=libEmoji||'📄', rest=t;
+  var m=t.match(/^(\S+)\s+([\s\S]+)$/);
+  if(m && !/[0-9A-Za-zÁÉÍÓÚÜÑáéíóúüñ]/.test(m[1])){ ic=m[1]; rest=m[2]; }
+  var nombre=rest, sub='', idx=-1, cut=0;
+  var pDash=rest.indexOf(' — '), pParen=rest.indexOf(' ('), pColon=rest.indexOf(': ');
+  if(pDash>0){ idx=pDash; cut=3; } else if(pParen>0){ idx=pParen; cut=2; } else if(pColon>0){ idx=pColon; cut=2; }
+  if(idx>0){ nombre=rest.slice(0,idx).trim(); sub=rest.slice(idx+cut).trim(); if(sub.indexOf('(')<0) sub=sub.replace(/\)\s*$/,'').trim(); }
+  sub=sub.replace(/,\s+/g,' · ');
+  return {ic:ic,nombre:nombre,sub:sub};
+}
 function _bibFiltrar(){
   var d=window._bibData; var res=document.getElementById('bib-results'); if(!d||!res) return;
   var q=_bibNorm((document.getElementById('bib-q')||{}).value||'').trim();
@@ -27063,8 +27111,14 @@ function _bibFiltrar(){
   (d.bibliotecas||[]).forEach(function(lib,li){
     var hits=[]; (lib.areas||[]).forEach(function(a,ai){ if(!q || _bibNorm(a.titulo).indexOf(q)>=0 || _bibAreaTxt(a).indexOf(q)>=0) hits.push({a:a,ai:ai}); });
     if(!hits.length) return;
-    h.push('<div class="bib-lib">'+_bibEsc((lib.emoji?lib.emoji+' ':'')+lib.titulo)+'</div>');
-    hits.forEach(function(o){ total++; h.push('<button class="bib-card" onclick="_bibAbrirArea('+li+','+o.ai+')"><span class="bib-card-t">'+_bibEsc(o.a.titulo)+'</span><span class="bib-card-ar">›</span></button>'); });
+    var cls=_BIB_LIBCLS[lib.id]||'';
+    h.push('<div class="bib-lib '+cls+'">'+_bibEsc((lib.emoji?lib.emoji+' ':'')+lib.titulo)+'<span class="bib-lib-n">'+hits.length+'</span></div>');
+    var sps=hits.map(function(o){ return _bibSplitTitulo(o.a.titulo,lib.emoji); });
+    var cnt={}; sps.forEach(function(sp){ cnt[sp.nombre]=(cnt[sp.nombre]||0)+1; });
+    hits.forEach(function(o,k){ total++; var sp=sps[k], nombre=sp.nombre;
+      if(cnt[sp.nombre]>1 && sp.sub){ var w=(sp.sub.split(/[ ·]/)[0]||'').replace(/[(),]/g,''); if(w) nombre=sp.nombre+' · '+w.charAt(0).toUpperCase()+w.slice(1); }
+      h.push('<button class="bib-card '+cls+'" onclick="_bibAbrirArea('+li+','+o.ai+')"><span class="bib-ic">'+_bibEsc(sp.ic)+'</span><span class="bib-ct"><span class="bib-ct-n">'+_bibEsc(nombre)+'</span>'+(sp.sub?'<span class="bib-ct-s">'+_bibEsc(sp.sub)+'</span>':'')+'</span><span class="bib-card-ar">›</span></button>');
+    });
   });
   if(!total) h.push('<div class="bib-empty">Sin resultados. Prueba otra palabra (ej. «aquiles», «SLAP», «cadera»).</div>');
   res.innerHTML=h.join('');
