@@ -9,7 +9,7 @@ Autor clínico de referencia: Carlos Fernando Aranda González. Este documento N
 
 Cada paciente recibe **dos documentos** que salen del mismo plan:
 
-1. **PROTOCOLO CLÍNICO** (para expediente y para el médico): la periodización completa, el razonamiento, los agentes físicos por fase y los criterios. Es el de Fausto.
+1. **PROTOCOLO CLÍNICO** (para expediente y para el médico): la periodización completa, el razonamiento, los agentes físicos por fase y los criterios.
 2. **RUTINA DEL PACIENTE** (para el paciente): la sesión tipo de la fase actual en lenguaje simple + semáforo del dolor. Sin tecnicismos.
 
 ### Estructura fija del PROTOCOLO CLÍNICO (secciones)
@@ -86,7 +86,7 @@ Banderas rojas → frenar y revalorar: dolor agudo con carga, pérdida de fuerza
 > Cada protocolo trae: encuadre, macro→meso, dosificación, sesión tipo y criterios. Las semanas son guía (se avanza por criterios). Ajustar a edad, deporte y comorbilidades del paciente.
 
 ### P1 · Tendón rotuliano — tendinopatía / desgarre parcial del polo inferior (HSR)
-*(Modelo del plan de Fausto. Base: Kongsgaard 2009; monitoreo Silbernagel.)*
+*(Base: Kongsgaard 2009; monitoreo Silbernagel.)*
 
 **Encuadre:** carga pesada-lenta (HSR) como motor del remodelado. Si es desgarre parcial en reparación (no tendinopatía pura), dosificar respetando la cicatriz; controlar la **flexión profunda bajo carga** (sentadilla profunda, aterrizajes) en fases tempranas.
 
@@ -197,7 +197,7 @@ M5 · Readaptación          sem 15+   actividad/laboral/deporte                
 ---
 
 ### P7 · Post-op reinserción tendón-hueso (extensor común / epicóndilo lateral) — reintegración deportiva
-*(Modelo del plan de Edgar Mondragón. Reparación con anclas; deporte: escalada. Base: carga tendinosa escalonada + retorno por criterios con autorización del cirujano.)*
+*(Ejemplo: reparación con anclas; deporte de retorno: escalada. Base: carga tendinosa escalonada + retorno por criterios con autorización del cirujano.)*
 
 **Encuadre:** reparación tendón-hueso con **anclas** → la cicatriz de inserción manda; progresión **por fases y con autorización del cirujano** para liberar el retorno deportivo. Posición de máxima tensión del extensor: extensión terminal de codo + agarre fuerte + muñeca extendida con codo separado de la pared.
 

@@ -12,11 +12,11 @@ Trata la **piel y el tejido tegumentario**: post-operatorio de cirugía plástic
 ### 1.1 Fases de la curación (periodizar por aquí, NO por calendario rígido)
 | Fase | Tiempo | Qué pasa | Qué se hace |
 |---|---|---|---|
-| **Inflamatoria** | fin de cx → 48-72 h (puede cronificar) | hiperemia, calor, edema, dolor; sensibilidad táctil ↓ | Reposo · Compresión (faja) · Ejercicios de respiración · TENS · Crioterapia* |
+| **Inflamatoria** | fin de cx → 48-72 h (puede cronificar) | hiperemia, calor, edema, dolor; sensibilidad táctil ↓ | Reposo · Compresión (faja) · Ejercicios de respiración · TENS · Crioterapia |
 | **Proliferativa** | día 3-10 (hasta 2-4 sem) | fibroblastos (día 2-3 → desaparecen ~día 15), tejido de granulación, angiogénesis, colágeno III→I | **DLM** (inicia día 1, o 48-72 h suave) · US pulsado baja intensidad · Microcorrientes · Movilización de tejido conectivo · LED/magneto en dehiscencia |
 | **Remodelación** | día 11-40 (y sigue) | miofibroblastos (contracción), colágeno madura; resistencia máx tisular 10-12 sem (nunca la original) | DLM · US · Vacuoterapia/endermología · **RF** · Movilización TC · **Extensión/estiramientos** · a partir del día 40 → regreso a rutina + EEM/ejercicio |
 
-*Crioterapia en fase aguda: OJO, la sensibilidad post-op está alterada → riesgo de lesión por frío; verificar sensibilidad táctil antes.
+- **Precaución (crioterapia en fase aguda):** la sensibilidad post-op está alterada → **riesgo de lesión por frío**; verificar la sensibilidad táctil antes de aplicar frío.
 
 ### 1.2 Complicaciones post-qx (definiciones para la ficha)
 - **Edema**: siempre presente post-op, puede durar hasta 3 meses. Tratamiento: DLM + manipulación + compresión.

@@ -150,8 +150,16 @@ def _fold_mech(html):
         intro=m.group(2).strip()
         resto=m.group(3).strip()
         cuerpo=(('<p>'+intro+'</p>') if intro else '')+resto
-        return '<details class="bib-mech"><summary>🔬 '+titulo+'</summary>'+cuerpo+'</details>'
+        return ('<details class="bib-mech"><summary>🔬 <span class="mech-t">'+titulo
+                +'</span><span class="mech-hint">toca para ver</span></summary>'+cuerpo+'</details>')
     return pat.sub(rep, html)
+
+def _mark_urgente(html):
+    """Resalta marcadores EXPLÍCITOS de urgencia escritos por el autor (bajo falso-positivo)
+    para que, dentro de un bloque rojo, la EMERGENCIA salte por encima del 'derivar de rutina'.
+    Solo toca texto (los términos no aparecen en atributos de etiqueta)."""
+    pat=re.compile(r'(\(urgencia\)|urgencias?\s+HOY|→\s*urgencias?\b|=\s*urgencia\b|\bURGENTE\b)')
+    return pat.sub(r'<span class="bib-urge">\1</span>', html)
 
 def _sep_lists(md):
     """sane_lists exige línea en blanco antes de una lista; muchas fases la omiten
@@ -291,7 +299,7 @@ def _link_xrefs(html):
 
 def md2html(body):
     _MD.reset()
-    html=_fold_mech(_declutter(_danger_zone(enrich(_MD.convert(_sep_lists(body))))))
+    html=_fold_mech(_declutter(_mark_urgente(_danger_zone(enrich(_MD.convert(_sep_lists(body)))))))
     html=re.sub(r'<pre><code>(.*?)</code></pre>', _conv_pre, html, flags=re.S)
     html=_add_table_labels(html)
     html=_color_semaforo(html)
@@ -314,10 +322,21 @@ def rename_area(t):
     t=re.sub(r'\s{2,}',' ',t).strip()
     return t
 
+def _strip_head_noise(s):
+    """Quita ruido de fuente de un encabezado DERMA: numeración ('1.2 ') y capítulos ('(Cap 7)')."""
+    s=re.sub(r'^\s*\d+(?:\.\d+)*\.?\s+','',s)
+    s=re.sub(r'\s*\(Cap[^)]*\)','',s)
+    return re.sub(r'\s{2,}',' ',s).strip()
+
+def _limpiar_headings_derma(html):
+    """Aplica _strip_head_noise al TEXTO de los h3–h6 (conserva el id del ancla y el chrome)."""
+    return re.sub(r'(<h[3-6][^>]*>)(.*?)(</h[3-6]>)',
+                  lambda m: m.group(1)+_strip_head_noise(m.group(2))+m.group(3), html, flags=re.S)
+
 LIBS=[
  {'id':'ortopedia','titulo':'Ortopedia, traumatología y deporte','emoji':'🦴',
   'file':'biblioteca_rehab_ortopedia.md','skip':['parte 0 perfil']},
- {'id':'agentes','titulo':'Agentes físicos — indicaciones, contraindicaciones y equipos','emoji':'💠',
+ {'id':'agentes','titulo':'Agentes físicos y equipos','emoji':'💠',
   'file':'biblioteca_agentes_fisicos.md','skip':[]},
  {'id':'msk','titulo':'Protocolos MSK / HSR (periodización)','emoji':'🏋️',
   'file':'biblioteca_protocolos.md','skip':['parte 3']},
@@ -332,6 +351,9 @@ for L in LIBS:
     render=[]
     for titulo,body in areas:
         _html,_toc=md2html(body)
+        if L['id']=='derma':
+            _html=_limpiar_headings_derma(_html)
+            for t in _toc: t['name']=_strip_head_noise(t['name'])
         render.append({'titulo':rename_area(titulo),'toc':_toc,'html':_html})
     out['bibliotecas'].append({'id':L['id'],'titulo':L['titulo'],'emoji':L['emoji'],'areas':render})
     print(f"{L['id']:10} {len(render):2} áreas:")
