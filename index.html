@@ -1356,7 +1356,7 @@ body.modo-oscuro .topbar{background:#141824}
 <body>
 <div id="sync-indicator" class="sync-indicator ok" style="display:none"></div>
 <div id="app-version-chip" title="Versión de la app en este equipo — toca para buscar actualización" onclick="try{_tapVersionChip()}catch(e){}"></div>
-<script>/* VERSIÓN VISIBLE: refleja el index.html realmente cargado en ESTE equipo (se bumpea junto con sw.js). Así un iPad con versión vieja se ve de un vistazo. */window.APP_VERSION='v1-2026-11-04a';(function(){try{var c=document.getElementById('app-version-chip');if(c)c.textContent=window.APP_VERSION;}catch(e){}})();</script>
+<script>/* VERSIÓN VISIBLE: refleja el index.html realmente cargado en ESTE equipo (se bumpea junto con sw.js). Así un iPad con versión vieja se ve de un vistazo. */window.APP_VERSION='v1-2026-11-04b';(function(){try{var c=document.getElementById('app-version-chip');if(c)c.textContent=window.APP_VERSION;}catch(e){}})();</script>
 <div class="toast" id="toast" aria-live="polite" aria-atomic="true"></div>
 
 <!-- LOGIN -->
@@ -8524,12 +8524,14 @@ function _rendimientoHTML(datos, noId, ventana, etiqueta, aviso, refresco, tri){
   var filas=Object.keys(TERAPEUTA_CAL2COD).map(function(n){
     var st=datos.stats[n], c=(typeof AGENDA_COLORES!=='undefined'&&AGENDA_COLORES[n])?AGENDA_COLORES[n]:'#9BA3B5';
     var t=tri[n]||{citas:st.citas, conNota:null, sinNota:null};
+    var _idc=((t.conNota||0)+(t.sinNota||0)); var _cob=(t.conNota==null)?null:(_idc>0?Math.round(100*(t.conNota||0)/_idc):null);   // COBERTURA = % de citas identificadas con nota
     // VISTA-SEMANAL: terapeuta con pendientes 🔴 esa semana → fila en rojo suave (de un vistazo)
     return '<tr style="border-bottom:1px solid var(--gray-100)'+((ventana==='semana'&&t.sinNota>0)?';background:#FEF2F2':'')+'">'
       +'<td style="padding:6px 8px;font-weight:700;color:'+c+'">'+escapeHTML(n)+'</td>'
       +'<td style="padding:6px 8px;text-align:center">'+t.citas+'</td>'
       +'<td style="padding:6px 8px;text-align:center;font-weight:700;color:#2E7D52">'+(t.conNota==null?'—':('✅ '+t.conNota))+'</td>'
-      +'<td style="padding:6px 8px;text-align:center;font-weight:700;color:'+((t.sinNota>0)?'#B91C1C':'var(--gray-400)')+'">'+(t.sinNota==null?'—':(t.sinNota>0?('🔴 '+t.sinNota):'0'))+((t.enTiempo>0)?(' <span style="color:#0369A1;font-weight:700;white-space:nowrap" title="Citas de las últimas 24 h (o futuras) aún en tiempo de documentar — no cuentan como falta">⏳ '+t.enTiempo+'</span>'):'')+((t.noIdentificados>0)?(' <span style="color:#92400E;font-weight:700;white-space:nowrap">🔎 '+t.noIdentificados+'</span>'):'')+((t.tardias>0)?(' <span style="color:#B45309;font-weight:700;white-space:nowrap" title="Notas creadas más de 24 h después de la cita">⏱ '+t.tardias+'</span>'):'')+'</td>'
+      +'<td style="padding:6px 8px;text-align:center;font-weight:700;color:'+((t.sinNota>0)?'#B91C1C':'var(--gray-400)')+'">'+(t.sinNota==null?'—':(t.sinNota>0?('🔴 '+t.sinNota):'0'))+((t.enTiempo>0)?(' <span style="color:#0369A1;font-weight:700;white-space:nowrap" title="Citas de las últimas 24 h (o futuras) aún en tiempo de documentar — no cuentan como falta">⏳ '+t.enTiempo+'</span>'):'')+((t.noIdentificados>0)?(' <span style="color:#92400E;font-weight:700;white-space:nowrap">🔎 '+t.noIdentificados+'</span>'):'')+'</td>'
+      +'<td style="padding:6px 8px;text-align:center;font-weight:800;color:'+(_cob==null?'var(--gray-400)':(_cob>=90?'#2E7D52':(_cob>=70?'#B45309':'#B91C1C')))+'">'+(_cob==null?'—':(_cob+'%'))+'</td>'
       +'<td style="padding:6px 8px;text-align:center">'+(st.scoreN?Math.round(st.scoreSum/st.scoreN):'—')+((st.incompletas>0)?(' <span style="color:#C0392B;font-weight:800;white-space:nowrap" title="Notas de la ventana con secciones obligatorias (S/A/P) por completar">⚠'+st.incompletas+'</span>'):'')+'</td>'
       +'<td style="padding:6px 8px;text-align:center"><button data-ter="'+escapeAttr_(n)+'" onclick="generarPDFRendimiento(this.dataset.ter)" title="PDF de desempeño de '+escapeAttr_(n)+'" style="background:none;border:none;font-size:15px;cursor:pointer;padding:2px 4px">📄</button></td></tr>';
   }).join('');
@@ -8681,6 +8683,7 @@ function _rendimientoHTML(datos, noId, ventana, etiqueta, aviso, refresco, tri){
     +'<button onclick="mostrarPendientesSOAP()" style="font-size:11px;font-weight:700;border:none;border-radius:10px;padding:5px 10px;cursor:pointer;font-family:inherit;background:#FEF3C7;color:#92400E" title="Lista simple, cruzando terapeutas, con los nombres por identificar">📋 Sin documentar (lista)</button>'
     +'<button onclick="enviarReporteFaltantes(\''+ventana+'\')" style="font-size:11px;font-weight:700;border:none;border-radius:10px;padding:5px 10px;cursor:pointer;font-family:inherit;background:#E7F1FB;color:#1B3A6B" title="Envía por correo a lftaranda@gmail.com las notas que faltan de este período, por terapeuta">📧 Enviarme este reporte</button>'
     +'<button onclick="enviarReporteFaltantes(\'agosep\')" style="font-size:11px;font-weight:700;border:none;border-radius:10px;padding:5px 10px;cursor:pointer;font-family:inherit;background:#E7F1FB;color:#1B3A6B" title="Envía por correo el reporte combinado de Agosto + Septiembre 2026, por terapeuta">📧 Ago+Sep</button>'
+    +'<button onclick="generarPDFRendimientoTodos()" style="font-size:11px;font-weight:700;border:none;border-radius:10px;padding:5px 10px;cursor:pointer;font-family:inherit;background:#DCFCE7;color:#166534" title="Genera el PDF de cada terapeuta y los comparte JUNTOS en una sola hoja — elige WhatsApp y se te mandan todos de un jalón">📲 PDF de todos</button>'
     +((refresco&&refresco.desdeCache)?('<span style="font-size:10px;color:var(--gray-400)">cache · hace '+Math.max(1,Math.round((Date.now()-(refresco.ts||Date.now()))/1000))+' s</span>'):'')
     +'</div>'
     +'<div style="font-size:12px;color:var(--gray-500);margin-bottom:8px">'+escapeHTML(etiqueta)+' · Citas de Google Calendar vs notas SOAP (activos + históricos)</div>'
@@ -8688,7 +8691,7 @@ function _rendimientoHTML(datos, noId, ventana, etiqueta, aviso, refresco, tri){
     +bloqueSemana
     +'<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px">'
     +'<thead><tr style="border-bottom:2px solid var(--gray-200);color:var(--gray-600);font-size:11px;text-transform:uppercase">'
-    +'<th style="padding:6px 8px;text-align:left">Terapeuta</th><th style="padding:6px 8px">Citas</th><th style="padding:6px 8px">✅ Nota</th><th style="padding:6px 8px">🔴 Sin</th><th style="padding:6px 8px">Score</th><th style="padding:6px 8px">📄</th></tr></thead>'
+    +'<th style="padding:6px 8px;text-align:left">Terapeuta</th><th style="padding:6px 8px">Citas</th><th style="padding:6px 8px">✅ Nota</th><th style="padding:6px 8px">🔴 Sin</th><th style="padding:6px 8px">Cobertura</th><th style="padding:6px 8px">Calidad</th><th style="padding:6px 8px">📄</th></tr></thead>'
     +'<tbody>'+filas+'</tbody></table></div>'
     +filaSA+bloqueNI
     +_auditoriaHistoriasHTML()
@@ -8697,9 +8700,8 @@ function _rendimientoHTML(datos, noId, ventana, etiqueta, aviso, refresco, tri){
     +seccionNoAcudio
     +seccionRevisar
     +seccionAutoria
-    +seccionTardias
     +lineaPiso
-    +'<div style="font-size:10px;color:var(--gray-400);margin-top:10px">✅/🔴 por PACIENTE y día: nota fechada el día exacto de la cita, sin importar qué terapeuta la escribió (activos por expediente; históricos por ultimaSesionLive). ✅ incluye citas resueltas a mano con ✓. ⏳ = cita de las últimas 24 h (o futura) aún en tiempo de documentar — no es falta ni entra a cobertura. Solo se evalúan citas desde el '+_ddmmFromISO(APP_INICIO_OPERACION)+' (inicio de operación de la app). Score = calidad promedio de nota (0-100) de pacientes activos.</div>';
+    +'<div style="font-size:10px;color:var(--gray-400);margin-top:10px"><b>Cobertura</b> = % de citas identificadas con nota del día (si se están haciendo las notas). <b>Calidad</b> = qué tan completa está cada nota escrita, 0-100 (son cosas distintas: una terapeuta puede tener Calidad alta y Cobertura baja porque hace pocas notas pero muy completas). ✅/🔴 por PACIENTE y día: nota fechada el día exacto de la cita, sin importar qué terapeuta la escribió. ✅ incluye citas resueltas a mano con ✓. El 🔴 de activos se confirma contra las notas vivas en Firestore antes de contarse (menos falsas faltas). ⏳ = cita de las últimas 24 h (o futura) aún en tiempo — no es falta ni entra a cobertura. 🔎 = nombre sin expediente o con homónimo ambiguo (no conectado) — no cuenta como falta; vincúlalo. Solo se evalúan citas desde el '+_ddmmFromISO(APP_INICIO_OPERACION)+'.</div>';
 }
 // ── AUDITORÍA DE HISTORIAS CLÍNICAS (retroalimentación a fisioterapeutas) ─────────────────────
 // Recorre los pacientes ACTIVOS (patientsDB, con campos clínicos completos en memoria), agrupa por
@@ -8873,6 +8875,55 @@ function _diasEntreISO(desdeISO, hastaISO){
 }
 // Calcula la triangulación para un arreglo de días ISO, sin pintar UI (headless). Misma secuencia que
 // mostrarRendimientoEquipo, sin caché de pantalla.
+// [EXACTITUD · DASHBOARD] Baja el FALSO 🔴 de activos. El triangulador mide la cobertura de activos
+// contra p.soap (Sheet, en memoria del supervisor), que puede ir ATRASADO vs la nota viva en Firestore
+// (sesiones del PROPIO uuid) — misma clase que el banner de la agenda (PR #479, casos Elizabeth/Martha).
+// Antes de dar por buena una falta de activo, se confirma cada 🔴 contra FST_fetchSesiones(uuid).
+// ESTRICTAMENTE ADITIVO: solo puede mover 🔴→✅ (nota real del día exacto), NUNCA al revés; si la
+// lectura falla o no hay nota, el 🔴 se CONSERVA (nunca esconde una falta real). Mismo-uuid = cero
+// riesgo de homónimo (no se acredita por nombre). Reusa la caché TTL de sesiones del banner.
+async function _confirmarActivosTriFS(tri){
+  try{
+    if(!tri || typeof tri!=='object') return;
+    var pend=[];   // {ter, pid, citaCanon, fecha}
+    Object.keys(TERAPEUTA_CAL2COD).forEach(function(n){
+      var t=tri[n]; if(!t || !Array.isArray(t.sinNotaPacs)) return;
+      t.sinNotaPacs.forEach(function(x){
+        if(x && x.tipo==='activo' && x.pid){ var cc=_diaCanon(x.fecha); if(cc) pend.push({ter:n, pid:String(x.pid), citaCanon:cc, fecha:x.fecha}); }
+      });
+    });
+    if(!pend.length) return;
+    if(!(await FST_init()) || !window._fstDb) return;   // sin red → conservar TODO (no se toca nada)
+    var pids={}; pend.forEach(function(p){ pids[p.pid]=true; });
+    var diasPorPid={};
+    await Promise.all(Object.keys(pids).slice(0,250).map(async function(pid){
+      try{
+        var ses=null, tsC=(typeof _fstSesionesCacheTs!=='undefined'&&_fstSesionesCacheTs[pid])||0;
+        if(typeof _fstSesionesCache!=='undefined' && Array.isArray(_fstSesionesCache[pid]) && _fstSesionesCache[pid].length && (Date.now()-tsC)<_FST_SES_TTL_MS){ ses=_fstSesionesCache[pid]; }
+        else { ses=await FST_fetchSesiones(pid); if(Array.isArray(ses) && typeof _fstSesionesCache!=='undefined'){ _fstSesionesCache[pid]=ses; _fstSesionesCacheTs[pid]=Date.now(); } }
+        if(!Array.isArray(ses)){ diasPorPid[pid]=null; return; }   // null = no pude confirmar → conservar el 🔴
+        var dset={}; ses.forEach(function(s){ var c=s&&_diaCanon(s.fecha||s.fechaHoraISO); if(c) dset[c]=true; });
+        diasPorPid[pid]=dset;
+      }catch(_e){ diasPorPid[pid]=null; }
+    }));
+    var creditar={};   // ter → { 'pid|fecha':true }
+    pend.forEach(function(p){ var ds=diasPorPid[p.pid]; if(ds && ds[p.citaCanon]){ (creditar[p.ter]=creditar[p.ter]||{})[p.pid+'|'+p.fecha]=true; } });
+    var porDia=tri._porDia||{};
+    Object.keys(creditar).forEach(function(n){
+      var t=tri[n]; if(!t) return;
+      var quitar=creditar[n], mov=0;
+      t.sinNotaPacs=(t.sinNotaPacs||[]).filter(function(x){
+        if(x && x.tipo==='activo' && x.pid && quitar[String(x.pid)+'|'+x.fecha]){
+          mov++;
+          var dd=porDia[x.fecha]; if(dd){ if(dd.sinNota>0) dd.sinNota--; dd.conNota=(dd.conNota||0)+1; }
+          return false;
+        }
+        return true;
+      });
+      if(mov){ t.sinNota=Math.max(0,(t.sinNota||0)-mov); t.conNota=(t.conNota||0)+mov; }
+    });
+  }catch(_e){}
+}
 async function _calcularTriRango(dias){
   var res=await FST_fetchAgendaRangoChunked(dias).catch(function(){ return null; });
   if(res && res.ok && (!res.apiAgenda||res.apiAgenda<2) && dias.length>1){ dias=[_hoyISOlocal()]; }
@@ -8889,6 +8940,7 @@ async function _calcularTriRango(dias){
   var resueltas=await FST_leerCitasResueltas(false);
   var noAcudioMap=await FST_leerNoAcudio(false);
   var tri=_triangularCitasNotas(eventos, resueltos, ultimaHist, asigMap, resueltas, fechasHist, candFechas, noAcudioMap);
+  try{ await _confirmarActivosTriFS(tri); }catch(_eConf){}   // [EXACTITUD] baja el falso 🔴 de activos (aditivo) — también para el correo/PDF
   var datos=_computarRendimiento(eventos, dias, asigMap);   // stats (score) para el PDF
   return {tri:tri, datos:datos, dias:dias, parcial:!!(res&&res.parcial)};
 }
@@ -9141,6 +9193,10 @@ async function mostrarRendimientoEquipo(ventana, forzar){
       }
     }
   }catch(_eCojoD){}
+  // [EXACTITUD · ACTIVOS] Tras confirmar los históricos, confirmar los 🔴 de ACTIVOS contra sus
+  // sesiones vivas en Firestore (mismo-uuid, aditivo: solo 🔴→✅, nunca al revés). Baja el falso "sin
+  // documentar" cuando la nota existe en la nube pero el p.soap local (Sheet) va atrasado.
+  try{ await _confirmarActivosTriFS(tri); }catch(_eConfA){}
   _tm('triangulación históricos', tTri);
   var etiqueta=(dias.length>1)?(_ddmmFromISO(dias[0])+' — '+_ddmmFromISO(dias[dias.length-1])):'Hoy';
   if(ventana==='mesAnterior') etiqueta='Mes anterior · '+etiqueta;   // [MES-ANTERIOR] sin duda de qué mes se mira
@@ -9221,7 +9277,6 @@ function _pdfDesempenoDoc(n, t, st, periodo){
   campo('Notas realizadas', conNota);
   campo('Cobertura', cobertura==null ? 'Sin citas identificadas' : (cobertura+' %  ('+conNota+' de '+identificadas+')'));
   campo('Calidad promedio', score==null ? '—' : (score+' / 100'));
-  campo('Notas fuera de 24 h', tardias);
   campo('En tiempo (últimas 24 h)', enTiempo);
   campo('No acudió (excluidas)', noAcudio);
   campo('Atendidas por otro', atendidasOtro.length);
@@ -9235,12 +9290,6 @@ function _pdfDesempenoDoc(n, t, st, periodo){
     seccionTitulo('EN TIEMPO (ÚLTIMAS 24 H)');
     doc.setTextColor(120,120,120); parrafo('Citas de las últimas 24 h (o futuras) sin nota todavía: aún están en tiempo de documentarse. No cuentan como falta ni entran a la cobertura.'); doc.setTextColor(40,40,40);
     enT.forEach(function(x){ bullet((x.nombre||'(sin nombre)')+'  —  '+(x.fecha||'')); }); y+=1;
-  }
-  var tard=Array.isArray(t.tardiasPacs)?t.tardiasPacs:[];
-  if(tard.length){
-    seccionTitulo('NOTAS FUERA DE LAS 24 H');
-    doc.setTextColor(120,120,120); parrafo('Cuentan como nota hecha; solo informan la puntualidad respecto a la hora de la cita.'); doc.setTextColor(40,40,40);
-    tard.forEach(function(x){ bullet((x.nombre||'(sin nombre)')+'  —  '+(x.fecha||'')+'  (nota +'+x.horas+' h)'); }); y+=1;
   }
   if(atendidasOtro.length){
     seccionTitulo('ATENDIDAS POR OTRO TERAPEUTA (CONTEXTO)');
@@ -9321,7 +9370,6 @@ async function generarPDFRendimiento(terapeuta){
   campo('Notas realizadas', conNota);
   campo('Cobertura', cobertura==null ? 'Sin citas identificadas' : (cobertura+' %  ('+conNota+' de '+identificadas+')'));
   campo('Calidad promedio', score==null ? '—' : (score+' / 100'));
-  campo('Notas fuera de 24 h', tardias);
   campo('En tiempo (últimas 24 h)', enTiempo);
   campo('No acudió (excluidas)', noAcudio);
   campo('Atendidas por otro', atendidasOtro.length);
@@ -9339,14 +9387,6 @@ async function generarPDFRendimiento(terapeuta){
     seccionTitulo('EN TIEMPO (ÚLTIMAS 24 H)');
     doc.setTextColor(120,120,120); parrafo('Citas de las últimas 24 h (o futuras) sin nota todavía: aún están en tiempo de documentarse. No cuentan como falta ni entran a la cobertura.'); doc.setTextColor(40,40,40);
     enT.forEach(function(x){ bullet((x.nombre||'(sin nombre)')+'  —  '+(x.fecha||'')); }); y+=1;
-  }
-
-  // Oportunidad (solo si hay)
-  var tard=Array.isArray(t.tardiasPacs)?t.tardiasPacs:[];
-  if(tard.length){
-    seccionTitulo('NOTAS FUERA DE LAS 24 H');
-    doc.setTextColor(120,120,120); parrafo('Cuentan como nota hecha; solo informan la puntualidad respecto a la hora de la cita.'); doc.setTextColor(40,40,40);
-    tard.forEach(function(x){ bullet((x.nombre||'(sin nombre)')+'  —  '+(x.fecha||'')+'  (nota +'+x.horas+' h)'); }); y+=1;
   }
 
   // Autoría (contexto, no reproche; solo si hay)
@@ -9387,6 +9427,43 @@ async function generarPDFRendimiento(terapeuta){
   }catch(err){
     try{ doc.save(nombreArch); }catch(e2){ showToast('No se pudo generar el PDF: '+(err.message||''),'error'); }
   }
+}
+// [PDF TODOS → WHATSAPP] Genera el PDF de desempeño de TODOS los terapeutas con actividad en la
+// ventana y los comparte JUNTOS en una sola hoja nativa (iPad/Android: elegir WhatsApp los manda
+// todos de un jalón, sin descargar uno por uno). Reusa el constructor compartido _pdfDesempenoDoc
+// (mismo formato que el 📄 por fila y el correo). Lee el snapshot window._rendUltimo (mismos números
+// que la pantalla). Fallback si el equipo no soporta compartir varios: descarga cada uno.
+async function generarPDFRendimientoTodos(){
+  if(!esSupervisorUI()){ showToast('Solo supervisor','error'); return; }
+  var snap=window._rendUltimo;
+  if(!snap || !snap.tri || !snap.datos){ showToast('Abre el rendimiento primero','warning'); return; }
+  if(snap.activosNoConfiables){ showToast('⚠️ Pacientes activos no cargados — PDF deshabilitado. Toca 🔄 Actualizar y reintenta','error'); return; }
+  var periodo=snap.etiqueta||'';
+  var ahora=new Date();
+  var fArch=ahora.getFullYear()+'-'+String(ahora.getMonth()+1).padStart(2,'0')+'-'+String(ahora.getDate()).padStart(2,'0');
+  _repProgreso('📄 Armando el PDF de cada terapeuta…','info');
+  var files=[], docs=[];
+  Object.keys(TERAPEUTA_CAL2COD).forEach(function(n){
+    var t=snap.tri[n], st=(snap.datos.stats||{})[n];
+    if(!t || !st) return;
+    var ident=(t.conNota||0)+(t.sinNota||0);
+    if(ident<=0 && (t.citas||0)<=0) return;   // sin actividad en la ventana → sin PDF
+    var doc=null; try{ doc=_pdfDesempenoDoc(n, t, st, periodo); }catch(e){}
+    if(!doc) return;
+    try{ var blob=doc.output('blob'); files.push(new File([blob], 'desempeno_'+String(n).replace(/[^\w]+/g,'_')+'_'+fArch+'.pdf', {type:'application/pdf'})); docs.push({doc:doc, n:n}); }catch(e){}
+  });
+  if(!files.length){ _repProgreso('No hay actividad en el período — no hay PDF que generar.','info'); _repProgresoCerrar(3600); return; }
+  if(navigator.canShare && navigator.canShare({files:files})){
+    try{
+      _repProgresoCerrar(0);
+      await navigator.share({files:files, title:'Desempeño del equipo — Clínica Sinergia', text:'Reportes de desempeño de documentación ('+periodo+') — '+files.length+' terapeutas'});
+      return;   // el usuario elige WhatsApp (u otro) y se mandan todos juntos
+    }catch(e){ if(e && e.name==='AbortError'){ _repProgresoCerrar(0); return; } }   // canceló la hoja: no re-descargar
+  }
+  // Fallback: el equipo no permite compartir varios a la vez → descargar cada uno (escalonado).
+  _repProgreso('Tu equipo no permite compartir varios juntos — descargando los '+docs.length+' PDF…','info');
+  docs.forEach(function(d,i){ setTimeout(function(){ try{ d.doc.save('desempeno_'+String(d.n).replace(/[^\w]+/g,'_')+'_'+fArch+'.pdf'); }catch(e){} }, i*500); });
+  _repProgresoCerrar(1200+docs.length*500);
 }
 // ══════════════════════════════════════════════════════════════════════════════
 // PANEL DE DETECCIÓN Y RESCATE DE DATOS — accesible a CUALQUIER usuario en SU iPad.
