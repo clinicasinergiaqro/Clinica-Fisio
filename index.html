@@ -8683,6 +8683,7 @@ function _rendimientoHTML(datos, noId, ventana, etiqueta, aviso, refresco, tri){
     +'<button onclick="mostrarPendientesSOAP()" style="font-size:11px;font-weight:700;border:none;border-radius:10px;padding:5px 10px;cursor:pointer;font-family:inherit;background:#FEF3C7;color:#92400E" title="Lista simple, cruzando terapeutas, con los nombres por identificar">📋 Sin documentar (lista)</button>'
     +'<button onclick="enviarReporteFaltantes(\''+ventana+'\')" style="font-size:11px;font-weight:700;border:none;border-radius:10px;padding:5px 10px;cursor:pointer;font-family:inherit;background:#E7F1FB;color:#1B3A6B" title="Envía por correo a lftaranda@gmail.com las notas que faltan de este período, por terapeuta">📧 Enviarme este reporte</button>'
     +'<button onclick="enviarReporteFaltantes(\'agosep\')" style="font-size:11px;font-weight:700;border:none;border-radius:10px;padding:5px 10px;cursor:pointer;font-family:inherit;background:#E7F1FB;color:#1B3A6B" title="Envía por correo el reporte combinado de Agosto + Septiembre 2026, por terapeuta">📧 Ago+Sep</button>'
+    +'<button onclick="generarPDFRendimientoTodos()" style="font-size:11px;font-weight:700;border:none;border-radius:10px;padding:5px 10px;cursor:pointer;font-family:inherit;background:#DCFCE7;color:#166534" title="Genera el PDF de cada terapeuta y los comparte JUNTOS en una sola hoja — elige WhatsApp y se te mandan todos de un jalón">📲 PDF de todos</button>'
     +((refresco&&refresco.desdeCache)?('<span style="font-size:10px;color:var(--gray-400)">cache · hace '+Math.max(1,Math.round((Date.now()-(refresco.ts||Date.now()))/1000))+' s</span>'):'')
     +'</div>'
     +'<div style="font-size:12px;color:var(--gray-500);margin-bottom:8px">'+escapeHTML(etiqueta)+' · Citas de Google Calendar vs notas SOAP (activos + históricos)</div>'
@@ -9276,7 +9277,6 @@ function _pdfDesempenoDoc(n, t, st, periodo){
   campo('Notas realizadas', conNota);
   campo('Cobertura', cobertura==null ? 'Sin citas identificadas' : (cobertura+' %  ('+conNota+' de '+identificadas+')'));
   campo('Calidad promedio', score==null ? '—' : (score+' / 100'));
-  campo('Notas fuera de 24 h', tardias);
   campo('En tiempo (últimas 24 h)', enTiempo);
   campo('No acudió (excluidas)', noAcudio);
   campo('Atendidas por otro', atendidasOtro.length);
@@ -9290,12 +9290,6 @@ function _pdfDesempenoDoc(n, t, st, periodo){
     seccionTitulo('EN TIEMPO (ÚLTIMAS 24 H)');
     doc.setTextColor(120,120,120); parrafo('Citas de las últimas 24 h (o futuras) sin nota todavía: aún están en tiempo de documentarse. No cuentan como falta ni entran a la cobertura.'); doc.setTextColor(40,40,40);
     enT.forEach(function(x){ bullet((x.nombre||'(sin nombre)')+'  —  '+(x.fecha||'')); }); y+=1;
-  }
-  var tard=Array.isArray(t.tardiasPacs)?t.tardiasPacs:[];
-  if(tard.length){
-    seccionTitulo('NOTAS FUERA DE LAS 24 H');
-    doc.setTextColor(120,120,120); parrafo('Cuentan como nota hecha; solo informan la puntualidad respecto a la hora de la cita.'); doc.setTextColor(40,40,40);
-    tard.forEach(function(x){ bullet((x.nombre||'(sin nombre)')+'  —  '+(x.fecha||'')+'  (nota +'+x.horas+' h)'); }); y+=1;
   }
   if(atendidasOtro.length){
     seccionTitulo('ATENDIDAS POR OTRO TERAPEUTA (CONTEXTO)');
@@ -9376,7 +9370,6 @@ async function generarPDFRendimiento(terapeuta){
   campo('Notas realizadas', conNota);
   campo('Cobertura', cobertura==null ? 'Sin citas identificadas' : (cobertura+' %  ('+conNota+' de '+identificadas+')'));
   campo('Calidad promedio', score==null ? '—' : (score+' / 100'));
-  campo('Notas fuera de 24 h', tardias);
   campo('En tiempo (últimas 24 h)', enTiempo);
   campo('No acudió (excluidas)', noAcudio);
   campo('Atendidas por otro', atendidasOtro.length);
@@ -9394,14 +9387,6 @@ async function generarPDFRendimiento(terapeuta){
     seccionTitulo('EN TIEMPO (ÚLTIMAS 24 H)');
     doc.setTextColor(120,120,120); parrafo('Citas de las últimas 24 h (o futuras) sin nota todavía: aún están en tiempo de documentarse. No cuentan como falta ni entran a la cobertura.'); doc.setTextColor(40,40,40);
     enT.forEach(function(x){ bullet((x.nombre||'(sin nombre)')+'  —  '+(x.fecha||'')); }); y+=1;
-  }
-
-  // Oportunidad (solo si hay)
-  var tard=Array.isArray(t.tardiasPacs)?t.tardiasPacs:[];
-  if(tard.length){
-    seccionTitulo('NOTAS FUERA DE LAS 24 H');
-    doc.setTextColor(120,120,120); parrafo('Cuentan como nota hecha; solo informan la puntualidad respecto a la hora de la cita.'); doc.setTextColor(40,40,40);
-    tard.forEach(function(x){ bullet((x.nombre||'(sin nombre)')+'  —  '+(x.fecha||'')+'  (nota +'+x.horas+' h)'); }); y+=1;
   }
 
   // Autoría (contexto, no reproche; solo si hay)
@@ -9442,6 +9427,43 @@ async function generarPDFRendimiento(terapeuta){
   }catch(err){
     try{ doc.save(nombreArch); }catch(e2){ showToast('No se pudo generar el PDF: '+(err.message||''),'error'); }
   }
+}
+// [PDF TODOS → WHATSAPP] Genera el PDF de desempeño de TODOS los terapeutas con actividad en la
+// ventana y los comparte JUNTOS en una sola hoja nativa (iPad/Android: elegir WhatsApp los manda
+// todos de un jalón, sin descargar uno por uno). Reusa el constructor compartido _pdfDesempenoDoc
+// (mismo formato que el 📄 por fila y el correo). Lee el snapshot window._rendUltimo (mismos números
+// que la pantalla). Fallback si el equipo no soporta compartir varios: descarga cada uno.
+async function generarPDFRendimientoTodos(){
+  if(!esSupervisorUI()){ showToast('Solo supervisor','error'); return; }
+  var snap=window._rendUltimo;
+  if(!snap || !snap.tri || !snap.datos){ showToast('Abre el rendimiento primero','warning'); return; }
+  if(snap.activosNoConfiables){ showToast('⚠️ Pacientes activos no cargados — PDF deshabilitado. Toca 🔄 Actualizar y reintenta','error'); return; }
+  var periodo=snap.etiqueta||'';
+  var ahora=new Date();
+  var fArch=ahora.getFullYear()+'-'+String(ahora.getMonth()+1).padStart(2,'0')+'-'+String(ahora.getDate()).padStart(2,'0');
+  _repProgreso('📄 Armando el PDF de cada terapeuta…','info');
+  var files=[], docs=[];
+  Object.keys(TERAPEUTA_CAL2COD).forEach(function(n){
+    var t=snap.tri[n], st=(snap.datos.stats||{})[n];
+    if(!t || !st) return;
+    var ident=(t.conNota||0)+(t.sinNota||0);
+    if(ident<=0 && (t.citas||0)<=0) return;   // sin actividad en la ventana → sin PDF
+    var doc=null; try{ doc=_pdfDesempenoDoc(n, t, st, periodo); }catch(e){}
+    if(!doc) return;
+    try{ var blob=doc.output('blob'); files.push(new File([blob], 'desempeno_'+String(n).replace(/[^\w]+/g,'_')+'_'+fArch+'.pdf', {type:'application/pdf'})); docs.push({doc:doc, n:n}); }catch(e){}
+  });
+  if(!files.length){ _repProgreso('No hay actividad en el período — no hay PDF que generar.','info'); _repProgresoCerrar(3600); return; }
+  if(navigator.canShare && navigator.canShare({files:files})){
+    try{
+      _repProgresoCerrar(0);
+      await navigator.share({files:files, title:'Desempeño del equipo — Clínica Sinergia', text:'Reportes de desempeño de documentación ('+periodo+') — '+files.length+' terapeutas'});
+      return;   // el usuario elige WhatsApp (u otro) y se mandan todos juntos
+    }catch(e){ if(e && e.name==='AbortError'){ _repProgresoCerrar(0); return; } }   // canceló la hoja: no re-descargar
+  }
+  // Fallback: el equipo no permite compartir varios a la vez → descargar cada uno (escalonado).
+  _repProgreso('Tu equipo no permite compartir varios juntos — descargando los '+docs.length+' PDF…','info');
+  docs.forEach(function(d,i){ setTimeout(function(){ try{ d.doc.save('desempeno_'+String(d.n).replace(/[^\w]+/g,'_')+'_'+fArch+'.pdf'); }catch(e){} }, i*500); });
+  _repProgresoCerrar(1200+docs.length*500);
 }
 // ══════════════════════════════════════════════════════════════════════════════
 // PANEL DE DETECCIÓN Y RESCATE DE DATOS — accesible a CUALQUIER usuario en SU iPad.
