@@ -1356,7 +1356,7 @@ body.modo-oscuro .topbar{background:#141824}
 <body>
 <div id="sync-indicator" class="sync-indicator ok" style="display:none"></div>
 <div id="app-version-chip" title="Versión de la app en este equipo — toca para buscar actualización" onclick="try{_tapVersionChip()}catch(e){}"></div>
-<script>/* VERSIÓN VISIBLE: refleja el index.html realmente cargado en ESTE equipo (se bumpea junto con sw.js). Así un iPad con versión vieja se ve de un vistazo. */window.APP_VERSION='v1-2026-11-03d';(function(){try{var c=document.getElementById('app-version-chip');if(c)c.textContent=window.APP_VERSION;}catch(e){}})();</script>
+<script>/* VERSIÓN VISIBLE: refleja el index.html realmente cargado en ESTE equipo (se bumpea junto con sw.js). Así un iPad con versión vieja se ve de un vistazo. */window.APP_VERSION='v1-2026-11-04a';(function(){try{var c=document.getElementById('app-version-chip');if(c)c.textContent=window.APP_VERSION;}catch(e){}})();</script>
 <div class="toast" id="toast" aria-live="polite" aria-atomic="true"></div>
 
 <!-- LOGIN -->
@@ -19834,7 +19834,11 @@ function renderNuevoPaciente(){
        + reglas pacienteClinicoUpdateOK + espejo FS) → CERO cambio de backend. Si el toggle queda
        apagado no se escribe nada: los pacientes MSK quedan idénticos. Activo=migrado (viaja dentro
        de valoracion por saveDB en ambas rutas). Android+iOS (DOM puro). -->
-  <div class="form-section">
+  <!-- OCULTA por defecto: la dermato se dio de alta por su botón independiente (🧴 Nuevo paciente
+       dermatofuncional → _nuevoModoDerma). En el alta MSK normal NO aparece. Se revela solo cuando
+       _dermaToggleAlta(true) la activa: en modo derma (showNuevoPacienteDerma) o al EDITAR un paciente
+       que YA es dermato (_dermaPrefill). Así el alta de nuevo paciente MSK queda limpia. -->
+  <div class="form-section" id="n-derma-card" style="display:none">
     <div style="border:2px solid #8E3B6E;border-radius:14px;overflow:hidden;background:#FDF6FA">
       <div style="background:#8E3B6E;color:#fff;padding:12px 14px;display:flex;align-items:center;gap:9px;cursor:pointer" onclick="_dermaToggleAlta()">
         <span style="font-size:22px;line-height:1">🧴</span>
@@ -20314,6 +20318,8 @@ function _dermaToggleAlta(forzarOn){
     if(!es||!f) return;
     var on=(forzarOn===true)?true:(es.value!=='1');
     es.value=on?'1':''; f.style.display=on?'block':'none';
+    // La tarjeta 🧴 nace oculta en el alta MSK; al ACTIVARse (modo derma o edición de paciente derma) se revela.
+    if(on){ var _dc=document.getElementById('n-derma-card'); if(_dc) _dc.style.display=''; }
     if(p){ p.textContent=on?'✓ ACTIVO':'OFF'; p.style.background=on?'#fff':'rgba(255,255,255,.18)'; p.style.color=on?'#8E3B6E':'#fff'; }
     try{ marcarDirty(); }catch(_){}
   }catch(_e){}
