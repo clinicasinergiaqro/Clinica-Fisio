@@ -1356,7 +1356,7 @@ body.modo-oscuro .topbar{background:#141824}
 <body>
 <div id="sync-indicator" class="sync-indicator ok" style="display:none"></div>
 <div id="app-version-chip" title="Versión de la app en este equipo — toca para buscar actualización" onclick="try{_tapVersionChip()}catch(e){}"></div>
-<script>/* VERSIÓN VISIBLE: refleja el index.html realmente cargado en ESTE equipo (se bumpea junto con sw.js). Así un iPad con versión vieja se ve de un vistazo. */window.APP_VERSION='v1-2026-11-04b';(function(){try{var c=document.getElementById('app-version-chip');if(c)c.textContent=window.APP_VERSION;}catch(e){}})();</script>
+<script>/* VERSIÓN VISIBLE: refleja el index.html realmente cargado en ESTE equipo (se bumpea junto con sw.js). Así un iPad con versión vieja se ve de un vistazo. */window.APP_VERSION='v1-2026-11-04c';(function(){try{var c=document.getElementById('app-version-chip');if(c)c.textContent=window.APP_VERSION;}catch(e){}})();</script>
 <div class="toast" id="toast" aria-live="polite" aria-atomic="true"></div>
 
 <!-- LOGIN -->
@@ -2254,18 +2254,32 @@ function saveLocal(k,v){
       // guardó, false/undefined si no → se guarda la promesa para saber si el respaldo durable sí entró.
       try{ if(typeof idbSet==='function') _idbBackupP = idbSet('__pts_backup__', toSave); }catch(_){ _idbBackupP = null; }
     }
-    localStorage.setItem('sinergia_'+k, JSON.stringify(toSave));
+    // Si ya se comprobó que la base NO cabe en el cupo chico de localStorage de este equipo (iOS ~5MB),
+    // NO reintentar el setItem de 'pts': fallaría igual y, peor, un blob viejo de 'sinergia_pts' tapa el
+    // cupo y deja sin lugar a las colas chicas (COLA_SOAP_ACT/COLA_SYNC). El espejo durable ya quedó en
+    // IndexedDB (arriba). Las claves chicas (colas/flags) SÍ se siguen escribiendo normal.
+    if(!(k==='pts' && window._ptsLocalNoCabe)){
+      localStorage.setItem('sinergia_'+k, JSON.stringify(toSave));
+    }
   }catch(e){
     var esCuota = !!(e && (e.name==='QuotaExceededError' || e.code===22 || e.code===1014
       || /quota/i.test((e.name||'')+' '+(e.message||''))));
     if(esCuota){
       console.warn('saveLocal QUOTA (localStorage lleno):', e && e.message);
-      // FALSO "memoria llena": la base COMPLETA de pacientes ya no cabe en el cupo CHICO de localStorage
-      // de iOS (~5MB) aunque el teléfono tenga 100+GB libres → este setItem truena en CADA sesión. Eso
-      // por sí solo NO pierde datos: el espejo durable en IndexedDB (cupo grande) sí se escribió arriba.
-      // Alarmar ahí es gritar lobo (asusta de más y hace que ignoren el aviso REAL). Por eso el aviso rojo
-      // SOLO sale si el respaldo durable TAMBIÉN falló. Integridad respetada: NUNCA se calla una pérdida
-      // real; solo se deja de gritar en falso cuando el dato quedó a salvo en IndexedDB.
+      // CAUSA del caso Jess ("no puede hacer nada", 2 toasts rojos): la base COMPLETA (395+ pacientes,
+      // >5MB) NO cabe en el cupo CHICO de localStorage de iOS (~5MB; es cupo del NAVEGADOR/PWA, NO del
+      // disco del teléfono, que puede tener 100+GB libres → por eso "sí tiene espacio" y aun así falla).
+      // Peor: un 'sinergia_pts' viejo (de cuando la base sí cabía) queda OCUPANDO ese cupo → ya no hay
+      // lugar ni para las COLAS CHICAS (COLA_SOAP_ACT/COLA_SYNC) → una nota/alta que no llegó a la nube
+      // NO se puede ni encolar y se pierde EN SILENCIO (el encolar se traga el error, p.ej. L3273). LA
+      // BASE NO SE PIERDE: su espejo durable vive en IndexedDB (__pts_backup__, cupo grande) y
+      // loadFromCloud lo recupera. Por eso, cuando 'pts' no cabe, LIBERAMOS ese blob de localStorage (y
+      // no lo volvemos a escribir en la sesión) para dejar lugar a las colas → la nota SÍ se encola de
+      // verdad. Seguro: ese 'sinergia_pts' viejo es una copia DESACTUALIZADA (no trae la nota nueva, que
+      // vive en su propia cola), así que quitarlo no pierde nada nuevo.
+      if(k==='pts'){ window._ptsLocalNoCabe=true; try{ localStorage.removeItem('sinergia_pts'); }catch(_){} }
+      // El aviso rojo SOLO sale si el respaldo durable TAMBIÉN falló. Integridad respetada: NUNCA se calla
+      // una pérdida real; solo se deja de gritar en falso cuando el dato quedó a salvo en IndexedDB.
       if(k==='pts' && _idbBackupP && typeof _idbBackupP.then==='function'){
         _idbBackupP.then(function(ok){ if(!ok) _avisarRespaldoLocalCritico_(); })   // idbSet resolvió false/undefined → NO guardó
                    .catch(function(){ _avisarRespaldoLocalCritico_(); });           // initIDB rechazó → sin respaldo durable
