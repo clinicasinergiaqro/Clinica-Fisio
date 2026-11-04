@@ -1356,7 +1356,7 @@ body.modo-oscuro .topbar{background:#141824}
 <body>
 <div id="sync-indicator" class="sync-indicator ok" style="display:none"></div>
 <div id="app-version-chip" title="Versión de la app en este equipo — toca para buscar actualización" onclick="try{_tapVersionChip()}catch(e){}"></div>
-<script>/* VERSIÓN VISIBLE: refleja el index.html realmente cargado en ESTE equipo (se bumpea junto con sw.js). Así un iPad con versión vieja se ve de un vistazo. */window.APP_VERSION='v1-2026-11-04c';(function(){try{var c=document.getElementById('app-version-chip');if(c)c.textContent=window.APP_VERSION;}catch(e){}})();</script>
+<script>/* VERSIÓN VISIBLE: refleja el index.html realmente cargado en ESTE equipo (se bumpea junto con sw.js). Así un iPad con versión vieja se ve de un vistazo. */window.APP_VERSION='v1-2026-11-04d';(function(){try{var c=document.getElementById('app-version-chip');if(c)c.textContent=window.APP_VERSION;}catch(e){}})();</script>
 <div class="toast" id="toast" aria-live="polite" aria-atomic="true"></div>
 
 <!-- LOGIN -->
@@ -7203,6 +7203,7 @@ async function _computarBannerPendientes(){
   var resueltos={};  try{ resueltos=await _resolverPacientesCalendario(eventos); }catch(_){ resueltos={}; }
   var ultimaHist={}; try{ ultimaHist=await _fetchUltimaSesionHistoricos(resueltos, false); }catch(_){ ultimaHist={}; }
   var fechasHist=(window._triUltimaHistCache&&window._triUltimaHistCache.mapFechas)||{};
+  var inasistHist=(window._triUltimaHistCache&&window._triUltimaHistCache.mapInasist)||{};   // [NO-ACUDIÓ MIGRADO] inasistencias por histórico (pid-based), para saldar su cita
   var resueltas={};  try{ resueltas=await FST_leerCitasResueltas(false); }catch(_){}
   var noAcudioMap={};try{ noAcudioMap=await FST_leerNoAcudio(false); }catch(_){}
   var ahora=Date.now(), items=[], vistos={};
@@ -7236,6 +7237,12 @@ async function _computarBannerPendientes(){
     // por Sheets de forma confiable aunque el marcador citasNoAcudio de Firestore se haya quedado atorado.
     // Solo activos (r.p cargado); en históricos el marcador Firestore + su cache es la vía.
     if(r.tipo==='activo' && r.p && Array.isArray(r.p.inasistencias) && r.p.inasistencias.some(function(x){ return x && (_diaCanon(x.fecha)===citaCanon || _diaCanon(x.fechaISO)===citaCanon); })) return;
+    // [NO-ACUDIÓ MIGRADO · activo=migrado] Paridad con el fallback de activos de arriba: un histórico
+    // (mig_pac_) también salda su cita con la inasistencia registrada en SU expediente (p.inasistencias),
+    // leída por pid en _fetchUltimaSesionHistoricos → inmune al nombre corto del calendario (que NO casa
+    // con el marcador citasNoAcudio escrito con el nombre completo; esa fue la causa del caso José Safa).
+    // Falla de lectura del histórico → sin entrada → conserva el pendiente (nunca esconde una falta real).
+    if(r.tipo==='historico' && Array.isArray(inasistHist[clave]) && inasistHist[clave].indexOf(citaCanon)!==-1) return;
     var kv=clave+'|'+ddmm;
     if(vistos[kv]) return;
     vistos[kv]=true;
@@ -7757,6 +7764,7 @@ async function _fetchUltimaSesionHistoricos(resueltos, forzar){
   var cache=window._triUltimaHistCache||{ts:0,map:{},mapFechas:{}};
   if(!cache.mapFechas) cache.mapFechas={};   // CAPA 3 — set de fechas por histórico (se lee del MISMO doc.get)
   if(!cache.mapFechasCand) cache.mapFechasCand={};   // BUG A — fechas por-candidato de homónimos: {clave:{pid:{fechas,ultima}}}
+  if(!cache.mapInasist) cache.mapInasist={};   // [NO-ACUDIÓ MIGRADO] inasistencias (p.inasistencias) por histórico, extraídas del MISMO doc.get que mapFechas → el banner salda la cita de un migrado con su propia inasistencia (por pid, inmune al nombre corto del calendario, igual que ya hace con activos)
   var fresco=(Date.now()-cache.ts)<REND_CACHE_TTL_MS;
   var pendientes=[], principalPid={};
   Object.keys(resueltos||{}).forEach(function(k){
@@ -7819,7 +7827,13 @@ async function _fetchUltimaSesionHistoricos(resueltos, forzar){
             cache.mapFechasCand[x.clave][x.pid]={fechas:_fs, ultima:_ult};
             // PRINCIPAL: SOLO candidatos[0] siembra map/mapFechas (compat con consumidores actuales).
             // Los homónimos extra NO pisan mapFechas → NO se vuelve unión (Opción A, nunca B).
-            if(x.pid===principalPid[x.clave]){ cache.map[x.clave]=_ult; cache.mapFechas[x.clave]=_fs; }
+            if(x.pid===principalPid[x.clave]){
+              cache.map[x.clave]=_ult; cache.mapFechas[x.clave]=_fs;
+              // [NO-ACUDIÓ MIGRADO] del MISMO doc padre: fechas de inasistencia canónicas (fecha DD/MM/AAAA y fechaISO AAAA-MM-DD) → fallback por pid para saldar la cita de un migrado.
+              var _inaArr=Array.isArray(_d.inasistencias)?_d.inasistencias:[], _inaCanon=[];
+              _inaArr.forEach(function(ia){ if(!ia) return; var c1=_diaCanon(ia.fechaISO), c2=_diaCanon(ia.fecha); if(c1) _inaCanon.push(c1); if(c2&&c2!==c1) _inaCanon.push(c2); });
+              cache.mapInasist[x.clave]=_inaCanon;
+            }
           });
           _porHacer = _fallaron;
         }
@@ -21361,6 +21375,9 @@ function _confirmarNoAcudio(pid){
   var o=document.getElementById('noacudio-overlay'); if(o) o.remove();
   // (1) persistir en el expediente (silencia el chip "SOAP semanal" del perfil)
   const _esHist=String(p.id||'').startsWith('mig_pac_');
+  // [NO-ACUDIÓ MIGRADO] invalida la caché de históricos para que el banner "sin documentar" relea las
+  // inasistencias de ESTE migrado (por pid) y salde la cita de inmediato, sin esperar al TTL.
+  try{ if(_esHist && window._triUltimaHistCache) window._triUltimaHistCache.ts=0; }catch(_){}
   (_esHist ? _persistirAdicionHistorico(p,{inasistencias:_inNueva})
            : saveDB('pts',[p],{camposHist:['inasistencias']})
   ).then(res=>{ if(res&&res.pendiente) return; showToast(res?.ok?('🚫 Inasistencia registrada — '+ddmm):'⚠️ Local, pendiente de subir',res?.ok?'success':'warning'); })
