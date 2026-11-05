@@ -1360,7 +1360,7 @@ body.modo-oscuro .topbar{background:#141824}
 <body>
 <div id="sync-indicator" class="sync-indicator ok" style="display:none"></div>
 <div id="app-version-chip" title="Versión de la app en este equipo — toca para buscar actualización" onclick="try{_tapVersionChip()}catch(e){}"></div>
-<script>/* VERSIÓN VISIBLE: refleja el index.html realmente cargado en ESTE equipo (se bumpea junto con sw.js). Así un iPad con versión vieja se ve de un vistazo. */window.APP_VERSION='v1-2026-11-05c';(function(){try{var c=document.getElementById('app-version-chip');if(c)c.textContent=window.APP_VERSION;}catch(e){}})();</script>
+<script>/* VERSIÓN VISIBLE: refleja el index.html realmente cargado en ESTE equipo (se bumpea junto con sw.js). Así un iPad con versión vieja se ve de un vistazo. */window.APP_VERSION='v1-2026-11-05d';(function(){try{var c=document.getElementById('app-version-chip');if(c)c.textContent=window.APP_VERSION;}catch(e){}})();</script>
 <div class="toast" id="toast" aria-live="polite" aria-atomic="true"></div>
 
 <!-- LOGIN -->
@@ -3580,9 +3580,13 @@ async function drenarColaHistDoc(){
 // nube quedó MÁS NUEVO (conflicto); esos NUNCA se reintentan (reintentar pisaría datos más nuevos) y
 // ANTES nadie los limpiaba → el aviso "N cambio(s) sin sincronizar" se quedaba clavado días (caso Camila;
 // viene del espejo SILENCIOSO de Fase 1). Aquí, en 2º plano, se re-verifica cada fallido contra la nube y
-// SOLO se descarta cuando el doc en la nube YA TIENE valores IDÉNTICOS a lo que ese diff escribiría
-// (cero pérdida: NUNCA re-escribe, NUNCA descarta un cambio que de verdad falte; un conflicto REAL con
-// valores distintos, o media, se CONSERVA para revisión). Activo=histórico (lee .doc(pid) de ambos).
+// SOLO se descarta cuando el doc en la nube YA TIENE el CONTENIDO CLÍNICO de ese diff. Se IGNORAN los
+// campos de bookkeeping (fechaActualizacion/ultimoUsuario/sellos): una escritura más nueva los cambia
+// legítimamente sin que falte nada clínico, y exigir que coincidieran dejaba el aviso clavado PARA SIEMPRE
+// (caso Zara/María Luisa: expediente y notas idénticos en Sheet+FS, solo difería la fecha-sello). La
+// bitácora (historialCambios) se acepta si la nube es SUPERSET (no se pierde ninguna línea). Cualquier
+// campo CLÍNICO real que difiera → conflicto genuino → se CONSERVA para revisión. (cero pérdida: NUNCA
+// re-escribe, NUNCA descarta un cambio clínico que de verdad falte; media se CONSERVA). Activo=histórico.
 let _SANANDO_FALL_HIST_DOC = false;
 async function _autoSanarFallidosHistDoc(){
   if(_SANANDO_FALL_HIST_DOC || !navigator.onLine) return;
@@ -3609,13 +3613,28 @@ async function _autoSanarFallidosHistDoc(){
         var d=(snap && snap.exists && snap.data()) || null;
         if(!d){ quedan.push(it); continue; }   // la nube NO tiene el doc → posible pendiente real → conservar
         var campos=it.campos||{}, claves=Object.keys(campos), ok=claves.length>0;
+        // Campos de BOOKKEEPING: una escritura más nueva (de ESTE u otro equipo, por un save posterior)
+        // los cambia legítimamente. Que difieran NO significa que falte contenido clínico → NO deben
+        // bloquear la limpieza. Comparar solo el contenido CLÍNICO protege contra pérdida real sin dejar
+        // el aviso clavado por un simple sello de fecha/usuario.
+        var _BOOK={fechaActualizacion:1, ultimoUsuario:1, updatedAt:1, fechaUltimaModificacion:1, ultimaModificacion:1, fecha:1, ultimaEdicion:1};
         for(var c=0;c<claves.length;c++){
           var k=claves[c];
           if(k==='fotos'||k==='docs'||k==='estudiosDocs'){ ok=false; break; }   // media (base64→null en cola) no comparable fiable → conservar
-          if(!_eq(d[k], campos[k])){ ok=false; break; }
+          if(_BOOK[k]) continue;   // sello de bookkeeping → ignorar en la decisión (no es dato clínico)
+          if(k==='historialCambios'){
+            // OK solo si la nube CONTIENE cada entrada del diff (es superset/misma bitácora) → no se pierde
+            // ninguna línea. Una escritura más nueva solo APPENDea al historial, nunca lo trunca.
+            var _dc=Array.isArray(d[k])?d[k]:[], _fc=Array.isArray(campos[k])?campos[k]:[];
+            var _set={}; for(var _z=0;_z<_dc.length;_z++){ _set[_stable(_dc[_z])]=1; }
+            var _todas=true; for(var _z2=0;_z2<_fc.length;_z2++){ if(!_set[_stable(_fc[_z2])]){ _todas=false; break; } }
+            if(!_todas){ ok=false; break; }   // la nube NO tiene alguna entrada del diff → conservar
+            continue;
+          }
+          if(!_eq(d[k], campos[k])){ ok=false; break; }   // campo CLÍNICO real difiere → conflicto → conservar
         }
-        if(ok){ limpiados++; }   // la nube YA tiene valores idénticos → el diff ya está aplicado → descartar sin riesgo
-        else{ quedan.push(it); }   // la nube difiere (conflicto real) o hay media → conservar para revisión
+        if(ok){ limpiados++; }   // la nube YA tiene el contenido clínico del diff (solo difería bookkeeping/bitácora-superset) → descartar sin riesgo
+        else{ quedan.push(it); }   // la nube difiere en algo clínico (conflicto real) o hay media → conservar para revisión
       }catch(_e){ quedan.push(it); }   // error de red/lectura → conservar (JAMÁS descartar a ciegas)
     }
     if(limpiados>0){
