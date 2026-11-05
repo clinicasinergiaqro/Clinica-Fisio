@@ -2823,7 +2823,19 @@ function autoCitasRecepcion(diasAdelante){
       nuevas.push(fila);
     }
   }
-  if(nuevas.length) sh.getRange(sh.getLastRow()+1,1,nuevas.length,ancho).setValues(nuevas);
+  if(nuevas.length){
+    var _inicio = sh.getLastRow()+1;
+    var _dest = sh.getRange(_inicio,1,nuevas.length,ancho);
+    _dest.setValues(nuevas);
+    // RESPETAR EL FORMATO: copiar estilo (bordes/colores/formato de fecha) + menús desplegables
+    // de la 1a fila de datos (plantilla) a las filas nuevas. No pisa los valores recién escritos.
+    var _mfila = hdr+2;
+    if(_mfila < _inicio){
+      var _modelo = sh.getRange(_mfila,1,1,ancho);
+      _modelo.copyTo(_dest, {formatOnly:true});
+      try{ var _dv=_modelo.getDataValidations()[0], _dvAll=[]; for(var _q=0;_q<nuevas.length;_q++){ _dvAll.push(_dv.slice()); } _dest.setDataValidations(_dvAll); }catch(_e){}
+    }
+  }
   Logger.log('Auto-citas: agregadas '+nuevas.length+' cita(s). Terapeuta se deja en blanco a propósito.');
   return nuevas.length;
 }
