@@ -1360,7 +1360,7 @@ body.modo-oscuro .topbar{background:#141824}
 <body>
 <div id="sync-indicator" class="sync-indicator ok" style="display:none"></div>
 <div id="app-version-chip" title="Versión de la app en este equipo — toca para buscar actualización" onclick="try{_tapVersionChip()}catch(e){}"></div>
-<script>/* VERSIÓN VISIBLE: refleja el index.html realmente cargado en ESTE equipo (se bumpea junto con sw.js). Así un iPad con versión vieja se ve de un vistazo. */window.APP_VERSION='v1-2026-11-05a';(function(){try{var c=document.getElementById('app-version-chip');if(c)c.textContent=window.APP_VERSION;}catch(e){}})();</script>
+<script>/* VERSIÓN VISIBLE: refleja el index.html realmente cargado en ESTE equipo (se bumpea junto con sw.js). Así un iPad con versión vieja se ve de un vistazo. */window.APP_VERSION='v1-2026-11-05b';(function(){try{var c=document.getElementById('app-version-chip');if(c)c.textContent=window.APP_VERSION;}catch(e){}})();</script>
 <div class="toast" id="toast" aria-live="polite" aria-atomic="true"></div>
 
 <!-- LOGIN -->
@@ -14135,16 +14135,21 @@ function renderSOAPForm(){
   </div>
 
   <div class="form-section">
-    <div class="form-section-title">📷 Fotos de sesión</div>
+    <div class="form-section-title">📎 Agregar fotos y estudios</div>
     <input type="file" id="si-foto" accept="image/*" capture="environment" style="display:none" onchange="handleSoapPhoto(event,'foto')">
     <input type="file" id="si-gal" accept="image/*,video/*" multiple style="display:none" onchange="handleSoapPhoto(event,'gal')">
     <input type="file" id="si-doc" accept="*/*" multiple style="display:none" onchange="handleSoapPhoto(event,'doc')">
-    <div class="media-btn-row">
-      <button class="media-btn" onclick="document.getElementById('si-foto').click()"><span class="media-icon">📷</span>Foto</button>
-      <button class="media-btn" onclick="document.getElementById('si-gal').click()"><span class="media-icon">🖼️</span>Galería</button>
-      <button class="media-btn" onclick="document.getElementById('si-doc').click()"><span class="media-icon">📄</span>Escanear</button>
+    <div class="media-btn-grid">
+      <button class="media-btn" onclick="document.getElementById('si-foto').click()"><span class="media-icon">📷</span>Foto<span class="media-sub">de la sesión</span></button>
+      <button class="media-btn" onclick="document.getElementById('si-gal').click()"><span class="media-icon">🖼️</span>Galería<span class="media-sub">de la sesión</span></button>
+      <button class="media-btn" onclick="document.getElementById('si-doc').click()"><span class="media-icon">📎</span>Archivo<span class="media-sub">de la sesión</span></button>
+      <button class="media-btn" onclick="(currentPatient||{}).id&&agregarEstudioLink(currentPatient.id)"><span class="media-icon">🔗</span>Link<span class="media-sub">CMJ / en línea</span></button>
+      <button class="media-btn" onclick="(currentPatient||{}).id&&agregarEstudioArchivo(currentPatient.id,'receta')"><span class="media-icon">💊</span>Receta<span class="media-sub">foto / archivo</span></button>
+      <button class="media-btn" onclick="(currentPatient||{}).id&&agregarEstudioArchivo(currentPatient.id,'imagen')"><span class="media-icon">🩻</span>Estudio<span class="media-sub">rayos X / RM</span></button>
+      <button class="media-btn" onclick="(currentPatient||{}).id&&agregarEstudioArchivo(currentPatient.id,'interpretacion')"><span class="media-icon">📝</span>Interpret.<span class="media-sub">reporte</span></button>
     </div>
-    <div id="soap-media-preview" class="media-grid" style="margin-top:0"></div>
+    <div style="font-size:10px;color:var(--gray-400);margin:2px 2px 0;line-height:1.3">Las 3 primeras quedan en ESTA nota; Link / Receta / Estudio / Interpret. se guardan en el expediente del paciente.</div>
+    <div id="soap-media-preview" class="media-grid" style="margin-top:8px"></div>
   </div>
 
   <div class="form-section">
@@ -20194,9 +20199,14 @@ function renderNuevoPaciente(){
         <div id="n-estudios-val-wrap" style="margin-top:10px"></div>
         <div style="font-size:12.5px;font-weight:700;color:#00584E;margin:14px 0 7px">3. Captura el documento</div>
         <button type="button" onclick="var i=document.getElementById('n-estudio-val-capture');if(i)i.click()" style="width:100%;background:#00695C;color:#fff;border:none;border-radius:12px;padding:14px;font-size:15px;font-weight:800;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px">📷 Escanear / foto / PDF de estudio</button>
-        <div style="display:flex;align-items:center;gap:8px;margin:12px 0 4px"><div style="flex:1;height:1px;background:#B7D8D2"></div><div style="font-size:11px;font-weight:700;color:#00584E">o agrega de un jalón</div><div style="flex:1;height:1px;background:#B7D8D2"></div></div>
-        <button type="button" onclick="menuAgregarEstudioAlta()" style="width:100%;background:#F4FBFA;color:#00584E;border:1.5px solid #00695C;border-radius:12px;padding:13px;font-size:14px;font-weight:800;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px">➕ Link · Receta · Interpretación · Imagen</button>
-        <div style="font-size:11px;color:var(--gray-500);margin-top:8px;line-height:1.45">Con los chips capturas foto/PDF con su interpretación. Con <b>➕</b> agregas también <b>link</b> de estudio, receta, interpretación o imagen — igual que en la pestaña Estudios. Todo queda ligado al paciente al crearlo.</div>
+        <div style="display:flex;align-items:center;gap:8px;margin:12px 0 8px"><div style="flex:1;height:1px;background:#B7D8D2"></div><div style="font-size:11px;font-weight:700;color:#00584E">o toca una opción</div><div style="flex:1;height:1px;background:#B7D8D2"></div></div>
+        <div class="media-btn-grid">
+          <button type="button" class="media-btn" onclick="agregarEstudioLinkAlta()"><span class="media-icon">🔗</span>Link<span class="media-sub">CMJ / en línea</span></button>
+          <button type="button" class="media-btn" onclick="agregarEstudioArchivoAlta('receta')"><span class="media-icon">💊</span>Receta<span class="media-sub">foto / archivo</span></button>
+          <button type="button" class="media-btn" onclick="agregarEstudioArchivoAlta('imagen')"><span class="media-icon">🩻</span>Estudio<span class="media-sub">rayos X / RM</span></button>
+          <button type="button" class="media-btn" onclick="agregarEstudioArchivoAlta('interpretacion')"><span class="media-icon">📝</span>Interpret.<span class="media-sub">reporte</span></button>
+        </div>
+        <div style="font-size:11px;color:var(--gray-500);margin-top:8px;line-height:1.45">Arriba capturas foto/PDF con su interpretación; aquí agregas también <b>link</b>, receta, estudio o interpretación — igual que en la pestaña Estudios. Todo queda ligado al paciente al crearlo.</div>
       </div>
     </div>
   </div>
