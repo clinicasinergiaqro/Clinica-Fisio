@@ -2835,6 +2835,8 @@ function autoCitasRecepcion(diasAdelante){
       _modelo.copyTo(_dest, {formatOnly:true});
       try{ var _dv=_modelo.getDataValidations()[0], _dvAll=[]; for(var _q=0;_q<nuevas.length;_q++){ _dvAll.push(_dv.slice()); } _dest.setDataValidations(_dvAll); }catch(_e){}
     }
+    // FECHA SIEMPRE día/mes/año (d/m/aaaa), sin importar el locale de la hoja — y sigue siendo fecha real
+    try{ sh.getRange(_inicio, cF+1, nuevas.length, 1).setNumberFormat('d/m/yyyy'); }catch(_e2){}
   }
   Logger.log('Auto-citas: agregadas '+nuevas.length+' cita(s). Terapeuta se deja en blanco a propósito.');
   return nuevas.length;
