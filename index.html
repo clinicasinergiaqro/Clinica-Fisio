@@ -1360,7 +1360,7 @@ body.modo-oscuro .topbar{background:#141824}
 <body>
 <div id="sync-indicator" class="sync-indicator ok" style="display:none"></div>
 <div id="app-version-chip" title="Versión de la app en este equipo — toca para buscar actualización" onclick="try{_tapVersionChip()}catch(e){}"></div>
-<script>/* VERSIÓN VISIBLE: refleja el index.html realmente cargado en ESTE equipo (se bumpea junto con sw.js). Así un iPad con versión vieja se ve de un vistazo. */window.APP_VERSION='v1-2026-11-05b';(function(){try{var c=document.getElementById('app-version-chip');if(c)c.textContent=window.APP_VERSION;}catch(e){}})();</script>
+<script>/* VERSIÓN VISIBLE: refleja el index.html realmente cargado en ESTE equipo (se bumpea junto con sw.js). Así un iPad con versión vieja se ve de un vistazo. */window.APP_VERSION='v1-2026-11-05c';(function(){try{var c=document.getElementById('app-version-chip');if(c)c.textContent=window.APP_VERSION;}catch(e){}})();</script>
 <div class="toast" id="toast" aria-live="polite" aria-atomic="true"></div>
 
 <!-- LOGIN -->
@@ -10887,6 +10887,72 @@ function _resaltarNombre(nombre, qRaw){
 // DERMATO: un paciente es dermatofuncional si tiene valoracion.dermato.es. Sirve para pintarlo en
 // rosa en la lista. Es aditivo: el mismo paciente puede tener también lo MSK (no se excluyen).
 function _esDerma(p){ try{ return !!(p && p.valoracion && p.valoracion.dermato && p.valoracion.dermato.es); }catch(_){ return false; } }
+// ===== MODALIDAD: Ortopedia/Trauma (MSK) <-> Dermatofuncional, en el MISMO expediente =====
+// El expediente es UN registro: identidad, antecedentes, cirugías, alergias, seguridadClinica y motivo
+// son COMPARTIDOS. La modalidad ACTIVA es solo valoracion.dermato.es (true=derma, false/ausente=MSK).
+// Un paciente puede tener AMBAS historias a la vez (valoracion MSK + valoracion.dermato); el switch solo
+// cambia cuál está ACTIVA (color/pastilla/SOAP), SIN borrar nada. activo=migrado (saveDB enruta ambos).
+// _tieneDerma: ya capturó datos de derma (existe el objeto dermato).
+function _tieneDerma(p){ try{ return !!(p && p.valoracion && p.valoracion.dermato); }catch(_){ return false; } }
+// _tieneMSKData: ya capturó exploración ortopédica REAL (no cuenta EVA, que es compartida con derma).
+function _tieneMSKData(p){ try{
+    var v=(p&&p.valoracion)||{}, dxf=(p&&p.dxFuncional)||{};
+    var def={'':1,'No evaluado':1,'No evaluada':1,'No realizadas':1,'No especificado':1,'Pendiente':1,'—':1,'Ninguna':1,'[pendiente]':1};
+    var campos=[v.rom,v.fuerza,v.pruebasEspeciales,v.palpacion,v.marcha,v.inflamacion,v.flexibilidad,dxf.dxFuncional,dxf.objetivosCP,dxf.pronostico];
+    return campos.some(function(x){ x=String(x==null?'':x).trim(); return x && !def[x]; });
+  }catch(_){ return false; } }
+// Barra de modalidad en el expediente: switch si tiene ambas, o botón para agregar la que falte.
+function _modalidadBarHTML(p){
+  try{
+    if(!p) return '';
+    var puede = currentUser && (currentUser.role==='supervisor'||currentUser.name==='CARLOS'||p.terapeuta===currentUser.name||p.terapeutaSeguimiento===currentUser.name);
+    if(!puede) return '';
+    var hayD=_tieneDerma(p), hayM=_tieneMSKData(p), dAct=_esDerma(p), pid=escapeAttr_(p.id);
+    var caja=function(inner){ return '<div style="padding:8px 14px 0">'+inner+'</div>'; };
+    if(hayD && hayM){
+      var pill=function(on,txt,color){ return '<span style="display:inline-flex;align-items:center;gap:4px;padding:6px 13px;border-radius:14px;font-size:12.5px;font-weight:800;'+(on?('background:'+color+';color:#fff'):('background:#fff;color:'+color+';border:1.5px solid '+color+';cursor:pointer'))+'">'+txt+'</span>'; };
+      var m = dAct
+        ? '<span data-pid="'+pid+'" onclick="_cambiarModalidad(this.dataset.pid,false)">'+pill(false,'🦴 Trauma/Orto','#1B3A6B')+'</span> '+pill(true,'🧴 Dermato','#8E3B6E')
+        : pill(true,'🦴 Trauma/Orto','#1B3A6B')+' <span data-pid="'+pid+'" onclick="_cambiarModalidad(this.dataset.pid,true)">'+pill(false,'🧴 Dermato','#8E3B6E')+'</span>';
+      return caja('<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span style="font-size:11px;color:var(--gray-400);font-weight:700">Modalidad activa:</span>'+m+'<span style="font-size:10.5px;color:var(--gray-400)">(toca la otra para cambiar · nada se borra)</span></div>');
+    }
+    if(hayD && !hayM){
+      return caja('<button data-pid="'+pid+'" onclick="_agregarModalidad(this.dataset.pid,\'msk\')" style="background:#1B3A6B;border:none;color:#fff;border-radius:14px;padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer">🦴 Agregar ortopedia y trauma</button>');
+    }
+    return caja('<button data-pid="'+pid+'" onclick="_agregarModalidad(this.dataset.pid,\'derma\')" style="background:#8E3B6E;border:none;color:#fff;border-radius:14px;padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer">🧴 Pasar / agregar dermatofuncional</button>');
+  }catch(_){ return ''; }
+}
+// Switch de modalidad activa: SOLO voltea valoracion.dermato.es (conserva todo), guardado quirúrgico.
+async function _cambiarModalidad(pid, aDerma){
+  try{
+    var p=(typeof _resolverPaciente==='function'?_resolverPaciente(pid):null)||currentPatient;
+    if(!p){ showToast('Paciente no encontrado','error'); return; }
+    if(!p.valoracion || !p.valoracion.dermato){ showToast('Este paciente no tiene datos de dermato aún','error'); return; }
+    var quiere=!!aDerma;
+    if(!!p.valoracion.dermato.es===quiere) return;   // ya está en esa modalidad
+    p.valoracion.dermato.es=quiere;
+    try{ p.fechaActualizacion=(typeof todayISO!=='undefined'?todayISO:new Date().toISOString()); }catch(_){}
+    try{ if(currentUser&&currentUser.name) p.ultimoUsuario=currentUser.name; }catch(_){}
+    try{ if(!Array.isArray(p.historialCambios)) p.historialCambios=[]; p.historialCambios.push({fecha:(typeof todayFmt==='function'?todayFmt():''),usuario:(currentUser&&currentUser.name)||'',cambio:'Modalidad activa → '+(quiere?'Dermato funcional':'Ortopedia/Trauma')}); }catch(_){}
+    showToast('Guardando…');
+    var res=await saveDB('pts',[p],{camposHist:['valoracion','historialCambios','fechaActualizacion','ultimoUsuario']});
+    if(res && res.ok && res.guardados!==0){ showToast('✅ Modalidad activa: '+(quiere?'Dermato funcional 🧴':'Ortopedia/Trauma 🦴')); }
+    else if(res && res.pendiente){ showToast('📴 Cambio guardado en este equipo (se sube solo al haber red)'); }
+    else { showToast('⚠️ No se pudo confirmar el cambio — revisa la conexión','error'); }
+    try{ currentPatient=p; }catch(_){}
+    try{ renderExpediente('historia'); }catch(_){}
+  }catch(e){ showToast('Error al cambiar de modalidad','error'); }
+}
+// Agregar la modalidad que falta: abre el editor COMPLETO (fusiona, no borra) con la sección correcta.
+function _agregarModalidad(pid, tipo){
+  try{
+    var p=(typeof _resolverPaciente==='function'?_resolverPaciente(pid):null)||currentPatient;
+    if(!p){ showToast('Paciente no encontrado','error'); return; }
+    if(tipo==='derma'){ window._forzarDermaAlEditar=true; window._focoMSKAlEditar=false; }
+    else { window._focoMSKAlEditar=true; window._forzarDermaAlEditar=false; }
+    editarValoracionComoNuevo(p.id);
+  }catch(e){ showToast('Error','error'); }
+}
 function _pacCardHTML(p, q, abrirFn){
   const _dm=_esDerma(p);   // DERMATO: tarjeta en rosa + pill para distinguir pacientes de dermato funcional
   const hasConsent=tieneConsentimientoFirmado(p);   // [LOOP-D D1-a] helper único (array+legacy, exige firma real)
@@ -11681,6 +11747,7 @@ function renderExpediente(tab='historia'){
       ${hasAllergy?'<span class="exp-pill" style="background:rgba(173,20,87,.3);color:#FFC0D4;">🚫 Alergia</span>':''}
       ${!hasConsent?'<span class="exp-pill" style="background:rgba(183,121,31,.3);color:#FFD580;">📋 Sin consentimiento</span>':'<span class="exp-pill gold">✅ Consentimiento</span>'}
     </div></div>
+  ${_modalidadBarHTML(p)}
   <div class="tabs">
     <button class="tab ${tab==='historia'?'active':''}" onclick="renderExpediente('historia')">Historia</button>
     <button class="tab ${tab==='valoracion'?'active':''}" onclick="renderExpediente('valoracion')">Valoración</button>
@@ -20294,6 +20361,20 @@ function renderNuevoPaciente(){
       var _tt=document.getElementById('nuevo-topbar-title'); if(_tt) _tt.textContent='Editar valoración';
       var _bg=document.getElementById('btn-guardar-nuevo'); if(_bg) _bg.textContent='💾 Guardar valoración';
       try{ _prefillNuevoDesdePaciente(_edP2); }catch(_e){ console.warn('[edit-val] prefill:', _e&&_e.message); }
+      // AGREGAR MODALIDAD (desde la barra del expediente): forzar el apartado 🧴 derma en un paciente MSK,
+      // o enfocar la exploración MSK en uno derma. El editor FUSIONA al guardar → no se pierde nada.
+      try{
+        if(window._forzarDermaAlEditar){
+          _dermaToggleAlta(true);
+          var _dw3=document.getElementById('n-derma-dolortipo-wrap'); if(_dw3) _dw3.style.display='block';
+          var _dc3=document.getElementById('n-derma-card'); if(_dc3){ try{ _dc3.scrollIntoView({behavior:'smooth',block:'start'}); }catch(_){} }
+          showToast('🧴 Elige el tipo de caso y llena el apartado dermato — lo básico ya está');
+        } else if(window._focoMSKAlEditar){
+          var _mx3=document.getElementById('n-msk-exam'); if(_mx3){ try{ _mx3.scrollIntoView({behavior:'smooth',block:'start'}); }catch(_){} }
+          showToast('🦴 Llena la exploración de ortopedia/trauma — lo básico ya está');
+        }
+      }catch(_ef){}
+      window._forzarDermaAlEditar=false; window._focoMSKAlEditar=false;
     } else {
       cargarBorradorNuevoSiExiste();
       // ALTA DERMATOFUNCIONAL: abre el apartado 🧴 activado, oculta la exploración MSK y avisa el modo.
