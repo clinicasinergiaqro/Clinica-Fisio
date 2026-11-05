@@ -1360,7 +1360,7 @@ body.modo-oscuro .topbar{background:#141824}
 <body>
 <div id="sync-indicator" class="sync-indicator ok" style="display:none"></div>
 <div id="app-version-chip" title="Versión de la app en este equipo — toca para buscar actualización" onclick="try{_tapVersionChip()}catch(e){}"></div>
-<script>/* VERSIÓN VISIBLE: refleja el index.html realmente cargado en ESTE equipo (se bumpea junto con sw.js). Así un iPad con versión vieja se ve de un vistazo. */window.APP_VERSION='v1-2026-11-05d';(function(){try{var c=document.getElementById('app-version-chip');if(c)c.textContent=window.APP_VERSION;}catch(e){}})();</script>
+<script>/* VERSIÓN VISIBLE: refleja el index.html realmente cargado en ESTE equipo (se bumpea junto con sw.js). Así un iPad con versión vieja se ve de un vistazo. */window.APP_VERSION='v1-2026-11-05e';(function(){try{var c=document.getElementById('app-version-chip');if(c)c.textContent=window.APP_VERSION;}catch(e){}})();</script>
 <div class="toast" id="toast" aria-live="polite" aria-atomic="true"></div>
 
 <!-- LOGIN -->
@@ -3286,7 +3286,24 @@ function _encolarSoapActivo(pid, sesion, modo){
     var modoFinal=(prevModo==='nueva') ? 'nueva' : (modo==='edicion' ? 'edicion' : 'nueva');
     q=q.filter(function(it){ return !(it && String(it.sesion && it.sesion.id)===sid); }); // solo la más reciente de esa sesión
     q.push({pid:pid, name:pac.name||'', nombreNormalizado:pac.nombreNormalizado||'', sesion:sLimpia, modo:modoFinal, ts:Date.now(), intentos:0});
-    localStorage.setItem('COLA_SOAP_ACT', JSON.stringify(q));
+    // INTEGRIDAD: la cola de notas NUNCA se puede perder en silencio por cupo lleno. En iOS el cupo de
+    // localStorage es ~5 MB y la base de pacientes ya lo roza (4.6 MB) → `setItem('COLA_SOAP_ACT')` podía
+    // tronar por cuota y el catch de abajo solo hacía console.warn → la nota que NO llegó a la nube tampoco
+    // se encolaba y se PERDÍA callada (caso Cuevas/Zara). Ahora: si trona, libera el `sinergia_pts` viejo
+    // (copia desactualizada; su respaldo durable vive en IndexedDB) y reintenta; si AÚN no cabe, aviso
+    // crítico HONESTO con el nombre del paciente (nunca un "guardado" falso).
+    try{
+      localStorage.setItem('COLA_SOAP_ACT', JSON.stringify(q));
+    }catch(_cuota){
+      try{ localStorage.removeItem('sinergia_pts'); window._ptsLocalNoCabe=true; }catch(_){}
+      try{
+        localStorage.setItem('COLA_SOAP_ACT', JSON.stringify(q));
+      }catch(_cuota2){
+        try{ if(typeof idbSet==='function') idbSet('__cola_soap_act_overflow__', q); }catch(_){}
+        try{ showToastCritico_('🛑 La nota de '+(pac.name||'este paciente')+' NO cupo en la cola de este equipo (memoria del navegador llena). Déjala ABIERTA con internet para que suba; si el aviso persiste, avísame. No la des por guardada.'); }catch(_){}
+        throw _cuota2;   // propaga: el caller NO debe creer que se encoló
+      }
+    }
     actualizarIndicadorSync();
   }catch(e){ console.warn('[SOAP-act] no se pudo encolar:', e && e.message); }
 }
@@ -3304,7 +3321,21 @@ async function drenarColaSoapActivo(){
   if(_DRENANDO_SOAP_ACT || !navigator.onLine) return;
   var q;
   try{ q=JSON.parse(localStorage.getItem('COLA_SOAP_ACT')||'[]'); }catch(e){ q=[]; _colaCorrupta('COLA_SOAP_ACT',e); }
-  if(!Array.isArray(q) || !q.length) return;
+  if(!Array.isArray(q)) q=[];
+  // RECUPERAR desbordes: notas que no cupieron en localStorage (cupo lleno) se respaldaron en IDB
+  // (`__cola_soap_act_overflow__`). Reincorporarlas a la cola (dedup por id de sesión) y limpiar el
+  // desborde — así una nota que no cupo NO se queda atorada fuera del drenado.
+  try{
+    if(typeof idbGet==='function'){
+      var _ov=await idbGet('__cola_soap_act_overflow__');
+      if(Array.isArray(_ov) && _ov.length){
+        var _vistos={}; q.forEach(function(it){ if(it&&it.sesion) _vistos[String(it.sesion.id)]=1; });
+        _ov.forEach(function(it){ if(it&&it.sesion&&!_vistos[String(it.sesion.id)]){ q.push(it); _vistos[String(it.sesion.id)]=1; } });
+        try{ localStorage.setItem('COLA_SOAP_ACT', JSON.stringify(q)); if(typeof idbSet==='function') idbSet('__cola_soap_act_overflow__', []); }catch(_){}
+      }
+    }
+  }catch(_eov){}
+  if(!q.length){ return; }
   _DRENANDO_SOAP_ACT=true;
   var restantes=[], fallidos=[], ahora=Date.now(), _permisoDenegado=false;
   try{
@@ -3613,11 +3644,19 @@ async function _autoSanarFallidosHistDoc(){
         var d=(snap && snap.exists && snap.data()) || null;
         if(!d){ quedan.push(it); continue; }   // la nube NO tiene el doc → posible pendiente real → conservar
         var campos=it.campos||{}, claves=Object.keys(campos), ok=claves.length>0;
-        // Campos de BOOKKEEPING: una escritura más nueva (de ESTE u otro equipo, por un save posterior)
-        // los cambia legítimamente. Que difieran NO significa que falte contenido clínico → NO deben
-        // bloquear la limpieza. Comparar solo el contenido CLÍNICO protege contra pérdida real sin dejar
-        // el aviso clavado por un simple sello de fecha/usuario.
-        var _BOOK={fechaActualizacion:1, ultimoUsuario:1, updatedAt:1, fechaUltimaModificacion:1, ultimaModificacion:1, fecha:1, ultimaEdicion:1};
+        // Campos que NO bloquean la limpieza:
+        //  (a) BOOKKEEPING (fechaActualizacion/ultimoUsuario/sellos): una escritura más nueva los cambia
+        //      legítimamente sin que falte nada clínico.
+        //  (b) NO-ESPEJADOS por el doc de historia: `soap` NUNCA se escribe a .doc(p.id) (vive en el Sheet
+        //      p.soap + en las sesiones live app_live_); `sesiones`/`numSesionEpisodioActual`/`numEpisodio`
+        //      son CONTADORES que se recalculan al sincronizar. Compararlos dejaba el aviso clavado PARA
+        //      SIEMPRE cuando el diff venía de guardar una NOTA (camposHist incluye soap+contadores), aunque
+        //      la nota y el expediente estén idénticos en la nube (caso Zara/María Luisa, diff real = [soap,
+        //      sesiones, numSesionEpisodioActual, fechaActualizacion, ultimoUsuario]). Ninguno es contenido
+        //      de expediente que ESTE espejo deba conservar → descartarlos no pierde dato clínico.
+        // Cualquier campo CLÍNICO real que difiera SÍ conserva el fallido (conflicto genuino).
+        var _BOOK={fechaActualizacion:1, ultimoUsuario:1, updatedAt:1, fechaUltimaModificacion:1, ultimaModificacion:1, fecha:1, ultimaEdicion:1,
+                   soap:1, sesiones:1, numSesionEpisodioActual:1, numEpisodio:1};
         for(var c=0;c<claves.length;c++){
           var k=claves[c];
           if(k==='fotos'||k==='docs'||k==='estudiosDocs'){ ok=false; break; }   // media (base64→null en cola) no comparable fiable → conservar
