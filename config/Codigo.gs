@@ -2768,7 +2768,7 @@ function _claudeRouter_(body) {
 // NO escribe terapeuta (la inicial del calendario puede cambiar y metería ruido) ni toca paquetes.
 // CONFIG: pon abajo el ID de la hoja de recepción (debe ser Google Sheet, no .xlsx).
 // INSTALAR: Guardar → correr autoCitasRecepcion una vez (prueba) → correr instalarAutoCitas una vez.
-var RECEPCION_SHEET_ID = '1IyFJD_yNsn6M5DF8o0wZlC4wqvZeP9JvkHvfueVF-I8';   // PRUEBA. Para producción, cambiar por el ID de la hoja de recepción (Google Sheet).
+var RECEPCION_SHEET_ID = '1WSji4eBJ9mQMRTCCX2Yg8LFhkwa6UlJXx0OFRR1NaNQ';   // PAGOS 26 OCT 2026 (Google Sheet de recepción, producción).
 var RECEPCION_DIAS     = 1;   // 1 = solo hoy. 2 = hoy y mañana.
 var _BLOQUE_RE_REC = /(^|\s)(clase|no viene|no vino|no esta|no está|bloque|junta|comida|vacacion|falta|cumple|evento|curso|taller|cerrado|festivo|reunion|descanso|puente|en espera|solo )/i;
 
@@ -2784,8 +2784,9 @@ function _diaKeyRec_(v){
 function autoCitasRecepcion(diasAdelante){
   var dias = diasAdelante || RECEPCION_DIAS;
   var ss = SpreadsheetApp.openById(RECEPCION_SHEET_ID);
-  var sh = ss.getSheetByName('REGISTRO DEL DÍA') || ss.getSheetByName('REGISTRO DEL DIA') || ss.getSheets()[0];
-  if(!sh){ Logger.log('No hay hoja donde escribir'); return 0; }
+  var sh = ss.getSheetByName('REGISTRO DEL DÍA') || ss.getSheetByName('REGISTRO DEL DIA');
+  if(!sh){ var _todas=ss.getSheets(); if(_todas.length===1) sh=_todas[0]; }   // solo cae a la 1a pestaña si la hoja tiene UNA (prueba); nunca escribe en otra pestaña de recepción
+  if(!sh){ Logger.log('No encontré la pestaña REGISTRO DEL DÍA'); return 0; }
   var datos = sh.getDataRange().getValues(), hdr=-1;
   for(var r=0;r<Math.min(datos.length,12);r++){
     var row=datos[r].map(_normRec_);
