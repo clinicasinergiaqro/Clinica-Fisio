@@ -4,6 +4,7 @@
 - SIEMPRE entregar diffs o código en UN SOLO bloque de código continuo y copiable de corrido.
 - NO fragmentar en varias partes/bloques. El usuario trabaja en iPad y no puede copiar por pedazos.
 - Si un cambio toca varios puntos del archivo, mostrarlo igualmente como un único bloque continuo.
+- **REGLA DE ORO (Carlos, enfático 2026-11-05): cuando pida el código de un archivo, ENTREGAR EL ARCHIVO COMPLETO, NUNCA fragmentos ni "pega esto al final" ni un snippet suelto. ES TODO O NADA.** Si el archivo es grande y retipearlo en el chat arriesga corromperlo (ej. `config/Codigo.gs`, 2800+ líneas de backend en producción), editar el archivo real del repo y entregarlo COMPLETO por `SendUserFile` (son los bytes reales, cero riesgo de typo) — eso ES el archivo completo, no una parte. Nunca mandar un pedazo para que él lo inserte.
 
 ## Instrucciones / pruebas / prompts para copiar
 - SIEMPRE en UN SOLO bloque de código de texto plano corrido, de principio a fin, en una sola caja copiable.

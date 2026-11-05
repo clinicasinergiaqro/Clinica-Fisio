@@ -2762,3 +2762,73 @@ function _claudeRouter_(body) {
 
   return respuesta({ ok: false, error: 'Acción claude no reconocida: ' + action, code: 400 });
 }
+
+// ════════ AUTO-CITAS: calendario → hoja de RECEPCIÓN (REGISTRO DEL DÍA) ════════
+// Reusa parsearTituloAgenda_ de este mismo archivo. Idempotente: no duplica (mismo día + mismo paciente).
+// NO escribe terapeuta (la inicial del calendario puede cambiar y metería ruido) ni toca paquetes.
+// CONFIG: pon abajo el ID de la hoja de recepción (debe ser Google Sheet, no .xlsx).
+// INSTALAR: Guardar → correr autoCitasRecepcion una vez (prueba) → correr instalarAutoCitas una vez.
+var RECEPCION_SHEET_ID = 'PEGA_AQUI_EL_ID_DE_LA_HOJA_DE_RECEPCION';
+var RECEPCION_DIAS     = 1;   // 1 = solo hoy. 2 = hoy y mañana.
+var _BLOQUE_RE_REC = /(^|\s)(clase|no viene|no vino|no esta|no está|bloque|junta|comida|vacacion|falta|cumple|evento|curso|taller|cerrado|festivo|reunion|descanso|puente|en espera|solo )/i;
+
+function _normRec_(s){ return String(s==null?'':s).normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().replace(/[^a-z0-9 ]/g,' ').replace(/\s+/g,' ').trim(); }
+function _diaKeyRec_(v){
+  if(v instanceof Date) return Utilities.formatDate(v,'America/Mexico_City','yyyyMMdd');
+  var s=String(v==null?'':v).trim(), m=s.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/);
+  if(m){ var y=m[3]; if(y.length<4) y='20'+y; return y+('0'+m[2]).slice(-2)+('0'+m[1]).slice(-2); }
+  m=s.match(/(\d{4})-(\d{2})-(\d{2})/); if(m) return m[1]+m[2]+m[3];
+  return s;
+}
+
+function autoCitasRecepcion(diasAdelante){
+  var dias = diasAdelante || RECEPCION_DIAS;
+  var ss = SpreadsheetApp.openById(RECEPCION_SHEET_ID);
+  var sh = ss.getSheetByName('REGISTRO DEL DÍA');
+  if(!sh){ Logger.log('No existe la hoja REGISTRO DEL DÍA'); return 0; }
+  var datos = sh.getDataRange().getValues(), hdr=-1;
+  for(var r=0;r<Math.min(datos.length,12);r++){
+    var row=datos[r].map(_normRec_);
+    if(row.indexOf('paciente')!==-1 && row.some(function(x){return x.indexOf('asisti')!==-1;})){ hdr=r; break; }
+  }
+  if(hdr<0){ Logger.log('No encontré el encabezado'); return 0; }
+  var head=datos[hdr].map(_normRec_);
+  function _colRec_(k){ for(var i=0;i<head.length;i++){ if(head[i].indexOf(k)!==-1) return i; } return -1; }
+  var cF=_colRec_('fecha'), cP=_colRec_('paciente'), cS=_colRec_('servicio');
+  if(cF<0||cP<0){ Logger.log('Faltan columnas fecha/paciente'); return 0; }
+  var existe={};
+  for(var r2=hdr+1;r2<datos.length;r2++){ var p=datos[r2][cP]; if(p) existe[_diaKeyRec_(datos[r2][cF])+'|'+_normRec_(p)]=true; }
+  var cal = CalendarApp.getDefaultCalendar();
+  if(!cal){ Logger.log('No se pudo abrir el calendario'); return 0; }
+  var ancho=sh.getLastColumn(), hoy=new Date(); hoy.setHours(0,0,0,0);
+  var nuevas=[];
+  for(var d=0; d<dias; d++){
+    var ini=new Date(hoy.getTime()+d*86400000), fin=new Date(ini.getTime()+86400000);
+    var evs=cal.getEvents(ini,fin);
+    for(var e=0;e<evs.length;e++){
+      if(evs[e].isAllDayEvent()) continue;
+      var titulo=evs[e].getTitle();
+      if(!titulo || _BLOQUE_RE_REC.test(titulo)) continue;
+      var pr=parsearTituloAgenda_(titulo);
+      if(pr.omitir) continue;
+      var nombre=String(pr.paciente||'').trim();
+      if(!nombre || nombre==='(sin nombre)') continue;
+      var key=_diaKeyRec_(ini)+'|'+_normRec_(nombre);
+      if(existe[key]) continue; existe[key]=true;
+      var fila=[]; for(var c=0;c<ancho;c++){ fila[c]=''; }
+      fila[cF]=new Date(ini.getFullYear(),ini.getMonth(),ini.getDate());
+      fila[cP]=nombre;
+      if(cS>=0) fila[cS]='FISIOTERAPIA';
+      nuevas.push(fila);
+    }
+  }
+  if(nuevas.length) sh.getRange(sh.getLastRow()+1,1,nuevas.length,ancho).setValues(nuevas);
+  Logger.log('Auto-citas: agregadas '+nuevas.length+' cita(s). Terapeuta se deja en blanco a propósito.');
+  return nuevas.length;
+}
+
+function instalarAutoCitas(){
+  ScriptApp.getProjectTriggers().forEach(function(t){ if(t.getHandlerFunction()==='autoCitasRecepcion') ScriptApp.deleteTrigger(t); });
+  ScriptApp.newTrigger('autoCitasRecepcion').timeBased().everyHours(1).create();
+  Logger.log('✅ Auto-citas instalado (corre cada hora). Para apagarlo: borra el disparador en Activadores.');
+}
