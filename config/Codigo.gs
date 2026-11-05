@@ -2816,7 +2816,7 @@ function autoCitasRecepcion(diasAdelante){
       var key=_diaKeyRec_(ini)+'|'+_normRec_(nombre);
       if(existe[key]) continue; existe[key]=true;
       var fila=[]; for(var c=0;c<ancho;c++){ fila[c]=''; }
-      fila[cF]=new Date(ini.getFullYear(),ini.getMonth(),ini.getDate());
+      fila[cF]=new Date(ini.getFullYear(),ini.getMonth(),ini.getDate(),12,0,0);  // mediodía: evita que la zona horaria corra el día
       fila[cP]=nombre;
       if(cS>=0) fila[cS]='FISIOTERAPIA';
       nuevas.push(fila);
