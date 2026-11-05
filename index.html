@@ -1253,6 +1253,10 @@ select.form-input{font-size:14px}
 .media-btn{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;background:var(--white);border:2px dashed var(--gray-200);border-radius:var(--radius);padding:14px 8px;cursor:pointer;font-size:11px;font-weight:700;color:var(--gray-400);font-family:inherit}
 .media-btn:active{border-color:var(--navy);color:var(--navy)}
 .media-btn .media-icon{font-size:24px}
+.media-btn-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin-bottom:10px}
+.media-btn-grid .media-btn{padding:11px 3px;font-size:10px;gap:4px;flex:none;line-height:1.1}
+.media-btn-grid .media-icon{font-size:21px}
+.media-btn .media-sub{font-size:8.5px;font-weight:400;color:var(--gray-400);line-height:1.12;text-align:center}
 .media-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:8px}
 .media-thumb{position:relative;aspect-ratio:1;border-radius:var(--radius-sm);overflow:hidden;background:var(--gray-100);border:1px solid var(--gray-200)}
 .media-thumb img{width:100%;height:100%;object-fit:cover;display:block}
@@ -1356,7 +1360,7 @@ body.modo-oscuro .topbar{background:#141824}
 <body>
 <div id="sync-indicator" class="sync-indicator ok" style="display:none"></div>
 <div id="app-version-chip" title="Versión de la app en este equipo — toca para buscar actualización" onclick="try{_tapVersionChip()}catch(e){}"></div>
-<script>/* VERSIÓN VISIBLE: refleja el index.html realmente cargado en ESTE equipo (se bumpea junto con sw.js). Así un iPad con versión vieja se ve de un vistazo. */window.APP_VERSION='v1-2026-11-04d';(function(){try{var c=document.getElementById('app-version-chip');if(c)c.textContent=window.APP_VERSION;}catch(e){}})();</script>
+<script>/* VERSIÓN VISIBLE: refleja el index.html realmente cargado en ESTE equipo (se bumpea junto con sw.js). Así un iPad con versión vieja se ve de un vistazo. */window.APP_VERSION='v1-2026-11-05a';(function(){try{var c=document.getElementById('app-version-chip');if(c)c.textContent=window.APP_VERSION;}catch(e){}})();</script>
 <div class="toast" id="toast" aria-live="polite" aria-atomic="true"></div>
 
 <!-- LOGIN -->
@@ -11982,11 +11986,16 @@ function renderExpediente(tab='historia'){
       <span style="font-size:14px">ℹ️</span>
       <span>Las fotos y documentos se guardan en la nube (Firebase). Visibles desde cualquier dispositivo. Límite 15MB por archivo.</span>
     </div>
-    <div class="media-btn-row">
-      <button class="media-btn" onclick="document.getElementById('inp-foto').click()"><span class="media-icon">📷</span>Foto</button>
-      <button class="media-btn" onclick="document.getElementById('inp-galeria').click()"><span class="media-icon">🖼️</span>Galería</button>
-      <button class="media-btn" onclick="iniciarEscaneoDocumento()"><span class="media-icon">📄</span>Escanear<br><span style="font-size:9px;font-weight:400;color:var(--gray-400)">Genera PDF</span></button>
-      <button class="media-btn" onclick="document.getElementById('inp-doc').click()"><span class="media-icon">📎</span>Archivo</button>
+    <div style="font-size:10px;font-weight:800;letter-spacing:.04em;color:var(--gray-400);margin:2px 2px 6px">AGREGAR AL EXPEDIENTE · toca una opción</div>
+    <div class="media-btn-grid">
+      <button class="media-btn" onclick="document.getElementById('inp-foto').click()"><span class="media-icon">📷</span>Foto<span class="media-sub">del paciente</span></button>
+      <button class="media-btn" onclick="document.getElementById('inp-galeria').click()"><span class="media-icon">🖼️</span>Galería<span class="media-sub">del teléfono</span></button>
+      <button class="media-btn" onclick="iniciarEscaneoDocumento()"><span class="media-icon">📄</span>Escanear<span class="media-sub">→ PDF</span></button>
+      <button class="media-btn" onclick="document.getElementById('inp-doc').click()"><span class="media-icon">📎</span>Archivo<span class="media-sub">PDF / doc</span></button>
+      <button class="media-btn" data-pid="${escapeAttr_(p.id)}" onclick="agregarEstudioLink(this.dataset.pid)"><span class="media-icon">🔗</span>Link<span class="media-sub">CMJ / en línea</span></button>
+      <button class="media-btn" data-pid="${escapeAttr_(p.id)}" onclick="agregarEstudioArchivo(this.dataset.pid,'receta')"><span class="media-icon">💊</span>Receta<span class="media-sub">foto / archivo</span></button>
+      <button class="media-btn" data-pid="${escapeAttr_(p.id)}" onclick="agregarEstudioArchivo(this.dataset.pid,'imagen')"><span class="media-icon">🩻</span>Estudio<span class="media-sub">rayos X / RM</span></button>
+      <button class="media-btn" data-pid="${escapeAttr_(p.id)}" onclick="agregarEstudioArchivo(this.dataset.pid,'interpretacion')"><span class="media-icon">📝</span>Interpret.<span class="media-sub">reporte</span></button>
     </div>
     <div class="section-card">
       <div class="section-title">🖼️ Fotos clínicas <span style="margin-left:auto;font-size:11px;font-weight:400;color:var(--gray-400)">${fotos.length} imagen${fotos.length!==1?'es':''}</span></div>
@@ -12003,7 +12012,7 @@ function renderExpediente(tab='historia'){
       ${!docs.length?`<div style="text-align:center;padding:20px;color:var(--gray-400);font-size:13px">Sin documentos — escanea con el botón de arriba</div>`:''}
     </div>
     <div class="section-card">
-      <div class="section-title">🔬 Estudios y documentos clínicos<button data-pid="${escapeAttr_(p.id)}" onclick="menuAgregarEstudio(this.dataset.pid)" style="margin-left:auto;background:var(--navy);color:#fff;border:none;border-radius:14px;padding:5px 12px;font-size:12px;font-weight:700;cursor:pointer">+ Agregar</button></div>
+      <div class="section-title">🔬 Estudios y documentos clínicos <span style="margin-left:auto;font-size:10px;font-weight:400;color:var(--gray-400)">agrega con los cuadritos de arriba ↑</span></div>
       <div id="estudios-apartado"><div style="text-align:center;padding:16px;color:var(--gray-400);font-size:12px">Cargando estudios…</div></div>
     </div>`;
   }
