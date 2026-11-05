@@ -1360,7 +1360,7 @@ body.modo-oscuro .topbar{background:#141824}
 <body>
 <div id="sync-indicator" class="sync-indicator ok" style="display:none"></div>
 <div id="app-version-chip" title="Versión de la app en este equipo — toca para buscar actualización" onclick="try{_tapVersionChip()}catch(e){}"></div>
-<script>/* VERSIÓN VISIBLE: refleja el index.html realmente cargado en ESTE equipo (se bumpea junto con sw.js). Así un iPad con versión vieja se ve de un vistazo. */window.APP_VERSION='v1-2026-11-05e';(function(){try{var c=document.getElementById('app-version-chip');if(c)c.textContent=window.APP_VERSION;}catch(e){}})();</script>
+<script>/* VERSIÓN VISIBLE: refleja el index.html realmente cargado en ESTE equipo (se bumpea junto con sw.js). Así un iPad con versión vieja se ve de un vistazo. */window.APP_VERSION='v1-2026-11-05f';(function(){try{var c=document.getElementById('app-version-chip');if(c)c.textContent=window.APP_VERSION;}catch(e){}})();</script>
 <div class="toast" id="toast" aria-live="polite" aria-atomic="true"></div>
 
 <!-- LOGIN -->
@@ -3074,8 +3074,32 @@ function getColaSync(){
   try{ var a = JSON.parse(localStorage.getItem('COLA_SYNC')||'[]'); return Array.isArray(a) ? a : []; }
   catch(e){ try{ if(typeof _colaCorrupta==='function') _colaCorrupta('COLA_SYNC', e); }catch(_){} return []; }
 }
+// [INTEGRIDAD — ANTI-PÉRDIDA SILENCIOSA] Escribe una cola de sync a localStorage SIN perder dato clínico
+// en silencio cuando el cupo del navegador está lleno (iOS ~5 MB). La base de pacientes ya no cabe en ese
+// cupo; si un `sinergia_pts` viejo lo ocupa, las colas chicas (notas/altas sin subir) NO caben y el
+// `catch` mudo de cada encolado las tiraba sin rastro mostrando "guardado" (casos Jess/Cuevas). Patrón:
+// 1) intenta; 2) si trona por cuota, LIBERA el `sinergia_pts` viejo (su respaldo durable vive en
+//    IndexedDB `__pts_backup__` — loadFromCloud lo recupera) y reintenta → casi siempre cabe ya; 3) si AÚN
+//    no cabe, aviso crítico HONESTO con el nombre (NUNCA un "guardado" falso). Devuelve true si persistió.
+// `avisar:false` para colas de respaldo silencioso (espejo de historia): el dato igual está en el Sheet.
+function _guardarColaLS(key, arr, etiqueta, avisar){
+  var json;
+  try{ json = JSON.stringify(Array.isArray(arr)?arr:[]); }catch(_){ return false; }
+  try{ localStorage.setItem(key, json); return true; }
+  catch(_q1){
+    try{ localStorage.removeItem('sinergia_pts'); window._ptsLocalNoCabe = true; }catch(_){}
+    try{ localStorage.setItem(key, json); return true; }
+    catch(_q2){
+      if(avisar !== false){
+        try{ showToastCritico_('🛑 '+(etiqueta||'Un cambio clínico')+' NO cupo en la memoria de este equipo (navegador lleno). Déjalo ABIERTO con internet para que suba y avísame — NO lo des por guardado.'); }catch(_){}
+      }
+      console.warn('[cola] '+key+' no cupo ni tras liberar pts');
+      return false;
+    }
+  }
+}
 function setColaSync(arr){
-  try{ localStorage.setItem('COLA_SYNC', JSON.stringify(arr||[])); }catch(e){}
+  _guardarColaLS('COLA_SYNC', arr||[], 'Un expediente/edición sin subir');
   actualizarIndicadorSync();
 }
 function encolarSync(id){
@@ -3109,7 +3133,7 @@ function _encolarSoapHistorico(sid, pid, payload){
     if(!Array.isArray(q)) q = [];
     q = q.filter(function(it){ return it && it.sid!==sid; }); // quedarse solo con la edición más reciente de esa nota
     q.push({sid:sid, pid:pid, payload:payload, ts:Date.now()});
-    localStorage.setItem('COLA_SYNC_HIST', JSON.stringify(q));
+    _guardarColaLS('COLA_SYNC_HIST', q, 'La edición de una nota');
   }catch(e){ console.warn('[SOAP-hist] no se pudo encolar:', e && e.message); }
 }
 // Bug B fix — cola local para NOTAS NUEVAS de históricos cuyo write a Firestore falló.
@@ -3131,7 +3155,7 @@ function _encolarSoapHistoricoNueva(pid, sesion){
     }; });
     q = q.filter(function(it){ return !(it && it.tipo==='nueva' && String(it.sesion && it.sesion.id)===sid); });
     q.push({tipo:'nueva', pid:pid, sesion:sLimpia, ts:Date.now()});
-    localStorage.setItem('COLA_SYNC_HIST', JSON.stringify(q));
+    _guardarColaLS('COLA_SYNC_HIST', q, 'La nota de '+(_nombrePacPorId(pid)||'este paciente'));
   }catch(e){ console.warn('[SOAP-hist-nueva] no se pudo encolar:', e && e.message); }
 }
 // FIX robustez cola — utilidades: timeout de write, clasificación de error, lista de fallidos permanentes.
@@ -3462,7 +3486,7 @@ function _encolarHistDoc(p, camposHist, _silencioso){
     if(prev){ campos=Object.assign({}, prev.campos||{}, campos); }
     q=q.filter(function(it){ return !(it && it.pid===p.id && it.tipo!=='identidad'); });
     q.push({pid:p.id, campos:campos, ts:Date.now(), intentos:0});
-    localStorage.setItem('COLA_SYNC_HIST_DOC', JSON.stringify(q));
+    _guardarColaLS('COLA_SYNC_HIST_DOC', q, 'Un cambio de expediente', !_silencioso);
     // FASE 1: el espejo de activos es silencioso (el Sheet YA guardó) → su fallo se encola SIN
     // molestar al usuario con un toast de "pendiente" en cada guardado si Firestore está caído un rato.
     if(!_silencioso){ try{ showToast('📴 Cambio de expediente histórico pendiente — se reintentará solo','warning'); }catch(_){} }
@@ -21580,7 +21604,7 @@ function _encolarNoAcudio(clave, ddmm, marcar){
     q=q.filter(function(x){ return !(x&&x.clave===clave&&x.ddmm===ddmm); });   // última operación gana (idempotente)
     q.push({clave:clave, ddmm:ddmm, marcar:!!marcar, ts:Date.now()});
     if(q.length>500) q=q.slice(q.length-500);
-    localStorage.setItem('COLA_NOACUDIO', JSON.stringify(q));
+    _guardarColaLS('COLA_NOACUDIO', q, 'Un "No acudió"');
   }catch(_){}
 }
 function _desencolarNoAcudio(clave, ddmm){
