@@ -2789,6 +2789,44 @@ function _claudeRouter_(body) {
       _claudeBitacora_(ss,'claudeRecepcion','fechaFix filas='+_nf);
       return respuesta({ ok:true, sub:'fechaFix', filas:_nf });
     }
+    if(_sub==='nombresFix'){
+      // Actualiza los nombres CORTOS ya escritos en REGISTRO DEL DÍA al nombre COMPLETO del expediente,
+      // con la MISMA regla de coincidencia ÚNICA del auto-llenado. PREVIEW por defecto; aplicar:true escribe.
+      // Solo reescribe la celda PACIENTE (nunca toca fecha/terapeuta/formato/fórmulas/otras columnas).
+      var _aplicar = body.aplicar === true;
+      var _dv=_rsh.getDataRange().getValues(), _hr2=-1;
+      for(var _r2=0;_r2<Math.min(_dv.length,12);_r2++){
+        var _row2=_dv[_r2].map(_normRec_);
+        if(_row2.indexOf('paciente')!==-1 && _row2.some(function(x){return x.indexOf('asisti')!==-1;})){ _hr2=_r2; break; }
+      }
+      if(_hr2<0) return respuesta({ ok:false, error:'No encontré el encabezado', code:500 });
+      var _head2=_dv[_hr2].map(_normRec_), _cp2=-1;
+      for(var _i2=0;_i2<_head2.length;_i2++){ if(_head2[_i2].indexOf('paciente')!==-1){ _cp2=_i2; break; } }
+      if(_cp2<0) return respuesta({ ok:false, error:'No hay columna PACIENTE', code:500 });
+      var _idx2=null; try{ _idx2=_recepcionIndexNombres_(ss); }catch(eIx){ _idx2=null; }
+      if(!_idx2) return respuesta({ ok:false, error:'No pude armar el índice de nombres (Firestore/Sheet)', code:500 });
+      var _cache2={}, _cambios=0, _rev=0, _ej=[];
+      var _ini2=_hr2+1, _n2=_rsh.getLastRow()-_ini2;
+      if(_n2>0){
+        var _rng2=_rsh.getRange(_ini2+1, _cp2+1, _n2, 1), _vals2=_rng2.getValues(), _hubo=false;
+        for(var _k2=0;_k2<_vals2.length;_k2++){
+          var _orig=String(_vals2[_k2][0]==null?'':_vals2[_k2][0]);
+          if(!_orig.trim()) continue;
+          _rev++;
+          var _nk=_normRec_(_orig), _fin;
+          if(_cache2.hasOwnProperty(_nk)){ _fin=_cache2[_nk]; }
+          else { try{ _fin=_recepcionResolverNombre_(_orig,_idx2)||_orig; }catch(eRr){ _fin=_orig; } _cache2[_nk]=_fin; }
+          if(_fin && _normRec_(_fin)!==_nk){
+            _cambios++;
+            if(_ej.length<20) _ej.push({de:_orig, a:_fin});
+            if(_aplicar){ _vals2[_k2][0]=_fin; _hubo=true; }
+          }
+        }
+        if(_aplicar && _hubo) _rng2.setValues(_vals2);
+      }
+      _claudeBitacora_(ss,'claudeRecepcion','nombresFix aplicar='+_aplicar+' revisadas='+_rev+' cambios='+_cambios);
+      return respuesta({ ok:true, sub:'nombresFix', aplicado:_aplicar, revisadas:_rev, cambios:_cambios, ejemplos:_ej });
+    }
     return respuesta({ ok:false, error:'claudeRecepcion sub no reconocido: '+_sub, code:400 });
   }
 
