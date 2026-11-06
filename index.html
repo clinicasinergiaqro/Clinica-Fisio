@@ -1360,7 +1360,7 @@ body.modo-oscuro .topbar{background:#141824}
 <body>
 <div id="sync-indicator" class="sync-indicator ok" style="display:none"></div>
 <div id="app-version-chip" title="Versión de la app en este equipo — toca para buscar actualización" onclick="try{_tapVersionChip()}catch(e){}"></div>
-<script>/* VERSIÓN VISIBLE: refleja el index.html realmente cargado en ESTE equipo (se bumpea junto con sw.js). Así un iPad con versión vieja se ve de un vistazo. */window.APP_VERSION='v1-2026-11-06a';(function(){try{var c=document.getElementById('app-version-chip');if(c)c.textContent=window.APP_VERSION;}catch(e){}})();</script>
+<script>/* VERSIÓN VISIBLE: refleja el index.html realmente cargado en ESTE equipo (se bumpea junto con sw.js). Así un iPad con versión vieja se ve de un vistazo. */window.APP_VERSION='v1-2026-11-06b';(function(){try{var c=document.getElementById('app-version-chip');if(c)c.textContent=window.APP_VERSION;}catch(e){}})();</script>
 <div class="toast" id="toast" aria-live="polite" aria-atomic="true"></div>
 
 <!-- LOGIN -->
@@ -7419,10 +7419,26 @@ async function _computarBannerPendientes(){
           _diasRealesPorPid[pid]=_dset;
         }catch(_e){ _diasRealesPorPid[pid]=null; }   // fallo de lectura → NO perdonar a ciegas
       }));
+      // [NO-ACUDIÓ MIGRADO v2 · Jess 2026-11-06] Saldar un histórico TAMBIÉN por su INASISTENCIA leída
+      // FRESCA del doc padre (pacientes/{pid}.inasistencias) — autoritativo, inmune a que la caché
+      // mapInasist del banner quede desincronizada (caso José Safa: inasistencia registrada 3× pero la
+      // cita seguía apareciendo). Read-only; fallo de lectura → sin entrada → conserva el pendiente.
+      var _inaPorPid={};
+      var _pidsHist=[]; (function(){ var m={}; _liveCand.forEach(function(x){ if(x._pidHist && !m[x._pidHist]){ m[x._pidHist]=1; _pidsHist.push(x._pidHist); } }); })();
+      await Promise.all(_pidsHist.map(async function(pid){
+        try{
+          var _doc=await window._fstDb.collection('pacientes').doc(pid).get();
+          var _d=(_doc && _doc.exists) ? (_doc.data()||{}) : {};
+          var _ina=Array.isArray(_d.inasistencias)?_d.inasistencias:[], _set={};
+          _ina.forEach(function(ia){ if(!ia) return; var c1=_diaCanon(ia.fechaISO), c2=_diaCanon(ia.fecha); if(c1)_set[c1]=true; if(c2)_set[c2]=true; });
+          _inaPorPid[pid]=_set;
+        }catch(_e){ _inaPorPid[pid]=null; }   // fallo de lectura → conservar el pendiente
+      }));
       var _repara={};   // SOLO históricos: pid → {isoDia:true} a unir al índice fechasSesiones del padre
       items=items.filter(function(x){
         if(!((x._pidHist||x._pidActivo) && x._citaCanon)) return true;
         var _hit=(x._fsPids||[]).some(function(_pp){ var _ds=_diasRealesPorPid[_pp]; return _ds && _ds[x._citaCanon]; });
+        if(!_hit && x._pidHist){ var _is=_inaPorPid[x._pidHist]; if(_is && _is[x._citaCanon]) return false; }   // inasistencia confirmada del día exacto → saldar (NO es nota: no auto-sanar fechasSesiones)
         if(_hit){
           if(x._pidHist){   // auto-sanar el índice cojo (solo los históricos lo usan)
             (_repara[x._pidHist]=_repara[x._pidHist]||{})[x._citaCanon]=true;
