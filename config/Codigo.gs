@@ -2760,6 +2760,38 @@ function _claudeRouter_(body) {
   }
   // FIN MANTENIMIENTO TEMPORAL - quitar este bloque al terminar
 
+  // ── AUTO-CITAS recepción: manipular la hoja desde la conexión Claude ──
+  if (action === 'claudeRecepcion') {
+    var _sub = String(body.sub || '');
+    var _rss;
+    try { _rss = SpreadsheetApp.openById(RECEPCION_SHEET_ID); }
+    catch(eR){ return respuesta({ ok:false, error:'No pude abrir la hoja de recepción: '+eR, code:500 }); }
+    var _rsh = _rss.getSheetByName('REGISTRO DEL DÍA') || _rss.getSheetByName('REGISTRO DEL DIA');
+    if(!_rsh){ var _tds=_rss.getSheets(); if(_tds.length===1) _rsh=_tds[0]; }
+    if(!_rsh) return respuesta({ ok:false, error:'No encontré la pestaña REGISTRO DEL DÍA', code:500 });
+
+    if(_sub==='correr'){
+      var _ag = autoCitasRecepcion(body.dias || 1);
+      _claudeBitacora_(ss,'claudeRecepcion','correr agregadas='+_ag);
+      return respuesta({ ok:true, sub:'correr', agregadas:_ag });
+    }
+    if(_sub==='fechaFix'){
+      // SOLO cambia el FORMATO de la columna FECHA a d/m/aaaa. No toca valores ni borra.
+      var _d=_rsh.getDataRange().getValues(), _hr=-1;
+      function _nrm(x){ return String(x==null?'':x).normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase(); }
+      for(var _r=0;_r<Math.min(_d.length,12);_r++){ var _row=_d[_r].map(_nrm); if(_row.indexOf('fecha')!==-1 && _row.some(function(z){return z.indexOf('paciente')!==-1;})){ _hr=_r; break; } }
+      if(_hr<0) return respuesta({ ok:false, error:'No encontré el encabezado', code:500 });
+      var _head=_d[_hr].map(_nrm), _cf=-1;
+      for(var _i=0;_i<_head.length;_i++){ if(_head[_i].indexOf('fecha')!==-1){ _cf=_i; break; } }
+      if(_cf<0) return respuesta({ ok:false, error:'No hay columna FECHA', code:500 });
+      var _lr=_rsh.getLastRow(), _nf=_lr-(_hr+1);
+      if(_nf>0) _rsh.getRange(_hr+2, _cf+1, _nf, 1).setNumberFormat('d/m/yyyy');
+      _claudeBitacora_(ss,'claudeRecepcion','fechaFix filas='+_nf);
+      return respuesta({ ok:true, sub:'fechaFix', filas:_nf });
+    }
+    return respuesta({ ok:false, error:'claudeRecepcion sub no reconocido: '+_sub, code:400 });
+  }
+
   return respuesta({ ok: false, error: 'Acción claude no reconocida: ' + action, code: 400 });
 }
 
