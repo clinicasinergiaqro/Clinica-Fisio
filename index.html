@@ -6398,7 +6398,7 @@ async function FST_montarAgendaCalendar(rango){
     + '<div style="font-size:13px;font-weight:700;color:var(--navy);margin-bottom:8px">📅 Agenda del calendario</div>'
     + '<div style="font-size:10px;color:var(--gray-400);margin:-4px 0 8px">Sincronizado desde Google Calendar · Solo lectura</div>'
     + '<div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap">'+btn('dia','Hoy')+btn('manana','Mañana')+btn('pasado','Pasado')+btn('semana','Semana')+btn('semanaSiguiente','Próxima')+'</div>'
-    + (esSupervisorUI()?'<div style="margin-bottom:10px;display:flex;gap:6px;flex-wrap:wrap;align-items:center"><button onclick="mostrarRendimientoEquipo(\'hoy\')" style="font-size:12px;font-weight:700;border:none;border-radius:10px;padding:6px 12px;cursor:pointer;font-family:inherit;background:#E8F5EE;color:#2E7D52">📊 Rendimiento</button><button id="btn-colarev" onclick="mostrarColaRevision()" style="font-size:12px;font-weight:700;border:none;border-radius:10px;padding:6px 12px;cursor:pointer;font-family:inherit;background:#FDE8E8;color:#B91C1C">🔍 Cola de revisión<span id="colarev-badge"></span></button><span style="position:relative;display:inline-block"><button onclick="_toggleMenuMasSup(this)" style="font-size:12px;font-weight:700;border:none;border-radius:10px;padding:6px 12px;cursor:pointer;font-family:inherit;background:#EEF1F6;color:var(--navy)">⚙️ Más ▾</button><div id="menu-mas-sup" style="display:none;position:absolute;right:0;top:112%;z-index:40;background:#fff;border:1px solid var(--gray-200);border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,.14);padding:6px;min-width:200px"><button onclick="document.getElementById(\'menu-mas-sup\').style.display=\'none\';toggleVistaTerapeuta()" style="display:block;width:100%;text-align:left;font-size:12px;font-weight:700;border:none;border-radius:8px;padding:9px 10px;cursor:pointer;font-family:inherit;background:#F7F9FC;color:var(--navy)">👁️ Ver como terapeuta</button>'+(_puedeBorrar()?'<button onclick="document.getElementById(\'menu-mas-sup\').style.display=\'none\';abrirPapelera()" style="display:block;width:100%;text-align:left;font-size:12px;font-weight:700;border:none;border-radius:8px;padding:9px 10px;margin-top:4px;cursor:pointer;font-family:inherit;background:#F7F9FC;color:#334155">🗑️ Papelera</button>':'')+'</div></span></div>':'')
+    + (esSupervisorUI()?'<div style="margin-bottom:10px;display:flex;gap:6px;flex-wrap:wrap;align-items:center"><button onclick="abrirConfirmacionesHoy()" style="font-size:12px;font-weight:700;border:none;border-radius:10px;padding:6px 12px;cursor:pointer;font-family:inherit;background:#DCFCE7;color:#15803D">📲 Confirmaciones de hoy</button><button onclick="mostrarRendimientoEquipo(\'hoy\')" style="font-size:12px;font-weight:700;border:none;border-radius:10px;padding:6px 12px;cursor:pointer;font-family:inherit;background:#E8F5EE;color:#2E7D52">📊 Rendimiento</button><button id="btn-colarev" onclick="mostrarColaRevision()" style="font-size:12px;font-weight:700;border:none;border-radius:10px;padding:6px 12px;cursor:pointer;font-family:inherit;background:#FDE8E8;color:#B91C1C">🔍 Cola de revisión<span id="colarev-badge"></span></button><span style="position:relative;display:inline-block"><button onclick="_toggleMenuMasSup(this)" style="font-size:12px;font-weight:700;border:none;border-radius:10px;padding:6px 12px;cursor:pointer;font-family:inherit;background:#EEF1F6;color:var(--navy)">⚙️ Más ▾</button><div id="menu-mas-sup" style="display:none;position:absolute;right:0;top:112%;z-index:40;background:#fff;border:1px solid var(--gray-200);border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,.14);padding:6px;min-width:200px"><button onclick="document.getElementById(\'menu-mas-sup\').style.display=\'none\';toggleVistaTerapeuta()" style="display:block;width:100%;text-align:left;font-size:12px;font-weight:700;border:none;border-radius:8px;padding:9px 10px;cursor:pointer;font-family:inherit;background:#F7F9FC;color:var(--navy)">👁️ Ver como terapeuta</button>'+(_puedeBorrar()?'<button onclick="document.getElementById(\'menu-mas-sup\').style.display=\'none\';abrirPapelera()" style="display:block;width:100%;text-align:left;font-size:12px;font-weight:700;border:none;border-radius:8px;padding:9px 10px;margin-top:4px;cursor:pointer;font-family:inherit;background:#F7F9FC;color:#334155">🗑️ Papelera</button>':'')+'</div></span></div>':'')
     + '<div id="banner-pend-personal"></div>'
     + '<div id="agenda-cal-list"><div style="font-size:12px;color:var(--gray-400);padding:6px 0">⏳ Cargando agenda…</div></div>'
     + '</div></div>';
@@ -24452,6 +24452,120 @@ function _modalCopiarTexto(texto){
   bClose.onclick=function(){ ov.remove(); };
   row.appendChild(bCopy); row.appendChild(bClose); box.appendChild(row); ov.appendChild(box); document.body.appendChild(ov);
 }
+// ── CONFIRMACIONES DE HOY — envío semi-manual por WhatsApp desde el PROPIO número ──
+// Botón supervisor en la agenda: arma la lista de citas de HOY del calendario, resuelve el teléfono del
+// paciente y abre WhatsApp con el mensaje YA escrito (1 toque por paciente). NO usa API; conserva el
+// número del usuario y su control total. Mensaje editable ({hora} se sustituye). Persiste quién ya se
+// envió hoy (localStorage por día) para no duplicar. Solo lectura del calendario; no toca saveDB.
+var _CONF_MSG_DEFAULT =
+'Buenos días 😊\n'+
+'Te recordamos que tienes una cita el día de hoy a las {hora}\n\n'+
+'📌 Importante:\n'+
+'El no responder este mensaje no cancela tu cita.\n'+
+'Si necesitas modificar o cancelar, es necesario avisar con mínimo 6 horas de anticipación.\n'+
+'En caso contrario, la sesión se cobrará en su totalidad, ya que respetamos el tiempo tanto del paciente como del fisioterapeuta.\n\n'+
+'Gracias por tu comprensión y nos vemos más tarde 🙌';
+function _confMsgPlantilla(){ try{ return localStorage.getItem('conf_msg_tpl') || _CONF_MSG_DEFAULT; }catch(_){ return _CONF_MSG_DEFAULT; } }
+function _confHoraAmigable(iso){
+  try{ var d=new Date(iso); if(isNaN(d.getTime())) return '';
+    var s=d.toLocaleTimeString('es-MX',{hour:'numeric',minute:'2-digit',hour12:true});
+    return s.replace(/\s*a\.?\s*m\.?/i,' a.m.').replace(/\s*p\.?\s*m\.?/i,' p.m.').trim();
+  }catch(_){ return ''; }
+}
+function _confSetEnviadas(){ var k='conf_enviadas_'+_hoyISOlocal(); try{ return new Set(JSON.parse(localStorage.getItem(k)||'[]')); }catch(_){ return new Set(); } }
+function _confMarcarEnviada(clave){ var k='conf_enviadas_'+_hoyISOlocal(); try{ var s=_confSetEnviadas(); s.add(clave); localStorage.setItem(k, JSON.stringify(Array.from(s))); }catch(_){} }
+function _confDesmarcarEnviada(clave){ var k='conf_enviadas_'+_hoyISOlocal(); try{ var s=_confSetEnviadas(); s.delete(clave); localStorage.setItem(k, JSON.stringify(Array.from(s))); }catch(_){} }
+async function abrirConfirmacionesHoy(){
+  if(typeof esSupervisorUI==='function' && !esSupervisorUI()){ showToast('Solo supervisor','error'); return; }
+  showToast('Cargando citas de hoy…');
+  var r; try{ r=await FST_fetchAgendaCalendar('dia'); }catch(e){ r=null; }
+  if(!r || !r.ok || !Array.isArray(r.eventos)){ showToast('No se pudo leer la agenda de hoy','error'); return; }
+  var eventos=r.eventos.filter(function(ev){ return ev && ev.paciente; });
+  var resueltos={}; try{ resueltos=await _resolverPacientesCalendario(eventos); }catch(_){ resueltos={}; }
+  var filas=[];
+  eventos.forEach(function(ev){
+    var clave=_normPend(ev.paciente||''); if(!clave) return;
+    var rr=resueltos[clave]||null;
+    var p=(rr&&rr.p)||null;
+    var tel=p?_normalizarTelWA(p.telefono):{valido:false,e164:null};
+    filas.push({
+      clave:clave, nombre:ev.paciente, hora:_confHoraAmigable(ev.inicio),
+      pid:(rr&&rr.pid)||'', tipo:(rr&&rr.tipo)||'',
+      tel: tel.valido?tel.e164:'', telOk:tel.valido,
+      resuelto:!!rr, ambiguo:!!(rr&&rr.ambiguo), esMigrado:!!(rr&&rr.tipo==='historico'&&!p)
+    });
+  });
+  filas.sort(function(a,b){ return (a.hora<b.hora)?-1:(a.hora>b.hora?1:0); });
+  _confHoyRender(filas);
+}
+function _confHoyRender(filas){
+  window._confFilas=filas;
+  var old=document.getElementById('confhoy-ov'); if(old) old.remove();
+  var ov=document.createElement('div'); ov.id='confhoy-ov';
+  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:100000;display:flex;align-items:flex-end;justify-content:center;padding:0';
+  ov.onclick=function(e){ if(e.target===ov) ov.remove(); };
+  var box=document.createElement('div');
+  box.style.cssText='background:#fff;border-radius:16px 16px 0 0;width:100%;max-width:560px;max-height:88vh;display:flex;flex-direction:column;overflow:hidden';
+  var tpl=_confMsgPlantilla();
+  box.innerHTML=
+    '<div style="padding:14px 16px 8px;border-bottom:1px solid #EEF1F6">'
+    +'<div style="display:flex;align-items:center;justify-content:space-between">'
+    +'<div style="font-size:16px;font-weight:800;color:var(--navy)">📲 Confirmaciones de hoy</div>'
+    +'<button onclick="var o=document.getElementById(\'confhoy-ov\');if(o)o.remove()" style="font-size:18px;background:none;border:none;cursor:pointer;color:#94A3B8">✕</button>'
+    +'</div>'
+    +'<div style="font-size:11px;color:#64748b;margin-top:3px">Se abre WhatsApp con el mensaje ya escrito — solo toca <b>Enviar</b>. Sale de <b>tu número</b>, uno por uno.</div>'
+    +'<details style="margin-top:8px"><summary style="font-size:12px;font-weight:700;color:#2563EB;cursor:pointer">✏️ Editar mensaje</summary>'
+    +'<textarea id="confhoy-tpl" style="width:100%;height:150px;margin-top:6px;font-size:12px;padding:8px;border:1px solid #E2E4E0;border-radius:8px;font-family:inherit;-webkit-user-select:text;user-select:text">'+escapeHTML(tpl)+'</textarea>'
+    +'<div style="font-size:11px;color:#64748b;margin:2px 0 6px">Usa <b>{hora}</b> donde va la hora de la cita (se sustituye sola).</div>'
+    +'<div style="display:flex;gap:6px"><button onclick="_confGuardarPlantilla()" style="font-size:12px;font-weight:700;background:#DCFCE7;color:#15803D;border:none;border-radius:8px;padding:7px 12px;cursor:pointer;font-family:inherit">Guardar mensaje</button>'
+    +'<button onclick="_confRestaurarPlantilla()" style="font-size:12px;font-weight:700;background:#F1F5F9;color:#475569;border:none;border-radius:8px;padding:7px 12px;cursor:pointer;font-family:inherit">Restaurar original</button></div>'
+    +'</details>'
+    +'</div>'
+    +'<div id="confhoy-body" style="flex:1;overflow-y:auto;padding:6px 14px 18px"></div>';
+  ov.appendChild(box); document.body.appendChild(ov);
+  _confHoyPintarBody();
+}
+function _confHoyPintarBody(){
+  var cont=document.getElementById('confhoy-body'); if(!cont) return;
+  var env=_confSetEnviadas();
+  var filas=window._confFilas||[];
+  var send=[], rev=[];
+  filas.forEach(function(f,i){ f._i=i; (f.telOk?send:rev).push(f); });
+  var nEnv=send.filter(function(f){ return env.has(f.clave); }).length;
+  var html='';
+  html+='<div style="font-size:12px;font-weight:700;color:#15803D;margin:4px 0 8px">Enviadas hoy: '+nEnv+' de '+send.length+(rev.length?(' · '+rev.length+' a revisar'):'')+'</div>';
+  if(!send.length && !rev.length){ html+='<div style="font-size:13px;color:#64748b;padding:12px 0">No hay citas de hoy en el calendario.</div>'; }
+  send.forEach(function(f){
+    var yl=env.has(f.clave);
+    html+='<div style="display:flex;align-items:center;gap:8px;padding:8px;border-bottom:1px solid #F0F2F7">'
+      +'<div style="font-size:12px;font-weight:800;color:var(--navy);min-width:66px">'+escapeHTML(f.hora||'')+'</div>'
+      +'<div style="flex:1;min-width:0;font-size:13px;font-weight:600;color:#1F2937;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+escapeHTML(f.nombre||'')+'</div>'
+      +(yl
+        ?'<span style="font-size:12px;font-weight:800;color:#15803D">✅ enviado</span><button onclick="_confHoyDesmarcar('+f._i+')" title="Deshacer" style="margin-left:4px;font-size:11px;background:#F1F5F9;border:none;border-radius:8px;padding:6px 9px;cursor:pointer;font-family:inherit">↺</button>'
+        :'<button onclick="_confHoyEnviar('+f._i+')" style="font-size:12px;font-weight:800;color:#fff;background:#25D366;border:none;border-radius:9px;padding:7px 13px;cursor:pointer;font-family:inherit">📲 Enviar</button>')
+      +'</div>';
+  });
+  if(rev.length){
+    html+='<div style="font-size:12px;font-weight:800;color:#B45309;margin:12px 0 4px">⚠️ Revisar manualmente ('+rev.length+')</div>';
+    rev.forEach(function(f){
+      var motivo = !f.resuelto ? 'No identificado en expediente'
+        : f.ambiguo ? 'Varios expedientes — vincula en 📊 Rendimiento'
+        : f.esMigrado ? 'Abre el expediente para el teléfono'
+        : 'Sin teléfono registrado';
+      html+='<div style="display:flex;align-items:center;gap:8px;padding:7px 8px;border-bottom:1px solid #F7F9FC">'
+        +'<div style="font-size:12px;font-weight:800;color:var(--navy);min-width:66px">'+escapeHTML(f.hora||'')+'</div>'
+        +'<div style="flex:1;min-width:0;font-size:12px;color:#475569;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+escapeHTML(f.nombre||'')+' · <span style="color:#B45309">'+motivo+'</span></div>'
+        +'<button onclick="_confHoyCopiar('+f._i+')" style="font-size:11px;font-weight:700;background:#EEF1F6;border:none;border-radius:8px;padding:6px 9px;cursor:pointer;font-family:inherit">📋 Copiar</button>'
+        +'</div>';
+    });
+  }
+  cont.innerHTML=html;
+}
+function _confHoyEnviar(i){ var f=(window._confFilas||[])[i]; if(!f||!f.tel) return; var msg=_confMsgPlantilla().replace(/\{hora\}/g, f.hora||''); try{ window.open('https://wa.me/'+f.tel+'?text='+encodeURIComponent(msg),'_blank'); }catch(_){} _confMarcarEnviada(f.clave); _confHoyPintarBody(); }
+function _confHoyDesmarcar(i){ var f=(window._confFilas||[])[i]; if(!f) return; _confDesmarcarEnviada(f.clave); _confHoyPintarBody(); }
+async function _confHoyCopiar(i){ var f=(window._confFilas||[])[i]; if(!f) return; var msg=_confMsgPlantilla().replace(/\{hora\}/g, f.hora||''); var ok=await _intentarCopiar(msg); if(ok) showToast('✅ Mensaje copiado','success'); else _modalCopiarTexto(msg); }
+function _confGuardarPlantilla(){ try{ var v=document.getElementById('confhoy-tpl').value; localStorage.setItem('conf_msg_tpl', v); showToast('✅ Mensaje guardado','success'); }catch(_){ showToast('No se pudo guardar','error'); } }
+function _confRestaurarPlantilla(){ try{ localStorage.removeItem('conf_msg_tpl'); var t=document.getElementById('confhoy-tpl'); if(t) t.value=_CONF_MSG_DEFAULT; showToast('Restaurado','success'); }catch(_){} }
 // [LINK LIGERO] El link que se manda al paciente apunta a rutina.html (página mínima que abre en datos
 // móviles), NO a index.html (la app completa, pesada). Deriva la carpeta de la URL actual y le agrega
 // rutina.html?ejercicios=TOKEN. Los links viejos (a index.html?ejercicios=) siguen funcionando.
