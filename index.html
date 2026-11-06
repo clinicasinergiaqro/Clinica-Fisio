@@ -1360,7 +1360,7 @@ body.modo-oscuro .topbar{background:#141824}
 <body>
 <div id="sync-indicator" class="sync-indicator ok" style="display:none"></div>
 <div id="app-version-chip" title="Versión de la app en este equipo — toca para buscar actualización" onclick="try{_tapVersionChip()}catch(e){}"></div>
-<script>/* VERSIÓN VISIBLE: refleja el index.html realmente cargado en ESTE equipo (se bumpea junto con sw.js). Así un iPad con versión vieja se ve de un vistazo. */window.APP_VERSION='v1-2026-11-06b';(function(){try{var c=document.getElementById('app-version-chip');if(c)c.textContent=window.APP_VERSION;}catch(e){}})();</script>
+<script>/* VERSIÓN VISIBLE: refleja el index.html realmente cargado en ESTE equipo (se bumpea junto con sw.js). Así un iPad con versión vieja se ve de un vistazo. */window.APP_VERSION='v1-2026-11-06c';(function(){try{var c=document.getElementById('app-version-chip');if(c)c.textContent=window.APP_VERSION;}catch(e){}})();</script>
 <div class="toast" id="toast" aria-live="polite" aria-atomic="true"></div>
 
 <!-- LOGIN -->
@@ -17158,13 +17158,48 @@ async function _espejarCampoFirestore(p, campo){
     return {ok:false, error:(e&&e.message)||'error'};
   }
 }
+// FIX SYNC-ESTUDIOS-INSTANTE (2026-11-06, caso Lucila/JESS: receta subida 3-nov, llegó a la nube
+// hasta que el fisio reabrió el expediente 6-nov → vivió 3 días SOLO en su equipo). El espejo frágil
+// de estudiosDocs para ACTIVOS (_espejarCampoFirestore con .set(merge) del array LOCAL) tenía 2 males:
+//  (1) merge sobre un campo ARRAY REEMPLAZA el array entero → podía TIRAR estudios que otro equipo
+//      agregó, y si FS no estaba listo encolaba a COLA_SYNC_HIST_DOC;
+//  (2) ese queue tiene guard de conflicto que manda a FALLIDOS los diffs cuyo doc en la nube quedó más
+//      nuevo → el estudio quedaba atorado indefinidamente, hasta que el reopen disparaba el write-back
+//      de FST_renderEstudiosApartado (la ÚNICA vía confiable).
+// Este helper trae esa MISMA lógica confiable al momento de SUBIR: fuerza init, LEE lo remoto, FUSIONA
+// (unión con dedup + tombstone, nunca pierde) y escribe la UNIÓN verificada con reintento → el estudio
+// llega a la nube en segundos y los demás equipos lo ven al abrir (lectura en vivo). Solo ACTIVOS.
+async function _syncEstudiosDocsFS(p){
+  try{
+    var ok = (typeof FST_init==='function') ? await FST_init() : false;
+    if(!ok || !window._fstDb){ _encolarHistDoc(p, ['estudiosDocs']); return {ok:false, pendiente:true}; }
+    var lastErr=null;
+    for(var intento=0; intento<2; intento++){
+      try{
+        var dsnap = await _conTimeout(window._fstDb.collection('pacientes').doc(p.id).get(), 8000);
+        var feR = ((dsnap && dsnap.data()) || {}).estudiosDocs;
+        var remoto = Array.isArray(feR) ? feR : [];
+        var fusion = _fusionarEstudiosDocs(Array.isArray(p.estudiosDocs)?p.estudiosDocs:[], remoto);
+        p.estudiosDocs = fusion;
+        await _conTimeout(window._fstDb.collection('pacientes').doc(p.id).set(_sinUndefined({ estudiosDocs: fusion }), { merge:true }), 8000);
+        return {ok:true};
+      }catch(e){ lastErr=e; }
+    }
+    _encolarHistDoc(p, ['estudiosDocs']);   // último recurso: cola durable (se auto-sana al coincidir la nube)
+    if(lastErr && lastErr.message==='timeout') return {ok:false, pendiente:true};
+    return {ok:false, error:(lastErr&&lastErr.message)||'sync-estudios'};
+  }catch(e){
+    try{ _encolarHistDoc(p, ['estudiosDocs']); }catch(_){}
+    return {ok:false, pendiente:true};
+  }
+}
 async function _persistirEstudios(p){
   if (patientsDB.some(function(x){ return x.id===p.id; })) {
     // ACTIVO: Sheets guarda el resto del paciente (SIN estudiosDocs); estudiosDocs va a Firestore
-    // (compartido) de forma DURABLE (antes: .set directo, sin _sinUndefined/_conTimeout, catch que
-    // tragaba el error → el toast mentía "agregado" y el espejo se perdía sin reintento).
+    // (compartido) VERIFICADO vía _syncEstudiosDocsFS (lee remoto + fusiona unión + escribe, reintento)
+    // → llega a la nube al instante, no depende de reabrir el expediente (fix 2026-11-06).
     await saveDB('pts',[p]);
-    var rf = await _espejarCampoFirestore(p, 'estudiosDocs');
+    var rf = await _syncEstudiosDocsFS(p);
     if(rf && rf.ok) return {ok:true};
     if(rf && rf.pendiente) return {ok:false, pendiente:true};
     return {ok:false, error:(rf&&rf.error)||'espejo-firestore'};
