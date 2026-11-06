@@ -2760,5 +2760,236 @@ function _claudeRouter_(body) {
   }
   // FIN MANTENIMIENTO TEMPORAL - quitar este bloque al terminar
 
+  // ── AUTO-CITAS recepción: manipular la hoja desde la conexión Claude ──
+  if (action === 'claudeRecepcion') {
+    var _sub = String(body.sub || '');
+    var _rss;
+    try { _rss = SpreadsheetApp.openById(RECEPCION_SHEET_ID); }
+    catch(eR){ return respuesta({ ok:false, error:'No pude abrir la hoja de recepción: '+eR, code:500 }); }
+    var _rsh = _rss.getSheetByName('REGISTRO DEL DÍA') || _rss.getSheetByName('REGISTRO DEL DIA');
+    if(!_rsh){ var _tds=_rss.getSheets(); if(_tds.length===1) _rsh=_tds[0]; }
+    if(!_rsh) return respuesta({ ok:false, error:'No encontré la pestaña REGISTRO DEL DÍA', code:500 });
+
+    if(_sub==='correr'){
+      var _ag = autoCitasRecepcion(body.dias || 1);
+      _claudeBitacora_(ss,'claudeRecepcion','correr agregadas='+_ag);
+      return respuesta({ ok:true, sub:'correr', agregadas:_ag });
+    }
+    if(_sub==='fechaFix'){
+      // SOLO cambia el FORMATO de la columna FECHA a d/m/aaaa. No toca valores ni borra.
+      var _d=_rsh.getDataRange().getValues(), _hr=-1;
+      function _nrm(x){ return String(x==null?'':x).normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase(); }
+      for(var _r=0;_r<Math.min(_d.length,12);_r++){ var _row=_d[_r].map(_nrm); if(_row.indexOf('fecha')!==-1 && _row.some(function(z){return z.indexOf('paciente')!==-1;})){ _hr=_r; break; } }
+      if(_hr<0) return respuesta({ ok:false, error:'No encontré el encabezado', code:500 });
+      var _head=_d[_hr].map(_nrm), _cf=-1;
+      for(var _i=0;_i<_head.length;_i++){ if(_head[_i].indexOf('fecha')!==-1){ _cf=_i; break; } }
+      if(_cf<0) return respuesta({ ok:false, error:'No hay columna FECHA', code:500 });
+      var _lr=_rsh.getLastRow(), _nf=_lr-(_hr+1);
+      if(_nf>0) _rsh.getRange(_hr+2, _cf+1, _nf, 1).setNumberFormat('d/m/yyyy');
+      _claudeBitacora_(ss,'claudeRecepcion','fechaFix filas='+_nf);
+      return respuesta({ ok:true, sub:'fechaFix', filas:_nf });
+    }
+    if(_sub==='nombresFix'){
+      // Actualiza los nombres CORTOS ya escritos en REGISTRO DEL DÍA al nombre COMPLETO del expediente,
+      // con la MISMA regla de coincidencia ÚNICA del auto-llenado. PREVIEW por defecto; aplicar:true escribe.
+      // Solo reescribe la celda PACIENTE (nunca toca fecha/terapeuta/formato/fórmulas/otras columnas).
+      var _aplicar = body.aplicar === true;
+      var _dv=_rsh.getDataRange().getValues(), _hr2=-1;
+      for(var _r2=0;_r2<Math.min(_dv.length,12);_r2++){
+        var _row2=_dv[_r2].map(_normRec_);
+        if(_row2.indexOf('paciente')!==-1 && _row2.some(function(x){return x.indexOf('asisti')!==-1;})){ _hr2=_r2; break; }
+      }
+      if(_hr2<0) return respuesta({ ok:false, error:'No encontré el encabezado', code:500 });
+      var _head2=_dv[_hr2].map(_normRec_), _cp2=-1;
+      for(var _i2=0;_i2<_head2.length;_i2++){ if(_head2[_i2].indexOf('paciente')!==-1){ _cp2=_i2; break; } }
+      if(_cp2<0) return respuesta({ ok:false, error:'No hay columna PACIENTE', code:500 });
+      var _idx2=null; try{ _idx2=_recepcionIndexNombres_(ss); }catch(eIx){ _idx2=null; }
+      if(!_idx2) return respuesta({ ok:false, error:'No pude armar el índice de nombres (Firestore/Sheet)', code:500 });
+      var _cache2={}, _cambios=0, _rev=0, _ej=[];
+      var _ini2=_hr2+1, _n2=_rsh.getLastRow()-_ini2;
+      if(_n2>0){
+        var _rng2=_rsh.getRange(_ini2+1, _cp2+1, _n2, 1), _vals2=_rng2.getValues(), _hubo=false;
+        for(var _k2=0;_k2<_vals2.length;_k2++){
+          var _orig=String(_vals2[_k2][0]==null?'':_vals2[_k2][0]);
+          if(!_orig.trim()) continue;
+          _rev++;
+          var _nk=_normRec_(_orig), _fin;
+          if(_cache2.hasOwnProperty(_nk)){ _fin=_cache2[_nk]; }
+          else { try{ _fin=_recepcionResolverNombre_(_orig,_idx2)||_orig; }catch(eRr){ _fin=_orig; } _cache2[_nk]=_fin; }
+          if(_fin && _normRec_(_fin)!==_nk){
+            _cambios++;
+            if(_ej.length<20) _ej.push({de:_orig, a:_fin});
+            if(_aplicar){ _vals2[_k2][0]=_fin; _hubo=true; }
+          }
+        }
+        if(_aplicar && _hubo) _rng2.setValues(_vals2);
+      }
+      _claudeBitacora_(ss,'claudeRecepcion','nombresFix aplicar='+_aplicar+' revisadas='+_rev+' cambios='+_cambios);
+      return respuesta({ ok:true, sub:'nombresFix', aplicado:_aplicar, revisadas:_rev, cambios:_cambios, ejemplos:_ej });
+    }
+    return respuesta({ ok:false, error:'claudeRecepcion sub no reconocido: '+_sub, code:400 });
+  }
+
   return respuesta({ ok: false, error: 'Acción claude no reconocida: ' + action, code: 400 });
+}
+
+// ════════ AUTO-CITAS: calendario → hoja de RECEPCIÓN (REGISTRO DEL DÍA) ════════
+// Reusa parsearTituloAgenda_ de este mismo archivo. Idempotente: no duplica (mismo día + mismo paciente).
+// NO escribe terapeuta (la inicial del calendario puede cambiar y metería ruido) ni toca paquetes.
+// CRUCE DE NOMBRE COMPLETO: resuelve el nombre del calendario al del expediente (activos+migrados) SOLO si
+// hay coincidencia ÚNICA (exacta o subset-única ≥2 tokens); si hay duda, deja el del calendario (nunca adivina).
+// CONFIG: pon abajo el ID de la hoja de recepción (debe ser Google Sheet, no .xlsx).
+// INSTALAR: Guardar → correr autoCitasRecepcion una vez (prueba) → correr instalarAutoCitas una vez.
+var RECEPCION_SHEET_ID = '1WSji4eBJ9mQMRTCCX2Yg8LFhkwa6UlJXx0OFRR1NaNQ';   // PAGOS 26 OCT 2026 (Google Sheet de recepción, producción).
+var RECEPCION_DIAS     = 1;   // 1 = solo hoy. 2 = hoy y mañana.
+var _BLOQUE_RE_REC = /(^|\s)(clase|no viene|no vino|no esta|no está|bloque|junta|comida|vacacion|falta|cumple|evento|curso|taller|cerrado|festivo|reunion|descanso|puente|en espera|solo )/i;
+
+function _normRec_(s){ return String(s==null?'':s).normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().replace(/[^a-z0-9 ]/g,' ').replace(/\s+/g,' ').trim(); }
+function _diaKeyRec_(v){
+  if(v instanceof Date) return Utilities.formatDate(v,'America/Mexico_City','yyyyMMdd');
+  var s=String(v==null?'':v).trim(), m=s.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/);
+  if(m){ var y=m[3]; if(y.length<4) y='20'+y; return y+('0'+m[2]).slice(-2)+('0'+m[1]).slice(-2); }
+  m=s.match(/(\d{4})-(\d{2})-(\d{2})/); if(m) return m[1]+m[2]+m[3];
+  return s;
+}
+
+// ── CRUCE DE NOMBRE COMPLETO (conservador: solo coincidencia ÚNICA) ──
+// Construye el índice de nombres de TODOS los expedientes: activos del Sheet + migrados de Firestore.
+// Devuelve {byExact:{normCompleto:[full,...]}, list:[{full,tok:{token:true}}]} o null si no se pudo.
+// NUNCA tira: si Firestore falla, usa solo activos; si todo falla, devuelve null (y el auto-llenado deja el nombre del calendario).
+function _recepcionIndexNombres_(ss){
+  var list=[], byExact={};
+  function _add(full){
+    full=String(full==null?'':full).trim(); if(!full) return;
+    var norm=_normRec_(full); if(!norm) return;
+    if(/\b(test|prueba|papelera|qa)\b/.test(norm)) return;   // salta nombres de prueba/papelera
+    var toks=norm.split(' ').filter(function(t){return t.length>=2;}); if(!toks.length) return;
+    var tm={}; for(var i=0;i<toks.length;i++) tm[toks[i]]=true;
+    list.push({full:full, tok:tm});
+    (byExact[norm]=byExact[norm]||[]).push(full);
+  }
+  // ACTIVOS (Sheet)
+  try{
+    var acts=leerPacientes(ss);
+    for(var a=0;a<acts.length;a++){
+      var p=acts[a]; if(!p) continue;
+      if(String(p.id||'').indexOf('mig_pac_')===0) continue;
+      if(p._activoEliminado===true || p.eliminado===true) continue;
+      _add(p.name);
+    }
+  }catch(eA){}
+  // MIGRADOS (Firestore pacientes) — solo campos de nombre (mask) para que sea liviano
+  try{
+    var tok=_claudeFsToken_();
+    if(tok){
+      var PROJ=PropertiesService.getScriptProperties().getProperty('FIRESTORE_PROJECT_ID')||'clinicasinergia-ec2cf';
+      var base='https://firestore.googleapis.com/v1/projects/'+PROJ+'/databases/(default)/documents/pacientes?pageSize=300'
+        +'&mask.fieldPaths=name&mask.fieldPaths=eliminado';
+      var pageToken='', paginas=0;
+      do{
+        var url=base+(pageToken?'&pageToken='+encodeURIComponent(pageToken):'');
+        var r=UrlFetchApp.fetch(url,{method:'get',headers:{Authorization:'Bearer '+tok},muteHttpExceptions:true});
+        if(r.getResponseCode()!==200) break;
+        var j=JSON.parse(r.getContentText()||'{}');
+        (j.documents||[]).forEach(function(doc){ var f=_fsDecodeFields_(doc.fields||{}); if(f.eliminado===true) return; _add(f.name); });
+        pageToken=j.nextPageToken||''; paginas++;
+      } while(pageToken && paginas<30);
+    }
+  }catch(eM){}
+  if(!list.length) return null;
+  return {byExact:byExact, list:list};
+}
+
+// Resuelve el nombre del calendario al nombre COMPLETO del expediente SOLO si hay coincidencia ÚNICA.
+// Duda (0 o >1 coincidencias) → devuelve el nombre del calendario sin cambios (NUNCA adivina).
+function _recepcionResolverNombre_(calNombre, idx){
+  if(!idx) return calNombre;
+  var norm=_normRec_(calNombre); if(!norm) return calNombre;
+  var ex=idx.byExact[norm];
+  if(ex && ex.length===1) return ex[0];        // 1) exacto y único
+  if(ex && ex.length>1) return calNombre;      //    homónimo exacto → no adivinar
+  var calToks=norm.split(' ').filter(function(t){return t.length>=2;});
+  if(calToks.length<2) return calNombre;       // 2) subset: 1 solo token (nombre de pila) = demasiado ambiguo
+  var hit=null, n=0, L=idx.list;
+  for(var i=0;i<L.length;i++){
+    var tm=L[i].tok, ok=true;
+    for(var k=0;k<calToks.length;k++){ if(!tm[calToks[k]]){ ok=false; break; } }
+    if(ok){ n++; hit=L[i]; if(n>1) break; }
+  }
+  if(n===1 && hit) return hit.full;            // subset único → nombre completo
+  return calNombre;
+}
+
+function autoCitasRecepcion(diasAdelante){
+  var dias = diasAdelante || RECEPCION_DIAS;
+  var ss = SpreadsheetApp.openById(RECEPCION_SHEET_ID);
+  var sh = ss.getSheetByName('REGISTRO DEL DÍA') || ss.getSheetByName('REGISTRO DEL DIA');
+  if(!sh){ var _todas=ss.getSheets(); if(_todas.length===1) sh=_todas[0]; }   // solo cae a la 1a pestaña si la hoja tiene UNA (prueba); nunca escribe en otra pestaña de recepción
+  if(!sh){ Logger.log('No encontré la pestaña REGISTRO DEL DÍA'); return 0; }
+  var datos = sh.getDataRange().getValues(), hdr=-1;
+  for(var r=0;r<Math.min(datos.length,12);r++){
+    var row=datos[r].map(_normRec_);
+    if(row.indexOf('paciente')!==-1 && row.some(function(x){return x.indexOf('asisti')!==-1;})){ hdr=r; break; }
+  }
+  if(hdr<0){ Logger.log('No encontré el encabezado'); return 0; }
+  var head=datos[hdr].map(_normRec_);
+  function _colRec_(k){ for(var i=0;i<head.length;i++){ if(head[i].indexOf(k)!==-1) return i; } return -1; }
+  var cF=_colRec_('fecha'), cP=_colRec_('paciente'), cS=_colRec_('servicio');
+  if(cF<0||cP<0){ Logger.log('Faltan columnas fecha/paciente'); return 0; }
+  var existe={};
+  for(var r2=hdr+1;r2<datos.length;r2++){ var p=datos[r2][cP]; if(p) existe[_diaKeyRec_(datos[r2][cF])+'|'+_normRec_(p)]=true; }
+  var cal = CalendarApp.getDefaultCalendar();
+  if(!cal){ Logger.log('No se pudo abrir el calendario'); return 0; }
+  var idxNom=null; try{ idxNom=_recepcionIndexNombres_(ss); }catch(eIdx){ idxNom=null; }   // índice de nombres (nunca rompe)
+  var ancho=sh.getLastColumn(), hoy=new Date(); hoy.setHours(0,0,0,0);
+  var nuevas=[], up=0;
+  for(var d=0; d<dias; d++){
+    var ini=new Date(hoy.getTime()+d*86400000), fin=new Date(ini.getTime()+86400000);
+    var evs=cal.getEvents(ini,fin);
+    for(var e=0;e<evs.length;e++){
+      if(evs[e].isAllDayEvent()) continue;
+      var titulo=evs[e].getTitle();
+      if(!titulo || _BLOQUE_RE_REC.test(titulo)) continue;
+      var pr=parsearTituloAgenda_(titulo);
+      if(pr.omitir) continue;
+      var nombreCal=String(pr.paciente||'').trim();
+      if(!nombreCal || nombreCal==='(sin nombre)') continue;
+      // CRUCE DE NOMBRE COMPLETO: solo coincidencia única; si hay duda, deja el del calendario
+      var nombre=nombreCal;
+      try{ nombre=_recepcionResolverNombre_(nombreCal, idxNom)||nombreCal; }catch(eRes){ nombre=nombreCal; }
+      if(_normRec_(nombre)!==_normRec_(nombreCal)) up++;
+      // dedup bajo el nombre final Y el del calendario (no duplica una cita ya puesta con nombre corto)
+      var diaK=_diaKeyRec_(ini), keyFin=diaK+'|'+_normRec_(nombre), keyCal=diaK+'|'+_normRec_(nombreCal);
+      if(existe[keyFin]||existe[keyCal]) continue;
+      existe[keyFin]=true; existe[keyCal]=true;
+      var fila=[]; for(var c=0;c<ancho;c++){ fila[c]=''; }
+      fila[cF]=new Date(ini.getFullYear(),ini.getMonth(),ini.getDate(),12,0,0);  // mediodía: evita que la zona horaria corra el día
+      fila[cP]=nombre;
+      if(cS>=0) fila[cS]='FISIOTERAPIA';
+      nuevas.push(fila);
+    }
+  }
+  if(nuevas.length){
+    var _inicio = sh.getLastRow()+1;
+    var _dest = sh.getRange(_inicio,1,nuevas.length,ancho);
+    _dest.setValues(nuevas);
+    // RESPETAR EL FORMATO: copiar estilo (bordes/colores/formato de fecha) + menús desplegables
+    // de la 1a fila de datos (plantilla) a las filas nuevas. No pisa los valores recién escritos.
+    var _mfila = hdr+2;
+    if(_mfila < _inicio){
+      var _modelo = sh.getRange(_mfila,1,1,ancho);
+      _modelo.copyTo(_dest, {formatOnly:true});
+      try{ var _dv=_modelo.getDataValidations()[0], _dvAll=[]; for(var _q=0;_q<nuevas.length;_q++){ _dvAll.push(_dv.slice()); } _dest.setDataValidations(_dvAll); }catch(_e){}
+    }
+    // FECHA SIEMPRE día/mes/año (d/m/aaaa), sin importar el locale de la hoja — y sigue siendo fecha real
+    try{ sh.getRange(_inicio, cF+1, nuevas.length, 1).setNumberFormat('d/m/yyyy'); }catch(_e2){}
+  }
+  Logger.log('Auto-citas: agregadas '+nuevas.length+' cita(s) ('+up+' con nombre completo del expediente). Terapeuta se deja en blanco a propósito.');
+  return nuevas.length;
+}
+
+function instalarAutoCitas(){
+  ScriptApp.getProjectTriggers().forEach(function(t){ if(t.getHandlerFunction()==='autoCitasRecepcion') ScriptApp.deleteTrigger(t); });
+  ScriptApp.newTrigger('autoCitasRecepcion').timeBased().everyHours(1).create();
+  Logger.log('✅ Auto-citas instalado (corre cada hora). Para apagarlo: borra el disparador en Activadores.');
 }

@@ -1360,7 +1360,7 @@ body.modo-oscuro .topbar{background:#141824}
 <body>
 <div id="sync-indicator" class="sync-indicator ok" style="display:none"></div>
 <div id="app-version-chip" title="Versión de la app en este equipo — toca para buscar actualización" onclick="try{_tapVersionChip()}catch(e){}"></div>
-<script>/* VERSIÓN VISIBLE: refleja el index.html realmente cargado en ESTE equipo (se bumpea junto con sw.js). Así un iPad con versión vieja se ve de un vistazo. */window.APP_VERSION='v1-2026-11-05h';(function(){try{var c=document.getElementById('app-version-chip');if(c)c.textContent=window.APP_VERSION;}catch(e){}})();</script>
+<script>/* VERSIÓN VISIBLE: refleja el index.html realmente cargado en ESTE equipo (se bumpea junto con sw.js). Así un iPad con versión vieja se ve de un vistazo. */window.APP_VERSION='v1-2026-11-06a';(function(){try{var c=document.getElementById('app-version-chip');if(c)c.textContent=window.APP_VERSION;}catch(e){}})();</script>
 <div class="toast" id="toast" aria-live="polite" aria-atomic="true"></div>
 
 <!-- LOGIN -->
@@ -7273,6 +7273,32 @@ function _difDiasCanon(a,b){
   if(isNaN(da.getTime())||isNaN(db.getTime())) return 99;
   return Math.round(Math.abs(da-db)/86400000);
 }
+// [SIN-DOC ACTIVO v2 · caso Jess 2026-11-06] Las notas VIVAS de un ACTIVO NO viven bajo
+// pacientes/{p…}/sesiones (ese doc está VACÍO) sino bajo el pid que usa el WRITE PATH —
+// app_live_<hash> o el espejo appSourceId— vía FST_resolverPidPaciente (el MISMO resolvedor con el que
+// la app guarda las notas vivas). Los guards de confirmación (banner de agenda Y dashboard de
+// Rendimiento) leían el p… CRUDO → ese subcolección está vacía → nunca confirmaban → 🔴 "sin documentar"
+// FALSO clavado cuando la nota la escribió OTRA fisio desde otro equipo y el Sheet de ESTE equipo va
+// atrasado (así crecían los 115 de Jess, obligando a re-documentar expedientes ya hechos). Este helper
+// devuelve el pid REAL donde están las notas; si no resuelve, cae al p… original (read-only, nunca
+// perdona a ciegas: si no puede resolver, el guard conserva el 🔴). mig_pac_ se resuelve a sí mismo.
+// Devuelve TODOS los pids candidatos donde pudo quedar la nota del activo (a prueba de que la
+// resolución cambie con el tiempo): (1) app_live_<hash(appId)> determinista —donde la app escribe las
+// notas vivas—, (2) el pid que resuelve HOY (puede ser el espejo appSourceId o un homónimo único),
+// (3) el p… crudo. El guard confirma contra la UNIÓN: si CUALQUIERA tiene la fecha → salda; si ninguno
+// (o fallo de lectura) → conserva el 🔴. mig_pac_ → sólo su propio doc.
+async function _fsPidsNotasActivo(p){
+  var out=[];
+  try{
+    if(!p) return out;
+    var _id=String(p.id||'').trim();
+    if(_id.indexOf('mig_pac_')===0) return [_id];
+    if(_id && typeof FST_hashSimpleLive==='function'){ out.push('app_live_'+FST_hashSimpleLive(_id)); }
+    try{ if(typeof FST_resolverPidPaciente==='function'){ var r=await FST_resolverPidPaciente(p); if(r&&r.ok&&r.pid) out.push(r.pid); } }catch(_e){}
+    if(_id) out.push(_id);
+  }catch(_e){ if(p&&p.id) out.push(String(p.id)); }
+  var seen={}, dedup=[]; out.forEach(function(x){ if(x&&!seen[x]){ seen[x]=1; dedup.push(x); } }); return dedup;
+}
 window._bannerPendCache=null;   // {ts, cod, total, items} — TTL = REND_CACHE_TTL_MS (5 min)
 async function _computarBannerPendientes(){
   var cod=String((currentUser&&currentUser.name)||'').toUpperCase();
@@ -7353,7 +7379,7 @@ async function _computarBannerPendientes(){
     // salía "sin documentar". Se tag el activo para confirmarlo abajo contra las sesiones REALES
     // (FST_fetchSesiones del propio uuid, igual que _RPT_obtenerSesionesDedup/actualizarFechasClinicas
     // que SÍ pintan su historial), antes de rendir el pendiente.
-    else if(r.tipo==='activo' && r.pid){ _it._pidActivo=r.pid; _it._citaCanon=citaCanon; }
+    else if(r.tipo==='activo' && r.pid){ _it._pidActivo=r.pid; _it._pActivo=r.p; _it._citaCanon=citaCanon; }
     items.push(_it);
   });
   // ── [GUARD DE CONFIRMACIÓN CONTRA NOTAS VIVAS] ──────────────────────────────────────
@@ -7370,8 +7396,17 @@ async function _computarBannerPendientes(){
   try{
     var _liveCand=items.filter(function(x){ return (x._pidHist || x._pidActivo) && x._citaCanon; });
     if(_liveCand.length && (await FST_init()) && window._fstDb){
+      // [SIN-DOC ACTIVO v2 · Jess 2026-11-06] Para un ACTIVO las notas vivas NO están bajo
+      // pacientes/{p…}/sesiones (vacío) sino bajo el pid del write path (app_live_<hash>/espejo).
+      // Resolver ese pid ANTES de leer; históricos usan su propio doc (_pidHist) sin cambio. Si no
+      // resuelve → cae al p… original (el guard conservará el 🔴, nunca perdona a ciegas).
+      await Promise.all(_liveCand.map(async function(x){
+        if(x._pidHist){ x._fsPids=[x._pidHist]; return; }
+        if(x._pActivo){ var _a=await _fsPidsNotasActivo(x._pActivo); x._fsPids=(_a&&_a.length)?_a:[x._pidActivo]; return; }
+        x._fsPids=[x._pidActivo];
+      }));
       var _pidsChk={};
-      _liveCand.forEach(function(x){ _pidsChk[x._pidHist||x._pidActivo]=true; });
+      _liveCand.forEach(function(x){ (x._fsPids||[]).forEach(function(_pp){ if(_pp) _pidsChk[_pp]=true; }); });
       var _diasRealesPorPid={};
       await Promise.all(Object.keys(_pidsChk).map(async function(pid){
         try{
@@ -7386,10 +7421,9 @@ async function _computarBannerPendientes(){
       }));
       var _repara={};   // SOLO históricos: pid → {isoDia:true} a unir al índice fechasSesiones del padre
       items=items.filter(function(x){
-        var _lp=x._pidHist||x._pidActivo;
-        if(!(_lp && x._citaCanon)) return true;
-        var _ds=_diasRealesPorPid[_lp];
-        if(_ds && _ds[x._citaCanon]){
+        if(!((x._pidHist||x._pidActivo) && x._citaCanon)) return true;
+        var _hit=(x._fsPids||[]).some(function(_pp){ var _ds=_diasRealesPorPid[_pp]; return _ds && _ds[x._citaCanon]; });
+        if(_hit){
           if(x._pidHist){   // auto-sanar el índice cojo (solo los históricos lo usan)
             (_repara[x._pidHist]=_repara[x._pidHist]||{})[x._citaCanon]=true;
             try{ var _mf=window._triUltimaHistCache&&window._triUltimaHistCache.mapFechas; if(_mf){ if(!Array.isArray(_mf[x._claveHist])) _mf[x._claveHist]=[]; if(_mf[x._claveHist].indexOf(x._citaCanon)===-1) _mf[x._claveHist].push(x._citaCanon); } }catch(_){}
@@ -7405,7 +7439,7 @@ async function _computarBannerPendientes(){
       });
     }
   }catch(_eCojo){}
-  items.forEach(function(x){ delete x._pidHist; delete x._citaCanon; delete x._claveHist; delete x._pidActivo; });   // limpiar campos internos antes de cachear/rendir
+  items.forEach(function(x){ delete x._pidHist; delete x._citaCanon; delete x._claveHist; delete x._pidActivo; delete x._pActivo; delete x._fsPids; });   // limpiar campos internos antes de cachear/rendir
   var out={ts:Date.now(), cod:cod, total:items.length, items:items};
   window._bannerPendCache=out;
   // SWR: persistir en localStorage para que la caja SOBREVIVA recargas (SW nuevo, cold start) y no
@@ -9011,14 +9045,26 @@ async function _confirmarActivosTriFS(tri){
     Object.keys(TERAPEUTA_CAL2COD).forEach(function(n){
       var t=tri[n]; if(!t || !Array.isArray(t.sinNotaPacs)) return;
       t.sinNotaPacs.forEach(function(x){
-        if(x && x.tipo==='activo' && x.pid){ var cc=_diaCanon(x.fecha); if(cc) pend.push({ter:n, pid:String(x.pid), citaCanon:cc, fecha:x.fecha}); }
+        if(x && x.tipo==='activo' && x.pid){ var cc=_diaCanon(x.fecha); if(cc) pend.push({ter:n, pid:String(x.pid), citaCanon:cc, fecha:x.fecha, nombre:x.nombre||''}); }
       });
     });
     if(!pend.length) return;
     if(!(await FST_init()) || !window._fstDb) return;   // sin red → conservar TODO (no se toca nada)
-    var pids={}; pend.forEach(function(p){ pids[p.pid]=true; });
+    // [SIN-DOC ACTIVO v2 · Jess 2026-11-06] Las notas vivas del activo viven bajo el pid del WRITE PATH
+    // (app_live_<hash>/espejo), NO bajo pacientes/{p…}/sesiones (vacío). Resolver TODOS los candidatos y
+    // confirmar contra su UNIÓN; si ninguno tiene la fecha (o falla la lectura) → conserva el 🔴.
+    var _fsDe={};
+    await Promise.all(pend.map(async function(p){
+      if(_fsDe[p.pid]!==undefined) return;
+      _fsDe[p.pid]=[p.pid];   // reserva síncrona: no resolver 2 veces el mismo activo en el batch
+      var _po=(typeof patientsDB!=='undefined'&&Array.isArray(patientsDB))?patientsDB.find(function(q){return q&&String(q.id)===p.pid;}):null;
+      if(!_po) _po={id:p.pid, name:p.nombre};
+      var _a=await _fsPidsNotasActivo(_po); _fsDe[p.pid]=(_a&&_a.length)?_a:[p.pid];
+    }));
+    pend.forEach(function(p){ p.fsPids=_fsDe[p.pid]||[p.pid]; });
+    var pids={}; pend.forEach(function(p){ (p.fsPids||[]).forEach(function(_pp){ if(_pp) pids[_pp]=true; }); });
     var diasPorPid={};
-    await Promise.all(Object.keys(pids).slice(0,250).map(async function(pid){
+    await Promise.all(Object.keys(pids).slice(0,500).map(async function(pid){   // tope ampliado: ahora hasta ~3 pids candidatos por activo (v2)
       try{
         var ses=null, tsC=(typeof _fstSesionesCacheTs!=='undefined'&&_fstSesionesCacheTs[pid])||0;
         if(typeof _fstSesionesCache!=='undefined' && Array.isArray(_fstSesionesCache[pid]) && _fstSesionesCache[pid].length && (Date.now()-tsC)<_FST_SES_TTL_MS){ ses=_fstSesionesCache[pid]; }
@@ -9029,7 +9075,7 @@ async function _confirmarActivosTriFS(tri){
       }catch(_e){ diasPorPid[pid]=null; }
     }));
     var creditar={};   // ter → { 'pid|fecha':true }
-    pend.forEach(function(p){ var ds=diasPorPid[p.pid]; if(ds && ds[p.citaCanon]){ (creditar[p.ter]=creditar[p.ter]||{})[p.pid+'|'+p.fecha]=true; } });
+    pend.forEach(function(p){ var _hit=(p.fsPids||[]).some(function(_pp){ var ds=diasPorPid[_pp]; return ds && ds[p.citaCanon]; }); if(_hit){ (creditar[p.ter]=creditar[p.ter]||{})[p.pid+'|'+p.fecha]=true; } });
     var porDia=tri._porDia||{};
     Object.keys(creditar).forEach(function(n){
       var t=tri[n]; if(!t) return;
