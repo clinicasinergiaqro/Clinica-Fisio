@@ -2889,6 +2889,56 @@ function _claudeRouter_(body) {
       _claudeBitacora_(ss,'claudeRecepcion','nombresFix aplicar='+_aplicar+' revisadas='+_rev+' cambios='+_cambios);
       return respuesta({ ok:true, sub:'nombresFix', aplicado:_aplicar, revisadas:_rev, cambios:_cambios, ejemplos:_ej });
     }
+    if(_sub==='buscar'){
+      // LECTURA: para cada {pac, fecha:'YYYY-MM-DD'} devuelve las filas de REGISTRO DEL DÍA
+      // que coinciden (paciente normalizado igual o subset de tokens + misma fecha) con su
+      // TERAPEUTA y ASISTIÓ. NO escribe nada.
+      var _cons = body.consultas || [];
+      if(!_cons.length) return respuesta({ ok:false, error:'Falta consultas:[{pac,fecha}]', code:400 });
+      var _dvB=_rsh.getDataRange().getValues(), _hrB=-1;
+      for(var _rb=0;_rb<Math.min(_dvB.length,12);_rb++){
+        var _rowB=_dvB[_rb].map(_normRec_);
+        if(_rowB.indexOf('paciente')!==-1 && _rowB.some(function(x){return x.indexOf('fecha')!==-1;})){ _hrB=_rb; break; }
+      }
+      if(_hrB<0) return respuesta({ ok:false, error:'No encontré el encabezado', code:500 });
+      var _hB=_dvB[_hrB].map(_normRec_);
+      function _colB(sub){ for(var i=0;i<_hB.length;i++){ if(_hB[i].indexOf(sub)!==-1) return i; } return -1; }
+      var _cF=_colB('fecha'), _cP=_colB('paciente'), _cT=_colB('terapeuta'), _cA=_colB('asisti');
+      if(_cF<0||_cP<0) return respuesta({ ok:false, error:'Faltan columnas FECHA/PACIENTE', code:500 });
+      function _pad(n){ return (n<10?'0':'')+n; }
+      function _fechaKey(v){
+        if(v instanceof Date) return v.getFullYear()+'-'+_pad(v.getMonth()+1)+'-'+_pad(v.getDate());
+        var s=String(v==null?'':v).trim();
+        var m=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/); if(m) return m[3]+'-'+_pad(+m[2])+'-'+_pad(+m[1]);
+        m=s.match(/^(\d{4})-(\d{2})-(\d{2})/); if(m) return m[1]+'-'+m[2]+'-'+m[3];
+        return s;
+      }
+      function _toks(s){ return _normRec_(s).split(' ').filter(function(t){return t.length>1;}); }
+      function _subset(a,b){ for(var i=0;i<a.length;i++){ if(b.indexOf(a[i])===-1) return false; } return a.length>0; }
+      // indexar filas por fecha
+      var _porFecha={};
+      for(var _ri=_hrB+1;_ri<_dvB.length;_ri++){
+        var _fk=_fechaKey(_dvB[_ri][_cF]);
+        if(!_fk) continue;
+        (_porFecha[_fk]=_porFecha[_fk]||[]).push(_ri);
+      }
+      var _out=[];
+      for(var _c=0;_c<_cons.length;_c++){
+        var _q=_cons[_c], _qp=String(_q.pac||''), _qf=String(_q.fecha||'').slice(0,10);
+        var _qt=_toks(_qp), _qn=_normRec_(_qp), _ms=[];
+        var _candRows=_porFecha[_qf]||[];
+        for(var _m=0;_m<_candRows.length;_m++){
+          var _row=_dvB[_candRows[_m]], _cellP=String(_row[_cP]==null?'':_row[_cP]);
+          var _cn=_normRec_(_cellP), _ct=_toks(_cellP);
+          if(_cn===_qn || _subset(_qt,_ct) || _subset(_ct,_qt)){
+            _ms.push({ paciente:_cellP, terapeuta:(_cT>=0?String(_row[_cT]||'').trim():''), asistio:(_cA>=0?String(_row[_cA]||'').trim():'') });
+          }
+        }
+        _out.push({ pac:_qp, fecha:_qf, matches:_ms });
+      }
+      _claudeBitacora_(ss,'claudeRecepcion','buscar consultas='+_cons.length);
+      return respuesta({ ok:true, sub:'buscar', resultados:_out });
+    }
     return respuesta({ ok:false, error:'claudeRecepcion sub no reconocido: '+_sub, code:400 });
   }
 
