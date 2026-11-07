@@ -2619,6 +2619,7 @@ function _claudeRouter_(body) {
   var _mntPatch = function(path, obj, mask){ var t=_mntTok(); var q = (mask&&mask.length) ? ('?'+mask.map(function(m){return 'updateMask.fieldPaths='+encodeURIComponent(m);}).join('&')) : ''; var r=UrlFetchApp.fetch(_mntBase()+'/'+path+q,{method:'patch',contentType:'application/json',headers:{Authorization:'Bearer '+t},muteHttpExceptions:true,payload:JSON.stringify(_mntEnc(obj))}); return r.getResponseCode(); };
   var _mntCreate = function(coll, obj){ var t=_mntTok(); var r=UrlFetchApp.fetch(_mntBase()+'/'+coll,{method:'post',contentType:'application/json',headers:{Authorization:'Bearer '+t},muteHttpExceptions:true,payload:JSON.stringify(_mntEnc(obj))}); return {code:r.getResponseCode(), name:((JSON.parse(r.getContentText()||'{}')||{}).name||'')}; };
   var _mntListSub = function(path){ var t=_mntTok(); var out=[]; var pg=''; do { var u=_mntBase()+'/'+path+'?pageSize=300'+(pg?('&pageToken='+encodeURIComponent(pg)):''); var r=UrlFetchApp.fetch(u,{method:'get',headers:{Authorization:'Bearer '+t},muteHttpExceptions:true}); if(r.getResponseCode()!==200) break; var j=JSON.parse(r.getContentText()||'{}'); (j.documents||[]).forEach(function(d){ out.push({id:String(d.name||'').split('/').pop(), data:_fsDecodeFields_(d.fields||{})}); }); pg=j.nextPageToken||''; } while(pg); return out; };
+  var _mntDelete = function(path){ var t=_mntTok(); if(!t) return false; var r=UrlFetchApp.fetch(_mntBase()+'/'+path,{method:'delete',headers:{Authorization:'Bearer '+t},muteHttpExceptions:true}); var c=r.getResponseCode(); return (c>=200&&c<300); };
   var _mntVacio = function(v){ if (v===null||v===undefined) return true; if (typeof v==='string'){ var t=v.trim().toLowerCase(); return (!t || /^(pendiente|no cuenta con diagn|sin diagn|no especificad|ninguna|ninguno|n\/?d|n\/?a|—|-|\[pendiente\])/.test(t)); } if (Array.isArray(v)) return v.length===0; if (typeof v==='object'){ for (var k in v){ if (!_mntVacio(v[k])) return false; } return true; } return false; };
   var _mntTombstonePac = function(pid, borradoPor, ts, esHist){
     var pref = 'pacientes/' + encodeURIComponent(pid);
@@ -2757,6 +2758,67 @@ function _claudeRouter_(body) {
     }
     _claudeBitacora_(ss,'claudeFusionarPacientes','pri='+pPri+' sec='+pSec+' estudios='+(campos.estudiosDocs?campos.estudiosDocs.length:0)+' sesMovidas='+sesMovidas+'/'+sesTotal+' secBorrado='+(tombSec&&tombSec.ok));
     return respuesta({ ok:true, idPrincipal:pPri, idSecundario:pSec, estudiosEnPrincipal:(campos.estudiosDocs?campos.estudiosDocs.length:0), sesionesMovidas:sesMovidas, sesionesSecundario:sesTotal, secundarioBorrado:(tombSec&&tombSec.ok)||false, revMergeTs:tsMg, restaurable:true });
+  }
+  // DES-FUSIÓN: deshace un claudeFusionarPacientes (RESTAURABLE). Restaura el expediente
+  // secundario (quita tombstone + papelera), devuelve el principal a su estado PRE-fusión
+  // (nombre + arrays + campos que la fusión pudo rellenar) y BORRA del principal las notas
+  // que la fusión copió (ids que terminan en __mg<ts>). El ts se toma de eliminadoFecha del
+  // secundario (o body.revMergeTs). Candado CLAUDE_TOKEN (igual que claudeFusionarPacientes).
+  if (action === 'claudeDesfusionarPacientes') {
+    var dxPri = String(body.idPrincipal||'').trim(), dxSec = String(body.idSecundario||'').trim();
+    if (!dxPri || !dxSec) return respuesta({ ok:false, error:'Falta idPrincipal o idSecundario', code:400 });
+    if (dxPri===dxSec) return respuesta({ ok:false, error:'idPrincipal == idSecundario', code:400 });
+    var dSecDX = _mntGet('pacientes/'+encodeURIComponent(dxSec));
+    if (!dSecDX) return respuesta({ ok:false, error:'Secundario no existe en FS', code:404 });
+    var dPriDX = _mntGet('pacientes/'+encodeURIComponent(dxPri));
+    if (!dPriDX) return respuesta({ ok:false, error:'Principal no existe en FS', code:404 });
+    var tsDX = 0;
+    if (body.revMergeTs) { tsDX = Number(body.revMergeTs)||0; }
+    if (!tsDX && dSecDX.eliminadoFecha) { var _pdDX = Date.parse(dSecDX.eliminadoFecha); if (!isNaN(_pdDX)) tsDX = _pdDX; }
+    if (!tsDX) return respuesta({ ok:false, error:'No pude determinar el ts de la fusión (el secundario no trae eliminadoFecha); pasa revMergeTs', code:400 });
+    var revDX = 'merge__'+dxPri+'__'+dxSec+'__'+tsDX;
+    var bkDX = _mntGet('revision/'+encodeURIComponent(revDX));
+    if (!bkDX || !bkDX.principal) return respuesta({ ok:false, error:'No encontré el respaldo de la fusión ('+revDX+'); verifica idPrincipal/idSecundario/revMergeTs', code:404 });
+    var oPri = bkDX.principal; // doc del principal PRE-fusión
+
+    // 1) RESTAURAR el principal a su estado pre-fusión (revierte nombre, merges de arrays y rellenos de campos)
+    var KDX = ['name','nombreNormalizado','estudiosDocs','fotos','docs','dx','motivoConsulta','motivo','motivoHC','dxFuncional','planTto','antecedentes','alergias','contraindicaciones','seguridadClinica','valoracion','sexo','fechaNacimiento','age','terapeuta'];
+    var patPriDX = {}, mskPriDX = [];
+    KDX.forEach(function(k){ patPriDX[k] = (oPri[k]!==undefined ? oPri[k] : null); mskPriDX.push(k); });
+    patPriDX.ultimoUsuario = 'CLAUDE/desfusion'; mskPriDX.push('ultimoUsuario');
+    var cPriDX = _mntPatch('pacientes/'+encodeURIComponent(dxPri), patPriDX, mskPriDX);
+    var priOkDX = (cPriDX>=200 && cPriDX<300);
+
+    // 2) BORRAR del principal las sesiones que la fusión COPIÓ (ids que terminan en __mg<ts>)
+    var sufDX = '__mg'+tsDX;
+    var sPriDX = _mntListSub('pacientes/'+encodeURIComponent(dxPri)+'/sesiones');
+    var copBorr=0, copTot=0;
+    sPriDX.forEach(function(s){ var sid=String(s.id); if (sid.length>=sufDX.length && sid.slice(-sufDX.length)===sufDX){ copTot++; if (_mntDelete('pacientes/'+encodeURIComponent(dxPri)+'/sesiones/'+encodeURIComponent(sid))) copBorr++; } });
+
+    // 3) REACTIVAR el secundario (quitar tombstone del doc)
+    var cReactDX = _mntPatch('pacientes/'+encodeURIComponent(dxSec), { eliminado:false, eliminadoPor:null, eliminadoFecha:null }, ['eliminado','eliminadoPor','eliminadoFecha']);
+    var secOkDX = (cReactDX>=200 && cReactDX<300);
+    var esHistDX = dxSec.indexOf('mig_pac_')===0;
+    var sheetPendDX = false;
+    if (!esHistDX) {
+      _mntDelete('pacientesEliminados/'+encodeURIComponent('pacienteActivo__'+dxSec));
+      sheetPendDX = true; // activo: su fila del Sheet se borró en la fusión → re-agregar desde la Papelera de la app
+    }
+    // 3b) quitar la entrada de papelera/ del secundario (si quedó), por query pid==secundario
+    var papBorrDX = 0;
+    try {
+      var tokPQ = _mntTok();
+      var qPQ = { structuredQuery:{ from:[{collectionId:'papelera'}], where:{ fieldFilter:{ field:{fieldPath:'pid'}, op:'EQUAL', value:{stringValue:dxSec} } }, limit:20 } };
+      var rPQ = UrlFetchApp.fetch(_mntBase()+':runQuery',{ method:'post', contentType:'application/json', headers:{Authorization:'Bearer '+tokPQ}, muteHttpExceptions:true, payload:JSON.stringify(qPQ) });
+      if (rPQ.getResponseCode()===200){ var rowsPQ = JSON.parse(rPQ.getContentText()||'[]'); (rowsPQ||[]).forEach(function(r){ if (r && r.document && r.document.name){ var pidDocPQ = String(r.document.name).split('/').pop(); if (_mntDelete('papelera/'+encodeURIComponent(pidDocPQ))) papBorrDX++; } }); }
+    } catch(_ePQ){}
+
+    _claudeBitacora_(ss,'claudeDesfusionarPacientes','pri='+dxPri+' sec='+dxSec+' ts='+tsDX+' priRestaurado='+priOkDX+' secReactivado='+secOkDX+' notasCopiadasBorradas='+copBorr+'/'+copTot+' papelera='+papBorrDX+' sheetPend='+sheetPendDX);
+    return respuesta({ ok:(priOkDX && secOkDX), idPrincipal:dxPri, idSecundario:dxSec, revMergeTs:tsDX,
+      principalRestaurado:priOkDX, secundarioReactivado:secOkDX,
+      nombrePrincipal:(oPri.name||''), nombreSecundario:(dSecDX.name||''),
+      notasCopiadasBorradas:copBorr, notasCopiadasTotal:copTot, papeleraLimpiada:papBorrDX,
+      sheetReinsertarPendiente:sheetPendDX, restaurado:true });
   }
   // FIN MANTENIMIENTO TEMPORAL - quitar este bloque al terminar
 
