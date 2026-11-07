@@ -1360,7 +1360,7 @@ body.modo-oscuro .topbar{background:#141824}
 <body>
 <div id="sync-indicator" class="sync-indicator ok" style="display:none"></div>
 <div id="app-version-chip" title="Versión de la app en este equipo — toca para buscar actualización" onclick="try{_tapVersionChip()}catch(e){}"></div>
-<script>/* VERSIÓN VISIBLE: refleja el index.html realmente cargado en ESTE equipo (se bumpea junto con sw.js). Así un iPad con versión vieja se ve de un vistazo. */window.APP_VERSION='v1-2026-11-06b';(function(){try{var c=document.getElementById('app-version-chip');if(c)c.textContent=window.APP_VERSION;}catch(e){}})();</script>
+<script>/* VERSIÓN VISIBLE: refleja el index.html realmente cargado en ESTE equipo (se bumpea junto con sw.js). Así un iPad con versión vieja se ve de un vistazo. */window.APP_VERSION='v1-2026-11-07a';(function(){try{var c=document.getElementById('app-version-chip');if(c)c.textContent=window.APP_VERSION;}catch(e){}})();</script>
 <div class="toast" id="toast" aria-live="polite" aria-atomic="true"></div>
 
 <!-- LOGIN -->
@@ -12203,7 +12203,7 @@ function renderExpediente(tab='historia'){
   if(tab==='estudios'){
     const fotos=p.fotos||[], docs=p.docs||[];
     html+=`<input type="file" id="inp-foto" accept="image/*" capture="environment" style="display:none" onchange="handleMedia(event,'foto','${p.id}')">
-    <input type="file" id="inp-galeria" accept="image/*" style="display:none" onchange="handleMedia(event,'galeria','${p.id}')">
+    <input type="file" id="inp-galeria" accept="image/*" multiple style="display:none" onchange="handleMedia(event,'galeria','${p.id}')">
     <input type="file" id="inp-doc" accept="*/*" multiple style="display:none" onchange="handleMedia(event,'doc','${p.id}')">
     <div style="background:var(--blue-light);border-radius:10px;padding:10px 12px;margin-bottom:12px;font-size:11px;color:var(--navy);display:flex;gap:8px;align-items:flex-start">
       <span style="font-size:14px">ℹ️</span>
@@ -15310,71 +15310,75 @@ function _selEstudioValTipo(el){
   window._altaEstudioTipo={ tipo:el.dataset.tipo||'imagen', clinico:el.dataset.clinico||'' };
 }
 async function _capturarEstudioVal(ev){
-  var file=ev&&ev.target&&ev.target.files&&ev.target.files[0]; if(ev&&ev.target) ev.target.value='';
-  if(!file) return;
-  if(file.size>15*1024*1024){ showToast('⚠️ '+(file.name||'archivo')+' supera 15MB — omitido','error'); return; }
+  // MULTI: acepta VARIOS archivos de una vez (input tiene `multiple`). Sube el lote conservando
+  // TODA la red de seguridad por archivo (reintento 3x + fallback IndexedDB + guard de cambio de
+  // formulario + contador en-vuelo). La interpretación escrita se aplica SOLO al primer archivo.
+  var files=(ev&&ev.target&&ev.target.files)?Array.from(ev.target.files):[]; if(ev&&ev.target) ev.target.value='';
+  if(!files.length) return;
   var sel=window._altaEstudioTipo||{tipo:'imagen',clinico:''};
   if(!window._altaPid) window._altaPid=(typeof generarIdSeguro_==='function'?generarIdSeguro_('p'):('p'+Date.now()));
   var interpEl=document.getElementById('n-estudio-val-interp');
   var interp=(interpEl&&interpEl.value?String(interpEl.value).trim():'');
   var _pidEst=window._altaPid;   // identidad del alta al iniciar (la subida es async)
-  var ts=Date.now();
-  var desc=(sel.clinico?sel.clinico+' · ':'')+String(file.name||'estudio').replace(/\.[^.]+$/,'');
-  function _baseItem(){
-    var it={ id:'est_'+ts+'_'+Math.random().toString(36).slice(2,6), tipo:sel.tipo||'imagen', tipoClinico:sel.clinico||'',
-      type:file.type||'', descripcion:desc, name:(file.name||'estudio'),
-      fechaEstudio:(typeof _isoMasDias==='function'?_isoMasDias(0):''), fechaAgregado:new Date().toLocaleDateString('es-MX'),
-      agregadoPor:(currentUser&&currentUser.name)||'' };
-    if(interp){ it.resumenManual={ texto:interp.slice(0,600), autor:(currentUser&&currentUser.name)||'', fecha:new Date().toISOString() }; }
-    return it;
-  }
   // [ESTUDIO-ALTA-NO-SE-PIERDE] Contador de subidas en vuelo: guardarNuevoPaciente NO deja crear el
   // expediente mientras haya una subida en curso (evita la carrera que dejaba el estudio fuera).
   window._altaEstudiosEnVuelo=(window._altaEstudiosEnVuelo||0)+1;
-  showToast('☁️ Subiendo…','');
+  var _ok=0, _fall=0, _multi=files.length>1;
   try{
-    var safeName=String(file.name||'estudio').replace(/[^\w.\-]+/g,'_');
-    var fbPath='clinica/sinergia/'+_pidEst+'/estudios/'+ts+'_'+safeName;
-    // [REINTENTO] mala señal: hasta 3 intentos con espera creciente antes de rendirse (igual que la
-    // foto de valoración _capturarMediaAntes). Antes: 1 intento y si fallaba se PERDÍA el estudio.
-    var url=null, _try=0;
-    while(_try<3 && !url){
-      _try++;
+    for(var _fi=0; _fi<files.length; _fi++){
+      var file=files[_fi];
+      if(!file) continue;
+      if(file.size>15*1024*1024){ _fall++; showToast('⚠️ '+(file.name||'archivo')+' supera 15MB — omitido','error'); continue; }
+      var ts=Date.now()+_fi;
+      var desc=(sel.clinico?sel.clinico+' · ':'')+String(file.name||'estudio').replace(/\.[^.]+$/,'');
+      var _thisInterp=(_fi===0)?interp:'';   // la interpretación escrita va solo al 1er estudio
+      var item={ id:'est_'+ts+'_'+Math.random().toString(36).slice(2,6), tipo:sel.tipo||'imagen', tipoClinico:sel.clinico||'',
+        type:file.type||'', descripcion:desc, name:(file.name||'estudio'),
+        fechaEstudio:(typeof _isoMasDias==='function'?_isoMasDias(0):''), fechaAgregado:new Date().toLocaleDateString('es-MX'),
+        agregadoPor:(currentUser&&currentUser.name)||'' };
+      if(_thisInterp){ item.resumenManual={ texto:_thisInterp.slice(0,600), autor:(currentUser&&currentUser.name)||'', fecha:new Date().toISOString() }; }
+      showToast(_multi?('☁️ Subiendo '+(_fi+1)+' de '+files.length+'…'):'☁️ Subiendo…','');
       try{
-        var ref=fbStorage.ref(fbPath);
-        url=await new Promise(function(resolve,reject){
-          var task=ref.put(file,{ contentType:file.type||'application/octet-stream' });
-          task.on('state_changed', null, function(err){ reject(err); }, async function(){ try{ resolve(await task.snapshot.ref.getDownloadURL()); }catch(e){ reject(e); } });
-        });
-      }catch(e){ console.warn('[estudio-val] intento '+_try, e&&e.message); if(_try<3){ showToast('Reintentando ('+_try+'/3)…',''); await new Promise(function(r){ setTimeout(r,_try*1500); }); } }
-    }
-    // FUGA ENTRE BORRADORES (auditoría): si se abrió otro Nuevo/Editar durante la subida, _altaPid ya
-    // cambió y _altaEstudios se vació → descartar para no meter el estudio de un alta en otra.
-    if(window._altaPid!==_pidEst){ showToast('Cambiaste de formulario — el estudio no se adjuntó','warning'); return; }
-    if(!Array.isArray(window._altaEstudios)) window._altaEstudios=[];
-    var item=_baseItem();
-    if(url){
-      item.url=url; item.fbPath=fbPath;
-      window._altaEstudios.push(item);
-    } else {
-      // [FALLBACK-IDB] La subida falló tras 3 intentos (mala señal). NO perder el estudio: binario a
-      // IndexedDB + mediaId + pendienteSubida. Se re-sube solo al reconectar o abrir Estudios
-      // (_reSubirFotosLocales procesa estudiosDocs). MISMA red de seguridad que la foto de valoración
-      // y la pestaña Estudios — antes esta ruta era la ÚNICA sin respaldo.
-      try{
-        var _data=await readFile(file);
-        var _mid='estv_'+_pidEst+'_'+ts+'_'+Math.random().toString(36).slice(2,7);
-        await idbSet(_mid,_data);
-        item.mediaId=_mid; item.pendienteSubida=true;
-        window._altaEstudios.push(item);
-        showToast('📴 Estudio guardado en el equipo — se subirá solo al reconectar','warning');
-      }catch(_e){ showToast('No se pudo guardar el estudio: '+((_e&&_e.message)||'error'),'error'); return; }
+        var safeName=String(file.name||'estudio').replace(/[^\w.\-]+/g,'_');
+        var fbPath='clinica/sinergia/'+_pidEst+'/estudios/'+ts+'_'+safeName;
+        // [REINTENTO] mala señal: hasta 3 intentos con espera creciente antes de rendirse.
+        var url=null, _try=0;
+        while(_try<3 && !url){
+          _try++;
+          try{
+            var ref=fbStorage.ref(fbPath);
+            url=await new Promise(function(resolve,reject){
+              var task=ref.put(file,{ contentType:file.type||'application/octet-stream' });
+              task.on('state_changed', null, function(err){ reject(err); }, async function(){ try{ resolve(await task.snapshot.ref.getDownloadURL()); }catch(e){ reject(e); } });
+            });
+          }catch(e){ console.warn('[estudio-val] intento '+_try, e&&e.message); if(_try<3){ showToast('Reintentando ('+_try+'/3)…',''); await new Promise(function(r){ setTimeout(r,_try*1500); }); } }
+        }
+        // FUGA ENTRE BORRADORES: si se abrió otro Nuevo/Editar durante la subida, _altaPid ya cambió
+        // y _altaEstudios se vació → descartar para no meter el estudio de un alta en otra.
+        if(window._altaPid!==_pidEst){ showToast('Cambiaste de formulario — se detuvo la carga','warning'); break; }
+        if(!Array.isArray(window._altaEstudios)) window._altaEstudios=[];
+        if(url){
+          item.url=url; item.fbPath=fbPath;
+          window._altaEstudios.push(item); _ok++;
+        } else {
+          // [FALLBACK-IDB] subida falló tras 3 intentos: binario a IndexedDB + pendienteSubida.
+          try{
+            var _data=await readFile(file);
+            var _mid='estv_'+_pidEst+'_'+ts+'_'+Math.random().toString(36).slice(2,7);
+            await idbSet(_mid,_data);
+            item.mediaId=_mid; item.pendienteSubida=true;
+            window._altaEstudios.push(item); _ok++;
+            showToast('📴 '+(file.name||'estudio')+' guardado en el equipo — se subirá al reconectar','warning');
+          }catch(_e){ _fall++; showToast('No se pudo guardar '+(file.name||'estudio')+': '+((_e&&_e.message)||'error'),'error'); }
+        }
+      }catch(e){ _fall++; console.warn('[estudio-val]', e&&e.message); }
     }
     if(interpEl) interpEl.value='';
     _renderEstudiosVal(); marcarDirty();
     try{ if(typeof guardarBorradorNuevo==='function') guardarBorradorNuevo(); }catch(_){}
-    if(url) showToast('✅ Estudio agregado','success');
-  }catch(e){ console.warn('[estudio-val]', e&&e.message); showToast('No se pudo agregar: '+((e&&e.message)||'error'),'error'); }
+    if(_ok) showToast('✅ '+_ok+' estudio(s) agregado(s)'+(_fall?(' · '+_fall+' con error'):''),'success');
+    else if(_fall) showToast('❌ No se agregó ningún estudio ('+_fall+' con error)','error');
+  }catch(e){ console.warn('[estudio-val lote]', e&&e.message); showToast('No se pudo agregar: '+((e&&e.message)||'error'),'error'); }
   finally{ window._altaEstudiosEnVuelo=Math.max(0,(window._altaEstudiosEnVuelo||1)-1); }
 }
 function _renderEstudiosVal(){
@@ -20418,7 +20422,7 @@ function renderNuevoPaciente(){
         </div>
         <div style="font-size:12.5px;font-weight:700;color:#00584E;margin-bottom:7px">2. Interpretación <span style="font-weight:400;color:var(--gray-400);font-size:11px">(opcional)</span></div>
         <input type="text" id="n-estudio-val-interp" placeholder="Ej: Rotura parcial de menisco interno, reporta Dr. Pérez" style="width:100%;box-sizing:border-box;border:1.5px solid #B7D8D2;border-radius:10px;padding:11px 12px;font-size:14px;font-family:inherit;color:var(--gray-800);background:#fff;outline:none">
-        <input type="file" id="n-estudio-val-capture" accept="image/*,application/pdf" style="display:none" onchange="_capturarEstudioVal(event)">
+        <input type="file" id="n-estudio-val-capture" accept="image/*,application/pdf" multiple style="display:none" onchange="_capturarEstudioVal(event)">
         <div id="n-estudios-val-wrap" style="margin-top:10px"></div>
         <div style="font-size:12.5px;font-weight:700;color:#00584E;margin:14px 0 7px">3. Captura el documento</div>
         <button type="button" onclick="var i=document.getElementById('n-estudio-val-capture');if(i)i.click()" style="width:100%;background:#00695C;color:#fff;border:none;border-radius:12px;padding:14px;font-size:15px;font-weight:800;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px">📷 Escanear / foto / PDF de estudio</button>
