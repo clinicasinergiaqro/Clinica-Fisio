@@ -1360,7 +1360,7 @@ body.modo-oscuro .topbar{background:#141824}
 <body>
 <div id="sync-indicator" class="sync-indicator ok" style="display:none"></div>
 <div id="app-version-chip" title="Versión de la app en este equipo — toca para buscar actualización" onclick="try{_tapVersionChip()}catch(e){}"></div>
-<script>/* VERSIÓN VISIBLE: refleja el index.html realmente cargado en ESTE equipo (se bumpea junto con sw.js). Así un iPad con versión vieja se ve de un vistazo. */window.APP_VERSION='v1-2026-11-07a';(function(){try{var c=document.getElementById('app-version-chip');if(c)c.textContent=window.APP_VERSION;}catch(e){}})();</script>
+<script>/* VERSIÓN VISIBLE: refleja el index.html realmente cargado en ESTE equipo (se bumpea junto con sw.js). Así un iPad con versión vieja se ve de un vistazo. */window.APP_VERSION='v1-2026-11-07b';(function(){try{var c=document.getElementById('app-version-chip');if(c)c.textContent=window.APP_VERSION;}catch(e){}})();</script>
 <div class="toast" id="toast" aria-live="polite" aria-atomic="true"></div>
 
 <!-- LOGIN -->
@@ -28460,7 +28460,7 @@ async function resetImportacion_(){
         <button onclick="capturarFotoScanner2()" id="scan2-btn-captura" style="flex:2;min-width:150px;background:var(--navy);color:white;border:none;border-radius:18px;padding:11px;font-weight:800;cursor:pointer">📸 Capturar</button>
         <button onclick="document.getElementById('scan2-file').click()" style="flex:1;min-width:130px;background:white;border:1.5px solid var(--gray-200);color:var(--gray-600);border-radius:18px;padding:11px;font-weight:700;cursor:pointer">🖼️ Elegir imagen</button>
       </div>
-      <input type="file" id="scan2-file" accept="image/*" style="display:none" onchange="scanner2ArchivoElegido(event)">
+      <input type="file" id="scan2-file" accept="image/*" multiple style="display:none" onchange="scanner2ArchivoElegido(event)">
     </div>
     <div id="scan2-editor" style="display:none">
       <div id="scan2-aviso-calidad" style="display:none;background:var(--red-light);color:var(--red);border-radius:8px;padding:8px 10px;font-size:12px;font-weight:700;margin-bottom:8px"></div>
@@ -28508,7 +28508,8 @@ const scannerState = {
   filtro:'color-suave', autoDetectado:false, ajusteManual:false,
   dragIdx:-1, calidad:[], isSaving:false,
   lastDetectedCorners:null, liveDetectionActive:false,
-  procesadaCanvas:null, paginaActualAgregada:false, _rafId:null, _lastFrameTs:0, _prevPuntos:null, _estableCount:0
+  procesadaCanvas:null, paginaActualAgregada:false, _rafId:null, _lastFrameTs:0, _prevPuntos:null, _estableCount:0,
+  cola:[]
 };
 let _cvReadyPromise = null;
 function ensureOpenCVReady(){
@@ -28558,6 +28559,7 @@ function resetScannerStateForNewScan(){
   scannerState.calidad=[]; scannerState.isSaving=false; scannerState.lastDetectedCorners=null;
   scannerState.liveDetectionActive=false; scannerState.procesadaCanvas=null; scannerState.paginaActualAgregada=false;
   scannerState._prevPuntos=null; scannerState._estableCount=0; scannerState.warpBase=null;
+  scannerState.cola=[];
 }
 function resetScannerUIForNewScan(){
   resetScannerCanvas(); resetScannerFileInput();
@@ -28771,8 +28773,17 @@ function capturarFotoScanner2(){
   img.src=cv2.toDataURL('image/jpeg',0.92);
 }
 function scanner2ArchivoElegido(ev){
-  const f=ev.target.files&&ev.target.files[0]; if(!f) return; ev.target.value='';
-  if(!f.type.startsWith('image')){ showToast('Selecciona una imagen','error'); return; }
+  // MULTI: se pueden elegir VARIAS imágenes de la galería de una vez. La 1ª entra al editor
+  // (ajuste de esquinas/filtro/rotar); las demás quedan en cola y se encadenan al tocar
+  // "Agregar página" → todas caen en el MISMO PDF. (La cámara sigue de una por página.)
+  const files=Array.from((ev.target&&ev.target.files)||[]).filter(f=>f.type&&f.type.startsWith('image'));
+  if(ev.target) ev.target.value='';
+  if(!files.length){ showToast('Selecciona una imagen','error'); return; }
+  scannerState.cola=files.slice(1);
+  _scanProcesarArchivoEscaner(files[0]);
+  if(scannerState.cola.length) showToast('Lote de '+files.length+' imágenes — ajusta cada una y toca "Agregar página"','');
+}
+function _scanProcesarArchivoEscaner(f){
   const reader=new FileReader();
   reader.onload=()=>{ const img=new Image(); img.onload=()=>{ detenerCamaraScanner2(); procesarCapturaScanner2(img, null, true); }; img.onerror=()=>showToast('Imagen inválida','error'); img.src=reader.result; };
   reader.readAsDataURL(f);
@@ -29315,6 +29326,14 @@ function agregarPaginaScanner2(){
   if(!agregarPaginaActualScanner2()){ showToast('No hay página para agregar','warning'); return; }
   showToast('Página '+scannerState.pages.length+' agregada','success');
   scannerState.procesadaCanvas=null; scannerState.warpBase=null; scannerState.paginaActualAgregada=false;
+  // Si hay imágenes en cola (lote de galería), encadenar la siguiente al editor en vez de la cámara.
+  if(scannerState.cola && scannerState.cola.length){
+    const nextF=scannerState.cola.shift();
+    showToast('Siguiente del lote — quedan '+scannerState.cola.length,'');
+    _scanProcesarArchivoEscaner(nextF);
+    actualizarContadorPaginasScanner();
+    return;
+  }
   document.getElementById('scan2-editor').style.display='none';
   document.getElementById('scan2-captura').style.display='block';
   abrirCamaraScanner2(); actualizarContadorPaginasScanner();
@@ -29337,6 +29356,11 @@ function cerrarScanner2(){ resetScannerAfterCancel(); document.getElementById('s
 
 async function guardarPDFScannerMultipagina(){
   if(scannerState.isSaving) return;
+  // Si quedan imágenes del lote de galería sin agregar, avisar antes de finalizar (no perderlas en silencio).
+  if(scannerState.cola && scannerState.cola.length){
+    if(!confirm('Quedan '+scannerState.cola.length+' imágen(es) del lote sin agregar. ¿Finalizar el PDF de todos modos?')) return;
+    scannerState.cola=[];
+  }
   if(scannerState.procesadaCanvas && !scannerState.paginaActualAgregada){ agregarPaginaActualScanner2(); }
   if(scannerState.pages.length===0){ showToast('Agrega al menos una página','warning'); return; }
   const p=currentPatient; if(!p){ showToast('Sin paciente','error'); return; }
