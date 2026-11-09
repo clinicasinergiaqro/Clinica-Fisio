@@ -3076,6 +3076,89 @@ function _claudeRouter_(body) {
       _claudeBitacora_(ss,'claudeRecepcion','fechaFixHojas aplicar='+_aplicar5+' '+JSON.stringify(_hojasOut));
       return respuesta({ ok:true, sub:'fechaFixHojas', aplicado:_aplicar5, hojas:_hojasOut });
     }
+    if(_sub==='leer'){
+      // LECTURA genérica de cualquier pestaña → objetos por encabezado + filtro opcional. No escribe.
+      // body:{ hoja?:'paquetes'|'ventas'|'inventario'|'registro'(default), filtro?:{columna:valor}, limite?, sinFecha?:true }
+      var _rl=_recLeer_(_rss, body.hoja, body.filtro, body.limite||0, body.sinFecha===true);
+      if(_rl.ok) _claudeBitacora_(ss,'claudeRecepcion','leer '+(body.hoja||'registro')+' total='+_rl.total);
+      return respuesta(_rl.ok ? Object.assign({sub:'leer'},_rl) : { ok:false, error:_rl.error, code:400 });
+    }
+    if(_sub==='sinFecha'){
+      // Lista las filas de REGISTRO DEL DÍA con FECHA vacía/ inválida (las que estorban abajo).
+      // Opcional borrar:true (+aplicar:true) para quitarlas. PREVIEW por defecto.
+      var _rsf=_recLeer_(_rss, 'registro', null, body.limite||200, true);
+      if(!_rsf.ok) return respuesta({ ok:false, error:_rsf.error, code:400 });
+      if(body.borrar===true){
+        var _apsf=body.aplicar===true, _rowsSf=_rsf.filas.map(function(f){return f._fila;}).sort(function(a,b){return b-a;});
+        if(_apsf){ for(var _zsf=0;_zsf<_rowsSf.length;_zsf++) _rsh.deleteRow(_rowsSf[_zsf]); }
+        _claudeBitacora_(ss,'claudeRecepcion','sinFecha borrar aplicar='+_apsf+' n='+_rowsSf.length);
+        return respuesta({ ok:true, sub:'sinFecha', modo:'borrar', aplicado:_apsf, aBorrar:_rowsSf.length, filas:_rsf.filas });
+      }
+      return respuesta({ ok:true, sub:'sinFecha', total:_rsf.total, filas:_rsf.filas });
+    }
+    if(_sub==='editarFila'){
+      // Edita celdas por NOMBRE de columna en las filas que cumplen TODOS los match. Rechaza columnas de fórmula.
+      // body:{ hoja?, match:{columna:valor,...}, set:{columna:valor,...}, aplicar? }
+      var _red=_recEditar_(_rss, body.hoja, body.match, body.set, body.aplicar===true);
+      if(_red.ok) _claudeBitacora_(ss,'claudeRecepcion','editarFila '+(body.hoja||'')+' aplicar='+(body.aplicar===true)+' n='+_red.coincidencias);
+      return respuesta(_red.ok ? Object.assign({sub:'editarFila'},_red) : { ok:false, error:_red.error, code:400, columnasBloqueadas:_red.columnasBloqueadas });
+    }
+    if(_sub==='agregarFila'){
+      // Agrega una fila a cualquier pestaña por NOMBRE de columna (hereda formato+validaciones). Rechaza fórmula.
+      // body:{ hoja, valores:{columna:valor,...}, aplicar? }
+      var _rag=_recAgregar_(_rss, body.hoja, body.valores, body.aplicar===true);
+      if(_rag.ok) _claudeBitacora_(ss,'claudeRecepcion','agregarFila '+(body.hoja||'')+' aplicar='+(body.aplicar===true));
+      return respuesta(_rag.ok ? Object.assign({sub:'agregarFila'},_rag) : { ok:false, error:_rag.error, code:400 });
+    }
+    if(_sub==='nuevoPaquete'){
+      // Da de alta un paquete en PAQUETES Y ABONOS (nunca toca CITAS USADAS/RESTANTES/ESTADO).
+      // body:{ titular, monto, citas, desde:'YYYY-MM-DD', fechaPago?, hasta?, ajuste?, obs?, aplicar? }
+      var _vp={};
+      if(body.fechaPago!=null) _vp['fecha pago']=body.fechaPago;
+      if(body.titular!=null)   _vp['titular']=body.titular;
+      if(body.monto!=null)     _vp['monto']=body.monto;
+      if(body.citas!=null)     _vp['compradas']=body.citas;
+      if(body.desde!=null)     _vp['desde']=body.desde;
+      if(body.hasta!=null)     _vp['hasta']=body.hasta;
+      if(body.ajuste!=null)    _vp['ajuste']=body.ajuste;
+      if(body.obs!=null)       _vp['obs']=body.obs;
+      var _rnp=_recAgregar_(_rss, 'paquete', _vp, body.aplicar===true);
+      if(_rnp.ok) _claudeBitacora_(ss,'claudeRecepcion','nuevoPaquete aplicar='+(body.aplicar===true)+' '+(body.titular||''));
+      return respuesta(_rnp.ok ? Object.assign({sub:'nuevoPaquete'},_rnp) : { ok:false, error:_rnp.error, code:400 });
+    }
+    if(_sub==='modificarPaquete'){
+      // Modifica un paquete existente por TITULAR (solo columnas editables). body:{ titular, set?|monto/citas/desde/hasta/ajuste/obs, aplicar? }
+      if(!body.titular) return respuesta({ ok:false, error:'Falta titular', code:400 });
+      var _M=body.set||body, _setp={};
+      if(_M.monto!=null)  _setp['monto']=_M.monto;
+      if(_M.citas!=null)  _setp['compradas']=_M.citas;
+      if(_M.desde!=null)  _setp['desde']=_M.desde;
+      if(_M.hasta!=null)  _setp['hasta']=_M.hasta;
+      if(_M.ajuste!=null) _setp['ajuste']=_M.ajuste;
+      if(_M.obs!=null)    _setp['obs']=_M.obs;
+      if(!Object.keys(_setp).length) return respuesta({ ok:false, error:'Nada que cambiar (monto/citas/desde/hasta/ajuste/obs)', code:400 });
+      var _rmp=_recEditar_(_rss, 'paquete', {titular:body.titular}, _setp, body.aplicar===true);
+      if(_rmp.ok) _claudeBitacora_(ss,'claudeRecepcion','modificarPaquete aplicar='+(body.aplicar===true)+' '+body.titular);
+      return respuesta(_rmp.ok ? Object.assign({sub:'modificarPaquete'},_rmp) : { ok:false, error:_rmp.error, code:400, columnasBloqueadas:_rmp.columnasBloqueadas });
+    }
+    if(_sub==='limpiarBasura'){
+      // Limpia celdas con #REF! en REGISTRO DEL DÍA + una fórmula suelta '=X####' en OBSERVACIONES. PREVIEW por defecto.
+      var _ap6=body.aplicar===true, _lr6=_rsh.getLastRow(), _lc6=_rsh.getLastColumn();
+      if(_lr6<1||_lc6<1) return respuesta({ ok:true, sub:'limpiarBasura', aplicado:_ap6, aLimpiar:0, ejemplos:[] });
+      var _rng6=_rsh.getRange(1,1,_lr6,_lc6), _vv6=_rng6.getValues(), _ff6=_rng6.getFormulas();
+      var _H6=_recHeader_(_rsh), _cObs6=_H6?_recCol_(_H6.headN,'observ'):-1, _lim6=[], _ej6=[];
+      for(var _a6=0;_a6<_vv6.length;_a6++){
+        for(var _b6=0;_b6<_vv6[_a6].length;_b6++){
+          var _val6=String(_vv6[_a6][_b6]==null?'':_vv6[_a6][_b6]), _frm6=String(_ff6[_a6][_b6]||'');
+          var _esRef6=_val6.indexOf('#REF!')!==-1 || _frm6.indexOf('#REF!')!==-1;
+          var _esSuelta6=(_cObs6>=0 && _b6===_cObs6 && /^=\s*[A-Z]+\d+\s*$/.test(_frm6));
+          if(_esRef6||_esSuelta6){ _lim6.push([_a6+1,_b6+1]); if(_ej6.length<25) _ej6.push('R'+(_a6+1)+'C'+(_b6+1)+' '+(_frm6||_val6)); }
+        }
+      }
+      if(_ap6){ for(var _c6=0;_c6<_lim6.length;_c6++){ _rsh.getRange(_lim6[_c6][0],_lim6[_c6][1]).clearContent(); } }
+      _claudeBitacora_(ss,'claudeRecepcion','limpiarBasura aplicar='+_ap6+' celdas='+_lim6.length);
+      return respuesta({ ok:true, sub:'limpiarBasura', aplicado:_ap6, aLimpiar:_lim6.length, ejemplos:_ej6 });
+    }
     return respuesta({ ok:false, error:'claudeRecepcion sub no reconocido: '+_sub, code:400 });
   }
 
@@ -3177,6 +3260,123 @@ function _recepcionResolverNombre_(calNombre, idx){
   return calNombre;
 }
 
+// ════════ COMANDO UNIFICADO DE RECEPCIÓN: helpers genéricos (leer/editar/agregar) ════════
+// Un mismo núcleo para manipular CUALQUIER pestaña del Google Sheet de recepción por NOMBRE de columna,
+// con CANDADO DURO sobre las columnas calculadas (fórmula) para no romper los conteos/estados/saldos.
+// Columnas calculadas por pestaña (match por subcadena del encabezado normalizado); '*' = toda la hoja:
+var _REC_COMPUT = {
+  'resumen del dia'   : ['*'],                             // cierre de turno = 100% fórmula
+  'registro del dia'  : ['observ','saldo'],                // OBSERVACIONES + SALDO RESTANTE
+  'paquetes y abonos' : ['citas usada','restante','estado'],// CITAS USADAS, CITAS RESTANTES, ESTADO
+  'inventario'        : ['salida','stock','alerta']         // SALIDAS, STOCK, ALERTA
+};
+function _recEsComputada_(hojaNorm, colNorm){
+  var keys=Object.keys(_REC_COMPUT);
+  for(var i=0;i<keys.length;i++){
+    if(hojaNorm.indexOf(keys[i])!==-1){
+      var subs=_REC_COMPUT[keys[i]];
+      for(var j=0;j<subs.length;j++){ if(subs[j]==='*') return true; if(colNorm.indexOf(subs[j])!==-1) return true; }
+    }
+  }
+  return false;
+}
+// Resuelve una pestaña por subcadena de su nombre (sin acentos). Vacío = REGISTRO DEL DÍA.
+function _recHojaPorNombre_(rss, sub){
+  var want=_normRec_(sub||''), all=rss.getSheets();
+  if(!want){ return rss.getSheetByName('REGISTRO DEL DÍA')||rss.getSheetByName('REGISTRO DEL DIA')||all[0]; }
+  for(var i=0;i<all.length;i++){ if(_normRec_(all[i].getName()).indexOf(want)!==-1) return all[i]; }
+  return null;
+}
+// Encuentra la fila de encabezado (busca paciente/titular/producto + ≥2 celdas de texto).
+function _recHeader_(sh){
+  var dv=sh.getDataRange().getValues(), hr=-1, max=Math.min(dv.length,15);
+  for(var r=0;r<max;r++){
+    var row=dv[r].map(_normRec_), txt=row.join(' '), llenas=row.filter(function(x){return x;}).length;
+    if(/(paciente|titular|producto|insumo|concepto)/.test(txt) && llenas>=2){ hr=r; break; }
+  }
+  if(hr<0){ for(var r2=0;r2<max;r2++){ if(dv[r2].map(_normRec_).filter(function(x){return x;}).length>=2){ hr=r2; break; } } }
+  if(hr<0) return null;
+  return { dv:dv, hr:hr, headN:dv[hr].map(_normRec_), headRaw:dv[hr].map(function(x){return String(x==null?'':x).trim();}) };
+}
+function _recCol_(headN, sub){ var s=_normRec_(sub); for(var i=0;i<headN.length;i++){ if(headN[i].indexOf(s)!==-1) return i; } return -1; }
+function _recFmtVal_(v){ return (v instanceof Date) ? Utilities.formatDate(v,'America/Mexico_City','d/M/yyyy') : v; }
+// clave de día ISO-first (evita el mal-parseo de _diaKeyRec_ con 'YYYY-MM-DD').
+function _recDiaKey_(v){ if(v instanceof Date) return Utilities.formatDate(v,'America/Mexico_City','yyyyMMdd'); var m=String(v==null?'':v).match(/^(\d{4})-(\d{2})-(\d{2})/); if(m) return m[1]+m[2]+m[3]; return _diaKeyRec_(v); }
+function _recTok_(s){ return _normRec_(s).split(' ').filter(function(t){return t.length>1;}); }
+function _recSubset_(a,b){ if(!a.length) return false; for(var i=0;i<a.length;i++){ if(b.indexOf(a[i])===-1) return false; } return true; }
+
+// LEER: objetos por encabezado + filtro (subcadena; la columna fecha compara por día). soloSinFecha = filas con FECHA vacía/ inválida.
+function _recLeer_(rss, hojaSub, filtro, limite, soloSinFecha){
+  var sh=_recHojaPorNombre_(rss, hojaSub); if(!sh) return { ok:false, error:'No encontré la pestaña: '+hojaSub };
+  var H=_recHeader_(sh); if(!H) return { ok:false, error:'No encontré el encabezado de '+sh.getName() };
+  var lim=limite>0?limite:300, cFecha=_recCol_(H.headN,'fecha');
+  var fil=[]; if(filtro){ for(var k in filtro){ if(filtro.hasOwnProperty(k)){ var ci=_recCol_(H.headN,k); if(ci>=0) fil.push([ci,_normRec_(filtro[k]),H.headN[ci].indexOf('fecha')!==-1,filtro[k]]); } } }
+  var out=[], total=0;
+  for(var r=H.hr+1;r<H.dv.length;r++){
+    var row=H.dv[r], vacia=true;
+    for(var c=0;c<row.length;c++){ if(String(row[c]==null?'':row[c]).trim()!==''){ vacia=false; break; } }
+    if(vacia) continue;
+    if(soloSinFecha){ var fv=cFecha>=0?row[cFecha]:''; if(!(fv===''||fv==null||!/^\d{8}$/.test(_recDiaKey_(fv)))) continue; }
+    var okF=true;
+    for(var f=0;f<fil.length;f++){ var cell=row[fil[f][0]]; if(fil[f][2]){ if(_recDiaKey_(cell)!==_recDiaKey_(fil[f][3])){ okF=false; break; } } else if(_normRec_(cell).indexOf(fil[f][1])===-1){ okF=false; break; } }
+    if(!okF) continue;
+    total++;
+    if(out.length<lim){ var o={ _fila:r+1 }; for(var cc=0;cc<H.headRaw.length;cc++){ var key=H.headRaw[cc]||('col'+(cc+1)); o[key]=_recFmtVal_(row[cc]); } out.push(o); }
+  }
+  return { ok:true, hoja:sh.getName(), encabezados:H.headRaw, total:total, mostradas:out.length, filas:out };
+}
+// EDITAR: busca filas que cumplen TODOS los match (fecha por día; texto por igualdad o subset de tokens) y escribe set.
+// Rechaza columnas calculadas. PREVIEW si !aplicar.
+function _recEditar_(rss, hojaSub, match, set, aplicar){
+  var sh=_recHojaPorNombre_(rss, hojaSub); if(!sh) return { ok:false, error:'No encontré la pestaña: '+hojaSub };
+  var hojaN=_normRec_(sh.getName());
+  var H=_recHeader_(sh); if(!H) return { ok:false, error:'No encontré el encabezado de '+sh.getName() };
+  if(!match || !Object.keys(match).length) return { ok:false, error:'Falta match:{columna:valor}' };
+  if(!set || !Object.keys(set).length) return { ok:false, error:'Falta set:{columna:valor}' };
+  var setCols=[], bloq=[];
+  for(var k in set){ if(!set.hasOwnProperty(k)) continue; var ci=_recCol_(H.headN,k); if(ci<0) return { ok:false, error:'No existe la columna "'+k+'" en '+sh.getName() }; if(_recEsComputada_(hojaN,H.headN[ci])) bloq.push(H.headRaw[ci]); else setCols.push([ci,k]); }
+  if(bloq.length) return { ok:false, error:'Esas columnas son CALCULADAS (fórmula), no se pueden editar: '+bloq.join(', '), columnasBloqueadas:bloq };
+  var matchCols=[]; for(var mk in match){ if(!match.hasOwnProperty(mk)) continue; var mi=_recCol_(H.headN,mk); if(mi<0) return { ok:false, error:'No existe la columna de match "'+mk+'"' }; matchCols.push([mi,match[mk],H.headN[mi]]); }
+  var hits=[];
+  for(var r=H.hr+1;r<H.dv.length;r++){
+    var row=H.dv[r], ok=true;
+    for(var m=0;m<matchCols.length;m++){
+      var ci2=matchCols[m][0], want=matchCols[m][1], colN=matchCols[m][2], cell=row[ci2];
+      if(colN.indexOf('fecha')!==-1){ if(_recDiaKey_(cell)!==_recDiaKey_(want)){ ok=false; break; } }
+      else { var cn=_normRec_(cell), wn=_normRec_(want); if(cn!==wn){ if(!(_recSubset_(_recTok_(want),_recTok_(cell))||_recSubset_(_recTok_(cell),_recTok_(want)))){ ok=false; break; } } }
+    }
+    if(ok) hits.push(r);
+  }
+  var cambios=[];
+  for(var h=0;h<hits.length;h++){ var rr=hits[h]; for(var s=0;s<setCols.length;s++){ var sc=setCols[s][0]; cambios.push({ fila:rr+1, columna:H.headRaw[sc], de:_recFmtVal_(H.dv[rr][sc]), a:set[setCols[s][1]] }); } }
+  if(aplicar){
+    for(var h2=0;h2<hits.length;h2++){ var rr2=hits[h2]; for(var s2=0;s2<setCols.length;s2++){ var sc2=setCols[s2][0], val2=set[setCols[s2][1]];
+        if(H.headN[sc2].indexOf('fecha')!==-1){ var pm=String(val2).match(/^(\d{4})-(\d{2})-(\d{2})/); if(pm){ sh.getRange(rr2+1,sc2+1).setValue(new Date(+pm[1],+pm[2]-1,+pm[3],12,0,0)).setNumberFormat('d/m/yyyy'); continue; } }
+        sh.getRange(rr2+1,sc2+1).setValue(val2);
+    } }
+  }
+  return { ok:true, hoja:sh.getName(), aplicado:!!aplicar, coincidencias:hits.length, cambios:cambios };
+}
+// AGREGAR: una fila nueva por nombre de columna, heredando formato + validaciones de la 1a fila de datos. Rechaza columnas calculadas.
+function _recAgregar_(rss, hojaSub, valores, aplicar){
+  var sh=_recHojaPorNombre_(rss, hojaSub); if(!sh) return { ok:false, error:'No encontré la pestaña: '+hojaSub };
+  var hojaN=_normRec_(sh.getName());
+  var H=_recHeader_(sh); if(!H) return { ok:false, error:'No encontré el encabezado de '+sh.getName() };
+  if(!valores || !Object.keys(valores).length) return { ok:false, error:'Falta valores:{columna:valor}' };
+  var ancho=sh.getLastColumn(), fila=[], bloq=[];
+  for(var c=0;c<ancho;c++) fila[c]='';
+  for(var k in valores){ if(!valores.hasOwnProperty(k)) continue; var ci=_recCol_(H.headN,k); if(ci<0) return { ok:false, error:'No existe la columna "'+k+'"' }; if(_recEsComputada_(hojaN,H.headN[ci])){ bloq.push(H.headRaw[ci]); continue; } var val=valores[k]; if(H.headN[ci].indexOf('fecha')!==-1){ var pm=String(val).match(/^(\d{4})-(\d{2})-(\d{2})/); if(pm) val=new Date(+pm[1],+pm[2]-1,+pm[3],12,0,0); } fila[ci]=val; }
+  if(bloq.length) return { ok:false, error:'Esas columnas son CALCULADAS (fórmula), no se pueden escribir: '+bloq.join(', ') };
+  var preview={}; for(var c2=0;c2<ancho;c2++){ if(String(fila[c2]).trim()!=='') preview[H.headRaw[c2]||('col'+(c2+1))]=_recFmtVal_(fila[c2]); }
+  if(aplicar){
+    var ini=sh.getLastRow()+1, dest=sh.getRange(ini,1,1,ancho); dest.setValues([fila]);
+    var mf=H.hr+2; if(mf<ini){ var mod=sh.getRange(mf,1,1,ancho); mod.copyTo(dest,{formatOnly:true}); try{ dest.setDataValidations([mod.getDataValidations()[0]]); }catch(_e){} }
+    for(var cf=0;cf<H.headN.length;cf++){ if(H.headN[cf].indexOf('fecha')!==-1) sh.getRange(ini,cf+1).setNumberFormat('d/m/yyyy'); }
+    return { ok:true, hoja:sh.getName(), aplicado:true, fila:ini, valores:preview };
+  }
+  return { ok:true, hoja:sh.getName(), aplicado:false, valores:preview };
+}
+
 function autoCitasRecepcion(diasAdelante){
   var dias = diasAdelante || RECEPCION_DIAS;
   var ss = SpreadsheetApp.openById(RECEPCION_SHEET_ID);
@@ -3193,13 +3393,13 @@ function autoCitasRecepcion(diasAdelante){
   function _colRec_(k){ for(var i=0;i<head.length;i++){ if(head[i].indexOf(k)!==-1) return i; } return -1; }
   var cF=_colRec_('fecha'), cP=_colRec_('paciente'), cS=_colRec_('servicio');
   if(cF<0||cP<0){ Logger.log('Faltan columnas fecha/paciente'); return 0; }
-  var existe={};
-  for(var r2=hdr+1;r2<datos.length;r2++){ var p=datos[r2][cP]; if(p) existe[_diaKeyRec_(datos[r2][cF])+'|'+_normRec_(p)]=true; }
+  var existe={}, existeMap={};
+  for(var r2=hdr+1;r2<datos.length;r2++){ var p=datos[r2][cP]; if(p){ var _kk=_diaKeyRec_(datos[r2][cF])+'|'+_normRec_(p); existe[_kk]=true; existeMap[_kk]={row:r2+1, name:String(p)}; } }
   var cal = CalendarApp.getDefaultCalendar();
   if(!cal){ Logger.log('No se pudo abrir el calendario'); return 0; }
   var idxNom=null; try{ idxNom=_recepcionIndexNombres_(ss); }catch(eIdx){ idxNom=null; }   // índice de nombres (nunca rompe)
   var ancho=sh.getLastColumn(), hoy=new Date(); hoy.setHours(0,0,0,0);
-  var nuevas=[], up=0;
+  var nuevas=[], up=0, _ups=[];
   for(var d=0; d<dias; d++){
     var ini=new Date(hoy.getTime()+d*86400000), fin=new Date(ini.getTime()+86400000);
     var evs=cal.getEvents(ini,fin);
@@ -3217,8 +3417,19 @@ function autoCitasRecepcion(diasAdelante){
       if(_normRec_(nombre)!==_normRec_(nombreCal)) up++;
       // dedup bajo el nombre final Y el del calendario (no duplica una cita ya puesta con nombre corto)
       var diaK=_diaKeyRec_(ini), keyFin=diaK+'|'+_normRec_(nombre), keyCal=diaK+'|'+_normRec_(nombreCal);
-      if(existe[keyFin]||existe[keyCal]) continue;
+      if(existe[keyFin]||existe[keyCal]){
+        // Ya existe la cita. Si el expediente resuelve a un nombre MÁS COMPLETO del MISMO paciente
+        // (los tokens del corto son subconjunto del completo y hay más tokens) → actualiza esa celda
+        // en su lugar (nunca cambia de persona). Así renombrar a nombre completo se refleja en la hoja.
+        var _ex=existeMap[keyCal]||existeMap[keyFin];
+        if(_ex && _normRec_(nombre)!==_normRec_(_ex.name)){
+          var _exTok=_recTok_(_ex.name), _fullTok=_recTok_(nombre);
+          if(_recSubset_(_exTok,_fullTok) && _fullTok.length>_exTok.length){ _ups.push({row:_ex.row, name:nombre}); _ex.name=nombre; }
+        }
+        continue;
+      }
       existe[keyFin]=true; existe[keyCal]=true;
+      existeMap[keyFin]={row:-1, name:nombre}; existeMap[keyCal]={row:-1, name:nombre};
       var fila=[]; for(var c=0;c<ancho;c++){ fila[c]=''; }
       fila[cF]=new Date(ini.getFullYear(),ini.getMonth(),ini.getDate(),12,0,0);  // mediodía: evita que la zona horaria corra el día
       fila[cP]=nombre;
@@ -3241,7 +3452,10 @@ function autoCitasRecepcion(diasAdelante){
     // FECHA SIEMPRE día/mes/año (d/m/aaaa), sin importar el locale de la hoja — y sigue siendo fecha real
     try{ sh.getRange(_inicio, cF+1, nuevas.length, 1).setNumberFormat('d/m/yyyy'); }catch(_e2){}
   }
-  Logger.log('Auto-citas: agregadas '+nuevas.length+' cita(s) ('+up+' con nombre completo del expediente). Terapeuta se deja en blanco a propósito.');
+  // Auto-upgrade de nombre corto → completo en filas YA existentes del día (mismo paciente, subset).
+  var _nUp=0;
+  for(var _u=0;_u<_ups.length;_u++){ if(_ups[_u].row>0){ try{ sh.getRange(_ups[_u].row, cP+1).setValue(_ups[_u].name); _nUp++; }catch(_eu){} } }
+  Logger.log('Auto-citas: agregadas '+nuevas.length+' cita(s) ('+up+' con nombre completo del expediente); '+_nUp+' fila(s) actualizadas a nombre completo.');
   return nuevas.length;
 }
 
