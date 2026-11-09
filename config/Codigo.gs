@@ -2939,6 +2939,78 @@ function _claudeRouter_(body) {
       _claudeBitacora_(ss,'claudeRecepcion','buscar consultas='+_cons.length);
       return respuesta({ ok:true, sub:'buscar', resultados:_out });
     }
+    if(_sub==='importar'){
+      // UPSERT de filas del Excel de recepción → REGISTRO DEL DÍA (para sincronizar el .xlsx con la Google Sheet):
+      //  - si la cita (fecha + nombre, exacto o subset de tokens) NO existe → AGREGA la fila con TODAS sus columnas.
+      //  - si existe pero le faltan terapeuta/asistió/costo/… → RELLENA SOLO las celdas en BLANCO (NUNCA pisa un valor).
+      // PREVIEW por defecto; aplicar:true escribe. Idempotente. Solo REGISTRO DEL DÍA; no toca Paquetes/fórmulas/otras pestañas.
+      var _aplicar3 = body.aplicar === true;
+      var _rowsIn = body.rows || [];
+      if(!_rowsIn.length) return respuesta({ ok:false, error:'Falta rows:[{fecha,paciente,...}]', code:400 });
+      var _dvI=_rsh.getDataRange().getValues(), _hrI=-1;
+      for(var _ri0=0;_ri0<Math.min(_dvI.length,12);_ri0++){
+        var _rowI=_dvI[_ri0].map(_normRec_);
+        if(_rowI.indexOf('paciente')!==-1 && _rowI.some(function(x){return x.indexOf('asisti')!==-1;})){ _hrI=_ri0; break; }
+      }
+      if(_hrI<0) return respuesta({ ok:false, error:'No encontré el encabezado', code:500 });
+      var _hI=_dvI[_hrI].map(_normRec_);
+      function _cI(sub){ for(var i=0;i<_hI.length;i++){ if(_hI[i].indexOf(sub)!==-1) return i; } return -1; }
+      var ciF=_cI('fecha'), ciP=_cI('paciente'), ciCo=_cI('costo'), ciPa=_cI('pago'), ciFa=_cI('factura'),
+          ciTe=_cI('terapeuta'), ciAs=_cI('asisti'), ciSe=_cI('servicio'), ciNu=_cI('cita'), ciOb=_cI('observ'), ciSa=_cI('saldo');
+      if(ciF<0||ciP<0) return respuesta({ ok:false, error:'Faltan columnas FECHA/PACIENTE', code:500 });
+      function _tk3(s){ return _normRec_(s).split(' ').filter(function(t){return t.length>1;}); }
+      function _sub3(a,b){ for(var i=0;i<a.length;i++){ if(b.indexOf(a[i])===-1) return false; } return a.length>0; }
+      var _porDia3={};
+      for(var _r3=_hrI+1;_r3<_dvI.length;_r3++){
+        var _pc3=_dvI[_r3][ciP]; if(!_pc3) continue;
+        var _dk3=_diaKeyRec_(_dvI[_r3][ciF]); (_porDia3[_dk3]=_porDia3[_dk3]||[]).push(_r3);
+      }
+      var _ancho3=_rsh.getLastColumn(), _nuevas3=[], _rellenos3=[], _ejAdd=[], _ejFill=[], _nFill=0;
+      var _mapCol=[[ciCo,'costo'],[ciPa,'tipoPago'],[ciFa,'factura'],[ciTe,'terapeuta'],[ciAs,'asistio'],[ciSe,'servicio'],[ciNu,'numCita'],[ciOb,'obs'],[ciSa,'saldo']];
+      for(var _q3=0;_q3<_rowsIn.length;_q3++){
+        var R=_rowsIn[_q3], nom=String(R.paciente||'').trim();
+        if(!nom || !R.fecha) continue;
+        var dk3=_diaKeyRec_(R.fecha), cand3=_porDia3[dk3]||[], nt=_tk3(nom), nn=_normRec_(nom), hit=-1;
+        for(var _m3=0;_m3<cand3.length;_m3++){
+          var rIdx=cand3[_m3], cp=String(_dvI[rIdx][ciP]==null?'':_dvI[rIdx][ciP]), cn=_normRec_(cp), ct=_tk3(cp);
+          if(cn===nn || _sub3(nt,ct) || _sub3(ct,nt)){ hit=rIdx; break; }
+        }
+        if(hit<0){
+          var fila=[]; for(var _c3=0;_c3<_ancho3;_c3++) fila[_c3]='';
+          var pm=String(R.fecha).match(/(\d{4})-(\d{2})-(\d{2})/);
+          fila[ciF]= pm ? new Date(+pm[1],+pm[2]-1,+pm[3],12,0,0) : R.fecha;
+          fila[ciP]=nom;
+          for(var _mc=0;_mc<_mapCol.length;_mc++){ var ci=_mapCol[_mc][0], key=_mapCol[_mc][1]; if(ci>=0 && R[key]!=null && String(R[key]).trim()!=='') fila[ci]=R[key]; }
+          _nuevas3.push(fila);
+          if(_ejAdd.length<15) _ejAdd.push(String(R.fecha)+' '+nom);
+        } else {
+          var _did=false;
+          for(var _mc2=0;_mc2<_mapCol.length;_mc2++){
+            var ci2=_mapCol[_mc2][0], key2=_mapCol[_mc2][1]; if(ci2<0) continue;
+            var cur=String(_dvI[hit][ci2]==null?'':_dvI[hit][ci2]).trim();
+            var nv=R[key2]==null?'':String(R[key2]).trim();
+            if(!cur && nv){ _rellenos3.push({r:hit, c:ci2, v:R[key2]}); _dvI[hit][ci2]=R[key2]; _did=true; }
+          }
+          if(_did){ _nFill++; if(_ejFill.length<15) _ejFill.push(String(R.fecha)+' '+nom); }
+        }
+      }
+      if(_aplicar3){
+        for(var _f3=0;_f3<_rellenos3.length;_f3++){ var rr=_rellenos3[_f3]; _rsh.getRange(rr.r+1, rr.c+1).setValue(rr.v); }
+        if(_nuevas3.length){
+          var _ini3=_rsh.getLastRow()+1, _dest3=_rsh.getRange(_ini3,1,_nuevas3.length,_ancho3);
+          _dest3.setValues(_nuevas3);
+          var _mf3=_hrI+2;
+          if(_mf3<_ini3){
+            var _mod3=_rsh.getRange(_mf3,1,1,_ancho3);
+            _mod3.copyTo(_dest3,{formatOnly:true});
+            try{ var _dvv3=_mod3.getDataValidations()[0], _all3=[]; for(var _qq=0;_qq<_nuevas3.length;_qq++) _all3.push(_dvv3.slice()); _dest3.setDataValidations(_all3); }catch(_e3){}
+          }
+          if(ciF>=0) _rsh.getRange(_ini3, ciF+1, _nuevas3.length, 1).setNumberFormat('d/m/yyyy');
+        }
+      }
+      _claudeBitacora_(ss,'claudeRecepcion','importar aplicar='+_aplicar3+' add='+_nuevas3.length+' fill='+_nFill);
+      return respuesta({ ok:true, sub:'importar', aplicado:_aplicar3, agregadas:_nuevas3.length, rellenadas:_nFill, celdas:_rellenos3.length, ejAdd:_ejAdd, ejFill:_ejFill });
+    }
     return respuesta({ ok:false, error:'claudeRecepcion sub no reconocido: '+_sub, code:400 });
   }
 
