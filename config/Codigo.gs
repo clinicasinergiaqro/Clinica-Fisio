@@ -3159,6 +3159,32 @@ function _claudeRouter_(body) {
       _claudeBitacora_(ss,'claudeRecepcion','limpiarBasura aplicar='+_ap6+' celdas='+_lim6.length);
       return respuesta({ ok:true, sub:'limpiarBasura', aplicado:_ap6, aLimpiar:_lim6.length, ejemplos:_ej6 });
     }
+    if(_sub==='arreglarResumen'){
+      // Extiende los rangos de las fórmulas de RESUMEN DEL DÍA que se quedaron CORTOS (p.ej.
+      // $A$4:$A$4342) para que cubran las filas nuevas — la hoja creció y las citas recientes
+      // caían FUERA del rango → el resumen salía en 0. SOLO cambia el número de fila FINAL de los
+      // rangos que apuntan a REGISTRO DEL DÍA / VENTAS DE PRODUCTO; NO toca la lógica ni los valores.
+      // Escribe celda por celda (solo las fórmulas que cambian). PREVIEW por defecto; aplicar:true escribe.
+      var _apR = body.aplicar===true;
+      var _shR = _rss.getSheetByName('RESUMEN DEL DÍA') || _rss.getSheetByName('RESUMEN DEL DIA');
+      if(!_shR) return respuesta({ ok:false, error:'No encontré RESUMEN DEL DÍA', code:500 });
+      var _lrR=_shR.getLastRow(), _lcR=_shR.getLastColumn();
+      if(_lrR<1||_lcR<1) return respuesta({ ok:true, sub:'arreglarResumen', aplicado:_apR, celdas:0, ejemplos:[] });
+      var _fmlR=_shR.getRange(1,1,_lrR,_lcR).getFormulas(), _cambR=[];
+      var _reReg=/('REGISTRO DEL D[ÍI]A'!\$[A-Z]{1,3}\$\d+:\$[A-Z]{1,3}\$)(\d+)/g;
+      var _reVen=/('VENTAS DE PRODUCTO'!\$[A-Z]{1,3}\$\d+:\$[A-Z]{1,3}\$)(\d+)/g;
+      for(var _iR=0;_iR<_fmlR.length;_iR++){
+        for(var _jR=0;_jR<_fmlR[_iR].length;_jR++){
+          var _fR=_fmlR[_iR][_jR]; if(!_fR || String(_fR).charAt(0)!=='=') continue;
+          var _nfR=_fR.replace(_reReg,function(m,p1,n){ return (+n<50000)?(p1+'50000'):m; })
+                      .replace(_reVen,function(m,p1,n){ return (+n<20000)?(p1+'20000'):m; });
+          if(_nfR!==_fR){ _cambR.push({fila:_iR+1, col:_jR+1, de:_fR, a:_nfR}); if(_apR) _shR.getRange(_iR+1,_jR+1).setFormula(_nfR); }
+        }
+      }
+      _claudeBitacora_(ss,'claudeRecepcion','arreglarResumen aplicar='+_apR+' celdas='+_cambR.length);
+      return respuesta({ ok:true, sub:'arreglarResumen', aplicado:_apR, celdas:_cambR.length,
+        ejemplos:_cambR.slice(0,12).map(function(c){ return { celda:'R'+c.fila+'C'+c.col, de:String(c.de).slice(0,80), a:String(c.a).slice(0,80) }; }) });
+    }
     return respuesta({ ok:false, error:'claudeRecepcion sub no reconocido: '+_sub, code:400 });
   }
 
