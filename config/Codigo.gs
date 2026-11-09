@@ -3215,6 +3215,44 @@ function _claudeRouter_(body) {
       return respuesta({ ok:true, sub:'arreglarPaquetes', aplicado:_apP, celdas:_cambP.length,
         ejemplos:_cambP.slice(0,12).map(function(c){ return { celda:'R'+c.fila+'C'+c.col, de:String(c.de).slice(0,90), a:String(c.a).slice(0,90) }; }) });
     }
+    if(_sub==='ordenarPaquetes'){
+      // Acomoda las filas de PAQUETES Y ABONOS por FECHA (ascendente por FECHA PAGO, fallback CONTAR DESDE).
+      // CLAVE: las columnas CALCULADAS (CITAS USADAS/RESTANTES/ESTADO) tienen fórmulas con refs a SU PROPIA
+      // fila (B4,E4,F4…) → se DEJAN en su lugar (no se mueven); solo se permutan los VALORES de las columnas
+      // EDITABLES (A,B,C,D,E,F,H,K) → cada fórmula recomputa desde los valores nuevos de su fila. Fechas se
+      // leen/escriben como valores (Date se conserva). PREVIEW por defecto; aplicar:true escribe.
+      var _apO = body.aplicar===true;
+      var _shO = _recHojaPorNombre_(_rss, 'abono');
+      if(!_shO || _normRec_(_shO.getName()).indexOf('abono')===-1) return respuesta({ ok:false, error:'No encontré PAQUETES Y ABONOS', code:500 });
+      var _HO=_recHeader_(_shO); if(!_HO) return respuesta({ ok:false, error:'No encontré el encabezado', code:500 });
+      var _hojaNO=_normRec_(_shO.getName()), _anchoO=_HO.headN.length;
+      var _firstO=_HO.hr+2, _lastO=_shO.getLastRow();
+      if(_lastO<_firstO) return respuesta({ ok:true, sub:'ordenarPaquetes', aplicado:_apO, filas:0, orden:[] });
+      var _espComp=[]; for(var _c=0;_c<_anchoO;_c++) _espComp[_c]=_recEsComputada_(_hojaNO,_HO.headN[_c]);
+      var _colFP=_recCol_(_HO.headN,'fecha pago'); if(_colFP<0) _colFP=_recCol_(_HO.headN,'fecha');
+      var _colCD=_recCol_(_HO.headN,'contar desde');
+      var _colTit=_recCol_(_HO.headN,'titular'); if(_colTit<0) _colTit=_recCol_(_HO.headN,'paciente');
+      var _dkO=function(v){ if(v instanceof Date) return v.getFullYear()*10000+(v.getMonth()+1)*100+v.getDate(); var s=String(v==null?'':v); var m=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/); if(m) return (+m[3])*10000+(+m[2])*100+(+m[1]); m=s.match(/^(\d{4})-(\d{2})-(\d{2})/); if(m) return (+m[1])*10000+(+m[2])*100+(+m[3]); return 0; };
+      var _valsO=_shO.getRange(_firstO,1,_lastO-_firstO+1,_anchoO).getValues();
+      var _dataO=[];
+      for(var _i=0;_i<_valsO.length;_i++){ var _r=_valsO[_i]; if(String(_r[_colTit]==null?'':_r[_colTit]).trim()==='') continue; var _k=(_colFP>=0?_dkO(_r[_colFP]):0)||(_colCD>=0?_dkO(_r[_colCD]):0); _dataO.push({k:_k, row:_r}); }
+      _dataO.sort(function(a,b){ return (a.k||99999999)-(b.k||99999999); });
+      var _N=_dataO.length;
+      if(_apO && _N){
+        var _M=_dataO.map(function(d){ return d.row; });
+        var _c2=0;
+        while(_c2<_anchoO){
+          if(_espComp[_c2]){ _c2++; continue; }
+          var _ini=_c2; while(_c2<_anchoO && !_espComp[_c2]) _c2++;
+          var _w=_c2-_ini;
+          var _block=_M.map(function(r){ return r.slice(_ini,_ini+_w); });
+          _shO.getRange(_firstO,_ini+1,_N,_w).setValues(_block);
+        }
+      }
+      _claudeBitacora_(ss,'claudeRecepcion','ordenarPaquetes aplicar='+_apO+' filas='+_N);
+      return respuesta({ ok:true, sub:'ordenarPaquetes', aplicado:_apO, filas:_N,
+        orden:_dataO.slice(0,80).map(function(d){ return String(d.row[_colTit]||'').trim()+' | '+(d.k||''); }) });
+    }
     return respuesta({ ok:false, error:'claudeRecepcion sub no reconocido: '+_sub, code:400 });
   }
 
