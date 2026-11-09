@@ -3215,6 +3215,42 @@ function _claudeRouter_(body) {
       return respuesta({ ok:true, sub:'arreglarPaquetes', aplicado:_apP, celdas:_cambP.length,
         ejemplos:_cambP.slice(0,12).map(function(c){ return { celda:'R'+c.fila+'C'+c.col, de:String(c.de).slice(0,90), a:String(c.a).slice(0,90) }; }) });
     }
+    if(_sub==='uniformarPaquetes'){
+      // Las fórmulas de las columnas CALCULADAS (CITAS USADAS/RESTANTES/ESTADO) NO son iguales en todas
+      // las filas (se pegaron en épocas distintas) → al reacomodar valores, un paquete puede quedar bajo
+      // una fórmula con bug (no acota por CONTAR DESDE). Este sub: (a) sin refFila → VOLCADO: devuelve,
+      // por columna calculada, las plantillas DISTINTAS (normalizando el nº de fila) + una fila ejemplo de
+      // cada una → para ver cuál es la buena. (b) con refFila + aplicar:true → copia la fórmula de esa fila
+      // a TODAS las filas de datos con copyTo PASTE_FORMULA (ajusta refs relativas solo). NO toca valores.
+      var _apU = body.aplicar===true;
+      var _shU = _recHojaPorNombre_(_rss, 'abono');
+      if(!_shU || _normRec_(_shU.getName()).indexOf('abono')===-1) return respuesta({ ok:false, error:'No encontré PAQUETES Y ABONOS', code:500 });
+      var _HU=_recHeader_(_shU); if(!_HU) return respuesta({ ok:false, error:'sin encabezado', code:500 });
+      var _hNU=_normRec_(_shU.getName()), _anchoU=_HU.headN.length;
+      var _firstU=_HU.hr+2, _lastU=_shU.getLastRow(), _NU=_lastU-_firstU+1;
+      if(_NU<1) return respuesta({ ok:true, sub:'uniformarPaquetes', filas:0 });
+      var _compU=[]; for(var _c=0;_c<_anchoU;_c++){ if(_recEsComputada_(_hNU,_HU.headN[_c])) _compU.push(_c+1); }
+      var _normFml=function(s){ return String(s||'').replace(/\$?([A-Z]{1,3})\$?\d+/g,'$1#'); };
+      if(!body.refFila || !_apU){
+        var _vol={};
+        for(var _k=0;_k<_compU.length;_k++){
+          var _cc=_compU[_k], _col=_HU.headRaw[_cc-1];
+          var _fm=_shU.getRange(_firstU,_cc,_NU,1).getFormulas();
+          var _tpl={};
+          for(var _r=0;_r<_fm.length;_r++){ var _f=_fm[_r][0]; if(!_f) continue; var _t=_normFml(_f); if(!_tpl[_t]) _tpl[_t]={filaEj:_firstU+_r, muestra:_f.slice(0,140), n:0}; _tpl[_t].n++; }
+          _vol[_col]=Object.keys(_tpl).map(function(t){ return _tpl[t]; });
+        }
+        return respuesta({ ok:true, sub:'uniformarPaquetes', aplicado:false, filas:_NU, plantillas:_vol });
+      }
+      var _ref=body.refFila; var _hechas=[];
+      for(var _k2=0;_k2<_compU.length;_k2++){
+        var _cc2=_compU[_k2];
+        _shU.getRange(_ref,_cc2).copyTo(_shU.getRange(_firstU,_cc2,_NU,1), SpreadsheetApp.CopyPasteType.PASTE_FORMULA, false);
+        _hechas.push(_HU.headRaw[_cc2-1]);
+      }
+      _claudeBitacora_(ss,'claudeRecepcion','uniformarPaquetes ref='+_ref+' cols='+_hechas.join(','));
+      return respuesta({ ok:true, sub:'uniformarPaquetes', aplicado:true, refFila:_ref, columnas:_hechas, filas:_NU });
+    }
     if(_sub==='ordenarPaquetes'){
       // Acomoda las filas de PAQUETES Y ABONOS por FECHA (ascendente por FECHA PAGO, fallback CONTAR DESDE).
       // CLAVE: las columnas CALCULADAS (CITAS USADAS/RESTANTES/ESTADO) tienen fórmulas con refs a SU PROPIA
