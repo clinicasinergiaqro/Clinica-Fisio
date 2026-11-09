@@ -3289,6 +3289,99 @@ function _claudeRouter_(body) {
       return respuesta({ ok:true, sub:'ordenarPaquetes', aplicado:_apO, filas:_N,
         orden:_dataO.slice(0,80).map(function(d){ return String(d.row[_colTit]||'').trim()+' | '+(d.k||''); }) });
     }
+    if(_sub==='auditar'){
+      // AUDITORÍA DE SALUD (read-only, NO escribe). Reporta el TIPO REAL de cada celda de fecha
+      // (Date vs TEXTO — el COUNTIFS/RESUMEN NO comparan fechas-texto) en REGISTRO DEL DÍA y PAQUETES Y ABONOS,
+      // + costos texto, + paquetes con adeudo (restantes<0) y titulares con >1 paquete (riesgo doble-conteo).
+      var _au={ ok:true, sub:'auditar' };
+      (function(){
+        var sh=_recHojaPorNombre_(_rss,'registro'); if(!sh) return;
+        var H=_recHeader_(sh); if(!H) return;
+        var cF=_recCol_(H.headN,'fecha'), cC=_recCol_(H.headN,'costo'), cP=_recCol_(H.headN,'paciente');
+        var last=sh.getLastRow(), first=H.hr+2;
+        if(last<first){ _au.registro={filas:0}; return; }
+        var vals=sh.getRange(first,1,last-first+1,H.headN.length).getValues();
+        var fDate=0,fTxt=0,fVac=0,fRara=0,cNum=0,cTxt=0, mues=[];
+        for(var i=0;i<vals.length;i++){
+          var pv=String(cP>=0?(vals[i][cP]==null?'':vals[i][cP]):'').trim(); if(!pv) continue;
+          var fv=cF>=0?vals[i][cF]:'';
+          if(fv instanceof Date) fDate++;
+          else if(fv===''||fv==null) fVac++;
+          else if(/^\s*\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}\s*$/.test(String(fv))||/^\s*\d{4}-\d{1,2}-\d{1,2}/.test(String(fv))){ fTxt++; if(mues.length<30) mues.push({fila:first+i, fecha:String(fv), paciente:pv.slice(0,22)}); }
+          else fRara++;
+          if(cC>=0){ var cv=vals[i][cC]; if(cv===''||cv==null){} else if(typeof cv==='number') cNum++; else cTxt++; }
+        }
+        _au.registro={ filas:vals.length, fechaReal:fDate, fechaTEXTO:fTxt, fechaVacia:fVac, fechaRara:fRara, costoNum:cNum, costoTexto:cTxt, muestrasFechaTexto:mues };
+      })();
+      (function(){
+        var sh=_recHojaPorNombre_(_rss,'abono'); if(!sh) return;
+        var H=_recHeader_(sh); if(!H) return;
+        var cFP=_recCol_(H.headN,'fecha pago'), cCD=_recCol_(H.headN,'contar desde'), cCH=_recCol_(H.headN,'contar hasta');
+        var cTit=_recCol_(H.headN,'titular'); if(cTit<0) cTit=_recCol_(H.headN,'paciente');
+        var cRest=_recCol_(H.headN,'restante');
+        var last=sh.getLastRow(), first=H.hr+2;
+        if(last<first){ _au.paquetes={filas:0}; return; }
+        var vals=sh.getRange(first,1,last-first+1,H.headN.length).getValues();
+        var txtF=[], adeudos=[], porTit={}, nP=0;
+        for(var i=0;i<vals.length;i++){
+          var tit=String(vals[i][cTit]==null?'':vals[i][cTit]).trim(); if(!tit) continue; nP++;
+          [['FECHA PAGO',cFP],['CONTAR DESDE',cCD],['CONTAR HASTA',cCH]].forEach(function(pr){
+            var v=pr[1]>=0?vals[i][pr[1]]:''; if(v!=='' && v!=null && !(v instanceof Date)) txtF.push({fila:first+i, col:pr[0], titular:tit.slice(0,20), v:String(v)});
+          });
+          var rest=cRest>=0?vals[i][cRest]:null;
+          if(typeof rest==='number' && rest<0) adeudos.push({fila:first+i, titular:tit.slice(0,24), restantes:rest});
+          var tn=_normRec_(tit); (porTit[tn]=porTit[tn]||[]).push(first+i);
+        }
+        var multi=[]; for(var t in porTit){ if(porTit[t].length>1) multi.push({titular:t, filas:porTit[t]}); }
+        _au.paquetes={ filas:nP, fechasTEXTO:txtF, adeudos:adeudos, titularesMultiPaquete:multi };
+      })();
+      _claudeBitacora_(ss,'claudeRecepcion','auditar');
+      return respuesta(_au);
+    }
+    if(_sub==='fechaReal'){
+      // ARREGLA LA RAÍZ: convierte las fechas-TEXTO a Fecha REAL (objeto Date, mediodía) + formato d/m/yyyy en
+      // las columnas de fecha de la hoja (REGISTRO: FECHA; PAQUETES: FECHA PAGO/CONTAR DESDE/CONTAR HASTA).
+      // Una fecha-texto NO la compara el COUNTIFS de paquetes ni el SUMIFS de RESUMEN → de ahí los conteos
+      // cortos y los adeudos falsos. SOLO escribe las columnas de fecha (nunca fórmulas). PREVIEW por defecto.
+      // Ambigüedad d/m vs m/d: si una posición es >12 desambigua sola; si ambas ≤12 asume d/m/aaaa (lo nuestro)
+      // y la marca 'ambigua' en las muestras para que la revises. body:{ hoja?, aplicar? }
+      var _apF=body.aplicar===true;
+      var _shF=_recHojaPorNombre_(_rss, body.hoja||'registro');
+      if(!_shF) return respuesta({ ok:false, error:'No encontré la pestaña: '+(body.hoja||'registro'), code:400 });
+      var _HF=_recHeader_(_shF); if(!_HF) return respuesta({ ok:false, error:'No encontré el encabezado', code:500 });
+      var _hojaNF=_normRec_(_shF.getName()), _colsF=[], _candF=['fecha pago','contar desde','contar hasta','fecha'];
+      for(var _q=0;_q<_candF.length;_q++){ var _ci=_recCol_(_HF.headN,_candF[_q]); if(_ci>=0 && _colsF.indexOf(_ci)===-1 && !_recEsComputada_(_hojaNF,_HF.headN[_ci])) _colsF.push(_ci); }
+      if(!_colsF.length) return respuesta({ ok:false, error:'No hay columnas de fecha editables en '+_shF.getName(), code:400 });
+      var _firstF=_HF.hr+2, _lastF=_shF.getLastRow();
+      if(_lastF<_firstF) return respuesta({ ok:true, sub:'fechaReal', hoja:_shF.getName(), aplicado:_apF, convertidas:0, yaDate:0, ambiguas:0, muestras:[] });
+      var _rngF=_shF.getRange(_firstF,1,_lastF-_firstF+1,_HF.headN.length), _vF=_rngF.getValues(), _fF=_rngF.getNumberFormats();
+      var _conv=0,_ya=0,_amb=0,_mues=[], _toca={};
+      var _parse=function(s){ s=String(s==null?'':s).trim(); if(!s) return null;
+        var m=s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/);
+        if(m){ var a=+m[1],b=+m[2],y=+m[3]; if(y<100) y+=2000;
+          if(a>12 && b<=12) return {y:y,mo:b,d:a,amb:false};
+          if(b>12 && a<=12) return {y:y,mo:a,d:b,amb:false};
+          return {y:y,mo:b,d:a,amb:true}; }
+        m=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/); if(m) return {y:+m[1],mo:+m[2],d:+m[3],amb:false};
+        return null; };
+      for(var _i=0;_i<_vF.length;_i++){
+        for(var _k=0;_k<_colsF.length;_k++){
+          var _c=_colsF[_k], _val=_vF[_i][_c];
+          if(_val instanceof Date){ _ya++; if(_fF[_i][_c]!=='d/m/yyyy'){ _fF[_i][_c]='d/m/yyyy'; _toca[_c]=1; } continue; }
+          if(_val===''||_val==null) continue;
+          var _pp=_parse(_val); if(!_pp) continue;
+          var _dt=new Date(_pp.y,_pp.mo-1,_pp.d,12,0,0);
+          if(isNaN(_dt.getTime())||_dt.getMonth()!==_pp.mo-1) continue;
+          _vF[_i][_c]=_dt; _fF[_i][_c]='d/m/yyyy'; _conv++; _toca[_c]=1; if(_pp.amb) _amb++;
+          if(_mues.length<40) _mues.push({fila:_firstF+_i, columna:_HF.headRaw[_c], de:String(_val), a:Utilities.formatDate(_dt,'America/Mexico_City','d/M/yyyy'), ambigua:_pp.amb});
+        }
+      }
+      if(_apF){ for(var _k2=0;_k2<_colsF.length;_k2++){ var _c2=_colsF[_k2]; if(!_toca[_c2]) continue;
+          var _cv=[],_cf=[]; for(var _r2=0;_r2<_vF.length;_r2++){ _cv.push([_vF[_r2][_c2]]); _cf.push([_fF[_r2][_c2]]); }
+          _shF.getRange(_firstF,_c2+1,_vF.length,1).setValues(_cv); _shF.getRange(_firstF,_c2+1,_vF.length,1).setNumberFormats(_cf); } }
+      _claudeBitacora_(ss,'claudeRecepcion','fechaReal '+_shF.getName()+' aplicar='+_apF+' conv='+_conv);
+      return respuesta({ ok:true, sub:'fechaReal', hoja:_shF.getName(), aplicado:_apF, convertidas:_conv, yaDate:_ya, ambiguas:_amb, muestras:_mues });
+    }
     return respuesta({ ok:false, error:'claudeRecepcion sub no reconocido: '+_sub, code:400 });
   }
 
