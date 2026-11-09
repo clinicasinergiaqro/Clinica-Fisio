@@ -3173,11 +3173,16 @@ function _claudeRouter_(body) {
       var _fmlR=_shR.getRange(1,1,_lrR,_lcR).getFormulas(), _cambR=[];
       var _reReg=/('REGISTRO DEL D[ÍI]A'!\$[A-Z]{1,3}\$\d+:\$[A-Z]{1,3}\$)(\d+)/g;
       var _reVen=/('VENTAS DE PRODUCTO'!\$[A-Z]{1,3}\$\d+:\$[A-Z]{1,3}\$)(\d+)/g;
+      // Tolerancia de fecha: el criterio exacto (..$A..,$B$4) falla si la fecha trae HORA (el
+      // auto-llenado guarda mediodía) → se cambia a rango por DÍA: (..$A..,">="&$B$4, ..$A..,"<"&($B$4+1)).
+      // Idempotente (no re-duplica porque ya no hay ",$B$4" crudo tras el cambio).
+      var _reFec=/('(?:REGISTRO DEL D[ÍI]A|VENTAS DE PRODUCTO)'!\$A\$\d+:\$A\$\d+),\$B\$4(?!\+)/g;
       for(var _iR=0;_iR<_fmlR.length;_iR++){
         for(var _jR=0;_jR<_fmlR[_iR].length;_jR++){
           var _fR=_fmlR[_iR][_jR]; if(!_fR || String(_fR).charAt(0)!=='=') continue;
           var _nfR=_fR.replace(_reReg,function(m,p1,n){ return (+n<50000)?(p1+'50000'):m; })
-                      .replace(_reVen,function(m,p1,n){ return (+n<20000)?(p1+'20000'):m; });
+                      .replace(_reVen,function(m,p1,n){ return (+n<20000)?(p1+'20000'):m; })
+                      .replace(_reFec,function(m,p1){ return p1+',">="&$B$4,'+p1+',"<"&($B$4+1)'; });
           if(_nfR!==_fR){ _cambR.push({fila:_iR+1, col:_jR+1, de:_fR, a:_nfR}); if(_apR) _shR.getRange(_iR+1,_jR+1).setFormula(_nfR); }
         }
       }
