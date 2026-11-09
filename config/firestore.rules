@@ -43,6 +43,9 @@ service cloud.firestore {
                   'altaClinica','revaloraciones','consentimientos',
                   'consentimientoDatos','consentimientoImagen','consentimientoWhatsApp',
                   'estudiosDocs','fotos','docs',
+                  // Medidor biomecánico: mediciones de cámara (ROM/sentadilla/marcha/goniómetro).
+                  // Sincroniza cross-device por su vía dedicada (_syncBiomecanicaFS, unión por id).
+                  'biomecanica',
                   'sexo','eventosAdversos','revalSolicitada','etiquetas','historialCambios',
                   // FIX SYNC: 'inasistencias' ("No acudio") lo escribe el front pero faltaba
                   // aqui -> Firestore rechazaba con "Missing or insufficient permissions"
