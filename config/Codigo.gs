@@ -3014,6 +3014,41 @@ function _claudeRouter_(body) {
       _claudeBitacora_(ss,'claudeRecepcion','importar aplicar='+_aplicar3+' add='+_nuevas3.length+' fill='+_nFill);
       return respuesta({ ok:true, sub:'importar', aplicado:_aplicar3, agregadas:_nuevas3.length, rellenadas:_nFill, celdas:_rellenos3.length, ejAdd:_ejAdd, ejFill:_ejFill });
     }
+    if(_sub==='borrarFuturas'){
+      // Borra de REGISTRO DEL DÍA las filas cuya FECHA es POSTERIOR a HOY (pre-cargas de días futuros).
+      // El auto-llenado corre día a día (RECEPCION_DIAS=1) → no debe haber futuros; esto limpia los que
+      // quedaron de un 'correr dias>1'. PREVIEW por defecto; aplicar:true borra. Opcional body.desde='YYYY-MM-DD'
+      // para borrar desde esa fecha inclusive (default = mañana). Solo REGISTRO DEL DÍA; no toca otras pestañas.
+      var _aplicar4 = body.aplicar === true;
+      var _hoyK = Utilities.formatDate(new Date(),'America/Mexico_City','yyyyMMdd');
+      var _desdeK = _hoyK;  // por defecto: todo lo ESTRICTAMENTE mayor a hoy
+      var _estricto = true;
+      if(body.desde){ var _md=String(body.desde).match(/^(\d{4})-(\d{2})-(\d{2})/); if(_md){ _desdeK=_md[1]+_md[2]+_md[3]; _estricto=false; } }
+      var _dvF=_rsh.getDataRange().getValues(), _hrF=-1;
+      for(var _rf0=0;_rf0<Math.min(_dvF.length,12);_rf0++){
+        var _rowF=_dvF[_rf0].map(_normRec_);
+        if(_rowF.indexOf('paciente')!==-1 && _rowF.some(function(x){return x.indexOf('fecha')!==-1;})){ _hrF=_rf0; break; }
+      }
+      if(_hrF<0) return respuesta({ ok:false, error:'No encontré el encabezado', code:500 });
+      var _hF=_dvF[_hrF].map(_normRec_), _cFF=-1, _cPF=-1;
+      for(var _if=0;_if<_hF.length;_if++){ if(_cFF<0&&_hF[_if].indexOf('fecha')!==-1) _cFF=_if; if(_cPF<0&&_hF[_if].indexOf('paciente')!==-1) _cPF=_if; }
+      if(_cFF<0) return respuesta({ ok:false, error:'No hay columna FECHA', code:500 });
+      var _delRows=[], _ejDel=[];
+      for(var _rf=_hrF+1;_rf<_dvF.length;_rf++){
+        var _fv=_dvF[_rf][_cFF]; if(_fv===''||_fv==null) continue;
+        var _pv=String(_dvF[_rf][_cPF]==null?'':_dvF[_rf][_cPF]).trim(); if(!_pv) continue;
+        var _k=_diaKeyRec_(_fv); if(!/^\d{8}$/.test(_k)) continue;
+        var _match = _estricto ? (_k>_desdeK) : (_k>=_desdeK);
+        if(_match){ _delRows.push(_rf+1); if(_ejDel.length<20) _ejDel.push(_k.slice(0,4)+'-'+_k.slice(4,6)+'-'+_k.slice(6,8)+' '+_pv); }
+      }
+      if(_aplicar4){
+        // borrar de ABAJO hacia ARRIBA para no correr los índices
+        _delRows.sort(function(a,b){return b-a;});
+        for(var _d4=0;_d4<_delRows.length;_d4++){ _rsh.deleteRow(_delRows[_d4]); }
+      }
+      _claudeBitacora_(ss,'claudeRecepcion','borrarFuturas aplicar='+_aplicar4+' hoy='+_hoyK+' borradas='+_delRows.length);
+      return respuesta({ ok:true, sub:'borrarFuturas', aplicado:_aplicar4, hoy:_hoyK, desde:_desdeK, estricto:_estricto, aBorrar:_delRows.length, ejemplos:_ejDel });
+    }
     return respuesta({ ok:false, error:'claudeRecepcion sub no reconocido: '+_sub, code:400 });
   }
 
