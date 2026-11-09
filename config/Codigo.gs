@@ -3122,7 +3122,7 @@ function _claudeRouter_(body) {
       if(body.hasta!=null)     _vp['hasta']=body.hasta;
       if(body.ajuste!=null)    _vp['ajuste']=body.ajuste;
       if(body.obs!=null)       _vp['obs']=body.obs;
-      var _rnp=_recAgregar_(_rss, 'paquete', _vp, body.aplicar===true);
+      var _rnp=_recAgregar_(_rss, 'abono', _vp, body.aplicar===true);
       if(_rnp.ok) _claudeBitacora_(ss,'claudeRecepcion','nuevoPaquete aplicar='+(body.aplicar===true)+' '+(body.titular||''));
       return respuesta(_rnp.ok ? Object.assign({sub:'nuevoPaquete'},_rnp) : { ok:false, error:_rnp.error, code:400 });
     }
@@ -3137,7 +3137,7 @@ function _claudeRouter_(body) {
       if(_M.ajuste!=null) _setp['ajuste']=_M.ajuste;
       if(_M.obs!=null)    _setp['obs']=_M.obs;
       if(!Object.keys(_setp).length) return respuesta({ ok:false, error:'Nada que cambiar (monto/citas/desde/hasta/ajuste/obs)', code:400 });
-      var _rmp=_recEditar_(_rss, 'paquete', {titular:body.titular}, _setp, body.aplicar===true);
+      var _rmp=_recEditar_(_rss, 'abono', {titular:body.titular}, _setp, body.aplicar===true);
       if(_rmp.ok) _claudeBitacora_(ss,'claudeRecepcion','modificarPaquete aplicar='+(body.aplicar===true)+' '+body.titular);
       return respuesta(_rmp.ok ? Object.assign({sub:'modificarPaquete'},_rmp) : { ok:false, error:_rmp.error, code:400, columnasBloqueadas:_rmp.columnasBloqueadas });
     }
@@ -3400,9 +3400,23 @@ function _recAgregar_(rss, hojaSub, valores, aplicar){
   if(bloq.length) return { ok:false, error:'Esas columnas son CALCULADAS (fórmula), no se pueden escribir: '+bloq.join(', ') };
   var preview={}; for(var c2=0;c2<ancho;c2++){ if(String(fila[c2]).trim()!=='') preview[H.headRaw[c2]||('col'+(c2+1))]=_recFmtVal_(fila[c2]); }
   if(aplicar){
-    var ini=sh.getLastRow()+1, dest=sh.getRange(ini,1,1,ancho); dest.setValues([fila]);
-    var mf=H.hr+2; if(mf<ini){ var mod=sh.getRange(mf,1,1,ancho); mod.copyTo(dest,{formatOnly:true}); try{ dest.setDataValidations([mod.getDataValidations()[0]]); }catch(_e){} }
-    for(var cf=0;cf<H.headN.length;cf++){ if(H.headN[cf].indexOf('fecha')!==-1) sh.getRange(ini,cf+1).setNumberFormat('d/m/yyyy'); }
+    // Buscar el PRIMER renglón vacío por la columna CLAVE (titular/paciente/nombre o 1a editable),
+    // dentro del rango donde las fórmulas (G/I/J) ya están pre-llenadas → NO usar getLastRow()+1,
+    // porque las celdas de fórmula cuentan como contenido y el append caería FUERA del rango (bug Adrian fila 501).
+    var keyCol=-1;
+    for(var kc=0;kc<H.headN.length;kc++){ if(H.headN[kc].indexOf('titular')!==-1||H.headN[kc].indexOf('paciente')!==-1||H.headN[kc].indexOf('nombre')!==-1){ keyCol=kc; break; } }
+    if(keyCol<0){ for(var kc2=0;kc2<H.headN.length;kc2++){ if(!_recEsComputada_(hojaN,H.headN[kc2]) && H.headN[kc2].indexOf('fecha')===-1){ keyCol=kc2; break; } } }
+    if(keyCol<0) keyCol=0;
+    var firstData=H.hr+2, maxR=sh.getMaxRows(), nR=Math.max(1,maxR-firstData+1);
+    var colVals=sh.getRange(firstData,keyCol+1,nR,1).getValues();
+    var ini=-1;
+    for(var rv=0;rv<colVals.length;rv++){ if(String(colVals[rv][0]).trim()===''){ ini=firstData+rv; break; } }
+    if(ini<0){ ini=maxR+1; sh.insertRowAfter(maxR); }
+    // Heredar formato + validaciones de la 1a fila de datos (modelo) SOLO si el renglón está fuera del rango pre-llenado.
+    var mf=H.hr+2; if(mf!==ini){ var mod=sh.getRange(mf,1,1,ancho), dest=sh.getRange(ini,1,1,ancho); mod.copyTo(dest,{formatOnly:true}); try{ dest.setDataValidations([mod.getDataValidations()[0]]); }catch(_e){} }
+    // Escribir SOLO las celdas con valor → NUNCA se pisan las columnas de fórmula (G/I/J) que ya viven en ese renglón.
+    for(var cw=0;cw<ancho;cw++){ if(String(fila[cw]).trim()!=='') sh.getRange(ini,cw+1).setValue(fila[cw]); }
+    for(var cf=0;cf<H.headN.length;cf++){ if(H.headN[cf].indexOf('fecha')!==-1 && String(fila[cf]).trim()!=='') sh.getRange(ini,cf+1).setNumberFormat('d/m/yyyy'); }
     return { ok:true, hoja:sh.getName(), aplicado:true, fila:ini, valores:preview };
   }
   return { ok:true, hoja:sh.getName(), aplicado:false, valores:preview };
