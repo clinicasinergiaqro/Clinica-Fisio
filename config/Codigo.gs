@@ -3017,18 +3017,26 @@ function _recepcionIndexNombres_(ss){
 function _recepcionResolverNombre_(calNombre, idx){
   if(!idx) return calNombre;
   var norm=_normRec_(calNombre); if(!norm) return calNombre;
+  // COLAPSA por NOMBRE: un mismo paciente vive en varios docs (activo p… + espejo app_live_ + migrado
+  // mig_pac_). Esos NO son homónimos: son el MISMO nombre repetido. Contar DOCS los trataba como
+  // ambiguos y dejaba el nombre corto; se cuenta NOMBRES DISTINTOS (normalizados) para no confundir
+  // "repetido-mismo-nombre" (→ sí completa) con "homónimo real-nombres distintos" (→ no adivina).
   var ex=idx.byExact[norm];
-  if(ex && ex.length===1) return ex[0];        // 1) exacto y único
-  if(ex && ex.length>1) return calNombre;      //    homónimo exacto → no adivinar
+  if(ex && ex.length){
+    var exSeen={}, exUno=null, exN=0;
+    for(var e=0;e<ex.length;e++){ var ek=_normRec_(ex[e]); if(!exSeen[ek]){ exSeen[ek]=1; exUno=ex[e]; exN++; if(exN>1) break; } }
+    if(exN===1) return exUno;                  // 1) exacto único (colapsa espejos del mismo nombre)
+    return calNombre;                          //    homónimo exacto REAL → no adivinar
+  }
   var calToks=norm.split(' ').filter(function(t){return t.length>=2;});
   if(calToks.length<2) return calNombre;       // 2) subset: 1 solo token (nombre de pila) = demasiado ambiguo
-  var hit=null, n=0, L=idx.list;
+  var hitFull=null, seen={}, n=0, L=idx.list;
   for(var i=0;i<L.length;i++){
     var tm=L[i].tok, ok=true;
     for(var k=0;k<calToks.length;k++){ if(!tm[calToks[k]]){ ok=false; break; } }
-    if(ok){ n++; hit=L[i]; if(n>1) break; }
+    if(ok){ var nk=_normRec_(L[i].full); if(!seen[nk]){ seen[nk]=1; n++; hitFull=L[i].full; if(n>1) break; } }
   }
-  if(n===1 && hit) return hit.full;            // subset único → nombre completo
+  if(n===1 && hitFull) return hitFull;         // subset único POR NOMBRE → nombre completo
   return calNombre;
 }
 
