@@ -3424,13 +3424,27 @@ function autoCitasRecepcion(diasAdelante){
   function _colRec_(k){ for(var i=0;i<head.length;i++){ if(head[i].indexOf(k)!==-1) return i; } return -1; }
   var cF=_colRec_('fecha'), cP=_colRec_('paciente'), cS=_colRec_('servicio');
   if(cF<0||cP<0){ Logger.log('Faltan columnas fecha/paciente'); return 0; }
+  var cObs=_colRec_('observ');
   var existe={}, existeMap={};
   for(var r2=hdr+1;r2<datos.length;r2++){ var p=datos[r2][cP]; if(p){ var _kk=_diaKeyRec_(datos[r2][cF])+'|'+_normRec_(p); existe[_kk]=true; existeMap[_kk]={row:r2+1, name:String(p)}; } }
+  // ── ENLACE EVENTO↔FILA: columna OCULTA con el ID del evento de calendario ──
+  // Permite que, al RENOMBRAR el MISMO evento (otra persona), se actualice ESA MISMA fila
+  // (no se duplica) y el nombre viejo quede en Observaciones. Todo fail-safe: si falla, el
+  // auto-llenado sigue igual (nunca se rompe).
+  var EVT_COL=16, evtById={};   // columna P (oculta), fuera de los datos A–K
+  try{
+    if(sh.getMaxColumns()<EVT_COL) sh.insertColumnsAfter(sh.getMaxColumns(), EVT_COL-sh.getMaxColumns());
+    sh.hideColumns(EVT_COL);
+    var _nD=sh.getLastRow()-(hdr+1);
+    if(_nD>0){ var _eidV=sh.getRange(hdr+2,EVT_COL,_nD,1).getValues();
+      for(var _ei=0;_ei<_eidV.length;_ei++){ var _id=String(_eidV[_ei][0]||'').trim();
+        if(_id){ var _nm=(datos[hdr+1+_ei]&&datos[hdr+1+_ei][cP]!=null)?String(datos[hdr+1+_ei][cP]):''; evtById[_id]={row:hdr+2+_ei, name:_nm}; } } }
+  }catch(_eE){ evtById={}; }
   var cal = CalendarApp.getDefaultCalendar();
   if(!cal){ Logger.log('No se pudo abrir el calendario'); return 0; }
   var idxNom=null; try{ idxNom=_recepcionIndexNombres_(ss); }catch(eIdx){ idxNom=null; }   // índice de nombres (nunca rompe)
   var ancho=sh.getLastColumn(), hoy=new Date(); hoy.setHours(0,0,0,0);
-  var nuevas=[], up=0, _ups=[];
+  var nuevas=[], up=0, _ups=[], _renames=[], _nuevasEid=[], _linkEid=[];
   for(var d=0; d<dias; d++){
     var ini=new Date(hoy.getTime()+d*86400000), fin=new Date(ini.getTime()+86400000);
     var evs=cal.getEvents(ini,fin);
@@ -3446,13 +3460,24 @@ function autoCitasRecepcion(diasAdelante){
       var nombre=nombreCal;
       try{ nombre=_recepcionResolverNombre_(nombreCal, idxNom)||nombreCal; }catch(eRes){ nombre=nombreCal; }
       if(_normRec_(nombre)!==_normRec_(nombreCal)) up++;
+      // ENLACE EVENTO↔FILA: si este evento YA tiene su fila (por ID), y le cambiaron el nombre
+      // (incluso a OTRA persona), se actualiza ESA MISMA fila — no se duplica.
+      var _eid=''; try{ _eid=String(evs[e].getId()||''); }catch(_eI){ _eid=''; }
+      if(_eid && evtById[_eid]){
+        var _evr=evtById[_eid];
+        if(_normRec_(_evr.name)!==_normRec_(nombre)){ _renames.push({row:_evr.row, name:nombre, old:_evr.name}); _evr.name=nombre; }
+        continue;
+      }
       // dedup bajo el nombre final Y el del calendario (no duplica una cita ya puesta con nombre corto)
       var diaK=_diaKeyRec_(ini), keyFin=diaK+'|'+_normRec_(nombre), keyCal=diaK+'|'+_normRec_(nombreCal);
       if(existe[keyFin]||existe[keyCal]){
-        // Ya existe la cita. Si el expediente resuelve a un nombre MÁS COMPLETO del MISMO paciente
+        // Ya existe la cita. Enlaza el ID del evento a esa fila (backfill) para que futuros renombres
+        // la actualicen en su lugar.
+        var _ex=existeMap[keyCal]||existeMap[keyFin];
+        if(_eid && _ex && _ex.row>0 && !evtById[_eid]){ _linkEid.push({row:_ex.row, eid:_eid}); evtById[_eid]={row:_ex.row, name:_ex.name}; }
+        // Si el expediente resuelve a un nombre MÁS COMPLETO del MISMO paciente
         // (los tokens del corto son subconjunto del completo y hay más tokens) → actualiza esa celda
         // en su lugar (nunca cambia de persona). Así renombrar a nombre completo se refleja en la hoja.
-        var _ex=existeMap[keyCal]||existeMap[keyFin];
         if(_ex && _normRec_(nombre)!==_normRec_(_ex.name)){
           var _exTok=_recTok_(_ex.name), _fullTok=_recTok_(nombre);
           if(_recSubset_(_exTok,_fullTok) && _fullTok.length>_exTok.length){ _ups.push({row:_ex.row, name:nombre}); _ex.name=nombre; }
@@ -3465,7 +3490,7 @@ function autoCitasRecepcion(diasAdelante){
       fila[cF]=new Date(ini.getFullYear(),ini.getMonth(),ini.getDate(),12,0,0);  // mediodía: evita que la zona horaria corra el día
       fila[cP]=nombre;
       if(cS>=0) fila[cS]='FISIOTERAPIA';
-      nuevas.push(fila);
+      nuevas.push(fila); _nuevasEid.push(_eid);   // guarda el ID del evento en paralelo
     }
   }
   if(nuevas.length){
@@ -3482,11 +3507,28 @@ function autoCitasRecepcion(diasAdelante){
     }
     // FECHA SIEMPRE día/mes/año (d/m/aaaa), sin importar el locale de la hoja — y sigue siendo fecha real
     try{ sh.getRange(_inicio, cF+1, nuevas.length, 1).setNumberFormat('d/m/yyyy'); }catch(_e2){}
+    // Guardar el ID del evento (columna oculta) de cada fila nueva → enlace evento↔fila
+    try{ if(_nuevasEid.length===nuevas.length) sh.getRange(_inicio, EVT_COL, nuevas.length, 1).setValues(_nuevasEid.map(function(x){return [x];})); }catch(_e4){}
   }
   // Auto-upgrade de nombre corto → completo en filas YA existentes del día (mismo paciente, subset).
   var _nUp=0;
   for(var _u=0;_u<_ups.length;_u++){ if(_ups[_u].row>0){ try{ sh.getRange(_ups[_u].row, cP+1).setValue(_ups[_u].name); _nUp++; }catch(_eu){} } }
-  Logger.log('Auto-citas: agregadas '+nuevas.length+' cita(s) ('+up+' con nombre completo del expediente); '+_nUp+' fila(s) actualizadas a nombre completo.');
+  // Backfill: enlazar el ID del evento a filas existentes (para futuros renombres).
+  for(var _l=0;_l<_linkEid.length;_l++){ try{ sh.getRange(_linkEid[_l].row, EVT_COL).setValue(_linkEid[_l].eid); }catch(_el){} }
+  // Renombrado por ENLACE DE EVENTO: el mismo evento cambió de nombre → se actualiza SU fila (y el viejo a Observaciones si está vacía).
+  var _nRen=0;
+  for(var _rr=0;_rr<_renames.length;_rr++){
+    try{
+      sh.getRange(_renames[_rr].row, cP+1).setValue(_renames[_rr].name);
+      if(cObs>=0 && _renames[_rr].old){
+        var _of=sh.getRange(_renames[_rr].row, cObs+1).getFormula();
+        var _ov=_of?'x':String(sh.getRange(_renames[_rr].row, cObs+1).getValue()||'');
+        if(!_of && !_ov) sh.getRange(_renames[_rr].row, cObs+1).setValue('(antes: '+_renames[_rr].old+')');
+      }
+      _nRen++;
+    }catch(_er){}
+  }
+  Logger.log('Auto-citas: agregadas '+nuevas.length+' ('+up+' nombre completo); '+_nUp+' a nombre completo; '+_nRen+' renombradas por evento; '+_linkEid.length+' enlazadas.');
   return nuevas.length;
 }
 
