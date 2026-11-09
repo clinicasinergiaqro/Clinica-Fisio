@@ -2967,10 +2967,13 @@ function _claudeRouter_(body) {
       }
       var _ancho3=_rsh.getLastColumn(), _nuevas3=[], _rellenos3=[], _ejAdd=[], _ejFill=[], _nFill=0;
       var _mapCol=[[ciCo,'costo'],[ciPa,'tipoPago'],[ciFa,'factura'],[ciTe,'terapeuta'],[ciAs,'asistio'],[ciSe,'servicio'],[ciNu,'numCita'],[ciOb,'obs'],[ciSa,'saldo']];
+      // clave de día ISO-aware para el import: _diaKeyRec_ mal-parsea 'YYYY-MM-DD' (su 1er regex d/m/aaaa
+      // la toma como DD-MM-AA) → aquí ISO primero, y si no, cae a _diaKeyRec_ (acepta d/m/aaaa y Date).
+      function _dkImp(f){ var m=String(f==null?'':f).match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? (m[1]+m[2]+m[3]) : _diaKeyRec_(f); }
       for(var _q3=0;_q3<_rowsIn.length;_q3++){
         var R=_rowsIn[_q3], nom=String(R.paciente||'').trim();
         if(!nom || !R.fecha) continue;
-        var dk3=_diaKeyRec_(R.fecha), cand3=_porDia3[dk3]||[], nt=_tk3(nom), nn=_normRec_(nom), hit=-1;
+        var dk3=_dkImp(R.fecha), cand3=_porDia3[dk3]||[], nt=_tk3(nom), nn=_normRec_(nom), hit=-1;
         for(var _m3=0;_m3<cand3.length;_m3++){
           var rIdx=cand3[_m3], cp=String(_dvI[rIdx][ciP]==null?'':_dvI[rIdx][ciP]), cn=_normRec_(cp), ct=_tk3(cp);
           if(cn===nn || _sub3(nt,ct) || _sub3(ct,nt)){ hit=rIdx; break; }
