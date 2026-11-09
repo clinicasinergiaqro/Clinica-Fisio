@@ -3049,6 +3049,33 @@ function _claudeRouter_(body) {
       _claudeBitacora_(ss,'claudeRecepcion','borrarFuturas aplicar='+_aplicar4+' hoy='+_hoyK+' borradas='+_delRows.length);
       return respuesta({ ok:true, sub:'borrarFuturas', aplicado:_aplicar4, hoy:_hoyK, desde:_desdeK, estricto:_estricto, aBorrar:_delRows.length, ejemplos:_ejDel });
     }
+    if(_sub==='fechaFixHojas'){
+      // Formatea a d/m/aaaa TODAS las celdas con FECHA de las pestañas indicadas (default: Paquetes/Abonos + Ventas).
+      // SOLO cambia el FORMATO de celdas cuyo valor YA es una fecha (objeto Date, o un serial de fecha 43000–55000
+      // = ~2017–2050) — NO toca montos/conteos/texto, NO cambia valores, NO toca fórmulas. PREVIEW por defecto; aplicar:true escribe.
+      var _aplicar5 = body.aplicar === true;
+      var _subcad5 = (body.hojas && body.hojas.length) ? body.hojas.map(function(x){ return _normRec_(x); }) : ['paquete','venta','abono'];
+      var _hojasOut = [], _todas5 = _rss.getSheets();
+      for(var _hs=0; _hs<_todas5.length; _hs++){
+        var _sh5 = _todas5[_hs], _nm5 = _normRec_(_sh5.getName()), _match5=false;
+        for(var _sc=0;_sc<_subcad5.length;_sc++){ if(_nm5.indexOf(_subcad5[_sc])!==-1){ _match5=true; break; } }
+        if(!_match5) continue;
+        var _lr5=_sh5.getLastRow(), _lc5=_sh5.getLastColumn();
+        if(_lr5<1||_lc5<1){ _hojasOut.push({ hoja:_sh5.getName(), fechas:0 }); continue; }
+        var _rng5=_sh5.getRange(1,1,_lr5,_lc5), _vals5=_rng5.getValues(), _fmts5=_rng5.getNumberFormats(), _cnt5=0;
+        for(var _r5=0;_r5<_vals5.length;_r5++){
+          for(var _c5=0;_c5<_vals5[_r5].length;_c5++){
+            var _v5=_vals5[_r5][_c5];
+            var _esFecha = (_v5 instanceof Date) || (typeof _v5==='number' && _v5>=43000 && _v5<=55000);
+            if(_esFecha && _fmts5[_r5][_c5] !== 'd/m/yyyy'){ _fmts5[_r5][_c5]='d/m/yyyy'; _cnt5++; }
+          }
+        }
+        if(_aplicar5 && _cnt5>0) _rng5.setNumberFormats(_fmts5);
+        _hojasOut.push({ hoja:_sh5.getName(), fechas:_cnt5 });
+      }
+      _claudeBitacora_(ss,'claudeRecepcion','fechaFixHojas aplicar='+_aplicar5+' '+JSON.stringify(_hojasOut));
+      return respuesta({ ok:true, sub:'fechaFixHojas', aplicado:_aplicar5, hojas:_hojasOut });
+    }
     return respuesta({ ok:false, error:'claudeRecepcion sub no reconocido: '+_sub, code:400 });
   }
 
