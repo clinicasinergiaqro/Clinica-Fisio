@@ -3190,6 +3190,31 @@ function _claudeRouter_(body) {
       return respuesta({ ok:true, sub:'arreglarResumen', aplicado:_apR, celdas:_cambR.length,
         ejemplos:_cambR.slice(0,12).map(function(c){ return { celda:'R'+c.fila+'C'+c.col, de:String(c.de).slice(0,80), a:String(c.a).slice(0,80) }; }) });
     }
+    if(_sub==='arreglarPaquetes'){
+      // Mismo mal que arreglarResumen pero en PAQUETES Y ABONOS: el COUNTIFS de CITAS USADAS (col G)
+      // apunta a un rango de filas de REGISTRO DEL DÍA que se quedó CORTO (la hoja creció) → las citas
+      // PAGADO recientes caen FUERA → CITAS USADAS=0 en TODOS los paquetes (verificado fila 39 y 40).
+      // SOLO extiende el nº de fila FINAL de los rangos que apuntan a 'REGISTRO DEL DÍA' a 50000;
+      // NO toca la lógica ni los valores. Escribe celda por celda (solo las fórmulas que cambian).
+      // PREVIEW por defecto; aplicar:true escribe. Idempotente (no re-extiende si ya es 50000).
+      var _apP = body.aplicar===true;
+      var _shP = _recHojaPorNombre_(_rss, 'abono');
+      if(!_shP || _normRec_(_shP.getName()).indexOf('abono')===-1) return respuesta({ ok:false, error:'No encontré PAQUETES Y ABONOS', code:500 });
+      var _lrP=_shP.getLastRow(), _lcP=_shP.getLastColumn();
+      if(_lrP<1||_lcP<1) return respuesta({ ok:true, sub:'arreglarPaquetes', aplicado:_apP, celdas:0, ejemplos:[] });
+      var _fmlP=_shP.getRange(1,1,_lrP,_lcP).getFormulas(), _cambP=[];
+      var _reRegP=/('REGISTRO DEL D[ÍI]A'!\$[A-Z]{1,3}\$\d+:\$[A-Z]{1,3}\$)(\d+)/g;
+      for(var _iP=0;_iP<_fmlP.length;_iP++){
+        for(var _jP=0;_jP<_fmlP[_iP].length;_jP++){
+          var _fP=_fmlP[_iP][_jP]; if(!_fP || String(_fP).charAt(0)!=='=') continue;
+          var _nfP=_fP.replace(_reRegP,function(m,p1,n){ return (+n<50000)?(p1+'50000'):m; });
+          if(_nfP!==_fP){ _cambP.push({fila:_iP+1, col:_jP+1, de:_fP, a:_nfP}); if(_apP) _shP.getRange(_iP+1,_jP+1).setFormula(_nfP); }
+        }
+      }
+      _claudeBitacora_(ss,'claudeRecepcion','arreglarPaquetes aplicar='+_apP+' celdas='+_cambP.length);
+      return respuesta({ ok:true, sub:'arreglarPaquetes', aplicado:_apP, celdas:_cambP.length,
+        ejemplos:_cambP.slice(0,12).map(function(c){ return { celda:'R'+c.fila+'C'+c.col, de:String(c.de).slice(0,90), a:String(c.a).slice(0,90) }; }) });
+    }
     return respuesta({ ok:false, error:'claudeRecepcion sub no reconocido: '+_sub, code:400 });
   }
 
