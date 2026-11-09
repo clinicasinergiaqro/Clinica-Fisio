@@ -1360,7 +1360,7 @@ body.modo-oscuro .topbar{background:#141824}
 <body>
 <div id="sync-indicator" class="sync-indicator ok" style="display:none"></div>
 <div id="app-version-chip" title="Versión de la app en este equipo — toca para buscar actualización" onclick="try{_tapVersionChip()}catch(e){}"></div>
-<script>/* VERSIÓN VISIBLE: refleja el index.html realmente cargado en ESTE equipo (se bumpea junto con sw.js). Así un iPad con versión vieja se ve de un vistazo. */window.APP_VERSION='v1-2026-11-09a';(function(){try{var c=document.getElementById('app-version-chip');if(c)c.textContent=window.APP_VERSION;}catch(e){}})();</script>
+<script>/* VERSIÓN VISIBLE: refleja el index.html realmente cargado en ESTE equipo (se bumpea junto con sw.js). Así un iPad con versión vieja se ve de un vistazo. */window.APP_VERSION='v1-2026-11-09b';(function(){try{var c=document.getElementById('app-version-chip');if(c)c.textContent=window.APP_VERSION;}catch(e){}})();</script>
 <div class="toast" id="toast" aria-live="polite" aria-atomic="true"></div>
 
 <!-- LOGIN -->
@@ -12979,6 +12979,8 @@ async function FST_hidratarCamposClinicos(p, id) {
     if (d.ejerciciosToken) p.ejerciciosToken = d.ejerciciosToken;
     if (d.ejerciciosLinkActivo != null) p.ejerciciosLinkActivo = d.ejerciciosLinkActivo;
     if (Array.isArray(d.reportesClinicosIA) && d.reportesClinicosIA.length) p.reportesClinicosIA = d.reportesClinicosIA; // v2: escrito en Write 1 (whitelist ejercicios)
+    // BIOMECÁNICA: UNIÓN (no reemplazo) → trae las mediciones de otros equipos sin pisar las local-only.
+    if (Array.isArray(d.biomecanica) && typeof _fusionarBiomecanica==='function') p.biomecanica = _fusionarBiomecanica(p.biomecanica, d.biomecanica);
 
     // v2 fix (Cambio C) — leer de vuelta los campos clínicos que saveDB-v2 escribe.
     // Guards estrictos: NO clobberear datos locales con vacíos de Firestore (mismo patrón que ejercicios).
@@ -17250,6 +17252,47 @@ async function _syncEstudiosDocsFS(p){
   if(lastErr && lastErr.message==='timeout') return {ok:false, pendiente:true};
   return {ok:false, pendiente:true};
 }
+// ── SYNC CROSS-DEVICE DE BIOMECÁNICA (medidor de cámara) ─────────────────────────────────────────
+// p.biomecanica = array de mediciones (ROM/sentadilla/marcha/goniometría) que vive en el doc
+// pacientes/{p.id} (activo Y migrado, mismo doc). Se sincroniza por UNIÓN (id + tombstone 'eliminado'),
+// NUNCA reemplazo, para no pisar mediciones de otro equipo. Los grados del goniómetro además viajan
+// en valoracion.rom (campo clínico normal) por la vía de siempre. Local sigue siendo DURABLE
+// (localStorage + IndexedDB + preservación local-only en loadFromCloud); esto solo agrega el espejo FS.
+// SEGURO antes o después de desplegar las reglas: si 'biomecanica' aún no está permitido en
+// pacienteClinicoUpdateOK (permission-denied), se queda local SIN dejar pendientes clavados y se sube
+// solo en el próximo guardado/apertura una vez que las reglas estén en vivo. NO toca saveDB ni outCl.
+function _fusionarBiomecanica(local, remoto){
+  var byId={}, order=[];
+  (Array.isArray(local)?local:[]).concat(Array.isArray(remoto)?remoto:[]).forEach(function(s){
+    if(!s) return; var k=String(s.id||'');
+    if(!k){ order.push(s); return; }                                      // sin id: no se puede dedup, se conserva
+    if(byId[k]===undefined){ byId[k]=s; order.push(k); }
+    else if(s.eliminado===true && byId[k].eliminado!==true){ byId[k]=s; } // tombstone gana (no revive un borrado)
+  });
+  return order.map(function(x){ return (typeof x==='string')?byId[x]:x; });
+}
+async function _syncBiomecanicaFS(p){
+  try{
+    if(!p || !p.id || !Array.isArray(p.biomecanica)) return {ok:false};
+    var ok = (typeof FST_init==='function') ? await FST_init() : false;
+    if(!ok || !window._fstDb) return {ok:false, pendiente:true};          // offline → queda local, se sube luego
+    var ref = window._fstDb.collection('pacientes').doc(p.id);
+    var dsnap = await _conTimeout(ref.get(), 8000);
+    var bmR = ((dsnap && dsnap.data()) || {}).biomecanica;
+    var fusion = _fusionarBiomecanica(p.biomecanica, Array.isArray(bmR)?bmR:[]);
+    p.biomecanica = fusion;                                               // local refleja la unión (trae lo de otros equipos)
+    await _conTimeout(ref.set(_sinUndefined({ biomecanica: fusion }), { merge:true }), 8000);
+    return {ok:true};
+  }catch(e){
+    if(e && (e.code==='permission-denied' || /permission|insufficient/i.test(String((e&&e.message)||'')))){
+      return {ok:false, sinReglas:true};   // reglas aún sin desplegar → local, sin error ni pendiente clavado
+    }
+    return {ok:false, pendiente:true};      // timeout/otro → queda local, se reintenta al guardar/abrir
+  }
+}
+window._syncBiomecanicaFS = _syncBiomecanicaFS;     // lo llama el medidor (archivo aparte)
+window._fusionarBiomecanica = _fusionarBiomecanica;
+
 async function _persistirEstudios(p){
   if (patientsDB.some(function(x){ return x.id===p.id; })) {
     // ACTIVO: Sheets guarda el resto del paciente (SIN estudiosDocs); estudiosDocs va a Firestore

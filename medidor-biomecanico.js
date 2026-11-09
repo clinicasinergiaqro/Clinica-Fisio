@@ -1485,6 +1485,9 @@
     }catch(e){
       toast('⚠️ Sin conexión — guardada local, se sincronizará','warning');
     }
+    // Espejo cross-device de la sesión completa a Firestore (unión por id). Best-effort: la medición ya
+    // quedó durable en local por saveDB; si falla o las reglas no están, se sube en la próxima apertura.
+    try{ if(typeof window!=='undefined' && typeof window._syncBiomecanicaFS==='function'){ await window._syncBiomecanicaFS(p); } }catch(e){}
     cerrarMedidor();
     if(typeof renderExpediente==='function') renderExpediente('biomecanica');
   }
@@ -2428,6 +2431,9 @@
   }
 
   function renderPestana(p){
+    // Catch-up de sync: al abrir la pestaña, empuja a la nube cualquier medición local-only y jala las
+    // de otros equipos (unión). Fire-and-forget; si las reglas aún no permiten 'biomecanica', se queda local.
+    try{ if(typeof window!=='undefined' && typeof window._syncBiomecanicaFS==='function' && p && Array.isArray(p.biomecanica) && p.biomecanica.length){ window._syncBiomecanicaFS(p); } }catch(e){}
     var lista = Array.isArray(p.biomecanica) ? p.biomecanica.filter(function(s){ return s && !s.eliminado; }) : [];
     var html = ''
       + '<button class="btn-gold" style="width:100%;margin-bottom:12px;font-size:15px;font-weight:800;border:none;border-radius:var(--radius);padding:14px;cursor:pointer;background:var(--gold);color:var(--navy-dark)" onclick="abrirMedidorBiomecanico()">▶️ Nueva medición ROM</button>';
@@ -2742,6 +2748,8 @@
     s.eliminado=true; s.eliminadoPor=usuarioActual(); s.eliminadoEn=new Date().toISOString();
     p.fechaActualizacion=fechaHoy(); p.ultimoUsuario=usuarioActual();
     if(typeof saveDB==='function'){ saveDB('pts',[p]).then(function(){}).catch(function(){}); }
+    // Propaga el tombstone (eliminado:true) a los demás equipos por la vía de unión.
+    try{ if(typeof window!=='undefined' && typeof window._syncBiomecanicaFS==='function'){ window._syncBiomecanicaFS(p); } }catch(e){}
     if(typeof renderExpediente==='function') renderExpediente('biomecanica');
     toast('Medición eliminada','');
   }
