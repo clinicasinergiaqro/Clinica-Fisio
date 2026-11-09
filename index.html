@@ -1360,7 +1360,7 @@ body.modo-oscuro .topbar{background:#141824}
 <body>
 <div id="sync-indicator" class="sync-indicator ok" style="display:none"></div>
 <div id="app-version-chip" title="Versión de la app en este equipo — toca para buscar actualización" onclick="try{_tapVersionChip()}catch(e){}"></div>
-<script>/* VERSIÓN VISIBLE: refleja el index.html realmente cargado en ESTE equipo (se bumpea junto con sw.js). Así un iPad con versión vieja se ve de un vistazo. */window.APP_VERSION='v1-2026-11-09a';(function(){try{var c=document.getElementById('app-version-chip');if(c)c.textContent=window.APP_VERSION;}catch(e){}})();</script>
+<script>/* VERSIÓN VISIBLE: refleja el index.html realmente cargado en ESTE equipo (se bumpea junto con sw.js). Así un iPad con versión vieja se ve de un vistazo. */window.APP_VERSION='v1-2026-11-09b';(function(){try{var c=document.getElementById('app-version-chip');if(c)c.textContent=window.APP_VERSION;}catch(e){}})();</script>
 <div class="toast" id="toast" aria-live="polite" aria-atomic="true"></div>
 
 <!-- LOGIN -->
@@ -3692,7 +3692,21 @@ async function _autoSanarFallidosHistDoc(){
                    soap:1, sesiones:1, numSesionEpisodioActual:1, numEpisodio:1};
         for(var c=0;c<claves.length;c++){
           var k=claves[c];
-          if(k==='fotos'||k==='docs'||k==='estudiosDocs'){ ok=false; break; }   // media (base64→null en cola) no comparable fiable → conservar
+          if(k==='fotos'||k==='docs'||k==='estudiosDocs'){
+            // Media YA subida trae identificador (id/mediaId/url/fbPath) → comparar por PERTENENCIA, no por
+            // igualdad del array completo. OK solo si la nube CONTIENE cada item del diff (por su clave
+            // estable). Si algún item no trae identificador (p.ej. base64→null) o no está en la nube, NO se
+            // puede confirmar → conservar. Antes era `ok=false` SIEMPRE, lo que dejaba el aviso clavado PARA
+            // SIEMPRE cuando el diff venía de subir una foto/estudio que la nube YA tenía (caso Zara/Juan
+            // Manuel Silva Porras: foto presente en fotos+estudiosDocs de la nube, fantasma "1 rendida").
+            var _dm=Array.isArray(d[k])?d[k]:[], _fm=Array.isArray(campos[k])?campos[k]:[];
+            var _mkey=function(x){ return (x&&(x.id||x.mediaId||x.url||x.fbPath))||''; };
+            var _have={}; for(var _m=0;_m<_dm.length;_m++){ var _hk=_mkey(_dm[_m]); if(_hk) _have[_hk]=1; }
+            var _allin=true;
+            for(var _m2=0;_m2<_fm.length;_m2++){ var _fk=_mkey(_fm[_m2]); if(!_fk || !_have[_fk]){ _allin=false; break; } }
+            if(!_allin){ ok=false; break; }   // algún item de media del diff NO está en la nube (o sin id) → conservar
+            continue;
+          }
           if(_BOOK[k]) continue;   // sello de bookkeeping → ignorar en la decisión (no es dato clínico)
           if(k==='historialCambios'){
             // OK solo si la nube CONTIENE cada entrada del diff (es superset/misma bitácora) → no se pierde
