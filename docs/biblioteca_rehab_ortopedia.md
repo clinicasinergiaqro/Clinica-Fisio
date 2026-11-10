@@ -2626,7 +2626,7 @@ Marco: van Melick 2016 (BJSM, guía KNGF multidisciplinar, 90 estudios) = **preh
 
 ---
 
-### Menisco — reparación vs meniscectomía parcial (quirúrgico; distinguir siempre cuál)
+### Menisco — guía post-operatoria semana a semana (meniscectomía vs reparación)
 
 > **📋 Encuadre**
 >
@@ -2636,80 +2636,238 @@ Marco: van Melick 2016 (BJSM, guía KNGF multidisciplinar, 90 estudios) = **preh
 >
 > **⚠️ Precauciones:** Confundir las dos rutas es el error típico. Reparación: proteger la sutura — sin flexión profunda cargada, cuclillas, pivote ni rotación con carga; evitar sentadilla profunda <4 meses; las restricciones varían por tipo de rotura (vertical estable vs horizontal/radial/compleja/raíz). Umbrales de retorno extrapolados de LCA (~≥90% LSI; el consenso no fija umbral propio) [verificar]. Manda el cirujano sobre carga/ROM según el patrón de rotura.
 
-> **Clave:** las dos rutas son OPUESTAS. **Meniscectomía parcial = progresión rápida** (se quitó tejido, no hay que proteger cicatrización). **Reparación = restricciones estrictas de flexión y carga** (hay que proteger la sutura). Confundirlas es el error típico. Marco: **Consenso EU-US 2024 (ESSKA-AOSSM-AASPT)**, Partes I y II — la mejor guía actual, aunque la mayoría de recomendaciones son **GRADE C-D** (evidencia débil); el consenso mismo dice que **no existe protocolo estandarizado validado** y recomienda enfoque por **hitos + tiempo**.
+El menisco es el "cojín" de cartílago que amortigua la rodilla. Esta guía va **semana por semana**: en cada ventana dice qué apoyo toca, qué ejercicios ya puede hacer **y cómo ejecutarlos**, y qué todavía no. Los ejercicios son **sugerencias**; el fisioterapeuta ajusta la carga, las series y la colocación según cómo responde cada persona. Se avanza **por logros, no por calendario**, y la orden del cirujano siempre manda.
 
-#### Diagnóstico — pruebas especiales
-Para menisco ningún test aislado es fiable; combinar historia + interlínea + provocación. Cifras de metaanálisis agrupado salvo donde se indique:
-- **Dolor en interlínea articular (joint line tenderness):** palpación de la interlínea medial/lateral · **Sens ~63% / Esp ~77%** (metaanálisis). A menudo el más sensible, pero **poco específico** (en atención primaria la Esp cae a ~0.26-0.39, NIHR HTA 2015). Útil como cribado.
-- **McMurray:** flexión máxima + rotación tibial con extensión buscando clic/dolor · **Sens ~70% / Esp ~71%** agrupado (algunas series Esp hasta 89%). El clic palpable (no solo dolor) sube la especificidad.
-- **Thessaly (20° flexión, en apoyo monopodal con rotación del cuerpo):** **MUY variable según la fuente** — original Karachalios 2005: **Sens ~90% / Esp ~91%** (exactitud 94% medial/96% lateral); pero estudios pragmáticos en atención primaria (NIHR HTA 2015): **Sens ~66% / Esp ~39%** (mucho peor). Metaanálisis 2015 (JOSPT): exactitud similar o levemente superior a McMurray/interlínea. **INCIERTO:** no es el test casi perfecto que sugería el estudio original.
-- **Apley (compresión/distracción en prono a 90°):** compresión dolorosa (menisco) vs distracción dolorosa (ligamento) · **Sens ~60% / Esp ~70%** (metaanálisis). **El menos sensible del grupo** (su especificidad ~70% es moderada, por debajo del dolor en interlínea ~77%); un Apley de compresión positivo apoya menisco, pero un negativo no descarta.
+#### ⛔ PRIMERO: confirma con el cirujano cuál cirugía se hizo — son DOS rutas OPUESTAS
+- **Meniscectomía parcial** (le **quitaron** un pedazo) → nada que esperar a que cicatrice → **rápido**, pisa desde el día 0.
+- **Reparación** (le **cosieron** el menisco) → hay que proteger la costura → **lento**, a veces sin apoyar 2-3 semanas.
+- Confundirlas es el error más común y el más peligroso.
 
-#### Rehabilitación por fases
+> **🎗️ Cómo colocar la liga (regla práctica para todo el protocolo).**
+>
+> - **Liga ARRIBA de la rodilla (supracondílea):** menos brazo de palanca, menos estrés en la articulación → la opción **segura al inicio** y para activar glúteo y corregir el valgo ("rodilla que se mete").
+> - **Liga en el TOBILLO:** más resistencia y más brazo de palanca, pero **carga más la rodilla** → se introduce **después**, cuando la articulación ya tolera.
+> - **¿Menisco + ligamento cruzado (LCA) juntos?** Pon la resistencia en la **rodilla / proximal, NO en el tobillo**, para evitar la cizalla y la tensión del injerto ("el fulcro"). Evita la extensión de rodilla en cadena abierta con peso en el tobillo en el tramo 0-45° las primeras semanas.
 
-##### (b) MENISCECTOMÍA PARCIAL — progresión rápida
-**Fase 1 — Recuperación temprana (sem ~0-2):**
-- Metas: control de derrame/dolor, ROM completo pronto, activación de cuádriceps, marcha normal.
-- Restricciones: **carga completa inmediata según tolerancia** y **ROM completo según síntomas** (EU-US 2024, GRADE C). Muletas solo hasta marcha sin cojera (días).
-- SÍ: ROM libre, isométricos/SLR, bici, CKC progresiva según molestia, control de derrame.
-- NO: forzar a través de derrame/dolor marcado; impacto hasta control de síntomas.
-- Criterios para AVANZAR: ROM completo, derrame mínimo, marcha normal, buen control de cuádriceps.
+> **🏋️ Entrena desde el día 1 — todo lo que NO carga la rodilla operada.** Mantiene la forma física y acelera el regreso. Aplica a las dos rutas, desde la primera semana:
+>
+> - **Core / abdomen:** bicho muerto (dead bug), perro-pájaro (bird-dog), plancha frontal y lateral, anti-rotación con liga (Pallof press), puente isométrico, vacío abdominal. *Evita* abdominales que obliguen a doblar y cargar la rodilla operada en reparación temprana.
+> - **Tren superior** (sentado o acostado al inicio, sin pararse sobre la rodilla): press de pecho, remo, jalón al pecho, press de hombro, bíceps, tríceps, fondos en banca.
+> - **Pierna sana:** entrénala normal (sentadilla, prensa, zancada) — fortalecer la sana también ayuda a la operada (efecto cruzado).
+> - **Cardio sin impacto:** ergómetro de brazos; bici o remo cuando el arco de rodilla lo permita.
 
-**Fase 2 — Fuerza y retorno funcional (sem ~2-8):**
-- Metas: fuerza simétrica, reintroducir impacto/carrera, gesto deportivo.
-- SÍ: fortalecimiento progresivo, carrera (~2-4 sem según síntomas y fuerza), pliometría y agilidad según tolerancia.
-- Criterios de retorno: síntomas controlados + fuerza y función simétricas (ver retorno).
+#### RUTA A — Meniscectomía parcial (quitaron pedazo) · RÁPIDO
 
-##### (a) REPARACIÓN MENISCAL — restricciones estrictas (según tipo de rotura)
-**Fase 1 — Protección de la sutura (sem ~0-4/6 · criterio de entrada: postop):**
-- Metas: proteger la reparación, extensión completa, control de derrame, activación de cuádriceps SIN cargar la sutura.
-- Restricciones **(varían por tipo de rotura — EU-US 2024):**
-  - **Rotura vertical estable:** puede permitirse **carga completa**; ROM a menudo limitado ~6 sem (variable; algunos protocolos la dejan libre).
-  - **Roturas horizontal / radial / compleja / raíz (root):** **carga restringida** (sin carga o toe-touch) **+ ROM limitado 4-6 sem**, típicamente **0-90° las primeras 4-6 sem**. Si se dañan las fibras circunferenciales (hoop) → **sin carga 6 sem** (revisión 2022). Las **roturas de raíz** y las combinadas con LCA llevan los protocolos **más restrictivos** (revisión sistemática 2025).
-  - Rodillera: bloqueada 0° para marcha/sueño y liberada por rangos permitidos para ejercicio (práctica común; el consenso no fija ángulos exactos).
-- SÍ: isométricos de cuádriceps, SLR (con extensión completa lograda), movilización rotuliana, ROM en el arco permitido, carga en el % permitido.
-- NO: **flexión profunda bajo carga, sentadilla/cuclillas profundas, pivotes, rotación con carga** (tensan la reparación); **evitar sentadilla profunda hasta ~4 meses**; flexión >90° con carga en fase temprana.
-- Criterios para AVANZAR: cicatrización en tiempo protegido cumplido, extensión completa, flexión progresando sin dolor, derrame controlado.
+| Hito (lo que la persona logra) | ¿Cuándo, aprox.? |
+|---|---|
+| Pisa completo (según lo que tolere) | **Día 0** |
+| Movimiento completo | **Semana 1-2** |
+| Empieza a correr | **Semana 2-4** |
+| Vuelve al deporte | **Semana 4-12** |
 
-**Fase 2 — ROM completo y fuerza progresiva (sem ~6-12):**
-- Metas: ROM completo (~120° hacia sem 12, progresando a completo), carga completa, fuerza.
-- Restricciones: aún **evitar flexión profunda cargada / cuclillas profundas hasta ~4 meses**; progresar flexión y carga gradualmente.
-- SÍ: CKC en arco seguro, bici, fortalecimiento, propiocepción, retirar restricciones de ROM al cumplir plazos.
-- Criterios para AVANZAR: ROM completo, fuerza simétrica en progreso, sin dolor en interlínea con carga.
+##### SEM 0-1 — Bajar hinchazón y caminar
+**Apoyo / muletas:** Carga completa según tolere desde el día 0. Muletas solo hasta caminar sin cojear (unos días).
 
-**Fase 3 — Retorno a carrera y deporte (mes ~3-9):**
-- SÍ: carrera cuando fuerza/control lo permitan y sin síntomas; pliometría y gesto deportivo progresivos.
-- Criterios de retorno: ver abajo.
+> **✅ YA PUEDE (ideas de ejercicio)**
+>
+> - **Isométricos de cuádriceps:** apretar el muslo 5 seg, pierna estirada
+> - **Elevación de pierna recta** (sin que se caiga la rodilla)
+> - **Bomba de tobillo**, hielo y compresión
+> - Movilidad libre de rodilla; **bici fija sin resistencia**, asiento alto
 
-#### Criterios de RETORNO AL DEPORTE (objetivos) — EU-US 2024, **criterio + tiempo**
+> **🚫 TODAVÍA NO**
+>
+> - Forzar a través de hinchazón o dolor marcado
+> - Impacto (correr, saltar)
+
+##### SEM 1-2 — Movimiento completo y fuerza base
+**Apoyo / muletas:** Marcha normal sin muletas.
+
+> **✅ YA PUEDE (ideas de ejercicio)**
+>
+> - **Cadena cerrada:** sentadilla parcial y prensa en arco cómodo, con **liga arriba de la rodilla** para alinear
+> - **Cadera:** abducción de lado y puente de glúteo, **liga arriba de la rodilla**
+> - **Tríceps sural:** elevación de talón bipodal (gemelo con rodilla recta, sóleo con rodilla doblada)
+> - Bici con resistencia, elíptica; propiocepción en dos pies
+
+> **🚫 TODAVÍA NO**
+>
+> - Carrera y saltos
+> - Giros con carga si todavía hay hinchazón
+
+##### SEM 2-4 — Reintroducir impacto
+**Apoyo / muletas:** Marcha normal.
+
+> **✅ YA PUEDE (ideas de ejercicio)**
+>
+> - Progresar fuerza: sentadilla a 90°, **step-ups**, prensa; pasar la liga de cadera **al tobillo** si tolera
+> - **Carrera suave** (~sem 2-4 si no hay derrame y la fuerza acompaña)
+> - Propiocepción **en una pierna**
+
+> **🚫 TODAVÍA NO**
+>
+> - Pivotes y contacto hasta cumplir criterios
+
+##### SEM 4-12 — Retorno al deporte
+**Apoyo / muletas:** Normal.
+
+> **✅ YA PUEDE (ideas de ejercicio)**
+>
+> - **Pliometría** (saltos de menos a más), agilidad, cambios de dirección
+> - Gesto específico del deporte
+
+> **🚫 TODAVÍA NO**
+>
+> - Competir antes de que la fuerza y los saltos estén parejos entre las dos piernas (≥90%)
+
+#### RUTA B — Reparación meniscal (cosieron) · LENTO y con candados
+**Clave:** hay que proteger la costura. El apoyo y el arco de movimiento los **define el cirujano** según el tipo de rotura (una rotura vertical estable es más permisiva; las de raíz, radiales o complejas son más estrictas).
+
+| Hito (lo que la persona logra) | ¿Cuándo, aprox.? |
+|---|---|
+| Pisa (según el cirujano; a veces sin cargar al inicio) | **Sem 0-3** |
+| Deja las muletas (destete) | **~Sem 4** |
+| 120° de flexión | **~Sem 6** |
+| Movimiento completo | **~Sem 12** |
+| Vuelve al deporte | **6-9 meses** |
+
+##### SEMANA 1 — Proteger la costura y lograr la extensión
+**Apoyo / muletas:** Según el cirujano: con frecuencia **sin apoyar o solo tocar el piso** las primeras 2-3 semanas. Rodillera trabada en estirado (0°). Arco permitido 0-90°.
+
+> **✅ YA PUEDE (ideas de ejercicio)**
+>
+> - **Isométricos de cuádriceps** (apretar el muslo, pierna estirada)
+> - **Elevación de pierna recta** (solo si ya estira completo, sin que se caiga)
+> - **Movilización de la rótula** (deslizar con los dedos) y movilidad asistida dentro de 0-90°
+> - Isométricos de glúteo, bomba de tobillo, hielo
+
+> **🚫 TODAVÍA NO**
+>
+> - Apoyar si el cirujano lo prohibió
+> - Doblar más de 90°
+> - Sentadillas, giros, extensión de rodilla con peso en el tobillo (cadena abierta resistida)
+
+##### SEMANA 2 — Mantener y preparar
+**Apoyo / muletas:** Igual que semana 1 (muchos cirujanos siguen sin carga completa). Seguir arco 0-90°.
+
+> **✅ YA PUEDE (ideas de ejercicio)**
+>
+> - Todo lo de la semana 1
+> - **Electroestimulación del cuádriceps** junto al isométrico
+> - **Bici fija sin resistencia**, asiento alto (si llega al arco)
+> - Isométricos de cuádriceps **a varios ángulos** dentro del arco (30°, 60°)
+
+> **🚫 TODAVÍA NO**
+>
+> - Lo mismo que la semana 1
+> - Cargar la rodilla en flexión
+
+##### SEMANA 3-4 — Empieza la carga con muletas → destete
+**Apoyo / muletas:** Empezar a **poner carga parcial con muletas** (según el cirujano) y hacer **destete** (quitar las muletas poco a poco). Hacia la **semana 4 ya sin muletas** si camina sin cojear.
+
+> **✅ YA PUEDE (ideas de ejercicio)**
+>
+> - **Extensiones de rodilla** en arco protegido (90-45°), sin peso o resistencia proximal; **evita el tramo 45-0° con peso en tobillo** si hay cruzado asociado
+> - **Flexión de rodilla activa** (curl) dentro del arco permitido
+> - **Cadera — glúteo medio:** abducción de lado, "monster walks" y clamshells con **liga arriba de la rodilla**
+> - **Cadera — glúteo mayor:** puente bipodal y patada de glúteo en cuadrupedia (kickback) con liga
+> - **Cadera — aductores:** aducción isométrica apretando una pelota entre las rodillas (suave)
+> - **Tríceps sural:** elevación de talón bipodal (gemelo con rodilla recta, sóleo con rodilla doblada)
+> - **Peroneos:** eversión de tobillo con liga, y caminata sobre los bordes externos del pie
+> - Propiocepción en dos pies (piso estable → cojín)
+
+> **🚫 TODAVÍA NO**
+>
+> - Sentadilla profunda
+> - Flexión profunda con carga
+> - Impacto y giros con carga
+
+##### SEMANA 5 — Primera carga en flexión controlada
+**Apoyo / muletas:** Sin muletas, marcha normal.
+
+> **✅ YA PUEDE (ideas de ejercicio)**
+>
+> - **Sentadilla isométrica a 45° contra la pared** (aguantar 20-45 seg), con **liga arriba de las rodillas** para evitar el valgo
+> - **Prensa** en arco parcial (0-60°)
+> - **Cadera de pie con liga o polea:** abducción, extensión y aducción (liga arriba de rodilla → tobillo si tolera)
+> - **Puente de glúteo** progresando a una pierna
+> - Peroneos y tríceps sural subiendo resistencia; propiocepción **en una pierna** iniciando
+
+> **🚫 TODAVÍA NO**
+>
+> - Romper el paralelo (sentadilla más de 90°) con carga
+> - Impacto y pivotes
+
+##### SEMANA 6 — Debe tener 120° de flexión
+**Apoyo / muletas:** Normal.
+
+> **✅ YA PUEDE (ideas de ejercicio)**
+>
+> - **Sentadillas a 90°** controladas, con **liga arriba de las rodillas** (protege y alinea)
+> - **Step-ups** (banco bajo → alto) y zancadas controladas
+> - **Peso muerto rumano ligero** y **hip thrust ligero** (cadena posterior / glúteo)
+> - **Cadera completa en polea:** abducción, aducción y extensión; desplazamientos laterales ("monster walks")
+> - Elevación de talón progresando a una pierna; bici con resistencia, elíptica
+
+> **🚫 TODAVÍA NO**
+>
+> - Romper el paralelo bajo carga **si la rotura es de raíz, radial o compleja** — eso suele esperar hasta ~4 meses (confirmar con el cirujano)
+> - Correr y saltar
+
+##### SEM 7-12 — Fuerza y movimiento completo
+**Apoyo / muletas:** Normal.
+
+> **✅ YA PUEDE (ideas de ejercicio)**
+>
+> - Progresar fuerza y arco hasta el **movimiento completo** (~sem 12)
+> - Cadena cerrada en arco creciente (sentadilla, prensa, zancadas controladas); propiocepción avanzada (una pierna en superficie inestable)
+> - Bici, elíptica; **empezar trote suave** hacia el final si la fuerza y el control lo permiten
+
+> **🚫 TODAVÍA NO**
+>
+> - Sentadilla profunda / flexión profunda con carga hasta ~4 meses (según la rotura)
+> - Pivotes e impacto fuerte
+
+##### MES 3-6+ — Retorno a carrera y deporte
+**Apoyo / muletas:** Normal.
+
+> **✅ YA PUEDE (ideas de ejercicio)**
+>
+> - Carrera progresiva → pliometría → agilidad → gesto del deporte
+> - Deporte **hacia los 6-9 meses** si pasa los criterios
+
+> **🚫 TODAVÍA NO**
+>
+> - Volver al deporte antes de que fuerza y saltos estén parejos (≥90%) y sin dolor en el borde de la rodilla
+
+#### 🚩 Señales de alarma — avisa o acude de inmediato
+- Rodilla **caliente + hinchada + fiebre** → posible infección **(urgencia)**.
+- La rodilla **se traba o se bloquea** y no termina de estirar → posible menisco atrapado (asa de balde).
+- Dolor e hinchazón en la **pantorrilla de una sola pierna** → posible coágulo (trombosis).
+- En reparación: **dolor agudo en el borde de la rodilla + hinchazón** al avanzar la flexión o la carga → posible falla de la costura; retrocede y avisa al cirujano.
+
+> **La orden del cirujano SIEMPRE manda** sobre estos tiempos. Avanzar la flexión profunda o el giro con carga "contra" lo que indicó puede **romper la costura**.
+
+#### Criterios de RETORNO AL DEPORTE (objetivos) — EU-US 2024, criterio + tiempo
 - Retorno **por criterios Y por tiempo** (EU-US 2024, GRADE D) — individualizado por procedimiento, lesiones concomitantes y demandas del deporte.
-- **Meniscectomía parcial: retorno al deporte ~4-12 semanas** (carrera ~2-4 sem).
-- **Reparación meniscal: retorno al deporte ~6-9 meses** (fase de retorno a actividad 6-9 meses en la tabla del consenso).
-- Criterios funcionales: fuerza y hops **simétricos (habitualmente ≥90% LSI, extrapolado de LCA — el consenso NO fija un umbral numérico propio)**, PRO + medidas de rendimiento combinadas, sin derrame ni dolor en interlínea con la actividad, y **motivación/preparación psicológica** evaluada.
-- **INCIERTO:** el consenso reconoce que estos criterios no son específicos para roturas traumáticas y que faltan umbrales numéricos validados.
+- **Meniscectomía parcial: ~4-12 semanas** (carrera ~2-4 sem).
+- **Reparación meniscal: ~6-9 meses.**
+- Criterios funcionales: fuerza y saltos (hops) **simétricos (habitualmente ≥90% LSI, extrapolado de LCA — el consenso NO fija un umbral propio)**, sin derrame ni dolor en interlínea con la actividad, y **preparación psicológica** evaluada.
+- **INCIERTO:** el consenso reconoce que faltan umbrales numéricos validados específicos de menisco.
 
-#### Timeline típico (hitos para saber si va en tiempo o desfasado)
-- **Meniscectomía parcial:** carga completa día 0 · ROM completo 1-2 sem · carrera 2-4 sem · deporte 4-12 sem (recuperación global 3-4 meses).
-- **Reparación:** arco protegido 0-90° y carga limitada 4-6 sem (según rotura) · ROM completo ~sem 12 · **sin cuclillas profundas <4 meses** · deporte **6-9 meses** (recuperación global 6-9 meses).
-- **Desfasado / bandera:** en reparación, si se progresa a flexión profunda cargada o pivote antes de tiempo = riesgo de fallo de la sutura; en meniscectomía, derrame persistente sugiere condral asociado.
-
-#### Contraindicaciones / banderas rojas
-- **Bloqueo articular verdadero / imposibilidad de extensión** → asa de balde desplazada (puede requerir cirugía urgente).
-- En reparación: **dolor agudo en interlínea + derrame al avanzar flexión/carga** → sospecha de fallo de la reparación; retroceder y avisar al cirujano.
-- Derrame caliente + fiebre → infección.
-- Dolor en pantorrilla / edema unilateral → TVP.
-- Progresar flexión profunda o rotación con carga en reparación **contra el protocolo del cirujano** = contraindicado (clase "se rompe la sutura").
-- Deep squat / hiperflexión cargada antes de 4 meses en reparación.
+#### Pruebas para diagnosticar menisco (valoración, antes de operar)
+Ningún test aislado es fiable; combinar historia + interlínea + provocación. Cifras de metaanálisis agrupado salvo donde se indique:
+- **Dolor en interlínea articular (joint line tenderness):** palpación de la interlínea medial/lateral · **Sens ~63% / Esp ~77%**. A menudo el más sensible, pero poco específico (en primaria la Esp cae a ~0.26-0.39, NIHR HTA 2015). Útil como cribado.
+- **McMurray:** flexión máxima + rotación tibial con extensión buscando clic/dolor · **Sens ~70% / Esp ~71%** (algunas series Esp hasta 89%). El clic palpable (no solo dolor) sube la especificidad.
+- **Thessaly (20° flexión, apoyo monopodal con rotación del cuerpo):** muy variable — original Karachalios 2005 ~90%/91%; pragmáticos en primaria (NIHR HTA 2015) ~66%/39%. **INCIERTO:** no es el test casi perfecto del estudio original.
+- **Apley (compresión/distracción en prono a 90°):** compresión dolorosa (menisco) vs distracción dolorosa (ligamento) · **Sens ~60% / Esp ~70%** — el menos sensible del grupo; un positivo apoya menisco, un negativo no descarta.
 
 #### Fuentes
-- EU-US Meniscus Rehabilitation 2024 Consensus (ESSKA-AOSSM-AASPT), **Parte I** (meniscectomía/reparación/reconstrucción) [[PMC](https://pmc.ncbi.nlm.nih.gov/articles/PMC12310086/)] y **Parte II** (prevención/no-operatorio/retorno al deporte), *JOSPT Open / IJSPT / KSSTA* 2024-2025 [[ref](https://www.jospt.org/doi/10.2519/josptopen.2025.13539)]
+- EU-US Meniscus Rehabilitation 2024 Consensus (ESSKA-AOSSM-AASPT), **Parte I** [[PMC](https://pmc.ncbi.nlm.nih.gov/articles/PMC12310086/)] y **Parte II** [[ref](https://www.jospt.org/doi/10.2519/josptopen.2025.13539)] — la mejor guía actual, aunque la mayoría de recomendaciones son **GRADE C-D** (evidencia débil) y el consenso mismo dice que **no existe protocolo estandarizado validado**: enfoque por **hitos + tiempo**. Las restricciones **varían por tipo de rotura** (vertical estable vs horizontal/radial/compleja/raíz; roturas de raíz y combinadas con LCA = más restrictivas).
 - Revisión sistemática 2025 — protocolos restringidos de ROM/carga en reparación de raíz meniscal lateral + LCA [[PMC](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC12616272/)]
 - Revisión de reparación meniscal aislada 2022 — ROM 0-90° 4 sem, sin carga 6 sem si fibras hoop [[Springer](https://link.springer.com/article/10.1186/s40634-022-00521-8)]
 - McCarty/CU Anschutz — ACL + Meniscus Repair Protocol 2024 (ejemplo de protocolo combinado) [[PDF](https://medschool.cuanschutz.edu/docs/librariesprovider65/eric-mccarty/rehab-protocols/acl-and-meniscus-repair-protocol-2024.pdf)]
-- Metaanálisis de exactitud de tests meniscales (McMurray 70/71, Apley 60/70, interlínea 63/77)
-- Karachalios T, et al. *JBJS* 2005 — Thessaly original (sens/esp ~90%)
-- NIHR HTA 2015 (Blyth/Hing et al.) — Thessaly pragmático en primaria (sens 66/esp 39) [[ref](https://www.ncbi.nlm.nih.gov/books/NBK310289/)]
-- Thessaly vs artroscopia, *JOSPT* 2015 [[ref](https://www.jospt.org/doi/10.2519/jospt.2015.5215)]
+- Pruebas diagnósticas: metaanálisis de exactitud de tests meniscales (McMurray 70/71, Apley 60/70, interlínea 63/77); Karachalios *JBJS* 2005 (Thessaly original); NIHR HTA 2015 (Thessaly pragmático) [[ref](https://www.ncbi.nlm.nih.gov/books/NBK310289/)]
 
 ---
 

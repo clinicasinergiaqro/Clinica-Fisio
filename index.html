@@ -1589,6 +1589,21 @@ body.modo-oscuro .topbar{background:#141824}
 .bib-art .ph{display:block;background:linear-gradient(90deg,rgba(21,50,91,.08),rgba(21,50,91,0));border-left:4px solid var(--navy);border-radius:0 8px 8px 0;padding:9px 12px;margin:22px 0 9px;color:var(--navy);font-weight:800;font-size:14.5px;text-align:left}
 .bib-art .ph strong{color:var(--navy)}
 .bib-art li.L-phase{list-style:none;margin:18px 0 6px -10px;padding:8px 12px;background:rgba(21,50,91,.08);border-left:4px solid var(--navy);border-radius:0 8px 8px 0;font-weight:700;color:var(--navy);text-align:left}
+/* MOLDE semana-a-semana: nota de apoyo + tarjetas YA PUEDE (verde) / TODAVÍA NO (roja) */
+.bib-art p.bib-apoyo{margin:9px 0 8px;padding:8px 13px;background:#EEF3F8;border:1px solid #D6E1EE;border-left:4px solid var(--navy);border-radius:0 8px 8px 0;font-size:13px;line-height:1.55;color:var(--gray-800)}
+.bib-art p.bib-apoyo strong{color:var(--navy)}
+.bib-art blockquote.bib-yapuede,.bib-art blockquote.bib-todavia{border-radius:12px;padding:9px 15px 11px;margin:9px 0}
+.bib-art blockquote.bib-yapuede{background:#EAF7EF;border:1px solid #BFE4CE;border-left:5px solid #1F8A4C}
+.bib-art blockquote.bib-todavia{background:#FCEBE9;border:1px solid #F3CFC9;border-left:5px solid #C0392B}
+.bib-art blockquote.bib-yapuede .yp-h strong{color:#1A6B40;font-size:11.5px;letter-spacing:.06em;text-transform:uppercase}
+.bib-art blockquote.bib-todavia .tn-h strong{color:#B42318;font-size:11.5px;letter-spacing:.06em;text-transform:uppercase}
+.bib-art blockquote.bib-yapuede p,.bib-art blockquote.bib-todavia p{margin:0}
+.bib-art blockquote.bib-yapuede ul,.bib-art blockquote.bib-todavia ul{margin:5px 0 0;padding-left:19px}
+.bib-art blockquote.bib-yapuede li,.bib-art blockquote.bib-todavia li{margin:4px 0;font-size:13px;line-height:1.5;text-align:left;color:var(--gray-800)}
+.bib-art blockquote.bib-yapuede li::marker{color:#1F8A4C}
+.bib-art blockquote.bib-todavia li::marker{color:#C0392B}
+.bib-art blockquote.bib-yapuede strong{color:#1A6B40}
+.bib-art blockquote.bib-todavia strong{color:var(--navy)}
 /* Callouts: qué sí / qué no / precaución / criterio / meta */
 .bib-art li.L-si,.bib-art li.L-no,.bib-art li.L-prec,.bib-art li.L-goal,.bib-art li.L-meta{list-style:none;position:relative;margin:6px 0 6px -10px;padding:6px 11px 6px 31px;border-radius:8px;border-left:3px solid;text-align:left}
 .bib-art li.L-si{background:#EAF7EF;border-color:#1F8A4C}
