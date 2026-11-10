@@ -3412,7 +3412,7 @@ function _diaKeyRec_(v){
 // Construye el índice de nombres de TODOS los expedientes: activos del Sheet + migrados de Firestore.
 // Devuelve {byExact:{normCompleto:[full,...]}, list:[{full,tok:{token:true}}]} o null si no se pudo.
 // NUNCA tira: si Firestore falla, usa solo activos; si todo falla, devuelve null (y el auto-llenado deja el nombre del calendario).
-function _recepcionIndexNombres_(ss){
+function _recepcionIndexNombres_(ss, deadlineMs){
   var list=[], byExact={};
   function _add(full){
     full=String(full==null?'':full).trim(); if(!full) return;
@@ -3442,6 +3442,7 @@ function _recepcionIndexNombres_(ss){
         +'&mask.fieldPaths=name&mask.fieldPaths=eliminado';
       var pageToken='', paginas=0;
       do{
+        if(deadlineMs && Date.now()>deadlineMs) break;   // ⏱ TOPE DE TIEMPO: si la conexión a Firestore está lenta, corta aquí y devuelve el índice PARCIAL — así la corrida horaria NUNCA topa los 6 min de Apps Script y las citas SÍ se escriben. Lo que quede con nombre corto lo completa `nombresFix` o la siguiente corrida.
         var url=base+(pageToken?'&pageToken='+encodeURIComponent(pageToken):'');
         var r=UrlFetchApp.fetch(url,{method:'get',headers:{Authorization:'Bearer '+tok},muteHttpExceptions:true});
         if(r.getResponseCode()!==200) break;
@@ -3648,7 +3649,11 @@ function autoCitasRecepcion(diasAdelante){
   }catch(_eE){ evtById={}; }
   var cal = CalendarApp.getDefaultCalendar();
   if(!cal){ Logger.log('No se pudo abrir el calendario'); return 0; }
-  var idxNom=null; try{ idxNom=_recepcionIndexNombres_(ss); }catch(eIdx){ idxNom=null; }   // índice de nombres (nunca rompe)
+  // El nombre COMPLETO es MEJORA opcional: construir el índice (~3,000 migrados de Firestore) se le da un
+  // TOPE de 150 s para que, aunque la conexión a Firestore esté lenta, NUNCA tope los 6 min de Apps Script
+  // y deje las citas sin escribir. Si no alcanza → índice PARCIAL (algunos quedan con nombre del calendario)
+  // y `nombresFix`/la siguiente corrida los completa. Las citas SIEMPRE se escriben después, sí o sí.
+  var idxNom=null; try{ idxNom=_recepcionIndexNombres_(ss, Date.now()+150000); }catch(eIdx){ idxNom=null; }   // índice de nombres (nunca rompe)
   var ancho=sh.getLastColumn(), hoy=new Date(); hoy.setHours(0,0,0,0);
   var nuevas=[], up=0, _ups=[], _renames=[], _nuevasEid=[], _linkEid=[];
   for(var d=0; d<dias; d++){
