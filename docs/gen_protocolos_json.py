@@ -94,8 +94,8 @@ def enrich(html):
     html=re.sub(r'\[verificar([^\]<]*)\]',
                 r'<span class="bib-verif" title="dato a confirmar contra la fuente">verificar\1</span>', html)
     # ENCUADRE (bloque "de un vistazo" al inicio del protocolo): marcar el blockquote y sus 3 líneas
-    html=re.sub(r'<blockquote>\s*<p><strong>📋 Encuadre</strong></p>',
-                '<blockquote class="bib-encuadre">\n<p class="enc-h"><strong>📋 Encuadre</strong></p>', html)
+    html=re.sub(r'<blockquote>\s*<p><strong>(📋 Encuadre[^<]*)</strong></p>',
+                r'<blockquote class="bib-encuadre">\n<p class="enc-h"><strong>\1</strong></p>', html)
     html=re.sub(r'<p><strong>(🎯[^<]*)</strong>', r'<p class="enc-ind"><strong>\1</strong>', html)
     html=re.sub(r'<p><strong>(⛔[^<]*)</strong>', r'<p class="enc-ci"><strong>\1</strong>', html)
     html=re.sub(r'<p><strong>(⚠️[^<]*)</strong>', r'<p class="enc-prec"><strong>\1</strong>', html)
@@ -182,7 +182,7 @@ def _mark_urgente(html):
     """Resalta marcadores EXPLÍCITOS de urgencia escritos por el autor (bajo falso-positivo)
     para que, dentro de un bloque rojo, la EMERGENCIA salte por encima del 'derivar de rutina'.
     Solo toca texto (los términos no aparecen en atributos de etiqueta)."""
-    pat=re.compile(r'(\(urgencia\)|urgencias?\s+HOY|→\s*urgencias?\b|=\s*urgencia\b|\bURGENTE\b)')
+    pat=re.compile(r'(\(urgencia\)|\(URGENCIA\)|urgencias?\s+HOY|→\s*urgencias?\b|=\s*urgencia\b|\bURGENTE\b)')
     return pat.sub(r'<span class="bib-urge">\1</span>', html)
 
 def _sep_lists(md):

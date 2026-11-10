@@ -2628,26 +2628,26 @@ Marco: van Melick 2016 (BJSM, guía KNGF multidisciplinar, 90 estudios) = **preh
 
 ### Menisco — guía post-operatoria semana a semana (meniscectomía vs reparación)
 
-> **📋 Encuadre**
+> **📋 Encuadre clínico** — para el fisioterapeuta / quien captura
 >
-> **🎯 Indicaciones:** Post-quirúrgico de menisco; distinguir SIEMPRE la ruta porque son opuestas — meniscectomía parcial = progresión rápida (carga día 0, deporte ~4-12 sem) vs reparación = restricciones estrictas (arco 0-90° + carga limitada 4-6 sem, deporte ~6-9 meses). Marco EU-US 2024 por hitos + tiempo (evidencia GRADE C-D).
+> **🎯 Indicaciones:** post-operado de menisco. Distinguir SIEMPRE la ruta: meniscectomía parcial (quitaron) = rápido; reparación (cosieron) = lento y protegido.
 >
-> **⛔ Contraindicaciones / cuándo derivar:** Bloqueo verdadero / no extiende → asa de balde desplazada (posible cirugía urgente). En reparación, dolor agudo en interlínea + derrame al avanzar flexión/carga → fallo de la sutura (retroceder y avisar al cirujano). Derrame caliente + fiebre → infección. Dolor/edema unilateral de pantorrilla → TVP.
+> **⛔ Cuándo derivar:** bloqueo verdadero que no extiende → posible asa de balde (valoración urgente); dolor agudo en interlínea + derrame al avanzar carga/flexión → posible falla de la sutura; caliente + fiebre → infección; pantorrilla hinchada → posible trombosis.
 >
-> **⚠️ Precauciones:** Confundir las dos rutas es el error típico. Reparación: proteger la sutura — sin flexión profunda cargada, cuclillas, pivote ni rotación con carga; evitar sentadilla profunda <4 meses; las restricciones varían por tipo de rotura (vertical estable vs horizontal/radial/compleja/raíz). Umbrales de retorno extrapolados de LCA (~≥90% LSI; el consenso no fija umbral propio) [verificar]. Manda el cirujano sobre carga/ROM según el patrón de rotura.
+> **⚠️ Precaución #1:** confundir las dos rutas es el error típico. En reparación, proteger la flexión profunda cargada hasta ~4 meses según el tipo de rotura.
 
 El menisco es el "cojín" de cartílago que amortigua la rodilla. Esta guía va **semana por semana**: en cada ventana dice qué apoyo toca, qué ejercicios ya puede hacer **y cómo ejecutarlos**, y qué todavía no. Los ejercicios son **sugerencias**; el fisioterapeuta ajusta la carga, las series y la colocación según cómo responde cada persona. Se avanza **por logros, no por calendario**, y la orden del cirujano siempre manda.
 
-#### ⛔ PRIMERO: confirma con el cirujano cuál cirugía se hizo — son DOS rutas OPUESTAS
+#### ⛔ PRIMERO: confirma con el cirujano cuál cirugía se hizo. Son DOS rutas OPUESTAS
 - **Meniscectomía parcial** (le **quitaron** un pedazo) → nada que esperar a que cicatrice → **rápido**, pisa desde el día 0.
 - **Reparación** (le **cosieron** el menisco) → hay que proteger la costura → **lento**, a veces sin apoyar 2-3 semanas.
 - Confundirlas es el error más común y el más peligroso.
 
 > **🎗️ Cómo colocar la liga (regla práctica para todo el protocolo).**
 >
-> - **Liga ARRIBA de la rodilla (supracondílea):** menos brazo de palanca, menos estrés en la articulación → la opción **segura al inicio** y para activar glúteo y corregir el valgo ("rodilla que se mete").
+> - **Liga por ARRIBA de la rodilla (supracondílea):** menos brazo de palanca, menos estrés en la articulación → la opción **segura al inicio** y para activar glúteo y corregir el valgo ("rodilla que se mete").
 > - **Liga en el TOBILLO:** más resistencia y más brazo de palanca, pero **carga más la rodilla** → se introduce **después**, cuando la articulación ya tolera.
-> - **¿Menisco + ligamento cruzado (LCA) juntos?** Pon la resistencia en la **rodilla / proximal, NO en el tobillo**, para evitar la cizalla y la tensión del injerto ("el fulcro"). Evita la extensión de rodilla en cadena abierta con peso en el tobillo en el tramo 0-45° las primeras semanas.
+> - **¿Menisco + ligamento cruzado (LCA) juntos?** El cuidado es **solo con la extensión de rodilla en cadena abierta**: para ese movimiento la resistencia va **proximal (en la rodilla), NO en el tobillo** en el tramo final 0-45° (evita la cizalla sobre el injerto). En cambio, la liga en el tobillo **para mover la CADERA con la rodilla recta** (flexión, extensión o abducción de cadera, pierna estirada) **no hay problema** — la rodilla no se mueve, el injerto no sufre.
 
 > **🏋️ Entrena desde el día 1 — todo lo que NO carga la rodilla operada.** Mantiene la forma física y acelera el regreso. Aplica a las dos rutas, desde la primera semana:
 >
@@ -2678,7 +2678,8 @@ El menisco es el "cojín" de cartílago que amortigua la rodilla. Esta guía va 
 > **🚫 TODAVÍA NO**
 >
 > - Forzar a través de hinchazón o dolor marcado
-> - Impacto (correr, saltar)
+> - Correr, saltar, pliometría
+> - Giros bruscos y cuclillas profundas con dolor
 
 ##### SEM 1-2 — Movimiento completo y fuerza base
 **Apoyo / muletas:** Marcha normal sin muletas.
@@ -2692,8 +2693,8 @@ El menisco es el "cojín" de cartílago que amortigua la rodilla. Esta guía va 
 
 > **🚫 TODAVÍA NO**
 >
-> - Carrera y saltos
-> - Giros con carga si todavía hay hinchazón
+> - Carrera, saltos y pliometría
+> - Giros y cambios de dirección con carga si todavía hay hinchazón
 
 ##### SEM 2-4 — Reintroducir impacto
 **Apoyo / muletas:** Marcha normal.
@@ -2706,7 +2707,8 @@ El menisco es el "cojín" de cartílago que amortigua la rodilla. Esta guía va 
 
 > **🚫 TODAVÍA NO**
 >
-> - Pivotes y contacto hasta cumplir criterios
+> - Pivotes, cambios de dirección bruscos y contacto hasta cumplir criterios
+> - Saltos máximos sin haber hecho pliometría progresiva
 
 ##### SEM 4-12 — Retorno al deporte
 **Apoyo / muletas:** Normal.
@@ -2738,14 +2740,15 @@ El menisco es el "cojín" de cartílago que amortigua la rodilla. Esta guía va 
 >
 > - **Isométricos de cuádriceps** (apretar el muslo, pierna estirada)
 > - **Elevación de pierna recta** (solo si ya estira completo, sin que se caiga)
-> - **Movilización de la rótula** (deslizar con los dedos) y movilidad asistida dentro de 0-90°
+> - **Movilización de la rótula** (deslizarla con los dedos) y movilidad asistida dentro de 0-90°
 > - Isométricos de glúteo, bomba de tobillo, hielo
 
 > **🚫 TODAVÍA NO**
 >
-> - Apoyar si el cirujano lo prohibió
-> - Doblar más de 90°
-> - Sentadillas, giros, extensión de rodilla con peso en el tobillo (cadena abierta resistida)
+> - Apoyar si el cirujano lo prohibió; caminar sin muletas antes de tiempo
+> - Doblar más de 90°; ponerte en cuclillas
+> - Sentadilla, prensa, estocadas; girar sobre el pie fijo
+> - Extensión de rodilla con peso en el tobillo (pierna colgando)
 
 ##### SEMANA 2 — Mantener y preparar
 **Apoyo / muletas:** Igual que semana 1 (muchos cirujanos siguen sin carga completa). Seguir arco 0-90°.
@@ -2753,14 +2756,15 @@ El menisco es el "cojín" de cartílago que amortigua la rodilla. Esta guía va 
 > **✅ YA PUEDE (ideas de ejercicio)**
 >
 > - Todo lo de la semana 1
-> - **Electroestimulación del cuádriceps** junto al isométrico
+> - **Electroestimulación del cuádriceps** junto con el isométrico
 > - **Bici fija sin resistencia**, asiento alto (si llega al arco)
 > - Isométricos de cuádriceps **a varios ángulos** dentro del arco (30°, 60°)
 
 > **🚫 TODAVÍA NO**
 >
-> - Lo mismo que la semana 1
-> - Cargar la rodilla en flexión
+> - Todo lo de la semana 1
+> - Cargar la rodilla en flexión; bici con resistencia o asiento bajo
+> - Bajar escaleras alternando (carga la rodilla en flexión)
 
 ##### SEMANA 3-4 — Empieza la carga con muletas → destete
 **Apoyo / muletas:** Empezar a **poner carga parcial con muletas** (según el cirujano) y hacer **destete** (quitar las muletas poco a poco). Hacia la **semana 4 ya sin muletas** si camina sin cojear.
@@ -2773,14 +2777,15 @@ El menisco es el "cojín" de cartílago que amortigua la rodilla. Esta guía va 
 > - **Cadera — glúteo mayor:** puente bipodal y patada de glúteo en cuadrupedia (kickback) con liga
 > - **Cadera — aductores:** aducción isométrica apretando una pelota entre las rodillas (suave)
 > - **Tríceps sural:** elevación de talón bipodal (gemelo con rodilla recta, sóleo con rodilla doblada)
-> - **Peroneos:** eversión de tobillo con liga, y caminata sobre los bordes externos del pie
+> - **Peroneos:** eversión de tobillo con liga y caminata sobre los bordes externos del pie
 > - Propiocepción en dos pies (piso estable → cojín)
 
 > **🚫 TODAVÍA NO**
 >
-> - Sentadilla profunda
-> - Flexión profunda con carga
-> - Impacto y giros con carga
+> - Sentadilla o cuclilla profunda; prensa más allá de 90°
+> - Peso muerto convencional; estocadas profundas
+> - Correr, saltar, pliometría
+> - Giros, pivoteos y cambios de dirección
 
 ##### SEMANA 5 — Primera carga en flexión controlada
 **Apoyo / muletas:** Sin muletas, marcha normal.
@@ -2795,8 +2800,10 @@ El menisco es el "cojín" de cartílago que amortigua la rodilla. Esta guía va 
 
 > **🚫 TODAVÍA NO**
 >
-> - Romper el paralelo (sentadilla más de 90°) con carga
-> - Impacto y pivotes
+> - Romper el paralelo (sentadilla >90°) con carga; hack squat profundo
+> - Estocada caminando profunda
+> - Trote, saltos, pliometría
+> - Pivotes y cambios de dirección
 
 ##### SEMANA 6 — Debe tener 120° de flexión
 **Apoyo / muletas:** Normal.
@@ -2811,8 +2818,9 @@ El menisco es el "cojín" de cartílago que amortigua la rodilla. Esta guía va 
 
 > **🚫 TODAVÍA NO**
 >
-> - Romper el paralelo bajo carga **si la rotura es de raíz, radial o compleja** — eso suele esperar hasta ~4 meses (confirmar con el cirujano)
-> - Correr y saltar
+> - Romper el paralelo bajo carga **si la rotura es de raíz, radial o compleja** — espera ~4 meses (confírmalo con el cirujano)
+> - Sentadilla muy profunda (al fondo), prensa a fondo
+> - Correr, saltar, pivotear
 
 ##### SEM 7-12 — Fuerza y movimiento completo
 **Apoyo / muletas:** Normal.
@@ -2825,8 +2833,9 @@ El menisco es el "cojín" de cartílago que amortigua la rodilla. Esta guía va 
 
 > **🚫 TODAVÍA NO**
 >
-> - Sentadilla profunda / flexión profunda con carga hasta ~4 meses (según la rotura)
-> - Pivotes e impacto fuerte
+> - Sentadilla / flexión profunda cargada hasta ~4 meses (según la rotura)
+> - Correr en terreno irregular; saltos de alta intensidad
+> - Pivotes y cambios de dirección bruscos
 
 ##### MES 3-6+ — Retorno a carrera y deporte
 **Apoyo / muletas:** Normal.
@@ -2838,36 +2847,19 @@ El menisco es el "cojín" de cartílago que amortigua la rodilla. Esta guía va 
 
 > **🚫 TODAVÍA NO**
 >
-> - Volver al deporte antes de que fuerza y saltos estén parejos (≥90%) y sin dolor en el borde de la rodilla
+> - Deporte de contacto o pivote antes de cumplir criterios (fuerza y saltos ≥90%, sin dolor en el borde)
+> - Volver a competir sin el visto bueno del cirujano
 
 #### 🚩 Señales de alarma — avisa o acude de inmediato
-- Rodilla **caliente + hinchada + fiebre** → posible infección **(urgencia)**.
+- Rodilla **caliente + hinchada + fiebre** → posible infección **(URGENCIA)**.
 - La rodilla **se traba o se bloquea** y no termina de estirar → posible menisco atrapado (asa de balde).
 - Dolor e hinchazón en la **pantorrilla de una sola pierna** → posible coágulo (trombosis).
 - En reparación: **dolor agudo en el borde de la rodilla + hinchazón** al avanzar la flexión o la carga → posible falla de la costura; retrocede y avisa al cirujano.
 
 > **La orden del cirujano SIEMPRE manda** sobre estos tiempos. Avanzar la flexión profunda o el giro con carga "contra" lo que indicó puede **romper la costura**.
 
-#### Criterios de RETORNO AL DEPORTE (objetivos) — EU-US 2024, criterio + tiempo
-- Retorno **por criterios Y por tiempo** (EU-US 2024, GRADE D) — individualizado por procedimiento, lesiones concomitantes y demandas del deporte.
-- **Meniscectomía parcial: ~4-12 semanas** (carrera ~2-4 sem).
-- **Reparación meniscal: ~6-9 meses.**
-- Criterios funcionales: fuerza y saltos (hops) **simétricos (habitualmente ≥90% LSI, extrapolado de LCA — el consenso NO fija un umbral propio)**, sin derrame ni dolor en interlínea con la actividad, y **preparación psicológica** evaluada.
-- **INCIERTO:** el consenso reconoce que faltan umbrales numéricos validados específicos de menisco.
-
-#### Pruebas para diagnosticar menisco (valoración, antes de operar)
-Ningún test aislado es fiable; combinar historia + interlínea + provocación. Cifras de metaanálisis agrupado salvo donde se indique:
-- **Dolor en interlínea articular (joint line tenderness):** palpación de la interlínea medial/lateral · **Sens ~63% / Esp ~77%**. A menudo el más sensible, pero poco específico (en primaria la Esp cae a ~0.26-0.39, NIHR HTA 2015). Útil como cribado.
-- **McMurray:** flexión máxima + rotación tibial con extensión buscando clic/dolor · **Sens ~70% / Esp ~71%** (algunas series Esp hasta 89%). El clic palpable (no solo dolor) sube la especificidad.
-- **Thessaly (20° flexión, apoyo monopodal con rotación del cuerpo):** muy variable — original Karachalios 2005 ~90%/91%; pragmáticos en primaria (NIHR HTA 2015) ~66%/39%. **INCIERTO:** no es el test casi perfecto del estudio original.
-- **Apley (compresión/distracción en prono a 90°):** compresión dolorosa (menisco) vs distracción dolorosa (ligamento) · **Sens ~60% / Esp ~70%** — el menos sensible del grupo; un positivo apoya menisco, un negativo no descarta.
-
-#### Fuentes
-- EU-US Meniscus Rehabilitation 2024 Consensus (ESSKA-AOSSM-AASPT), **Parte I** [[PMC](https://pmc.ncbi.nlm.nih.gov/articles/PMC12310086/)] y **Parte II** [[ref](https://www.jospt.org/doi/10.2519/josptopen.2025.13539)] — la mejor guía actual, aunque la mayoría de recomendaciones son **GRADE C-D** (evidencia débil) y el consenso mismo dice que **no existe protocolo estandarizado validado**: enfoque por **hitos + tiempo**. Las restricciones **varían por tipo de rotura** (vertical estable vs horizontal/radial/compleja/raíz; roturas de raíz y combinadas con LCA = más restrictivas).
-- Revisión sistemática 2025 — protocolos restringidos de ROM/carga en reparación de raíz meniscal lateral + LCA [[PMC](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC12616272/)]
-- Revisión de reparación meniscal aislada 2022 — ROM 0-90° 4 sem, sin carga 6 sem si fibras hoop [[Springer](https://link.springer.com/article/10.1186/s40634-022-00521-8)]
-- McCarty/CU Anschutz — ACL + Meniscus Repair Protocol 2024 (ejemplo de protocolo combinado) [[PDF](https://medschool.cuanschutz.edu/docs/librariesprovider65/eric-mccarty/rehab-protocols/acl-and-meniscus-repair-protocol-2024.pdf)]
-- Pruebas diagnósticas: metaanálisis de exactitud de tests meniscales (McMurray 70/71, Apley 60/70, interlínea 63/77); Karachalios *JBJS* 2005 (Thessaly original); NIHR HTA 2015 (Thessaly pragmático) [[ref](https://www.ncbi.nlm.nih.gov/books/NBK310289/)]
+#### Para el fisioterapeuta — pruebas de exploración
+No es parte de la guía del paciente. Ningún test aislado confirma o descarta; combinar historia + interlínea + provocación. **Dolor en interlínea** (sens ~63% / esp ~77%, buen cribado), **McMurray** (~70% / ~71%), **Thessaly** (muy variable según la fuente), **Apley** (~60% / ~70%, el menos sensible). Marco de rehabilitación: **Consenso EU-US 2024 (ESSKA-AOSSM-AASPT), evidencia GRADE C-D**. Progresión por criterios, no por calendario.
 
 ---
 
