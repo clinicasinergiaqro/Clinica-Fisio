@@ -550,12 +550,12 @@ function generarSoapIA(body) {
     : 'NOTA LIBRE DEL TERAPEUTA:\n' + notaLibre;
 
   const listaMods = ['Tecarterapia resistiva','Tecarterapia capacitiva','Ultrasonido',
-    'L\u00e1ser','Ondas de choque','Aguja seca','MEP','Electroterapia','Corriente Aura','ILIB',
-    'Ejercicio terap\u00e9utico','Estiramiento','Movilidad pasiva','Movilidad activa',
-    'Propiocepci\u00f3n / Equilibrio','Readaptaci\u00f3n deportiva','Programa domiciliario',
-    'Terapia manual','Masoterapia','Liberaci\u00f3n miofascial','Punci\u00f3n seca',
+    'Láser','Ondas de choque','Aguja seca','MEP','Electroterapia','Corriente Aura','ILIB',
+    'Ejercicio terapéutico','Estiramiento','Movilidad pasiva','Movilidad activa',
+    'Propiocepción / Equilibrio','Readaptación deportiva','Programa domiciliario',
+    'Terapia manual','Masoterapia','Liberación miofascial','Punción seca',
     'Vendaje neuromuscular','Presoterapia','Termoterapia','Crioterapia',
-    'Drenaje linf\u00e1tico','Tracciones','Otra'];
+    'Drenaje linfático','Tracciones','Otra'];
 
   const systemPrompt =
     'Eres un asistente clinico especializado en fisioterapia y rehabilitacion. Tu tarea es convertir ' +
@@ -2619,6 +2619,7 @@ function _claudeRouter_(body) {
   var _mntPatch = function(path, obj, mask){ var t=_mntTok(); var q = (mask&&mask.length) ? ('?'+mask.map(function(m){return 'updateMask.fieldPaths='+encodeURIComponent(m);}).join('&')) : ''; var r=UrlFetchApp.fetch(_mntBase()+'/'+path+q,{method:'patch',contentType:'application/json',headers:{Authorization:'Bearer '+t},muteHttpExceptions:true,payload:JSON.stringify(_mntEnc(obj))}); return r.getResponseCode(); };
   var _mntCreate = function(coll, obj){ var t=_mntTok(); var r=UrlFetchApp.fetch(_mntBase()+'/'+coll,{method:'post',contentType:'application/json',headers:{Authorization:'Bearer '+t},muteHttpExceptions:true,payload:JSON.stringify(_mntEnc(obj))}); return {code:r.getResponseCode(), name:((JSON.parse(r.getContentText()||'{}')||{}).name||'')}; };
   var _mntListSub = function(path){ var t=_mntTok(); var out=[]; var pg=''; do { var u=_mntBase()+'/'+path+'?pageSize=300'+(pg?('&pageToken='+encodeURIComponent(pg)):''); var r=UrlFetchApp.fetch(u,{method:'get',headers:{Authorization:'Bearer '+t},muteHttpExceptions:true}); if(r.getResponseCode()!==200) break; var j=JSON.parse(r.getContentText()||'{}'); (j.documents||[]).forEach(function(d){ out.push({id:String(d.name||'').split('/').pop(), data:_fsDecodeFields_(d.fields||{})}); }); pg=j.nextPageToken||''; } while(pg); return out; };
+  var _mntDelete = function(path){ var t=_mntTok(); if(!t) return false; var r=UrlFetchApp.fetch(_mntBase()+'/'+path,{method:'delete',headers:{Authorization:'Bearer '+t},muteHttpExceptions:true}); var c=r.getResponseCode(); return (c>=200&&c<300); };
   var _mntVacio = function(v){ if (v===null||v===undefined) return true; if (typeof v==='string'){ var t=v.trim().toLowerCase(); return (!t || /^(pendiente|no cuenta con diagn|sin diagn|no especificad|ninguna|ninguno|n\/?d|n\/?a|—|-|\[pendiente\])/.test(t)); } if (Array.isArray(v)) return v.length===0; if (typeof v==='object'){ for (var k in v){ if (!_mntVacio(v[k])) return false; } return true; } return false; };
   var _mntTombstonePac = function(pid, borradoPor, ts, esHist){
     var pref = 'pacientes/' + encodeURIComponent(pid);
@@ -2758,6 +2759,67 @@ function _claudeRouter_(body) {
     _claudeBitacora_(ss,'claudeFusionarPacientes','pri='+pPri+' sec='+pSec+' estudios='+(campos.estudiosDocs?campos.estudiosDocs.length:0)+' sesMovidas='+sesMovidas+'/'+sesTotal+' secBorrado='+(tombSec&&tombSec.ok));
     return respuesta({ ok:true, idPrincipal:pPri, idSecundario:pSec, estudiosEnPrincipal:(campos.estudiosDocs?campos.estudiosDocs.length:0), sesionesMovidas:sesMovidas, sesionesSecundario:sesTotal, secundarioBorrado:(tombSec&&tombSec.ok)||false, revMergeTs:tsMg, restaurable:true });
   }
+  // DES-FUSIÓN: deshace un claudeFusionarPacientes (RESTAURABLE). Restaura el expediente
+  // secundario (quita tombstone + papelera), devuelve el principal a su estado PRE-fusión
+  // (nombre + arrays + campos que la fusión pudo rellenar) y BORRA del principal las notas
+  // que la fusión copió (ids que terminan en __mg<ts>). El ts se toma de eliminadoFecha del
+  // secundario (o body.revMergeTs). Candado CLAUDE_TOKEN (igual que claudeFusionarPacientes).
+  if (action === 'claudeDesfusionarPacientes') {
+    var dxPri = String(body.idPrincipal||'').trim(), dxSec = String(body.idSecundario||'').trim();
+    if (!dxPri || !dxSec) return respuesta({ ok:false, error:'Falta idPrincipal o idSecundario', code:400 });
+    if (dxPri===dxSec) return respuesta({ ok:false, error:'idPrincipal == idSecundario', code:400 });
+    var dSecDX = _mntGet('pacientes/'+encodeURIComponent(dxSec));
+    if (!dSecDX) return respuesta({ ok:false, error:'Secundario no existe en FS', code:404 });
+    var dPriDX = _mntGet('pacientes/'+encodeURIComponent(dxPri));
+    if (!dPriDX) return respuesta({ ok:false, error:'Principal no existe en FS', code:404 });
+    var tsDX = 0;
+    if (body.revMergeTs) { tsDX = Number(body.revMergeTs)||0; }
+    if (!tsDX && dSecDX.eliminadoFecha) { var _pdDX = Date.parse(dSecDX.eliminadoFecha); if (!isNaN(_pdDX)) tsDX = _pdDX; }
+    if (!tsDX) return respuesta({ ok:false, error:'No pude determinar el ts de la fusión (el secundario no trae eliminadoFecha); pasa revMergeTs', code:400 });
+    var revDX = 'merge__'+dxPri+'__'+dxSec+'__'+tsDX;
+    var bkDX = _mntGet('revision/'+encodeURIComponent(revDX));
+    if (!bkDX || !bkDX.principal) return respuesta({ ok:false, error:'No encontré el respaldo de la fusión ('+revDX+'); verifica idPrincipal/idSecundario/revMergeTs', code:404 });
+    var oPri = bkDX.principal; // doc del principal PRE-fusión
+
+    // 1) RESTAURAR el principal a su estado pre-fusión (revierte nombre, merges de arrays y rellenos de campos)
+    var KDX = ['name','nombreNormalizado','estudiosDocs','fotos','docs','dx','motivoConsulta','motivo','motivoHC','dxFuncional','planTto','antecedentes','alergias','contraindicaciones','seguridadClinica','valoracion','sexo','fechaNacimiento','age','terapeuta'];
+    var patPriDX = {}, mskPriDX = [];
+    KDX.forEach(function(k){ patPriDX[k] = (oPri[k]!==undefined ? oPri[k] : null); mskPriDX.push(k); });
+    patPriDX.ultimoUsuario = 'CLAUDE/desfusion'; mskPriDX.push('ultimoUsuario');
+    var cPriDX = _mntPatch('pacientes/'+encodeURIComponent(dxPri), patPriDX, mskPriDX);
+    var priOkDX = (cPriDX>=200 && cPriDX<300);
+
+    // 2) BORRAR del principal las sesiones que la fusión COPIÓ (ids que terminan en __mg<ts>)
+    var sufDX = '__mg'+tsDX;
+    var sPriDX = _mntListSub('pacientes/'+encodeURIComponent(dxPri)+'/sesiones');
+    var copBorr=0, copTot=0;
+    sPriDX.forEach(function(s){ var sid=String(s.id); if (sid.length>=sufDX.length && sid.slice(-sufDX.length)===sufDX){ copTot++; if (_mntDelete('pacientes/'+encodeURIComponent(dxPri)+'/sesiones/'+encodeURIComponent(sid))) copBorr++; } });
+
+    // 3) REACTIVAR el secundario (quitar tombstone del doc)
+    var cReactDX = _mntPatch('pacientes/'+encodeURIComponent(dxSec), { eliminado:false, eliminadoPor:null, eliminadoFecha:null }, ['eliminado','eliminadoPor','eliminadoFecha']);
+    var secOkDX = (cReactDX>=200 && cReactDX<300);
+    var esHistDX = dxSec.indexOf('mig_pac_')===0;
+    var sheetPendDX = false;
+    if (!esHistDX) {
+      _mntDelete('pacientesEliminados/'+encodeURIComponent('pacienteActivo__'+dxSec));
+      sheetPendDX = true; // activo: su fila del Sheet se borró en la fusión → re-agregar desde la Papelera de la app
+    }
+    // 3b) quitar la entrada de papelera/ del secundario (si quedó), por query pid==secundario
+    var papBorrDX = 0;
+    try {
+      var tokPQ = _mntTok();
+      var qPQ = { structuredQuery:{ from:[{collectionId:'papelera'}], where:{ fieldFilter:{ field:{fieldPath:'pid'}, op:'EQUAL', value:{stringValue:dxSec} } }, limit:20 } };
+      var rPQ = UrlFetchApp.fetch(_mntBase()+':runQuery',{ method:'post', contentType:'application/json', headers:{Authorization:'Bearer '+tokPQ}, muteHttpExceptions:true, payload:JSON.stringify(qPQ) });
+      if (rPQ.getResponseCode()===200){ var rowsPQ = JSON.parse(rPQ.getContentText()||'[]'); (rowsPQ||[]).forEach(function(r){ if (r && r.document && r.document.name){ var pidDocPQ = String(r.document.name).split('/').pop(); if (_mntDelete('papelera/'+encodeURIComponent(pidDocPQ))) papBorrDX++; } }); }
+    } catch(_ePQ){}
+
+    _claudeBitacora_(ss,'claudeDesfusionarPacientes','pri='+dxPri+' sec='+dxSec+' ts='+tsDX+' priRestaurado='+priOkDX+' secReactivado='+secOkDX+' notasCopiadasBorradas='+copBorr+'/'+copTot+' papelera='+papBorrDX+' sheetPend='+sheetPendDX);
+    return respuesta({ ok:(priOkDX && secOkDX), idPrincipal:dxPri, idSecundario:dxSec, revMergeTs:tsDX,
+      principalRestaurado:priOkDX, secundarioReactivado:secOkDX,
+      nombrePrincipal:(oPri.name||''), nombreSecundario:(dSecDX.name||''),
+      notasCopiadasBorradas:copBorr, notasCopiadasTotal:copTot, papeleraLimpiada:papBorrDX,
+      sheetReinsertarPendiente:sheetPendDX, restaurado:true });
+  }
   // FIN MANTENIMIENTO TEMPORAL - quitar este bloque al terminar
 
   // ── AUTO-CITAS recepción: manipular la hoja desde la conexión Claude ──
@@ -2827,6 +2889,499 @@ function _claudeRouter_(body) {
       _claudeBitacora_(ss,'claudeRecepcion','nombresFix aplicar='+_aplicar+' revisadas='+_rev+' cambios='+_cambios);
       return respuesta({ ok:true, sub:'nombresFix', aplicado:_aplicar, revisadas:_rev, cambios:_cambios, ejemplos:_ej });
     }
+    if(_sub==='buscar'){
+      // LECTURA: para cada {pac, fecha:'YYYY-MM-DD'} devuelve las filas de REGISTRO DEL DÍA
+      // que coinciden (paciente normalizado igual o subset de tokens + misma fecha) con su
+      // TERAPEUTA y ASISTIÓ. NO escribe nada.
+      var _cons = body.consultas || [];
+      if(!_cons.length) return respuesta({ ok:false, error:'Falta consultas:[{pac,fecha}]', code:400 });
+      var _dvB=_rsh.getDataRange().getValues(), _hrB=-1;
+      for(var _rb=0;_rb<Math.min(_dvB.length,12);_rb++){
+        var _rowB=_dvB[_rb].map(_normRec_);
+        if(_rowB.indexOf('paciente')!==-1 && _rowB.some(function(x){return x.indexOf('fecha')!==-1;})){ _hrB=_rb; break; }
+      }
+      if(_hrB<0) return respuesta({ ok:false, error:'No encontré el encabezado', code:500 });
+      var _hB=_dvB[_hrB].map(_normRec_);
+      function _colB(sub){ for(var i=0;i<_hB.length;i++){ if(_hB[i].indexOf(sub)!==-1) return i; } return -1; }
+      var _cF=_colB('fecha'), _cP=_colB('paciente'), _cT=_colB('terapeuta'), _cA=_colB('asisti');
+      if(_cF<0||_cP<0) return respuesta({ ok:false, error:'Faltan columnas FECHA/PACIENTE', code:500 });
+      function _pad(n){ return (n<10?'0':'')+n; }
+      function _fechaKey(v){
+        if(v instanceof Date) return v.getFullYear()+'-'+_pad(v.getMonth()+1)+'-'+_pad(v.getDate());
+        var s=String(v==null?'':v).trim();
+        var m=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/); if(m) return m[3]+'-'+_pad(+m[2])+'-'+_pad(+m[1]);
+        m=s.match(/^(\d{4})-(\d{2})-(\d{2})/); if(m) return m[1]+'-'+m[2]+'-'+m[3];
+        return s;
+      }
+      function _toks(s){ return _normRec_(s).split(' ').filter(function(t){return t.length>1;}); }
+      function _subset(a,b){ for(var i=0;i<a.length;i++){ if(b.indexOf(a[i])===-1) return false; } return a.length>0; }
+      // indexar filas por fecha
+      var _porFecha={};
+      for(var _ri=_hrB+1;_ri<_dvB.length;_ri++){
+        var _fk=_fechaKey(_dvB[_ri][_cF]);
+        if(!_fk) continue;
+        (_porFecha[_fk]=_porFecha[_fk]||[]).push(_ri);
+      }
+      var _out=[];
+      for(var _c=0;_c<_cons.length;_c++){
+        var _q=_cons[_c], _qp=String(_q.pac||''), _qf=String(_q.fecha||'').slice(0,10);
+        var _qt=_toks(_qp), _qn=_normRec_(_qp), _ms=[];
+        var _candRows=_porFecha[_qf]||[];
+        for(var _m=0;_m<_candRows.length;_m++){
+          var _row=_dvB[_candRows[_m]], _cellP=String(_row[_cP]==null?'':_row[_cP]);
+          var _cn=_normRec_(_cellP), _ct=_toks(_cellP);
+          if(_cn===_qn || _subset(_qt,_ct) || _subset(_ct,_qt)){
+            _ms.push({ paciente:_cellP, terapeuta:(_cT>=0?String(_row[_cT]||'').trim():''), asistio:(_cA>=0?String(_row[_cA]||'').trim():'') });
+          }
+        }
+        _out.push({ pac:_qp, fecha:_qf, matches:_ms });
+      }
+      _claudeBitacora_(ss,'claudeRecepcion','buscar consultas='+_cons.length);
+      return respuesta({ ok:true, sub:'buscar', resultados:_out });
+    }
+    if(_sub==='importar'){
+      // UPSERT de filas del Excel de recepción → REGISTRO DEL DÍA (para sincronizar el .xlsx con la Google Sheet):
+      //  - si la cita (fecha + nombre, exacto o subset de tokens) NO existe → AGREGA la fila con TODAS sus columnas.
+      //  - si existe pero le faltan terapeuta/asistió/costo/… → RELLENA SOLO las celdas en BLANCO (NUNCA pisa un valor).
+      // PREVIEW por defecto; aplicar:true escribe. Idempotente. Solo REGISTRO DEL DÍA; no toca Paquetes/fórmulas/otras pestañas.
+      var _aplicar3 = body.aplicar === true;
+      var _rowsIn = body.rows || [];
+      if(!_rowsIn.length) return respuesta({ ok:false, error:'Falta rows:[{fecha,paciente,...}]', code:400 });
+      var _dvI=_rsh.getDataRange().getValues(), _hrI=-1;
+      for(var _ri0=0;_ri0<Math.min(_dvI.length,12);_ri0++){
+        var _rowI=_dvI[_ri0].map(_normRec_);
+        if(_rowI.indexOf('paciente')!==-1 && _rowI.some(function(x){return x.indexOf('asisti')!==-1;})){ _hrI=_ri0; break; }
+      }
+      if(_hrI<0) return respuesta({ ok:false, error:'No encontré el encabezado', code:500 });
+      var _hI=_dvI[_hrI].map(_normRec_);
+      function _cI(sub){ for(var i=0;i<_hI.length;i++){ if(_hI[i].indexOf(sub)!==-1) return i; } return -1; }
+      var ciF=_cI('fecha'), ciP=_cI('paciente'), ciCo=_cI('costo'), ciPa=_cI('pago'), ciFa=_cI('factura'),
+          ciTe=_cI('terapeuta'), ciAs=_cI('asisti'), ciSe=_cI('servicio'), ciNu=_cI('cita'), ciOb=_cI('observ'), ciSa=_cI('saldo');
+      if(ciF<0||ciP<0) return respuesta({ ok:false, error:'Faltan columnas FECHA/PACIENTE', code:500 });
+      function _tk3(s){ return _normRec_(s).split(' ').filter(function(t){return t.length>1;}); }
+      function _sub3(a,b){ for(var i=0;i<a.length;i++){ if(b.indexOf(a[i])===-1) return false; } return a.length>0; }
+      var _porDia3={};
+      for(var _r3=_hrI+1;_r3<_dvI.length;_r3++){
+        var _pc3=_dvI[_r3][ciP]; if(!_pc3) continue;
+        var _dk3=_diaKeyRec_(_dvI[_r3][ciF]); (_porDia3[_dk3]=_porDia3[_dk3]||[]).push(_r3);
+      }
+      var _ancho3=_rsh.getLastColumn(), _nuevas3=[], _rellenos3=[], _ejAdd=[], _ejFill=[], _nFill=0;
+      var _mapCol=[[ciCo,'costo'],[ciPa,'tipoPago'],[ciFa,'factura'],[ciTe,'terapeuta'],[ciAs,'asistio'],[ciSe,'servicio'],[ciNu,'numCita'],[ciOb,'obs'],[ciSa,'saldo']];
+      // clave de día ISO-aware para el import: _diaKeyRec_ mal-parsea 'YYYY-MM-DD' (su 1er regex d/m/aaaa
+      // la toma como DD-MM-AA) → aquí ISO primero, y si no, cae a _diaKeyRec_ (acepta d/m/aaaa y Date).
+      function _dkImp(f){ var m=String(f==null?'':f).match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? (m[1]+m[2]+m[3]) : _diaKeyRec_(f); }
+      for(var _q3=0;_q3<_rowsIn.length;_q3++){
+        var R=_rowsIn[_q3], nom=String(R.paciente||'').trim();
+        if(!nom || !R.fecha) continue;
+        var dk3=_dkImp(R.fecha), cand3=_porDia3[dk3]||[], nt=_tk3(nom), nn=_normRec_(nom), hit=-1;
+        for(var _m3=0;_m3<cand3.length;_m3++){
+          var rIdx=cand3[_m3], cp=String(_dvI[rIdx][ciP]==null?'':_dvI[rIdx][ciP]), cn=_normRec_(cp), ct=_tk3(cp);
+          if(cn===nn || _sub3(nt,ct) || _sub3(ct,nt)){ hit=rIdx; break; }
+        }
+        if(hit<0){
+          var fila=[]; for(var _c3=0;_c3<_ancho3;_c3++) fila[_c3]='';
+          var pm=String(R.fecha).match(/(\d{4})-(\d{2})-(\d{2})/);
+          fila[ciF]= pm ? new Date(+pm[1],+pm[2]-1,+pm[3],12,0,0) : R.fecha;
+          fila[ciP]=nom;
+          for(var _mc=0;_mc<_mapCol.length;_mc++){ var ci=_mapCol[_mc][0], key=_mapCol[_mc][1]; if(ci>=0 && R[key]!=null && String(R[key]).trim()!=='') fila[ci]=R[key]; }
+          _nuevas3.push(fila);
+          if(_ejAdd.length<15) _ejAdd.push(String(R.fecha)+' '+nom);
+        } else {
+          var _did=false;
+          for(var _mc2=0;_mc2<_mapCol.length;_mc2++){
+            var ci2=_mapCol[_mc2][0], key2=_mapCol[_mc2][1]; if(ci2<0) continue;
+            var cur=String(_dvI[hit][ci2]==null?'':_dvI[hit][ci2]).trim();
+            var nv=R[key2]==null?'':String(R[key2]).trim();
+            if(!cur && nv){ _rellenos3.push({r:hit, c:ci2, v:R[key2]}); _dvI[hit][ci2]=R[key2]; _did=true; }
+          }
+          if(_did){ _nFill++; if(_ejFill.length<15) _ejFill.push(String(R.fecha)+' '+nom); }
+        }
+      }
+      if(_aplicar3){
+        for(var _f3=0;_f3<_rellenos3.length;_f3++){ var rr=_rellenos3[_f3]; _rsh.getRange(rr.r+1, rr.c+1).setValue(rr.v); }
+        if(_nuevas3.length){
+          var _ini3=_rsh.getLastRow()+1, _dest3=_rsh.getRange(_ini3,1,_nuevas3.length,_ancho3);
+          _dest3.setValues(_nuevas3);
+          var _mf3=_hrI+2;
+          if(_mf3<_ini3){
+            var _mod3=_rsh.getRange(_mf3,1,1,_ancho3);
+            _mod3.copyTo(_dest3,{formatOnly:true});
+            try{ var _dvv3=_mod3.getDataValidations()[0], _all3=[]; for(var _qq=0;_qq<_nuevas3.length;_qq++) _all3.push(_dvv3.slice()); _dest3.setDataValidations(_all3); }catch(_e3){}
+          }
+          if(ciF>=0) _rsh.getRange(_ini3, ciF+1, _nuevas3.length, 1).setNumberFormat('d/m/yyyy');
+        }
+      }
+      _claudeBitacora_(ss,'claudeRecepcion','importar aplicar='+_aplicar3+' add='+_nuevas3.length+' fill='+_nFill);
+      return respuesta({ ok:true, sub:'importar', aplicado:_aplicar3, agregadas:_nuevas3.length, rellenadas:_nFill, celdas:_rellenos3.length, ejAdd:_ejAdd, ejFill:_ejFill });
+    }
+    if(_sub==='borrarFuturas'){
+      // Borra de REGISTRO DEL DÍA las filas cuya FECHA es POSTERIOR a HOY (pre-cargas de días futuros).
+      // El auto-llenado corre día a día (RECEPCION_DIAS=1) → no debe haber futuros; esto limpia los que
+      // quedaron de un 'correr dias>1'. PREVIEW por defecto; aplicar:true borra. Opcional body.desde='YYYY-MM-DD'
+      // para borrar desde esa fecha inclusive (default = mañana). Solo REGISTRO DEL DÍA; no toca otras pestañas.
+      var _aplicar4 = body.aplicar === true;
+      var _hoyK = Utilities.formatDate(new Date(),'America/Mexico_City','yyyyMMdd');
+      var _desdeK = _hoyK;  // por defecto: todo lo ESTRICTAMENTE mayor a hoy
+      var _estricto = true;
+      if(body.desde){ var _md=String(body.desde).match(/^(\d{4})-(\d{2})-(\d{2})/); if(_md){ _desdeK=_md[1]+_md[2]+_md[3]; _estricto=false; } }
+      var _dvF=_rsh.getDataRange().getValues(), _hrF=-1;
+      for(var _rf0=0;_rf0<Math.min(_dvF.length,12);_rf0++){
+        var _rowF=_dvF[_rf0].map(_normRec_);
+        if(_rowF.indexOf('paciente')!==-1 && _rowF.some(function(x){return x.indexOf('fecha')!==-1;})){ _hrF=_rf0; break; }
+      }
+      if(_hrF<0) return respuesta({ ok:false, error:'No encontré el encabezado', code:500 });
+      var _hF=_dvF[_hrF].map(_normRec_), _cFF=-1, _cPF=-1;
+      for(var _if=0;_if<_hF.length;_if++){ if(_cFF<0&&_hF[_if].indexOf('fecha')!==-1) _cFF=_if; if(_cPF<0&&_hF[_if].indexOf('paciente')!==-1) _cPF=_if; }
+      if(_cFF<0) return respuesta({ ok:false, error:'No hay columna FECHA', code:500 });
+      var _delRows=[], _ejDel=[];
+      for(var _rf=_hrF+1;_rf<_dvF.length;_rf++){
+        var _fv=_dvF[_rf][_cFF]; if(_fv===''||_fv==null) continue;
+        var _pv=String(_dvF[_rf][_cPF]==null?'':_dvF[_rf][_cPF]).trim(); if(!_pv) continue;
+        var _k=_diaKeyRec_(_fv); if(!/^\d{8}$/.test(_k)) continue;
+        var _match = _estricto ? (_k>_desdeK) : (_k>=_desdeK);
+        if(_match){ _delRows.push(_rf+1); if(_ejDel.length<20) _ejDel.push(_k.slice(0,4)+'-'+_k.slice(4,6)+'-'+_k.slice(6,8)+' '+_pv); }
+      }
+      if(_aplicar4){
+        // borrar de ABAJO hacia ARRIBA para no correr los índices
+        _delRows.sort(function(a,b){return b-a;});
+        for(var _d4=0;_d4<_delRows.length;_d4++){ _rsh.deleteRow(_delRows[_d4]); }
+      }
+      _claudeBitacora_(ss,'claudeRecepcion','borrarFuturas aplicar='+_aplicar4+' hoy='+_hoyK+' borradas='+_delRows.length);
+      return respuesta({ ok:true, sub:'borrarFuturas', aplicado:_aplicar4, hoy:_hoyK, desde:_desdeK, estricto:_estricto, aBorrar:_delRows.length, ejemplos:_ejDel });
+    }
+    if(_sub==='fechaFixHojas'){
+      // Formatea a d/m/aaaa TODAS las celdas con FECHA de las pestañas indicadas (default: Paquetes/Abonos + Ventas).
+      // SOLO cambia el FORMATO de celdas cuyo valor YA es una fecha (objeto Date, o un serial de fecha 43000–55000
+      // = ~2017–2050) — NO toca montos/conteos/texto, NO cambia valores, NO toca fórmulas. PREVIEW por defecto; aplicar:true escribe.
+      var _aplicar5 = body.aplicar === true;
+      var _subcad5 = (body.hojas && body.hojas.length) ? body.hojas.map(function(x){ return _normRec_(x); }) : ['paquete','venta','abono'];
+      var _hojasOut = [], _todas5 = _rss.getSheets();
+      for(var _hs=0; _hs<_todas5.length; _hs++){
+        var _sh5 = _todas5[_hs], _nm5 = _normRec_(_sh5.getName()), _match5=false;
+        for(var _sc=0;_sc<_subcad5.length;_sc++){ if(_nm5.indexOf(_subcad5[_sc])!==-1){ _match5=true; break; } }
+        if(!_match5) continue;
+        var _lr5=_sh5.getLastRow(), _lc5=_sh5.getLastColumn();
+        if(_lr5<1||_lc5<1){ _hojasOut.push({ hoja:_sh5.getName(), fechas:0 }); continue; }
+        var _rng5=_sh5.getRange(1,1,_lr5,_lc5), _vals5=_rng5.getValues(), _fmts5=_rng5.getNumberFormats(), _cnt5=0;
+        for(var _r5=0;_r5<_vals5.length;_r5++){
+          for(var _c5=0;_c5<_vals5[_r5].length;_c5++){
+            var _v5=_vals5[_r5][_c5];
+            var _esFecha = (_v5 instanceof Date) || (typeof _v5==='number' && _v5>=43000 && _v5<=55000);
+            if(_esFecha && _fmts5[_r5][_c5] !== 'd/m/yyyy'){ _fmts5[_r5][_c5]='d/m/yyyy'; _cnt5++; }
+          }
+        }
+        if(_aplicar5 && _cnt5>0) _rng5.setNumberFormats(_fmts5);
+        _hojasOut.push({ hoja:_sh5.getName(), fechas:_cnt5 });
+      }
+      _claudeBitacora_(ss,'claudeRecepcion','fechaFixHojas aplicar='+_aplicar5+' '+JSON.stringify(_hojasOut));
+      return respuesta({ ok:true, sub:'fechaFixHojas', aplicado:_aplicar5, hojas:_hojasOut });
+    }
+    if(_sub==='leer'){
+      // LECTURA genérica de cualquier pestaña → objetos por encabezado + filtro opcional. No escribe.
+      // body:{ hoja?:'paquetes'|'ventas'|'inventario'|'registro'(default), filtro?:{columna:valor}, limite?, sinFecha?:true }
+      var _rl=_recLeer_(_rss, body.hoja, body.filtro, body.limite||0, body.sinFecha===true);
+      if(_rl.ok) _claudeBitacora_(ss,'claudeRecepcion','leer '+(body.hoja||'registro')+' total='+_rl.total);
+      return respuesta(_rl.ok ? Object.assign({sub:'leer'},_rl) : { ok:false, error:_rl.error, code:400 });
+    }
+    if(_sub==='sinFecha'){
+      // Lista las filas de REGISTRO DEL DÍA con FECHA vacía/ inválida (las que estorban abajo).
+      // Opcional borrar:true (+aplicar:true) para quitarlas. PREVIEW por defecto.
+      var _rsf=_recLeer_(_rss, 'registro', null, body.limite||200, true);
+      if(!_rsf.ok) return respuesta({ ok:false, error:_rsf.error, code:400 });
+      if(body.borrar===true){
+        var _apsf=body.aplicar===true, _rowsSf=_rsf.filas.map(function(f){return f._fila;}).sort(function(a,b){return b-a;});
+        if(_apsf){ for(var _zsf=0;_zsf<_rowsSf.length;_zsf++) _rsh.deleteRow(_rowsSf[_zsf]); }
+        _claudeBitacora_(ss,'claudeRecepcion','sinFecha borrar aplicar='+_apsf+' n='+_rowsSf.length);
+        return respuesta({ ok:true, sub:'sinFecha', modo:'borrar', aplicado:_apsf, aBorrar:_rowsSf.length, filas:_rsf.filas });
+      }
+      return respuesta({ ok:true, sub:'sinFecha', total:_rsf.total, filas:_rsf.filas });
+    }
+    if(_sub==='editarFila'){
+      // Edita celdas por NOMBRE de columna en las filas que cumplen TODOS los match. Rechaza columnas de fórmula.
+      // body:{ hoja?, match:{columna:valor,...}, set:{columna:valor,...}, aplicar? }
+      var _red=_recEditar_(_rss, body.hoja, body.match, body.set, body.aplicar===true);
+      if(_red.ok) _claudeBitacora_(ss,'claudeRecepcion','editarFila '+(body.hoja||'')+' aplicar='+(body.aplicar===true)+' n='+_red.coincidencias);
+      return respuesta(_red.ok ? Object.assign({sub:'editarFila'},_red) : { ok:false, error:_red.error, code:400, columnasBloqueadas:_red.columnasBloqueadas });
+    }
+    if(_sub==='agregarFila'){
+      // Agrega una fila a cualquier pestaña por NOMBRE de columna (hereda formato+validaciones). Rechaza fórmula.
+      // body:{ hoja, valores:{columna:valor,...}, aplicar? }
+      var _rag=_recAgregar_(_rss, body.hoja, body.valores, body.aplicar===true);
+      if(_rag.ok) _claudeBitacora_(ss,'claudeRecepcion','agregarFila '+(body.hoja||'')+' aplicar='+(body.aplicar===true));
+      return respuesta(_rag.ok ? Object.assign({sub:'agregarFila'},_rag) : { ok:false, error:_rag.error, code:400 });
+    }
+    if(_sub==='nuevoPaquete'){
+      // Da de alta un paquete en PAQUETES Y ABONOS (nunca toca CITAS USADAS/RESTANTES/ESTADO).
+      // body:{ titular, monto, citas, desde:'YYYY-MM-DD', fechaPago?, hasta?, ajuste?, obs?, aplicar? }
+      var _vp={};
+      if(body.fechaPago!=null) _vp['fecha pago']=body.fechaPago;
+      if(body.titular!=null)   _vp['titular']=body.titular;
+      if(body.monto!=null)     _vp['monto']=body.monto;
+      if(body.citas!=null)     _vp['compradas']=body.citas;
+      if(body.desde!=null)     _vp['desde']=body.desde;
+      if(body.hasta!=null)     _vp['hasta']=body.hasta;
+      if(body.ajuste!=null)    _vp['ajuste']=body.ajuste;
+      if(body.obs!=null)       _vp['obs']=body.obs;
+      var _rnp=_recAgregar_(_rss, 'abono', _vp, body.aplicar===true);
+      if(_rnp.ok) _claudeBitacora_(ss,'claudeRecepcion','nuevoPaquete aplicar='+(body.aplicar===true)+' '+(body.titular||''));
+      return respuesta(_rnp.ok ? Object.assign({sub:'nuevoPaquete'},_rnp) : { ok:false, error:_rnp.error, code:400 });
+    }
+    if(_sub==='modificarPaquete'){
+      // Modifica un paquete existente por TITULAR (solo columnas editables). body:{ titular, set?|monto/citas/desde/hasta/ajuste/obs, aplicar? }
+      if(!body.titular) return respuesta({ ok:false, error:'Falta titular', code:400 });
+      var _M=body.set||body, _setp={};
+      if(_M.monto!=null)  _setp['monto']=_M.monto;
+      if(_M.citas!=null)  _setp['compradas']=_M.citas;
+      if(_M.desde!=null)  _setp['desde']=_M.desde;
+      if(_M.hasta!=null)  _setp['hasta']=_M.hasta;
+      if(_M.ajuste!=null) _setp['ajuste']=_M.ajuste;
+      if(_M.obs!=null)    _setp['obs']=_M.obs;
+      if(!Object.keys(_setp).length) return respuesta({ ok:false, error:'Nada que cambiar (monto/citas/desde/hasta/ajuste/obs)', code:400 });
+      var _rmp=_recEditar_(_rss, 'abono', {titular:body.titular}, _setp, body.aplicar===true);
+      if(_rmp.ok) _claudeBitacora_(ss,'claudeRecepcion','modificarPaquete aplicar='+(body.aplicar===true)+' '+body.titular);
+      return respuesta(_rmp.ok ? Object.assign({sub:'modificarPaquete'},_rmp) : { ok:false, error:_rmp.error, code:400, columnasBloqueadas:_rmp.columnasBloqueadas });
+    }
+    if(_sub==='limpiarBasura'){
+      // Limpia celdas con #REF! en REGISTRO DEL DÍA + una fórmula suelta '=X####' en OBSERVACIONES. PREVIEW por defecto.
+      var _ap6=body.aplicar===true, _lr6=_rsh.getLastRow(), _lc6=_rsh.getLastColumn();
+      if(_lr6<1||_lc6<1) return respuesta({ ok:true, sub:'limpiarBasura', aplicado:_ap6, aLimpiar:0, ejemplos:[] });
+      var _rng6=_rsh.getRange(1,1,_lr6,_lc6), _vv6=_rng6.getValues(), _ff6=_rng6.getFormulas();
+      var _H6=_recHeader_(_rsh), _cObs6=_H6?_recCol_(_H6.headN,'observ'):-1, _lim6=[], _ej6=[];
+      for(var _a6=0;_a6<_vv6.length;_a6++){
+        for(var _b6=0;_b6<_vv6[_a6].length;_b6++){
+          var _val6=String(_vv6[_a6][_b6]==null?'':_vv6[_a6][_b6]), _frm6=String(_ff6[_a6][_b6]||'');
+          var _esRef6=_val6.indexOf('#REF!')!==-1 || _frm6.indexOf('#REF!')!==-1;
+          var _esSuelta6=(_cObs6>=0 && _b6===_cObs6 && /^=\s*[A-Z]+\d+\s*$/.test(_frm6));
+          if(_esRef6||_esSuelta6){ _lim6.push([_a6+1,_b6+1]); if(_ej6.length<25) _ej6.push('R'+(_a6+1)+'C'+(_b6+1)+' '+(_frm6||_val6)); }
+        }
+      }
+      if(_ap6){ for(var _c6=0;_c6<_lim6.length;_c6++){ _rsh.getRange(_lim6[_c6][0],_lim6[_c6][1]).clearContent(); } }
+      _claudeBitacora_(ss,'claudeRecepcion','limpiarBasura aplicar='+_ap6+' celdas='+_lim6.length);
+      return respuesta({ ok:true, sub:'limpiarBasura', aplicado:_ap6, aLimpiar:_lim6.length, ejemplos:_ej6 });
+    }
+    if(_sub==='arreglarResumen'){
+      // Extiende los rangos de las fórmulas de RESUMEN DEL DÍA que se quedaron CORTOS (p.ej.
+      // $A$4:$A$4342) para que cubran las filas nuevas — la hoja creció y las citas recientes
+      // caían FUERA del rango → el resumen salía en 0. SOLO cambia el número de fila FINAL de los
+      // rangos que apuntan a REGISTRO DEL DÍA / VENTAS DE PRODUCTO; NO toca la lógica ni los valores.
+      // Escribe celda por celda (solo las fórmulas que cambian). PREVIEW por defecto; aplicar:true escribe.
+      var _apR = body.aplicar===true;
+      var _shR = _rss.getSheetByName('RESUMEN DEL DÍA') || _rss.getSheetByName('RESUMEN DEL DIA');
+      if(!_shR) return respuesta({ ok:false, error:'No encontré RESUMEN DEL DÍA', code:500 });
+      var _lrR=_shR.getLastRow(), _lcR=_shR.getLastColumn();
+      if(_lrR<1||_lcR<1) return respuesta({ ok:true, sub:'arreglarResumen', aplicado:_apR, celdas:0, ejemplos:[] });
+      var _fmlR=_shR.getRange(1,1,_lrR,_lcR).getFormulas(), _cambR=[];
+      var _reReg=/('REGISTRO DEL D[ÍI]A'!\$[A-Z]{1,3}\$\d+:\$[A-Z]{1,3}\$)(\d+)/g;
+      var _reVen=/('VENTAS DE PRODUCTO'!\$[A-Z]{1,3}\$\d+:\$[A-Z]{1,3}\$)(\d+)/g;
+      // Tolerancia de fecha: el criterio exacto (..$A..,$B$4) falla si la fecha trae HORA (el
+      // auto-llenado guarda mediodía) → se cambia a rango por DÍA: (..$A..,">="&$B$4, ..$A..,"<"&($B$4+1)).
+      // Idempotente (no re-duplica porque ya no hay ",$B$4" crudo tras el cambio).
+      var _reFec=/('(?:REGISTRO DEL D[ÍI]A|VENTAS DE PRODUCTO)'!\$A\$\d+:\$A\$\d+),\$B\$4(?!\+)/g;
+      for(var _iR=0;_iR<_fmlR.length;_iR++){
+        for(var _jR=0;_jR<_fmlR[_iR].length;_jR++){
+          var _fR=_fmlR[_iR][_jR]; if(!_fR || String(_fR).charAt(0)!=='=') continue;
+          var _nfR=_fR.replace(_reReg,function(m,p1,n){ return (+n<50000)?(p1+'50000'):m; })
+                      .replace(_reVen,function(m,p1,n){ return (+n<20000)?(p1+'20000'):m; })
+                      .replace(_reFec,function(m,p1){ return p1+',">="&$B$4,'+p1+',"<"&($B$4+1)'; });
+          if(_nfR!==_fR){ _cambR.push({fila:_iR+1, col:_jR+1, de:_fR, a:_nfR}); if(_apR) _shR.getRange(_iR+1,_jR+1).setFormula(_nfR); }
+        }
+      }
+      _claudeBitacora_(ss,'claudeRecepcion','arreglarResumen aplicar='+_apR+' celdas='+_cambR.length);
+      return respuesta({ ok:true, sub:'arreglarResumen', aplicado:_apR, celdas:_cambR.length,
+        ejemplos:_cambR.slice(0,12).map(function(c){ return { celda:'R'+c.fila+'C'+c.col, de:String(c.de).slice(0,80), a:String(c.a).slice(0,80) }; }) });
+    }
+    if(_sub==='arreglarPaquetes'){
+      // Mismo mal que arreglarResumen pero en PAQUETES Y ABONOS: el COUNTIFS de CITAS USADAS (col G)
+      // apunta a un rango de filas de REGISTRO DEL DÍA que se quedó CORTO (la hoja creció) → las citas
+      // PAGADO recientes caen FUERA → CITAS USADAS=0 en TODOS los paquetes (verificado fila 39 y 40).
+      // SOLO extiende el nº de fila FINAL de los rangos que apuntan a 'REGISTRO DEL DÍA' a 50000;
+      // NO toca la lógica ni los valores. Escribe celda por celda (solo las fórmulas que cambian).
+      // PREVIEW por defecto; aplicar:true escribe. Idempotente (no re-extiende si ya es 50000).
+      var _apP = body.aplicar===true;
+      var _shP = _recHojaPorNombre_(_rss, 'abono');
+      if(!_shP || _normRec_(_shP.getName()).indexOf('abono')===-1) return respuesta({ ok:false, error:'No encontré PAQUETES Y ABONOS', code:500 });
+      var _lrP=_shP.getLastRow(), _lcP=_shP.getLastColumn();
+      if(_lrP<1||_lcP<1) return respuesta({ ok:true, sub:'arreglarPaquetes', aplicado:_apP, celdas:0, ejemplos:[] });
+      var _fmlP=_shP.getRange(1,1,_lrP,_lcP).getFormulas(), _cambP=[];
+      var _reRegP=/('REGISTRO DEL D[ÍI]A'!\$[A-Z]{1,3}\$\d+:\$[A-Z]{1,3}\$)(\d+)/g;
+      for(var _iP=0;_iP<_fmlP.length;_iP++){
+        for(var _jP=0;_jP<_fmlP[_iP].length;_jP++){
+          var _fP=_fmlP[_iP][_jP]; if(!_fP || String(_fP).charAt(0)!=='=') continue;
+          var _nfP=_fP.replace(_reRegP,function(m,p1,n){ return (+n<50000)?(p1+'50000'):m; });
+          if(_nfP!==_fP){ _cambP.push({fila:_iP+1, col:_jP+1, de:_fP, a:_nfP}); if(_apP) _shP.getRange(_iP+1,_jP+1).setFormula(_nfP); }
+        }
+      }
+      _claudeBitacora_(ss,'claudeRecepcion','arreglarPaquetes aplicar='+_apP+' celdas='+_cambP.length);
+      return respuesta({ ok:true, sub:'arreglarPaquetes', aplicado:_apP, celdas:_cambP.length,
+        ejemplos:_cambP.slice(0,12).map(function(c){ return { celda:'R'+c.fila+'C'+c.col, de:String(c.de).slice(0,90), a:String(c.a).slice(0,90) }; }) });
+    }
+    if(_sub==='uniformarPaquetes'){
+      // Las fórmulas de las columnas CALCULADAS (CITAS USADAS/RESTANTES/ESTADO) NO son iguales en todas
+      // las filas (se pegaron en épocas distintas) → al reacomodar valores, un paquete puede quedar bajo
+      // una fórmula con bug (no acota por CONTAR DESDE). Este sub: (a) sin refFila → VOLCADO: devuelve,
+      // por columna calculada, las plantillas DISTINTAS (normalizando el nº de fila) + una fila ejemplo de
+      // cada una → para ver cuál es la buena. (b) con refFila + aplicar:true → copia la fórmula de esa fila
+      // a TODAS las filas de datos con copyTo PASTE_FORMULA (ajusta refs relativas solo). NO toca valores.
+      var _apU = body.aplicar===true;
+      var _shU = _recHojaPorNombre_(_rss, 'abono');
+      if(!_shU || _normRec_(_shU.getName()).indexOf('abono')===-1) return respuesta({ ok:false, error:'No encontré PAQUETES Y ABONOS', code:500 });
+      var _HU=_recHeader_(_shU); if(!_HU) return respuesta({ ok:false, error:'sin encabezado', code:500 });
+      var _hNU=_normRec_(_shU.getName()), _anchoU=_HU.headN.length;
+      var _firstU=_HU.hr+2, _lastU=_shU.getLastRow(), _NU=_lastU-_firstU+1;
+      if(_NU<1) return respuesta({ ok:true, sub:'uniformarPaquetes', filas:0 });
+      var _compU=[]; for(var _c=0;_c<_anchoU;_c++){ if(_recEsComputada_(_hNU,_HU.headN[_c])) _compU.push(_c+1); }
+      var _normFml=function(s){ return String(s||'').replace(/\$?([A-Z]{1,3})\$?\d+/g,'$1#'); };
+      if(!body.refFila || !_apU){
+        var _vol={};
+        for(var _k=0;_k<_compU.length;_k++){
+          var _cc=_compU[_k], _col=_HU.headRaw[_cc-1];
+          var _fm=_shU.getRange(_firstU,_cc,_NU,1).getFormulas();
+          var _tpl={};
+          for(var _r=0;_r<_fm.length;_r++){ var _f=_fm[_r][0]; if(!_f) continue; var _t=_normFml(_f); if(!_tpl[_t]) _tpl[_t]={filaEj:_firstU+_r, muestra:_f.slice(0,140), n:0}; _tpl[_t].n++; }
+          _vol[_col]=Object.keys(_tpl).map(function(t){ return _tpl[t]; });
+        }
+        return respuesta({ ok:true, sub:'uniformarPaquetes', aplicado:false, filas:_NU, plantillas:_vol });
+      }
+      var _ref=body.refFila; var _hechas=[];
+      for(var _k2=0;_k2<_compU.length;_k2++){
+        var _cc2=_compU[_k2];
+        _shU.getRange(_ref,_cc2).copyTo(_shU.getRange(_firstU,_cc2,_NU,1), SpreadsheetApp.CopyPasteType.PASTE_FORMULA, false);
+        _hechas.push(_HU.headRaw[_cc2-1]);
+      }
+      _claudeBitacora_(ss,'claudeRecepcion','uniformarPaquetes ref='+_ref+' cols='+_hechas.join(','));
+      return respuesta({ ok:true, sub:'uniformarPaquetes', aplicado:true, refFila:_ref, columnas:_hechas, filas:_NU });
+    }
+    if(_sub==='ordenarPaquetes'){
+      // Acomoda las filas de PAQUETES Y ABONOS por FECHA (ascendente por FECHA PAGO, fallback CONTAR DESDE).
+      // CLAVE: las columnas CALCULADAS (CITAS USADAS/RESTANTES/ESTADO) tienen fórmulas con refs a SU PROPIA
+      // fila (B4,E4,F4…) → se DEJAN en su lugar (no se mueven); solo se permutan los VALORES de las columnas
+      // EDITABLES (A,B,C,D,E,F,H,K) → cada fórmula recomputa desde los valores nuevos de su fila. Fechas se
+      // leen/escriben como valores (Date se conserva). PREVIEW por defecto; aplicar:true escribe.
+      var _apO = body.aplicar===true;
+      var _shO = _recHojaPorNombre_(_rss, 'abono');
+      if(!_shO || _normRec_(_shO.getName()).indexOf('abono')===-1) return respuesta({ ok:false, error:'No encontré PAQUETES Y ABONOS', code:500 });
+      var _HO=_recHeader_(_shO); if(!_HO) return respuesta({ ok:false, error:'No encontré el encabezado', code:500 });
+      var _hojaNO=_normRec_(_shO.getName()), _anchoO=_HO.headN.length;
+      var _firstO=_HO.hr+2, _lastO=_shO.getLastRow();
+      if(_lastO<_firstO) return respuesta({ ok:true, sub:'ordenarPaquetes', aplicado:_apO, filas:0, orden:[] });
+      var _espComp=[]; for(var _c=0;_c<_anchoO;_c++) _espComp[_c]=_recEsComputada_(_hojaNO,_HO.headN[_c]);
+      var _colFP=_recCol_(_HO.headN,'fecha pago'); if(_colFP<0) _colFP=_recCol_(_HO.headN,'fecha');
+      var _colCD=_recCol_(_HO.headN,'contar desde');
+      var _colTit=_recCol_(_HO.headN,'titular'); if(_colTit<0) _colTit=_recCol_(_HO.headN,'paciente');
+      var _dkO=function(v){ if(v instanceof Date) return v.getFullYear()*10000+(v.getMonth()+1)*100+v.getDate(); var s=String(v==null?'':v); var m=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/); if(m) return (+m[3])*10000+(+m[2])*100+(+m[1]); m=s.match(/^(\d{4})-(\d{2})-(\d{2})/); if(m) return (+m[1])*10000+(+m[2])*100+(+m[3]); return 0; };
+      var _valsO=_shO.getRange(_firstO,1,_lastO-_firstO+1,_anchoO).getValues();
+      var _dataO=[];
+      for(var _i=0;_i<_valsO.length;_i++){ var _r=_valsO[_i]; if(String(_r[_colTit]==null?'':_r[_colTit]).trim()==='') continue; var _k=(_colFP>=0?_dkO(_r[_colFP]):0)||(_colCD>=0?_dkO(_r[_colCD]):0); _dataO.push({k:_k, row:_r}); }
+      _dataO.sort(function(a,b){ return (a.k||99999999)-(b.k||99999999); });
+      var _N=_dataO.length;
+      if(_apO && _N){
+        var _M=_dataO.map(function(d){ return d.row; });
+        var _c2=0;
+        while(_c2<_anchoO){
+          if(_espComp[_c2]){ _c2++; continue; }
+          var _ini=_c2; while(_c2<_anchoO && !_espComp[_c2]) _c2++;
+          var _w=_c2-_ini;
+          var _block=_M.map(function(r){ return r.slice(_ini,_ini+_w); });
+          _shO.getRange(_firstO,_ini+1,_N,_w).setValues(_block);
+        }
+      }
+      _claudeBitacora_(ss,'claudeRecepcion','ordenarPaquetes aplicar='+_apO+' filas='+_N);
+      return respuesta({ ok:true, sub:'ordenarPaquetes', aplicado:_apO, filas:_N,
+        orden:_dataO.slice(0,80).map(function(d){ return String(d.row[_colTit]||'').trim()+' | '+(d.k||''); }) });
+    }
+    if(_sub==='auditar'){
+      // AUDITORÍA DE SALUD (read-only, NO escribe). Reporta el TIPO REAL de cada celda de fecha
+      // (Date vs TEXTO — el COUNTIFS/RESUMEN NO comparan fechas-texto) en REGISTRO DEL DÍA y PAQUETES Y ABONOS,
+      // + costos texto, + paquetes con adeudo (restantes<0) y titulares con >1 paquete (riesgo doble-conteo).
+      var _au={ ok:true, sub:'auditar' };
+      (function(){
+        var sh=_recHojaPorNombre_(_rss,'registro'); if(!sh) return;
+        var H=_recHeader_(sh); if(!H) return;
+        var cF=_recCol_(H.headN,'fecha'), cC=_recCol_(H.headN,'costo'), cP=_recCol_(H.headN,'paciente');
+        var last=sh.getLastRow(), first=H.hr+2;
+        if(last<first){ _au.registro={filas:0}; return; }
+        var vals=sh.getRange(first,1,last-first+1,H.headN.length).getValues();
+        var fDate=0,fTxt=0,fVac=0,fRara=0,cNum=0,cTxt=0, mues=[];
+        for(var i=0;i<vals.length;i++){
+          var pv=String(cP>=0?(vals[i][cP]==null?'':vals[i][cP]):'').trim(); if(!pv) continue;
+          var fv=cF>=0?vals[i][cF]:'';
+          if(fv instanceof Date) fDate++;
+          else if(fv===''||fv==null) fVac++;
+          else if(/^\s*\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}\s*$/.test(String(fv))||/^\s*\d{4}-\d{1,2}-\d{1,2}/.test(String(fv))){ fTxt++; if(mues.length<30) mues.push({fila:first+i, fecha:String(fv), paciente:pv.slice(0,22)}); }
+          else fRara++;
+          if(cC>=0){ var cv=vals[i][cC]; if(cv===''||cv==null){} else if(typeof cv==='number') cNum++; else cTxt++; }
+        }
+        _au.registro={ filas:vals.length, fechaReal:fDate, fechaTEXTO:fTxt, fechaVacia:fVac, fechaRara:fRara, costoNum:cNum, costoTexto:cTxt, muestrasFechaTexto:mues };
+      })();
+      (function(){
+        var sh=_recHojaPorNombre_(_rss,'abono'); if(!sh) return;
+        var H=_recHeader_(sh); if(!H) return;
+        var cFP=_recCol_(H.headN,'fecha pago'), cCD=_recCol_(H.headN,'contar desde'), cCH=_recCol_(H.headN,'contar hasta');
+        var cTit=_recCol_(H.headN,'titular'); if(cTit<0) cTit=_recCol_(H.headN,'paciente');
+        var cRest=_recCol_(H.headN,'restante');
+        var last=sh.getLastRow(), first=H.hr+2;
+        if(last<first){ _au.paquetes={filas:0}; return; }
+        var vals=sh.getRange(first,1,last-first+1,H.headN.length).getValues();
+        var txtF=[], adeudos=[], porTit={}, nP=0;
+        for(var i=0;i<vals.length;i++){
+          var tit=String(vals[i][cTit]==null?'':vals[i][cTit]).trim(); if(!tit) continue; nP++;
+          [['FECHA PAGO',cFP],['CONTAR DESDE',cCD],['CONTAR HASTA',cCH]].forEach(function(pr){
+            var v=pr[1]>=0?vals[i][pr[1]]:''; if(v!=='' && v!=null && !(v instanceof Date)) txtF.push({fila:first+i, col:pr[0], titular:tit.slice(0,20), v:String(v)});
+          });
+          var rest=cRest>=0?vals[i][cRest]:null;
+          if(typeof rest==='number' && rest<0) adeudos.push({fila:first+i, titular:tit.slice(0,24), restantes:rest});
+          var tn=_normRec_(tit); (porTit[tn]=porTit[tn]||[]).push(first+i);
+        }
+        var multi=[]; for(var t in porTit){ if(porTit[t].length>1) multi.push({titular:t, filas:porTit[t]}); }
+        _au.paquetes={ filas:nP, fechasTEXTO:txtF, adeudos:adeudos, titularesMultiPaquete:multi };
+      })();
+      _claudeBitacora_(ss,'claudeRecepcion','auditar');
+      return respuesta(_au);
+    }
+    if(_sub==='fechaReal'){
+      // ARREGLA LA RAÍZ: convierte las fechas-TEXTO a Fecha REAL (objeto Date, mediodía) + formato d/m/yyyy en
+      // las columnas de fecha de la hoja (REGISTRO: FECHA; PAQUETES: FECHA PAGO/CONTAR DESDE/CONTAR HASTA).
+      // Una fecha-texto NO la compara el COUNTIFS de paquetes ni el SUMIFS de RESUMEN → de ahí los conteos
+      // cortos y los adeudos falsos. SOLO escribe las columnas de fecha (nunca fórmulas). PREVIEW por defecto.
+      // Ambigüedad d/m vs m/d: si una posición es >12 desambigua sola; si ambas ≤12 asume d/m/aaaa (lo nuestro)
+      // y la marca 'ambigua' en las muestras para que la revises. body:{ hoja?, aplicar? }
+      var _apF=body.aplicar===true;
+      var _shF=_recHojaPorNombre_(_rss, body.hoja||'registro');
+      if(!_shF) return respuesta({ ok:false, error:'No encontré la pestaña: '+(body.hoja||'registro'), code:400 });
+      var _HF=_recHeader_(_shF); if(!_HF) return respuesta({ ok:false, error:'No encontré el encabezado', code:500 });
+      var _hojaNF=_normRec_(_shF.getName()), _colsF=[], _candF=['fecha pago','contar desde','contar hasta','fecha'];
+      for(var _q=0;_q<_candF.length;_q++){ var _ci=_recCol_(_HF.headN,_candF[_q]); if(_ci>=0 && _colsF.indexOf(_ci)===-1 && !_recEsComputada_(_hojaNF,_HF.headN[_ci])) _colsF.push(_ci); }
+      if(!_colsF.length) return respuesta({ ok:false, error:'No hay columnas de fecha editables en '+_shF.getName(), code:400 });
+      var _firstF=_HF.hr+2, _lastF=_shF.getLastRow();
+      if(_lastF<_firstF) return respuesta({ ok:true, sub:'fechaReal', hoja:_shF.getName(), aplicado:_apF, convertidas:0, yaDate:0, ambiguas:0, muestras:[] });
+      var _rngF=_shF.getRange(_firstF,1,_lastF-_firstF+1,_HF.headN.length), _vF=_rngF.getValues(), _fF=_rngF.getNumberFormats();
+      var _conv=0,_ya=0,_amb=0,_mues=[], _toca={};
+      var _parse=function(s){ s=String(s==null?'':s).trim(); if(!s) return null;
+        var m=s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/);
+        if(m){ var a=+m[1],b=+m[2],y=+m[3]; if(y<100) y+=2000;
+          if(a>12 && b<=12) return {y:y,mo:b,d:a,amb:false};
+          if(b>12 && a<=12) return {y:y,mo:a,d:b,amb:false};
+          return {y:y,mo:b,d:a,amb:true}; }
+        m=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/); if(m) return {y:+m[1],mo:+m[2],d:+m[3],amb:false};
+        return null; };
+      for(var _i=0;_i<_vF.length;_i++){
+        for(var _k=0;_k<_colsF.length;_k++){
+          var _c=_colsF[_k], _val=_vF[_i][_c];
+          if(_val instanceof Date){ _ya++; if(_fF[_i][_c]!=='d/m/yyyy'){ _fF[_i][_c]='d/m/yyyy'; _toca[_c]=1; } continue; }
+          if(_val===''||_val==null) continue;
+          var _pp=_parse(_val); if(!_pp) continue;
+          var _dt=new Date(_pp.y,_pp.mo-1,_pp.d,12,0,0);
+          if(isNaN(_dt.getTime())||_dt.getMonth()!==_pp.mo-1) continue;
+          _vF[_i][_c]=_dt; _fF[_i][_c]='d/m/yyyy'; _conv++; _toca[_c]=1; if(_pp.amb) _amb++;
+          if(_mues.length<40) _mues.push({fila:_firstF+_i, columna:_HF.headRaw[_c], de:String(_val), a:Utilities.formatDate(_dt,'America/Mexico_City','d/M/yyyy'), ambigua:_pp.amb});
+        }
+      }
+      if(_apF){ for(var _k2=0;_k2<_colsF.length;_k2++){ var _c2=_colsF[_k2]; if(!_toca[_c2]) continue;
+          var _cv=[],_cf=[]; for(var _r2=0;_r2<_vF.length;_r2++){ _cv.push([_vF[_r2][_c2]]); _cf.push([_fF[_r2][_c2]]); }
+          _shF.getRange(_firstF,_c2+1,_vF.length,1).setValues(_cv); _shF.getRange(_firstF,_c2+1,_vF.length,1).setNumberFormats(_cf); } }
+      _claudeBitacora_(ss,'claudeRecepcion','fechaReal '+_shF.getName()+' aplicar='+_apF+' conv='+_conv);
+      return respuesta({ ok:true, sub:'fechaReal', hoja:_shF.getName(), aplicado:_apF, convertidas:_conv, yaDate:_ya, ambiguas:_amb, muestras:_mues });
+    }
     return respuesta({ ok:false, error:'claudeRecepcion sub no reconocido: '+_sub, code:400 });
   }
 
@@ -2857,7 +3412,7 @@ function _diaKeyRec_(v){
 // Construye el índice de nombres de TODOS los expedientes: activos del Sheet + migrados de Firestore.
 // Devuelve {byExact:{normCompleto:[full,...]}, list:[{full,tok:{token:true}}]} o null si no se pudo.
 // NUNCA tira: si Firestore falla, usa solo activos; si todo falla, devuelve null (y el auto-llenado deja el nombre del calendario).
-function _recepcionIndexNombres_(ss){
+function _recepcionIndexNombres_(ss, deadlineMs){
   var list=[], byExact={};
   function _add(full){
     full=String(full==null?'':full).trim(); if(!full) return;
@@ -2887,6 +3442,7 @@ function _recepcionIndexNombres_(ss){
         +'&mask.fieldPaths=name&mask.fieldPaths=eliminado';
       var pageToken='', paginas=0;
       do{
+        if(deadlineMs && Date.now()>deadlineMs) break;   // ⏱ TOPE DE TIEMPO: si la conexión a Firestore está lenta, corta aquí y devuelve el índice PARCIAL — así la corrida horaria NUNCA topa los 6 min de Apps Script y las citas SÍ se escriben. Lo que quede con nombre corto lo completa `nombresFix` o la siguiente corrida.
         var url=base+(pageToken?'&pageToken='+encodeURIComponent(pageToken):'');
         var r=UrlFetchApp.fetch(url,{method:'get',headers:{Authorization:'Bearer '+tok},muteHttpExceptions:true});
         if(r.getResponseCode()!==200) break;
@@ -2905,19 +3461,158 @@ function _recepcionIndexNombres_(ss){
 function _recepcionResolverNombre_(calNombre, idx){
   if(!idx) return calNombre;
   var norm=_normRec_(calNombre); if(!norm) return calNombre;
+  // COLAPSA por NOMBRE: un mismo paciente vive en varios docs (activo p… + espejo app_live_ + migrado
+  // mig_pac_). Esos NO son homónimos: son el MISMO nombre repetido. Contar DOCS los trataba como
+  // ambiguos y dejaba el nombre corto; se cuenta NOMBRES DISTINTOS (normalizados) para no confundir
+  // "repetido-mismo-nombre" (→ sí completa) con "homónimo real-nombres distintos" (→ no adivina).
   var ex=idx.byExact[norm];
-  if(ex && ex.length===1) return ex[0];        // 1) exacto y único
-  if(ex && ex.length>1) return calNombre;      //    homónimo exacto → no adivinar
+  if(ex && ex.length){
+    var exSeen={}, exUno=null, exN=0;
+    for(var e=0;e<ex.length;e++){ var ek=_normRec_(ex[e]); if(!exSeen[ek]){ exSeen[ek]=1; exUno=ex[e]; exN++; if(exN>1) break; } }
+    if(exN===1) return exUno;                  // 1) exacto único (colapsa espejos del mismo nombre)
+    return calNombre;                          //    homónimo exacto REAL → no adivinar
+  }
   var calToks=norm.split(' ').filter(function(t){return t.length>=2;});
   if(calToks.length<2) return calNombre;       // 2) subset: 1 solo token (nombre de pila) = demasiado ambiguo
-  var hit=null, n=0, L=idx.list;
+  var hitFull=null, seen={}, n=0, L=idx.list;
   for(var i=0;i<L.length;i++){
     var tm=L[i].tok, ok=true;
     for(var k=0;k<calToks.length;k++){ if(!tm[calToks[k]]){ ok=false; break; } }
-    if(ok){ n++; hit=L[i]; if(n>1) break; }
+    if(ok){ var nk=_normRec_(L[i].full); if(!seen[nk]){ seen[nk]=1; n++; hitFull=L[i].full; if(n>1) break; } }
   }
-  if(n===1 && hit) return hit.full;            // subset único → nombre completo
+  if(n===1 && hitFull) return hitFull;         // subset único POR NOMBRE → nombre completo
   return calNombre;
+}
+
+// ════════ COMANDO UNIFICADO DE RECEPCIÓN: helpers genéricos (leer/editar/agregar) ════════
+// Un mismo núcleo para manipular CUALQUIER pestaña del Google Sheet de recepción por NOMBRE de columna,
+// con CANDADO DURO sobre las columnas calculadas (fórmula) para no romper los conteos/estados/saldos.
+// Columnas calculadas por pestaña (match por subcadena del encabezado normalizado); '*' = toda la hoja:
+var _REC_COMPUT = {
+  'resumen del dia'   : ['*'],                             // cierre de turno = 100% fórmula
+  'registro del dia'  : ['observ','saldo'],                // OBSERVACIONES + SALDO RESTANTE
+  'paquetes y abonos' : ['citas usada','restante','estado'],// CITAS USADAS, CITAS RESTANTES, ESTADO
+  'inventario'        : ['salida','stock','alerta']         // SALIDAS, STOCK, ALERTA
+};
+function _recEsComputada_(hojaNorm, colNorm){
+  var keys=Object.keys(_REC_COMPUT);
+  for(var i=0;i<keys.length;i++){
+    if(hojaNorm.indexOf(keys[i])!==-1){
+      var subs=_REC_COMPUT[keys[i]];
+      for(var j=0;j<subs.length;j++){ if(subs[j]==='*') return true; if(colNorm.indexOf(subs[j])!==-1) return true; }
+    }
+  }
+  return false;
+}
+// Resuelve una pestaña por subcadena de su nombre (sin acentos). Vacío = REGISTRO DEL DÍA.
+function _recHojaPorNombre_(rss, sub){
+  var want=_normRec_(sub||''), all=rss.getSheets();
+  if(!want){ return rss.getSheetByName('REGISTRO DEL DÍA')||rss.getSheetByName('REGISTRO DEL DIA')||all[0]; }
+  for(var i=0;i<all.length;i++){ if(_normRec_(all[i].getName()).indexOf(want)!==-1) return all[i]; }
+  return null;
+}
+// Encuentra la fila de encabezado (busca paciente/titular/producto + ≥2 celdas de texto).
+function _recHeader_(sh){
+  var dv=sh.getDataRange().getValues(), hr=-1, max=Math.min(dv.length,15);
+  for(var r=0;r<max;r++){
+    var row=dv[r].map(_normRec_), txt=row.join(' '), llenas=row.filter(function(x){return x;}).length;
+    if(/(paciente|titular|producto|insumo|concepto)/.test(txt) && llenas>=2){ hr=r; break; }
+  }
+  if(hr<0){ for(var r2=0;r2<max;r2++){ if(dv[r2].map(_normRec_).filter(function(x){return x;}).length>=2){ hr=r2; break; } } }
+  if(hr<0) return null;
+  return { dv:dv, hr:hr, headN:dv[hr].map(_normRec_), headRaw:dv[hr].map(function(x){return String(x==null?'':x).trim();}) };
+}
+function _recCol_(headN, sub){ var s=_normRec_(sub); for(var i=0;i<headN.length;i++){ if(headN[i].indexOf(s)!==-1) return i; } return -1; }
+function _recFmtVal_(v){ return (v instanceof Date) ? Utilities.formatDate(v,'America/Mexico_City','d/M/yyyy') : v; }
+// clave de día ISO-first (evita el mal-parseo de _diaKeyRec_ con 'YYYY-MM-DD').
+function _recDiaKey_(v){ if(v instanceof Date) return Utilities.formatDate(v,'America/Mexico_City','yyyyMMdd'); var m=String(v==null?'':v).match(/^(\d{4})-(\d{2})-(\d{2})/); if(m) return m[1]+m[2]+m[3]; return _diaKeyRec_(v); }
+function _recTok_(s){ return _normRec_(s).split(' ').filter(function(t){return t.length>1;}); }
+function _recSubset_(a,b){ if(!a.length) return false; for(var i=0;i<a.length;i++){ if(b.indexOf(a[i])===-1) return false; } return true; }
+
+// LEER: objetos por encabezado + filtro (subcadena; la columna fecha compara por día). soloSinFecha = filas con FECHA vacía/ inválida.
+function _recLeer_(rss, hojaSub, filtro, limite, soloSinFecha){
+  var sh=_recHojaPorNombre_(rss, hojaSub); if(!sh) return { ok:false, error:'No encontré la pestaña: '+hojaSub };
+  var H=_recHeader_(sh); if(!H) return { ok:false, error:'No encontré el encabezado de '+sh.getName() };
+  var lim=limite>0?limite:300, cFecha=_recCol_(H.headN,'fecha');
+  var fil=[]; if(filtro){ for(var k in filtro){ if(filtro.hasOwnProperty(k)){ var ci=_recCol_(H.headN,k); if(ci>=0) fil.push([ci,_normRec_(filtro[k]),H.headN[ci].indexOf('fecha')!==-1,filtro[k]]); } } }
+  var out=[], total=0;
+  for(var r=H.hr+1;r<H.dv.length;r++){
+    var row=H.dv[r], vacia=true;
+    for(var c=0;c<row.length;c++){ if(String(row[c]==null?'':row[c]).trim()!==''){ vacia=false; break; } }
+    if(vacia) continue;
+    if(soloSinFecha){ var fv=cFecha>=0?row[cFecha]:''; if(!(fv===''||fv==null||!/^\d{8}$/.test(_recDiaKey_(fv)))) continue; }
+    var okF=true;
+    for(var f=0;f<fil.length;f++){ var cell=row[fil[f][0]]; if(fil[f][2]){ if(_recDiaKey_(cell)!==_recDiaKey_(fil[f][3])){ okF=false; break; } } else if(_normRec_(cell).indexOf(fil[f][1])===-1){ okF=false; break; } }
+    if(!okF) continue;
+    total++;
+    if(out.length<lim){ var o={ _fila:r+1 }; for(var cc=0;cc<H.headRaw.length;cc++){ var key=H.headRaw[cc]||('col'+(cc+1)); o[key]=_recFmtVal_(row[cc]); } out.push(o); }
+  }
+  return { ok:true, hoja:sh.getName(), encabezados:H.headRaw, total:total, mostradas:out.length, filas:out };
+}
+// EDITAR: busca filas que cumplen TODOS los match (fecha por día; texto por igualdad o subset de tokens) y escribe set.
+// Rechaza columnas calculadas. PREVIEW si !aplicar.
+function _recEditar_(rss, hojaSub, match, set, aplicar){
+  var sh=_recHojaPorNombre_(rss, hojaSub); if(!sh) return { ok:false, error:'No encontré la pestaña: '+hojaSub };
+  var hojaN=_normRec_(sh.getName());
+  var H=_recHeader_(sh); if(!H) return { ok:false, error:'No encontré el encabezado de '+sh.getName() };
+  if(!match || !Object.keys(match).length) return { ok:false, error:'Falta match:{columna:valor}' };
+  if(!set || !Object.keys(set).length) return { ok:false, error:'Falta set:{columna:valor}' };
+  var setCols=[], bloq=[];
+  for(var k in set){ if(!set.hasOwnProperty(k)) continue; var ci=_recCol_(H.headN,k); if(ci<0) return { ok:false, error:'No existe la columna "'+k+'" en '+sh.getName() }; if(_recEsComputada_(hojaN,H.headN[ci])) bloq.push(H.headRaw[ci]); else setCols.push([ci,k]); }
+  if(bloq.length) return { ok:false, error:'Esas columnas son CALCULADAS (fórmula), no se pueden editar: '+bloq.join(', '), columnasBloqueadas:bloq };
+  var matchCols=[]; for(var mk in match){ if(!match.hasOwnProperty(mk)) continue; var mi=_recCol_(H.headN,mk); if(mi<0) return { ok:false, error:'No existe la columna de match "'+mk+'"' }; matchCols.push([mi,match[mk],H.headN[mi]]); }
+  var hits=[];
+  for(var r=H.hr+1;r<H.dv.length;r++){
+    var row=H.dv[r], ok=true;
+    for(var m=0;m<matchCols.length;m++){
+      var ci2=matchCols[m][0], want=matchCols[m][1], colN=matchCols[m][2], cell=row[ci2];
+      if(colN.indexOf('fecha')!==-1){ if(_recDiaKey_(cell)!==_recDiaKey_(want)){ ok=false; break; } }
+      else { var cn=_normRec_(cell), wn=_normRec_(want); if(cn!==wn){ if(!(_recSubset_(_recTok_(want),_recTok_(cell))||_recSubset_(_recTok_(cell),_recTok_(want)))){ ok=false; break; } } }
+    }
+    if(ok) hits.push(r);
+  }
+  var cambios=[];
+  for(var h=0;h<hits.length;h++){ var rr=hits[h]; for(var s=0;s<setCols.length;s++){ var sc=setCols[s][0]; cambios.push({ fila:rr+1, columna:H.headRaw[sc], de:_recFmtVal_(H.dv[rr][sc]), a:set[setCols[s][1]] }); } }
+  if(aplicar){
+    for(var h2=0;h2<hits.length;h2++){ var rr2=hits[h2]; for(var s2=0;s2<setCols.length;s2++){ var sc2=setCols[s2][0], val2=set[setCols[s2][1]];
+        if(H.headN[sc2].indexOf('fecha')!==-1){ var pm=String(val2).match(/^(\d{4})-(\d{2})-(\d{2})/); if(pm){ sh.getRange(rr2+1,sc2+1).setValue(new Date(+pm[1],+pm[2]-1,+pm[3],12,0,0)).setNumberFormat('d/m/yyyy'); continue; } }
+        sh.getRange(rr2+1,sc2+1).setValue(val2);
+    } }
+  }
+  return { ok:true, hoja:sh.getName(), aplicado:!!aplicar, coincidencias:hits.length, cambios:cambios };
+}
+// AGREGAR: una fila nueva por nombre de columna, heredando formato + validaciones de la 1a fila de datos. Rechaza columnas calculadas.
+function _recAgregar_(rss, hojaSub, valores, aplicar){
+  var sh=_recHojaPorNombre_(rss, hojaSub); if(!sh) return { ok:false, error:'No encontré la pestaña: '+hojaSub };
+  var hojaN=_normRec_(sh.getName());
+  var H=_recHeader_(sh); if(!H) return { ok:false, error:'No encontré el encabezado de '+sh.getName() };
+  if(!valores || !Object.keys(valores).length) return { ok:false, error:'Falta valores:{columna:valor}' };
+  var ancho=sh.getLastColumn(), fila=[], bloq=[];
+  for(var c=0;c<ancho;c++) fila[c]='';
+  for(var k in valores){ if(!valores.hasOwnProperty(k)) continue; var ci=_recCol_(H.headN,k); if(ci<0) return { ok:false, error:'No existe la columna "'+k+'"' }; if(_recEsComputada_(hojaN,H.headN[ci])){ bloq.push(H.headRaw[ci]); continue; } var val=valores[k]; if(H.headN[ci].indexOf('fecha')!==-1){ var pm=String(val).match(/^(\d{4})-(\d{2})-(\d{2})/); if(pm) val=new Date(+pm[1],+pm[2]-1,+pm[3],12,0,0); } fila[ci]=val; }
+  if(bloq.length) return { ok:false, error:'Esas columnas son CALCULADAS (fórmula), no se pueden escribir: '+bloq.join(', ') };
+  var preview={}; for(var c2=0;c2<ancho;c2++){ if(String(fila[c2]).trim()!=='') preview[H.headRaw[c2]||('col'+(c2+1))]=_recFmtVal_(fila[c2]); }
+  if(aplicar){
+    // Buscar el PRIMER renglón vacío por la columna CLAVE (titular/paciente/nombre o 1a editable),
+    // dentro del rango donde las fórmulas (G/I/J) ya están pre-llenadas → NO usar getLastRow()+1,
+    // porque las celdas de fórmula cuentan como contenido y el append caería FUERA del rango (bug Adrian fila 501).
+    var keyCol=-1;
+    for(var kc=0;kc<H.headN.length;kc++){ if(H.headN[kc].indexOf('titular')!==-1||H.headN[kc].indexOf('paciente')!==-1||H.headN[kc].indexOf('nombre')!==-1){ keyCol=kc; break; } }
+    if(keyCol<0){ for(var kc2=0;kc2<H.headN.length;kc2++){ if(!_recEsComputada_(hojaN,H.headN[kc2]) && H.headN[kc2].indexOf('fecha')===-1){ keyCol=kc2; break; } } }
+    if(keyCol<0) keyCol=0;
+    var firstData=H.hr+2, maxR=sh.getMaxRows(), nR=Math.max(1,maxR-firstData+1);
+    var colVals=sh.getRange(firstData,keyCol+1,nR,1).getValues();
+    var ini=-1;
+    for(var rv=0;rv<colVals.length;rv++){ if(String(colVals[rv][0]).trim()===''){ ini=firstData+rv; break; } }
+    if(ini<0){ ini=maxR+1; sh.insertRowAfter(maxR); }
+    // Heredar formato + validaciones de la 1a fila de datos (modelo) SOLO si el renglón está fuera del rango pre-llenado.
+    var mf=H.hr+2; if(mf!==ini){ var mod=sh.getRange(mf,1,1,ancho), dest=sh.getRange(ini,1,1,ancho); mod.copyTo(dest,{formatOnly:true}); try{ dest.setDataValidations([mod.getDataValidations()[0]]); }catch(_e){} }
+    // Escribir SOLO las celdas con valor → NUNCA se pisan las columnas de fórmula (G/I/J) que ya viven en ese renglón.
+    for(var cw=0;cw<ancho;cw++){ if(String(fila[cw]).trim()!=='') sh.getRange(ini,cw+1).setValue(fila[cw]); }
+    for(var cf=0;cf<H.headN.length;cf++){ if(H.headN[cf].indexOf('fecha')!==-1 && String(fila[cf]).trim()!=='') sh.getRange(ini,cf+1).setNumberFormat('d/m/yyyy'); }
+    return { ok:true, hoja:sh.getName(), aplicado:true, fila:ini, valores:preview };
+  }
+  return { ok:true, hoja:sh.getName(), aplicado:false, valores:preview };
 }
 
 function autoCitasRecepcion(diasAdelante){
@@ -2936,13 +3631,31 @@ function autoCitasRecepcion(diasAdelante){
   function _colRec_(k){ for(var i=0;i<head.length;i++){ if(head[i].indexOf(k)!==-1) return i; } return -1; }
   var cF=_colRec_('fecha'), cP=_colRec_('paciente'), cS=_colRec_('servicio');
   if(cF<0||cP<0){ Logger.log('Faltan columnas fecha/paciente'); return 0; }
-  var existe={};
-  for(var r2=hdr+1;r2<datos.length;r2++){ var p=datos[r2][cP]; if(p) existe[_diaKeyRec_(datos[r2][cF])+'|'+_normRec_(p)]=true; }
+  var cObs=_colRec_('observ');
+  var existe={}, existeMap={};
+  for(var r2=hdr+1;r2<datos.length;r2++){ var p=datos[r2][cP]; if(p){ var _kk=_diaKeyRec_(datos[r2][cF])+'|'+_normRec_(p); existe[_kk]=true; existeMap[_kk]={row:r2+1, name:String(p)}; } }
+  // ── ENLACE EVENTO↔FILA: columna OCULTA con el ID del evento de calendario ──
+  // Permite que, al RENOMBRAR el MISMO evento (otra persona), se actualice ESA MISMA fila
+  // (no se duplica) y el nombre viejo quede en Observaciones. Todo fail-safe: si falla, el
+  // auto-llenado sigue igual (nunca se rompe).
+  var EVT_COL=16, evtById={};   // columna P (oculta), fuera de los datos A–K
+  try{
+    if(sh.getMaxColumns()<EVT_COL) sh.insertColumnsAfter(sh.getMaxColumns(), EVT_COL-sh.getMaxColumns());
+    sh.hideColumns(EVT_COL);
+    var _nD=sh.getLastRow()-(hdr+1);
+    if(_nD>0){ var _eidV=sh.getRange(hdr+2,EVT_COL,_nD,1).getValues();
+      for(var _ei=0;_ei<_eidV.length;_ei++){ var _id=String(_eidV[_ei][0]||'').trim();
+        if(_id){ var _nm=(datos[hdr+1+_ei]&&datos[hdr+1+_ei][cP]!=null)?String(datos[hdr+1+_ei][cP]):''; evtById[_id]={row:hdr+2+_ei, name:_nm}; } } }
+  }catch(_eE){ evtById={}; }
   var cal = CalendarApp.getDefaultCalendar();
   if(!cal){ Logger.log('No se pudo abrir el calendario'); return 0; }
-  var idxNom=null; try{ idxNom=_recepcionIndexNombres_(ss); }catch(eIdx){ idxNom=null; }   // índice de nombres (nunca rompe)
+  // El nombre COMPLETO es MEJORA opcional: construir el índice (~3,000 migrados de Firestore) se le da un
+  // TOPE de 150 s para que, aunque la conexión a Firestore esté lenta, NUNCA tope los 6 min de Apps Script
+  // y deje las citas sin escribir. Si no alcanza → índice PARCIAL (algunos quedan con nombre del calendario)
+  // y `nombresFix`/la siguiente corrida los completa. Las citas SIEMPRE se escriben después, sí o sí.
+  var idxNom=null; try{ idxNom=_recepcionIndexNombres_(ss, Date.now()+150000); }catch(eIdx){ idxNom=null; }   // índice de nombres (nunca rompe)
   var ancho=sh.getLastColumn(), hoy=new Date(); hoy.setHours(0,0,0,0);
-  var nuevas=[], up=0;
+  var nuevas=[], up=0, _ups=[], _renames=[], _nuevasEid=[], _linkEid=[];
   for(var d=0; d<dias; d++){
     var ini=new Date(hoy.getTime()+d*86400000), fin=new Date(ini.getTime()+86400000);
     var evs=cal.getEvents(ini,fin);
@@ -2958,15 +3671,37 @@ function autoCitasRecepcion(diasAdelante){
       var nombre=nombreCal;
       try{ nombre=_recepcionResolverNombre_(nombreCal, idxNom)||nombreCal; }catch(eRes){ nombre=nombreCal; }
       if(_normRec_(nombre)!==_normRec_(nombreCal)) up++;
+      // ENLACE EVENTO↔FILA: si este evento YA tiene su fila (por ID), y le cambiaron el nombre
+      // (incluso a OTRA persona), se actualiza ESA MISMA fila — no se duplica.
+      var _eid=''; try{ _eid=String(evs[e].getId()||''); }catch(_eI){ _eid=''; }
+      if(_eid && evtById[_eid]){
+        var _evr=evtById[_eid];
+        if(_normRec_(_evr.name)!==_normRec_(nombre)){ _renames.push({row:_evr.row, name:nombre, old:_evr.name}); _evr.name=nombre; }
+        continue;
+      }
       // dedup bajo el nombre final Y el del calendario (no duplica una cita ya puesta con nombre corto)
       var diaK=_diaKeyRec_(ini), keyFin=diaK+'|'+_normRec_(nombre), keyCal=diaK+'|'+_normRec_(nombreCal);
-      if(existe[keyFin]||existe[keyCal]) continue;
+      if(existe[keyFin]||existe[keyCal]){
+        // Ya existe la cita. Enlaza el ID del evento a esa fila (backfill) para que futuros renombres
+        // la actualicen en su lugar.
+        var _ex=existeMap[keyCal]||existeMap[keyFin];
+        if(_eid && _ex && _ex.row>0 && !evtById[_eid]){ _linkEid.push({row:_ex.row, eid:_eid}); evtById[_eid]={row:_ex.row, name:_ex.name}; }
+        // Si el expediente resuelve a un nombre MÁS COMPLETO del MISMO paciente
+        // (los tokens del corto son subconjunto del completo y hay más tokens) → actualiza esa celda
+        // en su lugar (nunca cambia de persona). Así renombrar a nombre completo se refleja en la hoja.
+        if(_ex && _normRec_(nombre)!==_normRec_(_ex.name)){
+          var _exTok=_recTok_(_ex.name), _fullTok=_recTok_(nombre);
+          if(_recSubset_(_exTok,_fullTok) && _fullTok.length>_exTok.length){ _ups.push({row:_ex.row, name:nombre}); _ex.name=nombre; }
+        }
+        continue;
+      }
       existe[keyFin]=true; existe[keyCal]=true;
+      existeMap[keyFin]={row:-1, name:nombre}; existeMap[keyCal]={row:-1, name:nombre};
       var fila=[]; for(var c=0;c<ancho;c++){ fila[c]=''; }
       fila[cF]=new Date(ini.getFullYear(),ini.getMonth(),ini.getDate(),12,0,0);  // mediodía: evita que la zona horaria corra el día
       fila[cP]=nombre;
       if(cS>=0) fila[cS]='FISIOTERAPIA';
-      nuevas.push(fila);
+      nuevas.push(fila); _nuevasEid.push(_eid);   // guarda el ID del evento en paralelo
     }
   }
   if(nuevas.length){
@@ -2983,8 +3718,28 @@ function autoCitasRecepcion(diasAdelante){
     }
     // FECHA SIEMPRE día/mes/año (d/m/aaaa), sin importar el locale de la hoja — y sigue siendo fecha real
     try{ sh.getRange(_inicio, cF+1, nuevas.length, 1).setNumberFormat('d/m/yyyy'); }catch(_e2){}
+    // Guardar el ID del evento (columna oculta) de cada fila nueva → enlace evento↔fila
+    try{ if(_nuevasEid.length===nuevas.length) sh.getRange(_inicio, EVT_COL, nuevas.length, 1).setValues(_nuevasEid.map(function(x){return [x];})); }catch(_e4){}
   }
-  Logger.log('Auto-citas: agregadas '+nuevas.length+' cita(s) ('+up+' con nombre completo del expediente). Terapeuta se deja en blanco a propósito.');
+  // Auto-upgrade de nombre corto → completo en filas YA existentes del día (mismo paciente, subset).
+  var _nUp=0;
+  for(var _u=0;_u<_ups.length;_u++){ if(_ups[_u].row>0){ try{ sh.getRange(_ups[_u].row, cP+1).setValue(_ups[_u].name); _nUp++; }catch(_eu){} } }
+  // Backfill: enlazar el ID del evento a filas existentes (para futuros renombres).
+  for(var _l=0;_l<_linkEid.length;_l++){ try{ sh.getRange(_linkEid[_l].row, EVT_COL).setValue(_linkEid[_l].eid); }catch(_el){} }
+  // Renombrado por ENLACE DE EVENTO: el mismo evento cambió de nombre → se actualiza SU fila (y el viejo a Observaciones si está vacía).
+  var _nRen=0;
+  for(var _rr=0;_rr<_renames.length;_rr++){
+    try{
+      sh.getRange(_renames[_rr].row, cP+1).setValue(_renames[_rr].name);
+      if(cObs>=0 && _renames[_rr].old){
+        var _of=sh.getRange(_renames[_rr].row, cObs+1).getFormula();
+        var _ov=_of?'x':String(sh.getRange(_renames[_rr].row, cObs+1).getValue()||'');
+        if(!_of && !_ov) sh.getRange(_renames[_rr].row, cObs+1).setValue('(antes: '+_renames[_rr].old+')');
+      }
+      _nRen++;
+    }catch(_er){}
+  }
+  Logger.log('Auto-citas: agregadas '+nuevas.length+' ('+up+' nombre completo); '+_nUp+' a nombre completo; '+_nRen+' renombradas por evento; '+_linkEid.length+' enlazadas.');
   return nuevas.length;
 }
 
