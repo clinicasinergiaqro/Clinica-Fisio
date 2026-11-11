@@ -1360,7 +1360,7 @@ body.modo-oscuro .topbar{background:#141824}
 <body>
 <div id="sync-indicator" class="sync-indicator ok" style="display:none"></div>
 <div id="app-version-chip" title="Versión de la app en este equipo — toca para buscar actualización" onclick="try{_tapVersionChip()}catch(e){}"></div>
-<script>/* VERSIÓN VISIBLE: refleja el index.html realmente cargado en ESTE equipo (se bumpea junto con sw.js). Así un iPad con versión vieja se ve de un vistazo. */window.APP_VERSION='v1-2026-11-10a';(function(){try{var c=document.getElementById('app-version-chip');if(c)c.textContent=window.APP_VERSION;}catch(e){}})();</script>
+<script>/* VERSIÓN VISIBLE: refleja el index.html realmente cargado en ESTE equipo (se bumpea junto con sw.js). Así un iPad con versión vieja se ve de un vistazo. */window.APP_VERSION='v1-2026-11-11a';(function(){try{var c=document.getElementById('app-version-chip');if(c)c.textContent=window.APP_VERSION;}catch(e){}})();</script>
 <div class="toast" id="toast" aria-live="polite" aria-atomic="true"></div>
 
 <!-- LOGIN -->
@@ -14417,8 +14417,9 @@ function renderSOAPForm(){
       <button class="media-btn" onclick="(currentPatient||{}).id&&agregarEstudioArchivo(currentPatient.id,'receta')"><span class="media-icon">💊</span>Receta<span class="media-sub">foto / archivo</span></button>
       <button class="media-btn" onclick="(currentPatient||{}).id&&agregarEstudioArchivo(currentPatient.id,'imagen')"><span class="media-icon">🩻</span>Estudio<span class="media-sub">rayos X / RM</span></button>
       <button class="media-btn" onclick="(currentPatient||{}).id&&agregarEstudioArchivo(currentPatient.id,'interpretacion')"><span class="media-icon">📝</span>Interpret.<span class="media-sub">reporte</span></button>
+      <button class="media-btn" onclick="(currentPatient||{}).id&&window.abrirMedidorBiomecanico&&window.abrirMedidorBiomecanico('gonio')"><span class="media-icon">📐</span>Ángulo<span class="media-sub">foto / video</span></button>
     </div>
-    <div style="font-size:10px;color:var(--gray-400);margin:2px 2px 0;line-height:1.3">Las 3 primeras quedan en ESTA nota; Link / Receta / Estudio / Interpret. se guardan en el expediente del paciente.</div>
+    <div style="font-size:10px;color:var(--gray-400);margin:2px 2px 0;line-height:1.3">Las 3 primeras quedan en ESTA nota; Link / Receta / Estudio / Interpret. se guardan en el expediente del paciente. Ángulo abre el goniómetro (foto / video / cámara) y escribe el ROM de la Valoración.</div>
     <div id="soap-media-preview" class="media-grid" style="margin-top:8px"></div>
   </div>
 

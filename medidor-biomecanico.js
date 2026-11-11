@@ -715,6 +715,8 @@
 
   // ── Callback único de resultados de MediaPipe ──────────────────────────────
   function onResults(res){
+    // MODO FOTO: una sola imagen estática → solo guardamos el resultado y salimos (lo procesa procesarFoto).
+    if(BIO.modo==='foto'){ BIO._fotoRes = res; return; }
     var lm = res && res.poseLandmarks;
     var world = res && res.poseWorldLandmarks;
     if(BIO.tipoMedicion==='marcha'){
@@ -740,7 +742,9 @@
     if(BIO.tipoMedicion==='gonio'){
       var sg=BIO.accG&&BIO.accG.sel;
       var rg = (lm && sg) ? calcularGonio(lm, sg.grupo, sg.mov, sg.lado) : {ok:false,val:null};
-      procesarGonioFrame(rg);
+      var mejoroG = procesarGonioFrame(rg);
+      // Al analizar un VIDEO, al mejorar el pico guardamos ESE cuadro (imagen + landmarks) para anotar la foto del pico.
+      if(BIO.modo==='video' && mejoroG && lm && BIO.srcEl){ try{ BIO._peakFrameCanvas=_canvasDeImagen(BIO.srcEl); BIO._peakFrameLm=_copiaLm(lm); }catch(_e){} }
       if(BIO.canvas && BIO.srcEl){ dibujar(lm, null); dibujarGonioVivo(lm, rg); }
       return;
     }
@@ -814,6 +818,7 @@
       '.bio-modo-btn{width:100%;max-width:360px;border:none;border-radius:16px;padding:20px;font-size:17px;font-weight:800;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px}',
       '.bio-modo-cam{background:#C9A84C;color:#122950}',
       '.bio-modo-vid{background:rgba(255,255,255,.1);color:#fff;border:1.5px solid rgba(255,255,255,.25)}',
+      '.bio-modo-foto{background:rgba(201,168,76,.16);color:#F0E2B8;border:1.5px solid rgba(201,168,76,.55)}',
       '.bio-tipo-row{display:flex;gap:8px;width:100%;max-width:360px;flex-wrap:wrap}',
       '.bio-tipo-btn{flex:1 1 28%;min-width:92px;border:1.5px solid rgba(255,255,255,.25);background:rgba(255,255,255,.06);color:#9BA3B5;border-radius:12px;padding:11px 6px;font-size:13px;font-weight:800;cursor:pointer;font-family:inherit}',
       '.bio-tipo-btn.on{background:#1d3b6e;color:#fff;border-color:#C9A84C}',
@@ -867,7 +872,10 @@
       '.bio-gcap{background:rgba(61,220,151,.12);border:1px solid rgba(61,220,151,.35);color:#d6f5e6;border-radius:8px;padding:4px 8px;font-size:12px}',
       '.bio-gcap.al{background:rgba(232,201,106,.14);border-color:rgba(232,201,106,.45);color:#f0dfa8}',
       '.bio-gcap b{color:#ff9d9d;cursor:pointer;margin-left:4px;font-weight:800}',
-      '.bio-gcaps-empty{color:#9BA3B5;font-size:12px;font-style:italic}'
+      '.bio-gcaps-empty{color:#9BA3B5;font-size:12px;font-style:italic}',
+      '#bio-gonio-sel{text-align:left;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:12px 12px 6px}',
+      '#bio-gonio-caps{text-align:left}',
+      '.bio-gsel-hint{font-size:12px;color:#9BA3B5;margin-bottom:10px;line-height:1.4;font-weight:600}'
     ].join('\n');
     document.head.appendChild(st);
   }
@@ -891,9 +899,13 @@
       +   '<div id="bio-est-wrap" style="display:none;width:100%;max-width:360px">'
       +     '<input type="number" id="bio-estatura" inputmode="numeric" min="80" max="230" placeholder="Estatura del paciente en cm (opcional)" style="width:100%;box-sizing:border-box;border:1.5px solid rgba(255,255,255,.25);background:rgba(255,255,255,.08);color:#fff;border-radius:12px;padding:12px;font-size:14px;font-family:inherit">'
       +   '</div>'
+      +   '<div id="bio-gonio-sel" style="display:none;width:100%;max-width:400px"></div>'
       +   '<button class="bio-modo-btn bio-modo-cam" id="bio-go-cam">▶️ Cámara en vivo</button>'
       +   '<button class="bio-modo-btn bio-modo-vid" id="bio-go-vid">📁 Subir video</button>'
+      +   '<button class="bio-modo-btn bio-modo-foto" id="bio-go-foto" style="display:none">📷 Subir foto</button>'
       +   '<input type="file" id="bio-file" accept="video/*" style="display:none">'
+      +   '<input type="file" id="bio-file-foto" accept="image/*" style="display:none">'
+      +   '<div id="bio-gonio-caps" style="display:none;width:100%;max-width:400px;margin-top:2px"></div>'
       + '</div>'
       // Vista cámara en vivo
       + '<div class="bio-vista" id="bio-vista-camara">'
@@ -950,6 +962,11 @@
       var f = ev.target.files && ev.target.files[0]; ev.target.value='';
       if(f) procesarVideo(f);
     });
+    document.getElementById('bio-go-foto').addEventListener('click', function(){ document.getElementById('bio-file-foto').click(); });
+    document.getElementById('bio-file-foto').addEventListener('change', function(ev){
+      var f = ev.target.files && ev.target.files[0]; ev.target.value='';
+      if(f) procesarFoto(f);
+    });
     document.getElementById('bio-btn-rec').addEventListener('click', toggleGrabacion);
     document.getElementById('bio-btn-flip').addEventListener('click', voltearCamara);
     document.getElementById('bio-prog-cancel').addEventListener('click', function(){ BIO.cancelVideo=true; });
@@ -969,12 +986,12 @@
   }
 
   // ── Abrir / cerrar ─────────────────────────────────────────────────────────
-  function abrirMedidorBiomecanico(){
+  function abrirMedidorBiomecanico(tipoInicial){
     var pid = (typeof currentPatient!=='undefined' && currentPatient) ? currentPatient.id : null;
     if(!pid){ toast('Abre un expediente primero','warning'); return; }
     construirOverlay();
     resetEstado();
-    aplicarTipoMedicion(BIO.tipoMedicion||'rom');
+    aplicarTipoMedicion(tipoInicial || BIO.tipoMedicion || 'rom');
     // Precargar estatura desde la última sentadilla guardada de ESTE paciente (si la hubo).
     var est=document.getElementById('bio-estatura');
     if(est){
@@ -1001,10 +1018,16 @@
       : (BIO.tipoMedicion==='marcha'
         ? 'Análisis de MARCHA de PERFIL (lado): tiempos del paso, cadencia, fases de apoyo/balanceo y ángulos sagitales de cadera/rodilla/tobillo, con simetría izq/der. Ideal en caminadora o 2–3 pasadas cruzando el cuadro.'
         : (BIO.tipoMedicion==='gonio'
-          ? 'GONIÓMETRO de miembro inferior (plano sagital): mide en vivo cadera, rodilla y tobillo (flexión, extensión, dorsi/plantiflexión) por lado. Cámara al COSTADO; capturas cada ángulo y se llena el ROM de la Valoración.'
+          ? 'GONIÓMETRO (plano sagital): cadera, rodilla, tobillo, codo y muñeca por lado. Mídelo EN VIVO, subiendo una FOTO (ideal en camilla / decúbito prono) o subiendo un VIDEO. Elige articulación, movimiento y lado; el ángulo se escribe en el ROM de la Valoración.'
           : 'Mide los rangos articulares de codo y hombro. Elige cómo capturar el movimiento.'));
     var tt=document.querySelector('#bio-overlay .bio-top b');
-    if(tt) tt.textContent = BIO.tipoMedicion==='sent' ? '🏋️ Sentadilla — análisis frontal' : (BIO.tipoMedicion==='marcha' ? '🚶 Marcha — análisis sagital' : (BIO.tipoMedicion==='gonio' ? '📐 Goniómetro — miembro inferior' : '🦴 Medición biomecánica — ROM'));
+    if(tt) tt.textContent = BIO.tipoMedicion==='sent' ? '🏋️ Sentadilla — análisis frontal' : (BIO.tipoMedicion==='marcha' ? '🚶 Marcha — análisis sagital' : (BIO.tipoMedicion==='gonio' ? '📐 Goniómetro — cámara · foto · video' : '🦴 Medición biomecánica — ROM'));
+    // Goniómetro: selector de articulación/movimiento/lado + botón de foto + tira de capturas (foto/video usan el mismo acumulador).
+    var esG=(BIO.tipoMedicion==='gonio');
+    var gSel=document.getElementById('bio-gonio-sel'); if(gSel) gSel.style.display=esG?'block':'none';
+    var gCap=document.getElementById('bio-gonio-caps'); if(gCap) gCap.style.display=esG?'block':'none';
+    var gFoto=document.getElementById('bio-go-foto'); if(gFoto) gFoto.style.display=esG?'block':'none';
+    if(esG) pintarGonioInicio();
   }
   function _leerEstatura(){
     var el=document.getElementById('bio-estatura'); var v=el?parseFloat(el.value):NaN;
@@ -1013,6 +1036,7 @@
   function resetEstado(){
     BIO.modo=null; BIO.recording=false; BIO.procesandoVideo=false; BIO.cancelVideo=false; BIO.finalizando=false;
     BIO.acc=null; BIO.accS=null; BIO.accM=null; BIO.accG=null; BIO.framesTotales=0; BIO.srcEl=null; BIO.sending=false;
+    BIO._estaticoBase=null; BIO._estaticoLm=null; BIO._estaticoImg=null; BIO._estaticoFuente=null; BIO._peakFrameCanvas=null; BIO._peakFrameLm=null; BIO._fotoRes=null;
     BIO.facing='environment';           // cada medición arranca con la cámara TRASERA
     detenerGrabadorVideo(); BIO.pendingVideo=null;
     detenerLoopCamara(); pararCronometro();
@@ -1048,7 +1072,7 @@
     BIO.canvas=document.getElementById('bio-canvas'); BIO.ctx=BIO.canvas.getContext('2d');
     var _gc=document.getElementById('bio-gonio-ctrl'); if(_gc) _gc.style.display=(BIO.tipoMedicion==='gonio')?'block':'none';
     if(_br) _br.style.display=(BIO.tipoMedicion==='gonio')?'none':'';   // gonio no usa "grabar": captura en vivo
-    if(BIO.tipoMedicion==='gonio'){ BIO.accG=nuevoAccGonio(); pintarPanelGonio(); }
+    if(BIO.tipoMedicion==='gonio'){ if(!BIO.accG) BIO.accG=nuevoAccGonio(); pintarPanelGonio(); }
     else if(BIO.tipoMedicion==='sent') pintarPanelSent(null); else pintarPanelVivo(null);
     var estado=document.getElementById('bio-estado');
     estado.textContent='Cargando modelo de pose…';
@@ -1332,6 +1356,7 @@
 
     if(BIO.tipoMedicion==='sent'){ BIO.accS=nuevoAccSent(); }
     else if(BIO.tipoMedicion==='marcha'){ BIO.accM=nuevoAccMarcha(); }
+    else if(BIO.tipoMedicion==='gonio'){ if(!BIO.accG) BIO.accG=nuevoAccGonio(); _gonioSelDefault(BIO.accG); BIO.accG.peak=null; BIO.accG.run=0; BIO._peakFrameCanvas=null; BIO._peakFrameLm=null; }
     else { BIO.acc = nuevoAcumulador(); }
     BIO.framesTotales=0;
     BIO.procesandoVideo=true; BIO.cancelVideo=false;
@@ -1398,6 +1423,14 @@
         fuente:'video', duracionSeg:Math.round(dur),
         calidad:{ fpsMuestreo:FPS_VIDEO, framesTotales:BIO.framesTotales, framesValidos:(BIO.accM?BIO.accM.framesValidos:0) }
       });
+    } else if(BIO.tipoMedicion==='gonio'){
+      var gg=BIO.accG;
+      if(gg && gg.peak!=null && BIO._peakFrameCanvas){
+        _mostrarGonioEstatico(BIO._peakFrameCanvas, BIO._peakFrameLm, 'video');
+      } else {
+        toast('No se detectó la articulación con claridad en el video. Grábalo de PERFIL, con la zona y buena luz en cuadro, o usa una foto.','warning');
+        mostrarVista('bio-vista-inicio'); pintarGonioInicio();
+      }
     } else {
       var artic=finalizarMedidas(BIO.acc);
       mostrarResumen(artic, {
@@ -2157,7 +2190,7 @@
     }
     return { ok:false, val:null };
   }
-  function nuevoAccGonio(){ return { medidas:{}, sel:null, peak:null, run:0, ema:{} }; }
+  function nuevoAccGonio(){ return { medidas:{}, imgs:{}, sel:null, peak:null, run:0, ema:{} }; }
   function _gonioSelDefault(g){
     if(!g) return;
     if(!g.sel){ g.sel={ grupo:'Cadera', mov:'Flexión', lado:'der' }; }
@@ -2179,28 +2212,32 @@
 
   // Procesa un frame en vivo: histéresis de oclusión, EMA para el número visible, y pico (máx/mín).
   function procesarGonioFrame(r){
-    var g=BIO.accG; if(!g || !g.sel) return;
+    var g=BIO.accG; if(!g || !g.sel) return false;
     var ok = !!(r && r.ok);
     g.run = ok ? (g.run+1) : 0;
     var valido = ok && g.run>=3;                        // 3 cuadros seguidos válidos
     var eLive = _emaVivo('g_live', ok, ok?r.val:null);  // anti-parpadeo solo para mostrar
+    var mejoro=false;
     if(valido){
-      if(g.peak==null) g.peak=r.val;
-      else g.peak = (g.sel.agg==='min') ? Math.min(g.peak, r.val) : Math.max(g.peak, r.val);
+      if(g.peak==null){ g.peak=r.val; mejoro=true; }
+      else { var np=(g.sel.agg==='min') ? Math.min(g.peak, r.val) : Math.max(g.peak, r.val); if(np!==g.peak){ g.peak=np; mejoro=true; } }
     }
     var live=document.getElementById('bg-live'); if(live) live.textContent = (eLive!=null)? Math.round(eLive) : '—';
     var mx=document.getElementById('bg-max'); if(mx) mx.textContent = (g.peak!=null)? Math.round(g.peak) : '—';
+    return mejoro;
   }
-  // Dibuja los brazos del goniómetro + arco + valor sobre la articulación medida.
-  function dibujarGonioVivo(lm, r){
-    var g=BIO.accG; if(!lm || !BIO.ctx || !BIO.canvas || !g || !g.sel) return;
-    var ctx=BIO.ctx, w=BIO.canvas.width, h=BIO.canvas.height; if(!w||!h) return;
-    var P=_gonioPts(g.sel.lado), vtx, ea, eb;
-    if(g.sel.grupo==='Cadera'){ vtx=P.H; ea=P.S; eb=P.K; }
-    else if(g.sel.grupo==='Rodilla'){ vtx=P.K; ea=P.H; eb=P.A; }
-    else if(g.sel.grupo==='Codo'){ vtx=P.E; ea=P.S; eb=P.W; }
-    else if(g.sel.grupo==='Muñeca'){ vtx=P.W; ea=P.E; eb=P.Ix; }
-    else { vtx=P.A; ea=P.K; eb=P.F; }
+  // Vértice + brazos del goniómetro según articulación (compartido vivo / foto / video).
+  function _gonioVtx(grupo, P){
+    if(grupo==='Cadera') return { vtx:P.H, ea:P.S, eb:P.K };
+    if(grupo==='Rodilla') return { vtx:P.K, ea:P.H, eb:P.A };
+    if(grupo==='Codo')    return { vtx:P.E, ea:P.S, eb:P.W };
+    if(grupo==='Muñeca')  return { vtx:P.W, ea:P.E, eb:P.Ix };
+    return { vtx:P.A, ea:P.K, eb:P.F };   // Tobillo
+  }
+  // Traza brazos + arco + valor sobre CUALQUIER contexto (canvas vivo, o foto / cuadro-pico estático).
+  function _trazarGonio(ctx, w, h, lm, grupo, lado, val){
+    if(!ctx || !w || !h || !lm) return;
+    var P=_gonioPts(lado), j=_gonioVtx(grupo, P), vtx=j.vtx, ea=j.ea, eb=j.eb;
     if(!(_vis(lm,vtx)&&_vis(lm,ea)&&_vis(lm,eb))) return;
     var V=lm[vtx], A=lm[ea], B=lm[eb], vx=V.x*w, vy=V.y*h;
     ctx.lineCap='round';
@@ -2211,13 +2248,28 @@
     var rad=Math.max(24, Math.min(w,h)*0.10);
     ctx.beginPath(); ctx.arc(vx, vy, rad, a1, a2, false); ctx.strokeStyle='#E8C96A'; ctx.lineWidth=Math.max(2, Math.round(w*0.006)); ctx.stroke();
     [ea,eb,vtx].forEach(function(ix){ var p=lm[ix]; ctx.fillStyle='#C9A84C'; ctx.beginPath(); ctx.arc(p.x*w,p.y*h, Math.max(4,Math.round(w*0.009)),0,Math.PI*2); ctx.fill(); });
-    if(r && r.ok){
-      var txt=Math.round(r.val)+'°';
+    if(val!=null){
+      var txt=Math.round(val)+'°';
       ctx.font='bold '+Math.max(18, Math.round(w*0.05))+'px -apple-system,Arial'; ctx.textAlign='center'; ctx.textBaseline='middle';
       var tw=ctx.measureText(txt).width, bx=vx, by=vy-rad-22;
       ctx.fillStyle='rgba(13,22,38,.82)'; ctx.fillRect(bx-tw/2-9, by-15, tw+18, 30);
       ctx.fillStyle='#3DDC97'; ctx.fillText(txt, bx, by);
     }
+  }
+  // Copia defensiva de landmarks (para congelar el cuadro-pico de un video).
+  function _copiaLm(lm){ return (lm||[]).map(function(p){ return p?{x:p.x,y:p.y,z:p.z,visibility:p.visibility}:p; }); }
+  // Dibuja una imagen/cuadro (img o video) a un canvas nuevo, con tope de ancho.
+  function _canvasDeImagen(el){
+    var vw=(el&&(el.naturalWidth||el.videoWidth))||0, vh=(el&&(el.naturalHeight||el.videoHeight))||0;
+    var cap=1000, esc=vw>cap?cap/vw:1, w=Math.max(1,Math.round(vw*esc)), h=Math.max(1,Math.round(vh*esc));
+    var c=document.createElement('canvas'); c.width=w; c.height=h;
+    try{ c.getContext('2d').drawImage(el,0,0,w,h); }catch(e){}
+    return c;
+  }
+  // Dibuja los brazos del goniómetro + arco + valor sobre la articulación medida (vista EN VIVO).
+  function dibujarGonioVivo(lm, r){
+    var g=BIO.accG; if(!lm || !BIO.ctx || !BIO.canvas || !g || !g.sel) return;
+    _trazarGonio(BIO.ctx, BIO.canvas.width, BIO.canvas.height, lm, g.sel.grupo, g.sel.lado, (r && r.ok) ? r.val : null);
   }
   // Panel flotante con el número en vivo (grande) + el máximo.
   function pintarPanelGonio(){
@@ -2231,12 +2283,9 @@
       + '<div class="gl-max">máx <b id="bg-max">—</b>° · normal '+(s?esc(s.normTxt):'—')+'</div>'
       + '</div>';
   }
-  // Barra de control del goniómetro (selección + capturar + lista + terminar).
-  function pintarGonioCtrl(){
-    var box=document.getElementById('bio-gonio-ctrl'); if(!box) return;
-    if(!BIO.accG) BIO.accG=nuevoAccGonio();
-    _gonioSelDefault(BIO.accG);
-    var g=BIO.accG, sel=g.sel;
+  // Chips de selección articulación/movimiento/lado (compartido entre inicio, cámara y estático).
+  function _gonioSelectorHTML(g){
+    var sel=g.sel;
     function chips(kind, opts, cur){
       return opts.map(function(o){
         var on=(o===cur)?' on':'';
@@ -2244,31 +2293,143 @@
       }).join('');
     }
     var movs=_gonioMovs(sel.grupo).map(function(m){return m.mov;});
+    return '<div class="bio-grow"><span class="bio-glab">Articulación</span>'+chips('grupo', GONIO_JOINTS, sel.grupo)+'</div>'
+      + '<div class="bio-grow"><span class="bio-glab">Movimiento</span>'+chips('mov', movs, sel.mov)+'</div>'
+      + '<div class="bio-grow"><span class="bio-glab">Lado</span>'
+      +   '<button class="bio-gchip'+(sel.lado==='izq'?' on':'')+'" onclick="BIO_gonioSel(\'lado\',\'izq\')">Izquierda</button>'
+      +   '<button class="bio-gchip'+(sel.lado==='der'?' on':'')+'" onclick="BIO_gonioSel(\'lado\',\'der\')">Derecha</button>'
+      + '</div>';
+  }
+  // Lista de ángulos ya capturados (chips con × para borrar).
+  function _gonioCapsHTML(g){
     var caps=[]; GONIO_CAT.forEach(function(e){
       ['der','izq'].forEach(function(ld){
         var m=g.medidas[e.key+'_'+ld];
         if(m) caps.push({ txt:e.grupo+' '+e.mov+' '+(ld==='izq'?'I':'D')+': '+_gonioFmtGrado(m), key:e.key+'_'+ld, al:_gonioAlerta(m) });
       });
     });
-    var lista = caps.length
+    return caps.length
       ? '<div class="bio-gcaps">'+caps.map(function(c){
           return '<span class="bio-gcap'+(c.al?' al':'')+'">'+esc(c.txt)+' <b onclick="BIO_gonioBorrar(\''+c.key+'\')">×</b></span>';
         }).join('')+'</div>'
       : '<div class="bio-gcaps-empty">Aún no capturas ningún ángulo.</div>';
+  }
+  // Barra de control del goniómetro EN VIVO / ESTÁTICO (selección + capturar + lista + terminar).
+  function pintarGonioCtrl(){
+    var box=document.getElementById('bio-gonio-ctrl'); if(!box) return;
+    if(!BIO.accG) BIO.accG=nuevoAccGonio();
+    _gonioSelDefault(BIO.accG);
+    var g=BIO.accG, sel=g.sel;
     box.innerHTML =
-      '<div class="bio-grow"><span class="bio-glab">Articulación</span>'+chips('grupo', GONIO_JOINTS, sel.grupo)+'</div>'
-      + '<div class="bio-grow"><span class="bio-glab">Movimiento</span>'+chips('mov', movs, sel.mov)+'</div>'
-      + '<div class="bio-grow"><span class="bio-glab">Lado</span>'
-      +   '<button class="bio-gchip'+(sel.lado==='izq'?' on':'')+'" onclick="BIO_gonioSel(\'lado\',\'izq\')">Izquierda</button>'
-      +   '<button class="bio-gchip'+(sel.lado==='der'?' on':'')+'" onclick="BIO_gonioSel(\'lado\',\'der\')">Derecha</button>'
-      + '</div>'
+      _gonioSelectorHTML(g)
       + '<div class="bio-gbtns">'
       +   '<button class="bio-gcap-btn" onclick="BIO_gonioCapturar()">◉ Capturar</button>'
       +   '<button class="bio-gfin-btn" onclick="BIO_gonioFinish()">✓ Terminar y guardar</button>'
       + '</div>'
-      + lista;
+      + (BIO.modo==='estatico' ? '<div class="bio-grow" style="margin-bottom:8px"><button class="bio-gchip" style="width:100%;text-align:center" onclick="BIO_gonioVolverInicio()">↩︎ Medir otra (subir otra foto/video o cámara)</button></div>' : '')
+      + _gonioCapsHTML(g);
     pintarPanelGonio();
     var est=document.getElementById('bio-estado'); if(est) est.textContent = sel.pos+' · '+sel.guia;
+  }
+  // Pantalla de INICIO del goniómetro: selector arriba + tira de capturas + "Terminar y guardar".
+  function pintarGonioInicio(){
+    if(!BIO.accG) BIO.accG=nuevoAccGonio();
+    _gonioSelDefault(BIO.accG);
+    var selBox=document.getElementById('bio-gonio-sel');
+    if(selBox) selBox.innerHTML = '<div class="bio-gsel-hint">1) Elige qué medir · 2) toma la medición EN VIVO, con una FOTO o un VIDEO.</div>' + _gonioSelectorHTML(BIO.accG);
+    var capBox=document.getElementById('bio-gonio-caps');
+    if(capBox){
+      var arr=_gonioMedidasArr(BIO.accG);
+      capBox.innerHTML = _gonioCapsHTML(BIO.accG)
+        + (arr.length ? '<button class="bio-gfin-btn" style="width:100%;margin-top:10px" onclick="BIO_gonioFinish()">✓ Terminar y guardar ('+arr.length+')</button>' : '');
+    }
+  }
+  // Muestra el resultado de una FOTO o del cuadro-pico de un VIDEO en la vista de cámara (cuadro congelado + control).
+  function _mostrarGonioEstatico(baseCanvas, lm, fuente){
+    detenerCamaraStream(); detenerLoopCamara();
+    BIO.modo='estatico'; BIO._estaticoBase=baseCanvas; BIO._estaticoLm=lm; BIO._estaticoFuente=fuente;
+    mostrarVista('bio-vista-camara');
+    var cv=document.getElementById('bio-canvas'); if(!cv) return;
+    BIO.canvas=cv; BIO.ctx=cv.getContext('2d'); BIO.srcEl=null;
+    var cr=document.getElementById('bio-cron'); if(cr) cr.style.display='none';
+    var br=document.getElementById('bio-btn-rec'); if(br) br.style.display='none';
+    var bf=document.getElementById('bio-btn-flip'); if(bf) bf.style.display='none';
+    var gc=document.getElementById('bio-gonio-ctrl'); if(gc) gc.style.display='block';
+    pintarGonioCtrl();
+    _recalcEstatico();
+    var est=document.getElementById('bio-estado');
+    if(est) est.textContent = (fuente==='foto')
+      ? '📷 Foto analizada · cambia la articulación/lado para medir otra, o toca Capturar'
+      : '📁 Video analizado · toca Capturar (para otro movimiento sube otra foto/video)';
+  }
+  // Recalcula el ángulo del movimiento seleccionado SOBRE el cuadro estático (foto o pico de video) y lo dibuja.
+  function _recalcEstatico(){
+    var g=BIO.accG; if(!g || !g.sel || !BIO._estaticoBase || !BIO.canvas) return;
+    var cv=BIO.canvas, ctx=BIO.ctx;
+    if(cv.width!==BIO._estaticoBase.width || cv.height!==BIO._estaticoBase.height){ cv.width=BIO._estaticoBase.width; cv.height=BIO._estaticoBase.height; }
+    ctx.clearRect(0,0,cv.width,cv.height);
+    try{ ctx.drawImage(BIO._estaticoBase,0,0); }catch(e){}
+    var r = BIO._estaticoLm ? calcularGonio(BIO._estaticoLm, g.sel.grupo, g.sel.mov, g.sel.lado) : { ok:false, val:null };
+    if(r.ok){ _trazarGonio(ctx, cv.width, cv.height, BIO._estaticoLm, g.sel.grupo, g.sel.lado, r.val); g.peak=r.val; }
+    else { g.peak=null; }
+    var live=document.getElementById('bg-live'); if(live) live.textContent = r.ok ? Math.round(r.val) : '—';
+    var mx=document.getElementById('bg-max'); if(mx) mx.textContent = r.ok ? Math.round(r.val) : '—';
+    BIO._estaticoImg = r.ok ? cv : null;
+  }
+  // MODO C: subir una FOTO (ideal camilla / decúbito prono) → pose en imagen estática → ángulo + foto anotada.
+  async function procesarFoto(file){
+    if(!file || !file.type || file.type.indexOf('image')!==0){ toast('Selecciona una imagen (JPG/PNG)','error'); return; }
+    if(!BIO.accG) BIO.accG=nuevoAccGonio();
+    _gonioSelDefault(BIO.accG);
+    mostrarVista('bio-vista-progreso');
+    var fill=document.getElementById('bio-prog-fill'), txt=document.getElementById('bio-prog-txt');
+    if(fill) fill.style.width='25%'; if(txt) txt.textContent='Cargando motor de pose…';
+    var ok = await ensureMediaPipeReady();
+    if(!ok){ if(txt) txt.textContent='⚠️ No se pudo cargar el motor de pose. Revisa tu conexión.'; return; }
+    var url=URL.createObjectURL(file);
+    var img=new Image();
+    try{
+      await new Promise(function(res,rej){
+        img.onload=function(){ res(); };
+        img.onerror=function(){ rej(new Error('No se pudo leer la imagen')); };
+        img.src=url;
+        setTimeout(function(){ if(img.naturalWidth>0) res(); else rej(new Error('Imagen no compatible (prueba JPG o PNG)')); }, 9000);
+      });
+    }catch(e){ try{URL.revokeObjectURL(url);}catch(_){ } toast('⚠️ '+e.message,'error'); mostrarVista('bio-vista-inicio'); pintarGonioInicio(); return; }
+    if(txt) txt.textContent='Detectando postura…'; if(fill) fill.style.width='70%';
+    try{ if(BIO.pose && BIO.pose.reset) BIO.pose.reset(); }catch(_e){}
+    BIO.modo='foto'; BIO._fotoRes=null;
+    for(var i=0;i<2;i++){ try{ await BIO.pose.send({ image: img }); }catch(_s){} if(BIO._fotoRes && BIO._fotoRes.poseLandmarks) break; }
+    var res=BIO._fotoRes; BIO._fotoRes=null;
+    var lm = res && res.poseLandmarks;
+    var base=_canvasDeImagen(img);
+    try{URL.revokeObjectURL(url);}catch(_r){}
+    if(!lm){ toast('No se detectó el cuerpo en la foto. Que se vea de PERFIL, la zona completa en cuadro y con buena luz.','warning'); mostrarVista('bio-vista-inicio'); pintarGonioInicio(); return; }
+    if(fill) fill.style.width='100%';
+    _mostrarGonioEstatico(base, _copiaLm(lm), 'foto');
+  }
+  // Sube las imágenes anotadas (foto / cuadro-pico) a Storage. Devuelve [{key,etq,grado,url,fbPath,...}] o [] si falla.
+  async function _subirImagenesGonio(p, g, btn){
+    var out=[];
+    if(!(g && g.imgs) || typeof fbStorage==='undefined' || !fbStorage) return out;
+    var keys=Object.keys(g.imgs);
+    for(var i=0;i<keys.length;i++){
+      var it=g.imgs[keys[i]]; if(!it || !it.canvas) continue;
+      try{
+        var blob=await new Promise(function(resolve){ try{ it.canvas.toBlob(function(b){ resolve(b); }, 'image/jpeg', 0.85); }catch(e){ resolve(null); } });
+        if(!blob) continue;
+        if(btn) btn.textContent='☁️ Subiendo imagen '+(i+1)+'/'+keys.length+'…';
+        var _ts=Date.now()+'_'+i;
+        var _path='clinica/sinergia/'+p.id+'/biomecanica/gonio_'+(it.key||('img'+i))+'_'+_ts+'.jpg';
+        var _ref=fbStorage.ref(_path);
+        var _url=await new Promise(function(resolve,reject){
+          var task=_ref.put(blob,{contentType:'image/jpeg'});
+          task.on('state_changed', null, function(err){ reject(err); }, function(){ task.snapshot.ref.getDownloadURL().then(resolve).catch(reject); });
+        });
+        out.push({ key:keys[i], grupo:it.grupo, mov:it.mov, lado:it.lado, grado:it.grado, etq:it.etq, url:_url, fbPath:_path, mime:'image/jpeg' });
+      }catch(e){ console.warn('[BIO] subida de imagen gonio falló:', e && e.message); }
+    }
+    return out;
   }
   function BIO_gonioSel(kind, val){
     if(!BIO.accG) BIO.accG=nuevoAccGonio();
@@ -2277,17 +2438,40 @@
     else if(kind==='mov'){ g.sel.mov=val; }
     else if(kind==='lado'){ g.sel.lado=val; }
     _gonioSelDefault(g);
-    pintarGonioCtrl();
+    if(BIO.modo==='estatico'){
+      if(BIO._estaticoFuente==='foto'){ pintarGonioCtrl(); _recalcEstatico(); return; }   // misma foto: recalcula el nuevo movimiento
+      // VIDEO: el pico está atado al movimiento analizado → pide una fuente nueva para el movimiento elegido.
+      BIO.modo=null; BIO._estaticoBase=null; BIO._estaticoLm=null; BIO._estaticoImg=null; BIO._estaticoFuente=null;
+      mostrarVista('bio-vista-inicio'); pintarGonioInicio();
+      toast('Sube otra foto o video para medir '+g.sel.grupo+' '+g.sel.mov,'info'); return;
+    }
+    if(BIO.modo==='camara'){ pintarGonioCtrl(); return; }
+    pintarGonioInicio();   // pantalla de inicio
+  }
+  function BIO_gonioVolverInicio(){
+    BIO.modo=null; BIO._estaticoBase=null; BIO._estaticoLm=null; BIO._estaticoImg=null; BIO._estaticoFuente=null;
+    detenerCamaraStream(); detenerLoopCamara();
+    mostrarVista('bio-vista-inicio'); pintarGonioInicio();
   }
   function BIO_gonioCapturar(){
     var g=BIO.accG; if(!g||!g.sel){ return; }
-    if(g.peak==null){ toast('Mueve la articulación hasta el tope para medir','warning'); return; }
+    if(g.peak==null){ toast(BIO.modo==='estatico' ? 'No se detecta esa articulación en la imagen; cambia de movimiento/lado o sube otra' : 'Mueve la articulación hasta el tope para medir','warning'); return; }
     var e=_gonioEntry(g.sel.grupo, g.sel.mov);
-    g.medidas[_gonioSelKey(g)] = { key:g.sel.key, grupo:g.sel.grupo, mov:g.sel.mov, lado:g.sel.lado,
+    var key=_gonioSelKey(g);
+    g.medidas[key] = { key:g.sel.key, grupo:g.sel.grupo, mov:g.sel.mov, lado:g.sel.lado,
       grado:Math.round(g.peak*10)/10, ref:e.ref, lim:e.lim, defic:!!e.defic, normTxt:e.normTxt };
-    g.peak=null; g.run=0;
+    // Si viene de foto/video, guarda la IMAGEN ANOTADA de esta captura (copia del canvas actual).
+    if(BIO.modo==='estatico' && BIO._estaticoImg){
+      try{
+        var src=BIO._estaticoImg, cc=document.createElement('canvas'); cc.width=src.width; cc.height=src.height;
+        cc.getContext('2d').drawImage(src,0,0);
+        if(!g.imgs) g.imgs={};
+        g.imgs[key] = { canvas:cc, grupo:g.sel.grupo, mov:g.sel.mov, lado:g.sel.lado, grado:g.medidas[key].grado, etq:g.sel.grupo+' '+g.sel.mov+' '+(g.sel.lado==='izq'?'Izq':'Der') };
+      }catch(_e){}
+    }
     toast('Capturado: '+g.sel.grupo+' '+g.sel.mov+' '+(g.sel.lado==='izq'?'Izq':'Der'),'success');
-    pintarGonioCtrl();
+    if(BIO.modo==='estatico'){ pintarGonioCtrl(); _recalcEstatico(); }   // conserva la foto para medir otra
+    else { g.peak=null; g.run=0; pintarGonioCtrl(); }
   }
   function BIO_gonioBorrar(key){ var g=BIO.accG; if(g&&g.medidas[key]){ delete g.medidas[key]; pintarGonioCtrl(); } }
   function BIO_gonioFinish(){
@@ -2352,18 +2536,24 @@
       + '</div>';
     mostrarVista('bio-vista-resumen');
   }
-  function BIO_gonioVolver(){ mostrarVista('bio-vista-camara'); try{ BIO.video&&BIO.video.play(); }catch(e){} if(!BIO.rafId) loopCamara(); pintarGonioCtrl(); }
+  function BIO_gonioVolver(){
+    // "← Seguir midiendo" desde el resumen: si hubo cámara en vivo, reanúdala; si fue foto/video, vuelve al inicio.
+    if(BIO.stream){ BIO.modo='camara'; mostrarVista('bio-vista-camara'); try{ BIO.video&&BIO.video.play(); }catch(e){} if(!BIO.rafId) loopCamara(); pintarGonioCtrl(); }
+    else { BIO_gonioVolverInicio(); }
+  }
   async function guardarSesionGonio(){
     var p=(typeof currentPatient!=='undefined')?currentPatient:null; if(!p){ toast('Sin paciente activo','error'); return; }
     var g=BIO.accG, arr=_gonioMedidasArr(g);
     if(!arr.length){ toast('Sin medidas que guardar','warning'); return; }
     var btn=document.getElementById('bio-gonio-guardar'); if(btn){ btn.disabled=true; btn.textContent='⏳ Guardando…'; }
+    var imagenes = await _subirImagenesGonio(p, g, btn);   // fotos anotadas (foto/cuadro-pico); [] si no hubo o falló (las métricas igual se guardan)
+    var fuenteG = (g.imgs && Object.keys(g.imgs).length) ? 'imagen' : 'camara';
     var sesion={
-      id:'bm_'+p.id+'_'+Date.now(), tipo:'goniometria', fuente:'camara',
+      id:'bm_'+p.id+'_'+Date.now(), tipo:'goniometria', fuente:fuenteG,
       fecha:fechaHoy(), horaCreacion:horaAhora(), fechaHoraISO:new Date().toISOString(),
       terapeuta:usuarioActual(), convencion:'clinica', plano:'sagital',
       medidas:arr, hallazgos:_gonioHallazgos(arr), cita:GONIO_CITA,
-      calidad:{ nMedidas:arr.length }, video:null, reportePdf:null, eliminado:false
+      calidad:{ nMedidas:arr.length }, imagenes:imagenes, video:null, reportePdf:null, eliminado:false
     };
     // Vuelca el resumen de grados al campo ROM de la Valoración (sin borrar lo que el terapeuta escribió;
     // reemplaza solo una línea previa de "Goniometría (" para no acumular en re-mediciones).
@@ -2388,16 +2578,22 @@
         + '<span><b style="color:var(--gray-400);font-weight:600">Izq</b> '+cel(d.izq)+'</span>'
         + '<span style="color:var(--gray-400);font-size:12px">'+esc(e.normTxt)+'</span></div></div>'; }
     var filas=GONIO_CAT.map(fila).join('');
+    var _imgs=(s.imagenes||[]).filter(function(x){ return x && x.url; });
+    var imgHTML = _imgs.length ? ('<div class="field-row"><div class="field-label">Imágenes</div><div class="field-value" style="display:flex;gap:10px;flex-wrap:wrap">'
+      + _imgs.map(function(im){ return '<a href="'+esc(im.url)+'" target="_blank" rel="noopener" style="text-decoration:none"><img src="'+esc(im.url)+'" alt="'+esc(im.etq||'')+'" style="width:96px;height:96px;object-fit:cover;border-radius:10px;border:1.5px solid var(--gray-200);display:block"><div style="font-size:10px;color:var(--gray-400);text-align:center;max-width:96px;margin-top:2px">'+esc(im.etq||'')+(im.grado!=null?(' '+Math.round(im.grado)+'°'):'')+'</div></a>'; }).join('')
+      + '</div></div>') : '';
+    var fuenteLbl = s.fuente==='imagen' ? '📷 Imagen' : (s.fuente==='video' ? '📁 Video' : '📷 Cámara');
     var pdfBtn = (s.reportePdf && s.reportePdf.url)
       ? '<button data-url="'+esc(s.reportePdf.url)+'" onclick="window.open(this.dataset.url,\'_blank\')" style="background:var(--navy);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer">📄 Ver PDF</button>'
       : '<button data-sid="'+esc(s.id)+'" onclick="BIO_pdf(this.dataset.sid)" style="background:var(--white);color:var(--navy);border:1.5px solid var(--gray-200);border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer">📄 Generar PDF</button>';
     return '<div class="section-card" style="margin-bottom:10px">'
       + '<div class="section-title" style="display:flex;align-items:center;justify-content:space-between">'
       +   '<span>📐 Goniometría · '+esc(s.fecha)+' '+esc(s.horaCreacion||'')+'</span>'
-      +   '<span style="font-weight:600;text-transform:none;letter-spacing:0;color:var(--gray-400)">📷 Cámara · sagital</span>'
+      +   '<span style="font-weight:600;text-transform:none;letter-spacing:0;color:var(--gray-400)">'+fuenteLbl+' · sagital</span>'
       + '</div>'
       + '<div class="field-row"><div class="field-label">Terapeuta</div><div class="field-value">'+esc(s.terapeuta||'—')+' · '+((s.medidas||[]).length)+' medidas</div></div>'
       + filas
+      + imgHTML
       + ((s.hallazgos&&s.hallazgos.length)?('<div class="field-row"><div class="field-label">Hallazgos</div><div class="field-value" style="color:#B45309">'+esc(s.hallazgos.join('; '))+'</div></div>'):'')
       + '<div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;padding:10px 14px">'
       +   pdfBtn
@@ -2918,6 +3114,7 @@
   window.BIO_gonioBorrar = BIO_gonioBorrar;
   window.BIO_gonioFinish = BIO_gonioFinish;
   window.BIO_gonioVolver = BIO_gonioVolver;
+  window.BIO_gonioVolverInicio = BIO_gonioVolverInicio;
   window.BIO_gonioGuardar = guardarSesionGonio;
   window.BIO_comparar = BIO_comparar;
   window.BIO_cmpSel = BIO_cmpSel;
