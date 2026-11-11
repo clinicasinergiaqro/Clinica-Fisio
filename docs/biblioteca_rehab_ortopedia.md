@@ -2197,434 +2197,336 @@ Números/afirmaciones que NO pude confirmar en el texto completo (WebFetch bloqu
 
 ## 🕺 CADERA — labrum acetabular / pinzamiento femoroacetabular (FAI)
 
-> **📋 Encuadre**
+### Cadera — labrum y pinzamiento (FAI), guía por tipo
+
+El labrum es el anillo de cartílago que sella y estabiliza la cadera. Duele cuando hay **pinzamiento (FAI**, el fémur choca contra el borde del acetábulo) o una lesión del labrum. Lo que lo irrita es la **flexión profunda de cadera + rotación** (la posición de pinzamiento): cuclillas hondas, sentarse muy bajo, cruzar la pierna. Lo primero es saber si vas por **manejo sin cirugía** o **después de una artroscopia**, porque el plan cambia. Se avanza por logros, no por calendario, y en lo operado manda el cirujano.
+
+#### ⛔ PRIMERO: ¿qué camino es? — de esto depende TODO
+- **Conservador (sin cirugía):** dolor en la ingle al flexionar o girar la cadera, estar mucho sentado, cuclillas. Se maneja con fuerza de glúteo y core y evitando las posiciones de pinzamiento.
+- **Post-artroscopia (operado):** te repararon el labrum y a veces limaron el hueso (osteoplastia). Hay que proteger la reparación: progresión por fases y, al inicio, **cero flexores de cadera activos**. Manda el cirujano.
+
+**Agentes físicos por fase** (acompañan a la carga, no la sustituyen): láser y TECAR atérmica para analgesia; ultrasonido pulsado si hay edema; hielo tras la sesión. En fase de carga, apoyan antes/después del ejercicio.
+
+> **⚠️ Seguridad:** nada de radiofrecuencia, diatermia, TECAR térmica ni ultrasonido térmico sobre las anclas/tornillos de la reparación, prótesis o marcapaso. Precaución con anticoagulación, cáncer activo, embarazo y trombosis.
+
+| Semáforo del dolor | Qué hacer |
+|---|---|
+| **VERDE ≤3/10** | en la ingle durante, que se va en 24 h y no amanece peor → progresa. |
+| **AMARILLO 4–5/10** | o molestia que dura → mantén, no subas, repite. |
+| **ROJO >5/10** | dolor que cojea o que queda → baja un escalón y avísame. |
+
+#### RUTA A — Conservador (sin cirugía)
+**Regla de oro:** fortalecer **fuera de la posición de pinzamiento**. Nada de forzar la cadera a flexión profunda + rotación. El rango que no duele es el rango que sirve.
+
+##### FASE 1 · sem 1–3 — Bajar el dolor y activar el glúteo
+**Apoyo / muletas:** Normal. Evita sentarte muy bajo y cruzar la pierna.
+
+> **✅ YA PUEDE (ideas de ejercicio)**
 >
-> **🎯 Indicaciones:** FAI sintomático (tríada de Warwick: síntomas + signos clínicos + morfología CAM/PINCER/mixto en imagen) y lesión del labrum acetabular. Cubre el MANEJO CONSERVADOR (ejercicio/PHT) y la REHABILITACIÓN POST-ARTROSCOPIA con reparación del labrum (± femoroplastia/acetabuloplastia).
+> - **Isométricos de glúteo** (puente bipodal, aprieta arriba) y clamshells en rango corto
+> - **Core:** bicho muerto, plancha, anti-rotación con liga
+> - Movilidad de cadera solo en rango sin dolor; agentes para analgesia
+
+> **🚫 TODAVÍA NO**
 >
-> **⛔ Contraindicaciones / cuándo derivar:** Artrosis avanzada / condromalacia (p. ej. Tönnis ≥ 2, espacio articular < 2 mm [verificar]) → peor resultado de la artroscopia y contraindicación relativa (manejo conservador o protésico). Displasia significativa no corregida (LCEA bajo) → la artroscopia aislada puede empeorar la inestabilidad; requiere osteotomía/valoración especializada. Post-op: TVP (dolor/edema/calor de pantorrilla) → urgente; inestabilidad/microinestabilidad, infección o lesión neurológica por tracción (parestesias/déficit) → cirujano.
+> - Flexión de cadera profunda + rotación (la posición de pinzamiento)
+> - Sentadilla o cuclilla honda, estar mucho tiempo sentado bajo
+> - Estiramientos forzados de cadera que lleven al tope
+
+##### FASE 2 · sem 4–8 — Fuerza de glúteo y cadena
+**Apoyo / muletas:** Normal.
+
+> **✅ YA PUEDE (ideas de ejercicio)**
 >
-> **⚠️ Precauciones:** Respetar el tejido en reparación: el labrum reinsertado con anclas y la cápsula suturada necesitan protección — evitar extensión + rotación externa (combinadas y forzadas) y flexión > 90° temprana. Ojo con el PSOAS: la sobreactivación → tendinitis del iliopsoas iatrogénica (la complicación de rehab más frecuente); priorizar glúteos y control. Carga según indicación del cirujano, mucho más conservadora si hubo microfractura/condral. Anclas metálicas → NO radiofrecuencia/diatermia/tecar térmica/US térmico sobre el material (ante anclas bioabsorbibles, tratar como metal salvo confirmación). Manda la hoja del cirujano; progresar por CRITERIOS.
+> - **Glúteo medio:** abducción de lado y "monster walks" con liga arriba de la rodilla
+> - **Glúteo mayor:** puente progresando a una pierna, hip thrust ligero, patada atrás (kickback)
+> - **Cadena posterior:** peso muerto rumano ligero, curl femoral; sentadilla y prensa en rango sin dolor
 
-> **Para qué sirve este documento.** Es **material de referencia** para que el fisioterapeuta ubique **en qué fase va el paciente, qué restricciones aplican y si va en tiempo o desfasado** tras una artroscopia de cadera por pinzamiento femoroacetabular (FAI) con reparación del labrum (± femoroplastia / acetabuloplastia), y para encuadrar el **manejo conservador** del FAI/labrum.
-> **NO es una prescripción automática.** El protocolo quirúrgico, las restricciones de carga y los límites de rango los **define el cirujano** (dependen de la técnica exacta: tamaño de la resección, calidad del labrum, cierre capsular, microfractura/condroplastia concomitante). Ante duda o discrepancia, **manda la hoja del cirujano**. Progresión **por criterios, no por calendario**: las semanas son guía.
-
----
-
-### 0. Encuadre y reglas de oro
-
-> **Aplican las reglas de oro del inicio** (criterios > calendario · la carga es el motor · semáforo del dolor); en post-qx **manda la hoja del cirujano**. Lo **específico de la cadera de preservación**:
-
-- **Respetar el tejido en reparación.** El labrum reinsertado con anclas y la cápsula suturada necesitan protección temprana de los rangos que los tensan (ver §5). Microfractura/condral concomitante = plazos de descarga mucho más largos.
-- **Ojo con el psoas:** la sobreactivación del psoas/flexores → **tendinitis del iliopsoas iatrogénica** es la complicación de rehab más frecuente de esta cirugía (manejo en §5 y §7).
-- **Individualizar:** edad, deporte/gesto, displasia o laxitud de base (microinestabilidad), estado del cartílago (artrosis = peor pronóstico), comorbilidades y **seguridad clínica** (anclas metálicas, ver §8).
-
----
-
-### 1. Qué es el FAI y qué corrige la cirugía
-
-**Definición (Acuerdo de Warwick, Griffin et al., BJSM 2016).** El **síndrome de FAI** es una **tríada clínica**: (1) **síntomas** (dolor de ingle/cadera relacionado con el movimiento o la posición, a veces chasquido/bloqueo/rigidez), (2) **signos clínicos** (pruebas de pinzamiento positivas, rango limitado), y (3) **hallazgos de imagen** (morfología CAM y/o PINCER). **Ningún dato aislado hace el diagnóstico**: se necesita la combinación de los tres. El consenso **no fijó valores de corte radiográficos** ni un algoritmo de tratamiento definitivo (no había evidencia de alto nivel para ello en 2016).
-
-#### Clasificación morfológica (para encuadrar)
-
-| Tipo | Dónde está la deformidad | Medida habitual | Umbral citado (aprox.) |
-|---|---|---|---|
-| **CAM (leva)** | Unión cabeza-cuello femoral (pérdida de esfericidad; "giba" femoral) | **Ángulo alfa** | **> ~55°** más usado (rango publicado 50–83°; algunos usan 60° para separar sintomático) **[verificar]** |
-| **PINCER (pinza)** | Acetábulo: sobrecobertura (sobrecubre la cabeza) | **Ángulo centro-borde lateral (LCEA)** | **> ~40°** más frecuente (rango 35–45°) **[verificar]** |
-| **MIXTO** | CAM + PINCER a la vez | Ambas | Es el tipo **más frecuente** en la práctica |
-
-> Referencia de "normalidad": LCEA ~**25–40°** se considera normal; **< 20–25°** sugiere **displasia / infracobertura** (otro problema, con manejo distinto y a veces contraindicación relativa de artroscopia aislada). **[verificar umbrales — son dependientes del estudio; cítese el que se use].**
-
-#### Qué se hace en el quirófano (impacta la rehab)
-
-- **Femoroplastia / osteocondroplastia** (CAM): se "lima" la giba femoral para recuperar la esfericidad. → Vigilar hueso resecado (riesgo de osificación heterotópica; ver §7).
-- **Acetabuloplastia / trimming del reborde** (PINCER): se recorta el reborde acetabular sobrecubriente.
-- **Reparación del labrum:** reinserción del labrum con **anclas (suturas/implantes)** → **relevante para agentes físicos (§8)** y define los rangos a proteger (§5).
-- **Cierre capsular (capsulotomía):** se abre la cápsula para entrar; si se **cierra/plica**, hay precauciones de protección de la sutura capsular; si se deja **capsulotomía amplia sin cierre**, aumenta el riesgo de **inestabilidad** (§7).
-- **Microfractura / condroplastia** (si hay daño de cartílago): **alarga mucho la descarga** (NWB/carga muy protegida) — dato clave para saber si el paciente "va en tiempo".
-
----
-
-### 2. Diagnóstico y pruebas especiales
-
-> **Advertencia transversal:** las pruebas de pinzamiento/labrum son típicamente **MUY SENSIBLES pero POCO ESPECÍFICAS** → sirven para **descartar** (tamizaje) y para **agrupar en clúster**, **no** para confirmar la estructura lesionada por sí solas. El **estándar de imagen es la RM-artrografía**, y la **infiltración intraarticular diagnóstica** (anestésico local intraarticular que quita el dolor) confirma que el origen del dolor es **intraarticular**.
-
-| Prueba | Maniobra / qué busca | Para qué sirve | S / E (orientativo) |
-|---|---|---|---|
-| **FADIR / pinzamiento anterior** (flexión + aducción + rotación interna) | Lleva la cadera a flexión ~90°, la aduce y la rota internamente; positivo = dolor anterior/ingle reproducido | **Tamizaje de FAI/labrum anterior.** Muy sensible → **un FADIR negativo ayuda a descartar** | **S alta** ~0.78–1.00 (hasta 96–99%); **E baja** ~0.05–0.33 (tan baja como 5–11%). Para desgarro labral, un estudio dio **S 0.53 / E 0.67 [verificar — las cifras varían mucho entre estudios]** |
-| **FABER / Patrick** (flexión + abducción + rotación externa, "4") | Tobillo sobre rodilla contraria; mide distancia rodilla-camilla y reproduce dolor | Dolor **posterolateral/sacroilíaco** o **anterior**; cribado inespecífico de patología intra/extraarticular | **S ~0.93 / E ~0.55** en una serie de CAM vs ángulo alfa; **un FABER negativo no descarta [verificar]** |
-| **Scour / cuadrante** (compresión en arco) | Cadera y rodilla a ~90°, se recorre un arco manteniendo compresión axial posterior; positivo = "enganche"/clic/aprensión bajo carga | Sugiere **labral/FAI o condral** bajo carga | S reportada muy dispersa (~50–100%); **negativo no descarta [verificar]** |
-| **Log roll** (rodamiento en supino) | Rotación pasiva de la pierna extendida; positivo = dolor/clic/pop | **De las más ESPECÍFICAS** para patología **intraarticular** (la cápsula/ligamentos no se tensan, solo gira la articulación). ER aumentada vs contralateral → **laxitud/microinestabilidad** | E relativamente alta; S baja **[verificar]** |
-| **Aprensión posterior / anterior** | Posterior: cadera en flexión-aducción-RI con carga posterior. **Anterior (hiperextensión-RE):** extensión + rotación externa reproduce dolor/aprensión anterior | Posterior → labrum/pared posterior; **anterior → microinestabilidad anterior** (laxitud capsular) | Evidencia escasa; usar en clúster **[verificar]** |
-| **Dial test** (variante del log roll) | ER pasiva: si supera a la contralateral o el ángulo pie-camilla es < ~20° / sin tope firme → **laxitud capsular anterior** | Sospecha de **microinestabilidad** (dx diferencial del FAI o coexistente) | Sin gold standard; apoyo clínico **[verificar]** |
-| **Thomas** | Decúbito, se abraza una rodilla al pecho; la pierna evaluada que no baja = **acortamiento de flexores / flexo de cadera** | **Flexibilidad de flexores de cadera** (psoas/recto anterior), no es prueba de labrum per se | Como prueba de labrum es **débil**: en realidad mide LONGITUD de flexores; la S 0.89/E 0.92 viene de un **estudio único atípico** y no debe tomarse como fuerte **[verificar]** |
-| **Trendelenburg** | Apoyo monopodal; positivo = la pelvis **cae del lado contrario** al de apoyo | **Debilidad de abductores (glúteo medio/menor)** — NO es intraarticular. Clave para el **objetivo de fuerza** de la rehab | Marcador de debilidad abductora, no diagnóstico de FAI |
-
-**Clúster recomendado (práctico):** **FADIR + FABER + log roll (± scour)** positivos juntos aumentan la probabilidad; combinar **pruebas de pinzamiento + limitación del rango** mejora la precisión diagnóstica (Reiman et al. y cols.). Un estudio 2026 (Halliwell et al., *Arthroscopy*) reportó que el **clúster FABER + FADIR + elevación de pierna recta resistida** concurrentemente positivo alcanzó **S 94% y exactitud 94%** para desgarro labral **[verificar — E y VPP al 100%, cifras "al techo", pendientes de replicación]**. Aun así, **la imagen (RM-artrografía) y la respuesta a la infiltración intraarticular siguen siendo el referente** para confirmar.
-
-> **Diagnóstico diferencial que no hay que olvidar:** microinestabilidad/displasia (dial test, aprensión anterior, LCEA bajo, signo de pared posterior), tendinopatía del glúteo, pubalgia/aductores, patología del psoas, dolor lumbar referido, cadera "en resorte" (snapping) extraarticular.
-
----
-
-### 3. Manejo CONSERVADOR del FAI/labrum (ejercicio vs cirugía)
-
-> **📋 Encuadre**
+> **🚫 TODAVÍA NO**
 >
-> **🎯 Indicaciones:** FAI sintomático que se trata PRIMERO sin cirugía (razonable en muchos casos, sobre todo con cartílago conservado): ensayo de fisioterapia estructurada y progresiva (Personalised Hip Therapy / PHT, ~12–26 semanas). En FASHIoN ambos (artroscopia y PHT) mejoraron; la artroscopia aventaja sobre todo en morfología CAM.
+> - Rango de pinzamiento (flexión profunda + giro)
+> - Impacto, correr, saltar
+
+##### FASE 3 · sem 9+ — Fuerza, control y retorno
+**Apoyo / muletas:** Normal.
+
+> **✅ YA PUEDE (ideas de ejercicio)**
 >
-> **⛔ Contraindicaciones / cuándo derivar:** La decisión cirugía vs conservador es COMPARTIDA con el cirujano. Si el ensayo conservador estructurado no mejora → revalorar con el cirujano. No olvidar el diagnóstico diferencial (microinestabilidad/displasia, tendinopatía del glúteo, pubalgia/aductores, patología del psoas, dolor lumbar referido, cadera "en resorte").
+> - Progresar fuerza y propiocepción en una pierna (equilibrio, sentadilla a una pierna en rango seguro)
+> - Reintroducir gradualmente carrera y gesto si no duele
+
+> **🚫 TODAVÍA NO**
 >
-> **⚠️ Precauciones:** Ejercicio dentro de rango NO provocativo: evitar forzar la flexión-rotación interna que reproduce el pinzamiento. Modificar la actividad: reducir posiciones de pinzamiento sostenidas (sentado profundo prolongado, flexión-RI repetida, sentadilla muy profunda). Centrar el programa en control lumbopélvico, fuerza de abductores/extensores/rotadores externos y core; progresar a movimientos compuestos funcionales/gesto cuando tolera.
+> - Volver a deporte de pivote/contacto sin control de la cadera y sin criterios
 
-El FAI sintomático **se puede tratar primero sin cirugía** en muchos casos. La evidencia principal:
+#### RUTA B — Post-artroscopia (reparación del labrum ± osteoplastia)
+**Las 3 reglas que NO se rompen las primeras semanas:** cero flexores de cadera activos (no levantar la pierna estirada activamente) las primeras ~4 semanas; no estar sentado más de 30 minutos las primeras 3 semanas; no luchar contra el dolor. Se hizo una apertura de la cápsula, así que hay que cuidar la cadera de posiciones de luxación. Manda el cirujano.
 
-- **UK FASHIoN (Griffin et al., *Lancet* 2018):** ECA multicéntrico (23 hospitales del NHS, **348 pacientes**, artroscopia vs **Personalised Hip Therapy / PHT**). A 12 meses, la **artroscopia** dio una mejoría mayor de calidad de vida de la cadera (**iHOT-33: diferencia media de ~6.8 puntos** a favor, por encima de la MCID), **pero AMBOS tratamientos mejoraron**. El beneficio de la cirugía fue claro en **morfología CAM** (~8.3 puntos) y **mínimo en mixto** (~1.1). La artroscopia tuvo **más eventos adversos** y fue **menos costo-efectiva** a 12 meses. **[verificar cifras finas]**
-- **Lectura clínica:** un ensayo de **fisioterapia estructurada y progresiva** antes de operar es razonable, sobre todo si el cartílago está conservado; la cirugía muestra ventaja sobre todo en CAM. La decisión es compartida con el cirujano.
+Línea de tiempo (según el cirujano):
 
-**Contenido del programa conservador (PHT — Personalised Hip Therapy, Wall et al. 2016, desarrollado para FASHIoN).** Cuatro componentes nucleares, dirigidos por fisioterapeuta, a lo largo de **~12–26 semanas, 6–10 sesiones + programa en casa**:
+| Hito (lo que la persona logra) | ¿Cuándo, aprox.? |
+|---|---|
+| Apoyo 30% con muletas (pie a piso) | **Sem 0–3** |
+| Deja las muletas (marcha normal) | **Sem 3–6** |
+| Empieza propiocepción | **Sem 8** |
+| Camina → trote (si hay control en una pierna) | **Sem 12+** |
+| Pliometría y agilidad | **Sem 12–20** |
+| Deporte de contacto | **≥ 6 meses** |
 
-1. **Valoración detallada** de la cadera y de factores contribuyentes.
-2. **Educación y consejo** (qué es el FAI, pronóstico, tranquilizar).
-3. **Ayuda para el dolor** (modificación de actividad, agentes físicos coadyuvantes).
-4. **Ejercicio individualizado y progresivo**, centrado en **control pélvico y femoral**.
+##### SEM 0–3 — Proteger y movilidad pasiva
+**Apoyo / muletas:** Apoyo 30% con muletas (pie a piso). No sentarse más de 30 min.
 
-**Ejes del ejercicio (y de todo plan conservador de FAI):**
-- **Fuerza y control de cadera:** abductores (glúteo medio: clamshells, abducción con banda de pie, planchas laterales), extensores (glúteo mayor), rotadores externos.
-- **Control lumbopélvico y core / estabilidad.**
-- **Movilidad de cadera** dentro de rango no provocativo (evitar forzar la flexión-RI que reproduce el pinzamiento).
-- **Control postural y propiocepción** (apoyo monopodal, equilibrio).
-- **Modificación de actividad:** reducir posiciones de pinzamiento sostenidas (sentado profundo prolongado, flexión-RI repetida, sentadilla muy profunda), corregir patrón de movimiento del gesto que provoca.
-- Progresión a **movimientos compuestos funcionales** y gesto deportivo cuando tolera.
-
----
-
-### 4. Fases de rehabilitación POST-ARTROSCOPIA (por criterios)
-
-> **📋 Encuadre**
+> **✅ YA PUEDE (ideas de ejercicio)**
 >
-> **🎯 Indicaciones:** Rehabilitación tras ARTROSCOPIA de cadera por FAI con reparación del labrum (± femoroplastia/acetabuloplastia; ± microfractura/condroplastia). Estructura de 4 fases por criterios; tasa de retorno al deporte ~90%. Las semanas son orientativas para un labrum reparado aislado SIN microfractura.
+> - Isométricos de cuádriceps, glúteo y tibial anterior (20 reps, 2 veces al día)
+> - Arcos de movilidad pasivos (otro te mueve): flexión 90°, rotación interna 20° a 90°, abducción 30°
+> - Cuadrupedia (rocking, tilts de pelvis), clamshells
+> - Bici fija vertical sin resistencia, asiento alto, 20 min
+
+> **🚫 TODAVÍA NO**
 >
-> **⛔ Contraindicaciones / cuándo derivar:** Tendinitis del iliopsoas iatrogénica (dolor anterior de ingle, chasquido doloroso con la flexión activa) → bajar flexión, reforzar glúteos. Inestabilidad/microinestabilidad (aprensión anterior, sensación de fallo, RE pasiva aumentada sin tope firme) → no forzar extensión + RE. Adherencias capsulares, osificación heterotópica, infección o lesión neurológica por tracción → cirujano. TVP → URGENTE. Dolor de ingle que no cede → reevaluar.
+> - Levantar la pierna estirada activamente (cero flexores de cadera)
+> - Estar sentado más de 30 min
+> - Albercas, tinas o jacuzzi
+> - Forzar el rango o luchar contra el dolor
+
+> **Lo más importante:** nada de activar el psoas/flexores de cadera. Si levantas la pierna estirada tú solo, lo activas. Que te la muevan.
+
+##### SEM 3–6 — Dejar muletas y rango completo
+**Apoyo / muletas:** Progresar a apoyo 100%, deja las muletas cuando camines sin cojear. (Si hubo trabajo en cartílago, continúa muletas 6 semanas.)
+
+> **✅ YA PUEDE (ideas de ejercicio)**
 >
-> **⚠️ Precauciones:** Carga según indicación del cirujano: parcial/de contacto ~2–4 sem en labrum reparado aislado; NWB o carga muy protegida ~6–8 sem si hubo microfractura/condral (dato decisivo) [verificar por técnica]. Límites de rango: evitar RE pasiva y extensión de rango final, y sobre todo la COMBINACIÓN extensión + RE; evitar flexión > 90° temprana; no distracción axial de rango largo. Psoas: no SLR resistido ni flexión activa de cadena abierta temprana. Bicicleta estática: sillín alto, sin resistencia, no recumbente, sin correas. Anclas metálicas → no RF/diatermia/tecar térmica/US térmico. Retirar muletas solo con carga completa y sin cojera/Trendelenburg. Manda la hoja del cirujano; progresar por CRITERIOS.
+> - Arcos de movilidad completos sin dolor, progresivo
+> - Estiramientos de cápsula anterior, flexores de cadera y cintilla iliotibial
+> - Progresar fortalecimiento 2–4 veces por semana (glúteo, core)
+> - Bici fija y elíptica, progresar el tiempo a tolerancia
 
-> Estructura de **4 fases** (la más consensuada en la literatura: revisión sistemática *State of the Art* 2024, JCM; 14 estudios, 1105 pacientes; tasa de retorno al deporte ~90%). Hay **uniformidad en las 4 fases** pero **inconsistencia en tiempos y criterios de retorno** — por eso se gobierna por criterios y por la hoja del cirujano. Las semanas de abajo son **orientativas para un labrum reparado aislado sin microfractura**; ajustar al caso.
+> **🚫 TODAVÍA NO**
+>
+> - Forzar el rango o el dolor
+> - Impacto, correr, saltar
 
-#### Macrociclo orientativo
+##### SEM 6–12 — Fuerza y propiocepción
+**Apoyo / muletas:** Apoyo 100%, marcha normal.
 
-```
-FASE 1 · Protección/cicatrización   sem ~0–4    proteger labrum+cápsula, control dolor/edema, marcha, activación suave
-FASE 2 · Movilidad y activación      sem ~4–8    recuperar ROM por criterios, patrón de marcha normal sin muletas, activación glútea
-FASE 3 · Fuerza y control neuromusc. sem ~8–16   fuerza de cadera/core, control lumbopélvico, resistencia, iniciar impacto
-FASE 4 · Retorno a carrera/deporte   mes ~4–6+   carrera → pliometría → gesto → deporte por criterios y batería de pruebas
-```
+> **✅ YA PUEDE (ideas de ejercicio)**
+>
+> - Progresar fuerza de glúteo, cuádriceps, isquios
+> - Propiocepción desde la semana 8 (equilibrio, apoyo en una pierna)
+> - Bici y elíptica 20–60 min, iniciar progresión de resistencia
 
----
+> **🚫 TODAVÍA NO**
+>
+> - Impacto fuerte, pivotes
 
-#### FASE 1 — Protección y cicatrización (≈ sem 0–4, por criterios)
+##### SEM 12–20 — Pliometría y agilidad
+**Apoyo / muletas:** Normal.
 
-**Metas:** proteger la reparación del labrum y la cápsula; controlar dolor y edema; mantener la movilidad de rotación del cartílago **sin tensar la sutura**; activación muscular suave; marcha con muletas segura.
+> **✅ YA PUEDE (ideas de ejercicio)**
+>
+> - Progresar fuerza, propiocepción y resistencia (core, glúteos, cuádriceps, isquios, pantorrilla)
+> - Pliometría inicial: saltar cuerda a uno y dos pies; de apoyo parcial a completo
+> - Programa caminar → trote si el control en una pierna lo permite
 
-**Restricciones CLAVE (típicas — las define el cirujano):**
-- **Carga:** **parcial / de contacto ("flat-foot", ~9–20 kg)** con dos muletas, **~2–4 semanas** en labrum reparado aislado. **[verificar por técnica]** → **Si hubo microfractura/condral: NWB o carga muy protegida ~6–8 semanas** (dato decisivo para saber si va en tiempo).
-- **Límites de rango (proteger la reparación):**
-  - **EVITAR rotación externa (RE) pasiva de rango final** y **extensión de rango final**, y **sobre todo la COMBINACIÓN extensión + RE** (posición de máxima tensión anterior sobre labrum y cápsula).
-  - **EVITAR flexión > 90° temprana** y **sentarse con cadera flexionada > 90°** las primeras ~2 semanas. **[verificar días: p. ej. "sin sentarse >90° por ~14 días", "sin RE más allá de neutro ~21 días", "sin extensión más allá de neutro ~17 días" — muy variable por cirujano]**
-  - **NO distracción axial de rango largo** hasta **~8 semanas** (labrum reparado) / **~12 semanas** (reconstrucción labral). **[verificar]**
-- **Órtesis (dependiente del cirujano):** a veces **brace de cadera** (limita flexión a ~90°, abducción a ~45°, extensión a 0°) y/o **almohada de abducción** para dormir. Hay evidencia de que **retirar el brace no aumenta complicaciones** en muchos casos → su uso **varía por cirujano**.
-- **Psoas:** **NO elevación de pierna recta (SLR) resistida** ni **flexión de cadera activa de cadena abierta** las primeras ~2 semanas (protección del iliopsoas; ver §5).
+> **🚫 TODAVÍA NO**
+>
+> - Cambios de dirección y contacto todavía
 
-**Qué SÍ (ejemplos):**
-- Marcha con muletas respetando la carga indicada; crioterapia/compresión para edema.
-- **Movilidad pasiva/asistida suave en rango seguro** (rotación interna suave, flexión ≤90°, péndulos/círculos suaves), **bicicleta estática sin resistencia y con sillín alto** cuando el fisio lo apruebe (ver §5).
-- **Isométricos** suaves (glúteos, transverso/core, cuádriceps), **activación glútea de baja carga en cadena cerrada protegida**, movilidad de tobillo (bomba venosa → profilaxis de TVP).
-- Profilaxis de osificación heterotópica si el cirujano la indicó (AINE; p. ej. **naproxeno 500 mg c/12 h × ~3 semanas**, o celecoxib/etoricoxib). **[verificar pauta — es indicación médica]**
+##### SEM 20 – mes 6 — Readaptación deportiva
+**Apoyo / muletas:** Normal.
 
-**Qué NO:**
-- Estiramiento de flexores en **extensión + RE**; RE o extensión pasivas forzadas; flexión profunda bajo carga; distracción; sentarse profundo prolongado; SLR resistido; cualquier maniobra que reproduzca dolor de ingle agudo.
+> **✅ YA PUEDE (ideas de ejercicio)**
+>
+> - Progresar pliometría, agilidad y propiocepción
+> - Drills específicos del deporte sin contacto
 
-**Criterios para avanzar a Fase 2:**
-- Dolor mínimo con los ejercicios de Fase 1.
-- **ROM activo y pasivo ≥ ~75% del lado sano** (dentro de los límites permitidos). **[verificar]**
-- **Patrón de disparo neuromuscular normal** (activación glútea sin dominancia del psoas/TFL).
-- **Marcha normalizada** (base para dejar muletas según carga permitida).
+> **🚫 TODAVÍA NO**
+>
+> - Deporte competitivo de contacto antes de los 6 meses
+> - Volver sin la indicación conjunta de ortopedista y fisioterapeuta
 
----
+#### Criterios de retorno
+- **Fuerza:** glúteo y cuádriceps parejos con el otro lado, control en una pierna sin que la cadera se "meta".
+- **Función:** pruebas de salto y agilidad sin dolor de ingle ni aprensión.
+- **Tiempo (operado):** deporte de contacto no antes de 6 meses, y con indicación conjunta de ortopedista y fisioterapeuta.
 
-#### FASE 2 — Movilidad y activación progresiva (≈ sem 4–8, por criterios)
+#### 🚩 Señales de alarma — avisa de inmediato
+- Dolor profundo de ingle que no cede o que cojea.
+- Sensación de que la cadera se sale o se **traba (bloqueo)** → avisa, sobre todo en el operado (se abrió la cápsula).
+- Cadera **caliente + hinchada + fiebre** → posible infección (urgencia).
+- Dolor e hinchazón en la **pantorrilla de una sola pierna** → posible coágulo.
 
-**Metas:** recuperar **rango completo e indoloro** (ya levantadas la mayoría de las restricciones de rango hacia ~sem 6–8, **según cirujano**); **retirar muletas** a marcha normal sin cojera; activación glútea de calidad; preparar la fase de fuerza.
+> En el operado, **la orden del cirujano manda** sobre apoyo, rangos y tiempos.
 
-**Restricciones:**
-- Retirar límites de rango **progresivamente y sin dolor** (confirmar con la hoja del cirujano **antes** de forzar extensión + RE).
-- Seguir **cuidando el psoas**: progresar flexión de cadera **sin dolor** y sin provocar tendinitis (si aparece dolor anterior con la flexión activa resistida, bajar carga — bandera, §7).
-- Evitar impacto/carrera y pliometría todavía.
-
-**Qué SÍ:**
-- Movilidad hasta rango completo indoloro; **marcha sin muletas** cuando la carga es completa y sin cojera.
-- **Fortalecimiento de cadena cerrada de baja-moderada carga:** puentes (bipodal→unipodal), sentadilla parcial, peso muerto rumano ligero, abducción/aducción con banda, control lumbopélvico.
-- **Progresión glútea** (clamshells, abducción de pie, monster walks), core antirrotación, equilibrio monopodal.
-- **Bicicleta estática** aumentando tiempo (aún precaución con resistencia alta si molesta el psoas); natación/acuaterapia si la herida cerró **[verificar]**.
-
-**Qué NO:**
-- Carrera, saltos, cambios de dirección; cargas máximas; estiramientos agresivos de flexores; nada que reproduzca pinzamiento o dolor de ingle.
-
-**Criterios para avanzar a Fase 3:**
-- **ROM completo e indoloro** (o el techo que fijó el cirujano).
-- **Marcha normal sin cojera ni muletas**, sin signo de Trendelenburg.
-- Buena **activación y control glúteo** en cadena cerrada sin compensación del psoas/TFL.
-- Dolor controlado (semáforo verde, §9) con los ejercicios de Fase 2.
-
----
-
-#### FASE 3 — Fuerza y control neuromuscular (≈ sem 8–16, por criterios)
-
-**Metas:** **fuerza de cadera y core** (prioridad **glúteo medio y mayor**), **control lumbopélvico** en tareas progresivamente exigentes, resistencia, e **introducción del impacto** al final de la fase.
-
-**Clave de esta fase (y bandera a vigilar):**
-- **Priorizar glúteos** (medio = estabilidad frontal de pelvis / corrige Trendelenburg; mayor = extensión/potencia) y **control del core**.
-- **Vigilar el psoas:** si se vuelve el motor de la flexión (dolor anterior con flexión resistida, chasquido doloroso), **reducir trabajo de flexión activa, reforzar glúteos y control**, y revalorar (ver §7).
-
-**Qué SÍ:**
-- Fuerza progresiva **bilateral → unilateral**: sentadilla, peso muerto, zancadas, prensa, puentes cargados, abducción cargada; **énfasis en abductores y extensores**.
-- Control neuromuscular dinámico, propiocepción avanzada (superficies inestables, alcances multidireccionales / Y-balance), resistencia aeróbica sin impacto (bici con resistencia, elíptica).
-- **Introducción del impacto por criterios** hacia el final (saltos de baja intensidad bipodales, preparación para correr) cuando la fuerza lo permite.
-
-**Qué NO:**
-- Correr/pliometría pesada o cambios de dirección **antes** de cumplir criterios de fuerza; cargas que disparen dolor anterior de psoas o de ingle.
-
-**Criterios para avanzar a Fase 4 (iniciar carrera):**
-- **Fuerza de cadera ≥ ~80% del lado sano** (dinamómetro manual; abducción/aducción/flexión/extensión). **[verificar umbral — dependiente de protocolo]**
-- **Reclutamiento glúteo normal**, control pélvico mantenido en tareas unipodales (p. ej. **single-leg "pick-up" / sentadilla monopodal con pelvis nivelada**, sin Trendelenburg).
-- Sin dolor con la progresión de impacto de baja intensidad; semáforo verde.
-
----
-
-#### FASE 4 — Retorno a la carrera y al deporte (≈ mes 4–6+, por criterios)
-
-**Metas:** progresión **carrera → pliometría → agilidad/cambios de dirección → gesto deportivo → deporte**, superando una **batería de pruebas**.
-
-**Progresión y tiempos orientativos:**
-- **Inicio de carrera:** lo más citado **~12 semanas** una vez cumplidos los hitos (algunos protocolos 16–18 semanas). **[verificar — por cirujano]**
-- **Retorno al deporte:** típico **~5–6 meses** (guía ISHA ~5 meses; estudios acelerados ~6 meses; literatura antigua media ~9.4 meses). **Deportes de pivote, contacto/colisión y gestos "overhead"/por encima de la cabeza → MÁS TARDE.** **[verificar]**
-- **Tasa de retorno al deporte** reportada **~90%** (revisión sistemática 2024).
-
-**Qué SÍ:** programa de carrera progresivo; pliometría creciente; técnica de aterrizaje y desaceleración; cambios de dirección controlados → agilidad; **drills específicos del deporte**; mantener trabajo de fuerza.
-
-**Criterios de retorno al deporte (clúster — no hay un estándar validado único; OSU CPG 2019 advierte que no hay criterios de retorno validados para FAI):**
-
-```
-Dolor        sin dolor en carga ni en el gesto deportivo (semáforo verde)
-Fuerza       ≥ ~90% de simetría de cadera (abducción/aducción/flex/ext); <80% = BANDERA ROJA
-ROM          simétrico e indoloro
-Función      pruebas funcionales superadas (hop tests, Y-balance, Vail Hip Sports Test);
-             SIN consenso sobre cuál es la mejor batería → usar varias y comparar vs lado sano
-Gesto        tolera el gesto específico y la velocidad plena sin dolor ni aprensión
-PROM         cuestionario específico (iHOT-33 / HAGOS) en ascenso
-```
-> **Importante:** estos umbrales son **consenso de expertos**, no puntos de corte validados; individualizar y acordar el alta deportiva con el cirujano.
-
----
-
-### 5. Precauciones específicas post-artroscopia (resumen operativo)
-
-- **Flexores de cadera / psoas:** **no** trabajo agresivo de flexores temprano (SLR resistido, flexión activa de cadena abierta cargada) → **riesgo de tendinitis del iliopsoas**. Priorizar glúteos y control; introducir flexión activa de forma gradual e indolora.
-- **No estirar en EXTENSIÓN + ROTACIÓN EXTERNA temprano** (posición de máxima tensión anterior sobre la reparación labral y la cápsula). Igual, cuidado con la **RE pasiva forzada** y la **extensión de rango final** aisladas en fase temprana.
-- **Bicicleta estática:** **sillín ALTO** (para no pasar de ~90° de flexión), **SIN resistencia** al inicio, **no recumbente**, **sin correas en los pedales**; típicamente **10–20 min**, comenzar cuando el fisio lo apruebe (frecuentemente tras la 1.ª semana). **[verificar]**
-- **No distracción axial de rango largo** hasta ~8 sem (reparación) / ~12 sem (reconstrucción). **[verificar]**
-- **Carga:** respetar estrictamente la indicación (parcial/NWB), **mucho más conservadora si hubo microfractura/condral**.
-- **Marcha:** retirar muletas solo con carga completa permitida y **sin cojera / sin Trendelenburg**.
-- **Brace / almohada de abducción:** solo si el cirujano los indicó; su uso es variable.
-
----
-
-### 6. Línea de hitos (para detectar DESFASE)
-
-> Úsese para ubicar "si el paciente va en tiempo". **Si un hito se retrasa claramente, investigar la causa** (dolor no controlado, edema persistente, psoas irritado, adherencias, carga mal progresada) y **revalorar con el cirujano**. Ajustar todo si hubo microfractura/condral (todo se corre varias semanas).
-
-```
-~Sem 0–2    Marcha con muletas estable y carga correcta; edema/dolor bajando; isométricos y movilidad
-            suave sin dolor; activación glútea iniciada; profilaxis de TVP/osificación según indicación.
-~Sem 2–4    Dolor mínimo con ejercicios de Fase 1; ROM acercándose a ~75% del sano dentro de límites;
-            disparo neuromuscular correcto (glúteo > psoas).
-~Sem 4–6    Dejando muletas a marcha normal (si carga completa permitida); ROM casi completo indoloro.
-~Sem 6–8    ROM completo e indoloro; marcha normal sin cojera; buena activación glútea → Fase 3.
-~Sem 8–16   Fuerza subiendo a ≥80% del sano; control pélvico unipodal; introducción de impacto por criterios.
-~Mes 3–4    Inicio de carrera (~sem 12, si cumple criterios de fuerza y control).
-~Mes 4–6    Pliometría → agilidad → gesto; batería de retorno (fuerza ≥90%, pruebas funcionales).
-~Mes 5–6+   Retorno al deporte por criterios; pivote/contacto/overhead más tarde.
-```
-
-**Señales de que va DESFASADO (revisar):** sigue con muletas más allá de lo esperado por la técnica; ROM estancado por debajo del ~75% pasadas varias semanas; cojera/Trendelenburg persistente; dolor de ingle que no cede; dolor anterior con la flexión (psoas); edema/derrame que reaparece con la progresión.
-
----
-
-### 7. Banderas rojas, complicaciones y contraindicaciones
-
-**Banderas rojas / complicaciones a vigilar (derivar/avisar al cirujano):**
-- **Tendinitis del iliopsoas iatrogénica / por sobreactivación:** dolor anterior de ingle, **chasquido doloroso persistente** con la flexión activa; la complicación "de rehab" más común → bajar trabajo de flexión, reforzar glúteos/control.
-- **Adherencias capsulares:** entre labrum/cápsula, sobre todo tras reparación + recorte de reborde; pérdida de rango y dolor que no progresa → considerar como fuente de dolor; movilización y, si persiste, valoración del cirujano.
-- **Inestabilidad / microinestabilidad de cadera:** sobre todo si hubo **capsulotomía amplia sin cierre**, sobre-resección del reborde, o base de **displasia/laxitud**. Signos: aprensión anterior, sensación de fallo, RE pasiva aumentada sin tope firme (dial test). **No forzar extensión + RE.**
-- **Osificación heterotópica:** dolor, pinzamiento y pérdida de rango; incidencia reportada muy variable (**0–46% [verificar]**); los **AINE reducen** su aparición/severidad.
-- **TVP (trombosis venosa profunda):** dolor/edema/calor de pantorrilla, empeoramiento desproporcionado → **urgente**. Incidencia baja (**<1% a ~4% [verificar]**); profilaxis con movilización temprana y bomba venosa.
-- **Dolor que no cede / dolor de ingle con chasquido doloroso persistente:** reevaluar (psoas, adherencia, condral, reparación).
-- Infección, lesión neurológica por tracción (nervio pudendo/ciático/femorocutáneo) — avisar si parestesias o déficit.
-
-**Contraindicaciones / peor pronóstico (para el encuadre y expectativas):**
-- **Condromalacia / artrosis avanzada** (p. ej. **Tönnis ≥ 2**, espacio articular **< 2 mm**): **peor resultado** de la artroscopia y, a veces, **contraindicación relativa** (el manejo puede ser conservador o protésico, no de preservación). **[verificar umbrales]**
-- **Displasia significativa no corregida** (LCEA bajo): la artroscopia aislada puede **empeorar la inestabilidad**; suele requerir osteotomía/valoración especializada.
-
----
-
-### 8. Seguridad de agentes físicos (ligar a seguridad clínica del expediente)
-
-> El labrum reparado se fija con **anclas (implantes)**; la femoroplastia/acetabuloplastia deja hueso resecado. Capturar en `seguridadClinica` del expediente que hay **material/implante** para que salte la alerta.
-
-- **Con anclas metálicas de la reparación labral → NO** aplicar **radiofrecuencia / diatermia / tecarterapia TÉRMICA / ultrasonido TÉRMICO SOBRE el material** (riesgo de calentamiento del implante y del tejido circundante). Si la clínica tiene **anclas no metálicas/bioabsorbibles**, confirmar con el cirujano; ante la duda, **tratar como metal**.
-- **Osificación heterotópica:** evitar agentes térmicos agresivos sobre la zona en fase inflamatoria; no "forzar" calor profundo sobre hueso resecado reciente.
-- **Agentes como COADYUVANTES** (la carga es el tratamiento): crioterapia/compresión para edema temprano; láser (fotobiomodulación) y tecar **atérmica/leve** o electroterapia analgésica (TENS) para dolor/activación, **lejos del implante y sin modo térmico sobre el material**.
-- **Precauciones generales** (igual que el resto de la biblioteca): anticoagulación, cáncer activo, embarazo, trombosis → revisar antes de cualquier agente físico.
-
----
-
-### 9. Semáforo del dolor (adaptado a cadera de preservación)
-
-```
-VERDE     ≤3/10 durante el ejercicio y normaliza en 24 h, sin aumento de edema ni dolor de ingle   → progresar por criterios
-AMARILLO  4–5/10 o molestia que cede en 24 h, o leve dolor anterior con flexión                      → mantener carga, no progresar, repetir
-ROJO      >5/10, dolor de ingle agudo, chasquido doloroso, edema/derrame que reaparece,              → bajar un escalón, revalorar 48–72 h;
-          dolor anterior de psoas que persiste, o sensación de fallo/inestabilidad                     si inestabilidad o signos de TVP → avisar al cirujano
-```
-Termómetros clave en cadera: **dolor anterior de ingle** (reparación/psoas), **edema/derrame que reaparece** con la progresión y **cojera/Trendelenburg** (control abductor insuficiente).
-
----
-
-### Fuentes
-
-- **Griffin DR, Dickenson EJ, O'Donnell J, et al. The Warwick Agreement on femoroacetabular impingement syndrome (FAI syndrome): an international consensus statement.** *Br J Sports Med.* 2016;50(19):1169–1176. — https://pubmed.ncbi.nlm.nih.gov/27629403/ · PDF: https://www.hiparthroscopyclinic.co.uk/research/downloads/Warwick_Agreement.pdf
-- **Griffin DR, Dickenson EJ, Wall PDH, et al. Hip arthroscopy versus best conservative care for the treatment of femoroacetabular impingement syndrome (UK FASHIoN): a multicentre randomised controlled trial.** *Lancet.* 2018;391(10136):2225–2235. — https://pmc.ncbi.nlm.nih.gov/articles/PMC5988794/ · https://pubmed.ncbi.nlm.nih.gov/29893223/
-- **Wall PDH, Dickenson EJ, Robinson D, et al. Personalised Hip Therapy (PHT): development of a non-operative protocol to treat FAI syndrome in the UK FASHIoN RCT.** *Br J Sports Med.* 2016. — https://pmc.ncbi.nlm.nih.gov/articles/PMC5036255/
-- **State of the Art in Rehabilitation Strategies After Hip Arthroscopy for FAI Syndrome: A Systematic Review.** *J Clin Med.* 2024 (14 estudios, 1105 pacientes; 4 fases; RTS ~90%). — https://www.ncbi.nlm.nih.gov/pmc/articles/PMC11642080/
-- **Structured physical therapy protocols following hip arthroscopy: systematic review.** 2021. — https://pubmed.ncbi.nlm.nih.gov/33948193/
-- **Leo et al. Criteria-Based Rehabilitation Following Revision Hip Arthroscopy: A Clinical Commentary.** *IJSPT* 2023. — https://ijspt.org/wp-content/uploads/2023/04/19-Leo.pdf
-- **Rehabilitation and Return to Sport After Arthroscopic Treatment of FAI (revisión + técnicas avanzadas).** — https://pmc.ncbi.nlm.nih.gov/articles/PMC8811526/
-- **Halliwell et al. Clinical Physical Exam Shows High Sensitivity for Detecting Labral Tears in FAI (clúster FABER+FADIR+RSLR).** *Arthroscopy.* 2026. — https://arthroscopyjournals.onlinelibrary.wiley.com/doi/10.1002/arj.70074
-- **Combining hip impingement and ROM tests increases diagnostic accuracy in FAI.** — https://www.ncbi.nlm.nih.gov/pmc/articles/PMC7511272/
-- **Physical Examination of the Hip: FAI, Labral Pathology, and Microinstability.** — https://pmc.ncbi.nlm.nih.gov/articles/PMC9076795/ · FADIR: https://www.physio-pedia.com/FADIR_(Flexion,_Adduction,_Internal_Rotation)_Test
-- **Hip Microinstability: etiology, diagnosis and treatment** (dial test, aprensión, PART). — https://academic.oup.com/jhps/article/2/2/123/2188787 · https://academic.oup.com/jhps/article/7/2/288/5864907
-- **Complications in Hip Arthroscopy: Recognizing and Managing Adverse Events** (psoas, adherencias, inestabilidad, osificación, TVP). — https://pmc.ncbi.nlm.nih.gov/articles/PMC12396418/ · https://boneandjoint.org.uk/Article/10.1302/2046-3758.17.2000108
-- **Chemoprophylaxis for Heterotopic Ossification After Hip Arthroscopy: Systematic Review and Meta-analysis** (AINE; naproxeno 500 mg c/12 h ×3 sem). 2025. — https://pmc.ncbi.nlm.nih.gov/articles/PMC12835504/
-- **Clasificación/umbrales radiográficos (ángulo alfa, LCEA):** Femoroacetabular Impingement (revisión NIH) — https://pmc.ncbi.nlm.nih.gov/articles/PMC4280287/ · LCEA en FAI — https://pmc.ncbi.nlm.nih.gov/articles/PMC11596748/
-- **Return to running after arthroscopic hip surgery (revisión)** — https://www.drpascualmd.com/pdf/back-to-running1.pdf · **Accelerated rehab and RTS after hip arthroscopy (seguro/efectivo)** — https://pmc.ncbi.nlm.nih.gov/articles/PMC12051851/
-- **Objetivos de retorno al deporte / falta de criterios validados:** OSU Hip Arthroscopy Clinical Practice Guideline (2019) — https://medicine.osu.edu/-/media/files/wexnermedical/patient-care/healthcare-services/sports-medicine/education/medical-professionals/hip/hip-arthroscopy-cpg-2019-(002).pdf · A systematic review of objective RTS criteria following hip arthroscopy — https://orthopedicreviews.openmedicalpublishing.org/article/144729
-- **Protocolos institucionales (restricciones de carga/ROM, bici, distracción, brace):** MGH — https://www.massgeneral.org/assets/MGH/pdf/orthopaedics/sports-medicine/physical-therapy/rehabilitation-protocol-for-hip-labral-postop.pdf · Brigham & Women's — https://www.brighamandwomens.org/assets/BWH/patients-and-families/rehabilitation-services/pdfs/hip-fai-post-op-rehab-protocol.pdf · Lahey — https://www.lahey.org/-/media/files/lhmc/orthopedics/hip/lhmc-hip-arthroscopy-protocol-bts.pdf · OrthoVirginia (precauciones RE/extensión/sentado) — https://www.orthovirginia.com/wp-content/uploads/2022/09/Eastwood-hip-arthroscopy-PT-protocol.pdf · NebraskaOrtho (iliopsoas release) — https://nebraskaortho.com/wp-content/uploads/2023/04/PT-Protocol-Hip-Arthroscopy-with-Iliopsoas-Release.pdf
-- **Non-operative Management and Outcomes of FAI Syndrome** (revisión 2023) — https://link.springer.com/article/10.1007/s12178-023-09863-x
-- **Elimination of a Postoperative Brace Does Not Increase Complications Following Hip Arthroscopy** — https://www.ncbi.nlm.nih.gov/pmc/articles/PMC10337986/
-
-### Incertidumbres [verificar]
-
-- **Cifras de sensibilidad/especificidad de las pruebas** (FADIR, FABER, scour, log roll, Thomas): **muy dispersas entre estudios** y de calidad heterogénea; las del clúster 2026 (S/E "al techo") **están pendientes de replicación**. Tómense como orientativas, no como puntos de corte firmes.
-- **Umbrales radiográficos (ángulo alfa ~55°, LCEA ~40°):** sin consenso internacional; **dependientes del estudio**. Warwick explícitamente **no fijó cortes**. Cítese el umbral que use el radiólogo/cirujano.
-- **Días/semanas de las restricciones post-op** (carga parcial 2–4 sem; "sin RE más allá de neutro ~21 d"; "sin extensión ~17 d"; "sin sentarse >90° ~14 d"; distracción 8/12 sem; NWB 6–8 sem si microfractura): **varían mucho por cirujano y técnica**. **Confirmar SIEMPRE con la hoja del cirujano.**
-- **Tiempos de carrera (~12 sem) y retorno al deporte (~5–6 meses):** orientativos; **no hay criterios de retorno validados para FAI** (OSU CPG 2019). Pivote/contacto/overhead más tarde, sin cifra consensuada.
-- **Umbrales de fuerza (≥80% para correr, ≥90% para deporte, <80% bandera):** consenso de expertos / dependientes de protocolo, no validados.
-- **Incidencias de complicaciones** (osificación heterotópica 0–46%; TVP <1–4%): rangos amplios por subregistro y heterogeneidad.
-- **Pauta de profilaxis de osificación (AINE):** es **indicación médica**; el esquema (naproxeno 500 mg c/12 h ×3 sem, u otros) debe confirmarlo el cirujano.
-- **Tipo de ancla (metálica vs bioabsorbible):** determina la restricción de agentes térmicos; **confirmar con el cirujano**. Ante la duda, tratar como metal.
-- **Umbral de artrosis como contraindicación relativa** (Tönnis ≥2 / espacio <2 mm): citado en la literatura pero con variación; decisión del cirujano.
-
----
-
-## 🦵 RODILLA — ligamentos (LCA) y menisco
+## 🦵 RODILLA — ligamentos (LCA), menisco y tendón rotuliano
 
 > **Nota de uso:** material de referencia para que el fisio ubique fase, restricciones y si el paciente va en tiempo. NO es prescripción automática: el cirujano manda sobre carga/ROM (sobre todo en reparación meniscal y lesiones concomitantes). La evidencia en rehabilitación de rodilla es desigual: fuerte para criterios de retorno al deporte en LCA (Grindem 2016), débil/consenso para menisco (EU-US 2024, mayoría GRADE C-D). Los tiempos son orientativos; **la progresión es por CRITERIOS, no por calendario** (van Melick 2016).
 
 ---
 
-### Reconstrucción de LCA (quirúrgico)
+### Reconstrucción de LCA (ligamento cruzado anterior) — guía post-operatoria semana a semana
 
-> **📋 Encuadre**
+Te reconstruyeron el **ligamento cruzado anterior (LCA)**, el que da estabilidad a la rodilla y evita que "se zafe", con un injerto nuevo que tarda en pegarse al hueso. Esta guía va **semana por semana**: en cada ventana dice qué apoyo toca, qué ejercicios ya puedes hacer y cómo ejecutarlos, y qué todavía no. Lo primero y más importante al inicio: **recuperar la extensión completa** (que la rodilla estire igual que la sana). Se avanza **por logros, no por calendario**; meta global: volver al deporte entre los **9 y 12 meses**. La orden del cirujano siempre manda.
+
+#### ⛔ Lo que protege el injerto — no se negocia
+Nada de giros ni pivoteos con el pie fijo hasta que te autoricen: esa torsión es la que más estresa el injerto nuevo. Y cuida la extensión: recuperar que la rodilla estire completa desde el inicio es la **prioridad #1**.
+
+> **🎗️ Cómo colocar la liga (regla práctica para todo el protocolo).**
 >
-> **🎯 Indicaciones:** Post-reconstrucción de LCA (quirúrgico). Progresión por prehabilitación + 3 fases postop (van Melick 2016); timeline global 9-12 meses, por CRITERIOS no calendario; ajustar según injerto (BPTB/QT/HT/aloinjerto).
+> - **Liga por ARRIBA de la rodilla (supracondílea):** menos palanca sobre la articulación → la opción segura al inicio, para activar glúteo y corregir el valgo ("rodilla que se mete").
+> - **Liga en el TOBILLO para mover la CADERA** (flexión, extensión o abducción de cadera con la rodilla recta, pierna estirada): **sin problema desde temprano** — la rodilla no se mueve, el injerto no sufre. Aquí la liga en el tobillo es buena (más palanca = más trabajo de cadera).
+> - **Liga o peso en el tobillo para EXTENDER la RODILLA en cadena abierta** (pierna colgando): ese sí espera — el peso en el tobillo en el tramo final (de 45° a estirar del todo) tensa el injerto. Las primeras semanas la extensión de rodilla se trabaja en arco protegido (de 90° a 45°) o con el pie apoyado (cadena cerrada).
+
+> **🏋️ Entrena desde el día 1 — todo lo que NO carga la rodilla operada.** Mantiene tu forma y acelera el regreso, desde la primera semana:
 >
-> **⛔ Contraindicaciones / cuándo derivar:** Pérdida de extensión que no recupera → cyclops/artrofibrosis (RM; suele requerir cirugía). Giving way con laxitud brusca → re-rotura del injerto. Bloqueo/clunk → cyclops o lesión meniscal. Derrame caliente + fiebre → infección articular (urgencia). Dolor/edema unilateral de pantorrilla → TVP.
+> - **Core / abdomen:** bicho muerto (dead bug), perro-pájaro (bird-dog), plancha frontal y lateral, anti-rotación con liga (Pallof), puente isométrico.
+> - **Tren superior** (sentado o acostado al inicio): press de pecho, remo, jalón, press de hombro, bíceps, tríceps.
+> - **Pierna sana:** entrénala normal — fortalecerla también ayuda a la operada (efecto cruzado).
+> - **Cardio sin impacto:** ergómetro de brazos; bici cuando el arco de rodilla lo permita.
+
+#### Línea de tiempo — hitos clave
+
+| Hito (lo que la persona logra) | ¿Cuándo, aprox.? |
+|---|---|
+| Estira la rodilla completa (igual que la sana) | **Semana 1–2** |
+| Sube la pierna estirada sin que se le "caiga" la rodilla | **Semana 1–2** |
+| Dobla ~90° | **Semana 2** |
+| Deja las muletas (destete) | **Semana 3–4** |
+| Movimiento completo y marcha normal | **Semana 4–6** |
+| El muslo recupera fuerza (hacia 80% de la sana) | **Semana 8** |
+| Empieza a correr (si cumple criterios) | **Mes 3–4** |
+| Saltos y agilidad | **Mes 4–6** |
+| Vuelve al deporte si pasa todas las pruebas | **≥ 9 meses** |
+
+##### SEMANA 1 — Extensión completa y despertar el muslo
+**Apoyo / muletas:** Según el cirujano: normalmente pisa según tolere con muletas desde el día 0 (si fue solo LCA). Rodillera, si la indican, trabada en estirado para caminar y dormir.
+
+> **✅ YA PUEDE (ideas de ejercicio)**
 >
-> **⚠️ Precauciones:** Extensión completa 0° temprana = prioridad #1 (previene cyclops/artrofibrosis); no sacrificarla por perseguir flexión. Carga WBAT en LCA aislado, pero restringida si hay reparación meniscal concomitante. OKC de cuádriceps: evitar arco terminal 0-45° temprano (tensa el injerto), introducir ~6 sem en arco protegido. El LSI sobreestima la recuperación → comparar con basal pre-lesión. Manda el cirujano sobre carga/ROM.
+> - **Extensión pasiva:** talón en alto o boca abajo con la pierna colgando, deja que estire sola
+> - **Isométricos de cuádriceps** (apretar el muslo) + electroestimulación
+> - **Elevación de pierna recta** (sin que se caiga la rodilla)
+> - Movilización de la rótula, bomba de tobillo, hielo y compresión
 
-#### Diagnóstico — pruebas especiales
-Mejor usarlas en combinación; ningún test aislado confirma/descarta. Cifras de metaanálisis 2022 (Sokal et al., KSSTA) salvo donde se indique:
-- **Lachman:** rodilla ~20-30° flexión, traslación tibial anterior con tope blando = positivo · **Sens ~79% / Esp ~91%** (Sokal 2022; el metaanálisis concluye que la sensibilidad del Lachman **se había sobreestimado** históricamente —antes se citaba 85-87%). Es el más sensible de los tres.
-- **Cajón anterior:** rodilla 90° flexión, tracción tibial anterior · **Sens ~78% / Esp ~91%** (Sokal 2022). Menos útil en agudo (guarding/dolor).
-- **Pivot shift:** valgo + rotación interna en extensión→flexión buscando subluxación-reducción · **Sens ~55% / Esp ~96-97%** (Sokal 2022; rango de sens 55-65% entre revisiones). **Muy específico, poco sensible despierto**; mucho más sensible bajo anestesia. Un pivot shift positivo en consulta es casi confirmatorio de inestabilidad rotatoria.
+> **🚫 TODAVÍA NO**
+>
+> - Doblar a la fuerza
+> - Extensión de rodilla con peso en el tobillo en el tramo final (45° a estirar)
+> - Sentadilla, prensa, estocadas; cargar la pierna de pie
+> - Girar o pivotear sobre el pie fijo
+> - Descuidar la extensión por perseguir la flexión
 
-#### Rehabilitación por fases
-Marco: van Melick 2016 (BJSM, guía KNGF multidisciplinar, 90 estudios) = **prehabilitación + 3 fases postop por criterios** (basada en deficiencias → entrenamiento específico del deporte → retorno al juego); timeline global **9-12 meses**. Complementada con MOON (Wright et al.) y progresión criterio-basada de Wilk & Arrigo (JOSPT 2012).
+##### SEMANA 2 — Doblar a 90° y control
+**Apoyo / muletas:** Pisa cada vez mejor con muletas; marcha mejorando.
 
-**Fase 1 — Protección y control (sem ~0-2 · criterio de entrada: postop inmediato):**
-- Metas: extensión COMPLETA 0° (igualar la sana, incluida hiperextensión fisiológica) — prioridad #1 para prevenir cyclops/artrofibrosis; flexión ≥90° al final de sem 1-2; control de derrame; SLR sin retraso del cuádriceps (extension lag).
-- Restricciones: **carga = WBAT (según tolerancia) con muletas desde el día 0** en LCA aislado (estándar; la carga precoz da resultados comparables a 3 sem sin carga — evidencia limitada, PMC11106972). **Si hay reparación meniscal concomitante → carga restringida varias semanas (ver sección Menisco).** Rodillera: muchos cirujanos ya NO la usan en LCA aislado; si se usa, bloqueada en extensión para marcha/sueño las primeras 1-2 sem (práctica variable, no consensuada).
-- SÍ: extensión pasiva (prono con peso en tobillo, heel props), movilización rotuliana, SLR, isométricos de cuádriceps/electroestimulación, flexión activa-asistida, bomba de tobillo, crioterapia/compresión.
-- NO: hiperflexión forzada; **OKC de cuádriceps en arco terminal (0-45°)** (tensión del injerto); descuidar la extensión (ganar extensión tarde es el principal factor de cyclops).
-- Criterios para AVANZAR: extensión 0° simétrica, flexión ≥90-100°, SLR sin lag, derrame ≤1+, marcha sin muletas con buen control.
+> **✅ YA PUEDE (ideas de ejercicio)**
+>
+> - Seguir ganando **extensión completa**
+> - **Flexión asistida hasta ~90°** (talón resbalando, con ayuda de la otra pierna)
+> - Bici fija sin resistencia, asiento alto, si ya llega al arco
+> - Cadena cerrada ligera: mini-sentadilla con el pie apoyado
 
-**Fase 2 — ROM completo y fuerza (sem ~2-12):**
-- Metas: ROM completo e indoloro a las 4-6 sem; marcha normal sin muletas (típico 2-4 sem al resolver el lag); recuperar cuádriceps progresivamente (LSI del cuádriceps >60% hacia sem 4-6, **>80% hacia sem 8** — Wilk/JOSPT, Delaware).
-- Restricciones: introducir OKC de cuádriceps con cautela; evitar impacto/pivote.
-- SÍ: CKC (sentadilla parcial, prensa, step-ups), bici y elíptica, propiocepción/equilibrio, fortalecimiento de cadena posterior y cadera, **OKC de cuádriceps desde ~6 sem** (MOON) empezando en arco protegido 90-45° y progresando; natación/aqua-jogging. La evidencia actual (van Melick 2016) respalda combinar CKC **y** OKC —los protocolos antiguos eran más restrictivos con OKC.
-- NO: correr, saltar, pivotes, deporte; carga en hiperflexión profunda bajo resistencia si injerto de isquios (ver abajo).
-- Criterios para AVANZAR a carrera: **cuádriceps LSI ≥70-80%** (umbral variable entre fuentes: 70% mínimo citado, muchos exigen 80% —mejor sostenido), **derrame trazo o ausente**, extensión completa, flexión ≥95% del lado sano, hop monopodal indoloro. Suele caer a los **~3-4 meses** (criterio, no calendario).
+> **🚫 TODAVÍA NO**
+>
+> - Forzar la flexión más allá de lo cómodo
+> - Extensión de rodilla con peso en el tobillo en el tramo final (45° a estirar)
+> - Correr, saltar, giros o pivoteos
+> - Sentadilla o prensa pesada
 
-**Fase 3 — Carrera, pliometría y específico del deporte (mes ~3-6+):**
-- Metas: carrera progresiva → pliometría → agilidad → gestos del deporte; cuádriceps LSI subiendo hacia ≥90%.
-- Restricciones: progresar pliometría SOLO tras pasar compuerta de fuerza (habitualmente **LSI ≥80%**); bilateral→unilateral, baja→alta intensidad.
-- SÍ: programa de carrera, pliometría (inicio ~4 meses, p.ej. Sportsmetrics a 4-6 meses — Texas Children's; algunos empiezan plio ligera 8-16 sem), cambios de dirección controlados, reintroducción del gesto deportivo.
-- NO: retorno a competición/contacto antes de cumplir criterios y el mínimo de tiempo (ver retorno).
-- Criterios para AVANZAR: superar la batería de retorno al deporte (abajo).
+##### SEMANA 3–4 — Dejar las muletas (destete)
+**Apoyo / muletas:** Hacer destete de muletas (quitarlas poco a poco). Hacia la semana 4 ya sin muletas si caminas sin cojear.
 
-#### Criterios de RETORNO AL DEPORTE (objetivos)
-- **Tiempo mínimo ≥9 meses** desde cirugía (Grindem 2016): retornar <9 meses se asoció a riesgo de re-lesión **hasta ~7×** mayor (Beischer 2020, reportado). Injertos BPTB/cuádriceps/aloinjerto a menudo empujan a **9-12 meses**.
-- **Fuerza de cuádriceps LSI ≥90%** (isocinético 60°/s; también isquios ≥90%). Cada **+1% de simetría de cuádriceps = −3% de re-lesión** (Grindem 2016).
-- **Batería de hop tests ≥90% LSI** en cada uno: salto único, triple, cruzado, 6-m cronometrado (SMU 2025). Precaución: el LSI **sobreestima** la recuperación (el lado "sano" también se debilita) — comparar contra pre-lesión cuando sea posible (Wellsandt/JOSPT 2017: solo 16/40 que pasaban 90% LSI lo pasaban vs. su basal).
-- **Listo psicológico: ACL-RSI ≥80%** (algunas revisiones usan ~68-71 como mínimo; cifra variable). Es de los predictores más potentes de retorno exitoso.
-- **Derrame trazo-a-cero**, ROM completo, técnica de aterrizaje sin valgo dinámico.
-- **Regla de decisión Grindem 2016:** retorno ≥9 meses **+** cuádriceps LSI ≥90% al retornar → **reducción del 84%** de re-lesión (cada mes de retraso hasta los 9 meses = −51% de riesgo).
+> **✅ YA PUEDE (ideas de ejercicio)**
+>
+> - **Cadena cerrada:** sentadilla parcial, prensa, step-ups con liga arriba de la rodilla para alinear
+> - **Glúteo mayor:** puente bipodal; **glúteo medio:** abducción de lado y "monster walks" con liga arriba de la rodilla
+> - **Tríceps sural:** elevación de talón bipodal (gemelo y sóleo)
+> - Propiocepción en dos pies; bici progresando
 
-#### Timeline típico (hitos para saber si va en tiempo o desfasado)
-- Sem 1-2: extensión 0°, flexión ~90°, SLR sin lag, marcha con muletas WBAT.
-- Sem 4-6: ROM completo, sin muletas, cuádriceps >60-80%.
-- Sem 8: cuádriceps ~80%, derrame mínimo; OKC de cuádriceps ya en curso (desde sem 6).
-- Mes 3-4 (sem 12-16): inicia **carrera** (si cuádriceps LSI ≥70-80% + sin derrame).
-- Mes 4-6: **pliometría/salto** tras compuerta de fuerza; agilidad.
-- Mes 6-9: específico del deporte, testing tardío.
-- **≥9 meses:** retorno al deporte si pasa la batería completa.
-- **Desfasado / bandera amarilla:** sin extensión completa a las 4-6 sem; cuádriceps <80% a los 3 meses; derrame recurrente con actividad; no corre a los 4-5 meses.
+> **🚫 TODAVÍA NO**
+>
+> - Correr, saltar, pliometría
+> - Giros, pivoteos y cambios de dirección sobre el pie fijo
+> - Extensión de rodilla en cadena abierta con peso en el tobillo (tramo final)
+> - Sentadilla muy profunda con carga
 
-**Diferencias por injerto (relevantes para la progresión):**
-- **HTH / BPTB (hueso-tendón rotuliano-hueso):** dolor de rodilla anterior y déficit de cuádriceps más marcados; **más lento en alcanzar hitos y criterios de retorno** (ACL-SPORTS, JOSPT 2020). Cuidar la rodilla al arrodillarse; énfasis extra en cuádriceps. Incorporación biológica más rápida y menor tasa de re-rotura que isquios (narrativa, discutido).
-- **Isquiotibiales (HT):** recuperación de cuádriceps más rápida, pero **déficit de fuerza de isquios/flexión profunda más persistente**; cautela con carga de flexión profunda/resistida las primeras semanas; vigilar simetría de isquios a 60/90°.
-- **Tendón de cuádriceps (QT):** cada vez más usado, **menor morbilidad del sitio donante que BPTB**, pero **déficit de cuádriceps similar a BPTB** → priorizar cuádriceps y no acelerar. Resultados globales (fallo, laxitud, PRO, retorno) similares a HT/BPTB en metaanálisis de ECA 2025.
-- **Aloinjerto:** incorporación biológica más lenta → timeline de retorno más conservador; **mayor tasa de fallo en jóvenes/activos** → preferir 9-12 meses.
-- Dato normativo: la fuerza de cuádriceps no difiere mucho por injerto a los 6-9 meses; sexo y estado meniscal influyen más que el injerto (Schwery et al., IJSPT). Varones con BPTB alcanzan 80% de simetría antes que mujeres (5.7 vs 7.1 meses).
+##### SEMANA 5–6 — Movimiento completo y primera fuerza
+**Apoyo / muletas:** Marcha normal.
 
-#### Contraindicaciones / banderas rojas
-- **Pérdida de extensión que no recupera** → sospecha de **lesión de cyclops / artrofibrosis** (confirmar por RM; suele requerir cirugía, no se "rehabilita"). Déficit de extensión precoz es el factor de riesgo principal.
-- Derrame caliente + fiebre → **infección articular** (urgencia).
-- Dolor en pantorrilla, edema unilateral → **TVP**.
-- Clunk mecánico / bloqueo → cyclops o lesión meniscal asociada.
-- Inestabilidad franca (giving way) con ganancia brusca de laxitud → sospecha de **re-rotura del injerto**.
-- Dolor femoropatelar progresivo con OKC agresivo (sobre todo BPTB/QT) → ajustar dosis/arco.
+> **✅ YA PUEDE (ideas de ejercicio)**
+>
+> - **Sentadilla a 90° y prensa**, con liga arriba de las rodillas
+> - **Step-ups**, peso muerto rumano ligero (cadena posterior)
+> - **Extensión de rodilla en máquina** desde ~semana 6, en arco protegido (90° a 45°), sin el tramo final pesado
+> - Propiocepción en una pierna iniciando
 
-#### Fuentes
-- van Melick N, et al. *Br J Sports Med* 2016;50:1506-15 — guía práctica de rehabilitación de LCA (base multidisciplinar/criterio) [[PDF](https://andreasphysioblog.com/wp-content/uploads/2022/05/Van-melick-2016-Evidence-based-clinical-practice-up.pdf)]
-- Grindem H, et al. (Delaware-Oslo). *Br J Sports Med* 2016;50:804-8 — reglas de decisión (−84% re-lesión) [[ref](https://orthopedicindex.com/library/grindem-2016-simple-decision-rules-can-reduce-reinjury-risk-by-84-after-acl-reconstruction)]
-- MOON ACL Rehabilitation Guidelines (Wright et al.) — fases, OKC a las 6 sem [[ref](https://www.jospt.org/doi/10.2519/jospt.2012.3871)]
-- Wilk KE, Arrigo C. *J Orthop Sports Phys Ther* 2012 — progresión criterio-basada
-- ACL-SPORTS secondary analysis. *JOSPT* 2020 — BPTB más lento en hitos/retorno [[ref](https://www.jospt.org/doi/10.2519/jospt.2020.9111)]
-- Schwery N, et al. *IJSPT* — valores normativos de fuerza de cuádriceps por sexo/injerto a 3-6-9 meses [[ref](https://ijspt.scholasticahq.com/article/32378)]
-- Leung et al. *Annals of Joint* — consideraciones postop por tipo de injerto [[ref](https://aoj.amegroups.org/article/view/8067/html)]
-- Sokal et al. *KSSTA* 2022 — metaanálisis de tests de LCA (Lachman sobreestimado) [[ref](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC9464183/)]
-- Wellsandt E, et al. *JOSPT* 2017 — el LSI sobreestima la función [[ref](https://www.jospt.org/doi/10.2519/jospt.2017.7285)]
+> **🚫 TODAVÍA NO**
+>
+> - Extensión de rodilla en el tramo final (45° a estirar) con peso en el tobillo
+> - Correr, saltar, pliometría
+> - Giros, pivoteos y cambios de dirección
 
----
+##### SEM 7–12 — Fuerza, el muslo hacia 80%
+**Apoyo / muletas:** Normal.
+
+> **✅ YA PUEDE (ideas de ejercicio)**
+>
+> - Fuerza progresiva en cadena cerrada (sentadilla, prensa, zancadas controladas) y extensión de rodilla **ampliando el arco poco a poco**
+> - Cadena posterior, cadera completa (abducción, extensión, aducción en polea)
+> - Bici con resistencia, elíptica, natación
+
+> **🚫 TODAVÍA NO**
+>
+> - Correr, saltar o pivotear todavía
+> - Cambios de dirección y deportes con giro
+> - Pliometría de alta intensidad
+
+##### MES 3–4 — Empezar a correr
+**Apoyo / muletas:** Normal.
+
+> **✅ YA PUEDE (ideas de ejercicio)**
+>
+> - **Programa de carrera progresivo** (empieza alternando caminar y trotar) si el muslo llegó a ≥70–80% de la pierna sana y no hay hinchazón
+> - Seguir subiendo la fuerza
+
+> **🚫 TODAVÍA NO**
+>
+> - Saltos de alta intensidad y cambios de dirección antes de pasar la prueba de fuerza
+> - Pivotes y deporte de contacto
+> - Correr en terreno irregular al inicio
+
+##### MES 4–6 — Saltos y agilidad
+**Apoyo / muletas:** Normal.
+
+> **✅ YA PUEDE (ideas de ejercicio)**
+>
+> - **Pliometría** (saltos de menos a más, de dos piernas a una)
+> - Cambios de dirección controlados, reintroducir el gesto del deporte
+
+> **🚫 TODAVÍA NO**
+>
+> - Volver a competir o al contacto antes de cumplir criterios Y tiempo
+> - Pivotes y cambios de dirección máximos sin haber hecho la progresión
+
+##### ≥ 9 MESES — Volver al deporte
+**Apoyo / muletas:** Normal.
+
+> **✅ YA PUEDE (ideas de ejercicio)**
+>
+> - **Retorno al deporte** si pasas toda la batería: fuerza del muslo y saltos ≥90% de la pierna sana, confianza (cuestionario), sin hinchazón, aterrizas sin que la rodilla se meta
+
+> **🚫 TODAVÍA NO**
+>
+> - Volver antes de ≥9 meses Y de pasar las pruebas (volver antes dispara el riesgo de re-lesión)
+
+#### 🚩 Señales de alarma — avisa o acude de inmediato
+- La rodilla **no termina de estirar** y no mejora → avisa pronto (es lo más importante de vigilar).
+- Rodilla **caliente + hinchada + fiebre** → posible infección **(URGENCIA)**.
+- Dolor e hinchazón en la **pantorrilla de una sola pierna** → posible coágulo.
+- La rodilla **"se zafa"** de repente con aflojamiento → avísame.
+
+> **La orden del cirujano SIEMPRE manda** sobre estos tiempos. El tipo de injerto (de tu propio tendón o de banco) puede cambiar un poco el ritmo.
 
 ### Menisco — guía post-operatoria semana a semana (meniscectomía vs reparación)
 
@@ -2862,6 +2764,125 @@ El menisco es el "cojín" de cartílago que amortigua la rodilla. Esta guía va 
 No es parte de la guía del paciente. Ningún test aislado confirma o descarta; combinar historia + interlínea + provocación. **Dolor en interlínea** (sens ~63% / esp ~77%, buen cribado), **McMurray** (~70% / ~71%), **Thessaly** (muy variable según la fuente), **Apley** (~60% / ~70%, el menos sensible). Marco de rehabilitación: **Consenso EU-US 2024 (ESSKA-AOSSM-AASPT), evidencia GRADE C-D**. Progresión por criterios, no por calendario.
 
 ---
+
+### Tendón rotuliano (rodilla de saltador) — guía por tipo, semana a semana
+
+El tendón rotuliano une la rótula con la tibia (el hueso de la espinilla). Se trata con **carga progresiva**: el ejercicio es el tratamiento y los aparatos (láser, TECAR, ultrasonido) solo acompañan. Lo primero es saber **QUÉ tipo es**. El tendón se estresa al máximo en **flexión profunda de rodilla bajo carga** (sentadilla profunda, aterrizar de un salto) — por eso eso se controla al inicio. El termómetro es la **rigidez o el dolor de la mañana**. Se avanza por logros, no por calendario.
+
+#### ⛔ PRIMERO: ¿qué tipo es? — de esto depende TODO
+Ubica dónde y cómo duele:
+- **Tendinopatía ("rodilla de saltador"):** duele en el polo inferior de la rótula (justo debajo del hueso de la rodilla), al saltar, aterrizar, ponerse en cuclillas o bajar escaleras. Es una sobrecarga; mejor pronóstico. La más común en quien salta.
+- **Desgarre parcial del polo inferior:** hubo una lesión más aguda (no solo desgaste). Se trata parecido, pero respetando la cicatriz: más cuidado con la flexión profunda bajo carga en las primeras fases.
+- Si el tendón se **rompió por completo o fue reparado con cirugía**, ese es otro protocolo (manda el cirujano): avísame y lo armamos aparte.
+
+**Agentes físicos por fase** (acompañan a la carga, no la sustituyen):
+- **Fase aguda:** láser (fotobiomodulación) en el foco; TECAR atérmica para analgesia; ultrasonido pulsado si hay edema; hielo tras la sesión.
+- **Fase de carga:** láser y TECAR antes o después de la carga; la carga (HSR) es el tratamiento.
+- **Fase avanzada:** los aparatos casi se retiran; foco en carga, potencia y gesto.
+- **Ondas de choque:** útil en tendinopatía crónica o calcificante como apoyo puntual — no en desgarre agudo.
+
+> **⚠️ Seguridad:** nada de radiofrecuencia, diatermia, TECAR térmica ni ultrasonido térmico sobre material de osteosíntesis, prótesis o marcapaso. Precaución con anticoagulación, cáncer activo, embarazo y trombosis.
+
+| Semáforo del dolor (Silbernagel) | Qué hacer |
+|---|---|
+| **VERDE ≤3/10** | durante el ejercicio, que se normaliza en 24 h y sin más rigidez en la mañana → progresa. |
+| **AMARILLO 4–5/10** | o molestia que tarda en irse → mantén la carga, no subas, repite la semana. |
+| **ROJO >5/10** | o la rigidez matutina empeora, o el síntoma dura más de 24 h → baja un escalón y reevalúa en 48–72 h. |
+
+#### El mapa completo (las semanas son guía; se avanza por criterios)
+
+| Fase | Semanas | Qué se hace |
+|---|---|---|
+| **M1** | sem 1–3 | Descarga y analgesia. Isométricos de cuádriceps, proteger el tendón. |
+| **M2** | sem 4–8 | Carga lenta (HSR) — introducción. Sentadilla, prensa, extensión en arco controlado. |
+| **M3** | sem 9–14 | Fuerza pesada (HSR), rango completo, unilateral. |
+| **M4** | sem 15–20 | Energía elástica y pliometría. Saltos y aterrizajes. |
+| **M5** | sem 21–24 | Readaptación deportiva. Salto, aterrizaje, cambios de dirección. |
+
+##### SEM 1–3 · M1 — Bajar el dolor y despertar el muslo
+**Apoyo / muletas:** Normal (caminar). Evita bajar escaleras rápido y ponerte en cuclillas.
+
+> **✅ YA PUEDE (ideas de ejercicio)**
+>
+> - **Isométrico de cuádriceps** (sentadilla española con liga, o en máquina de extensión en ángulo medio) **5 × 45 seg a ~70%**, sin dolor — baja el dolor del tendón
+> - Movilidad; agentes (láser / TECAR / ultrasonido pulsado)
+
+> **🚫 TODAVÍA NO**
+>
+> - Saltar, aterrizar, correr
+> - Sentadilla o cuclilla profunda, bajar escaleras rápido
+> - Prensa o sentadilla pesadas
+
+> **⊕ Si es DESGARRE parcial:** isométricos más suaves y cuidando la cicatriz; progresa más lento y confirma rangos con el fisioterapeuta.
+
+##### SEM 4–8 · M2 — Empezar la carga lenta (HSR)
+**Apoyo / muletas:** Normal.
+
+> **✅ YA PUEDE (ideas de ejercicio)**
+>
+> - **Sentadilla** (goblet con talones elevados), **prensa** y **extensión de rodilla**, tempo 3 seg sube / 3 seg baja, **3 × 12–15 bajando a 3 × 10–12**
+> - Rango controlado (no profundo todavía); tres veces por semana en días alternos
+
+> **🚫 TODAVÍA NO**
+>
+> - Saltos, pliometría, correr
+> - Sentadilla profunda bajo carga y aterrizajes
+> - Subir la carga de golpe
+
+> **⊕ DESGARRE parcial:** mantén el rango aún más corto y sube el peso más despacio — la cicatriz manda.
+
+##### SEM 9–14 · M3 — Fuerza pesada (HSR)
+**Apoyo / muletas:** Normal.
+
+> **✅ YA PUEDE (ideas de ejercicio)**
+>
+> - Progresar a **3–4 × 8** (y hacia **4 × 6** en lo más avanzado), rango completo, énfasis en la bajada (excéntrico)
+> - Añadir unilateral (una pierna)
+> - Sube el peso en escalones chicos, nunca de golpe
+
+> **🚫 TODAVÍA NO**
+>
+> - Saltos de alta intensidad y carrera todavía
+> - Romper la regla del dolor (si amanece peor, baja un escalón)
+
+##### SEM 15–20 · M4 — Energía elástica y pliometría
+**Apoyo / muletas:** Normal.
+
+> **✅ YA PUEDE (ideas de ejercicio)**
+>
+> - **Pliometría progresiva:** saltos y aterrizajes de menos a más — volumen antes que intensidad
+> - Mantener 2 × semana el HSR pesado como base
+
+> **🚫 TODAVÍA NO**
+>
+> - Saltos máximos o competir antes de tolerar la pliometría
+> - Cambios de dirección bruscos al inicio
+
+##### SEM 21–24 · M5 — Readaptación deportiva
+**Apoyo / muletas:** Normal.
+
+> **✅ YA PUEDE (ideas de ejercicio)**
+>
+> - Salto, aterrizaje y cambios de dirección específicos del deporte
+> - Reintroducir el gesto deportivo
+
+> **🚫 TODAVÍA NO**
+>
+> - Competir antes de cumplir los criterios de retorno
+
+#### Criterios de retorno — hay que cumplir TODO
+- **Fuerza del muslo:** cuádriceps ≥90% de la pierna sana.
+- **Saltos:** hop / salto ≥90% de simetría con la otra pierna.
+- **Cuestionario:** VISA-P en ascenso (escala de función del tendón rotuliano que llena el paciente).
+- **Gesto:** sin dolor en el polo inferior al saltar, aterrizar o en el gesto del deporte.
+
+#### 🚩 Señales de alarma — avisa de inmediato
+- **Dolor agudo con un esfuerzo + no puedes estirar la rodilla** (extensión) → posible rotura del tendón, acude de inmediato.
+- Pérdida de fuerza para subir escaleras o levantarte de la silla.
+- Aumento marcado de edema o dolor que no cede.
+- La rigidez de la mañana empeora semana a semana → vas sobrecargado, baja la carga y avísame.
+
+> **La carga es el tratamiento; los aparatos acompañan.** Si hubo cirugía o material, la orden del cirujano manda sobre estos tiempos.
 
 ### Notas transversales de incertidumbre (marcar al afinar)
 1. **Tiempos = orientativos, criterios = mandan.** Los rangos de semanas varían ampliamente entre instituciones; progresar por metas objetivas (van Melick 2016).
@@ -3705,66 +3726,220 @@ Este documento es análogo a `docs/biblioteca_protocolos.md` (MSK) y `docs/bibli
 
 ---
 
-### 4) Ruptura del tendón de AQUILES (ambos: quirúrgico y conservador — rehab funcional temprana en ambos)
+### Tendón de Aquiles — guía por tipo, semana a semana (porción media · insercional · roto/reparado)
 
-> **📋 Encuadre**
+El tendón de Aquiles une la pantorrilla con el talón. Se trata con **carga progresiva**: el ejercicio es el tratamiento y los aparatos (láser, TECAR, ultrasonido) solo acompañan. Lo primero es saber **QUÉ tipo es**, porque el ejercicio que cura a uno puede empeorar al otro. El termómetro más fiable es la **rigidez o el dolor de la mañana**: si amanece peor, hubo sobrecarga aunque durante el ejercicio no doliera. Se avanza por logros, no por calendario.
+
+#### ⛔ PRIMERO: ¿qué tipo de Aquiles es? — de esto depende TODO
+Ubica dónde duele. No es lo mismo el tendón irritado que el tendón roto, y dentro del irritado, no es lo mismo arriba que pegado al hueso:
+- **Porción media (el más común):** duele en el cordón del tendón, uno o dos dedos por arriba del talón. Mejor pronóstico. Aquí estirar bajo carga ayuda — en fases avanzadas puede bajar el talón del escalón.
+- **Insercional:** duele justo donde el tendón se pega al hueso del talón (atrás y abajo); a veces hay un bulto duro (Haglund). Más lento. Estirar el tobillo hacia arriba **APLASTA el tendón contra el hueso** → por eso NO se baja del escalón.
+- **Roto / reparado:** el tendón se rompió (te operaron, o traes bota con cuñas). Otro mundo: primero se protege la reparación y se progresa despacio; no se estira temprano. **Manda el cirujano.**
+
+Esta guía tiene dos partes: **Sección 1** para el tendón irritado (porción media e insercional, con lo que cambia en cada uno marcado con ⊕) y **Sección 2** para el tendón roto o reparado.
+
+**Agentes físicos por fase** (acompañan a la carga, no la sustituyen):
+- **Fase aguda:** láser (fotobiomodulación) en el foco; TECAR atérmica para analgesia; ultrasonido pulsado si hay edema; hielo tras la sesión.
+- **Fase de carga:** láser y TECAR antes o después de la carga; la carga (HSR) es el tratamiento.
+- **Fase avanzada:** los aparatos casi se retiran; foco en carga, potencia y gesto.
+- **Ondas de choque:** útil en tendinopatía crónica o calcificante (más en insercional con calcificación) — no en desgarre agudo ni sobre un tendón recién reparado.
+
+> **⚠️ Seguridad:** nada de radiofrecuencia, diatermia, TECAR térmica ni ultrasonido térmico sobre material de osteosíntesis, prótesis o marcapaso. Precaución con anticoagulación, cáncer activo, embarazo y trombosis.
+
+| Semáforo del dolor (Silbernagel) | Qué hacer |
+|---|---|
+| **VERDE ≤3/10** | durante el ejercicio, que se normaliza en 24 h y sin más rigidez en la mañana → progresa. |
+| **AMARILLO 4–5/10** | o molestia que tarda en irse → mantén la carga, no subas, repite la semana. |
+| **ROJO >5/10** | o la rigidez matutina empeora, o el síntoma dura más de 24 h → baja un escalón y reevalúa en 48–72 h. |
+
+#### Sección 1 — Tendón IRRITADO (tendinopatía): porción media e insercional
+
+El mapa completo (las semanas son guía; se avanza por criterios):
+
+| Fase | Semanas | Qué se hace |
+|---|---|---|
+| **M1** | sem 1–2 | Analgesia e isométricos. |
+| **M2** | sem 3–6 | Carga lenta (HSR) — introducción. |
+| **M3** | sem 7–12 | Fuerza pesada (HSR), unilateral. |
+| **M4** | sem 13–18 | Energía elástica (rebote y saltos). |
+| **M5** | sem 19–24 | Readaptación y carrera. |
+
+##### SEM 1–2 · M1 — Bajar el dolor y despertar el tendón
+**Apoyo / muletas:** Normal (caminar).
+
+> **✅ YA PUEDE (ideas de ejercicio)**
 >
-> **🎯 Indicaciones:** Ruptura aguda del tendón de Aquiles, vía quirúrgica o conservadora. Con rehabilitación funcional temprana ambas dan resultados similares (incluida re-ruptura); lo que más importa es la rehab funcional temprana, sea cual sea la vía.
+> - **Isométrico de gemelo** (de puntas, aguanta arriba) **5 × 45 seg a ~70%** de tu fuerza, en rango neutro
+> - Movilidad suave de tobillo; agentes (láser / TECAR / ultrasonido pulsado)
+
+> **🚫 TODAVÍA NO**
 >
-> **⛔ Contraindicaciones / cuándo derivar:** Dorsiflexión forzada/caída en fase temprana = riesgo de RE-RUPTURA (urgencia relativa). Signos de TVP (pantorrilla dolorosa, edema, calor). Infección de herida (post-op) o lesión del nervio sural. Tendón que se "alarga" (brecha de dorsiflexión excesiva, incapacidad de heel-rise) → revalorar.
+> - Correr, saltar, brincar
+> - Cuestas y escaleras pesadas
+
+> **⊕ Si es INSERCIONAL:** el isométrico en neutro o en puntas (plantiflexión), nunca con el talón caído. Evita los estiramientos que lleven el tobillo hacia arriba — aplastan la inserción.
+
+##### SEM 3–6 · M2 — Empezar la carga lenta (HSR)
+**Apoyo / muletas:** Normal.
+
+> **✅ YA PUEDE (ideas de ejercicio)**
 >
-> **⚠️ Precauciones:** Fase 1 en equino con bota walker + cuñas de talón ~3 cm; carga según tolerancia desde ~las 2 primeras sem. NO dorsiflexión más allá de neutro ni estiramiento pasivo del tríceps sural precoz [verificar umbral con el cirujano]. Destete de cuñas sem 4→8. Iniciar carrera por criterios de fuerza (heel-rise monopodal), no por fecha. Vigilar TVP en inmovilización. Progresar por criterios.
+> - **Elevación de talón**, tempo 3 seg sube / 3 seg baja, **3 × 12–15**, tres veces por semana en días alternos
+> - Bipodal → unipodal conforme toleres
+> - De pie (trabaja el gemelo) y sentado (trabaja el sóleo)
 
-> **Mensaje central (AOFAS 2024 + metaanálisis):** con **rehabilitación funcional temprana** (movilización y carga precoces), el tratamiento **quirúrgico y el no operatorio dan resultados similares, incluida la re-ruptura.** La decisión qx vs conservador se individualiza; **lo que más importa es la rehab funcional temprana, sea cual sea la vía.**
+> **🚫 TODAVÍA NO**
+>
+> - Saltar, correr, pliometría
+> - Subir la carga de golpe
 
-#### Diagnóstico — pruebas especiales
-- **Thompson / Simmonds** (prono, pie fuera de la camilla, se comprime la pantorrilla; normal = flexión plantar; **ausencia de flexión plantar = positivo** = ruptura completa): · **Sens ~96% / Esp ~93%** (metaanálisis Wang 2013; serie Maffulli 174 pts 0.96/0.93). Rule-in fuerte. ⚠ Puede haber flexión plantar residual (flexores largos) → no descarta por sí solo.
-- **Palpación del gap** (defecto palpable **~2–6 cm proximal a la inserción en calcáneo**): sin Sens/Esp robustas publicadas; **combinar** con Thompson + **incapacidad de talón monopodal** + mayor dorsiflexión en reposo (prueba de Matles) para el "clúster" diagnóstico.
-- Si duda clínica → **ecografía/RM**. (Ottawa no aplica al tendón; sirve para descartar fractura asociada.)
+> **⊕ INSERCIONAL:** haz la elevación en el piso (de 0 a puntas), SIN bajar el talón por debajo del escalón. **Porción media:** rango completo, y más adelante puede añadir el déficit (bajar del escalón).
 
-#### Rehabilitación por fases (modelo funcional temprano; aplica a conservador y a post-reparación)
-**Fase 1 — Protección en equino, carga precoz (sem ~0–4 · criterio de entrada: dx confirmado / post-op):**
-- Metas: proteger el tendón en acortamiento (equino), permitir carga temprana.
-- Restricciones: **bota walker con cuñas de talón ~3 cm (equino) · carga según tolerancia desde ~las 2 primeras sem** (AOFAS 2024: la evidencia favorece carga dentro de ~2 sem). **ROM: flexión plantar activa libre; NO dorsiflexión más allá de neutro; NO estiramiento pasivo del tríceps sural** (⚠ convención biomecánica para proteger la reparación/cicatrización; la tendencia moderna es a movilidad activa temprana a neutro — confirmar umbral con el cirujano).
-- SÍ: carga en bota con cuñas, dorsiflexión **activa solo hasta neutro**, flexión plantar activa, movilidad de dedos, control de edema.
-- NO: dorsiflexión pasiva/forzada, estiramiento del gastro-sóleo, caminar sin bota, flexión plantar resistida pesada.
-- Criterios para AVANZAR: herida ok, tolera carga en bota, control de dolor/edema.
+##### SEM 7–12 · M3 — Fuerza pesada (HSR)
+**Apoyo / muletas:** Normal.
 
-**Fase 2 — Retiro progresivo de cuñas y de la bota (sem ~4–8):**
-- Metas: llevar el tobillo hacia neutro, destetar cuñas y bota, iniciar fuerza.
-- Restricciones (esquema representativo tipo acelerado/UK STAR): **cuñas 3 cm × 4 sem → 1.5 cm × 2 sem → neutro × 2 sem → carga total fuera de bota ~sem 8** (ClinicalTrials NCT02598843). **Retirar bota ~sem 8 cuando: dorsiflexión ≈ neutro y marcha indolora.**
-- SÍ: dorsiflexión progresiva hacia neutro/ligero positivo, fortalecimiento isométrico→concéntrico suave, propiocepción, bici; hacia el final, elevaciones de talón bilaterales.
-- NO: dorsiflexión forzada agresiva, salto, carrera, sobreestiramiento.
-- Criterios para AVANZAR: fuera de bota con marcha normal, **~10 elevaciones de talón monopodales** para iniciar fortalecimiento en carga.
+> **✅ YA PUEDE (ideas de ejercicio)**
+>
+> - Progresar hacia **3 × 8 (8RM)**, manteniendo el tempo 3-3
+> - Unilateral y prensa de gemelo / con mancuerna
+> - Sube el peso en escalones chicos, nunca de golpe (el tendón castiga el salto brusco de carga)
 
-**Fase 3 — Fuerza y resistencia (sem ~8–~16+):**
-- Metas: fuerza del flexor plantar, altura de talón, patrón de marcha/trote.
-- SÍ: progresión a **talón monopodal**, fortalecimiento progresivo (incluye excéntrico), equilibrio avanzado; iniciar carrera **cuando se cumplen criterios de fuerza** (no por fecha).
-- Criterios para iniciar carrera: **25 elevaciones de talón monopodales con altura dentro del 20% del lado sano** (criterio tipo UK STAR / Ohio State).
+> **🚫 TODAVÍA NO**
+>
+> - Saltos de alta intensidad y carrera todavía
+> - Romper la regla del dolor (si amanece peor, baja un escalón)
 
-**Fase 4 — Retorno al deporte (meses ~6–12):**
-- SÍ: pliometría, agilidad, gesto deportivo, retorno gradual.
-- Criterios: ver retorno al deporte.
+> **⊕ INSERCIONAL:** sigue sin déficit (sin bajar del escalón). **Porción media:** ya puede meter déficit controlado si no hay dolor matutino.
 
-#### Criterios de RETORNO AL DEPORTE (objetivos)
-- **Fuerza de flexores plantares / altura de heel-rise ≥90% LSI** (algunos 95%); **heel-rise test** (número/altura/trabajo total) simétrico.
-- **Hop tests ≥90% LSI** y tareas de estiramiento-acortamiento (no basta fuerza en cadena cerrada).
-- **ATRS ≥95/100** (autorreporte Achilles).
-- Tiempos: **agilidad específica del deporte ~6 meses** con 90–100% LSI; retorno completo frecuentemente **6–12 meses**. Volver antes de cumplir criterios → peores tasas de re-lesión.
+##### SEM 13–18 · M4 — Energía elástica (rebote y saltos)
+**Apoyo / muletas:** Normal.
 
-#### Timeline típico (para detectar desfase)
-- Carga en bota **~2 sem**; destete de cuñas **sem 4→8**; **fuera de bota ~sem 8** (si DF≈neutro + marcha indolora); talón monopodal **~sem 10–12**; **carrera cuando cumple fuerza (≈3–4 meses)**; **deporte 6–12 meses.**
-- ⚠ Alta variabilidad entre protocolos (p.ej. algunas guías NHS difieren carrera a 5–6 meses o fases finales 8–12 meses). Si a las ~12 sem no hace talón monopodal → revisar elongación del tendón (tendón "largo"/débil), adherencia, dorsiflexión excesiva temprana.
+> **✅ YA PUEDE (ideas de ejercicio)**
+>
+> - **Skipping, pogos y saltos progresivos** — volumen antes que intensidad
+> - Mantener 2 × semana el HSR pesado como base
 
-#### Contraindicaciones / banderas rojas
-- **Dorsiflexión forzada/caída** en fase temprana = riesgo de **re-ruptura** (urgencia relativa).
-- Signos de **TVP** (pantorrilla dolorosa, edema, calor — mayor riesgo en inmovilización), infección de herida (post-op), lesión del nervio sural.
-- Tendón que se "alarga" (brecha de dorsiflexión excesiva, incapacidad de heel-rise) → revalorar.
+> **🚫 TODAVÍA NO**
+>
+> - Correr a alta intensidad antes de tolerar los saltos
+> - Saltar en terreno irregular al inicio
 
-#### Fuentes
-- **AOFAS Position Statement, Management of Acute Achilles Tendon Ruptures, nov 2024.** · Metaanálisis rehab funcional acelerada no-op (2021). · Revisión narrativa "How Early Is Early?" (2024). · **UK STAR trial** (yeso vs bracing funcional; Costa et al.). · Protocolo ClinicalTrials NCT02598843 (esquema de cuñas). · Protocolo Ohio State reparación de Aquiles (criterios de heel-rise/LSI). · Wang 2013 / Maffulli (Thompson test).
+> **⊕ INSERCIONAL:** mete el impacto más despacio — la caída en dorsiflexión comprime la inserción. Vigila la mañana siguiente.
 
----
+##### SEM 19–24 · M5 — Volver a correr y al deporte
+**Apoyo / muletas:** Normal.
+
+> **✅ YA PUEDE (ideas de ejercicio)**
+>
+> - **Programa de carrera progresivo** (alterna caminar y trotar)
+> - Gesto específico del deporte, cambios de dirección
+
+> **🚫 TODAVÍA NO**
+>
+> - Competir o correr al máximo antes de cumplir los criterios de retorno
+
+#### Sección 2 — Tendón ROTO O REPARADO (protocolo distinto)
+
+Aquí el chip cambia. Si el tendón se rompió (operado o en bota con cuñas), primero se protege la reparación y se sube la carga despacio. **NO se estira el tendón temprano:** se puede alargar o volver a romper. El cirujano manda sobre los tiempos, las cuñas y cuándo dejar la bota.
+
+Línea de tiempo (según el cirujano):
+
+| Hito (lo que la persona logra) | ¿Cuándo, aprox.? |
+|---|---|
+| Bota con cuñas, carga protegida | **Sem 0–2** |
+| Empieza a quitar cuñas (destete) | **Sem 2–6** |
+| Deja la bota, camina normal | **~Sem 8** |
+| Empieza la fuerza (HSR) | **Sem 8–12** |
+| Saltos y carrera | **Mes 3–6** |
+| Vuelve al deporte | **6–9 meses** |
+
+##### SEM 0–2 — Proteger la reparación
+**Apoyo / muletas:** Bota con cuña de talón (pie en puntas). Carga según el cirujano (a veces parcial, con muletas).
+
+> **✅ YA PUEDE (ideas de ejercicio)**
+>
+> - Mover los dedos del pie
+> - Isométricos muy suaves de gemelo solo si el cirujano lo autoriza
+> - Cuidar la cicatriz; hielo y elevar
+> - Entrena lo que no toca la pierna: core, tren superior, pierna sana
+
+> **🚫 TODAVÍA NO**
+>
+> - Estirar el tendón (llevar el tobillo hacia arriba)
+> - Quitar las cuñas por tu cuenta
+> - Apoyar sin la bota
+
+> **Clave:** en esta fase el enemigo es estirar. Todo movimiento que lleve el pie hacia arriba (dorsiflexión) pone en riesgo la reparación.
+
+##### SEM 2–6 — Quitar cuñas poco a poco
+**Apoyo / muletas:** Destete de las cuñas (según el cirujano), llevando el pie de puntas hacia neutro. Carga parcial → total con la bota.
+
+> **✅ YA PUEDE (ideas de ejercicio)**
+>
+> - Rango activo sin pasar de neutro (el pie llega a plano, no más arriba)
+> - Isométricos de gemelo progresivos
+> - Bici con la bota si se puede
+
+> **🚫 TODAVÍA NO**
+>
+> - Llevar el pie hacia arriba más allá de neutro (dorsiflexión)
+> - Impacto, saltar
+> - Caminar sin bota antes de que lo autoricen
+
+##### SEM 6–8 — Dejar la bota
+**Apoyo / muletas:** Dejar la bota (según el cirujano) y pasar a marcha normal.
+
+> **✅ YA PUEDE (ideas de ejercicio)**
+>
+> - Recuperar el rango completo poco a poco (ya se permite llegar arriba, sin forzar)
+> - Isométricos y elevación de talón bipodal asistida
+> - Movilización de la cicatriz
+
+> **🚫 TODAVÍA NO**
+>
+> - Saltar, correr
+> - Forzar el estiramiento de golpe
+
+##### SEM 8–12 — Empezar la fuerza (HSR)
+**Apoyo / muletas:** Normal.
+
+> **✅ YA PUEDE (ideas de ejercicio)**
+>
+> - **Elevación de talón HSR**, tempo 3-3, bipodal → unipodal
+> - Progresar la carga en escalones chicos
+> - Prensa de gemelo / con mancuerna
+
+> **🚫 TODAVÍA NO**
+>
+> - Impacto, carrera, saltos todavía
+
+##### MES 3–6 — Energía elástica y carrera
+**Apoyo / muletas:** Normal.
+
+> **✅ YA PUEDE (ideas de ejercicio)**
+>
+> - Saltos progresivos (volumen antes que intensidad), luego programa de carrera
+> - Gesto del deporte
+
+> **🚫 TODAVÍA NO**
+>
+> - Competir o volver al deporte antes de cumplir criterios Y del visto bueno del cirujano
+
+#### Criterios de retorno — hay que cumplir TODO
+- **Fuerza del tendón:** elevación de talón en una pierna ≥90% del lado sano (en número de repeticiones y en carga).
+- **Saltos:** hop / salto ≥90% de simetría con la otra pierna.
+- **Cuestionario:** VISA-A en ascenso (escala de función del Aquiles que llena el paciente).
+- **Carrera:** corre sin dolor en la mañana siguiente.
+- **Si fue rotura:** además, visto bueno del cirujano y, normalmente, 6–9 meses desde la cirugía.
+
+#### 🚩 Señales de alarma — avisa de inmediato
+- **Dolor agudo y chasquido con un esfuerzo + no puedes empujar con el pie** → posible rotura, acude de inmediato.
+- Pérdida de fuerza para ponerte de puntas.
+- Aumento marcado de edema o dolor que no cede.
+- La rigidez de la mañana empeora semana a semana → vas sobrecargado, baja la carga y avísame.
+- En tendón reparado: rodilla/tobillo **caliente + hinchado + fiebre** → posible infección (urgencia).
+
+> **La carga es el tratamiento; los aparatos acompañan.** En el tendón roto o reparado, la orden del cirujano manda sobre estos tiempos.
 
 ### Avisos transversales de seguridad clínica (ligar con `seguridadClinica` de la app)
 Rige la **seguridad transversal (PARTE 0b)** — anticoagulación, embarazo, cáncer, marcapaso/DAI. Específico de tobillo/pie:

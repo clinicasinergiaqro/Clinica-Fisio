@@ -304,7 +304,7 @@ def _color_semaforo(html):
         elif first.startswith(('CONTRAINDICAC','NUNCA','🛑','⛔','🚩')) or 'BANDERA ROJA' in first or 'BANDERAS ROJAS' in first: cls=' class="sem-r"'
         else: cls=''
         return '<tr'+cls+'><td'+m.group('rest')
-    return re.sub(r'<tr><td(?P<rest>[^>]*>(?P<first>.*?)</td>)', rep, html, flags=re.S)
+    return re.sub(r'<tr>\s*<td(?P<rest>[^>]*>(?P<first>.*?)</td>)', rep, html, flags=re.S)
 
 def _link_xrefs(html):
     """Convierte las referencias internas «§N» / «§N.M» en enlaces que saltan a esa sección."""
