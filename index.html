@@ -1596,6 +1596,21 @@ body.modo-oscuro .topbar{background:#141824}
 .bib-art .ph{display:block;background:linear-gradient(90deg,rgba(21,50,91,.08),rgba(21,50,91,0));border-left:4px solid var(--navy);border-radius:0 8px 8px 0;padding:9px 12px;margin:22px 0 9px;color:var(--navy);font-weight:800;font-size:14.5px;text-align:left}
 .bib-art .ph strong{color:var(--navy)}
 .bib-art li.L-phase{list-style:none;margin:18px 0 6px -10px;padding:8px 12px;background:rgba(21,50,91,.08);border-left:4px solid var(--navy);border-radius:0 8px 8px 0;font-weight:700;color:var(--navy);text-align:left}
+/* MOLDE semana-a-semana: nota de apoyo + tarjetas YA PUEDE (verde) / TODAVÍA NO (roja) */
+.bib-art p.bib-apoyo{margin:9px 0 8px;padding:8px 13px;background:#EEF3F8;border:1px solid #D6E1EE;border-left:4px solid var(--navy);border-radius:0 8px 8px 0;font-size:13px;line-height:1.55;color:var(--gray-800)}
+.bib-art p.bib-apoyo strong{color:var(--navy)}
+.bib-art blockquote.bib-yapuede,.bib-art blockquote.bib-todavia{border-radius:12px;padding:9px 15px 11px;margin:9px 0}
+.bib-art blockquote.bib-yapuede{background:#EAF7EF;border:1px solid #BFE4CE;border-left:5px solid #1F8A4C}
+.bib-art blockquote.bib-todavia{background:#FCEBE9;border:1px solid #F3CFC9;border-left:5px solid #C0392B}
+.bib-art blockquote.bib-yapuede .yp-h strong{color:#1A6B40;font-size:11.5px;letter-spacing:.06em;text-transform:uppercase}
+.bib-art blockquote.bib-todavia .tn-h strong{color:#B42318;font-size:11.5px;letter-spacing:.06em;text-transform:uppercase}
+.bib-art blockquote.bib-yapuede p,.bib-art blockquote.bib-todavia p{margin:0}
+.bib-art blockquote.bib-yapuede ul,.bib-art blockquote.bib-todavia ul{margin:5px 0 0;padding-left:19px}
+.bib-art blockquote.bib-yapuede li,.bib-art blockquote.bib-todavia li{margin:4px 0;font-size:13px;line-height:1.5;text-align:left;color:var(--gray-800)}
+.bib-art blockquote.bib-yapuede li::marker{color:#1F8A4C}
+.bib-art blockquote.bib-todavia li::marker{color:#C0392B}
+.bib-art blockquote.bib-yapuede strong{color:#1A6B40}
+.bib-art blockquote.bib-todavia strong{color:var(--navy)}
 /* Callouts: qué sí / qué no / precaución / criterio / meta */
 .bib-art li.L-si,.bib-art li.L-no,.bib-art li.L-prec,.bib-art li.L-goal,.bib-art li.L-meta{list-style:none;position:relative;margin:6px 0 6px -10px;padding:6px 11px 6px 31px;border-radius:8px;border-left:3px solid;text-align:left}
 .bib-art li.L-si{background:#EAF7EF;border-color:#1F8A4C}
@@ -12266,7 +12281,7 @@ function renderExpediente(tab='historia'){
   if(tab==='estudios'){
     const fotos=p.fotos||[], docs=p.docs||[];
     html+=`<input type="file" id="inp-foto" accept="image/*" capture="environment" style="display:none" onchange="handleMedia(event,'foto','${p.id}')">
-    <input type="file" id="inp-galeria" accept="image/*" style="display:none" onchange="handleMedia(event,'galeria','${p.id}')">
+    <input type="file" id="inp-galeria" accept="image/*" multiple style="display:none" onchange="handleMedia(event,'galeria','${p.id}')">
     <input type="file" id="inp-doc" accept="*/*" multiple style="display:none" onchange="handleMedia(event,'doc','${p.id}')">
     <div style="background:var(--blue-light);border-radius:10px;padding:10px 12px;margin-bottom:12px;font-size:11px;color:var(--navy);display:flex;gap:8px;align-items:flex-start">
       <span style="font-size:14px">ℹ️</span>
@@ -15381,71 +15396,75 @@ function _selEstudioValTipo(el){
   window._altaEstudioTipo={ tipo:el.dataset.tipo||'imagen', clinico:el.dataset.clinico||'' };
 }
 async function _capturarEstudioVal(ev){
-  var file=ev&&ev.target&&ev.target.files&&ev.target.files[0]; if(ev&&ev.target) ev.target.value='';
-  if(!file) return;
-  if(file.size>15*1024*1024){ showToast('⚠️ '+(file.name||'archivo')+' supera 15MB — omitido','error'); return; }
+  // MULTI: acepta VARIOS archivos de una vez (input tiene `multiple`). Sube el lote conservando
+  // TODA la red de seguridad por archivo (reintento 3x + fallback IndexedDB + guard de cambio de
+  // formulario + contador en-vuelo). La interpretación escrita se aplica SOLO al primer archivo.
+  var files=(ev&&ev.target&&ev.target.files)?Array.from(ev.target.files):[]; if(ev&&ev.target) ev.target.value='';
+  if(!files.length) return;
   var sel=window._altaEstudioTipo||{tipo:'imagen',clinico:''};
   if(!window._altaPid) window._altaPid=(typeof generarIdSeguro_==='function'?generarIdSeguro_('p'):('p'+Date.now()));
   var interpEl=document.getElementById('n-estudio-val-interp');
   var interp=(interpEl&&interpEl.value?String(interpEl.value).trim():'');
   var _pidEst=window._altaPid;   // identidad del alta al iniciar (la subida es async)
-  var ts=Date.now();
-  var desc=(sel.clinico?sel.clinico+' · ':'')+String(file.name||'estudio').replace(/\.[^.]+$/,'');
-  function _baseItem(){
-    var it={ id:'est_'+ts+'_'+Math.random().toString(36).slice(2,6), tipo:sel.tipo||'imagen', tipoClinico:sel.clinico||'',
-      type:file.type||'', descripcion:desc, name:(file.name||'estudio'),
-      fechaEstudio:(typeof _isoMasDias==='function'?_isoMasDias(0):''), fechaAgregado:new Date().toLocaleDateString('es-MX'),
-      agregadoPor:(currentUser&&currentUser.name)||'' };
-    if(interp){ it.resumenManual={ texto:interp.slice(0,600), autor:(currentUser&&currentUser.name)||'', fecha:new Date().toISOString() }; }
-    return it;
-  }
   // [ESTUDIO-ALTA-NO-SE-PIERDE] Contador de subidas en vuelo: guardarNuevoPaciente NO deja crear el
   // expediente mientras haya una subida en curso (evita la carrera que dejaba el estudio fuera).
   window._altaEstudiosEnVuelo=(window._altaEstudiosEnVuelo||0)+1;
-  showToast('☁️ Subiendo…','');
+  var _ok=0, _fall=0, _multi=files.length>1;
   try{
-    var safeName=String(file.name||'estudio').replace(/[^\w.\-]+/g,'_');
-    var fbPath='clinica/sinergia/'+_pidEst+'/estudios/'+ts+'_'+safeName;
-    // [REINTENTO] mala señal: hasta 3 intentos con espera creciente antes de rendirse (igual que la
-    // foto de valoración _capturarMediaAntes). Antes: 1 intento y si fallaba se PERDÍA el estudio.
-    var url=null, _try=0;
-    while(_try<3 && !url){
-      _try++;
+    for(var _fi=0; _fi<files.length; _fi++){
+      var file=files[_fi];
+      if(!file) continue;
+      if(file.size>15*1024*1024){ _fall++; showToast('⚠️ '+(file.name||'archivo')+' supera 15MB — omitido','error'); continue; }
+      var ts=Date.now()+_fi;
+      var desc=(sel.clinico?sel.clinico+' · ':'')+String(file.name||'estudio').replace(/\.[^.]+$/,'');
+      var _thisInterp=(_fi===0)?interp:'';   // la interpretación escrita va solo al 1er estudio
+      var item={ id:'est_'+ts+'_'+Math.random().toString(36).slice(2,6), tipo:sel.tipo||'imagen', tipoClinico:sel.clinico||'',
+        type:file.type||'', descripcion:desc, name:(file.name||'estudio'),
+        fechaEstudio:(typeof _isoMasDias==='function'?_isoMasDias(0):''), fechaAgregado:new Date().toLocaleDateString('es-MX'),
+        agregadoPor:(currentUser&&currentUser.name)||'' };
+      if(_thisInterp){ item.resumenManual={ texto:_thisInterp.slice(0,600), autor:(currentUser&&currentUser.name)||'', fecha:new Date().toISOString() }; }
+      showToast(_multi?('☁️ Subiendo '+(_fi+1)+' de '+files.length+'…'):'☁️ Subiendo…','');
       try{
-        var ref=fbStorage.ref(fbPath);
-        url=await new Promise(function(resolve,reject){
-          var task=ref.put(file,{ contentType:file.type||'application/octet-stream' });
-          task.on('state_changed', null, function(err){ reject(err); }, async function(){ try{ resolve(await task.snapshot.ref.getDownloadURL()); }catch(e){ reject(e); } });
-        });
-      }catch(e){ console.warn('[estudio-val] intento '+_try, e&&e.message); if(_try<3){ showToast('Reintentando ('+_try+'/3)…',''); await new Promise(function(r){ setTimeout(r,_try*1500); }); } }
-    }
-    // FUGA ENTRE BORRADORES (auditoría): si se abrió otro Nuevo/Editar durante la subida, _altaPid ya
-    // cambió y _altaEstudios se vació → descartar para no meter el estudio de un alta en otra.
-    if(window._altaPid!==_pidEst){ showToast('Cambiaste de formulario — el estudio no se adjuntó','warning'); return; }
-    if(!Array.isArray(window._altaEstudios)) window._altaEstudios=[];
-    var item=_baseItem();
-    if(url){
-      item.url=url; item.fbPath=fbPath;
-      window._altaEstudios.push(item);
-    } else {
-      // [FALLBACK-IDB] La subida falló tras 3 intentos (mala señal). NO perder el estudio: binario a
-      // IndexedDB + mediaId + pendienteSubida. Se re-sube solo al reconectar o abrir Estudios
-      // (_reSubirFotosLocales procesa estudiosDocs). MISMA red de seguridad que la foto de valoración
-      // y la pestaña Estudios — antes esta ruta era la ÚNICA sin respaldo.
-      try{
-        var _data=await readFile(file);
-        var _mid='estv_'+_pidEst+'_'+ts+'_'+Math.random().toString(36).slice(2,7);
-        await idbSet(_mid,_data);
-        item.mediaId=_mid; item.pendienteSubida=true;
-        window._altaEstudios.push(item);
-        showToast('📴 Estudio guardado en el equipo — se subirá solo al reconectar','warning');
-      }catch(_e){ showToast('No se pudo guardar el estudio: '+((_e&&_e.message)||'error'),'error'); return; }
+        var safeName=String(file.name||'estudio').replace(/[^\w.\-]+/g,'_');
+        var fbPath='clinica/sinergia/'+_pidEst+'/estudios/'+ts+'_'+safeName;
+        // [REINTENTO] mala señal: hasta 3 intentos con espera creciente antes de rendirse.
+        var url=null, _try=0;
+        while(_try<3 && !url){
+          _try++;
+          try{
+            var ref=fbStorage.ref(fbPath);
+            url=await new Promise(function(resolve,reject){
+              var task=ref.put(file,{ contentType:file.type||'application/octet-stream' });
+              task.on('state_changed', null, function(err){ reject(err); }, async function(){ try{ resolve(await task.snapshot.ref.getDownloadURL()); }catch(e){ reject(e); } });
+            });
+          }catch(e){ console.warn('[estudio-val] intento '+_try, e&&e.message); if(_try<3){ showToast('Reintentando ('+_try+'/3)…',''); await new Promise(function(r){ setTimeout(r,_try*1500); }); } }
+        }
+        // FUGA ENTRE BORRADORES: si se abrió otro Nuevo/Editar durante la subida, _altaPid ya cambió
+        // y _altaEstudios se vació → descartar para no meter el estudio de un alta en otra.
+        if(window._altaPid!==_pidEst){ showToast('Cambiaste de formulario — se detuvo la carga','warning'); break; }
+        if(!Array.isArray(window._altaEstudios)) window._altaEstudios=[];
+        if(url){
+          item.url=url; item.fbPath=fbPath;
+          window._altaEstudios.push(item); _ok++;
+        } else {
+          // [FALLBACK-IDB] subida falló tras 3 intentos: binario a IndexedDB + pendienteSubida.
+          try{
+            var _data=await readFile(file);
+            var _mid='estv_'+_pidEst+'_'+ts+'_'+Math.random().toString(36).slice(2,7);
+            await idbSet(_mid,_data);
+            item.mediaId=_mid; item.pendienteSubida=true;
+            window._altaEstudios.push(item); _ok++;
+            showToast('📴 '+(file.name||'estudio')+' guardado en el equipo — se subirá al reconectar','warning');
+          }catch(_e){ _fall++; showToast('No se pudo guardar '+(file.name||'estudio')+': '+((_e&&_e.message)||'error'),'error'); }
+        }
+      }catch(e){ _fall++; console.warn('[estudio-val]', e&&e.message); }
     }
     if(interpEl) interpEl.value='';
     _renderEstudiosVal(); marcarDirty();
     try{ if(typeof guardarBorradorNuevo==='function') guardarBorradorNuevo(); }catch(_){}
-    if(url) showToast('✅ Estudio agregado','success');
-  }catch(e){ console.warn('[estudio-val]', e&&e.message); showToast('No se pudo agregar: '+((e&&e.message)||'error'),'error'); }
+    if(_ok) showToast('✅ '+_ok+' estudio(s) agregado(s)'+(_fall?(' · '+_fall+' con error'):''),'success');
+    else if(_fall) showToast('❌ No se agregó ningún estudio ('+_fall+' con error)','error');
+  }catch(e){ console.warn('[estudio-val lote]', e&&e.message); showToast('No se pudo agregar: '+((e&&e.message)||'error'),'error'); }
   finally{ window._altaEstudiosEnVuelo=Math.max(0,(window._altaEstudiosEnVuelo||1)-1); }
 }
 function _renderEstudiosVal(){
@@ -20596,7 +20615,7 @@ function renderNuevoPaciente(){
         </div>
         <div style="font-size:12.5px;font-weight:700;color:#00584E;margin-bottom:7px">2. Interpretación <span style="font-weight:400;color:var(--gray-400);font-size:11px">(opcional)</span></div>
         <input type="text" id="n-estudio-val-interp" placeholder="Ej: Rotura parcial de menisco interno, reporta Dr. Pérez" style="width:100%;box-sizing:border-box;border:1.5px solid #B7D8D2;border-radius:10px;padding:11px 12px;font-size:14px;font-family:inherit;color:var(--gray-800);background:#fff;outline:none">
-        <input type="file" id="n-estudio-val-capture" accept="image/*,application/pdf" style="display:none" onchange="_capturarEstudioVal(event)">
+        <input type="file" id="n-estudio-val-capture" accept="image/*,application/pdf" multiple style="display:none" onchange="_capturarEstudioVal(event)">
         <div id="n-estudios-val-wrap" style="margin-top:10px"></div>
         <div style="font-size:12.5px;font-weight:700;color:#00584E;margin:14px 0 7px">3. Captura el documento</div>
         <button type="button" onclick="var i=document.getElementById('n-estudio-val-capture');if(i)i.click()" style="width:100%;background:#00695C;color:#fff;border:none;border-radius:12px;padding:14px;font-size:15px;font-weight:800;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px">📷 Escanear / foto / PDF de estudio</button>
@@ -28637,7 +28656,7 @@ async function resetImportacion_(){
         <button onclick="capturarFotoScanner2()" id="scan2-btn-captura" style="flex:2;min-width:150px;background:var(--navy);color:white;border:none;border-radius:18px;padding:11px;font-weight:800;cursor:pointer">📸 Capturar</button>
         <button onclick="document.getElementById('scan2-file').click()" style="flex:1;min-width:130px;background:white;border:1.5px solid var(--gray-200);color:var(--gray-600);border-radius:18px;padding:11px;font-weight:700;cursor:pointer">🖼️ Elegir imagen</button>
       </div>
-      <input type="file" id="scan2-file" accept="image/*" style="display:none" onchange="scanner2ArchivoElegido(event)">
+      <input type="file" id="scan2-file" accept="image/*" multiple style="display:none" onchange="scanner2ArchivoElegido(event)">
     </div>
     <div id="scan2-editor" style="display:none">
       <div id="scan2-aviso-calidad" style="display:none;background:var(--red-light);color:var(--red);border-radius:8px;padding:8px 10px;font-size:12px;font-weight:700;margin-bottom:8px"></div>
@@ -28685,7 +28704,8 @@ const scannerState = {
   filtro:'color-suave', autoDetectado:false, ajusteManual:false,
   dragIdx:-1, calidad:[], isSaving:false,
   lastDetectedCorners:null, liveDetectionActive:false,
-  procesadaCanvas:null, paginaActualAgregada:false, _rafId:null, _lastFrameTs:0, _prevPuntos:null, _estableCount:0
+  procesadaCanvas:null, paginaActualAgregada:false, _rafId:null, _lastFrameTs:0, _prevPuntos:null, _estableCount:0,
+  cola:[]
 };
 let _cvReadyPromise = null;
 function ensureOpenCVReady(){
@@ -28735,6 +28755,7 @@ function resetScannerStateForNewScan(){
   scannerState.calidad=[]; scannerState.isSaving=false; scannerState.lastDetectedCorners=null;
   scannerState.liveDetectionActive=false; scannerState.procesadaCanvas=null; scannerState.paginaActualAgregada=false;
   scannerState._prevPuntos=null; scannerState._estableCount=0; scannerState.warpBase=null;
+  scannerState.cola=[];
 }
 function resetScannerUIForNewScan(){
   resetScannerCanvas(); resetScannerFileInput();
@@ -28948,8 +28969,17 @@ function capturarFotoScanner2(){
   img.src=cv2.toDataURL('image/jpeg',0.92);
 }
 function scanner2ArchivoElegido(ev){
-  const f=ev.target.files&&ev.target.files[0]; if(!f) return; ev.target.value='';
-  if(!f.type.startsWith('image')){ showToast('Selecciona una imagen','error'); return; }
+  // MULTI: se pueden elegir VARIAS imágenes de la galería de una vez. La 1ª entra al editor
+  // (ajuste de esquinas/filtro/rotar); las demás quedan en cola y se encadenan al tocar
+  // "Agregar página" → todas caen en el MISMO PDF. (La cámara sigue de una por página.)
+  const files=Array.from((ev.target&&ev.target.files)||[]).filter(f=>f.type&&f.type.startsWith('image'));
+  if(ev.target) ev.target.value='';
+  if(!files.length){ showToast('Selecciona una imagen','error'); return; }
+  scannerState.cola=files.slice(1);
+  _scanProcesarArchivoEscaner(files[0]);
+  if(scannerState.cola.length) showToast('Lote de '+files.length+' imágenes — ajusta cada una y toca "Agregar página"','');
+}
+function _scanProcesarArchivoEscaner(f){
   const reader=new FileReader();
   reader.onload=()=>{ const img=new Image(); img.onload=()=>{ detenerCamaraScanner2(); procesarCapturaScanner2(img, null, true); }; img.onerror=()=>showToast('Imagen inválida','error'); img.src=reader.result; };
   reader.readAsDataURL(f);
@@ -29492,6 +29522,14 @@ function agregarPaginaScanner2(){
   if(!agregarPaginaActualScanner2()){ showToast('No hay página para agregar','warning'); return; }
   showToast('Página '+scannerState.pages.length+' agregada','success');
   scannerState.procesadaCanvas=null; scannerState.warpBase=null; scannerState.paginaActualAgregada=false;
+  // Si hay imágenes en cola (lote de galería), encadenar la siguiente al editor en vez de la cámara.
+  if(scannerState.cola && scannerState.cola.length){
+    const nextF=scannerState.cola.shift();
+    showToast('Siguiente del lote — quedan '+scannerState.cola.length,'');
+    _scanProcesarArchivoEscaner(nextF);
+    actualizarContadorPaginasScanner();
+    return;
+  }
   document.getElementById('scan2-editor').style.display='none';
   document.getElementById('scan2-captura').style.display='block';
   abrirCamaraScanner2(); actualizarContadorPaginasScanner();
@@ -29514,6 +29552,11 @@ function cerrarScanner2(){ resetScannerAfterCancel(); document.getElementById('s
 
 async function guardarPDFScannerMultipagina(){
   if(scannerState.isSaving) return;
+  // Si quedan imágenes del lote de galería sin agregar, avisar antes de finalizar (no perderlas en silencio).
+  if(scannerState.cola && scannerState.cola.length){
+    if(!confirm('Quedan '+scannerState.cola.length+' imágen(es) del lote sin agregar. ¿Finalizar el PDF de todos modos?')) return;
+    scannerState.cola=[];
+  }
   if(scannerState.procesadaCanvas && !scannerState.paginaActualAgregada){ agregarPaginaActualScanner2(); }
   if(scannerState.pages.length===0){ showToast('Agrega al menos una página','warning'); return; }
   const p=currentPatient; if(!p){ showToast('Sin paciente','error'); return; }
