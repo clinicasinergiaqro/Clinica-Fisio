@@ -1367,7 +1367,7 @@ body.modo-oscuro .topbar{background:#141824}
 <body>
 <div id="sync-indicator" class="sync-indicator ok" style="display:none"></div>
 <div id="app-version-chip" title="Versión de la app en este equipo — toca para buscar actualización" onclick="try{_tapVersionChip()}catch(e){}"></div>
-<script>/* VERSIÓN VISIBLE: refleja el index.html realmente cargado en ESTE equipo (se bumpea junto con sw.js). Así un iPad con versión vieja se ve de un vistazo. */window.APP_VERSION='v1-2026-11-11a';(function(){try{var c=document.getElementById('app-version-chip');if(c)c.textContent=window.APP_VERSION;}catch(e){}})();</script>
+<script>/* VERSIÓN VISIBLE: refleja el index.html realmente cargado en ESTE equipo (se bumpea junto con sw.js). Así un iPad con versión vieja se ve de un vistazo. */window.APP_VERSION='v1-2026-11-11b';(function(){try{var c=document.getElementById('app-version-chip');if(c)c.textContent=window.APP_VERSION;}catch(e){}})();</script>
 <div class="toast" id="toast" aria-live="polite" aria-atomic="true"></div>
 
 <!-- LOGIN -->
@@ -14598,12 +14598,23 @@ function renderSOAPForm(){
     Usa "Copiar sesión anterior" solo cuando el tratamiento sea continuo. Revisa y modifica lo que cambió antes de guardar.
   </div>
 
+  <div id="soap-retro-wrap" style="display:none;margin:0 0 10px"></div>
   <button class="btn-primary" onclick="guardarSOAP()">💾 Guardar nota SOAP</button>
   <button class="btn-secondary" onclick="confirmarSalidaSiDirty(goBack)">Cancelar</button>
   </div><!-- /soap-full (1C: se oculta completo en modo descarga) -->
   <div style="height:20px"></div>`;
   // [BORRADOR-SOAP] write-ahead: attach autosave a los campos, y tras el poblado de edición (~150ms) ofrecer restaurar.
   setTimeout(function(){ try{ _soapAdaptarDerma(p); }catch(_){} }, 50);
+  // RETRO DE REDACCIÓN SOAP (coaching read-only): engancha la caja a los campos S/O/A/P en vivo.
+  setTimeout(function(){ try{
+    if(typeof _soapRetroCheck==='function'){
+      ['f-sdolor','f-scambios','f-sactfisica','f-orom','f-ofuerza','f-ohallazgos','f-aevolucion','f-arespuesta','f-aanalisis','f-pindicaciones','f-pcontra','f-objetivo-sesion'].forEach(function(id){
+        var e=document.getElementById(id);
+        if(e && !e._retroWired){ e._retroWired=1; e.addEventListener('input',function(){ if(window._retroT) clearTimeout(window._retroT); window._retroT=setTimeout(_soapRetroCheck,400); }); }
+      });
+      _soapRetroCheck();
+    }
+  }catch(_){} }, 120);
   setTimeout(function(){ try{ activarAutosaveSoap(); }catch(_){} }, 60);
   // FASE 1 EJERCICIOS: el grid de modalidades se pinta inline, así que el bloque de "ejercicios
   // trabajados hoy" hay que renderizarlo aquí tras pintar el form (nota nueva). En edición/copiar
@@ -14909,6 +14920,53 @@ function _updateModCounter(){
 // examen MSK, más piel/aparatología. SOLO toca la UI (re-rotula/oculta/añade chips que escriben en los
 // MISMOS campos) — NO toca la ruta de guardado (guardarSOAP) ni agrega campos nuevos. Activo=migrado
 // (lee currentPatient). Las modalidades derma ya salen por _modGruposActivos().
+// ── RETRO DE REDACCIÓN SOAP (solo lectura; NUNCA cambia la nota ni toca saveDB) ──────────────
+// Caja de coaching: revisa ortografía frecuente + estructura MIENTRAS el fisio escribe y le
+// SUGIERE mejoras (el fisio corrige a mano). No guarda nada, no toca la nota (append-only).
+// Mapa clave=forma SIN acento (mal) → valor=correcta. Match por PALABRA COMPLETA (una "lesión"
+// bien escrita no matchea; un plural correcto "lesiones" tampoco → cero falso positivo en esos).
+var _RETRO_ORTO = {
+  'cuadriceps':'cuádriceps','biceps':'bíceps','triceps':'tríceps','popliteo':'poplíteo',
+  'analisis':'análisis','diagnostico':'diagnóstico','evaluacion':'evaluación','exploracion':'exploración',
+  'flexion':'flexión','extension':'extensión','rotacion':'rotación','abduccion':'abducción','aduccion':'aducción',
+  'palpacion':'palpación','inflamacion':'inflamación','region':'región','musculo':'músculo','articulacion':'articulación',
+  'lesion':'lesión','sesion':'sesión','despues':'después','tendon':'tendón','clinico':'clínico','clinica':'clínica',
+  'rotula':'rótula','medico':'médico','craneo':'cráneo','numero':'número',
+  'deambulacion':'deambulación','funcion':'función','presion':'presión','tension':'tensión',
+  'edematizacion':'edematización','contraccion':'contracción','posicion':'posición','progresion':'progresión'
+};
+function _soapRetroCheck(){
+  try{
+    var wrap=document.getElementById('soap-retro-wrap');
+    if(!wrap) return;
+    var ids=['f-sdolor','f-scambios','f-sactfisica','f-orom','f-ofuerza','f-ohallazgos','f-aevolucion','f-arespuesta','f-aanalisis','f-pindicaciones','f-pcontra','f-objetivo-sesion'];
+    var txt=''; ids.forEach(function(id){ var e=document.getElementById(id); if(e&&e.value) txt+=' '+e.value; });
+    var hints=[];
+    var vistos={}, orto=[];
+    (txt.toLowerCase().match(/[a-záéíóúüñ]+/g)||[]).forEach(function(w){
+      if(_RETRO_ORTO[w] && !vistos[w]){ vistos[w]=1; orto.push(w+' → '+_RETRO_ORTO[w]); }
+    });
+    if(orto.length) hints.push({t:'Ortografía / acentos', c:'#8A5E0C', b:'#FBF3DC', items:orto.slice(0,8)});
+    var est=[];
+    var a=((document.getElementById('f-aanalisis')||{}).value||'').trim();
+    if(a.length < 12) est.push('El Análisis (A) está muy corto — agrega tu razonamiento clínico de la sesión.');
+    var pi=((document.getElementById('f-pindicaciones')||{}).value||'').trim();
+    var po=((document.getElementById('f-objetivo-sesion')||{}).value||'').trim();
+    if(!pi && !po) est.push('Falta el Plan (P) — escribe qué sigue / qué se espera en las próximas citas.');
+    if(est.length) hints.push({t:'Para completar', c:'#1B3A6B', b:'#EAF0F8', items:est});
+    if(!hints.length){ wrap.style.display='none'; wrap.innerHTML=''; return; }
+    var html='<div style="border:1.5px solid #D9CBE4;border-radius:12px;background:#FBF8FD;overflow:hidden">'
+      +'<div style="background:#6B4E82;color:#fff;padding:8px 12px;font-size:12.5px;font-weight:800;display:flex;align-items:center;gap:7px;flex-wrap:wrap">💡 Mejora de redacción <span style="font-weight:500;font-size:10px;opacity:.85">· sugerencia, NO cambia tu nota</span></div>'
+      +'<div style="padding:9px 12px">';
+    hints.forEach(function(h){
+      html+='<div style="margin-bottom:6px"><div style="font-size:11px;font-weight:700;color:'+h.c+';margin-bottom:3px">'+h.t+'</div>';
+      h.items.forEach(function(it){ html+='<div style="font-size:12px;color:#4A3A58;background:'+h.b+';border-radius:7px;padding:4px 8px;margin-bottom:3px">'+escapeHTML(it)+'</div>'; });
+      html+='</div>';
+    });
+    html+='</div></div>';
+    wrap.innerHTML=html; wrap.style.display='';
+  }catch(_){}
+}
 function _soapAdaptarDerma(p){
   try{
     if(typeof _esDerma!=='function' || !_esDerma(p)) return;
