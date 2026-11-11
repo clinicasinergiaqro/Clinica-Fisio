@@ -428,7 +428,7 @@ async function FST_fetchSesiones(pid){
         // DIAG 1 (BUG 2): episodio en históricos — null si el doc no lo trae
         motivoIndex: d.motivoIndex != null ? Number(d.motivoIndex) : null,
         numEpisodio: d.numEpisodio != null ? Number(d.numEpisodio) : null,
-        modalidades: Array.isArray(d.modalidades) ? d.modalidades : [], modoNota: d.modoNota || '',
+        modalidades: Array.isArray(d.modalidades) ? d.modalidades : [], modoNota: d.modoNota || '', modalidad: d.modalidad || '',
         // FIX SOAP-MEDIA (B): rehidratar adjuntos de la nota (referencias url/fbPath)
         media: Array.isArray(d.media) ? d.media : [],
         historialEdiciones: Array.isArray(d.historialEdiciones) ? d.historialEdiciones : [],
@@ -469,6 +469,12 @@ function FST_badgesSesion(s){
   else b.push('<span style="font-size:10px;color:var(--green);font-weight:700">✅ Revisada</span>');
   if ((s.motivosRevision||[]).some(function(m){ return m==='FECHA_FUTURA'||m==='FECHA_RARA'||m==='fecha_futura'; })) b.push('<span class="badge badge-alert" style="font-size:10px;background:#FEF3C7;color:#92400E">\u{1F534} Fecha pendiente</span>');
   if (s.imagenesPendientes) b.push('<span style="font-size:10px;color:var(--gray-400);font-weight:700">\u{1F5BC}️ Imágenes pendientes</span>');
+  // MODALIDAD (swap trauma/derma): badge VISIBLE en la tarjeta del histórico, igual que en activos.
+  // SOLO si el paciente abierto tiene derma (dual); legacy sin etiqueta → sin badge.
+  if ((typeof _tieneDerma==='function') && _tieneDerma(currentPatient)){
+    if (s.modalidad==='derma') b.push('<span style="font-size:10px;font-weight:800;background:#F3E8EF;color:#7A2F5D;padding:2px 8px;border-radius:9px">\u{1F9F4} Dermato</span>');
+    else if (s.modalidad==='trauma') b.push('<span style="font-size:10px;font-weight:800;background:#EAF0F8;color:#1B3A6B;padding:2px 8px;border-radius:9px">\u{1F9B4} Trauma</span>');
+  }
   return b.join(' ');
 }
 
@@ -881,6 +887,7 @@ function FST_buildSesionPayload(sesion, modo) {
     evaI: (sesion.evaI !== undefined && sesion.evaI !== null) ? sesion.evaI : null,
     evaF: (sesion.evaF !== undefined && sesion.evaF !== null) ? sesion.evaF : null,
     modalidades: Array.isArray(sesion.modalidades) ? sesion.modalidades : [],
+    modalidad: sesion.modalidad || '',
     // FIX SOAP-MEDIA (A): adjuntos de la nota — SOLO referencias (url/fbPath), NUNCA base64 al doc.
     // Mismo criterio de strip que el chunking a Sheets (data:null). Condicional: sin adjuntos no se escribe.
     ...(Array.isArray(sesion.media) && sesion.media.length ? {
@@ -925,7 +932,7 @@ function FST_buildSesionPayload(sesion, modo) {
       })), true)
     } : {}),
     ...(sesion.modalidadesDetalle && typeof sesion.modalidadesDetalle === 'object' && Object.keys(sesion.modalidadesDetalle).length ? { modalidadesDetalle: sesion.modalidadesDetalle } : {}),
-    completa: !!sesion.completa, modoNota: sesion.modoNota || '',
+    completa: !!sesion.completa, modoNota: sesion.modoNota || '', modalidad: sesion.modalidad || '',
     importado: false, formatoOriginal: 'soap', revisionPendiente: false,
     origen: 'app_live',
     updatedAt: firebase.firestore.FieldValue.serverTimestamp()
@@ -1360,7 +1367,7 @@ body.modo-oscuro .topbar{background:#141824}
 <body>
 <div id="sync-indicator" class="sync-indicator ok" style="display:none"></div>
 <div id="app-version-chip" title="Versión de la app en este equipo — toca para buscar actualización" onclick="try{_tapVersionChip()}catch(e){}"></div>
-<script>/* VERSIÓN VISIBLE: refleja el index.html realmente cargado en ESTE equipo (se bumpea junto con sw.js). Así un iPad con versión vieja se ve de un vistazo. */window.APP_VERSION='v1-2026-11-10a';(function(){try{var c=document.getElementById('app-version-chip');if(c)c.textContent=window.APP_VERSION;}catch(e){}})();</script>
+<script>/* VERSIÓN VISIBLE: refleja el index.html realmente cargado en ESTE equipo (se bumpea junto con sw.js). Así un iPad con versión vieja se ve de un vistazo. */window.APP_VERSION='v1-2026-11-11a';(function(){try{var c=document.getElementById('app-version-chip');if(c)c.textContent=window.APP_VERSION;}catch(e){}})();</script>
 <div class="toast" id="toast" aria-live="polite" aria-atomic="true"></div>
 
 <!-- LOGIN -->
@@ -11104,17 +11111,18 @@ function _modalidadBarHTML(p){
     if(!puede) return '';
     var hayD=_tieneDerma(p), hayM=_tieneMSKData(p), dAct=_esDerma(p), pid=escapeAttr_(p.id);
     var caja=function(inner){ return '<div style="padding:8px 14px 0">'+inner+'</div>'; };
-    if(hayD && hayM){
+    // El swap intercambia la LENTE completa. Aparece SIEMPRE que el paciente tenga derma: trauma es la otra
+    // lente (exista capturada o no). Se quitó el bucle viejo "Agregar trauma" — para capturar trauma basta
+    // cambiar a 🦴 y tocar ✏️ Editar en la valoración.
+    if(hayD){
       var pill=function(on,txt,color){ return '<span style="display:inline-flex;align-items:center;gap:4px;padding:6px 13px;border-radius:14px;font-size:12.5px;font-weight:800;'+(on?('background:'+color+';color:#fff'):('background:#fff;color:'+color+';border:1.5px solid '+color+';cursor:pointer'))+'">'+txt+'</span>'; };
       var m = dAct
         ? '<span data-pid="'+pid+'" onclick="_cambiarModalidad(this.dataset.pid,false)">'+pill(false,'🦴 Trauma/Orto','#1B3A6B')+'</span> '+pill(true,'🧴 Dermato','#8E3B6E')
         : pill(true,'🦴 Trauma/Orto','#1B3A6B')+' <span data-pid="'+pid+'" onclick="_cambiarModalidad(this.dataset.pid,true)">'+pill(false,'🧴 Dermato','#8E3B6E')+'</span>';
-      return caja('<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span style="font-size:11px;color:var(--gray-400);font-weight:700">Modalidad activa:</span>'+m+'<span style="font-size:10.5px;color:var(--gray-400)">(toca la otra para cambiar · nada se borra)</span></div>');
+      var hint = (!dAct && !hayM) ? '<span style="font-size:10.5px;color:var(--gray-400)">(trauma sin capturar aún — toca ✏️ Editar en la valoración)</span>' : '';
+      return caja('<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span style="font-size:11px;color:var(--gray-400);font-weight:700">Modalidad activa:</span>'+m+'<span style="font-size:10.5px;color:var(--gray-400)">(toca la otra para cambiar · nada se borra)</span>'+hint+'</div>');
     }
-    if(hayD && !hayM){
-      return caja('<button data-pid="'+pid+'" onclick="_agregarModalidad(this.dataset.pid,\'msk\')" style="background:#1B3A6B;border:none;color:#fff;border-radius:14px;padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer">🦴 Agregar ortopedia y trauma</button>');
-    }
-    return caja('<button data-pid="'+pid+'" onclick="_agregarModalidad(this.dataset.pid,\'derma\')" style="background:#8E3B6E;border:none;color:#fff;border-radius:14px;padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer">🧴 Pasar / agregar dermatofuncional</button>');
+    return caja('<button data-pid="'+pid+'" onclick="_agregarModalidad(this.dataset.pid,\'derma\')" style="background:#8E3B6E;border:none;color:#fff;border-radius:14px;padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer">🧴 Agregar dermatofuncional</button>');
   }catch(_){ return ''; }
 }
 // Switch de modalidad activa: SOLO voltea valoracion.dermato.es (conserva todo), guardado quirúrgico.
@@ -11803,6 +11811,12 @@ function _renderSoapCard(s,p,readOnly){
   // Notas auto-generadas: badge para distinguirlas de las notas normales.
   if(s.modoNota==='valoracion') sesionLine+=` <span style="background:#EEF4FF;color:var(--navy);font-size:10px;font-weight:800;padding:2px 8px;border-radius:9px">📋 Valoración</span>`;
   if(s.modoNota==='descarga') sesionLine+=` <span style="background:#FFF8E6;color:#8A6D1A;font-size:10px;font-weight:800;padding:2px 8px;border-radius:9px">🙌 Descarga</span>`;
+  // MODALIDAD (swap trauma/derma): badge VISIBLE de a qué modalidad pertenece la nota — SOLO si el
+  // paciente tiene derma (en puro-MSK no hay ambigüedad → no se mete ruido). Legacy sin etiqueta → sin badge.
+  if((typeof _tieneDerma==='function') && _tieneDerma(p)){
+    if(s.modalidad==='derma') sesionLine+=` <span style="background:#F3E8EF;color:#7A2F5D;font-size:10px;font-weight:800;padding:2px 8px;border-radius:9px">🧴 Dermato</span>`;
+    else if(s.modalidad==='trauma') sesionLine+=` <span style="background:#EAF0F8;color:#1B3A6B;font-size:10px;font-weight:800;padding:2px 8px;border-radius:9px">🦴 Trauma</span>`;
+  }
   // AUTO-REVISOR: badge de nota incompleta (faltan secciones OBLIGATORIAS S/A/P con contenido real).
   var _faltCard=_faltantesSoap(s);
   if(_faltCard.aplica && _faltCard.incompleta) sesionLine+=` <span style="background:#FDECEA;color:#C0392B;font-size:10px;font-weight:800;padding:2px 8px;border-radius:9px">⚠ Incompleta: ${escapeHTML(_faltantesSoapLabel(_faltCard))}</span>`;
@@ -12108,7 +12122,8 @@ function renderExpediente(tab='historia'){
 
   if(tab==='valoracion'){
     const v=mv.valoracion; // FIX HISTORIA: valoración del episodio vigente (raíz para pacientes sin episodios)
-    html+=`
+    const _dmV=(typeof _esDerma==='function')&&_esDerma(p);   // MODALIDAD: el swap intercambia la lente (derma→apartado dermato / trauma→exploración MSK)
+    html+=_dmV?'':`
     <div class="section-card">
       <div class="section-title">📊 Valoración inicial${_epSufijo}
         <button onclick="editarHistoria('valoracion')" style="margin-left:auto;background:var(--navy);color:white;border:none;border-radius:20px;padding:3px 12px;font-size:11px;font-weight:700;cursor:pointer">✏️ Editar</button>
@@ -12124,8 +12139,9 @@ function renderExpediente(tab='historia'){
       <div class="field-row"><div class="field-label">Palpación</div><div class="field-value">${valorSeguroHTML(v.palpacion)}</div></div>
       <div class="field-row"><div class="field-label">🚩 Banderas rojas</div><div class="field-value" style="color:${v.banderasRojas&&v.banderasRojas!=='Ninguna'?'var(--red)':'var(--green)'};font-weight:600;">${valorSeguroHTML(v.banderasRojas,'Ninguna')}</div></div>
       ${(Array.isArray(v.mediaBaseline)&&v.mediaBaseline.length)?`<div class="field-row"><div class="field-label">📷 Antes (cómo llegó)</div><div class="field-value"><div style="display:flex;flex-wrap:wrap;gap:8px">${v.mediaBaseline.map(function(m){var src=m.url||'',t=String(m.type||'');var inner=(t.indexOf('video')===0)?'<video src="'+escapeAttr_(src)+'" preload="metadata" muted playsinline style="width:100%;height:100%;object-fit:cover"></video><div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:18px;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.7)">▶</div>':'<img src="'+escapeAttr_(src)+'" loading="lazy" style="width:100%;height:100%;object-fit:cover">';var verArgs=JSON.stringify(src).replace(/"/g,'&quot;')+','+JSON.stringify(t).replace(/"/g,'&quot;')+','+JSON.stringify('Antes · cómo llegó').replace(/"/g,'&quot;');return '<div onclick="_verMediaSesion('+verArgs+')" style="width:76px;height:76px;border-radius:10px;overflow:hidden;position:relative;background:#0E1622;cursor:pointer">'+inner+'</div>';}).join('')}</div></div></div>`:''}
-    </div>
-    ${(typeof _dermaCardHTML==='function')?_dermaCardHTML(v):''}
+    </div>`;
+    html+=(_dmV && typeof _dermaCardHTML==='function')?_dermaCardHTML(v):'';
+    html+=`
     <div class="section-card">
       <div class="section-title">🔎 Diagnóstico y plan${_epSufijo}
         <button onclick="editarHistoria('dxfuncional')" style="margin-left:auto;background:var(--navy);color:white;border:none;border-radius:20px;padding:3px 12px;font-size:11px;font-weight:700;cursor:pointer">✏️ Editar</button>
@@ -12178,7 +12194,14 @@ function renderExpediente(tab='historia'){
     // (#fst-hist-block, se inyecta tras este render) y se editan por la rama histórica
     // (editarSoapHistorico → _guardarEdicionSoapHistorico, que SÍ persiste historialEdiciones).
     const _esMigSoap = String(p.id||'').startsWith('mig_pac_');
-    const soaps = _esMigSoap ? [] : _soapVivas(p).slice().sort(_cmpSoapFechaDesc);   // [BORRADO-NOTAS] VISTA: historial sin notas borradas (.slice: _soapVivas puede devolver p.soap crudo → no mutar)
+    const _soapAll = _esMigSoap ? [] : _soapVivas(p).slice().sort(_cmpSoapFechaDesc);   // [BORRADO-NOTAS] VISTA: historial sin notas borradas (.slice: _soapVivas puede devolver p.soap crudo → no mutar)
+    // MODALIDAD: el swap filtra el historial. Nota SIN etiqueta (legacy) se muestra en AMBAS lentes para no esconder nada.
+    const _dmS=(typeof _esDerma==='function')&&_esDerma(p);
+    const soaps = _soapAll.filter(function(s){ var md=s&&s.modalidad; if(!md) return true; return _dmS?(md==='derma'):(md!=='derma'); });
+    const _ocultasOtra = _soapAll.length - soaps.length;
+    if(_ocultasOtra>0){
+      html+=`<div style="margin:0 0 10px;padding:7px 12px;background:${_dmS?'#F3E8EF':'#EAF0F8'};border:1px solid ${_dmS?'#D9BBCB':'#C3D6EC'};border-radius:10px;font-size:11.5px;color:${_dmS?'#7A2F5D':'#1B3A6B'};font-weight:600">🔁 ${_ocultasOtra} nota(s) de ${_dmS?'🦴 Trauma/Orto':'🧴 Dermato'} ocultas en esta vista — toca el swap de modalidad de arriba para verlas.</div>`;
+    }
     if(_esMigSoap){
       html+=`<div style="padding:12px 14px;font-size:12px;color:var(--gray-400)">📂 Historial clínico desde la nube (abajo).</div>`;
     } else if(!soaps.length){
@@ -14180,6 +14203,7 @@ function renderSOAPForm(){
     </div>
   </div>`:'';
   c.innerHTML=alertaPrecaucion+_descargaHtml+`<div id="soap-full">
+  ${((typeof _tieneDerma==='function')&&_tieneDerma(p))?(function(){var _dm=(typeof _esDerma==='function')&&_esDerma(p);return '<div style="margin:0 0 10px;padding:9px 13px;border-radius:11px;font-size:12.5px;font-weight:800;display:flex;align-items:center;gap:7px;flex-wrap:wrap;'+(_dm?'background:#F3E8EF;color:#7A2F5D;border:1.5px solid #D9BBCB':'background:#EAF0F8;color:#1B3A6B;border:1.5px solid #C3D6EC')+'">'+(_dm?'🧴 Nota de DERMATO funcional':'🦴 Nota de TRAUMA / Ortopedia')+'<span style="font-weight:500;font-size:10.5px;opacity:.78">· se guarda en esta modalidad (cámbiala con el swap del expediente)</span></div>';})():''}
   <!-- ENCABEZADO -->
   <div class="form-section">
     <div class="form-section-title">📋 Identificación</div>
@@ -15878,6 +15902,8 @@ async function guardarSOAP(){
     atendidoPor:[...(Array.isArray(tempAtendio)?tempAtendio:[])],
     media:[...tempEvolMedia], completa:true,
     modoNota: modoNotaActual||'',
+    // MODALIDAD (swap trauma/derma): etiqueta la nota con la lente activa; al EDITAR conserva la que ya tenía.
+    modalidad:(function(){ try{ if(editingSoapId && Array.isArray(p.soap)){ var _na=p.soap.find(function(s){return s&&s.id===editingSoapId;}); if(_na && _na.modalidad) return _na.modalidad; } }catch(_){} return (typeof _esDerma==='function'&&_esDerma(p))?'derma':'trauma'; })(),
     objetivoSesion: v('f-objetivo-sesion'),
     // #1 limpieza (2026-09-27): se retiraron las lecturas de 5 campos que NO existen en el editor
     // (f-respuesta-tto, f-tolerancia, f-eventos-sesion, f-cambios-plan, f-criterios-progreso,
@@ -21395,6 +21421,9 @@ async function guardarNuevoPaciente(){
     // checkboxes; si quedó vacía/"Ninguna" pero existía texto libre, conservar el existente.
     if(nuevo.valoracion){ var _nbr=String(nuevo.valoracion.banderasRojas||'').trim(); var _obr=String((_ep.valoracion&&_ep.valoracion.banderasRojas)||'').trim();
       if((!_nbr||_nbr==='Ninguna') && _obr && _obr!=='Ninguna') nuevo.valoracion.banderasRojas=_ep.valoracion.banderasRojas; }
+    // FIX anti-pérdida (swap trauma/derma): si en edición el apartado derma no se tocó (toggle OFF →
+    // dermato=null), NO borrar la historia de derma existente — conservar la que ya está en el expediente.
+    if(nuevo.valoracion && nuevo.valoracion.dermato==null && _ep.valoracion && _ep.valoracion.dermato){ nuevo.valoracion.dermato=_ep.valoracion.dermato; }
     _ep.valoracion=Object.assign({}, _ep.valoracion||{}, nuevo.valoracion||{});
     // dxFuncional: preservar objetivosLP y dxClinico (no editables en este form).
     _ep.dxFuncional=Object.assign({}, _ep.dxFuncional||{}, {dxFuncional:nuevo.dxFuncional.dxFuncional, limitaciones:nuevo.dxFuncional.limitaciones, objetivosCP:nuevo.dxFuncional.objetivosCP, pronostico:nuevo.dxFuncional.pronostico});
