@@ -975,241 +975,181 @@ Los agentes son **coadyuvantes**. Respetar siempre `seguridadClinica` (la alerta
 
 ---
 
-## 💪 HOMBRO — SLAP, manguito rotador e inestabilidad / Bankart
+## 💪 HOMBRO — manguito rotador (tendinopatía/pinzamiento y reparación)
 
-> **Advertencia transversal sobre pruebas especiales:** casi todas las cifras "estrella" vienen del artículo original del autor de la prueba y NO se reproducen en estudios independientes (p. ej. O'Brien original 100/98.5 → pooled ~60/40). Regla práctica: ninguna prueba sola confirma; se usan en CLÚSTER y el estándar de referencia real es RM-artrografía o artroscopia. En general en hombro: las pruebas de manguito/labrum son **sensibles pero poco específicas** (sirven para descartar), y las de inestabilidad/subescapular son **muy específicas pero poco sensibles** (sirven para confirmar). La mejor síntesis independiente sigue siendo Hegedus et al. 2012 (BJSM, meta-análisis).
+### Hombro — manguito rotador, guía por tipo
 
----
+El manguito rotador es el grupo de tendones que mueven y estabilizan el hombro. Duele por sobrecarga / pinzamiento (el tendón se pellizca al subir el brazo) o porque se rompió y lo repararon. Se trata con **carga progresiva del manguito + control de la escápula** (el omóplato); los aparatos solo acompañan. Lo primero es saber si es **conservador** o **post-operado**, porque el plan cambia por completo. Se avanza por logros, no por calendario; en lo operado manda el cirujano.
 
-### 1. Reparación de SLAP tipo II (quirúrgico)
+#### ⛔ PRIMERO: ¿qué tipo es? — de esto depende TODO
+- **Conservador (sin cirugía):** dolor al subir el brazo (arco doloroso), a veces dolor de noche al acostarse sobre el hombro. Se trata con fuerza del manguito y control de la escápula, evitando al inicio las posiciones que pellizcan.
+- **Manguito reparado (operado):** te cosieron el tendón. Hay que proteger la reparación: cabestrillo, primero mover el hombro pasivo (que lo muevan), nada de fuerza activa contra resistencia temprano. Manda el cirujano.
 
-> **📋 Encuadre**
+> **Si fue SLAP / labrum o inestabilidad, avísame:** lleva matices propios y lo ajustamos.
+
+**Agentes físicos por fase** (acompañan, no sustituyen la carga): láser y TECAR atérmica para analgesia; ultrasonido pulsado si hay dolor local; hielo tras la sesión. En fase de carga, apoyan antes o después del ejercicio.
+
+> **⚠️ Seguridad:** nada de radiofrecuencia, diatermia, TECAR térmica ni ultrasonido térmico sobre las anclas de la reparación, prótesis o marcapaso. Precaución con anticoagulación, cáncer activo, embarazo y trombosis.
+
+| Semáforo del dolor | Qué hacer |
+|---|---|
+| **VERDE ≤3/10** | durante el ejercicio, que se va en 24 h y sin dolor nocturno nuevo → progresa. |
+| **AMARILLO 4–5/10** | o molestia que dura → mantén, no subas. |
+| **ROJO >5/10** | dolor nocturno que empeora o pérdida de fuerza → baja un escalón y avísame. |
+
+#### RUTA A — Conservador (sin cirugía)
+
+El mapa (las semanas son guía; se avanza por criterios):
+
+| Fase | Semanas | Qué se hace |
+|---|---|---|
+| **M1** | sem 1–3 | Analgesia y activación del manguito sin pinzamiento. |
+| **M2** | sem 4–8 | Fuerza de rotadores y escápula en rango medio. |
+| **M3** | sem 9–14 | Fuerza por encima del hombro. |
+| **M4** | sem 15–18 | Potencia y función específica. |
+| **M5** | sem 19+ | Readaptación al gesto deportivo o laboral. |
+
+##### SEM 1–3 · M1 — Bajar el dolor y activar sin pellizcar
+**Apoyo / muletas:** Normal. Evita dormir sobre el hombro y subir el brazo con dolor.
+
+> **✅ YA PUEDE (ideas de ejercicio)**
 >
-> **🎯 Indicaciones:** Rehabilitación tras reparación quirúrgica de lesión SLAP tipo II (típicamente atleta overhead/lanzador); diagnóstico por clúster O'Brien + Biceps Load II, con estándar de referencia RM-artrografía o artroscopia.
+> - **Isométricos de rotadores** (rotación externa e interna contra la pared o con liga) en rango neutro, sin dolor
+> - **Control de la escápula:** retracción (juntar los omóplatos), serrato (empujar la pared)
+> - Agentes para analgesia
+
+> **🚫 TODAVÍA NO**
 >
-> **⛔ Contraindicaciones / cuándo derivar:** Dolor del anclaje con contracción de bíceps o RE pasiva forzada → retroceder, no progresar. Pérdida súbita de ROM o chasquido doloroso nuevo → sospecha de fallo de reparación, derivar. Signos de infección (fiebre, eritema/calor/drenaje), TVP, parestesias nuevas o déficit neurológico.
+> - Subir el brazo por encima de la cabeza con dolor (arco de pinzamiento)
+> - Cargar peso con el brazo elevado
+> - Dormir sobre el hombro
+
+##### SEM 4–8 · M2 — Fuerza en rango medio
+**Apoyo / muletas:** Normal.
+
+> **✅ YA PUEDE (ideas de ejercicio)**
 >
-> **⚠️ Precauciones:** Invariante = proteger el anclaje del bíceps: NO contracción activa/aislada del bíceps ni RE pasiva forzada temprano. Fase 1 con cabestrillo 4 sem, RE pasiva ~10–15° (hasta ~30° según protocolo) [verificar], sin elevación activa/extensión/abducción+RE. Bíceps resistido se reintroduce ligero ~sem 12 (pleno sem 16–20). Progresar por criterios; manda el protocolo del cirujano (variabilidad alta, no hay GPC JOSPT post-qx).
+> - Rotación externa e interna con liga, remo, "full can" en rango medio
+> - Serrato y trapecio inferior; rango progresivo según tolere
 
-#### Diagnóstico — pruebas especiales
-- **O'Brien (compresión activa):** hombro en flexión 90° + aducción 10°, pulgar abajo, resistir descenso → dolor profundo que se alivia con pulgar arriba = + · Sens ~50–67% / Esp ~30–50% (revisiones/meta-análisis; original O'Brien 1998 reportó 100%/98.5%, NO reproducido) · (O'Brien 1998; rev. sistemática Active Compression, PMC 2019)
-- **Biceps Load II:** supino, abducción 120° + rotación externa máxima, antebrazo supinado; resistir flexión de codo → dolor = + · Sens ~90% / Esp ~97% en el estudio original; cohortes independientes bajan la especificidad pero mantienen VPN alto (~90%) · (Kim et al. 2001)
-- **Dynamic Labral Shear / O'Driscoll:** abducir a 120° en RE y descender de 120°→60° en el plano escapular → dolor/clic entre 90–120° = + · Sens ~78% / Esp ~51% (VPN ~100%) en validación; el paper desarrollador reportó ~72%/98% (no reproducido; subgrupos muy pequeños n=9) · (Sodha et al. 2017; desarrollador Kibler/O'Driscoll ~2009)
-- **Speed:** codo extendido, antebrazo supinado; resistir flexión de hombro a 90° → dolor en corredera bicipital = + · Sens ~32% / Esp ~61% para SLAP (es mejor marcador de patología bicipital que de SLAP) · (Hegedus et al. 2008)
-- **Crank:** abducción ~160° en plano escapular + carga axial + rotación interna/externa → dolor/clic/aprensión = + · Sens ~91% / Esp ~93% original; revisiones posteriores dan cifras bastante menores y variables · (Liu et al. 1996)
-
-> Clúster recomendado: O'Brien + Biceps Load II mejora el rendimiento frente a cualquiera sola. Marcar incierto: los valores altos aislados no son fiables.
-
-#### Rehabilitación por fases
-> La evidencia específica son protocolos de cirujano (variabilidad alta, confirmada por la revisión de 60 protocolos, Chang et al. 2021, PMC8523106) más una revisión narrativa de retorno al juego (Michener/ScienceDirect 2017). No hay GPC JOSPT para SLAP post-qx. El invariante clínico clave es **proteger el anclaje del bíceps**: nada de contracción activa del bíceps ni RE pasiva forzada temprano.
-
-**Fase 1 — Protección máxima (sem ~0–4 · criterio de entrada: post-op inmediato):**
-- Metas: proteger reparación, control del dolor/edema, ROM pasivo seguro, evitar inhibición.
-- Restricciones: RE pasiva limitada a ~10–15° en plano escapular (algunos protocolos permiten hasta 30°); cabestrillo 4 semanas; prohibido elevación activa, extensión de hombro, abducción+RE combinada.
-- SÍ: pendulares, PROM en rango permitido, isométricos submáximos de hombro, movilidad de codo/muñeca (sin resistir bíceps), ejercicio escapular suave.
-- NO: **contracción activa/aislada del bíceps** (flexión de codo o supinación resistida), RE pasiva más allá del tope, abducción+RE, extensión de hombro (todas tensan el anclaje SLAP).
-- Avanzar si: dolor controlado y tolera PROM en los topes sin molestia del anclaje.
-
-**Fase 2 — Movimiento e inicio de fuerza (sem ~4–10):**
-- Metas: recuperar ROM completo progresivamente, iniciar fuerza de manguito/escápula.
-- Restricciones: RE a 30° hasta la semana 6, luego progresar hacia 60° [verificar límite exacto por protocolo]; retirar cabestrillo ~sem 4; seguir SIN bíceps resistido.
-- SÍ: progresión PROM→AAROM→AROM, RE/RI asistida, isométricos que pasan a isotónicos de manguito ~sem 6, fortalecimiento escapular.
-- NO: resistir bíceps, estiramiento agresivo en RE (sobre todo reparaciones de base anterior → progresar RE pasiva más lento; base posterior → progresar RI más lento).
-- Avanzar si: ROM casi completo e indoloro, buen control escapular.
-
-**Fase 3 — Fortalecimiento (sem ~10–16):**
-- Metas: ROM completo, fuerza progresiva de manguito/escápula, reintroducir bíceps.
-- Restricciones: iniciar bíceps resistido LIGERO ~sem 12; bíceps resistido pleno diferido a sem 16–20.
-- SÍ: fortalecimiento progresivo con bandas/pesas, cadena cerrada, propiocepción, isométricos de bíceps → isotónicos.
-- NO: pliometría pesada o lanzamiento aún.
-- Avanzar si: fuerza ~simétrica, ROM completo, sin dolor con cargas.
-
-**Fase 4 — Retorno al deporte / lanzamiento (sem ~16–24+):**
-- Metas: potencia, resistencia, gesto deportivo, programa de lanzamiento por intervalos.
-- SÍ: pliometría progresiva, programa de lanzamiento por intervalos (ventana más común 16–24 sem; Michener ~16 sem; encuesta 16–20 sem), trabajo específico.
-- Avanzar/alta si: ver criterios de retorno.
-
-#### Criterios de RETORNO AL DEPORTE (objetivos)
-- ROM completo e indoloro; fuerza simétrica (vs contralateral); programa de lanzamiento por intervalos completado sin síntomas; mecánica correcta; tiempo mínimo ~16 sem para iniciar lanzar, **retorno pleno a lanzamiento/pitcheo competitivo típicamente 9–12 meses**. Solo ~80–90% de atletas overhead vuelven a su nivel previo.
-
-#### Timeline típico (para saber si van en tiempo o desfasados)
-- Sem 0–4: cabestrillo, PROM, RE ≤~15–30°.
-- Sem 6: inicia isotónicos de manguito; RE progresa hacia 60°.
-- Sem 12: ROM completo + inicio bíceps resistido ligero.
-- Mes 4 (~sem 16): inicia programa de lanzamiento por intervalos.
-- Meses 9–12: retorno pleno a lanzamiento.
-> Señal de desfase: si a la semana 6–8 aún no hay AAROM/AROM útil, o si a los 4–5 meses no tolera fuerza simétrica, va atrasado. Forzar RE/bíceps antes de tiempo = riesgo de fallo del anclaje.
-
-#### Contraindicaciones / banderas rojas
-- Dolor del anclaje con contracción de bíceps o RE pasiva forzada → retroceder, no progresar.
-- Pérdida súbita de ROM o chasquido doloroso nuevo → sospecha de fallo de reparación, derivar.
-- Signos de infección (fiebre, eritema/calor/drenaje crecientes), signos de TVP.
-- Parestesias nuevas / déficit neurológico.
-
-#### Fuentes
-- O'Brien et al. 1998 (Active Compression); Kim et al. 2001 (Biceps Load II); Liu et al. 1996 (Crank); Sodha et al. 2017 (Dynamic Labral Shear); Hegedus et al. 2008/2012 (meta-análisis pruebas de hombro).
-- Chang et al. 2021 "Variability in Rehabilitation Protocols after SLAP Repair" (PMC8523106); revisión de rehabilitación y retorno al juego post-SLAP (ScienceDirect 2017, Michener).
-
----
-
-### 2. Reparación de manguito rotador (quirúrgico)
-
-> **📋 Encuadre**
+> **🚫 TODAVÍA NO**
 >
-> **🎯 Indicaciones:** Post-operatorio de reparación de manguito rotador; la progresión cambia según el TAMAÑO del desgarro (pequeño/mediano/grande/masivo) y según si se reparó el SUBESCAPULAR.
+> - Press militar pesado, dominadas, fondos
+> - Rango alto cargado si pellizca
+
+##### SEM 9–14 · M3 — Fuerza por encima del hombro
+**Apoyo / muletas:** Normal.
+
+> **✅ YA PUEDE (ideas de ejercicio)**
 >
-> **⛔ Contraindicaciones / cuándo derivar:** Pérdida súbita de fuerza/ROM activo, chasquido o dolor nuevo → sospecha de re-ruptura → suspender fortalecimiento y derivar. Infección (fiebre, calor/eritema/drenaje), TVP, déficit del nervio axilar (deltoides/sensibilidad en "charretera"), parestesias nuevas, rigidez progresiva/capsulitis.
+> - Progresar a elevación cargada, press controlado, jalón (pull)
+> - Escalones chicos de carga
+
+> **🚫 TODAVÍA NO**
 >
-> **⚠️ Precauciones:** Fase 1 PROM (sin ROM activo; isométricos submáximos NO-manguito y escápula suave sí permitidos), cabestrillo 4 sem (pequeño) a 6–8 sem (grande/masivo). Si se reparó subescapular → RE solo hasta neutro (0°) × 6 sem y SIN RI resistida × 6 sem. Nada de RE/elevación activa ni RE pasiva más allá del tope en fase 1. Fortalecimiento resistido ~sem 12 (antes en grandes/masivos = riesgo de re-ruptura). Retorno por CRITERIOS, no por calendario; manda el cirujano. (La JOSPT 2025 de manguito es para tendinopatía NO quirúrgica, no aplicar post-qx.)
+> - Lanzamientos o gesto deportivo máximo todavía
 
-#### Diagnóstico — pruebas especiales
-- **Jobe / empty can (supraespinoso):** abducción 90° en plano escapular + RI (pulgar abajo), resistir → debilidad/dolor = + · Sens ~74–88% / Esp ~30–62% (la DEBILIDAD es más informativa que el dolor; pooled Hegedus 2012 ~74%/30%) · (Hegedus et al. 2012; Itoi 1999)
-- **Full can (supraespinoso):** igual pero pulgar arriba (RE ~45°) → debilidad = + · Sens ~70–74% / Esp ~81% (precisión ~75%); preferido por provocar menos dolor que empty can · (Itoi 1999)
-- **Hawkins-Kennedy (pinzamiento subacromial):** flexión 90° + RI forzada → dolor = + · Sens ~79% / Esp ~59% · (Hegedus et al. 2012)
-- **Neer (pinzamiento subacromial):** elevación pasiva completa en RI estabilizando escápula → dolor = + · Sens ~72% / Esp ~60% · (Hegedus et al. 2012)
-- **Lift-off / Gerber (subescapular):** dorso de la mano en región lumbar, separar de la espalda contra resistencia → no poder/debilidad = + · Sens ~12–40% (baja) / Esp ~100% · (Gerber; rev. Clinical Examination of the Rotator Cuff, PMC3826176)
-- **Belly-press (subescapular, porción alta):** palma sobre abdomen, presionar manteniendo el codo adelante → codo cae atrás/debilidad = + · Sens ~40% / Esp ~93–98% (la más sensible de las de subescapular, aun así baja) · (PMC3826176)
-- **External rotation lag sign (infraespinoso/redondo menor):** codo 90°, brazo en ~20° abd, llevar pasivo a RE casi máxima y pedir sostener → el antebrazo "cae" hacia RI = + · Sens ~46–98% (muy variable) / Esp ~72–100% (Hertel original 70%/100%); requiere RE normal para ser válido · (Hertel 1996; PMC3826176)
-- **Drop arm (desgarro grande/completo supraespinoso):** abducir pasivo a 90–120° y pedir descender lento → el brazo cae = + · Sens ~10–73% (baja, típico ~20–30%) / Esp ~77–98% · (PMC3826176)
+##### SEM 15–18 · M4 — Potencia y función
+**Apoyo / muletas:** Normal.
 
-> Patrón: Jobe/full can/Neer/Hawkins para cribar (sensibles); lift-off/belly-press/ERLS/drop-arm para confirmar (específicas). Ninguna sola es diagnóstica (meta-análisis BMC 2017 y Hegedus 2012: ningún test individual mostró validez superior).
-
-#### Rehabilitación por fases
-> **La progresión cambia según el TAMAÑO del desgarro y si se reparó el SUBESCAPULAR.** Protocolos de referencia: Mass General Brigham / Sanford Health / UW Health (handouts de cirujano, criterio-dependientes). Evidencia reciente: un meta-análisis 2023 (PMC10694899) muestra que la movilización TEMPRANA vs diferida en desgarros pequeños-grandes NO aumenta la tasa de re-ruptura; el estándar histórico era inmovilización estricta 4–6 sem (revisión 2025, PMC12537514).
-
-**Fase 1 — Pasiva / protección (sem ~0–6):**
-- Metas: proteger reparación, PROM, controlar dolor, evitar rigidez sin estresar el tendón.
-- Restricciones por tamaño:
-  - Pequeño: cabestrillo ~4 sem; PROM solo 0–4/6 sem.
-  - Mediano/grande: cabestrillo 6 sem; solo PROM; objetivo flexión pasiva ≥~125°.
-  - Grande/masivo: cabestrillo 6 (–8) sem; PROM sem 1–6 (en masivos a veces PROM por terapeuta se difiere a sem 6); objetivo flexión pasiva benchmark ~100–120°.
-  - RE pasiva típica: 0–30° las primeras 3 sem, 0–60° resto de fase 1 — **EXCEPTO si se reparó subescapular → RE solo hasta neutro (0°) × 6 sem y SIN RI resistida × 6 sem**.
-- SÍ: pendulares, PROM en topes, isométricos submáximos (no de manguito reparado al inicio), movilidad codo/muñeca, control escapular suave.
-- NO: elevación/RE activa; RE pasiva más allá del tope; soltar el cabestrillo antes de tiempo; cargar el brazo.
-- Avanzar si: cumple objetivos de PROM (p. ej. flexión pasiva ≥90–120° según tamaño) sin dolor.
-
-**Fase 2 — AAROM → AROM (sem ~4–12):**
-- Metas: recuperar ROM activo completo.
-- Restricciones: pequeño inicia AROM ~sem 4–6; grande/masivo inicia AROM ~sem 8 (Sanford); evitar RE en abducción si subescapular involucrado.
-- SÍ: AAROM→AROM progresivo, escápula, isométricos suaves al final de fase.
-- NO: fortalecimiento resistido del manguito aún, sobre todo en grandes/masivos.
-- Avanzar si: AROM funcional sin compensación/dolor.
-
-**Fase 3 — Fortalecimiento (sem ~12–20):**
-- Metas: fuerza progresiva de manguito y escápula.
-- Restricciones: iniciar fortalecimiento ~sem 12 (grandes/masivos típicamente a sem 12); cargas ligeras y progresivas.
-- SÍ: bandas/pesas, manguito en progresión, cadena cerrada→abierta, propiocepción.
-- Avanzar si: fuerza progresando sin dolor nocturno ni signos de re-ruptura.
-
-**Fase 4 — Avanzada / retorno (mes ~4–9):**
-- Metas: potencia, resistencia, gesto deportivo/laboral.
-- SÍ: trabajo específico, pliometría si procede.
-- Alta/retorno: ver criterios.
-
-#### Criterios de RETORNO AL DEPORTE (objetivos)
-- **No hay timeline universal; es por criterios** (Consenso Internacional de Manguito Parte III, Hurley et al. 2025): restauración de fuerza, ROM, propiocepción, resolución del dolor y disposición psicológica. En la práctica: ROM completo e indoloro, fuerza ~prelesional/simétrica, examen funcional satisfactorio. Tiempo mínimo ~6 meses; grandes/masivos 6–9 meses. (Rev. sistemática RTP, Ciccotti 2022, PMC9024603: no hay criterios precisos consensuados).
-
-#### Timeline típico (para saber si van en tiempo o desfasados)
-- Sem 0–6: cabestrillo + PROM (RE ≤30° al inicio; neutro si subescapular).
-- Sem 6–8: retira cabestrillo; inicia AAROM/AROM (pequeño antes, masivo hacia sem 8).
-- Sem 12: inicia fortalecimiento resistido.
-- Meses 4–6: fuerza funcional; inicio de retorno en desgarros pequeños.
-- Meses 6–9: retorno deportivo (grandes/masivos en el extremo alto).
-> Señal de desfase vs riesgo: un masivo con fuerza resistida antes de sem 12, o RE forzada en fase 1, es riesgo de re-ruptura; a la inversa, rigidez que no cede a los 3 meses también es bandera (capsulitis).
-
-#### Contraindicaciones / banderas rojas
-- Pérdida súbita de fuerza/ROM activo, chasquido, dolor nuevo → sospecha de re-ruptura → suspender fortalecimiento, derivar.
-- RE/abducción pasada temprano (sobre todo con subescapular reparado) = contraindicado.
-- Infección (fiebre, calor/eritema/drenaje), TVP.
-- Déficit del nervio axilar (deltoides/sensibilidad en "charretera"), parestesias nuevas.
-- Rigidez progresiva/capsulitis.
-
-#### Fuentes
-- Hegedus et al. 2012 (BJSM, meta-análisis); Itoi 1999 (empty vs full can); Hertel 1996 (lag signs); revisión "Clinical Examination of the Rotator Cuff" (PMC3826176); meta-análisis BMC Musculoskelet Disord 2017.
-- Hurley et al. 2025 "Rotator Cuff Consensus Part III" (Arthroscopy); meta-análisis movilización temprana vs diferida 2023 (PMC10694899); revisión de técnicas y protocolos 2025 (PMC12537514); Ciccotti et al. 2022 RTP (PMC9024603); protocolos Mass General Brigham / Sanford Health / UW Health. **[JOSPT 2025 "Rotator Cuff Tendinopathy CPG" es para manejo NO quirúrgico/tendinopatía, no para post-reparación — no aplicar como guía post-qx.]**
-
----
-
-### 3. Inestabilidad anterior / reparación de Bankart artroscópica (quirúrgico)
-
-> **📋 Encuadre**
+> **✅ YA PUEDE (ideas de ejercicio)**
 >
-> **🎯 Indicaciones:** Post-operatorio de reparación de Bankart artroscópica por inestabilidad anterior (traumática); diagnóstico por clúster aprensión + reubicación + sorpresa (patrón muy específico).
+> - Pliometría de brazo (lanzar y atrapar balón), trabajo de cadena (piernas–core–brazo)
+
+> **🚫 TODAVÍA NO**
 >
-> **⛔ Contraindicaciones / cuándo derivar:** Sensación de subluxación/luxación o aprensión persistente con la actividad → suspender provocación y derivar (posible recidiva/fallo). Déficit del nervio axilar (deltoides/sensibilidad charretera), parestesias nuevas. Infección (fiebre, calor/eritema/drenaje), TVP. Sulcus marcado + hiperlaxitud generalizada → considerar componente multidireccional.
+> - Competir o gesto máximo antes de tolerar la pliometría
+
+##### SEM 19+ · M5 — Readaptación
+**Apoyo / muletas:** Normal.
+
+> **✅ YA PUEDE (ideas de ejercicio)**
 >
-> **⚠️ Precauciones:** Invariante = proteger la cápsula anterior: evitar abducción + RE (posición de aprensión) y RE pasiva forzada las primeras semanas/meses. Fase 1 cabestrillo 4–6 sem, RE 0°→~30° según protocolo [verificar]; si subescapular reparado (abierto) RE <20° × 6 sem. NO RE activa, abducción+RE, extensión ni mano-a-la-espalda en fase 1; sin estiramiento forzado en RE × 3 meses. Forzar RE/abd+RE antes de ~12 sem = riesgo de recidiva. Progresar por criterios; manda el cirujano (variabilidad alta).
+> - Drills específicos del deporte o del trabajo; retorno progresivo
 
-#### Diagnóstico — pruebas especiales
-- **Aprensión (apprehension):** supino, abducción 90° + RE progresiva → sensación de que "se va a salir" (aprensión, NO dolor) = + · Sens ~66% / Esp ~95% (cuando el criterio + es aprensión, no dolor) · (Hegedus et al. 2012; Lo et al. 2004)
-- **Reubicación (relocation / Jobe):** desde aprensión, aplicar fuerza posterior sobre la cabeza humeral → desaparece la aprensión = + · Sens ~65% / Esp ~90% · (Lo et al. 2004)
-- **Sorpresa / release (surprise):** desde reubicación, soltar de golpe la fuerza posterior → reaparece aprensión súbita = + · Sens ~64% / Esp ~99% — **la prueba individual más precisa**; las 3 positivas juntas = altísimo valor predictivo de inestabilidad anterior traumática · (Lo et al. 2004)
-- **Load and shift:** carga axial + traslación anterior/posterior de la cabeza humeral, graduar I–III → traslación aumentada = + · Sens ~50–55% / Esp ~78–100% · (orthofixar; rev. inestabilidad)
-- **Sulcus sign:** tracción caudal del brazo en aducción → surco subacromial >1–2 cm = laxitud inferior/sospecha de inestabilidad multidireccional · datos escasos; con corte >2 cm Sens ~28% / Esp ~97% · (Tzannes & Murrell 1999)
+> **🚫 TODAVÍA NO**
+>
+> - Volver sin cumplir los criterios de retorno
 
-> Clave clínica: distinguir APRENSIÓN (sensación de inestabilidad) de dolor; definida por aprensión la prueba es mucho más específica. El clúster aprensión+reubicación+sorpresa es el patrón más fiable (muy específico).
+#### RUTA B — Manguito reparado (post-operado)
 
-#### Rehabilitación por fases
-> Evidencia: protocolos académicos (Mass General, CHOP 2023, VUMC) + revisión sistemática 2024 que confirma **variabilidad sustancial** entre protocolos post-Bankart. El invariante es proteger la cápsula anterior: **evitar la posición de abducción + RE (posición de aprensión) y la RE pasiva forzada** en las primeras semanas/meses.
+**Lo que NO se rompe:** respeta el cabestrillo el tiempo que indique el cirujano; primero el hombro se mueve **pasivo** (que te lo muevan o con el otro brazo), sin que tú actives el músculo reparado; nada de fuerza contra resistencia ni llevar la mano a la espalda hasta que te autoricen. Manda el cirujano.
 
-**Fase 1 — Protección (sem ~0–4/6 · post-op inmediato):**
-- Metas: proteger reparación capsulolabral anterior, controlar dolor, PROM seguro.
-- Restricciones: cabestrillo 4–6 sem (rango 4–8; hasta 8 en entornos "no controlados"); **RE limitada**: fase 1 típicamente RE 0° (neutro) hasta ~30° según protocolo (protocolos académicos tipo MGH: FF ≤90°, abd ≤45°, RE ≤30°); si se reparó subescapular (reparación abierta) RE <20° hasta 6 sem.
-- SÍ: pendulares, PROM dentro de topes, isométricos submáximos, escápula, codo/muñeca.
-- NO: **RE activa; abducción + RE combinadas (posición de aprensión/riesgo); extensión de hombro y mano-a-la-espalda (tensan cápsula anterior); estiramiento pasivo forzado en RE**.
-- Avanzar si: dolor controlado, tolera PROM en topes.
+Línea de tiempo (según el cirujano):
 
-**Fase 2 — ROM e inicio de fuerza (sem ~6–12):**
-- Metas: recuperar ROM progresivamente, iniciar fuerza de manguito/escápula.
-- Restricciones: progresar RE a 45° y luego hacia 90° hacia la semana ~12; NO estiramiento forzado en RE × 3 meses (reparación anterior); evitar abducción+RE de rango final hasta ~12 sem.
-- SÍ: AAROM→AROM en todos los planos dentro de límites, isotónicos de manguito/escápula, cadena cerrada.
-- NO: posición de aprensión de rango final, RE pasiva agresiva.
-- Avanzar si: ROM casi completo, buena activación de manguito/escápula.
+| Hito (lo que la persona logra) | ¿Cuándo, aprox.? |
+|---|---|
+| Cabestrillo + movimiento pasivo | **Sem 0–6** |
+| Movimiento activo-asistido → activo | **Sem 6–12** |
+| Empieza la fuerza | **Sem 12–16** |
+| Fuerza por encima de la cabeza | **Mes 4–6** |
+| Retorno (según cirujano) | **4–6 meses** |
 
-**Fase 3 — Fortalecimiento (sem ~12–20):**
-- Metas: ROM completo, fuerza/potencia, propiocepción.
-- SÍ: fortalecimiento progresivo y excéntrico, perturbaciones/propiocepción, inicio controlado de RE de rango final; reintroducir abducción+RE de forma gradual.
-- Avanzar si: fuerza ~simétrica, control dinámico, sin aprensión.
+##### SEM 0–6 — Proteger la reparación
+**Apoyo / muletas:** Cabestrillo el tiempo que indique el cirujano.
 
-**Fase 4 — Retorno al deporte (sem ~20–28+):**
-- Metas: gesto deportivo, potencia, contacto.
-- SÍ: pliometría, trabajo específico; programa de lanzamiento por intervalos ~sem 28 (overhead/lanzadores más tarde).
-- Alta/retorno: ver criterios.
+> **✅ YA PUEDE (ideas de ejercicio)**
+>
+> - Péndulos (dejar colgar el brazo y mecerlo)
+> - Movimiento pasivo: que el fisioterapeuta o tu otro brazo lo muevan, en el rango permitido
+> - Mover codo, muñeca y mano; apretar la mano (pelota)
 
-#### Criterios de RETORNO AL DEPORTE (objetivos)
-- ROM completo (incl. RE/abducción de rango final sin aprensión), fuerza simétrica, control propioceptivo, disposición psicológica. **No lanzadores/no contacto ~4–6 meses; lanzamiento ~4.5–6 meses; deportes de contacto/colisión ≥6 meses.** (CHOP 2023: 4–6 meses no lanzadores; clínicas: throwing 4.5 m, deporte 6 m; MGB posterior: lanzamiento por intervalos a sem 28).
+> **🚫 TODAVÍA NO**
+>
+> - Mover el hombro activo (que tú jales el músculo)
+> - Cargar peso, llevar la mano a la espalda
+> - Apoyarte con ese brazo
 
-#### Timeline típico (para saber si van en tiempo o desfasados)
-- Sem 0–4/6: cabestrillo, RE ≤0–30°, sin abd+RE.
-- Sem 6–12: RE progresa 45°→90°; AROM todos los planos; inicia fuerza.
-- Sem 12–20: ROM completo, fuerza/propiocepción, RE de rango final controlada.
-- Mes 4–6: retorno no-contacto / lanzamiento progresivo.
-- ≥Mes 6: contacto/colisión.
-> Señal de desfase vs riesgo: forzar RE/abducción+RE antes de ~12 sem = riesgo de recidiva/fallo; apresurar a "sanadores rápidos" se asocia a recurrencia. A la inversa, RE que no llega a ~90° hacia los 3–4 meses va atrasado.
+> **Clave:** en estas semanas el tendón solo está pegado por la costura. Activar el músculo tira de la reparación.
 
-#### Contraindicaciones / banderas rojas
-- Sensación de subluxación/luxación o aprensión persistente con la actividad → suspender provocación, derivar (posible recidiva/fallo).
-- RE/abducción+RE forzada temprana = contraindicado.
-- Déficit del nervio axilar (deltoides/sensibilidad charretera), parestesias nuevas.
-- Infección (fiebre, calor/eritema/drenaje), TVP.
-- Sulcus marcado + hiperlaxitud generalizada → considerar componente multidireccional (ajustar expectativas y protocolo).
+##### SEM 6–12 — Recuperar el movimiento
+**Apoyo / muletas:** Según el cirujano, dejar el cabestrillo.
 
-#### Fuentes
-- Lo et al. 2004 (apprehension/relocation/surprise); Hegedus et al. 2012 (BJSM meta-análisis); Tzannes & Murrell 1999 (sulcus); revisión "Physical Exam of the Unstable Shoulder" (PMC5646139).
-- CHOP "Arthroscopic Bankart Protocol Revised 2023"; Mass General / VUMC protocolos; revisión sistemática 2024 sobre variabilidad de protocolos post-Bankart (PMC11446737).
+> **✅ YA PUEDE (ideas de ejercicio)**
+>
+> - Movimiento activo-asistido (te ayudas con el otro brazo o una polea) → activo sin peso
+> - Seguir con el control de la escápula
 
----
+> **🚫 TODAVÍA NO**
+>
+> - Fuerza contra resistencia, cargar peso
+> - Forzar el rango final
 
-### Notas de incertidumbre / dónde difieren los protocolos (para el clínico que afine)
-1. **Límites de RE son el punto de mayor desacuerdo** en los tres (SLAP, manguito, Bankart): varían de 0° (neutro) a 30° en fase 1 según cirujano y según si hubo reparación de subescapular o base anterior/posterior. Marcados [verificar] arriba — definir el estándar de la clínica con el/los cirujanos de referencia.
-2. **Cabestrillo:** 4 sem (pequeño/SLAP) hasta 6–8 sem (manguito grande/masivo); Bankart ~4–6 sem (hasta 8 en entornos no controlados). 
-3. **Inicio de fuerza:** converge en ~sem 12 en los tres; AROM converge 4–6 sem (pequeño) vs 8 sem (masivo).
-4. **Cifras de pruebas especiales:** dar rangos (no un valor único) es lo honesto; las cifras originales están infladas. Hegedus 2012 es la mejor referencia neutral.
-5. **No existe GPC JOSPT post-quirúrgica** para estas 3 (la JOSPT 2025 de manguito es para tendinopatía no quirúrgica). La mejor evidencia de consenso quirúrgico es el Consenso Internacional de Manguito 2025 (criterios, no tiempos) y, para retorno, revisiones sistemáticas que coinciden en "por criterios, no por calendario" — lo cual encaja perfectamente con el modelo de semáforo/"qué falta" de la pestaña Protocolo de la app.
+##### SEM 12–16 — Empezar la fuerza
+**Apoyo / muletas:** Normal.
 
-Este es material de referencia para revisión clínica, no prescripción automática. Verificar grados y semanas marcados [verificar] contra la fuente primaria antes de fijarlos en la biblioteca durable.
+> **✅ YA PUEDE (ideas de ejercicio)**
+>
+> - Isométricos → banda de rotadores, en rango medio, progresivo
+> - Fortalecer escápula
 
----
+> **🚫 TODAVÍA NO**
+>
+> - Pesos altos por encima de la cabeza
+
+##### MES 4–6 — Fuerza y retorno
+**Apoyo / muletas:** Normal.
+
+> **✅ YA PUEDE (ideas de ejercicio)**
+>
+> - Progresar fuerza por encima de la cabeza y función; retorno según el cirujano
+
+> **🚫 TODAVÍA NO**
+>
+> - Gesto deportivo/laboral máximo antes del visto bueno del cirujano
+
+#### Criterios de retorno
+- **Fuerza:** rotación externa e interna ≥90% del otro lado.
+- **Dolor:** sin dolor nocturno y sin dolor al subir el brazo.
+- **Función:** mano por encima de la cabeza sin dolor; cuestionario (ej. SPADI) en mejora.
+
+#### 🚩 Señales de alarma — avisa de inmediato
+- **No puedes subir el brazo o se te "cae" al bajarlo** → posible re-rotura (en operado) o rotura.
+- Dolor nocturno que empeora semana a semana.
+- Hombro **caliente + hinchado + fiebre** → posible infección (urgencia).
+- Hormigueo o pérdida de fuerza en el brazo o la mano.
+
+> En el operado, **la orden del cirujano manda** sobre el cabestrillo, los rangos y los tiempos.
 
 ## 🦾 CODO — epicondilalgia, post-fractura/luxación, LCU/Tommy John, bursitis olecraniana y túnel cubital
 
@@ -1920,280 +1860,90 @@ Calor/parafina antes del ejercicio, TENS/US/láser para dolor como coadyuvantes 
 
 ## 🕺 CADERA — prótesis / artroplastia total (THA)
 
-> **📋 Encuadre**
+### Prótesis de cadera — guía post-operatoria semana a semana
+
+Te pusieron una **prótesis (reemplazo) de cadera**. El objetivo es recuperar la marcha y la fuerza del glúteo, pero lo primero y más importante son las **"precauciones de luxación"**: mientras la cápsula cicatriza (las primeras ~6–12 semanas), ciertas posiciones pueden hacer que la cadera se zafe. Y esas posiciones dependen de **por dónde te operaron (el abordaje)**. Se avanza por logros, y la orden del cirujano manda.
+
+#### ⛔ PRIMERO: ¿por dónde te operaron? — las reglas son OPUESTAS
+Confirma con el cirujano el abordaje. De esto depende qué posiciones están prohibidas:
+- **Abordaje POSTERIOR (el más común):** NO dobles la cadera más de 90° (no te sientes muy bajo), NO cruces la pierna hacia el otro lado, NO gires el pie hacia adentro. Usa silla alta y cojín para no hundirte.
+- **Abordaje ANTERIOR:** NO lleves la pierna muy atrás (extensión) girando el pie hacia afuera. Al sentarte hay menos restricción que en el posterior.
+
+**Agentes físicos:** crioterapia y compresión para el edema; TECAR atérmica y láser para analgesia.
+
+> **⚠️ Seguridad con prótesis:** nada de radiofrecuencia, diatermia, TECAR térmica ni ultrasonido térmico **sobre la prótesis**. Precaución con anticoagulación (común tras esta cirugía), cáncer activo, embarazo y trombosis.
+
+| Semáforo del dolor | Qué hacer |
+|---|---|
+| **VERDE ≤3/10** | que se va, edema que baja → progresa. |
+| **AMARILLO 4–5/10** | o más hinchada al día siguiente → mantén, no fuerces. |
+| **ROJO >5/10** | pantorrilla hinchada, calor con fiebre, o dolor súbito con la pierna "chueca" → para y avísame (urgencia). |
+
+#### Línea de tiempo — hitos clave
+
+| Hito (lo que la persona logra) | ¿Cuándo, aprox.? |
+|---|---|
+| Camina con andador, apoyo según tolere | **Semana 0–2** |
+| Deja el andador / bastón | **Semana 4–6** |
+| Se relajan las precauciones (según cirujano) | **Semana 6–12** |
+| Marcha sin cojear, fuerza de glúteo | **Semana 8–12** |
+| Actividad de bajo impacto (bici, caminar, natación) | **Mes 3+** |
+
+##### SEM 0–6 — Proteger la cadera y caminar
+**Apoyo / muletas:** Apoyo según tolere con andador o bastón. Respeta las precauciones de tu abordaje todo el tiempo.
+
+> **✅ YA PUEDE (ideas de ejercicio)**
 >
-> **🎯 Indicaciones:** Paciente tras artroplastia total de cadera (PTC/THA) — por coxartrosis o fractura. Sirve para ubicar la fase, aplicar las restricciones según ABORDAJE y FIJACIÓN y detectar si va "en tiempo"; el plan lo manda el cirujano.
+> - Isométricos de glúteo, cuádriceps y tobillo (bomba de tobillo contra la trombosis)
+> - Abducción de cadera en rango seguro (abrir la pierna hacia afuera, no cruzar)
+> - Marcha con el andador; silla alta y cojín para no hundirte
+> - Crioterapia para el edema
+
+> **🚫 TODAVÍA NO**
 >
-> **⛔ Contraindicaciones / cuándo derivar:** Luxación protésica (dolor súbito, acortamiento y rotación anómala del miembro, "clunk", imposibilidad de cargar) → URGENCIA/reducción. Signos de TVP/TEP (dolor/edema de pantorrilla que no cede con elevación; disnea súbita/dolor torácico) → URGENCIA. Infección periprotésica (herida que drena, eritema, fiebre, dolor que no mejora) → evaluación ortopédica urgente, no "esperar a ver". Fractura periprotésica, aflojamiento del vástago (dolor de muslo de "arranque" a la carga) y lesión nerviosa (pie caído, parestesias) → cirujano.
+> - Las posiciones prohibidas de tu abordaje (ver arriba)
+> - Posterior: sentarte bajo, cruzar la pierna, girar el pie hacia adentro, agacharte a recoger algo
+> - Forzar rango, impacto
+
+> **Lo más importante:** una cadera protésica se zafa si la llevas a la posición prohibida. Respeta las precauciones hasta que el cirujano las levante.
+
+##### SEM 6–12 — Fuerza y marcha normal
+**Apoyo / muletas:** Progresar a apoyo completo, dejar el andador/bastón. Precauciones se relajan según el cirujano.
+
+> **✅ YA PUEDE (ideas de ejercicio)**
 >
-> **⚠️ Precauciones:** Precauciones por ABORDAJE (lo más importante): posterior → no flexión > 90°, no aducción cruzando la línea media, no rotación interna; anterior directo (DAA) / lateral → evitar extensión + rotación externa combinadas. Carga según FIJACIÓN: cementada = carga total inmediata; no cementada/press-fit = carga según tolerancia (WBAT) en la mayoría; fractura/injerto/revisión según cirujano. Relajar las precauciones lo decide el CIRUJANO. Mayor riesgo de luxación en las primeras ~6 semanas. Vigilar Trendelenburg (abordaje lateral/posterior). Implante metálico → NO radiofrecuencia/diatermia/tecarterapia térmica/ultrasonido térmico sobre el material (cruzar con `seguridadClinica`); no agentes ni masaje sobre pantorrilla con sospecha de TVP. Progresar por CRITERIOS, no por calendario.
-
-> **Qué es esto:** un andamio para que el fisio ubique en qué FASE va el paciente, qué RESTRICCIONES aplican según el ABORDAJE y la FIJACIÓN, y si va "en tiempo". **No es una prescripción automática: el plan lo manda el cirujano.** La progresión es por CRITERIOS cumplidos, no por semanas del calendario; las semanas que aparecen son promedios orientativos para detectar desfase, no metas rígidas.
-> **Regla de oro de esta clínica para esta función:** PTC = implante metálico. Antes de cualquier agente físico, leer la Sección 9 (seguridad con metal) y cruzarla con `seguridadClinica`.
-
-### 0. Lo primero: datos que hay que sacar de la nota quirúrgica (o preguntar)
-
-Sin estos datos NO se puede fijar la fase ni las precauciones. Capturarlos en el expediente (motivo/antecedentes/seguridadClinica):
-
-- **Abordaje quirúrgico** (posterior/posterolateral · anterior directo (DAA) · lateral directo o anterolateral). Define las precauciones de luxación (Sección 1). Es el dato más importante.
-- **Tipo de fijación** (cementada · no cementada/press-fit · híbrida). Define la carga permitida (Sección 2).
-- **Reparación capsular / tipo de cabeza** (cabeza grande, cotilo de doble movilidad). Reduce riesgo de luxación y suele permitir precauciones más laxas.
-- **Restricciones explícitas del cirujano** (carga, rango, tiempo de precauciones). Mandan sobre este documento.
-- **Longitud de miembros** post-op (si hubo alargamiento intencional/no intencional).
-- **Profilaxis de TVP indicada** (aspirina, HBPM, anticoagulante oral) y hasta cuándo. Relevante para agentes físicos y para vigilancia (Secciones 7 y 9).
-- **Diagnóstico de base y comorbilidades** (fractura vs coxartrosis; fusión lumbar previa; obesidad; cirugía de revisión) — suben el riesgo de luxación/complicación.
-
-### 1. Precauciones por ABORDAJE quirúrgico (lo más importante)
-
-La dirección de la luxación depende de por dónde entró el cirujano: se luxa hacia el lado donde se soltó la cápsula/músculos. Por eso las precauciones son ESPEJO entre abordajes.
-
-#### 1.1 Abordaje POSTERIOR / posterolateral (el más frecuente a nivel mundial)
-
-Entra por detrás; la inestabilidad clásica es POSTERIOR. Precauciones clásicas ("las de toda la vida"), típicamente por ~6 semanas mientras cicatriza la cápsula:
-
-- **NO flexión de cadera > 90°** (no sentarse en sillas bajas/inodoro bajo, no agacharse a amarrarse los zapatos, no acercar la rodilla al pecho).
-- **NO aducción cruzando la línea media** (no cruzar las piernas sentado ni acostado; almohada de abducción entre las piernas al dormir).
-- **NO rotación INTERNA de la cadera** (no girar el pie hacia adentro; no girar el cuerpo hacia el lado operado con el pie fijo).
-- La combinación de riesgo máximo es **flexión + aducción + rotación interna** (la posición de "ponerse de pie desde una silla baja girando").
-- **SÍ permitido:** extensión, rotación externa, abducción, marcha, sentarse en silla alta con reposabrazos, dormir boca arriba.
-
-#### 1.2 Abordaje ANTERIOR DIRECTO (DAA)
-
-Entra por delante entre planos musculares; la inestabilidad es ANTERIOR. Precauciones ESPEJO de las posteriores y, en general, MÁS LIBERTAD temprana (muchos centros no ponen precauciones formales):
-
-- **Evitar la combinación EXTENSIÓN + ROTACIÓN EXTERNA** (la posición de "dar un paso largo hacia atrás y girar el pie hacia afuera"; cuidado al bajar de la cama o al pivotar).
-- Protocolos restrictivos limitan **extensión de cadera más allá de ~20°** y **rotación externa más allá de ~50°** las primeras ~6 semanas [verificar: cifras de protocolos institucionales, p. ej. OSU CPG 2022 y Salina Regional 2024; no son un estándar único].
-- Otros protocolos (p. ej. Lahey) permiten **extensión y rotación externa ACTIVAS** desde temprano y solo limitan las PASIVAS/forzadas; y varios centros no imponen ninguna precaución formal.
-- **SÍ permitido (ventaja del DAA):** flexión > 90°, sentarse normal, cruzar piernas, agacharse — justo lo contrario del posterior. Esto hace el DAA cómodo para actividades de la vida diaria desde el día 1.
-- Precaución general: evitar zancadas largas hacia extensión y camas/sofás muy bajos los primeros días.
-
-#### 1.3 Abordaje LATERAL DIRECTO (Hardinge) / ANTEROLATERAL (Watson-Jones)
-
-Separa parte del glúteo medio (lateral) o pasa entre glúteo medio y tensor (anterolateral). Precauciones del lado anterior (como DAA): **evitar extensión + rotación externa combinadas**; algunos protocolos aplican los mismos topes de ~20° extensión / ~50° rotación externa [verificar]. Tasa de luxación baja, PERO mayor riesgo de **debilidad del glúteo medio / marcha de Trendelenburg** por la manipulación del abductor (vigilar y fortalecer; Sección 8).
-
-#### 1.4 Tendencia actual: precauciones MÍNIMAS o SIN precauciones en abordaje posterior (controversia)
-
-Punto clave y en evolución. En los últimos años, varios centros han **relajado o eliminado** las precauciones clásicas tras abordaje posterior en pacientes de riesgo estándar, con respaldo de evidencia reciente:
-
-- **Korfitsen et al., Acta Orthopaedica, 2023** — metaanálisis de 8,835 pacientes (coxartrosis primaria, abordaje posterior): las precauciones de cadera **no influyen en la recuperación temprana**; la recomendación clásica se basaba en evidencia de muy baja certeza.
-- **Revisión sistemática (7 estudios, 6,900 pacientes)** — las precauciones **no modificaron las tasas de luxación** tras abordaje posterior [verificar año exacto de publicación].
-- **ECA prospectivo, 2022** — pacientes con estabilidad intraoperatoria documentada (**90° flexión / 45° rotación interna / 0°**) NO requieren precauciones; eliminarlas no aumentó la luxación.
-- **Estudio retrospectivo del Hospital for Special Surgery (HSS)** — en posterior sin factores de riesgo de inestabilidad, las precauciones estándar serían innecesarias.
-- **ECA 2025 (posterior con reparación capsular)** — sin diferencia en luxación con/sin precauciones estrictas, y **menor satisfacción (HOOS JR)** en el grupo con precauciones [verificar: por ahora resumen/abstract de congreso].
-
-**Cómo usar esto en la clínica:** la tendencia es real, pero la decisión de relajar precauciones es del CIRUJANO (depende de reparación capsular, tamaño de cabeza/doble movilidad, estabilidad intraoperatoria y factores del paciente). El fisio **sigue las órdenes del cirujano**; si no hay orden explícita, asume las precauciones clásicas del abordaje. Precaución transversal incluso en protocolos "mínimos": evitar **cruzar las piernas sentado** y las posiciones combinadas extremas las primeras semanas.
-
-### 2. Carga según TIPO DE FIJACIÓN
-
-La carga permitida depende de cómo se ancló el implante al hueso, porque el riesgo es el **micromovimiento del vástago** antes de la osteointegración.
-
-- **Cementada → carga TOTAL inmediata (WBAT/FWB desde el día 0).** El cemento fija al instante; no hay que esperar osteointegración. Es el escenario sin conflicto.
-- **No cementada / press-fit → la evidencia actual tiende a permitir CARGA SEGÚN TOLERANCIA (WBAT) en la mayoría.** Metaanálisis recientes (incluida una síntesis de 17 estudios) **no hallaron daño adicional significativo** con carga inmediata sin restricción vs carga parcial; un metaanálisis de 2017 vio **mayor hundimiento (subsidencia) femoral a los 3 meses** con carga completa, pero **sin diferencia en Harris Hip Score a 1–2 años**. Algunos cirujanos aún indican carga parcial 6–12 semanas por precaución biológica.
-- **Híbrida** (un componente cementado, otro no): seguir la indicación del componente más restrictivo según el cirujano.
-- **Press-fit en paciente mayor / hueso osteoporótico:** mayor riesgo de **fractura periprotésica**; aquí muchos cirujanos prefieren cementar o protegen la carga. Si llega un press-fit en un anciano con dolor de muslo a la carga, pensar en fractura/subsidencia (Sección 7).
-- **Fractura intra-op, injerto, revisión, osteotomía:** la carga la define el cirujano (puede ser parcial o "toque"), caso por caso. No asumir WBAT.
-
-**Para el fisio:** confirmar siempre el estatus de carga en la orden. "WBAT" = carga según tolerancia con ayuda de marcha; no equivale a "sin andadera". El avance de la ayuda de marcha es por criterios (Sección 5), no por el estatus de carga.
-
-### 3. Ventana de mayor riesgo de luxación (por qué el foco está en las primeras semanas)
-
-Entender esto justifica por qué las precauciones y la educación pesan tanto al inicio:
-
-- **~60–70% de las luxaciones ocurren en las primeras 6 semanas**, la mayoría en dirección posterior; hasta ~70% en el primer mes según algunas series.
-- En otras series (distinta definición/cohorte, **NO sumar ni comparar** con el dato de arriba): hasta **~77% en el primer año** [verificar: literatura citada en Proceedings of the Hip Society 2025]. *(El "~59% a 3 meses" que a veces se cita proviene de una serie distinta; no es la misma cohorte que el ~60–70% a 6 semanas, así que no deben leerse como acumulados.)*
-- Razón: en las primeras **6–8 semanas** la cápsula y los tejidos blandos aún cicatrizan (el "sobre" de tejido que estabiliza la prótesis todavía no madura). Por eso las precauciones clásicas se prescriben ~6 semanas.
-- Si una primera luxación ocurre TARDE (> 5 semanas), el riesgo de reluxación es mayor (hasta ~60% vs ~33% si fue temprana) [verificar]. Una cadena de luxaciones es señal de reevaluación quirúrgica.
-
-### 4. Fases de rehabilitación POR CRITERIOS
-
-No hay guía de práctica clínica formal revisada por pares para la rehabilitación post-PTC; lo que existe son protocolos institucionales y revisiones. La estructura más usada es de 3–4 fases con avance por criterios. Las semanas son orientativas.
-
-#### FASE I — Hospitalaria / aguda ("protección", ~0 a 4–6 semanas)
-
-**Metas:** proteger la reparación, controlar dolor e inflamación, prevenir TVP, lograr marcha segura con ayuda, independencia en transferencias y AVD básicas, recuperar activación muscular y ROM dentro de precauciones.
-
-**SÍ (lo que se trabaja):**
-- Movilización temprana y marcha el mismo día o al día siguiente (clave ERAS; se asocia a menos TVP/TEP y recuperación más rápida).
-- Marcha con **andadera** (o muletas), con el estatus de carga indicado (WBAT en cementada; WBAT en la mayoría de press-fit salvo orden distinta).
-- Ejercicios: bombeo de tobillo, isométricos de cuádriceps (quad sets) y glúteos (glut sets), deslizamiento de talón dentro de precaución de flexión, abducción en decúbito/parado, activación de abductores.
-- Transferencias seguras (silla alta con reposabrazos, cama, inodoro elevado), higiene de posiciones según abordaje.
-- Educación del paciente y la familia en precauciones del abordaje y banderas rojas.
-
-**NO (en Fase I):**
-- Violar las precauciones del abordaje (Sección 1).
-- **Elevación de pierna recta (SLR) resistida/repetida al inicio:** puede irritar los flexores de cadera y la reparación; introducir con criterio [verificar: recomendación de protocolos, no estándar universal].
-- Marcha sin ayuda o escaleras sin supervisión antes de cumplir criterios.
-- Ejercicios de rango/fuerza al extremo de la posición de riesgo.
-
-**Criterios para avanzar a Fase II (todos, no por fecha):**
-- Dolor e inflamación mínimos y controlados.
-- Camina distancias domésticas **sin ayuda técnica** o con mínima asistencia, patrón seguro.
-- Buen control: **apoyo monopodal sin caída de la pelvis** (Trendelenburg negativo o en vías de serlo).
-- Transferencias y AVD básicas independientes y seguras.
-- Herida cicatrizando sin signos de infección.
-
-#### FASE II — Intermedia ("movilidad y fuerza", ~4–6 a 10–12 semanas)
-
-**Metas:** recuperar ROM funcional, normalizar la marcha sin ayuda, progresar fuerza (sobre todo abductores y extensores de cadera y cuádriceps), subir/bajar escaleras con patrón recíproco, equilibrio.
-
-**SÍ:**
-- Transición **andadera → bastón → sin ayuda** por criterios (ver Sección 5).
-- Progresión de abductores: abducción de pie con banda, "almeja" (clamshell) y puente/bridge introducidos en esta fase, step-ups laterales, marcha lateral resistida (monster walk).
-- Fortalecimiento de cadena cerrada: sentadilla parcial, sit-to-stand, subir escalón; bicicleta estática (con sillín alto si hay precaución de flexión).
-- Entrenamiento de marcha (simetría, longitud de paso, eliminar Trendelenburg/cojera) y equilibrio/propiocepción.
-- Movilidad hacia el ROM funcional; muchas precauciones se liberan hacia las 6 semanas según el cirujano.
-
-**NO:**
-- Impacto, carrera, saltos, pivotes, deporte.
-- Cargas máximas o rangos forzados al extremo si persiste dolor/inflamación.
-- Abandonar la ayuda de marcha mientras haya Trendelenburg marcado o cojera (perpetúa patrón defectuoso).
-
-**Criterios para avanzar a Fase III:**
-- ROM funcional para AVD (sentarse, vestirse, escaleras) sin dolor.
-- **Marcha sin ayuda, simétrica, sin Trendelenburg ni cojera.**
-- Escaleras con patrón recíproco y seguro.
-- Fuerza de cadera/rodilla acercándose al lado sano (umbral práctico frecuente **~70% del contralateral** para progresar; algunos protocolos piden apoyo monopodal > 20 s sin caída de pelvis) [verificar: umbrales de protocolos institucionales].
-
-#### FASE III — Fortalecimiento / retorno a función (~3 meses en adelante)
-
-**Metas:** fuerza, resistencia y potencia cercanas a lo normal; retorno a trabajo, actividad recreativa y deporte de bajo impacto; corregir déficits residuales.
-
-**SÍ:**
-- Fortalecimiento progresivo (el entrenamiento de resistencia progresiva es superior a cargas bajas para recuperación funcional) [verificar: fuente secundaria].
-- Resistencia cardiovascular de bajo impacto (bicicleta, elíptica, natación/agua una vez cerrada la herida).
-- Entrenamiento específico de la tarea/deporte permitido; equilibrio avanzado.
-- Retorno escalonado a deporte de bajo impacto (Sección 6), con alta del cirujano.
-
-**NO:**
-- Alto impacto/pivote salvo autorización explícita del cirujano (y aun así, controvertido; Sección 6).
-
-**Criterios de alta funcional:**
-- Fuerza y resistencia **~80–90% del lado sano** (umbral práctico frecuente) [verificar].
-- Marcha y AVD normales e indoloras; escaleras sin barandal si aplica.
-- Capacidad para la actividad/laboral o deportiva objetivo sin dolor ni inestabilidad.
-- Escalas de resultado en metas (Sección 8).
-
-### 5. Timeline típico de hitos (para detectar DESFASE, no como meta rígida)
-
-Orientativo; varía por abordaje, fijación, edad y comorbilidad. Si el paciente está muy por detrás de esto, buscar la causa (dolor, debilidad de abductores, complicación).
-
-- **Día 0–1:** de pie y primeros pasos con andadera; transferencias asistidas.
-- **Alta hospitalaria:** mismo día (ERAS, seleccionados) hasta ~1–3 días.
-- **Andadera → bastón:** cuando hay carga equitativa, equilibrio adecuado y Trendelenburg/cojera limitados (frecuentemente ~1–3 semanas, por criterios).
-- **Bastón → sin ayuda:** cuando la marcha es normal, simétrica y sin cojera (frecuentemente ~3–6 semanas, por criterios).
-- **Escaleras:** patrón de aprendizaje "sube con la pierna sana primero, baja con la operada primero" ("la buena sube al cielo, la mala baja al infierno"); patrón recíproco conforme mejora fuerza/equilibrio.
-- **Conducir** (ver Sección 6): cadera DERECHA ~4–6 semanas; IZQUIERDA con automático ~2 semanas; algunos DAA antes. Requisitos: sin opioides, prueba de frenado de emergencia, entrar/salir del auto respetando precauciones.
-- **Retorno al trabajo:** sedentario/ligero pocas semanas; media global reportada **~10–13 semanas** (p. ej. media 12.5 semanas THA; mediana 10 semanas, IQR 7–14 en vástago corto) [verificar]; trabajo pesado más tarde y según cirujano.
-- **Deporte de bajo impacto:** la mayoría de cirujanos lo permite **dentro de los primeros 3 meses**; AAHKS sugiere iniciar retorno deportivo en ese lapso.
-- **Fin de precauciones del abordaje:** típicamente ~6 semanas (10% de cirujanos hasta 12) [verificar], o según estabilidad intraoperatoria/reparación capsular.
-
-### 6. Retorno a deporte y actividad
-
-Las recomendaciones **se han vuelto menos restrictivas** conforme mejoran los implantes; no hay consenso uniforme y el alta es del cirujano. Guía general:
-
-**Recomendados / de bajo impacto (en general permitidos):** caminar, nadar, ejercicio en agua, bicicleta (fija o de ruta), golf, senderismo suave, remo suave, baile de bajo impacto. Bicicleta estática de baja resistencia es buena opción temprana.
-
-**Con precaución / impacto moderado (según cirujano y condición):** tenis en **dobles**, esquí de fondo, pilates/yoga adaptado (evitando rangos extremos de la posición de riesgo), elíptica.
-
-**Desaconsejados / alto impacto o pivote (en general NO, salvo indicación expresa):** correr/trotar, baloncesto, fútbol, balonmano, deportes de contacto/artes marciales, saltos, tenis **individual** (fuente en conflicto; varios lo desaconsejan), squash, aeróbicos de alto impacto. Aceleran el desgaste y suben el riesgo de fractura/aflojamiento.
-
-**Encuadre con el paciente:** la postura quirúrgica varía (en una encuesta, ~51% permitía algún retorno a alto impacto, ~34% lo desaconsejaba, ~8% sin límites). Individualizar por edad, nivel previo, fijación y expectativas; dejar por escrito lo que autorizó el cirujano.
-
-**Conducir (detalle):**
-- **Cadera derecha:** ~4–6 semanas (controla acelerador/freno); el tiempo de reacción de frenado se mantiene peor a los 6 días y 2 semanas tras cirugía derecha [verificar].
-- **Cadera izquierda, transmisión automática:** tan pronto como ~2 semanas si está sin opioides.
-- **Transmisión manual:** más tiempo (estimaciones variables; para izquierda algunas fuentes 8–10 semanas) [verificar].
-- **Serie de un cirujano (DAA):** retomar manejo ~1 semana y trabajo ~3 semanas si médicamente apto [verificar: serie monocéntrica, no generalizable].
-- Requisito transversal: sin medicación sedante/opioide, poder hacer frenado de emergencia, y entrar/salir del auto sin violar precauciones.
-
-### 7. Banderas rojas y complicaciones (vigilancia del fisio)
-
-El fisio suele ser quien más ve al paciente: reconocer y DERIVAR a tiempo salva prótesis y vidas.
-
-- **Luxación protésica:** dolor súbito intenso, imposibilidad de cargar, **acortamiento y rotación anómala del miembro** (posterior: pierna acortada, aducida y rotada INTERNA; anterior: en extensión y rotación EXTERNA), "clunk" y pérdida de movilidad. Es URGENCIA → reducción. Incidencia global ~0–4.1% (anterior ~0.8% vs posterior ~1.4%) [verificar]. Mayor riesgo primeras 6 semanas.
-- **TVP / TEP (vigilancia ALTA en cadera):** TVP suele ser asintomática; cuando da signos: **dolor/edema de pantorrilla o miembro que no cede con elevación**, calor, enrojecimiento, venas distendidas. TEP: **disnea súbita, dolor torácico (punzante, peor al inspirar), taquicardia, tos (±hemoptisis)** → URGENCIA (activar emergencias). Riesgo mayor en las primeras 1–2 semanas, hasta ~3 semanas. La movilización temprana reduce el riesgo; no masajear ni aplicar agentes sobre una pantorrilla sospechosa.
-- **Infección periprotésica (IAP):** **secreción/drenaje de la herida persistente, eritema, aumento de volumen, dolor que no mejora o reaparece, fiebre/escalofríos/malestar.** Marcadores: VSG y PCR elevadas (umbrales orientativos VSG > 30 mm/h, PCR > ~5–10 mg/L; VSG/PCR juntas sensibilidad 94–98%, especificidad 59–77%) [verificar umbrales; usar los del laboratorio local]. Confirmación por aspiración/cultivo. Cualquier cadera dolorosa + fiebre o herida que drena → evaluación ortopédica urgente, no "esperar a ver".
-- **Fractura periprotésica:** dolor agudo y falla para cargar tras caída o esfuerzo (o incluso atraumática en press-fit anciano); umbral bajo para imagen (Rx; a veces TC). Pensar en ella ante dolor nuevo a la carga, sobre todo press-fit en hueso frágil.
-- **Lesión nerviosa (ciático/femoral/peroneo):** el **ciático es el más afectado (~79% de las lesiones nerviosas), femoral ~13%** [verificar]. Signos: pie caído (peroneo/ciático), debilidad/parestesias, pérdida de dorsiflexión. Asociado a **alargamiento del miembro** (ciático con alargamiento > ~4 cm; peroneo > ~3.8 cm) [verificar] y a luxación (parálisis ciática hasta ~10% en luxaciones). Documentar fuerza/sensibilidad distal de base.
-- **Dolor de muslo / aflojamiento del vástago:** dolor de muslo con la carga o al iniciar la marcha (dolor de "arranque"), que mejora en reposo, sobre todo en no cementadas → sospecha de aflojamiento/subsidencia → Rx y cirujano.
-- **Discrepancia de longitud de miembros:** **causa #1 de insatisfacción y de litigio** tras PTC; 1–2 cm suelen tolerarse, más suele dar problemas (lumbalgia, marcha, sensación de cojera). Ojo con la discrepancia **aparente** por oblicuidad pélvica (contractura de cadera o patología lumbar). Medir (Sección 8) y manejar con alza si lo indica el cirujano.
-
-### 8. Valoración relevante en consulta
-
-- **Marcha de Trendelenburg / signo de Trendelenburg:** evalúa fuerza del **glúteo medio** y control pélvico en apoyo monopodal. Positivo = la pelvis del lado en vuelo cae (o el tronco se inclina compensando). Frecuente tras abordaje lateral/posterior por manipulación/disección del abductor. Útil como criterio de progresión (apoyo monopodal sostenido sin caída de pelvis) y como objetivo de fortalecimiento. Un positivo aislado no es diagnóstico: orienta a seguir explorando.
-- **Longitud de miembros:** longitud real (EIAS → maléolo medial) y aparente (ombligo → maléolo medial); diferenciar discrepancia real vs aparente (oblicuidad pélvica/contractura). Registrar en Fase I como línea base.
-- **ROM** (dentro de precauciones), **fuerza** (abductores, extensores, cuádriceps; comparar % contra lado sano), **inflamación/perímetro**, **estado de la herida**, **dolor (EVA)**, equilibrio y patrón de marcha.
-- **Escalas de resultado reportado (PROMs):**
-  - **Harris Hip Score (HHS)** (Harris, 1969, *J Bone Joint Surg Am* — referencia fundacional): 100 puntos (dolor ~44, función ~47, ROM ~5, deformidad ~4). Bandas usuales: **90–100 excelente, 80–89 bueno, 70–79 regular, < 70 malo** (hay convención alterna 91–100/81–90/71–80/≤70, verificar cuál usa cada estudio). MCID reportada ~15.9–18 puntos [verificar]; mejoría clínicamente relevante a menudo citada ~40 puntos tras PTC.
-  - **HOOS / HOOS JR** (Hip disability and Osteoarthritis Outcome Score): PROM específico de cadera; HOOS JR es la versión corta usada en registros. MCID exacta de HOOS JR tras PTC primaria no confirmada aquí [verificar: trabajos de validación 2024–2026]; MCID de subescalas HOOS a 3 meses reportadas ~7.5 (síntomas), ~8.75 (dolor), ~4.41 (AVD), ~9.38 (deporte/CdV) [verificar].
-  - Usarlas al inicio y en seguimiento para objetivar avance y detectar estancamiento.
-
-### 9. Seguridad de AGENTES FÍSICOS con implante metálico (clave para esta clínica)
-
-Una PTC es un implante metálico grande. Antes de cualquier agente físico sobre o cerca de la cadera operada, cruzar con `seguridadClinica` y aplicar:
-
-- **NO radiofrecuencia / diatermia / TECARTERAPIA TÉRMICA / ultrasonido TÉRMICO sobre el material metálico ni sus proximidades.** La diatermia por onda corta/microonda está **contraindicada sobre implantes metálicos**: el campo induce **calentamiento excesivo del metal y del tejido vecino → quemaduras**. En esta clínica esto incluye **Tecar en modo térmico (RET/CET)** y cualquier modalidad de RF/diatermia sobre la zona de la prótesis. (Regla ya vigente de la clínica: metal/osteosíntesis → no RF/diatermia/tecar térmica/US térmico sobre el material.)
-- **Ultrasonido terapéutico:** contraindicación **debatida**. Algunas guías sostienen que el metal "no se calienta" con US y que el US continuo/pulsado **no está contraindicado** sobre implantes metálicos modernos; otros estudios (modelos animales/cadavéricos) muestran calentamiento del metal a 1–2 W/cm² continuos. Postura prudente: si se usa, **evitar US térmico/continuo de alta intensidad sobre el componente**; preferir pulsado/baja intensidad y **nunca sobre prótesis cementada** (el efecto térmico podría afectar la integridad del cemento). Ante la duda, no aplicarlo sobre el implante.
-- **Electroterapia (TENS/EEM):** el metal en sí no se calienta, pero puede haber **quemadura en los extremos de una barra/implante metálico por intensificación del campo eléctrico**. Más seguro con implantes superficiales y **evitando colocar electrodos directamente sobre el implante**; usar TENS para analgesia y EEM para activación muscular (p. ej. glúteo/cuádriceps) con sentido común de colocación.
-- **Marcapaso / DAI / neuroestimulador:** contraindican RF/diatermia y obligan cautela con US/electro (ver `seguridadClinica`).
-- **Vigilar TVP en inmovilización:** no aplicar agentes ni masaje sobre pantorrilla con sospecha de TVP; promover movilización temprana (reduce TVP/TEP).
-- **Anticoagulación post-op frecuente (precaución):** muchos pacientes salen con profilaxis (aspirina, HBPM o anticoagulante oral). Implica **precaución con técnicas agresivas** (riesgo de hematoma/equimosis), con crioterapia prolongada sobre piel comprometida, y atención a signos de sangrado. Profilaxis típica: agentes AAOS (aspirina, HBPM, warfarina, inhibidores del factor Xa), duración mínima ~10–14 días, extensible hasta ~35 días según riesgo; aspirina 81–325 mg frecuentemente 4–6 semanas en riesgo típico [verificar dosis/pauta contra la guía AAOS vigente y la orden del cirujano].
-- **Qué SÍ suele ser seguro y útil (lejos del implante / sin calor sobre metal):** crioterapia para dolor/edema (vigilando piel y sangrado), ejercicio terapéutico (el motor de la recuperación), terapia manual suave fuera de rango de riesgo, EEM para reactivar glúteo/cuádriceps, educación. Los agentes físicos son **coadyuvantes**; la carga/ejercicio manda.
-
-### Fuentes
-
-Evidencia obtenida vía WebSearch (resúmenes); WebFetch a sitios externos quedó bloqueado en esta sesión (DNS/ENOTFOUND), por lo que no se abrieron los PDFs/artículos completos. Cifras finas marcadas [verificar].
-
-- Korfitsen CB et al. "Hip precautions after posterior-approach THA among patients with primary hip OA do not influence early recovery: systematic review and meta-analysis (8,835 patients)." *Acta Orthopaedica*, 2023. https://actaorthop.org/actao/article/view/11958
-- Revisión sistemática (7 estudios, 6,900 pacientes): precauciones y tasas de luxación tras abordaje posterior. PMC8023879. https://www.ncbi.nlm.nih.gov/pmc/articles/PMC8023879/
-- Chan PHA et al. "Scoping review on recommendations of hip precautions after posterior THA." *J Orthop Trauma Rehabil* (SAGE), 2025. https://journals.sagepub.com/doi/10.1177/22104917251336772
-- ECA estabilidad intraoperatoria 90°/45°/0° sin precauciones (posterior). *J Arthroplasty*, 2022 (ScienceDirect S0883540322000456). https://www.sciencedirect.com/science/article/abs/pii/S0883540322000456
-- ECA 2025: precauciones vs reparación capsular en posterior (sin diferencia en luxación; menor satisfacción con precauciones). ScienceDirect S0883540326004146. https://www.sciencedirect.com/science/article/pii/S0883540326004146
-- "Rehabilitation Phases, Precautions, and Mobility Goals Following THA." PMC10626929 (fases y criterios por abordaje). https://pmc.ncbi.nlm.nih.gov/articles/PMC10626929/
-- Ohio State University — Total Hip Arthroplasty Post-op Clinical Practice Guideline, update 2022 (precauciones por abordaje). https://medicine.osu.edu/-/media/files/medicine/departments/sports-medicine/medical-professionals/hip/total-hip-arthroplasty-cpg-update-2022.pdf
-- Salina Regional Orthopedic Clinic — THA (Anterior Approach) Rehab Protocol, rev. mayo 2024. https://www.salinaregionalorthopedicclinic.com/documents/47/THA_Anterior_Approach_Protocol.pdf
-- Lahey Hospital — Rehabilitation Protocol: Total Hip Arthroplasty. https://www.lahey.org/-/media/files/lhmc/orthopedics/hip/lhmc-total-hip-arthroplasty.pdf
-- UW Health — Rehabilitation Guideline for Traditional THA (criterio-based), act. 2024. https://bynder.uwhealth.org/m/918ed4c21dc7de54/original/Rehab-Guideline-Traditional-Total-Hip-Arthroplasty.pdf
-- E&B Orthopaedics — THA Protocol (ejercicios tempranos, destete de ayuda de marcha). https://eandbortho.com/wp-content/uploads/2022/07/Total-Hip-Arthroplasty-Protocol.pdf
-- "Immediate unrestricted vs graduated weight bearing after cementless THA: RCT" (*Annals of Joint*) y metaanálisis carga parcial vs completa en no cementada (PMC5316222, PMC10684916). https://aoj.amegroups.org/article/view/3631/html · https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5316222/ · https://www.ncbi.nlm.nih.gov/pmc/articles/PMC10684916/
-- Comparación abordaje anterior vs posterior (tasas de luxación/complicaciones). PMC11942977; análisis de fijación femoral 60,739 PTC PMC11264548. https://pmc.ncbi.nlm.nih.gov/articles/PMC11942977/ · https://www.ncbi.nlm.nih.gov/pmc/articles/PMC11264548/
-- "Recommendations for return to sports after THA are becoming less restrictive." PMC7899958. https://pmc.ncbi.nlm.nih.gov/articles/PMC7899958/
-- "Returning to Sports and High-Impact Exercise After THA: What Should We Be Recommending in 2026?" *Orthopedic Reviews*. https://orthopedicreviews.openmedicalpublishing.org/article/165090
-- AAHKS — "Resuming Sports After Hip Replacement." https://hipkneeinfo.org/hip-care/resuming-sports-after-hip-replacement/
-- "Management of VTE After Hip and Knee Arthroplasty" (AAOS/ACCP, aspirina, pautas). PMC12376865; AAOS VTE guideline (NZOA copy). https://pmc.ncbi.nlm.nih.gov/articles/PMC12376865/ · https://www.nzoa.org.nz/sites/default/files/AAOS%20Guidelines%20for%20VTE%20prevention.pdf
-- Ensayo CRISTAL (aspirina vs enoxaparina, VTE sintomática 3.45% vs 1.82%) — citado en revisiones AAOS. https://www.aaos.org/aaosnow/2026/apr/clinical/clinical02/
-- AAOS OrthoInfo — Deep Vein Thrombosis (signos TVP/TEP). https://orthoinfo.aaos.org/en/diseases--conditions/deep-vein-thrombosis/ · Stop the Clot — Orthopedic Surgery Fact Sheet. https://www.stoptheclot.org/about-clots/toolkit-for-knee-hip-replacement-patients/orthopedic-surgery-fact-sheet/
-- "Identification of periprosthetic joint infection after THA" PMC5982357; revisión diagnóstico IAP (VSG/PCR) Hip & Pelvis 2021. https://pmc.ncbi.nlm.nih.gov/articles/PMC5982357/ · https://www.hipandpelvis.or.kr/journal/view.html?doi=10.5371%2Fhp.2021.33.1.11
-- "Complications Following Total Hip Arthroplasty" (IntechOpen); emDocs EM@3AM THA Complications (luxación, nervio, fractura, longitud). https://www.intechopen.com/chapters/42832 · https://www.emdocs.net/em3am-total-hip-arthroplasty-complications/
-- Trendelenburg: Physiopedia; StatPearls (Europe PMC); MedBridge. https://www.physio-pedia.com/Trendelenburg_Gait · https://europepmc.org/books/n/statpearls/article-30566/ · https://www.medbridge.com/blog/trendelenburg-test-clinical-use-interpretation-and-application
-- Harris WH (1969), Harris Hip Score — referencia fundacional (bandas/pesos vía fuentes secundarias). Umbrales de mejoría HHS: Singh et al./estudio de thresholds PMC4901425. https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4901425/
-- MCID HOOS tras THA (cohorte multicéntrica 2026). DOI 10.1177/10225536261433423. https://doi.org/10.1177/10225536261433423
-- Luxación y fusión lumbar / spinopelvic / doble movilidad: estudio fusión lumbar + doble movilidad (*Int Orthop*, 2020). https://link.springer.com/article/10.1007/s00264-020-04507-y
-- Ventana temporal de luxación (60–70% en 6 semanas; reparación capsular): PMC7509067; Healio/BHS president. https://pmc.ncbi.nlm.nih.gov/articles/PMC7509067/ · https://www.healio.com/news/orthopedics/20160525/
-- Conducir tras PTC: serie DAA (PMC6250078) y guías clínicas (resúmenes). https://pmc.ncbi.nlm.nih.gov/articles/PMC6250078/
-- Retorno al trabajo: PMC4651988 (media ~12.5 sem) y vástago corto PMC7925530 (mediana 10 sem). https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4651988/ · https://www.ncbi.nlm.nih.gov/pmc/articles/PMC7925530/
-- Agentes físicos y metal: "Electrophysical Agents — Contraindications and Precautions" (consenso canadiense/APTA), PMC3031347; Physiopedia Electrotherapy Contraindications. https://pmc.ncbi.nlm.nih.gov/articles/PMC3031347/ · https://www.physio-pedia.com/Electrotherapy_Contraindications
-
-### Incertidumbres marcadas [verificar]
-
-Números/afirmaciones que NO pude confirmar en el texto completo (WebFetch bloqueado) o que vienen de fuentes secundarias con cifras en conflicto. Verificar contra el PDF/artículo original o la orden del cirujano antes de usarlos como absolutos:
-
-- Topes numéricos del abordaje ANTERIOR/lateral (extensión ~20°, rotación externa ~50°, 6 semanas): provienen de protocolos institucionales (OSU 2022, Salina 2024); no son estándar único y varían por centro.
-- Tasas de luxación por abordaje (anterior ~0.8% vs posterior ~1.4%; rango global 0–4.1%): cifras de resúmenes; confirmar contra el registro/estudio citado.
-- Cronología de luxación (~59% a 3 meses, ~77% a 1 año; reluxación hasta ~60% si la primera es > 5 semanas): mezcla de series antiguas y un abstract de congreso 2025.
-- ECA 2025 de reparación capsular vs precauciones: por ahora resumen/abstract; confirmar publicación completa.
-- Carga en no cementada: dirección de la evidencia (WBAT seguro en la mayoría) es sólida, pero el protocolo óptimo NO está establecido; señal de subsidencia temprana real. La indicación concreta la da el cirujano.
-- Profilaxis TVP (aspirina 81–325 mg, 4–6 semanas; duración 10–14 hasta 35 días): de revisiones secundarias de la guía AAOS; verificar la pauta exacta vigente y la orden individual.
-- HHS: bandas (90–100/80–89/70–79/<70 vs 91–100/81–90/71–80/≤70) y pesos (dolor 44/función 47/ROM 5/deformidad 4) de fuentes secundarias; MCID ~15.9–18 y "mejoría relevante ~40 pts" conviven y no coinciden entre fuentes.
-- HOOS JR: MCID exacta tras PTC primaria NO confirmada aquí; las MCID de subescalas HOOS a 3 meses (7.5/8.75/4.41/9.38) son de un estudio que no abrí.
-- Lesión nerviosa: ciático ~79% / femoral ~13% de lesiones; alargamiento umbral ciático > ~4 cm, peroneo > ~3.8 cm; parálisis ciática hasta ~10% en luxaciones — cifras de resúmenes.
-- Umbrales IAP (VSG > 30 mm/h; PCR > 5–10 mg/L; sens 94–98%/esp 59–77%): usar los cortes del laboratorio local y la definición vigente (EBJIS/ICM/MSIS).
-- Umbrales de progresión por fuerza (~70% para avanzar, ~80–90% para alta; apoyo monopodal > 20 s): umbrales prácticos de protocolos; no hay estándar único.
-- Tiempos de conducir/trabajo (derecha 4–6 sem; izquierda automático ~2 sem; manual 8–10 sem; DAA manejar ~1 sem/trabajo ~3 sem; retorno laboral medio ~10–13 sem): mayoría de fuentes son series monocéntricas o guías clínicas, no ECA; tratar como rangos típicos.
-- Ultrasonido terapéutico sobre metal: contraindicación genuinamente DEBATIDA en la literatura; postura prudente adoptada aquí (evitar US térmico sobre el implante, nunca sobre cementada). RF/diatermia/tecar térmica sobre metal SÍ es contraindicación firme.
-- "No SLR al inicio" y "entrenamiento de resistencia progresiva superior": recomendaciones de protocolos/fuente secundaria, no de guía de práctica clínica formal (no existe una guía revisada por pares para rehab post-PTC a la fecha).
-
----
+> - Fuerza de glúteo (abducción con liga, puente, sentadilla parcial en rango seguro) — clave para no cojear
+> - Bici fija, marcha normal, equilibrio
+
+> **🚫 TODAVÍA NO**
+>
+> - Impacto, correr, saltar
+> - Rangos extremos hasta el visto bueno del cirujano
+
+##### MES 3+ — Resistencia y vida normal
+**Apoyo / muletas:** Normal.
+
+> **✅ YA PUEDE (ideas de ejercicio)**
+>
+> - Progresar fuerza y resistencia; propiocepción
+> - Actividad de bajo impacto: caminar, bici, natación, golf
+
+> **🚫 TODAVÍA NO**
+>
+> - Impacto alto de por vida (correr, saltar, deportes de contacto) — desgasta la prótesis
+
+#### Criterios de alta funcional
+- **Marcha:** camina sin cojear y sin ayuda (sin que la cadera se "caiga" al apoyar — eso es debilidad de glúteo).
+- **Fuerza:** glúteo medio y mayor que permitan subir escaleras y levantarse sin empujarse.
+- **Dolor:** sin dolor de ingle ni de muslo al cargar.
+
+#### 🚩 Señales de alarma — avisa de inmediato
+- **Dolor súbito + la pierna se ve más corta o "chueca" (rotada) + no la puedes mover** → posible luxación (se zafó la prótesis), urgencia.
+- Dolor e hinchazón en la pantorrilla de una sola pierna → posible coágulo (urgencia).
+- Cadera/herida **caliente + hinchada + fiebre** o secreción → posible infección (urgencia).
+- Cojera que no mejora (la cadera se cae al apoyar) → debilidad de glúteo, avísame.
+
+> **La orden del cirujano manda** sobre el apoyo, las precauciones y los tiempos.
 
 ## 🕺 CADERA — labrum acetabular / pinzamiento femoroacetabular (FAI)
 
@@ -2896,346 +2646,103 @@ Ubica dónde y cómo duele:
 
 ## 🦵 RODILLA — prótesis / artroplastia (TKA · nota de UKA)
 
-> **📋 Encuadre**
+### Prótesis de rodilla — guía post-operatoria semana a semana
+
+Te pusieron una **prótesis (reemplazo) de rodilla**: el metal y plástico sustituyen la articulación gastada. A diferencia de otras cirugías, aquí no hay que proteger una costura de tejido blando — el reto es **recuperar el movimiento pronto** (sobre todo la extensión completa y la flexión) antes de que se endurezca, y reconstruir la fuerza para caminar bien. Se avanza por logros, y la orden del cirujano manda. La prótesis es para **actividad de bajo impacto**: nada de correr ni saltar de por vida.
+
+#### ⛔ PRIMERO: lo que hay que entender
+- **Total (TKA):** se reemplazó toda la articulación. Lo más común. Apoyo según tolere casi desde el día 1.
+- **Parcial (unicompartimental, UKA):** se reemplazó solo un lado de la rodilla. Suele recuperar más rápido, pero mismas reglas.
+
+> **La prioridad #1 es el movimiento:** extensión completa (que estire del todo) y ganar flexión. Si el rango se estanca las primeras semanas, cuesta mucho recuperarlo después.
+
+**Agentes físicos por fase:** la **crioterapia (hielo) + compresión** es protagonista las primeras semanas (hay mucho edema); TECAR atérmica y láser para analgesia y flujo.
+
+> **⚠️ Seguridad — MUY importante con prótesis:** nada de radiofrecuencia, diatermia, TECAR térmica ni ultrasonido térmico **sobre la prótesis** (el metal se calienta y daña el hueso alrededor). Precaución con anticoagulación (es común tras esta cirugía), cáncer activo, embarazo y trombosis.
+
+| Semáforo del dolor | Qué hacer |
+|---|---|
+| **VERDE ≤3/10** | que se va, edema que baja → progresa el rango y la fuerza. |
+| **AMARILLO 4–5/10** | o rodilla más caliente/hinchada al día siguiente → mantén, no fuerces. |
+| **ROJO >5/10** | edema marcado, calor con fiebre, o pantorrilla hinchada → para y avísame. |
+
+#### Línea de tiempo — hitos clave
+
+| Hito (lo que la persona logra) | ¿Cuándo, aprox.? |
+|---|---|
+| Estira la rodilla completa; dobla ~90° | **Semana 1–2** |
+| Deja el andador / las muletas | **Semana 2–4** |
+| Dobla ~110°+; camina sin cojear | **Semana 6** |
+| Sube y baja escaleras alternando | **Semana 8–12** |
+| Actividad de bajo impacto (bici, caminar, natación) | **Mes 3+** |
+
+##### SEM 0–2 — Movimiento y bajar el edema
+**Apoyo / muletas:** Apoyo según tolere con andador o muletas (la prótesis aguanta carga desde el inicio).
+
+> **✅ YA PUEDE (ideas de ejercicio)**
 >
-> **🎯 Indicaciones:** Post-artroplastia de rodilla — TKA primaria (caso base: cementada, WBAT) e, incluida aquí, la nota de UKA (unicompartimental: mismos principios pero comprimidos/acelerados). Progresión por criterios en 4 fases; AVD hacia ~3 meses, recuperación plena 6-12 meses [verificar].
+> - **Extensión completa:** talón en alto dejando caer la rodilla, o boca abajo con la pierna colgando
+> - **Flexión asistida hasta ~90°:** talón deslizando, con ayuda de la otra pierna
+> - Isométricos de cuádriceps + electroestimulación; elevación de pierna estirada
+> - Crioterapia y compresión para el edema; movilización de la rótula
+
+> **🚫 TODAVÍA NO**
 >
-> **⛔ Contraindicaciones / cuándo derivar:** Rigidez (flexión <90° hacia ~6 sem o flexo persistente) → artrofibrosis, consultar cirujano por posible MUA. Infección periprotésica (dolor/calor/eritema que persiste o empeora >3-4 sem, drenaje turbio, fiebre) → cirujano urgente. TVP (no masaje/drenaje) / TEP, fractura periprotésica → urgencia. Déficit del mecanismo extensor, inestabilidad, dehiscencia de herida, sospecha de SDRC → cirujano.
+> - Descuidar la extensión por perseguir la flexión
+> - Forzar con dolor agudo
+> - Estar mucho tiempo con la rodilla doblada (almohada bajo la rodilla) — se pega en flexión
+
+##### SEM 2–6 — Dejar el andador y fuerza
+**Apoyo / muletas:** Progresar el apoyo; dejar el andador/muletas cuando camines seguro.
+
+> **✅ YA PUEDE (ideas de ejercicio)**
 >
-> **⚠️ Precauciones:** Extensión completa 0° temprana = prioridad #1 (evita flexo); no descuidarla por perseguir flexión. Déficit de cuádriceps por inhibición artrogénica (AMI) → activación desde día 1; NMES de superficie SÍ (no térmica), fuera del implante. Implante metálico + cemento + polietileno → NO radiofrecuencia/diatermia/tecar térmica/US térmico sobre el material; marcapaso/DAI = diatermia contraindicada; SÍ crioterapia y NMES/TENS fuera del implante. CPM NO de rutina. Carga WBAT en cementada pero restringida en press-fit/injerto óseo/osteotomía/fractura periprotésica → lo define el cirujano. UKA: no extrapolar a TKA sus permisos de deporte vigoroso.
-
-> **Para qué sirve este documento:** material de referencia para que el fisio **ubique la fase del paciente, las restricciones, y si va EN TIEMPO** (o si hay desfase/bandera). **NO es prescripción automática.** El plan de cada paciente lo **manda el cirujano** (tipo de prótesis, fijación, estabilidad, restricciones de carga y arco, tiempos). Ante duda o bandera roja → consultar al cirujano antes de progresar. Progresión **por CRITERIOS cumplidos, no por calendario**; las semanas son solo un mapa para detectar desfase.
-
----
-
-### 1. Principios que ordenan toda la rehabilitación post-TKA
-
-1. **La EXTENSIÓN completa (0°) temprana es prioridad #1.** Un déficit de extensión que se deja instalar se vuelve **contractura en flexión** (flexo), que arruina la marcha, sobrecarga el cuádriceps y es difícil de revertir. Recuperar flexión importa, pero **nunca a costa de perder extensión**.
-2. **El déficit de CUÁDRICEPS es EL gran problema post-TKA.** No es solo atrofia: hay **inhibición muscular artrogénica (AMI)** — el cerebro no "enciende" bien el cuádriceps por dolor/derrame/inflamación. El músculo está, pero no se activa. Por eso el trabajo de **activación** (no solo de fuerza bruta) es central desde el día 1.
-3. **La CARGA (ejercicio terapéutico) es el motor; los agentes físicos son COADYUVANTES.** Frío, electro analgésica, etc., ayudan a crear la ventana para moverse y cargar, pero no sustituyen el ejercicio.
-4. **Carga TOTAL inmediata (WBAT) es lo normal en TKA primaria cementada.** "Weight-bearing as tolerated" (carga según tolerancia) con andadera/bastón desde el día de la cirugía, salvo que el cirujano diga otra cosa. Ojo: en prótesis **no cementada (press-fit)**, injertos óseos, osteotomías asociadas o fracturas periprotésicas, la carga puede estar **restringida** → ese dato lo da el cirujano, no se asume.
-5. **Dolor y edema se vigilan de forma transversal** (como el semáforo del dolor): controlarlos abre la ventana para el ROM y la activación del cuádriceps.
-6. **Rehabilitación supervisada y temprana.** La guía APTA recomienda iniciar fisioterapia **dentro de las 24 h** de la cirugía y manejo supervisado; prefiere el entorno ambulatorio cuando es seguro `[verificar: redacción exacta de la recomendación APTA]`.
-
----
-
-### 2. Datos que SIEMPRE manda el cirujano (confirmar antes de progresar)
-
-- **Tipo de artroplastia:** total (TKA) vs unicompartimental (UKA) vs revisión.
-- **Fijación:** cementada (WBAT habitual) vs no cementada/press-fit (puede restringir carga).
-- **Estabilidad / diseño:** CR (retención de cruzado posterior), PS (estabilizada posterior), constreñida, bisagra → algunas limitan arcos o rotación.
-- **Restricciones específicas:** tope de flexión, de extensión, carga parcial, uso de inmovilizador, precauciones por reparación de mecanismo extensor.
-- **Profilaxis de TVP/TEP y anticoagulación** vigentes (ver §13 y §14).
-- **Comorbilidades / seguridad clínica:** metal/osteosíntesis adicional, marcapaso/DAI, anticoagulación, diabetes, cáncer, etc. → se captura en `seguridadClinica` para que la alerta salte (§14).
-
----
-
-### 3. Fases por CRITERIOS (con semanas solo como referencia)
-
-> Las semanas son aproximadas y orientativas. **Se avanza cuando se cumplen los CRITERIOS de salida, no cuando llega la fecha.** Metas de ROM: ver tabla de hitos (§4).
-
-#### FASE 1 — Aguda / hospitalaria y primeros días (≈ día 0 a 1–2 semanas)
-**Metas:**
-- Marcha segura con andadera, carga según tolerancia (WBAT) en TKA cementada.
-- **Encender el cuádriceps:** contracción isométrica (quad set) y **elevación de pierna recta (SLR) SIN retraso de extensión (extension lag)**.
-- **Extensión pasiva a 0°** lo antes posible (talón en alto / toalla bajo el tobillo, NO bajo la rodilla).
-- Flexión activa-asistida progresiva (meta temprana ~**90°** hacia 2 semanas).
-- Control de dolor y edema; cuidado de herida.
-- Transferencias, sentado↔de pie, escalón con ayuda.
-
-**Qué SÍ:** quad sets, SLR, bombeo de tobillo (circulación/TVP), extensión pasiva en prono o con toalla, flexión activa/activa-asistida (deslizar talón, sentado al borde), crioterapia + elevación, movilización de rótula (§9), marcha con andadera.
-**Qué NO:** poner almohada **bajo la rodilla** (induce flexo), forzar flexión a dolor alto, cargar más allá de lo indicado en prótesis no cementada, ignorar un extension lag.
-**Restricciones:** respetar topes del cirujano; herida protegida; vigilar signos de TVP/infección.
-**Criterios de avance:** SLR activa sin lag o con lag mínimo, extensión activa cercana a 0°, flexión ≈ 90° `[verificar: umbral exacto]`, marcha independiente con andadera, dolor/edema controlados.
-
-#### FASE 2 — ROM temprano, control de edema y activación del cuádriceps (≈ 2 a 6 semanas)
-**Metas:**
-- **Extensión activa 0° completa y mantenida** (sin lag). *Esta es la meta crítica de la fase.*
-- Flexión progresando: hitos típicos ~**90–100° a las 2–3 sem**, **~105–110° hacia 4–6 sem**, rumbo a **110–120° a 6 sem** `[verificar: cifras varían por fuente]`.
-- Edema a la baja; dolor manejable para permitir ejercicio.
-- Transición **andadera → bastón** cuando la marcha es estable y segura.
-- Cuádriceps activándose cada vez mejor (reducir AMI).
-
-**Qué SÍ:** progresión de ROM (flexión y extensión), fortalecimiento de cuádriceps/glúteos en cadena cerrada tolerable (mini-sentadillas, puente, step-ups bajos), **NMES de cuádriceps** si hay activación pobre (§7), movilización de rótula, re-educación de marcha, propiocepción básica, crioterapia/compresión para edema.
-**Qué NO:** descuidar la extensión por perseguir flexión; agentes físicos **térmicos** sobre el material (§14); progresiones de impacto; marcha sin control del valgo/varo.
-**Criterios de avance:** extensión 0° estable, flexión ≥ ~100–110° `[verificar]`, cuádriceps activo con SLR sin lag y control en apoyo monopodal breve, marcha con bastón sin claudicar, edema controlado.
-
-> **BANDERA DE RIGIDEZ (crítica):** si hacia **~6 semanas** no logra **~90–100° de flexión** (o persiste flexo), o no alcanza 0–90° → **riesgo de ARTROFIBROSIS**. Consultar al cirujano: puede requerir **manipulación bajo anestesia (MUA)** (ver §5). No esperar a que "se destrabe solo".
-
-#### FASE 3 — Fuerza, marcha y escaleras (≈ 6 a 12 semanas)
-**Metas:**
-- ROM funcional: extensión 0°, flexión hacia **115–120°+** `[verificar]`.
-- Fuerza de cuádriceps/cadera en progresión (reducir la brecha vs pierna sana).
-- **Marcha sin dispositivo** cuando sea segura (sin claudicación, buen control).
-- **Escaleras** alternando pasos (subir y bajar) — recordar que subir escalera requiere ~**85–90°** de flexión y buen cuádriceps.
-- Resistencia (caminar distancias crecientes, bici estática).
-
-**Qué SÍ:** fortalecimiento progresivo (sentadillas más profundas tolerables, prensa/extensión en arcos seguros, step-ups más altos, trabajo de cadera), equilibrio/propiocepción avanzada, bici estática (resistencia creciente), caminata, retiro gradual del bastón.
-**Qué NO:** impacto/pivote, correr, deportes de contacto; progresar si persiste un déficit grosero de extensión o un cuádriceps que no sostiene la rodilla.
-**Criterios de avance:** marcha independiente sin dispositivo y sin dolor, escaleras alternando, déficit de fuerza de cuádriceps en descenso, pruebas funcionales mejorando (TUG, 6MWT — §12).
-
-#### FASE 4 — Funcional y retorno a actividad (≈ 3 meses en adelante; recuperación plena 6–12 meses)
-**Metas:**
-- ROM y fuerza cercanos a meseta (extensión plena; flexión según objetivo del paciente).
-- Independencia total en AVD, trabajo, y **actividad de bajo impacto**.
-- Retorno guiado a deporte recomendado (§11).
-
-**Qué SÍ:** fortalecimiento avanzado, acondicionamiento, reentrenamiento del gesto/actividad del paciente, bajo impacto (bici, natación, caminata, golf).
-**Qué NO (a largo plazo):** alto impacto/pivote repetitivo que acelera el desgaste del polietileno (§11).
-**Criterios de "alta"/meseta:** objetivos funcionales del paciente logrados, mínima diferencia lado a lado en fuerza y pruebas funcionales, dolor estable y bajo. La mayoría retoma AVD hacia los **3 meses**; recuperación plena **6–12 meses** `[verificar]`.
-
----
-
-### 4. Hitos para detectar DESFASE (mapa de tiempos, no reglas rígidas)
-
-> Las cifras varían mucho entre fuentes (estudios medidos vs protocolos de clínica). Usar como **detector de desfase**, no como meta forzada. Marcadas `[verificar]` las que vienen de resúmenes.
-
-| Momento | Flexión típica esperada | Extensión | Otros hitos |
-|---|---|---|---|
-| Día 0–3 | ~60–80° `[verificar]` | buscando 0° | WBAT con andadera; quad set; SLR |
-| 2 semanas | ~90° `[verificar]` | **0° (meta)** | andadera firme |
-| 2–3 sem | ~90–100° `[verificar]` | 0° mantenida | andadera → bastón |
-| 4–6 sem | ~105–110° `[verificar]` | 0° | bastón; sube escalón |
-| 6 sem | ~110–120° `[verificar]` | 0° | **CHECKPOINT: si <90°, consultar cirujano** |
-| 12 sem | ~115–120°+ `[verificar]` | 0° | sin dispositivo; escaleras alternando |
-| 3–6 meses | meseta funcional | 0° | retorno a bajo impacto |
-
-**Datos medidos de cohorte** (referencia de evolución real, no meta): flexión mediana ~**80° en semana 1 → ~110° en semana 8**; extensión de ~**−10.7° → −3.2°** en el mismo periodo; mayor ganancia en las **primeras 4 semanas**; la flexión tiende a mesetar hacia ~3 meses y la extensión hacia ~6 meses `[verificar: Chen/colaboradores, cohorte primeras 8 sem]`.
-
-**Umbrales funcionales útiles para interpretar el ROM:** caminar cómodo ≈ **65°**, subir escaleras ≈ **85°**, sentarse/pararse ≈ **95°** de flexión `[verificar: Physiopedia]`.
-
-**Transiciones típicas (referencia, las ajusta el cirujano):**
-- **Andadera → bastón:** cuando la marcha es estable (frecuentemente ~2–4 sem).
-- **Bastón → sin dispositivo:** marcha sin claudicar (frecuentemente ~4–8 sem).
-- **Conducir:** la evidencia (Kirschbaum 2021, TKA derecha) muestra que el **tiempo de reacción de frenado vuelve al basal hacia las ~4 semanas**, pero la **confianza subjetiva** recién a las **~6 semanas** `[verificar]`. Estudios previos también apuntaban a ~4 semanas para TKA derecha. **Regla práctica:** no conducir con opioides, y requerir buen control, fuerza y frenado de emergencia; para rodilla izquierda con transmisión automática suele ser antes. Siempre confirmar con cirujano.
-- **Retorno a trabajo:** depende del tipo de trabajo (sedentario antes; físico más tarde).
-
----
-
-### 5. Bandera de rigidez → ARTROFIBROSIS y manipulación bajo anestesia (MUA)
-
-- **Definición operativa de rigidez:** flexión **< 90°** persistente, o flexo (déficit de extensión) **> 10°**, más allá de ~12 semanas `[verificar: definiciones varían]`. Un ROM < 90° que persiste **> 12 semanas** se considera rigidez adquirida.
-- **Ventana típica de MUA:** cuando no se alcanza **> 90° de flexión** hacia las **6–12 semanas** `[verificar]`. La mayoría de cirujanos la hacen en esa ventana.
-- **Timing (evidencia):** series retrospectivas (**Issa et al. 2014, JBJS**, 144 manipulaciones) sugieren que la **MUA temprana (< 12 sem)** logra mayor ganancia de flexión y mayor arco final que la tardía (ganancia ~**36.5° vs 17°**; arco final ~**119° vs 95°**) `[verificar: cifras de resumen]`. Por eso se recomienda **umbral bajo para manipular temprano** si el paciente se está trabando. (Nota: otra lectura señala que los pacientes "tempranos" partían de peor flexión, así que el beneficio neto no está 100% zanjado; y una cohorte Mayo asoció MUA con más riesgo de revisión → decisión del cirujano.)
-- **Rol del fisio:** detectar el desfase a tiempo, documentar el ROM objetivo y **escalar al cirujano** si no progresa; post-MUA, rehabilitación intensiva inmediata de ROM para no perder lo ganado.
-
----
-
-### 6. ¿Por qué la EXTENSIÓN completa temprana es tan crítica?
-
-- La **contractura en flexión (flexo)** altera la biomecánica: marcha con rodilla flexionada → **demanda constante del cuádriceps**, fatiga, dolor anterior, y marcha ineficiente.
-- Historia natural (referencia): la incidencia de flexo recién desarrollado baja de ~**14% a las 6 sem** a ~**0.3% al año** en la mayoría `[verificar: Int Orthop 2013, umbral de 5°]`; un flexo **< 15° a los 3 meses** suele poder resolver a extensión plena hacia los 2 años, pero **> 15° a los 3 meses tiende a PERSISTIR** `[verificar]`. Los pacientes con **extensión plena caminan y suben escaleras mejor** que los que quedan con flexo.
-- **Implicación clínica:** la extensión se "gana" en las **primeras semanas**; perseguir flexión descuidando la extensión es el error clásico. Técnicas: extensión pasiva en prono (pierna colgando), toalla bajo el tobillo (no bajo la rodilla), estiramiento mantenido, y **evitar dormir/descansar con la rodilla flexionada** sobre almohada. Algunos protocolos usan inmovilización corta en extensión (~2–3 días) para prevenir recurrencia temprana `[verificar]`.
-
----
-
-### 7. Cuádriceps y electroestimulación (NMES): la evidencia
-
-**El problema (fundacional):**
-- **Mizner, Stevens, Snyder-Mackler (2003, Phys Ther):** el déficit de **activación voluntaria** del cuádriceps post-TKA es ~**26%**, ~**4× el del grupo comparación (~6%)** `[verificar]`; concluyeron que **la rehabilitación centrada solo en ejercicio voluntario difícilmente vence esta falla de activación** → justifica NMES.
-- **Mizner et al. (2005, JBJS):** en la pérdida temprana de fuerza, la **falla de activación voluntaria pesa casi el doble que la atrofia**; fenómeno descrito como **inhibición muscular artrogénica (AMI)** por dolor/derrame.
-- El dolor durante la contracción explica una parte pequeña pero significativa del déficit de activación `[verificar: r²≈0.22]`.
-
-**La intervención — NMES (electroestimulación neuromuscular de superficie, sobre el vientre del cuádriceps):**
-- **Stevens-Lapsley et al. (2012, Phys Ther):** NMES iniciada **~48 h post-op** mejoró fuerza y activación del cuádriceps a las ~3.5 sem; a las 52 sem las diferencias se atenuaron pero seguían significativas en fuerza y desempeño funcional; efecto mayor en el **primer mes** y con **intensidades más altas** `[verificar]`.
-- **Petterson et al. (2009, Arthritis Care Res):** fortalecimiento progresivo **con o sin NMES** dio resultados similares a 3 y 12 meses (lectura null-leaning); pero lo clave de ese trabajo es que **el fortalecimiento progresivo supervisado funciona** (hubo gran mejoría funcional en ambos brazos).
-- **Metaanálisis recientes:** en general, la NMES **mejora la fuerza del cuádriceps a corto–mediano plazo** (algunos reportan beneficio hasta 12–13 meses con "alta calidad") `[verificar]`; el beneficio más sólido es el de **corto plazo (primer mes)** y a **mayor intensidad tolerada**.
-- **Síntesis práctica:** NMES es un **coadyuvante útil, sobre todo temprano y cuando la activación es pobre**, siempre **combinada con ejercicio voluntario progresivo** (no lo reemplaza).
-
-> **Importante (seguridad, ver §14):** la **NMES de superficie** sobre el vientre muscular para activar el cuádriceps **es distinta** de la diatermia/tecar/US **térmicos**. La NMES de superficie **se usa y tiene evidencia** en TKA; **no se aplica directamente sobre el material protésico** ni se usan modalidades **térmicas profundas** sobre el metal/cemento.
-
----
-
-### 8. ¿CPM (movilización pasiva continua) sí o no?
-
-**Respuesta corta: NO de rutina.** La evidencia reciente **no la apoya** como estándar.
-- **Cochrane (Harvey et al., 2014):** evidencia de calidad moderada de **ningún efecto clínicamente importante sobre la función** a mediano plazo; evidencia de muy baja calidad de que podría reducir el riesgo de MUA (del ~7% al ~2% en los ensayos) — dato débil y no consistente `[verificar]`.
-- **Yang et al. (2019, Arch Phys Med Rehabil)** y **revisión sistemática 2024 (J Orthop Surg Res):** CPM **no mejora** de forma relevante la flexión/extensión activa ni pasiva vs fisioterapia estándar `[verificar]`.
-- **Guía APTA (2020/revisión 2026):** ubica la CPM entre las opciones de **beneficio incierto** → **sugiere limitar su uso rutinario** (junto con Kinesio taping, drenaje linfático manual y vendajes compresivos) `[verificar: redacción exacta]`.
-- **Conclusión:** priorizar **ROM activo/activo-asistido + ejercicio supervisado**. La CPM queda, a lo sumo, para casos puntuales a criterio del cirujano, no como estándar.
-
----
-
-### 9. Movilización de rótula
-
-- Práctica **común en protocolos** desde la fase temprana: **deslizamientos patelares superior/inferior y medial/lateral**, suaves, para preservar la **movilidad rotuliana** y el juego patelofemoral.
-- Fundamento clínico: una rótula que pierde movilidad (sobre todo el deslizamiento **superior**) limita la flexión y la mecánica extensora; el tejido periarticular puede fibrosar. Mantener la movilidad rotuliana acompaña la ganancia de ROM.
-- Se complementa con **movilización tibiofemoral** si el ROM se estanca `[verificar: respaldo de protocolos de clínica, no de ensayo controlado específico]`.
-
----
-
-### 10. Manejo de dolor y edema
-
-- **Crioterapia:** evidencia **mixta pero favorable a corto plazo**. Revisiones muestran **beneficio modesto y de baja certeza en dolor a ~48 h** (diferencia ~**1.6/10** en EVA `[verificar]`) y reducción de edema peripatelar a los **2–6 días** (no a 6 sem/3 meses) `[verificar]`; la guía APTA la ubica como **opción beneficiosa de bajo riesgo**. **Crioterapia + compresión dinámica** podría dar mayor reducción de edema y mejor flexión pasiva que el frío solo `[verificar]`. Útil como coadyuvante; no sustituye el ejercicio.
-- **Elevación + bombeo de tobillo + movilización temprana:** base del control de edema (y profilaxis de TVP).
-- **Posicionamiento temprano de la extremidad** (p. ej. talón elevado para extensión): la guía APTA lo marca como beneficioso de bajo riesgo `[verificar]`.
-- **Beneficio incierto / limitar rutina (APTA):** Kinesio taping, **drenaje linfático manual**, vendajes compresivos, CPM `[verificar]`.
-- **Electroanalgesia (TENS):** coadyuvante de dolor; de nuevo, distinta de modalidades térmicas (§14).
-- **Analgesia farmacológica:** la maneja el equipo médico; el fisio **cronometra la sesión** aprovechando la ventana analgésica y vigila que no se enmascare una bandera roja.
-
----
-
-### 11. Deportes y actividad: recomendados vs desaconsejados
-
-**Marco:** la evidencia es sobre todo de **consenso de expertos** (no ensayos). No hay señal clara de que retomar actividad de bajo impacto aumente complicaciones; **el factor pronóstico más fuerte es la experiencia previa del paciente con ese deporte**.
-
-**Recomendados (BAJO impacto):**
-- **Caminar, bicicleta (estática y de ruta), natación/aquafitness, golf.** Bici y natación tienen las mejores tasas de retorno. Golf es de los más respaldados.
-- **European Knee Associates (EKA, 2021):** alto consenso para permitir progresivamente — ~**5 deportes en las primeras 6 sem** (caminar, subir escaleras, natación, aquafitness, bici estática), **~7 a las 6–12 sem** (se agrega bici en plano, yoga), **~14 a los 3–6 meses**, y **~21 de 47 actividades a los 6 meses** (golf, tenis en dobles, senderismo, pesas) `[verificar: cifras]`.
-- Senderismo, tenis en **dobles** y esquí de descenso: "recomendados **con experiencia previa**".
-
-**Desaconsejados / restringidos (ALTO impacto, pivote, contacto):**
-- **Correr/trotar, baloncesto, fútbol, tenis en singles, deportes de pivote y de contacto.** Aceleran el desgaste del polietileno y el riesgo de aflojamiento.
-- Los corredores/trotadores son los que **más difícil** retoman su nivel previo.
-
-> **Tiempos de referencia:** retorno a deporte de bajo impacto frecuentemente hacia los **~3–6 meses** según el deporte y la recuperación `[verificar]`.
-
----
-
-### 12. Valoración y pruebas (qué medir)
-
-**ROM (goniometría):**
-- Medir **flexión Y extensión activas y pasivas** cada visita. Documentar la extensión como déficit (p. ej. "−5°") para no "redondear" un flexo a 0°.
-- **Retraso de extensión (extension lag):** diferencia entre extensión **pasiva** (la logra el examinador) y **activa** (la logra el paciente con SLR). Un lag marca **déficit de activación/fuerza del cuádriceps**, no rigidez articular → el trabajo es de **activación**, no de estiramiento.
-
-**Fuerza de cuádriceps:**
-- Comparar **lado a lado** (índice de simetría). Dinamómetro si hay; si no, grados de MMT y calidad del quad set/SLR. Vigilar la **brecha** como guía de progresión.
-
-**Pruebas funcionales:**
-- **TUG (Timed Up and Go):** levantarse, caminar 3 m, volver y sentarse. Referencia de mejoría: de ~**18 s → ~10 s** en el postoperatorio temprano `[verificar]`.
-- **6MWT (caminata de 6 minutos):** distancia; buen predictor de deambulación funcional. Referencia: de ~**231 m → ~361 m** `[verificar]`.
-- **Prueba de escaleras (stair climb test):** tiempo para subir/bajar un tramo.
-
-**Escalas / resultados reportados por el paciente (PROMs):**
-- **KOOS** (y su versión corta) — síntomas, dolor, AVD, deporte, calidad de vida.
-- **Oxford Knee Score (OKS):** 12 ítems, **0–48** `[verificar]` (mayor = mejor).
-- (Otras en uso: WOMAC, Knee Society Score/KSS.)
-
-**Edema:** perímetro peripatelar comparativo; útil para seguir el control de inflamación.
-
----
-
-### 13. Banderas rojas y contraindicaciones (escalar al cirujano/urgencias)
-
-- **TVP (trombosis venosa profunda):** dolor/hinchazón de pantorrilla, calor, enrojecimiento unilateral. **No aplicar masaje/drenaje linfático** si hay sospecha de TVP. → Médico de inmediato.
-- **TEP (tromboembolia pulmonar):** disnea súbita, dolor torácico, taquicardia → **urgencia**.
-- **Infección periprotésica (PJI):** dolor creciente, calor/eritema que **persiste o empeora más allá de ~3–4 sem**, **drenaje turbio/purulento**, dehiscencia, fiebre (p. ej. > 38 °C / 101.5 °F) `[verificar: umbrales]`. → Cirujano urgente; no "trabajar a través" de una posible infección.
-- **Dehiscencia de la herida / drenaje persistente.** → Cirujano.
-- **Déficit del mecanismo extensor** (no logra extensión activa, extension lag grosero nuevo, "se le va" la rodilla): posible lesión del aparato extensor. → Cirujano.
-- **Inestabilidad** (giving way, bostezo): evaluar; → Cirujano.
-- **Fractura periprotésica:** dolor súbito intenso, deformidad, incapacidad de cargar tras caída/trauma. → Urgencia.
-- **Dolor desproporcionado, quemante, con cambios de color/temperatura/sudoración y alodinia → sospecha de SDRC (síndrome doloroso regional complejo).** → Evaluación médica.
-- **Rigidez/artrofibrosis:** ver §5 (bandera de ROM a las ~6 sem).
-
----
-
-### 14. Seguridad de AGENTES FÍSICOS con IMPLANTE METÁLICO (ligar a `seguridadClinica`)
-
-> El paciente con TKA/UKA **tiene prótesis metálica + cemento (PMMA) + polietileno**. Esto condiciona qué agentes se pueden usar. **Se liga con la alerta de seguridad clínica de la app** (`_soapSeguridadHTML`/`seguridadClinica`): capturar "material de osteosíntesis / prótesis de rodilla" para que la caja de **CUIDADO** salte sola.
-
-**NO usar sobre el material (modalidades TÉRMICAS profundas):**
-- **Radiofrecuencia / diatermia / tecarterapia TÉRMICA / ultrasonido TÉRMICO (continuo)** sobre o alrededor del implante. El metal y, sobre todo, el **cemento y el polietileno** concentran/retienen calor → **riesgo de quemadura y de daño a la interfase**. La diatermia de onda corta lista el **metal como contraindicación**; el US térmico está **contraindicado/cautelado sobre prótesis cementadas o de plástico** aunque el metal refleje parte de la energía `[verificar]`.
-- Precaución adicional absoluta con **marcapaso/DAI** (cualquier diatermia = contraindicación).
-
-**SÍ se puede (con criterio):**
-- **NMES de SUPERFICIE del cuádriceps** para activación muscular: **se usa y tiene evidencia** (§7). Es una corriente de **estimulación neuromuscular**, **no** una modalidad térmica. Se aplica sobre el **vientre del cuádriceps**, **no directamente sobre el implante**, y **no calienta** el metal.
-- **TENS** analgésica (mismo principio: no térmica, electrodos fuera del implante).
-- **Crioterapia** (§10) — sin problema con el metal.
-- **US/diatermia:** si por algún motivo se considerara US, usar solo **pulsado/atérmico y lejos del material**, nunca térmico sobre el implante (y en general, evitarlo sobre la prótesis).
-
-**Otros candados de seguridad en este paciente:**
-- **Vigilar TVP** de forma transversal (§13); **anticoagulación post-op frecuente** → cuidado con maniobras agresivas, hematomas, y con cualquier técnica que aumente sangrado; coordinar con el estado de anticoagulación.
-- **Embarazo, cáncer activo** → precauciones generales de agentes físicos (como en el resto de la biblioteca).
-
-**Regla de bolsillo:** sobre una prótesis de rodilla → **nada que CALIENTE en profundidad el material**; **sí** electroestimulación de superficie (NMES/TENS) fuera del implante, y frío.
-
----
-
-### 15. UKA (artroplastia unicompartimental) — nota breve
-
-- **Recuperación más rápida que TKA:** menor agresión quirúrgica, estancia más corta (~1–2 días), **retorno más temprano** a AVD, trabajo y actividad.
-- **Datos de referencia:** retorno al trabajo en 3 meses ~**73% (UKA) vs ~48% (TKA)**; tiempo a retorno deportivo ~**12 sem (UKA) vs ~13 sem (TKA)**; tasas de retorno a deporte altas y algo mayores que TKA (sin diferencia estadística clara) `[verificar]`.
-- **Principios de rehabilitación: los MISMOS que TKA pero comprimidos/acelerados** — extensión plena temprana, activación del cuádriceps, ROM, fuerza, marcha, progresión por criterios. **El cirujano igual manda** tiempos y restricciones.
-- **Matiz importante:** la **UKA tiene MAYOR tasa de revisión** que la TKA a largo plazo. Y **OJO**: algunas fuentes de "retorno sin restricciones a deportes vigorosos (trote, esquí, tenis singles)" son **específicas de UKA, NO extrapolables a TKA**. Para TKA mantener la recomendación de bajo impacto (§11).
-
----
-
-### Fuentes
-
-**Guía de referencia (columna vertebral):**
-- Jette DU, et al. **Physical Therapist Management of Total Knee Arthroplasty** (Clinical Practice Guideline, APTA/Academy of Orthopaedic PT). *Phys Ther.* **2020**;100(9):1603–1631. → https://academic.oup.com/ptj/article/100/9/1603/5857258
-- **Revisión 2026** de la misma CPG. *Phys Ther.* **2026**;106(7):pzag058. → https://academic.oup.com/ptj/article/106/7/pzag058/8742282 · Resumen: https://www.guidelinecentral.com/insights/jul-2026-apta-managementtka-guideline-spotlight/
-
-**Déficit/activación de cuádriceps (fundacionales):**
-- Mizner RL, Stevens JE, Snyder-Mackler L. **Voluntary Activation and Decreased Force Production of the Quadriceps Femoris Muscle After TKA.** *Phys Ther.* 2003;83(4):359–365. → https://academic.oup.com/ptj/article-abstract/83/4/359/2857537
-- Mizner RL, Petterson SC, Stevens JE, Vandenborne K, Snyder-Mackler L. **Early Quadriceps Strength Loss After TKA: Contributions of Muscle Atrophy and Failure of Voluntary Muscle Activation.** *J Bone Joint Surg Am.* 2005. → https://www.researchgate.net/publication/7871266
-- Petterson SC, et al. **Improved function from progressive strengthening interventions after TKA: RCT comparing rehabilitation programs.** *Arthritis Care Res (Arthritis Rheum).* 2009. → (pmid 19177542)
-
-**NMES:**
-- Stevens-Lapsley JE, Balter JE, Wolfe P, Eckhoff DG, Kohrt WM. **Early NMES to Improve Quadriceps Muscle Strength After TKA: RCT.** *Phys Ther.* 2012;92(2):210–226. → https://academic.oup.com/ptj/article-abstract/92/2/210/2703178
-- Metaanálisis de RCT de NMES post-TKA. → https://pmc.ncbi.nlm.nih.gov/articles/PMC8677678/ y https://pmc.ncbi.nlm.nih.gov/articles/PMC12047048/
-
-**CPM:**
-- Harvey LA, Brosseau L, Herbert RD. **Continuous passive motion following TKA.** *Cochrane Database Syst Rev.* 2014. → https://www.cochrane.org/evidence/CD004260
-- Yang X, et al. **CPM After TKA: SR & Meta-analysis.** *Arch Phys Med Rehabil.* 2019. → https://pubmed.ncbi.nlm.nih.gov/30831093/
-- SR & meta-analysis 2024. *J Orthop Surg Res.* → https://link.springer.com/article/10.1186/s13018-024-04536-y
-
-**Rigidez / MUA / artrofibrosis:**
-- Issa K, et al. **Effect of timing of MUA to improve ROM and functional outcomes after TKA.** *J Bone Joint Surg Am.* 2014. → https://pubmed.ncbi.nlm.nih.gov/25143495
-- **Management of Stiffness following TKA.** *SICOT-J.* 2021. → https://www.sicot-j.org/articles/sicotj/pdf/2021/01/sicotj200146.pdf
-- Early MUA & mayor ganancia de flexión. → https://www.ncbi.nlm.nih.gov/pmc/articles/PMC9957883/
-
-**Contractura en flexión / extensión:**
-- **The natural history of a newly developed flexion contracture following primary TKA.** *Int Orthop.* 2013. → https://pmc.ncbi.nlm.nih.gov/articles/PMC3779550/
-- **Management of fixed flexion contracture in primary TKA: recent systematic review.** *SICOT-J.* 2024. → https://www.sicot-j.org/articles/sicotj/full_html/2024/01/sicotj240002/sicotj240002.html
-
-**ROM / recuperación medida:**
-- **Recovery of knee ROM after TKA in the first postoperative weeks.** *Musculoskelet Surg.* 2019. → https://link.springer.com/article/10.1007/s12306-019-00588-0
-- Physiopedia — **Total Knee Arthroplasty** (hitos de fase). → https://www.physio-pedia.com/Total_Knee_Arthroplasty
-- Protocolos de referencia: OHSU (2023), Brigham & Women's, Mass General, Alberta Hip & Knee. → https://www.ohsu.edu/sites/default/files/2023-11/OHSU-Rehab-Protocols-Total-Knee-Nov2023.pdf · https://www.brighamandwomens.org/assets/bwh/patients-and-families/rehabilitation-services/pdfs/knee-tkr-protocol-bwh.pdf
-
-**Crioterapia / edema:**
-- SR de RCT (crioterapia y edema, 2023). → https://pmc.ncbi.nlm.nih.gov/articles/PMC10415999/
-- Reassessment of SRs (2025). → https://pmc.ncbi.nlm.nih.gov/articles/PMC12138932/
-- RCT crioterapia compresiva vs estándar (2024). → https://www.ncbi.nlm.nih.gov/pmc/articles/PMC10900683/
-
-**Conducir:**
-- Kirschbaum S, et al. **Reaction time and brake pedal force after TKA: timeframe for return to driving.** *Knee Surg Sports Traumatol Arthrosc.* 2021. → https://esskajournals.onlinelibrary.wiley.com/doi/full/10.1007/s00167-020-06105-2
-
-**Retorno a deporte / UKA vs TKA:**
-- **European Knee Associates (EKA): 21 sports activities recommended 6 months after TKA.** *KSSTA.* 2021. → https://pubmed.ncbi.nlm.nih.gov/33404817
-- **Return to sport post-knee arthroplasty: umbrella review for consensus guidelines.** *Bone Joint Open.* 2022. → https://pmc.ncbi.nlm.nih.gov/articles/PMC8965786/
-- **High rate of return to low-impact activity/sport after TKA and UKA: SR & meta-analysis** (2026). → https://pmc.ncbi.nlm.nih.gov/articles/PMC13502459/
-- **Outcomes TKA vs UKA in an ERAS protocol.** → https://pmc.ncbi.nlm.nih.gov/articles/PMC11490907/
-
-**Pruebas / escalas:**
-- Fiabilidad del 6MWT y predicción de deambulación tras TKA. → https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3644243/
-- PROMs y pruebas funcionales tras TKR. → https://pmc.ncbi.nlm.nih.gov/articles/PMC13252258/
-
-**Seguridad de agentes físicos / metal:**
-- **Electrophysical Agents — Contraindications and Precautions: An Evidence-Based Approach.** *Physiother Can.* 2010. → https://pmc.ncbi.nlm.nih.gov/articles/PMC3031347/
-- Physiopedia — **Electrotherapy Contraindications.** → https://www.physio-pedia.com/Electrotherapy_Contraindications
-- Short Wave Diathermy (overview). → https://www.sciencedirect.com/topics/medicine-and-dentistry/short-wave-diathermy
-
----
-
-### Incertidumbres [verificar]
-
-1. **Método de esta revisión:** todo proviene de **resúmenes de WebSearch extended**, no de la lectura de los PDFs/artículos completos. **No se abrieron los textos originales.** Por eso, antes de fijar cifras finas en protocolo clínico, verificar en fuente primaria.
-2. **Cifras de ROM por semana:** varían mucho entre fuentes (estudios medidos vs protocolos de clínica vs páginas divulgativas). Las de la tabla (§4) son **orientativas**, no metas rígidas; confirmar con el protocolo del cirujano.
-3. **Redacción exacta de las recomendaciones APTA 2020/2026** (cuáles son "recomendadas", "beneficiosas de bajo riesgo" o "beneficio incierto/limitar"): tomada de resúmenes; **verificar el texto y el grado de evidencia** en la guía original (incluye ~20 recomendaciones: prehabilitación, inicio < 24 h, supervisión, crioterapia, posicionamiento temprano, NMES, y "no bracing rutinario" para TKA primaria no complicada).
-4. **MUA (Issa 2014):** las ganancias "36.5° vs 17°" y arco final "119° vs 95°", y el umbral/ventana "6–12 sem / <90°", vienen de resúmenes; **verificar**. La evidencia de timing es mayormente retrospectiva y no está del todo zanjada (una cohorte asoció MUA con más revisión).
-5. **NMES:** la magnitud y durabilidad del beneficio (si supera al ejercicio progresivo solo) **no está totalmente zanjada**; el consenso más firme es el beneficio de **corto plazo** y a **mayor intensidad**.
-6. **Crioterapia:** evidencia mixta; cifras de EVA (~1.6/10) y ventana de edema (2–6 días) por resumen; **verificar**.
-7. **Conducir (Kirschbaum 2021):** "4 sem reacción / 6 sem confianza" para TKA derecha; aplicar siempre con criterio clínico y marco legal local; confirmar con cirujano.
-8. **Retorno a deporte:** cifras del EKA (5/7/14/21 actividades por ventana) y UKA (73% vs 48% RTW; 12 vs 13 sem) por resumen; **verificar**. Recordar que varias recomendaciones de deporte vigoroso "sin restricción" son **de UKA, no de TKA**.
-9. **Movilización de rótula y topes de carga en no cementadas:** respaldo de **protocolos de clínica**, no de ensayo controlado específico; individualizar con el cirujano.
-10. **Oxford Knee Score 0–48** y umbrales de fiebre/temperatura para infección: por resumen; **verificar** rangos y puntos de corte.
-11. **Seguridad US sobre metal:** hay matiz en la literatura (el metal refleja, pero cemento/polietileno sí se calientan) → para una **prótesis de rodilla cementada**, lo prudente y lo que marca la regla de la clínica es **evitar modalidades térmicas profundas sobre el material**; verificar con la política interna y el implante específico.
-
-> **Nota de uso clínico:** este documento ubica fase, restricciones y desfase. **No reemplaza la indicación del cirujano** ni la valoración individual. Ante bandera roja (§13) o rigidez a las ~6 sem (§5), **escalar antes de progresar**.
-
----
+> - Flexión progresando a 110°+
+> - Bici fija (primero medios giros adelante/atrás, luego vuelta completa)
+> - Cadena cerrada: sentadilla parcial, prensa, step-ups bajos; fuerza de cuádriceps y glúteo
+
+> **🚫 TODAVÍA NO**
+>
+> - Impacto, correr, saltar
+> - Giros bruscos con el pie fijo
+
+##### SEM 6–12 — Movimiento completo y marcha normal
+**Apoyo / muletas:** Marcha normal.
+
+> **✅ YA PUEDE (ideas de ejercicio)**
+>
+> - Recuperar la flexión completa y afinar la extensión
+> - Fuerza progresiva; escaleras alternando los pies
+> - Elíptica, bici con resistencia
+
+> **🚫 TODAVÍA NO**
+>
+> - Correr, saltar, deportes de impacto
+
+##### MES 3+ — Resistencia y vida normal
+**Apoyo / muletas:** Normal.
+
+> **✅ YA PUEDE (ideas de ejercicio)**
+>
+> - Progresar fuerza y resistencia
+> - Actividad de bajo impacto: caminar, bici, natación, golf
+
+> **🚫 TODAVÍA NO**
+>
+> - Impacto alto de por vida: correr, saltar, deportes de contacto — desgastan la prótesis
+
+#### Criterios de alta funcional
+- **Movimiento:** extensión completa (0°) y flexión ≥110–120°.
+- **Marcha:** camina sin cojear y sin ayuda; sube y baja escaleras alternando.
+- **Fuerza:** cuádriceps y glúteo que permitan levantarse de una silla sin empujarse con las manos.
+
+#### 🚩 Señales de alarma — avisa de inmediato
+- **Dolor e hinchazón en la pantorrilla de una sola pierna** → posible coágulo (trombosis), frecuente tras esta cirugía (urgencia).
+- Rodilla **caliente + hinchada + fiebre**, o secreción por la herida → posible infección (urgencia).
+- Un "tronido" fuerte + no poder apoyar o la pierna se deforma → acude de inmediato.
+- La flexión o la extensión **se estancan y no mejoran en varias semanas** → avísame, hay que intervenir el rango pronto.
+
+> **La orden del cirujano manda** sobre apoyo y tiempos. El objetivo siempre: ganar el movimiento temprano y proteger la prótesis del impacto.
 
 ## 🧩 CARTÍLAGO Y LESIONES OSTEOCONDRALES (rodilla y astrágalo)
 
