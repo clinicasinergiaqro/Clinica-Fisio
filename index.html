@@ -1371,7 +1371,7 @@ body.modo-oscuro .topbar{background:#141824}
 <body>
 <div id="sync-indicator" class="sync-indicator ok" style="display:none"></div>
 <div id="app-version-chip" title="Versión de la app en este equipo — toca para buscar actualización" onclick="try{_tapVersionChip()}catch(e){}"></div>
-<script>/* VERSIÓN VISIBLE: refleja el index.html realmente cargado en ESTE equipo (se bumpea junto con sw.js). Así un iPad con versión vieja se ve de un vistazo. */window.APP_VERSION='v1-2026-11-11c';(function(){try{var c=document.getElementById('app-version-chip');if(c)c.textContent=window.APP_VERSION;}catch(e){}})();</script>
+<script>/* VERSIÓN VISIBLE: refleja el index.html realmente cargado en ESTE equipo (se bumpea junto con sw.js). Así un iPad con versión vieja se ve de un vistazo. */window.APP_VERSION='v1-2026-11-11d';(function(){try{var c=document.getElementById('app-version-chip');if(c)c.textContent=window.APP_VERSION;}catch(e){}})();</script>
 <div class="toast" id="toast" aria-live="polite" aria-atomic="true"></div>
 
 <!-- LOGIN -->
@@ -4637,7 +4637,51 @@ document.addEventListener('change', function(e){
     const obs=document.getElementById(obsId);
     if(obs){ obs.focus(); obs.style.borderColor='var(--navy)'; }
   }
+  // Medicamento por condición (ALTA): al marcar/desmarcar una condición, re-pinta los campos de medicamento
+  if(cls==='sc-condicion' && typeof _renderMedPorCond==='function'){ try{ _renderMedPorCond(); }catch(_){} }
 });
+// Auto-crecer un textarea para que SIEMPRE se vea todo el texto (pedido de Carlos: el motivo de consulta
+// se "desaparecía" al escribir porque el textarea tenía altura fija y hacía scroll interno). Crece con el
+// contenido; nunca encoge por debajo de su min-height. Solo UI, no toca ningún dato.
+function _autoGrowTA(el){ try{ if(!el) return; el.style.height='auto'; el.style.height=Math.max(120, el.scrollHeight+2)+'px'; }catch(e){} }
+// Medicamento por CONDICIÓN (ALTA): por cada condición médica marcada (Diabetes, Hipertensión, …) muestra un
+// campo para el medicamento de ESA condición; lo demás va en "Otros medicamentos". Es una AYUDA DE CAPTURA:
+// el valor final se COMBINA en el MISMO campo antecedentes.medicamentos (string) → CERO cambio de datos/backend.
+window._medCondVals = window._medCondVals || {};
+function _renderMedPorCond(){
+  try{
+    var cont=document.getElementById('n-med-cond'); if(!cont) return;
+    window._medCondVals = window._medCondVals || {};
+    // conservar lo ya tecleado antes de re-pintar
+    cont.querySelectorAll('input[data-cond]').forEach(function(i){ window._medCondVals[i.getAttribute('data-cond')]=i.value; });
+    var conds=Array.prototype.slice.call(document.querySelectorAll('.sc-condicion:checked')).map(function(c){return c.value;})
+      .filter(function(v){ return v && v!=='Ninguna referida' && v!=='Otro'; });
+    if(!conds.length){ cont.style.display='none'; cont.innerHTML=''; return; }
+    cont.style.display='';
+    cont.innerHTML='<div style="font-size:12px;color:var(--gray-500);margin:2px 0 6px">💊 ¿Qué medicamento toma para cada condición? (opcional — así sabemos qué es para qué)</div>'+
+      conds.map(function(c){
+        var val=(window._medCondVals[c]||'');
+        var ce=escapeHTML(c).replace(/"/g,'&quot;');
+        return '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">'+
+          '<span style="flex:0 0 40%;font-size:13px;font-weight:600;color:var(--navy)">'+escapeHTML(c)+'</span>'+
+          '<input class="form-input" data-cond="'+ce+'" data-label="'+ce+'" type="text" placeholder="Medicamento y dosis" value="'+escapeHTML(val).replace(/"/g,'&quot;')+'" style="flex:1;font-size:14px;padding:10px"></div>';
+      }).join('');
+  }catch(e){}
+}
+// Combina los medicamentos por condición + "otros" en el string único que se guarda (antecedentes.medicamentos).
+function _medAltaCombinar(){
+  try{
+    var parts=[];
+    var cont=document.getElementById('n-med-cond');
+    if(cont){ cont.querySelectorAll('input[data-label]').forEach(function(inp){
+      var val=(inp.value||'').trim(); if(val) parts.push(inp.getAttribute('data-label')+': '+val);
+    }); }
+    var otros=((document.getElementById('n-medicamentos')||{}).value||'').trim();
+    var hayOtros = otros && !/^ningun[oa]s?$/i.test(otros);
+    if(parts.length){ if(hayOtros) parts.push('Otros: '+otros); return parts.join(' · '); }
+    return otros||'Ninguno';
+  }catch(e){ return ((document.getElementById('n-medicamentos')||{}).value||'').trim()||'Ninguno'; }
+}
 // Post-saneado: recalcular age si hay fechaNacimiento válida
 function sanearYRecalcularEdad(p){
   const s = sanearPaciente(p);
@@ -20090,6 +20134,7 @@ function showNuevoPaciente(){
   limpiarDirty();
   window._nuevoModoDerma=false;   // alta MSK normal
   window._nuevoEditPid=null;   // modo CREAR
+  window._medCondVals={};   // medicamento-por-condición: arranca limpio en cada alta nueva
   screenStack.push('screen-nuevo');showScreen('screen-nuevo',false);renderNuevoPaciente();
 }
 // Alta DERMATOFUNCIONAL: mismo formulario (ficha + historia básica), pero abre el apartado 🧴 ya
@@ -20100,6 +20145,7 @@ function showNuevoPacienteDerma(){
   limpiarDirty();
   window._nuevoModoDerma=true;
   window._nuevoEditPid=null;
+  window._medCondVals={};   // medicamento-por-condición: arranca limpio
   screenStack.push('screen-nuevo');showScreen('screen-nuevo',false);renderNuevoPaciente();
 }
 // EDITAR VALORACIÓN reusando el MISMO formulario de nuevo paciente, en modo edición.
@@ -20222,7 +20268,7 @@ function renderNuevoPaciente(){
     </div>
     <div class="form-group">
       <div class="form-field"><div class="form-label">Cirugías previas</div><input class="form-input" id="n-cirugias" type="text" placeholder="Ej: Apendicectomía 2018"><div class="chip-row"><button type="button" class="chip-oneshot" onclick="setCampoRapido('n-cirugias','Ninguna')">Sin cirugías previas relevantes</button></div></div>
-      <div class="form-field"><div class="form-label">Medicamentos actuales</div><input class="form-input" id="n-medicamentos" type="text" placeholder="Ej: Enalapril 10mg"><div class="chip-row"><button type="button" class="chip-oneshot" onclick="setCampoRapido('n-medicamentos','Ninguno')">No toma medicamentos</button></div></div>
+      <div class="form-field"><div class="form-label">Medicamentos actuales</div><div id="n-med-cond" style="display:none;margin-bottom:6px"></div><input class="form-input" id="n-medicamentos" type="text" placeholder="Otros medicamentos (o todos, si no los separas)"><div class="chip-row"><button type="button" class="chip-oneshot" onclick="setCampoRapido('n-medicamentos','Ninguno')">No toma medicamentos</button></div></div>
       <div class="form-field"><div class="form-label">🚫 Alergias <span class="req">*</span></div><input class="form-input" id="n-alergias" type="text" placeholder="Ej: Penicilina, AINES, látex. O escribir 'Ninguna'"><div class="chip-row"><button type="button" class="chip-oneshot" onclick="setCampoRapido('n-alergias','Ninguna')">Sin alergias conocidas</button></div></div>
       <div class="form-field"><div class="form-label" id="n-depo-label">Antecedentes deportivos</div><input class="form-input" id="n-deportivos" type="text" placeholder="Ej: Crossfit, natación..."><div class="chip-row"><button type="button" class="chip-quick" onclick="setCampoRapido('n-deportivos','No practica actividad deportiva')">No practica</button></div></div>
       <div class="form-field"><div class="form-label">Deporte y frecuencia</div><input class="form-input" id="n-deporte-freq" type="text" placeholder="Ej: Crossfit 4x semana"><div class="chip-row"><button type="button" class="chip-quick" onclick="setCampoRapido('n-deporte-freq','No aplica')">No aplica</button></div></div>
@@ -20280,7 +20326,7 @@ function renderNuevoPaciente(){
         <div class="form-label">¿Qué le pasa? Cuéntelo como lo dice el paciente <span class="req">*</span></div>
         <!-- Título del episodio (motivoConsulta): oculto; se genera solo (zona + desde) o de la 1ª línea del relato -->
         <input type="hidden" id="n-motivoconsulta">
-        <textarea class="form-input" id="n-padecimiento" autocapitalize="sentences" style="min-height:120px" placeholder="Escríbelo como lo cuenta el paciente…"></textarea>
+        <textarea class="form-input" id="n-padecimiento" autocapitalize="sentences" oninput="_autoGrowTA(this)" style="min-height:120px;overflow:hidden" placeholder="Escríbelo como lo cuenta el paciente…"></textarea>
         <div id="n-motivo-guia" style="background:#F0F5FB;border:1px solid #DCE8F5;border-radius:10px;padding:10px 12px;font-size:12px;color:var(--navy-light);margin:7px 14px 0;line-height:1.7">
           <b style="color:var(--navy)">Guíate con esto 👇</b><br>
           • ¿Cuál es la molestia principal y dónde la siente?<br>
@@ -20811,7 +20857,7 @@ function _prefillNuevoDesdePaciente(p){
   // Alergias es OBLIGATORIO: NO limpiar 'Ninguna'/'No' (blanquearlo bloquearía el guardado).
   S('n-alergias', (p.alergias!=null&&String(p.alergias).trim())?p.alergias:'');
   // Motivo (relato + estructurado)
-  S('n-padecimiento', hc.relato||m.padecimiento||'');
+  S('n-padecimiento', hc.relato||m.padecimiento||''); try{ _autoGrowTA(document.getElementById('n-padecimiento')); }catch(_){}
   S('n-motivoconsulta', p.motivoConsulta||'');
   S('n-dxmedico', (m.dxMedico&&m.dxMedico!=='No cuenta con diagnóstico médico referido')?m.dxMedico:( (p.dx&&p.dx!=='No cuenta con diagnóstico médico referido')?p.dx:'' ));
   S('n-mecanismo',_clean(m.mecanismo)); S('n-evolucion',_clean(m.evolucion));
@@ -20843,6 +20889,7 @@ function _prefillNuevoDesdePaciente(p){
   // Seguridad clínica
   setChecks('sc-implante', sc.implantes||[]); setChecks('sc-condicion', sc.condiciones||[]); setChecks('sc-bandera', sc.banderasRojas||[]);
   S('sc-implantes-detalle', sc.implantesDetalle||''); S('sc-condiciones-obs', sc.condicionesObs||''); S('sc-banderas-detalle', sc.banderasDetalle||'');
+  try{ window._medCondVals={}; _renderMedPorCond(); }catch(_){}   // medicamento por condición: pinta las filas según las condiciones del paciente
   try{ _actualizarAlertaSegVivo(); }catch(_){}   // LIVE: mostrar la caja al abrir en edición si ya trae seguridad
   // Consentimientos (solo reflejar; no se re-piden en edición)
   var _ck=function(id,on){ var el=document.getElementById(id); if(el) el.checked=!!on; };
@@ -21316,7 +21363,7 @@ async function guardarNuevoPaciente(){
     contraindicaciones:v('n-contra','Ninguna'),
     alergias,
     antecedentes:{patologicos:v('n-patologicos','Ninguno'),deportivos:v('n-deportivos','Ninguno'),
-      deporteFrecuencia:v('n-deporte-freq','No aplica'),cirugias:v('n-cirugias','Ninguna'),medicamentos:v('n-medicamentos','Ninguno')},
+      deporteFrecuencia:v('n-deporte-freq','No aplica'),cirugias:v('n-cirugias','Ninguna'),medicamentos:_medAltaCombinar()},
     motivo:{dxMedico:dxmedicoFinal, padecimiento, mecanismo:v('n-mecanismo','No especificado'),
       evolucion:v('n-evolucion','No especificado'),estudios:v('n-estudios','Pendiente'),hallazgos:'',
       // RED DE SEGURIDAD: espejo de la estructura del motivo DENTRO de motivo (que nunca se pierde en
@@ -22856,6 +22903,7 @@ function aplicarBorradorNuevo(data){
     if(data._nEvaVal!=null){ _nEvaVal=data._nEvaVal; var _r=document.getElementById('n-eva-row'); if(_r) _r.innerHTML=_nEvaBtnsHTML(); }
     if(data._implantes) setChecks('sc-implante',data._implantes);
     if(data._condiciones) setChecks('sc-condicion',data._condiciones);
+    try{ _renderMedPorCond&&_renderMedPorCond(); _autoGrowTA(document.getElementById('n-padecimiento')); }catch(_){}
     if(data._banderas) setChecks('sc-bandera',data._banderas);
     // FIX (auditoría): restaurar el motivo estructurado (_HC) y re-marcar sus chips (zona/lado/irrad).
     if(data._HC&&typeof data._HC==='object'){ window._HC=Object.assign({},data._HC); if(typeof _hcInit==='function') _hcInit(); if(typeof _hcRemarcarChips==='function') _hcRemarcarChips(); }
