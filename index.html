@@ -1371,7 +1371,7 @@ body.modo-oscuro .topbar{background:#141824}
 <body>
 <div id="sync-indicator" class="sync-indicator ok" style="display:none"></div>
 <div id="app-version-chip" title="Versión de la app en este equipo — toca para buscar actualización" onclick="try{_tapVersionChip()}catch(e){}"></div>
-<script>/* VERSIÓN VISIBLE: refleja el index.html realmente cargado en ESTE equipo (se bumpea junto con sw.js). Así un iPad con versión vieja se ve de un vistazo. */window.APP_VERSION='v1-2026-11-11d';(function(){try{var c=document.getElementById('app-version-chip');if(c)c.textContent=window.APP_VERSION;}catch(e){}})();</script>
+<script>/* VERSIÓN VISIBLE: refleja el index.html realmente cargado en ESTE equipo (se bumpea junto con sw.js). Así un iPad con versión vieja se ve de un vistazo. */window.APP_VERSION='v1-2026-11-11e';(function(){try{var c=document.getElementById('app-version-chip');if(c)c.textContent=window.APP_VERSION;}catch(e){}})();</script>
 <div class="toast" id="toast" aria-live="polite" aria-atomic="true"></div>
 
 <!-- LOGIN -->
@@ -6182,6 +6182,20 @@ function renderAgenda(){
           +'<div style="flex:1;min-width:0"><div style="font-size:15px;font-weight:800;color:#117A3D;letter-spacing:-.01em">Equipos al día ('+_sa.total+')</div>'
           +'<div style="font-size:12.5px;color:#117A3D;margin-top:1px;font-weight:600">🟢 Todos sincronizados y en la última versión — toca para ver el tablero →</div></div>'
           +'<svg width="18" height="18" fill="none" stroke="#117A3D" stroke-width="2.5" viewBox="0 0 24 24" style="flex-shrink:0"><polyline points="9 18 15 12 9 6"/></svg></div>';
+      }
+    }
+  }catch(_){}
+  // REVISIÓN DIARIA DE CONTRAINDICACIONES (supervisor): banner si hay activos con enfermedad/implante
+  // detectado en el expediente que aún no tiene su alerta. Toca → modal con la lista para revisar y confirmar.
+  try{
+    if(typeof esSupervisorUI==='function' && esSupervisorUI()){
+      var _cl=_contraCountActivos();
+      if(_cl && _cl.length){
+        html+='<div onclick="try{_contraModalRevisar();}catch(_){}" style="margin-bottom:12px;padding:14px 16px;border-radius:16px;background:linear-gradient(135deg,#FFF4E5,#FFE8CC);border:1.5px solid #F5C77E;cursor:pointer;display:flex;align-items:center;gap:13px;box-shadow:0 2px 10px rgba(120,80,20,.12)">'
+          +'<div style="font-size:28px;line-height:1">⚠️</div>'
+          +'<div style="flex:1;min-width:0"><div style="font-size:15px;font-weight:800;color:#8A5A00;letter-spacing:-.01em">Revisar contraindicaciones ('+_cl.length+')</div>'
+          +'<div style="font-size:12.5px;color:#8A5A00;margin-top:1px;font-weight:600">Pacientes con una enfermedad/implante detectado sin alerta marcada — toca para revisar y confirmar →</div></div>'
+          +'<svg width="18" height="18" fill="none" stroke="#8A5A00" stroke-width="2.5" viewBox="0 0 24 24" style="flex-shrink:0"><polyline points="9 18 15 12 9 6"/></svg></div>';
       }
     }
   }catch(_){}
@@ -12039,6 +12053,9 @@ function renderExpediente(tab='historia'){
   // Alerta de seguridad clínica — visible en TODOS los tabs del expediente (incluida SOAP/notas).
   // Caja rica y específica (implantes, condiciones, contraindicaciones, banderas, alergias); roja si es grave.
   html+=_soapSeguridadHTML(p);
+  // Revisión diaria de contraindicaciones: propone marcar enfermedades/implantes detectados en el expediente
+  // (del propio paciente) que aún no tienen alerta. Se confirma con 1 toque. Vacío si no hay nada por revisar.
+  html+='<div id="contra-exp-wrap">'+_contraBannerExpediente(p)+'</div>';
 
   if(tab==='historia'){
     if(hasContra) html+=`<div class="contraindication-box">⚠️ ${escapeHTML(p.contraindicaciones)}</div>`;
@@ -13979,6 +13996,149 @@ function _soapSeguridadHTML(p){
     +'<div style="font-size:11px;color:#8A6D1A;margin-top:7px;font-weight:600">Verifica antes de aplicar agentes físicos (tecar, US, ondas, electro, termo, láser) o ejercicio de carga.</div>'
     +'</div>';
 }
+// ══════════════════════════════════════════════════════════════════════════════
+// REVISIÓN DIARIA DE CONTRAINDICACIONES (2026-11-11) — "propone y confirma".
+// Detecta enfermedades/implantes de riesgo en el texto del expediente (dx + antecedentes
+// patológicos/cirugías/medicamentos + motivo) que NO están reflejados en seguridadClinica,
+// FILTRANDO antecedentes familiares, y los PROPONE para confirmar con 1 toque → se escriben a
+// seguridadClinica (de donde _soapSeguridadHTML ya saca la alerta). NUNCA auto-escribe.
+// Corre al abrir el expediente (todos los días, en el acto) y en un banner del supervisor.
+function _contraNorm(s){ try{ return String(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,''); }catch(_){ return String(s||'').toLowerCase(); } }
+// Términos de antecedente FAMILIAR (sin 'mama' a propósito: "cáncer de mama" es del paciente).
+var _CONTRA_FAM=/(pap[ao]|abuel|herman|\bt[ií]os?\b|\bt[ií]as?\b|prim[oa]|familiar|hereditar|heredofamil|espos[oa]|\bhij[oa]s?\b|\bpadres?\b|\bmadre\b|abuelit|niet[oa]|sobrin|bisabuel|por parte|parte de)/;
+var _CONTRA_DEFS=[
+  {cat:'MARCAPASO', rx:/marcapas|desfibrilador|\bdai\b|cardiodesfibril|resincronizador/, tipo:'impl', val:'Implante electrónico', ancla:/marcapas|desfibrilador|\bdai\b|implante electr/, nota:'Marcapaso/DAI: NO electroterapia/tecar/diatermia/US/ondas cerca del dispositivo.'},
+  {cat:'ANTICOAG', rx:/anticoagul|warfarin|acenocumar|sintrom|xarelto|rivaroxaban|apixaban|eliquis|dabigatran|pradaxa|clopidogrel|heparin/, tipo:'cond', val:'Anticoagulantes', ancla:/anticoagul|sintrom|xarelto|warfarin|eliquis|heparin|clopidogrel|acenocumar/, nota:'Anticoagulación: precaución con punción seca/MEP y masaje profundo (riesgo de hematoma).'},
+  {cat:'METAL', rx:/osteosintesis|\bplacas?\b|tornillo|\bclavos?\b|protesis|artrodesis|fijador|material de osteo|endoprotesis/, tipo:'impl', valFn:function(b){ return /protesis|endoprotesis|artrodesis/.test(b)?'Prótesis metálica':'Material de osteosíntesis'; }, ancla:/osteosintesis|protesis|\bplaca|tornillo|\bclavo|\bmetal|implante|artrodesis/, nota:'Osteosíntesis/implante metálico: NO radiofrecuencia/diatermia/tecar térmica/US térmico sobre el material.'},
+  {cat:'CANCER', rx:/\bcancer|oncolog|carcinoma|linfoma|leucemia|metastas|mastectom|melanoma|\btumor|quimioterap|radioterap|tamoxifen|letrozol/, tipo:'cond', val:'Antecedente de cáncer', ancla:/cancer|oncolog|tumor|melanoma|linfoma|leucemia|metastas|mastectom/, nota:'Antecedente oncológico: NO termoterapia/tecar/US/ondas sobre la zona sin aval; confirmar estado.'},
+  {cat:'EMBARAZO', rx:/\bembaraz|gestant|semanas de gestac/, tipo:'cond', val:'Embarazo', ancla:/embaraz|gestant/, nota:'Embarazo: NO tecar/diatermia/US/electro/ondas sobre tronco/abdomen/zona lumbopélvica.'},
+  {cat:'TROMBO', rx:/trombos|\btvp\b|\btep\b|tromboembol|embolia pulmon/, tipo:'cond', val:'Alteración vascular', ancla:/trombos|\btvp\b|\btep\b|vascular|tromboembol/, nota:'Antecedente trombótico (TVP/TEP): NO masaje/compresión/termo en la zona; valorar.'},
+  {cat:'DIABETES', rx:/\bdiabet|\bdm2\b|dm tipo|insulinodepend/, tipo:'cond', val:'Diabetes', ancla:/diabet/, nota:'Diabetes: precaución con termo/crioterapia por alteración de sensibilidad; vigilar piel.'},
+  {cat:'EPILEPSIA', rx:/epileps|convulsi/, tipo:'cond', val:'Epilepsia', ancla:/epileps|convulsi/, nota:'Epilepsia: precaución con electroestimulación; valorar.'}
+];
+function _contraBlob(p){
+  // OJO: antecedentes.patologicos es el campo "Antecedentes HEREDOFAMILIARES" (familia), NO del paciente
+  //  → se EXCLUYE a propósito. Lo del propio paciente vive en dx + cirugías + medicamentos + motivo
+  //  (+ seguridadClinica.condicionesObs, que no se re-escanea porque ya está marcado).
+  var parts=[]; var dx=p&&p.dx;
+  if(dx&&typeof dx==='object') parts.push(Object.keys(dx).map(function(k){return dx[k];}).join(' ')); else parts.push(String(dx||''));
+  var a=(p&&p.antecedentes)||{};
+  if(a&&typeof a==='object') ['cirugias','medicamentos'].forEach(function(k){ parts.push(String(a[k]||'')); });
+  var m=p&&p.motivo;
+  if(m&&typeof m==='object') parts.push(Object.keys(m).map(function(k){return m[k];}).join(' ')); else parts.push(String(m||''));
+  return _contraNorm(parts.join(' || '));
+}
+function _contraSegText(p){
+  var sc=(p&&p.seguridadClinica)||{}; var t='';
+  try{ t=JSON.stringify(sc); }catch(_){}
+  t+=' '+((p&&p.contraindicaciones)||'')+' '+((p&&p.planTto&&p.planTto.contraindicaciones)||'');
+  return _contraNorm(t);
+}
+function _contraDescSet(){ try{ return JSON.parse(localStorage.getItem('sinergia_contra_desc')||'{}')||{}; }catch(_){ return {}; } }
+function _contraDescartado(pid,cat){ var m=_contraDescSet(); return !!(m[pid]&&m[pid][cat]); }
+// Propuestas para un paciente: riesgo del PROPIO paciente, sin reflejar en seguridadClinica y sin descartar.
+function _contraDetect(p){
+  if(!p||p._activoEliminado||p.eliminado) return [];
+  var blob=_contraBlob(p); if(!blob.replace(/[^a-z]/g,'')) return [];
+  var seg=_contraSegText(p); var out=[];
+  _CONTRA_DEFS.forEach(function(d){
+    if(_contraDescartado(p.id,d.cat)) return;
+    if(d.ancla.test(seg)) return;                         // ya está en Seguridad clínica
+    var re=new RegExp(d.rx.source,'g'), mm, hits=[], algunoPropio=false;
+    while((mm=re.exec(blob))){ var i=mm.index; var frag=blob.slice(Math.max(0,i-45), i+45); var fam=_CONTRA_FAM.test(frag); hits.push(frag); if(!fam) algunoPropio=true; }
+    if(!hits.length) return;
+    if(!algunoPropio) return;                              // todos los hits son de familiar → no aplica
+    var val=d.val||(d.valFn?d.valFn(blob):'');
+    out.push({cat:d.cat, tipo:d.tipo, val:val, nota:d.nota, frag:(hits.find(function(f){return !_CONTRA_FAM.test(f);})||hits[0]).trim()});
+  });
+  return out;
+}
+// Escribe la contraindicación confirmada en seguridadClinica (merge, preserva lo existente) + guarda verificado.
+async function _contraConfirmar(pid,cat){
+  var p=(currentPatient&&currentPatient.id===pid)?currentPatient:(Array.isArray(patientsDB)?patientsDB.find(function(x){return x&&x.id===pid;}):null);
+  if(!p){ showToast('No se encontró el paciente.','warning'); return; }
+  var prop=_contraDetect(p).find(function(x){return x.cat===cat;}); if(!prop){ return; }
+  if(!p.seguridadClinica||typeof p.seguridadClinica!=='object'||Array.isArray(p.seguridadClinica)) p.seguridadClinica={};
+  var sc=p.seguridadClinica;
+  if(!Array.isArray(sc.implantes)) sc.implantes=[];
+  if(!Array.isArray(sc.condiciones)) sc.condiciones=[];
+  if(!Array.isArray(sc.banderasRojas)) sc.banderasRojas=[];
+  var arr=(prop.tipo==='impl')?sc.implantes:sc.condiciones;
+  if(arr.indexOf(prop.val)<0) arr.push(prop.val);
+  var campoObs=(prop.tipo==='impl')?'implantesDetalle':'condicionesObs';
+  var obs=String(sc[campoObs]||'').trim();
+  if(_segNegDefault(obs)) obs='';
+  if(obs.toLowerCase().indexOf(prop.nota.toLowerCase().slice(0,24))<0) obs=obs?(obs+' · '+prop.nota):prop.nota;
+  sc[campoObs]=obs;
+  try{ sc.tienePrecaucion = calcularTienePrecaucion(sc) || !!sc.tienePrecaucion || true; }catch(_){ sc.tienePrecaucion=true; }
+  var ahora=new Date(); var fh=ahora.toLocaleDateString('es-MX')+' '+ahora.toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'});
+  var quien=(typeof currentUser!=='undefined'&&currentUser&&currentUser.name)?currentUser.name:'';
+  p.fechaActualizacion=fh; p.ultimoUsuario=quien;
+  if(!Array.isArray(p.historialCambios)) p.historialCambios=[];
+  p.historialCambios.push({usuario:quien,seccion:'seguridadClinica',fecha:fh,accion:'Marcó contraindicación detectada',antes:'',despues:prop.val+' — '+prop.nota});
+  try{ var idx=patientsDB.findIndex(function(x){return x&&x.id===p.id;}); if(idx>=0) patientsDB[idx]=p; }catch(_){}
+  var res=null;
+  try{ res=await saveDB('pts',[p],{camposHist:['seguridadClinica','historialCambios','fechaActualizacion','ultimoUsuario']}); }catch(e){ res={ok:false,error:(e&&e.message)||String(e)}; }
+  if(res&&res.ok) showToast('✅ Contraindicación marcada en Seguridad clínica','success');
+  else if(res&&res.pendiente) showToast('📴 Sin conexión — quedó en este equipo y se sincronizará.','warning');
+  else showToast('⚠️ No se pudo confirmar el guardado. Reintenta con conexión.','warning');
+  _contraRefrescar(pid);
+}
+function _contraDescartar(pid,cat){
+  var m=_contraDescSet(); if(!m[pid]) m[pid]={}; m[pid][cat]=1;
+  try{ localStorage.setItem('sinergia_contra_desc', JSON.stringify(m)); }catch(_){}
+  _contraRefrescar(pid);
+}
+function _contraRefrescar(pid){
+  try{ var w=document.getElementById('contra-exp-wrap'); if(w&&currentPatient&&currentPatient.id===pid){ renderExpediente(currentTab||'historia'); return; } }catch(_){}
+  try{ window._contraCountCache=null; if(document.getElementById('contra-modal-wrap')) _contraModalRevisar(); }catch(_){}
+  try{ if(document.getElementById('screen-agenda')&&document.getElementById('screen-agenda').classList.contains('active')) renderAgenda(); }catch(_){}
+}
+// Banner dentro del expediente (todas las pestañas). Se ve al abrir cualquier paciente.
+function _contraBannerExpediente(p){
+  var props=_contraDetect(p); if(!props.length) return '';
+  var filas=props.map(function(x){
+    return '<div style="background:#fff;border:1px solid #F0D9A8;border-radius:10px;padding:8px 10px;margin-top:7px">'
+      +'<div style="font-size:12.5px;color:#7A4E00;font-weight:700">'+escapeHTML(x.nota)+'</div>'
+      +'<div style="font-size:11px;color:#8a7a55;margin-top:2px">Detectado en el expediente: “…'+escapeHTML(x.frag)+'…”</div>'
+      +'<div style="display:flex;gap:7px;margin-top:7px">'
+      +'<button data-pid="'+escapeAttr_(p.id)+'" data-cat="'+x.cat+'" onclick="_contraConfirmar(this.dataset.pid,this.dataset.cat)" style="background:#117A3D;border:none;color:#fff;border-radius:14px;padding:6px 13px;font-size:12px;font-weight:700;cursor:pointer">✓ Confirmar y marcar</button>'
+      +'<button data-pid="'+escapeAttr_(p.id)+'" data-cat="'+x.cat+'" onclick="_contraDescartar(this.dataset.pid,this.dataset.cat)" style="background:#F3F4F6;border:1px solid #D1D5DB;color:#555;border-radius:14px;padding:6px 13px;font-size:12px;font-weight:600;cursor:pointer">✕ No aplica</button>'
+      +'</div></div>';
+  }).join('');
+  return '<div style="margin:0 14px 12px;background:#FFF7E6;border:1.5px solid #E0B000;border-left:6px solid #E0B000;border-radius:12px;padding:11px 14px">'
+    +'<div style="font-size:12px;font-weight:800;color:#8A5A00;text-transform:uppercase;letter-spacing:.4px">⚠️ POSIBLES CONTRAINDICACIONES SIN MARCAR ('+props.length+')</div>'
+    +'<div style="font-size:11px;color:#8a7a55;margin-top:3px">La app detectó estas condiciones en el expediente que aún no tienen su alerta. Confirma las que apliquen (o descártalas si son de un familiar).</div>'
+    +filas+'</div>';
+}
+// Conteo para el banner del supervisor (activos con propuestas). Cacheado.
+function _contraCountActivos(){
+  if(window._contraCountCache && (Date.now()-window._contraCountCache.ts<60000)) return window._contraCountCache.list;
+  var list=[];
+  try{ (Array.isArray(patientsDB)?patientsDB:[]).forEach(function(p){ if(!p||String(p.id||'').indexOf('mig_pac_')===0) return; var pr=_contraDetect(p); if(pr.length) list.push({id:p.id,name:p.name,ter:p.terapeuta||p.terapeutaSeguimiento||'',n:pr.length}); }); }catch(_){}
+  window._contraCountCache={ts:Date.now(),list:list};
+  return list;
+}
+// Modal del supervisor: lista de activos con contraindicaciones por revisar (abrir expediente para confirmar).
+function _contraModalRevisar(){
+  var list=_contraCountActivos();
+  var cuerpo=list.length? list.sort(function(a,b){return b.n-a.n;}).map(function(x){
+    return '<div style="display:flex;align-items:center;gap:10px;padding:9px 4px;border-bottom:1px solid #eef1f5">'
+      +'<div style="flex:1;min-width:0"><div style="font-weight:700;color:#14233d;font-size:13.5px">'+escapeHTML(x.name||'(sin nombre)')+'</div>'
+      +'<div style="font-size:11px;color:#8a7a55">'+x.n+' posible'+(x.n!==1?'s':'')+(x.ter?(' · '+escapeHTML(x.ter)):'')+'</div></div>'
+      +'<button data-pid="'+escapeAttr_(x.id)+'" onclick="_contraAbrirDesdeModal(this.dataset.pid)" style="background:var(--gold);border:none;color:var(--navy-dark);border-radius:14px;padding:6px 13px;font-size:12px;font-weight:700;cursor:pointer">Revisar →</button></div>';
+  }).join('') : '<div style="padding:24px 8px;text-align:center;color:#117A3D;font-weight:700">✅ Nada por revisar — todo al día.</div>';
+  var ov=document.getElementById('contra-modal-wrap');
+  if(!ov){ ov=document.createElement('div'); ov.id='contra-modal-wrap'; document.body.appendChild(ov); }
+  ov.innerHTML='<div onclick="if(event.target===this)_contraCerrarModal()" style="position:fixed;inset:0;background:rgba(10,20,40,.5);z-index:9999;display:flex;align-items:flex-end;justify-content:center">'
+    +'<div style="background:#fff;width:100%;max-width:560px;max-height:85vh;overflow:auto;border-radius:18px 18px 0 0;padding:16px 16px 26px">'
+    +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px"><div style="font-size:16px;font-weight:800;color:#1B3A6B">⚠️ Revisar contraindicaciones ('+list.length+')</div>'
+    +'<button onclick="_contraCerrarModal()" style="background:transparent;border:none;font-size:22px;color:#999;cursor:pointer;line-height:1">×</button></div>'
+    +'<div style="font-size:11.5px;color:#5b6572;margin-bottom:8px">Pacientes activos con una enfermedad/implante detectado en su expediente que aún no tiene su alerta. Abre cada uno y confirma (o descarta) desde la caja amarilla.</div>'
+    +cuerpo+'</div></div>';
+}
+function _contraCerrarModal(){ var ov=document.getElementById('contra-modal-wrap'); if(ov) ov.remove(); }
+function _contraAbrirDesdeModal(pid){ _contraCerrarModal(); try{ FST_abrirPacienteDesdeLista(pid); }catch(_){ try{ openExpediente(pid); }catch(__){} } }
 // LIVE (2026-09-30): caja de seguridad que se actualiza MIENTRAS se llena la historia (form content-nuevo).
 // Lee los checkboxes/campos del formulario y reusa _soapSeguridadHTML con un objeto armado al vuelo, para
 // que "🛑 CUIDADO / seguridad clínica" aparezca al momento (no solo después de guardar).
