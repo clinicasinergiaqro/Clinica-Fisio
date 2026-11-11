@@ -2107,16 +2107,27 @@
     { key:'tob_df',   grupo:'Tobillo', mov:'Dorsiflexión',  pos:'Supino',        agg:'max', ref:20,  lim:10,  normTxt:'0–20°',
       guia:'Cámara al COSTADO del pie. Lleva la punta hacia la espinilla.' },
     { key:'tob_pf',   grupo:'Tobillo', mov:'Plantiflexión', pos:'Supino',        agg:'max', ref:50,  lim:40,  normTxt:'0–50°',
-      guia:'Cámara al COSTADO del pie. Apunta la punta del pie hacia abajo.' }
+      guia:'Cámara al COSTADO del pie. Apunta la punta del pie hacia abajo.' },
+    // ── Miembro superior (plano sagital, cámara al COSTADO del brazo) ──
+    // Codo es fiable en 2D (hombro-codo-muñeca, todos landmarks sólidos). Muñeca es una ESTIMACIÓN
+    // (depende de ver bien la mano/índice). El fisio elige el movimiento y lo hace solo → la app mide la magnitud.
+    { key:'cod_flex', grupo:'Codo',    mov:'Flexión',       pos:'Sentado/De pie', agg:'max', ref:145, lim:130, normTxt:'0–145°',
+      guia:'Cámara al COSTADO del brazo. Brazo pegado al cuerpo; dobla el codo llevando la mano al hombro.' },
+    { key:'cod_ext',  grupo:'Codo',    mov:'Extensión',     pos:'Sentado/De pie', agg:'min', ref:0,   lim:5, defic:true, normTxt:'0° (déficit ≤5°)',
+      guia:'Cámara al COSTADO del brazo. Estira el codo al máximo (mide el déficit de extensión).' },
+    { key:'mun_flex', grupo:'Muñeca',  mov:'Flexión',       pos:'Sentado',        agg:'max', ref:80,  lim:60,  normTxt:'0–80°',
+      guia:'Antebrazo apoyado, MANO LIBRE y visible, cámara al COSTADO. Dobla la muñeca llevando la palma hacia el antebrazo.' },
+    { key:'mun_ext',  grupo:'Muñeca',  mov:'Extensión',     pos:'Sentado',        agg:'max', ref:70,  lim:50,  normTxt:'0–70°',
+      guia:'Antebrazo apoyado, MANO LIBRE y visible, cámara al COSTADO. Lleva el dorso de la mano hacia arriba/atrás.' }
   ];
   var GONIO_CITA = 'AAOS; Norkin & White, Measurement of Joint Motion.';
-  var GONIO_JOINTS = ['Cadera','Rodilla','Tobillo'];
+  var GONIO_JOINTS = ['Cadera','Rodilla','Tobillo','Codo','Muñeca'];
   function _gonioMovs(grupo){ return GONIO_CAT.filter(function(m){ return m.grupo===grupo; }); }
   function _gonioEntry(grupo, mov){ for(var i=0;i<GONIO_CAT.length;i++){ if(GONIO_CAT[i].grupo===grupo && GONIO_CAT[i].mov===mov) return GONIO_CAT[i]; } return null; }
   function _gonioPts(lado){
     return (lado==='izq')
-      ? { S:11, H:23, K:25, A:27, F:31 }
-      : { S:12, H:24, K:26, A:28, F:32 };
+      ? { S:11, H:23, K:25, A:27, F:31, E:13, W:15, Ix:19 }
+      : { S:12, H:24, K:26, A:28, F:32, E:14, W:16, Ix:20 };
   }
   // Ángulo del movimiento seleccionado, en convención clínica (0° neutro), desde landmarks 2D de imagen.
   function calcularGonio(lm, grupo, mov, lado){
@@ -2135,6 +2146,14 @@
       if(!(v(P.K)&&v(P.A)&&v(P.F))) return { ok:false, val:null };
       var ia=_ang2D(lm[P.K], lm[P.A], lm[P.F]);                            // interior pierna–tobillo–pie
       return (mov==='Dorsiflexión') ? { ok:true, val: Math.max(0, 90-ia) } : { ok:true, val: Math.max(0, ia-90) };
+    }
+    if(grupo==='Codo'){
+      if(!(v(P.S)&&v(P.E)&&v(P.W))) return { ok:false, val:null };
+      return { ok:true, val: 180 - _ang2D(lm[P.S], lm[P.E], lm[P.W]) };    // hombro–codo–muñeca; flexión (ext = déficit)
+    }
+    if(grupo==='Muñeca'){
+      if(!(v(P.E)&&v(P.W)&&v(P.Ix))) return { ok:false, val:null };
+      return { ok:true, val: Math.max(0, 180 - _ang2D(lm[P.E], lm[P.W], lm[P.Ix])) };  // antebrazo–muñeca–mano; el fisio elige flex/ext
     }
     return { ok:false, val:null };
   }
@@ -2179,6 +2198,8 @@
     var P=_gonioPts(g.sel.lado), vtx, ea, eb;
     if(g.sel.grupo==='Cadera'){ vtx=P.H; ea=P.S; eb=P.K; }
     else if(g.sel.grupo==='Rodilla'){ vtx=P.K; ea=P.H; eb=P.A; }
+    else if(g.sel.grupo==='Codo'){ vtx=P.E; ea=P.S; eb=P.W; }
+    else if(g.sel.grupo==='Muñeca'){ vtx=P.W; ea=P.E; eb=P.Ix; }
     else { vtx=P.A; ea=P.K; eb=P.F; }
     if(!(_vis(lm,vtx)&&_vis(lm,ea)&&_vis(lm,eb))) return;
     var V=lm[vtx], A=lm[ea], B=lm[eb], vx=V.x*w, vy=V.y*h;
@@ -2319,7 +2340,7 @@
       : 'Todos los arcos medidos se encuentran dentro de rangos de referencia.';
     var cont=document.getElementById('bio-vista-resumen');
     cont.innerHTML =
-      '<h3>Resumen — Goniometría (miembro inferior)</h3>'
+      '<h3>Resumen — Goniometría de cámara</h3>'
       + '<div style="color:#9BA3B5;font-size:13px;margin-bottom:10px">📷 Cámara · plano sagital · '+arr.length+' medida'+(arr.length===1?'':'s')+'</div>'
       + '<table class="bio-tabla-res"><thead><tr><th>Articulación / movimiento</th><th style="text-align:center">Der</th><th style="text-align:center">Izq</th><th style="text-align:center">Normal</th></tr></thead><tbody>'+filas+'</tbody></table>'
       + '<div style="margin-top:12px;background:rgba(255,255,255,.05);border-radius:10px;padding:10px 12px;font-size:13px;color:#cfd6e4">'+esc(interp)+'</div>'
@@ -2390,12 +2411,12 @@
     var doc=new jsPDFCtor({unit:'pt', format:'letter'});
     var W=doc.internal.pageSize.getWidth(), M=40;
     var NAVY=[27,58,107], GOLD=[201,168,76], VERDE=[46,125,82], GRIS=[120,128,148], AMBAR=[180,83,9], INK=[31,41,55];
-    try{ doc.setProperties({ title:'Goniometría — '+((p&&p.name)||''), author:'Clínica Sinergia', subject:'Goniometría de miembro inferior' }); }catch(e){}
+    try{ doc.setProperties({ title:'Goniometría — '+((p&&p.name)||''), author:'Clínica Sinergia', subject:'Goniometría (plano sagital)' }); }catch(e){}
     doc.setFillColor(NAVY[0],NAVY[1],NAVY[2]); doc.rect(0,0,W,74,'F');
     doc.setFillColor(GOLD[0],GOLD[1],GOLD[2]); doc.rect(0,74,W,4,'F');
     var lg=(typeof window!=='undefined'&&window.BIO_LOGO_DATAURL)?window.BIO_LOGO_DATAURL:null; if(lg){ try{ doc.addImage(lg,'PNG',W-M-54,10,54,54); }catch(e){} }
     doc.setTextColor(255,255,255); doc.setFont('helvetica','bold'); doc.setFontSize(18); doc.text('Clínica Sinergia', M, 34);
-    doc.setFont('helvetica','normal'); doc.setFontSize(11); doc.text('Reporte de goniometría — Miembro inferior (plano sagital)', M, 55);
+    doc.setFont('helvetica','normal'); doc.setFontSize(11); doc.text('Reporte de goniometría — Rangos de movimiento (plano sagital)', M, 55);
     var y=100;
     doc.setTextColor(INK[0],INK[1],INK[2]); doc.setFontSize(11);
     doc.text('Paciente: '+((p&&p.name)||'—'), M, y); doc.text('Fecha: '+(s.fecha||''), W-M, y, {align:'right'}); y+=16;
@@ -2441,6 +2462,9 @@
       html += '<div style="text-align:center;padding:22px;color:var(--gray-400);font-size:13px">Sin mediciones — toca <b>▶️ Nueva medición ROM</b> para empezar.<br>Mide ROM de brazos (codo y hombro) o analiza una SENTADILLA (valgo de rodilla), con la cámara o subiendo un video.</div>';
       return html;
     }
+    if(lista.length>=2){
+      html += '<button style="width:100%;margin-bottom:12px;font-size:14px;font-weight:800;border:none;border-radius:var(--radius);padding:12px;cursor:pointer;background:var(--navy);color:#fff" onclick="BIO_comparar()">⚖️ Comparar antes / después</button>';
+    }
     var orden = lista.slice().reverse(); // más reciente primero
     html += orden.map(function(s){
       if(s.tipo==='sentadilla') return tarjetaSentHTML(s);
@@ -2470,6 +2494,129 @@
     }).join('');
     return html;
   }
+
+  // ── COMPARADOR "antes / después" (solo lectura: 2 mediciones lado a lado) ───
+  // Elige dos sesiones de p.biomecanica y muestra los videos + los grados con Δ. NO toca el guardado.
+  var _CMP_TIPO={ rom:'ROM de brazos', sentadilla:'Sentadilla', marcha:'Marcha', goniometria:'Goniometría' };
+  function _cmpTipoLeg(s){ return (s && _CMP_TIPO[s.tipo]) || (s && s.tipo) || 'Medición'; }
+  function _cmpSesiones(){
+    var p=(typeof currentPatient!=='undefined')?currentPatient:null;
+    var lista=(p && Array.isArray(p.biomecanica)) ? p.biomecanica.filter(function(s){ return s && !s.eliminado && s.id; }) : [];
+    lista.sort(function(a,b){ return String(b.fechaHoraISO||b.id||'').localeCompare(String(a.fechaHoraISO||a.id||'')); }); // más reciente primero
+    return lista;
+  }
+  // Extrae de una sesión las filas comparables {k,etq,num,disp} según su tipo.
+  function _cmpExtraer(s){
+    var out=[], med=Array.isArray(s.medidas)?s.medidas:[];
+    if(s.tipo==='goniometria'){
+      med.forEach(function(m){ var l=/izq/i.test(m.lado)?'Izq':'Der';
+        out.push({ k:(m.key||'')+'_'+m.lado, etq:(m.grupo||'')+' '+(m.mov||'')+' '+l, num:(m.grado==null?null:m.grado), disp:_gonioFmtGrado(m) }); });
+    } else if(s.tipo==='sentadilla'){
+      var L={ fppa_izq:'Valgo FPPA Izq', fppa_der:'Valgo FPPA Der', mkd_izq:'Desplaz. medial Izq', mkd_der:'Desplaz. medial Der', sep_rodillas:'Separación rodillas', tronco_lateral:'Tronco lateral', sacro_descenso:'Descenso del sacro' };
+      med.forEach(function(m){ var etq=L[m.key]; if(!etq || m.media==null) return;
+        var r=(m.unidad==='ratio'), suf=r?'':(m.unidad==='%'?'%':'°');
+        out.push({ k:m.key, etq:etq, num:m.media, disp:(r?m.media.toFixed(2):(_r1(m.media)+suf)) }); });
+    } else if(s.tipo==='marcha'){
+      if(s.cadencia!=null) out.push({ k:'cadencia', etq:'Cadencia', num:s.cadencia, disp:s.cadencia+' pasos/min' });
+      if(s.velocidad!=null) out.push({ k:'velocidad', etq:'Velocidad', num:s.velocidad, disp:s.velocidad+' m/s' });
+      var LM={ stance_izq:'Fase apoyo Izq', stance_der:'Fase apoyo Der', rod_pico_izq:'Rodilla pico Izq', rod_pico_der:'Rodilla pico Der', cadera_rom_izq:'Cadera ROM Izq', cadera_rom_der:'Cadera ROM Der' };
+      med.forEach(function(m){ var etq=LM[m.key]; if(!etq || m.valor==null) return;
+        var u=(m.unidad==='m')?' m':(m.unidad==='%'?'%':(m.unidad==='pasos/min'?'':'°'));
+        out.push({ k:m.key, etq:etq, num:m.valor, disp:m.valor+u }); });
+    } else { // rom
+      med.forEach(function(m){ var l=/izq/i.test(m.lado)?'Izq':'Der', etq=(m.grupo||'')+' '+(m.mov||'')+' '+l, num, disp;
+        if(m.grupo==='Codo'){ num=(m.max!=null?m.max:m.media); disp=(m.min!=null&&m.max!=null)?(m.min+'°–'+m.max+'°'):(num!=null?num+'°':'—'); }
+        else { num=(m.media!=null?m.media:m.max); disp=(num!=null?num+'°':'—'); }
+        out.push({ k:m.key||etq, etq:etq, num:(num==null?null:num), disp:disp }); });
+    }
+    return out;
+  }
+  function _cmpVid(s, etq){
+    var fecha=s?esc(s.fecha):'—';
+    if(s && s.video && s.video.url){
+      return '<div class="cmp-vpanel"><div class="cmp-vlab">'+etq+' · '+fecha+'</div>'
+        + '<video controls preload="none" playsinline src="'+esc(s.video.url)+'" style="width:100%;min-height:160px;border-radius:8px;background:#0d1626;display:block"></video></div>';
+    }
+    var motivo=(s && s.tipo==='goniometria') ? 'el goniómetro no graba video' : 'sin video en esta medición';
+    return '<div class="cmp-vpanel"><div class="cmp-vlab">'+etq+' · '+fecha+'</div><div class="cmp-novid">— '+motivo+' —</div></div>';
+  }
+  function _cmpTablaHTML(A,B){
+    if(!A || !B) return '<div style="color:#9BA3B5;font-size:12px">Elige las dos mediciones.</div>';
+    var ra=_cmpExtraer(A), rb=_cmpExtraer(B), ma={}, mb={}, keys=[], seen={};
+    ra.forEach(function(r){ ma[r.k]=r; if(!seen[r.k]){ seen[r.k]=1; keys.push(r.k); } });
+    rb.forEach(function(r){ mb[r.k]=r; if(!seen[r.k]){ seen[r.k]=1; keys.push(r.k); } });
+    if(!keys.length) return '<div style="color:#9BA3B5;font-size:12px;padding:8px 0">Estas mediciones no tienen grados para comparar.</div>';
+    var filas=keys.map(function(k){ var a=ma[k], b=mb[k];
+      var etq=(a&&a.etq)||(b&&b.etq)||k;
+      var da=a?esc(a.disp):'<span class="cmp-eq">—</span>', db=b?esc(b.disp):'<span class="cmp-eq">—</span>';
+      var dcell='<span class="cmp-eq">—</span>';
+      if(a&&b&&a.num!=null&&b.num!=null){ var d=Math.round((b.num-a.num)*10)/10;
+        if(d===0){ dcell='<span class="cmp-eq">0</span>'; }
+        else { var cls=d>0?'cmp-up':'cmp-dn', ar=d>0?'▲':'▼', sg=d>0?'+':''; dcell='<span class="'+cls+'">'+sg+d+' '+ar+'</span>'; }
+      }
+      return '<tr><td>'+esc(etq)+'</td><td class="n">'+da+'</td><td class="n">'+db+'</td><td class="n">'+dcell+'</td></tr>';
+    }).join('');
+    return '<table class="cmp-tbl"><thead><tr><th>Movimiento</th><th class="n">Antes</th><th class="n">Después</th><th class="n">Δ</th></tr></thead><tbody>'+filas+'</tbody></table>';
+  }
+  function _cmpOpt(ses, selId){
+    return ses.map(function(s){ var sel=(s.id===selId)?' selected':'', vid=(s.video&&s.video.url)?' · 🎥':'';
+      return '<option value="'+esc(s.id)+'"'+sel+'>'+esc(s.fecha)+' '+esc(s.horaCreacion||'')+' · '+esc(_cmpTipoLeg(s))+vid+'</option>'; }).join('');
+  }
+  function _cmpInjectStyle(){
+    if(document.getElementById('bio-cmp-style')) return;
+    var st=document.createElement('style'); st.id='bio-cmp-style';
+    st.textContent='#bio-cmp-overlay{position:fixed;inset:0;z-index:100000;background:#F4F6F9;overflow:auto;-webkit-overflow-scrolling:touch}'
+      +'.cmp-head{position:sticky;top:0;background:var(--navy,#1B3A6B);color:#fff;display:flex;align-items:center;gap:10px;padding:12px 14px;z-index:2}'
+      +'.cmp-head b{font-size:15px}.cmp-x{margin-left:auto;background:rgba(255,255,255,.18);border:none;color:#fff;width:32px;height:32px;border-radius:8px;font-size:17px;cursor:pointer}'
+      +'.cmp-body{padding:12px 14px 48px;max-width:900px;margin:0 auto}'
+      +'.cmp-sels{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}'
+      +'.cmp-sel label{display:block;font-size:11px;font-weight:800;color:var(--navy,#1B3A6B);margin-bottom:3px}'
+      +'.cmp-sel select{width:100%;padding:8px;border:1.5px solid #CFDDF2;border-radius:8px;font-size:12px;background:#fff}'
+      +'.cmp-vids{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}'
+      +'.cmp-vpanel{background:#fff;border:1px solid #E3E8F0;border-radius:10px;padding:8px}'
+      +'.cmp-vlab{font-size:11px;font-weight:800;color:var(--navy,#1B3A6B);margin-bottom:6px}'
+      +'.cmp-novid{background:#0d1626;color:#9BA3B5;border-radius:8px;padding:30px 10px;text-align:center;font-size:12px}'
+      +'.cmp-tbl{width:100%;border-collapse:collapse;background:#fff;border:1px solid #E3E8F0;border-radius:10px;overflow:hidden;font-size:12.5px}'
+      +'.cmp-tbl th{background:var(--navy,#1B3A6B);color:#fff;padding:7px 9px;text-align:left;font-size:11px}'
+      +'.cmp-tbl th.n,.cmp-tbl td.n{text-align:center}'
+      +'.cmp-tbl td{padding:7px 9px;border-top:1px solid #EEF1F6}'
+      +'.cmp-tbl tr:nth-child(even) td{background:#FAFBFD}'
+      +'.cmp-up{color:#2E7D52;font-weight:800}.cmp-dn{color:#B23B3B;font-weight:800}.cmp-eq{color:#9BA3B5}';
+    document.head.appendChild(st);
+  }
+  function _cmpRender(){
+    var ov=document.getElementById('bio-cmp-overlay'); if(!ov || !BIO.cmp) return;
+    var p=(typeof currentPatient!=='undefined')?currentPatient:null, ses=_cmpSesiones();
+    var A=ses.filter(function(s){return s.id===BIO.cmp.idA;})[0]||null;
+    var B=ses.filter(function(s){return s.id===BIO.cmp.idB;})[0]||null;
+    var nombre=(p&&p.name)?esc(p.name):'Paciente', distinto=(A&&B&&A.tipo!==B.tipo);
+    ov.innerHTML=
+      '<div class="cmp-head"><span style="font-size:18px">⚖️</span><b>Comparar — '+nombre+'</b><button class="cmp-x" onclick="BIO_cmpCerrar()">✕</button></div>'
+      +'<div class="cmp-body">'
+      +'<div style="font-size:11.5px;color:#667085;margin-bottom:10px">Elige dos mediciones para ver el <b>antes</b> y el <b>después</b> (videos + grados).</div>'
+      +'<div class="cmp-sels"><div class="cmp-sel"><label>🅰️ Antes</label><select onchange="BIO_cmpSel(\'a\',this.value)">'+_cmpOpt(ses,BIO.cmp.idA)+'</select></div>'
+      +'<div class="cmp-sel"><label>🅱️ Después</label><select onchange="BIO_cmpSel(\'b\',this.value)">'+_cmpOpt(ses,BIO.cmp.idB)+'</select></div></div>'
+      +'<div class="cmp-vids">'+_cmpVid(A,'Antes')+_cmpVid(B,'Después')+'</div>'
+      +(distinto?('<div style="background:#FFF4E5;border:1px solid #F3D9A8;color:#8A5E0C;border-radius:8px;padding:8px 10px;font-size:11.5px;margin-bottom:10px">⚠️ Son de <b>distinto tipo</b> ('+esc(_cmpTipoLeg(A))+' vs '+esc(_cmpTipoLeg(B))+'). Los videos se comparan, pero los grados solo cambian si eliges el <b>mismo tipo</b>.</div>'):'')
+      +_cmpTablaHTML(A,B)
+      +'<div style="font-size:10.5px;color:#9BA3B5;margin-top:8px">Δ = Después − Antes. ▲ subió · ▼ bajó (interpreta según el movimiento: en ROM más suele ser mejor; en un déficit, menos es mejor).</div>'
+      +'</div>';
+  }
+  function BIO_comparar(){
+    var ses=_cmpSesiones();
+    if(ses.length<2){ toast('Necesitas al menos 2 mediciones guardadas','warning'); return; }
+    var B=ses[0], A=null, i;
+    for(i=1;i<ses.length;i++){ if(ses[i].tipo===B.tipo){ A=ses[i]; break; } }
+    if(!A) A=ses[1];
+    BIO.cmp={ idA:A.id, idB:B.id };
+    var ov=document.getElementById('bio-cmp-overlay');
+    if(!ov){ _cmpInjectStyle(); ov=document.createElement('div'); ov.id='bio-cmp-overlay'; document.body.appendChild(ov); }
+    ov.style.display='block'; _cmpRender();
+  }
+  function BIO_cmpSel(which, id){ if(!BIO.cmp) return; if(which==='a') BIO.cmp.idA=id; else BIO.cmp.idB=id; _cmpRender(); }
+  function BIO_cmpCerrar(){ var ov=document.getElementById('bio-cmp-overlay'); if(!ov) return;
+    try{ var vs=ov.querySelectorAll('video'); for(var i=0;i<vs.length;i++){ try{ vs[i].pause(); }catch(e){} } }catch(e){}
+    ov.style.display='none'; ov.innerHTML=''; }
 
   // ── PDF de una sesión (bajo demanda; sube a Storage y guarda la url) ───────
   // ROM normal de referencia (grados) por movimiento — guía clínica, no diagnóstico.
@@ -2772,6 +2919,9 @@
   window.BIO_gonioFinish = BIO_gonioFinish;
   window.BIO_gonioVolver = BIO_gonioVolver;
   window.BIO_gonioGuardar = guardarSesionGonio;
+  window.BIO_comparar = BIO_comparar;
+  window.BIO_cmpSel = BIO_cmpSel;
+  window.BIO_cmpCerrar = BIO_cmpCerrar;
   window.__BIO_GONIO = { calcularGonio:calcularGonio, nuevoAccGonio:nuevoAccGonio, GONIO_CAT:GONIO_CAT, _gonioTexto:_gonioTexto, _gonioAlerta:_gonioAlerta, _gonioFmtGrado:_gonioFmtGrado };  // hook de pruebas
 
 })();
