@@ -67,6 +67,16 @@
   // CDN de MediaPipe Pose (rango semver 0.5.x — jsdelivr resuelve el último parche).
   var MP_BASE = 'https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5';
 
+  // Sello de versión del algoritmo 2D (para trazabilidad en cada medición guardada).
+  var BIO_ALGO_VER = 'bio-2d-2026-11-13';
+  // CORRECCIÓN DE ASPECTO (H1): las coords de MediaPipe vienen normalizadas 0–1 por ANCHO (x) y por
+  // ALTO (y) de forma INDEPENDIENTE. En un cuadro NO cuadrado (p.ej. 9:16 vertical del celular) eso
+  // deforma los ángulos de segmentos oblicuos hasta ~20°. Reescalando x por (ancho/alto) se recupera
+  // el ángulo real del plano de la imagen. _ANG_AR = ancho/alto de la fuente activa; 1 = cuadrado
+  // (idéntico al comportamiento anterior). Lo fijan onResults (vivo/video) y _recalcEstatico (foto).
+  var _ANG_AR = 1;
+  function _setAspect(w,h){ _ANG_AR = (w>0 && h>0) ? (w/h) : 1; }
+
   // ── Estado del módulo ─────────────────────────────────────────────────────
   var BIO = {
     pose:null, ready:false, cargando:false,
@@ -318,14 +328,20 @@
   function _r1(v){ return v==null?null:Math.round(v*10)/10; }
   function _r2(v){ return v==null?null:Math.round(v*100)/100; }
   // Ángulo interior 2D (grados) en el vértice b, SOLO plano de la imagen (para proyecciones frontales).
+  // x se reescala por _ANG_AR (ancho/alto) para no deformar el ángulo en cuadros no cuadrados (H1).
   function _ang2D(a,b,c){
-    var v1x=a.x-b.x, v1y=a.y-b.y, v2x=c.x-b.x, v2y=c.y-b.y;
+    var ar=_ANG_AR||1;
+    var v1x=(a.x-b.x)*ar, v1y=a.y-b.y, v2x=(c.x-b.x)*ar, v2y=c.y-b.y;
     var m1=Math.hypot(v1x,v1y), m2=Math.hypot(v2x,v2y);
     if(!m1||!m2) return 0;
     var cos=(v1x*v2x+v1y*v2y)/(m1*m2); if(cos>1)cos=1; if(cos<-1)cos=-1;
     return Math.acos(cos)*180/Math.PI;
   }
+  // Longitud del segmento a–b en el espacio con aspecto corregido (para detectar puntos encimados).
+  function _seg2D(a,b){ var ar=_ANG_AR||1; return Math.hypot((a.x-b.x)*ar, a.y-b.y); }
   function _dist2D(a,b){ return Math.hypot(a.x-b.x, a.y-b.y); }
+  // Cadencia inverosímil → los TIEMPOS del video no son fiables (cámara lenta/acelerada o fps irregular).
+  function _cadenciaDudosa(cad){ return (cad!=null && !(cad>=20 && cad<=220)); }
   // Resume cada movimiento como la MEDIA de los picos de sus repeticiones (más reproducible que un
   // máximo suelto y robusto al ruido). Codo añade extensión (mínimo robusto). Mantiene min/max/rango
   // por compatibilidad con el render/PDF y con sesiones ya guardadas.
@@ -663,6 +679,10 @@
     out.nCiclos=Math.max(tI?tI.nCiclos:0, tD?tD.nCiclos:0);
     var allHS=evI.hs.map(function(e){return e.t;}).concat(evD.hs.map(function(e){return e.t;})).sort(function(a,b){return a-b;});
     if(allHS.length>=2){ var span=allHS[allHS.length-1]-allHS[0]; if(span>0) out.cadencia=Math.round((allHS.length-1)/span*60); }
+    // CÁMARA LENTA / FPS IRREGULAR (VFR): si el ritmo es inverosímil, los TIEMPOS del video no son fiables
+    // (una grabación en cámara lenta da cadencias absurdas). Los ángulos sagitales (geometría por cuadro) sí.
+    out.calidad.tiempoDudoso = _cadenciaDudosa(out.cadencia);
+    if(out.calidad.tiempoDudoso) out.calidad.tiempoDudosoMsg = 'El ritmo calculado ('+out.cadencia+' pasos/min) es atípico. Si el video es en cámara lenta o acelerada, los tiempos (cadencia, fase de apoyo, doble apoyo, longitud de paso y velocidad) NO son fiables; el ángulo de rodilla/cadera sí.';
     // Doble apoyo %: solape de los intervalos de apoyo (HS→siguiente TO) de ambos pies.
     function stances(ev){ var o=[]; for(var i=0;i<ev.hs.length;i++){ var h=ev.hs[i].t, toA=null; for(var j=0;j<ev.to.length;j++){ if(ev.to[j].t>h){ toA=ev.to[j].t; break; } } if(toA!=null && (toA-h)>0.15 && (toA-h)<1.6) o.push([h,toA]); } return o; }
     var stI=stances(evI), stD=stances(evD), overlap=0;
@@ -696,8 +716,11 @@
     out.simetria={ stancePct:sim(tI&&tI.stancePct,tD&&tD.stancePct), rodPeak:sim(rodI.peak,rodD.peak),
       hipROM:sim(hipI.rom,hipD.rom), strideT:sim(tI&&tI.strideT,tD&&tD.strideT) };
     var nMin=Math.min(tI?tI.nCiclos:0, tD?tD.nCiclos:0);
-    function med2(key,grupo,mov,lado,unidad,valor,nCic){ out.medidas.push({ key:key,grupo:grupo,mov:mov,lado:lado,vista:'sagital',unidad:unidad,
-      valor:(valor==null?null:_r1(valor)), confiable:!!(valor!=null && nCic>=2 && orientOK!==false && visPct>=50), nCiclos:nCic }); }
+    function med2(key,grupo,mov,lado,unidad,valor,nCic){
+      var esTemporal=(grupo==='Temporal'||grupo==='Espacial');   // tiempos/distancias dependen de que los fps del video sean reales
+      var conf=!!(valor!=null && nCic>=2 && orientOK!==false && visPct>=50 && !(esTemporal && out.calidad.tiempoDudoso));
+      out.medidas.push({ key:key,grupo:grupo,mov:mov,lado:lado,vista:'sagital',unidad:unidad,
+        valor:(valor==null?null:_r1(valor)), confiable:conf, nCiclos:nCic }); }
     med2('cadencia','Temporal','Cadencia','—','pasos/min', out.cadencia, out.nCiclos);
     med2('doble_apoyo','Temporal','Doble apoyo','—','%', out.espacial.dobleApoyoPct, out.nCiclos);
     med2('stance_izq','Temporal','Fase de apoyo','Izq','%', tI&&tI.stancePct, tI?tI.nCiclos:0);
@@ -717,6 +740,10 @@
   function onResults(res){
     // MODO FOTO: una sola imagen estática → solo guardamos el resultado y salimos (lo procesa procesarFoto).
     if(BIO.modo==='foto'){ BIO._fotoRes = res; return; }
+    // Descarta UN cuadro si el watchdog liberó un send() colgado → evita pintar un resultado TARDÍO/stale.
+    if(BIO._dropStale){ BIO._dropStale=false; return; }
+    // Fija el aspecto real de la fuente (ancho/alto) para que los ángulos 2D no se deformen en vertical (H1).
+    if(BIO.srcEl && BIO.srcEl.videoWidth){ _setAspect(BIO.srcEl.videoWidth, BIO.srcEl.videoHeight); }
     var lm = res && res.poseLandmarks;
     var world = res && res.poseWorldLandmarks;
     if(BIO.tipoMedicion==='marcha'){
@@ -743,7 +770,9 @@
       var sg=BIO.accG&&BIO.accG.sel;
       var rg = (lm && sg) ? calcularGonio(lm, sg.grupo, sg.mov, sg.lado) : {ok:false,val:null};
       var mejoroG = procesarGonioFrame(rg);
-      // Al analizar un VIDEO, al mejorar el pico guardamos ESE cuadro (imagen + landmarks) para anotar la foto del pico.
+      // Al mejorar el pico guardamos los landmarks de ESE cuadro (trazabilidad: qué puntos produjeron el grado).
+      if(mejoroG && lm){ try{ BIO._peakGonioLm=_copiaLm(lm); BIO._peakGonioAR=_ANG_AR; }catch(_g){} }
+      // Al analizar un VIDEO, además guardamos la IMAGEN del cuadro-pico para anotarla.
       if(BIO.modo==='video' && mejoroG && lm && BIO.srcEl){ try{ BIO._peakFrameCanvas=_canvasDeImagen(BIO.srcEl); BIO._peakFrameLm=_copiaLm(lm); }catch(_e){} }
       if(BIO.canvas && BIO.srcEl){ dibujar(lm, null); dibujarGonioVivo(lm, rg); }
       return;
@@ -1106,6 +1135,13 @@
     var v = document.getElementById('bio-cam-src') || document.createElement('video');
     v.autoplay=true; v.muted=true; v.defaultMuted=true; v.setAttribute('muted',''); v.playsInline=true; v.setAttribute('playsinline',''); v.setAttribute('webkit-playsinline','');
     v.srcObject=BIO.stream; BIO.video=v; BIO.srcEl=v;
+    // Ajustes REALES del track (resolución/fps/cámara) para trazabilidad honesta de la captura.
+    try{
+      var _tk = BIO.stream.getVideoTracks ? BIO.stream.getVideoTracks()[0] : null;
+      var _s = (_tk && _tk.getSettings) ? _tk.getSettings() : null;
+      BIO.camSettings = _s ? { width:_s.width||null, height:_s.height||null,
+        frameRate:(_s.frameRate!=null?Math.round(_s.frameRate):null), facingMode:_s.facingMode||facing||null } : null;
+    }catch(_c){ BIO.camSettings=null; }
     try{ await v.play(); }catch(_){}
     return true;
   }
@@ -1129,7 +1165,7 @@
       // (síntoma: "no graba / se queda pegado / 0 cuadros"). Si lleva >2.5 s sin resolver, lo liberamos
       // y dejamos que el SIGUIENTE tick envíe un frame fresco (sin enviar dos a la vez).
       if(BIO.sending){
-        if(BIO._sendAt && (Date.now()-BIO._sendAt)>2500){ BIO.sending=false; BIO._sendStuck=(BIO._sendStuck||0)+1; }
+        if(BIO._sendAt && (Date.now()-BIO._sendAt)>2500){ BIO.sending=false; BIO._sendStuck=(BIO._sendStuck||0)+1; BIO._dropStale=true; }
         return;
       }
       // Si el <video> se pausó (iOS al volver de segundo plano / bloqueo de pantalla), reintenta.
@@ -1508,6 +1544,12 @@
   async function _persistirSesion(p, sesion, btn, accionTxt){
     if(btn){ btn.textContent='⏳ Guardando…'; }
     if(!Array.isArray(p.biomecanica)) p.biomecanica=[];
+    // Sello de trazabilidad común a TODA medición: versión del algoritmo + ajustes REALES de cámara (solo en vivo).
+    try{
+      if(!sesion.calidad || typeof sesion.calidad!=='object') sesion.calidad={};
+      if(!sesion.calidad.algoVersion) sesion.calidad.algoVersion=BIO_ALGO_VER;
+      if(!sesion.calidad.captura && sesion.fuente==='camara' && typeof BIO!=='undefined' && BIO.camSettings) sesion.calidad.captura=BIO.camSettings;
+    }catch(_s){}
     p.biomecanica.push(sesion);
     if(!Array.isArray(p.historialCambios)) p.historialCambios=[];
     p.historialCambios.push({ usuario:usuarioActual(), seccion:'biomecanica', fecha:sesion.fecha+' '+sesion.horaCreacion, accion:accionTxt, antes:'', despues:accionTxt });
@@ -1708,6 +1750,7 @@
     if(res.calidad && res.calidad.orientPerfilOK===false) avisos.push('⚠️ La toma no se vio DE PERFIL — la marcha se mide de lado; repite con el paciente de perfil a la cámara.');
     if(!res.nCiclos) avisos.push('⚠️ No se detectaron ciclos de marcha completos. Repite DE PERFIL, con el cuerpo completo en cuadro y 8–10 pasos (o en caminadora).');
     if(res.nCiclos && q.framesValidos!=null && q.framesValidos<20) avisos.push('⚠️ Pocos cuadros válidos ('+q.framesValidos+'). Repite con mejor luz y el cuerpo completo en cuadro.');
+    if(q.tiempoDudoso) avisos.push('⚠️ '+(q.tiempoDudosoMsg||'Ritmo atípico: si el video es en cámara lenta o acelerada, los tiempos no son fiables.'));
     var vel=(res.velocidad!=null)?(res.velocidad+' m/s'):'—';
     cont.innerHTML =
       '<h3>Resumen — Marcha (análisis sagital)</h3>'
@@ -2137,6 +2180,8 @@
       guia:'Cámara al COSTADO. Lleva el talón hacia el glúteo.' },
     { key:'rod_ext',  grupo:'Rodilla', mov:'Extensión',     pos:'Supino',        agg:'min', ref:0,   lim:5, defic:true, normTxt:'0° (déficit ≤5°)',
       guia:'Cámara al COSTADO. Estira la rodilla al máximo (mide el déficit de extensión).' },
+    { key:'rod_hext', grupo:'Rodilla', mov:'Hiperextensión', pos:'Supino',       agg:'max', ref:5,   lim:10, hiperext:true, normTxt:'≤5–10° (genu recurvatum si más)',
+      guia:'Cámara al COSTADO. Rodilla en su máxima extensión; si la articulación rebasa la línea recta hacia atrás es hiperextensión. La app mide los GRADOS de desviación respecto a la recta; tú confirmas visualmente que es hacia atrás.' },
     { key:'tob_df',   grupo:'Tobillo', mov:'Dorsiflexión',  pos:'Supino',        agg:'max', ref:20,  lim:10,  normTxt:'0–20°',
       guia:'Cámara al COSTADO del pie. Lleva la punta hacia la espinilla.' },
     { key:'tob_pf',   grupo:'Tobillo', mov:'Plantiflexión', pos:'Supino',        agg:'max', ref:50,  lim:40,  normTxt:'0–50°',
@@ -2148,6 +2193,8 @@
       guia:'Cámara al COSTADO del brazo. Brazo pegado al cuerpo; dobla el codo llevando la mano al hombro.' },
     { key:'cod_ext',  grupo:'Codo',    mov:'Extensión',     pos:'Sentado/De pie', agg:'min', ref:0,   lim:5, defic:true, normTxt:'0° (déficit ≤5°)',
       guia:'Cámara al COSTADO del brazo. Estira el codo al máximo (mide el déficit de extensión).' },
+    { key:'cod_hext', grupo:'Codo',    mov:'Hiperextensión', pos:'Sentado/De pie', agg:'max', ref:5,  lim:10, hiperext:true, normTxt:'≤5–10° (laxitud si más)',
+      guia:'Cámara al COSTADO del brazo. Codo en su máxima extensión; si rebasa la línea recta es hiperextensión. La app mide la MAGNITUD respecto a la recta; tú confirmas la dirección.' },
     { key:'mun_flex', grupo:'Muñeca',  mov:'Flexión',       pos:'Sentado',        agg:'max', ref:80,  lim:60,  normTxt:'0–80°',
       guia:'Antebrazo apoyado, MANO LIBRE y visible, cámara al COSTADO. Dobla la muñeca llevando la palma hacia el antebrazo.' },
     { key:'mun_ext',  grupo:'Muñeca',  mov:'Extensión',     pos:'Sentado',        agg:'max', ref:70,  lim:50,  normTxt:'0–70°',
@@ -2167,25 +2214,33 @@
     if(!lm) return { ok:false, val:null };
     var P=_gonioPts(lado);
     function v(i){ return _vis(lm,i); }
+    // Guarda de geometría degenerada: si dos puntos quedan casi encimados (tracking fallido, articulación
+    // fuera de cuadro o doblada sobre sí misma) el ángulo es basura → "no medible" en vez de un número falso.
+    function deg(i,j,k){ return _seg2D(lm[i],lm[j])<0.03 || _seg2D(lm[j],lm[k])<0.03; }
     if(grupo==='Cadera'){
       if(!(v(P.S)&&v(P.H)&&v(P.K))) return { ok:false, val:null };
+      if(deg(P.S,P.H,P.K)) return { ok:false, val:null };
       return { ok:true, val: 180 - _ang2D(lm[P.S], lm[P.H], lm[P.K]) };   // flex/ext desde tronco alineado
     }
-    if(grupo==='Rodilla'){
+    if(grupo==='Rodilla'){                                                 // flexión, déficit de extensión E hiperextensión (misma geometría; el fisio elige el mov)
       if(!(v(P.H)&&v(P.K)&&v(P.A))) return { ok:false, val:null };
-      return { ok:true, val: 180 - _ang2D(lm[P.H], lm[P.K], lm[P.A]) };   // flexión (déficit = flex residual)
+      if(deg(P.H,P.K,P.A)) return { ok:false, val:null };
+      return { ok:true, val: 180 - _ang2D(lm[P.H], lm[P.K], lm[P.A]) };   // magnitud de desviación respecto a la recta (0°=extendido)
     }
     if(grupo==='Tobillo'){
       if(!(v(P.K)&&v(P.A)&&v(P.F))) return { ok:false, val:null };
+      if(deg(P.K,P.A,P.F)) return { ok:false, val:null };
       var ia=_ang2D(lm[P.K], lm[P.A], lm[P.F]);                            // interior pierna–tobillo–pie
       return (mov==='Dorsiflexión') ? { ok:true, val: Math.max(0, 90-ia) } : { ok:true, val: Math.max(0, ia-90) };
     }
-    if(grupo==='Codo'){
+    if(grupo==='Codo'){                                                    // flexión, déficit de extensión E hiperextensión (el fisio elige el mov)
       if(!(v(P.S)&&v(P.E)&&v(P.W))) return { ok:false, val:null };
-      return { ok:true, val: 180 - _ang2D(lm[P.S], lm[P.E], lm[P.W]) };    // hombro–codo–muñeca; flexión (ext = déficit)
+      if(deg(P.S,P.E,P.W)) return { ok:false, val:null };
+      return { ok:true, val: 180 - _ang2D(lm[P.S], lm[P.E], lm[P.W]) };    // hombro–codo–muñeca; magnitud respecto a la recta
     }
     if(grupo==='Muñeca'){
       if(!(v(P.E)&&v(P.W)&&v(P.Ix))) return { ok:false, val:null };
+      if(deg(P.E,P.W,P.Ix)) return { ok:false, val:null };
       return { ok:true, val: Math.max(0, 180 - _ang2D(lm[P.E], lm[P.W], lm[P.Ix])) };  // antebrazo–muñeca–mano; el fisio elige flex/ext
     }
     return { ok:false, val:null };
@@ -2202,11 +2257,13 @@
   function _gonioSelKey(g){ return g && g.sel ? (g.sel.key+'_'+g.sel.lado) : ''; }
   function _gonioFmtGrado(m){
     if(!m || m.grado==null) return '—';
+    if(m.hiperext){ return (m.grado<=1) ? '0° (neutro)' : ('+'+Math.round(m.grado)+'° hiperext'); }
     if(m.defic){ return (m.grado<=1) ? '0° (completa)' : ('déficit '+Math.round(m.grado)+'°'); }
     return Math.round(m.grado)+'°';
   }
   function _gonioAlerta(m){
     if(!m || m.grado==null) return false;
+    if(m.hiperext) return m.grado>m.lim;              // hiperextensión: alerta si rebasa el umbral
     return m.defic ? (m.grado>m.lim) : (m.grado<m.lim);
   }
 
@@ -2233,6 +2290,15 @@
     if(grupo==='Codo')    return { vtx:P.E, ea:P.S, eb:P.W };
     if(grupo==='Muñeca')  return { vtx:P.W, ea:P.E, eb:P.Ix };
     return { vtx:P.A, ea:P.K, eb:P.F };   // Tobillo
+  }
+  // Los 3 landmarks (redondeados) que produjeron el grado, para trazabilidad de la captura.
+  function _gonioLmUsados(lm, grupo, lado){
+    if(!lm) return null;
+    var P=_gonioPts(lado), vx=_gonioVtx(grupo,P);
+    function pt(i){ var q=lm[i]; if(!q) return null;
+      return { i:i, x:Math.round(q.x*1e4)/1e4, y:Math.round(q.y*1e4)/1e4,
+               v:(q.visibility!=null?Math.round(q.visibility*100)/100:null) }; }
+    return { a:pt(vx.ea), vtx:pt(vx.vtx), b:pt(vx.eb) };
   }
   // Traza brazos + arco + valor sobre CUALQUIER contexto (canvas vivo, o foto / cuadro-pico estático).
   function _trazarGonio(ctx, w, h, lm, grupo, lado, val){
@@ -2366,6 +2432,7 @@
   function _recalcEstatico(){
     var g=BIO.accG; if(!g || !g.sel || !BIO._estaticoBase || !BIO.canvas) return;
     var cv=BIO.canvas, ctx=BIO.ctx;
+    _setAspect(BIO._estaticoBase.width, BIO._estaticoBase.height);   // aspecto del cuadro estático (H1)
     if(cv.width!==BIO._estaticoBase.width || cv.height!==BIO._estaticoBase.height){ cv.width=BIO._estaticoBase.width; cv.height=BIO._estaticoBase.height; }
     ctx.clearRect(0,0,cv.width,cv.height);
     try{ ctx.drawImage(BIO._estaticoBase,0,0); }catch(e){}
@@ -2458,8 +2525,15 @@
     if(g.peak==null){ toast(BIO.modo==='estatico' ? 'No se detecta esa articulación en la imagen; cambia de movimiento/lado o sube otra' : 'Mueve la articulación hasta el tope para medir','warning'); return; }
     var e=_gonioEntry(g.sel.grupo, g.sel.mov);
     var key=_gonioSelKey(g);
+    // TRAZABILIDAD (H6): guarda qué landmarks produjeron el grado + versión del algoritmo + aspecto + fuente,
+    // para poder re-verificar la medición después. Cuadro estático → BIO._estaticoLm; vivo → pico BIO._peakGonioLm.
+    var lmCap = (BIO.modo==='estatico') ? BIO._estaticoLm : BIO._peakGonioLm;
+    var arCap = (BIO.modo==='estatico') ? (_ANG_AR||1) : (BIO._peakGonioAR||_ANG_AR||1);
     g.medidas[key] = { key:g.sel.key, grupo:g.sel.grupo, mov:g.sel.mov, lado:g.sel.lado,
-      grado:Math.round(g.peak*10)/10, ref:e.ref, lim:e.lim, defic:!!e.defic, normTxt:e.normTxt };
+      grado:Math.round(g.peak*10)/10, ref:e.ref, lim:e.lim, defic:!!e.defic, hiperext:!!e.hiperext, normTxt:e.normTxt,
+      traza:{ algoVersion:BIO_ALGO_VER, aspect:Math.round(arCap*1e4)/1e4,
+              fuente:(BIO.modo==='estatico'?(BIO._estaticoFuente||'estatico'):'camara'),
+              lmUsados:_gonioLmUsados(lmCap, g.sel.grupo, g.sel.lado) } };
     // Si viene de foto/video, guarda la IMAGEN ANOTADA de esta captura (copia del canvas actual).
     if(BIO.modo==='estatico' && BIO._estaticoImg){
       try{
@@ -2485,15 +2559,16 @@
   // Texto compacto para el campo ROM de la Valoración: "Cadera flex D118°/I120°; Rodilla ..."
   function _gonioTexto(arr){
     var by={}; arr.forEach(function(m){ var k=m.grupo+'|'+m.mov; (by[k]=by[k]||{})[m.lado]=m; });
-    var abr={ 'Flexión':'flex', 'Extensión':'ext', 'Dorsiflexión':'DF', 'Plantiflexión':'PF' };
+    var abr={ 'Flexión':'flex', 'Extensión':'ext', 'Dorsiflexión':'DF', 'Plantiflexión':'PF', 'Hiperextensión':'hiperext' };
+    function _fmt(m){ return _gonioFmtGrado(m).replace(' (completa)','').replace(' (neutro)','').replace('déficit ','−').replace(' hiperext',''); }
     var partes=[];
     GONIO_JOINTS.forEach(function(gr){
       var segs=[];
       GONIO_CAT.filter(function(e){return e.grupo===gr;}).forEach(function(e){
         var d=by[gr+'|'+e.mov]; if(!d) return;
         var pieces=[];
-        if(d.der) pieces.push('D'+_gonioFmtGrado(d.der).replace(' (completa)','').replace('déficit ','−'));
-        if(d.izq) pieces.push('I'+_gonioFmtGrado(d.izq).replace(' (completa)','').replace('déficit ','−'));
+        if(d.der) pieces.push('D'+_fmt(d.der));
+        if(d.izq) pieces.push('I'+_fmt(d.izq));
         if(pieces.length) segs.push((abr[e.mov]||e.mov)+' '+pieces.join('/'));
       });
       if(segs.length) partes.push(gr+' '+segs.join(', '));
@@ -2559,8 +2634,8 @@
     // reemplaza solo una línea previa de "Goniometría (" para no acumular en re-mediciones).
     try{
       if(!p.valoracion || typeof p.valoracion!=='object') p.valoracion={};
-      var linea='Goniometría ('+sesion.fecha+'): '+_gonioTexto(arr);
-      var prev=String(p.valoracion.rom||'').split('\n').filter(function(l){ return l.trim() && l.indexOf('Goniometría (')!==0; });
+      var linea='Goniometría cámara 2D ('+sesion.fecha+', cribado ±5–10°): '+_gonioTexto(arr);
+      var prev=String(p.valoracion.rom||'').split('\n').filter(function(l){ var t=l.trim(); return t && t.indexOf('Goniometría')!==0; });
       prev.push(linea);
       p.valoracion.rom = prev.join('\n');
     }catch(e){}
@@ -2702,28 +2777,33 @@
     return lista;
   }
   // Extrae de una sesión las filas comparables {k,etq,num,disp} según su tipo.
+  // dir: sentido clínico de MEJORA para colorear el Δ. 'up' = más es mejor (ROM, flexión), 'down' = menos
+  // es mejor (valgo, inclinación, déficit), '' = neutro (no se colorea, solo muestra el cambio).
   function _cmpExtraer(s){
     var out=[], med=Array.isArray(s.medidas)?s.medidas:[];
     if(s.tipo==='goniometria'){
       med.forEach(function(m){ var l=/izq/i.test(m.lado)?'Izq':'Der';
-        out.push({ k:(m.key||'')+'_'+m.lado, etq:(m.grupo||'')+' '+(m.mov||'')+' '+l, num:(m.grado==null?null:m.grado), disp:_gonioFmtGrado(m) }); });
+        var dir = m.defic ? 'down' : (m.hiperext ? '' : 'up');   // más ROM mejor; menos déficit mejor; hiperext neutro
+        out.push({ k:(m.key||'')+'_'+m.lado, etq:(m.grupo||'')+' '+(m.mov||'')+' '+l, num:(m.grado==null?null:m.grado), disp:_gonioFmtGrado(m), dir:dir }); });
     } else if(s.tipo==='sentadilla'){
       var L={ fppa_izq:'Valgo FPPA Izq', fppa_der:'Valgo FPPA Der', mkd_izq:'Desplaz. medial Izq', mkd_der:'Desplaz. medial Der', sep_rodillas:'Separación rodillas', tronco_lateral:'Tronco lateral', sacro_descenso:'Descenso del sacro' };
+      var Ds={ fppa_izq:'down', fppa_der:'down', mkd_izq:'down', mkd_der:'down', tronco_lateral:'down' };   // menos valgo/inclinación = mejor
       med.forEach(function(m){ var etq=L[m.key]; if(!etq || m.media==null) return;
         var r=(m.unidad==='ratio'), suf=r?'':(m.unidad==='%'?'%':'°');
-        out.push({ k:m.key, etq:etq, num:m.media, disp:(r?m.media.toFixed(2):(_r1(m.media)+suf)) }); });
+        out.push({ k:m.key, etq:etq, num:m.media, disp:(r?m.media.toFixed(2):(_r1(m.media)+suf)), dir:(Ds[m.key]||'') }); });
     } else if(s.tipo==='marcha'){
-      if(s.cadencia!=null) out.push({ k:'cadencia', etq:'Cadencia', num:s.cadencia, disp:s.cadencia+' pasos/min' });
-      if(s.velocidad!=null) out.push({ k:'velocidad', etq:'Velocidad', num:s.velocidad, disp:s.velocidad+' m/s' });
+      if(s.cadencia!=null) out.push({ k:'cadencia', etq:'Cadencia', num:s.cadencia, disp:s.cadencia+' pasos/min', dir:'' });
+      if(s.velocidad!=null) out.push({ k:'velocidad', etq:'Velocidad', num:s.velocidad, disp:s.velocidad+' m/s', dir:'up' });
       var LM={ stance_izq:'Fase apoyo Izq', stance_der:'Fase apoyo Der', rod_pico_izq:'Rodilla pico Izq', rod_pico_der:'Rodilla pico Der', cadera_rom_izq:'Cadera ROM Izq', cadera_rom_der:'Cadera ROM Der' };
+      var DM={ rod_pico_izq:'up', rod_pico_der:'up', cadera_rom_izq:'up', cadera_rom_der:'up' };   // más ROM = mejor; apoyo neutro
       med.forEach(function(m){ var etq=LM[m.key]; if(!etq || m.valor==null) return;
         var u=(m.unidad==='m')?' m':(m.unidad==='%'?'%':(m.unidad==='pasos/min'?'':'°'));
-        out.push({ k:m.key, etq:etq, num:m.valor, disp:m.valor+u }); });
+        out.push({ k:m.key, etq:etq, num:m.valor, disp:m.valor+u, dir:(DM[m.key]||'') }); });
     } else { // rom
       med.forEach(function(m){ var l=/izq/i.test(m.lado)?'Izq':'Der', etq=(m.grupo||'')+' '+(m.mov||'')+' '+l, num, disp;
         if(m.grupo==='Codo'){ num=(m.max!=null?m.max:m.media); disp=(m.min!=null&&m.max!=null)?(m.min+'°–'+m.max+'°'):(num!=null?num+'°':'—'); }
         else { num=(m.media!=null?m.media:m.max); disp=(num!=null?num+'°':'—'); }
-        out.push({ k:m.key||etq, etq:etq, num:(num==null?null:num), disp:disp }); });
+        out.push({ k:m.key||etq, etq:etq, num:(num==null?null:num), disp:disp, dir:'up' }); });   // más ROM = mejor
     }
     return out;
   }
@@ -2748,7 +2828,15 @@
       var dcell='<span class="cmp-eq">—</span>';
       if(a&&b&&a.num!=null&&b.num!=null){ var d=Math.round((b.num-a.num)*10)/10;
         if(d===0){ dcell='<span class="cmp-eq">0</span>'; }
-        else { var cls=d>0?'cmp-up':'cmp-dn', ar=d>0?'▲':'▼', sg=d>0?'+':''; dcell='<span class="'+cls+'">'+sg+d+' '+ar+'</span>'; }
+        else {
+          var dir=(b&&b.dir)||(a&&a.dir)||'';   // sentido clínico de mejora
+          var ar=d>0?'▲':'▼', sg=d>0?'+':'';
+          // 'up' → subir es verde; 'down' → bajar es verde; '' (neutro) → gris, solo muestra el cambio.
+          var cls='cmp-eq';
+          if(dir==='up') cls=(d>0?'cmp-up':'cmp-dn');
+          else if(dir==='down') cls=(d>0?'cmp-dn':'cmp-up');
+          dcell='<span class="'+cls+'">'+sg+d+' '+ar+'</span>';
+        }
       }
       return '<tr><td>'+esc(etq)+'</td><td class="n">'+da+'</td><td class="n">'+db+'</td><td class="n">'+dcell+'</td></tr>';
     }).join('');
@@ -3120,5 +3208,12 @@
   window.BIO_cmpSel = BIO_cmpSel;
   window.BIO_cmpCerrar = BIO_cmpCerrar;
   window.__BIO_GONIO = { calcularGonio:calcularGonio, nuevoAccGonio:nuevoAccGonio, GONIO_CAT:GONIO_CAT, _gonioTexto:_gonioTexto, _gonioAlerta:_gonioAlerta, _gonioFmtGrado:_gonioFmtGrado };  // hook de pruebas
+  // Hook de PRUEBAS (geometría pura, sin DOM/MediaPipe) — lo usa pruebas/geometria.test.js.
+  window.__BIO_TEST = {
+    setAspect:_setAspect, ang2D:_ang2D, seg2D:_seg2D,
+    calcularGonio:calcularGonio, cmpExtraer:_cmpExtraer, cmpTablaHTML:_cmpTablaHTML,
+    cadenciaDudosa:_cadenciaDudosa, gonioFmtGrado:_gonioFmtGrado, gonioAlerta:_gonioAlerta,
+    GONIO_CAT:GONIO_CAT, ALGO_VER:BIO_ALGO_VER
+  };
 
 })();
