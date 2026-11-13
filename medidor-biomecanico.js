@@ -68,7 +68,7 @@
   var MP_BASE = 'https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5';
 
   // Sello de versión del algoritmo 2D (para trazabilidad en cada medición guardada).
-  var BIO_ALGO_VER = 'bio-2d-2026-11-13b';   // Fase 1 auditoría: validez de entrada (entradas no-finitas/degeneradas → no medible)
+  var BIO_ALGO_VER = 'bio-2d-2026-11-13c';   // Fase 2 auditoría: geometría coherente con aspecto (cadera/tronco/abducción/cuello/longitud de paso)
   // CORRECCIÓN DE ASPECTO (H1): las coords de MediaPipe vienen normalizadas 0–1 por ANCHO (x) y por
   // ALTO (y) de forma INDEPENDIENTE. En un cuadro NO cuadrado (p.ej. 9:16 vertical del celular) eso
   // deforma los ángulos de segmentos oblicuos hasta ~20°. Reescalando x por (ancho/alto) se recupera
@@ -182,8 +182,9 @@
     if(theta3D>=12){ dir = (Math.abs(al)>=Math.abs(af)) ? 'abd' : (af>0 ? 'flex' : 'ext'); }
     var theta=theta3D;
     if(dir==='abd' && lm && lm[sIdx] && lm[eIdx] && lm[11] && lm[12] && lm[23] && lm[24]){
-      var downX=((lm[23].x+lm[24].x)/2)-((lm[11].x+lm[12].x)/2), downY=((lm[23].y+lm[24].y)/2)-((lm[11].y+lm[12].y)/2); // hombros→caderas (abajo)
-      var armX=lm[eIdx].x-lm[sIdx].x, armY=lm[eIdx].y-lm[sIdx].y;
+      var ar=_ANG_AR||1;   // x escalada por aspecto (Fase 2): abducción in-plane real en cuadro no cuadrado
+      var downX=(((lm[23].x+lm[24].x)/2)-((lm[11].x+lm[12].x)/2))*ar, downY=((lm[23].y+lm[24].y)/2)-((lm[11].y+lm[12].y)/2); // hombros→caderas (abajo)
+      var armX=(lm[eIdx].x-lm[sIdx].x)*ar, armY=lm[eIdx].y-lm[sIdx].y;
       var md=Math.hypot(downX,downY), ma=Math.hypot(armX,armY);
       if(md>1e-6 && ma>1e-6){
         var cos=(downX*armX+downY*armY)/(md*ma); if(cos>1)cos=1; if(cos<-1)cos=-1;
@@ -217,7 +218,7 @@
       } else if(m.calc==='cuello'){ // lateralización cervical: eje nariz→hombros vs vertical, en 2D (frontal)
         if(_vis(lm,0)&&_vis(lm,11)&&_vis(lm,12)){
           var mSx=(lm[11].x+lm[12].x)/2, mSy=(lm[11].y+lm[12].y)/2;
-          var hx=lm[0].x-mSx, hy=lm[0].y-mSy;                 // eje cabeza (nariz) respecto a mitad de hombros
+          var hx=(lm[0].x-mSx)*(_ANG_AR||1), hy=lm[0].y-mSy;  // eje cabeza vs hombros; x escalada por aspecto (Fase 2)
           if(Math.hypot(hx,hy)>1e-4){
             var tilt=Math.atan2(hx, -hy)*180/Math.PI;          // 0=recto; + = hacia +x (hombro IZQ del paciente, imagen espejada)
             var mag=Math.abs(tilt), ladoDir=(tilt>=0)?'izq':'der';
@@ -434,7 +435,7 @@
       if(dA>0.01) out.sepRatio={val:_dist2D(lm[25],lm[26])/dA, ok:true};
     }
     if(midSh && midHip){
-      var dx=midSh.x-midHip.x, dyT=midHip.y-midSh.y;
+      var dx=(midSh.x-midHip.x)*(_ANG_AR||1), dyT=midHip.y-midSh.y;   // x escalada por aspecto (Fase 2)
       if(dyT>1e-6) out.troncoLat={val:Math.atan2(dx,dyT)*180/Math.PI, ok:true};   // + = hacia un lado de la imagen
     }
     if(midHip) out.sacro={x:midHip.x, y:midHip.y, ok:true};
@@ -578,8 +579,8 @@
     if(midSh){ var ancho=(Math.abs(lm[11].x-lm[12].x)+Math.abs(lm[23].x-lm[24].x))/2, alto=Math.abs(midSh.y-midHip.y)||1e-6; out.orientPerfil=(ancho/alto)<0.35; }
     if(vis(0)) out.noseRel=lm[0].x-midHip.x;                 // nariz vs sacro → dirección de marcha
     // Cadera flexo-ext = ángulo SIGNADO muslo vs eje del tronco (ROM usa max−min → el signo no importa).
-    function hipAng(hip,knee){ if(!midSh) return null;
-      var tdx=hip.x-midSh.x, tdy=hip.y-midSh.y, thx=knee.x-hip.x, thy=knee.y-hip.y;
+    function hipAng(hip,knee){ if(!midSh) return null; var ar=_ANG_AR||1;   // x escalada por aspecto (Fase 2): ángulo muslo–tronco real
+      var tdx=(hip.x-midSh.x)*ar, tdy=hip.y-midSh.y, thx=(knee.x-hip.x)*ar, thy=knee.y-hip.y;
       var cross=tdx*thy-tdy*thx, dot=tdx*thx+tdy*thy; return Math.atan2(cross,dot)*180/Math.PI; }
     // Guarda de validez (Fase 1): finitud + segmento mínimo → sin esto, puntos coincidentes/NaN daban 180° ok:true.
     if(vis(23)&&vis(25)&&midSh&&_medible3(midSh,lm[23],lm[25])){ var hI=hipAng(lm[23],lm[25]); if(hI!=null) out.hipIzq={val:hI,ok:true}; }
@@ -606,6 +607,7 @@
   function acumularMarcha(acc,f,tSec){
     if(!acc||!f) return;
     acc._frame++; acc.frames++;
+    if(acc.aspect==null) acc.aspect=(_ANG_AR||1);   // aspecto de la fuente al capturar (Fase 2): lo usa finalizarMarcha para la longitud de paso
     if(tSec==null) tSec=acc._frame/(FPS_CAMARA||20);
     if(f.orientPerfil!=null){ acc.orientN++; if(f.orientPerfil) acc.orientPerfilN++; }
     var i=acc._frame, R=acc._run, alguno=false;
@@ -660,6 +662,10 @@
       calidad:{framesValidos:(acc&&acc.framesValidos)||0},
       calibracion:{estaturaCm:estaturaCm||null, treadmillKmh:treadmillKmh||null} };
     if(!acc) return out;
+    // ASPECTO (Fase 2): la longitud de paso mezclaba una distancia X (fracción de ANCHO) con una escala
+    // derivada de Y (altura-proxy). Sin corregir, 9:16 y 16:9 daban el mismo metraje (falso). Se escala la
+    // distancia X por el aspecto de la fuente (acc.aspect; global _ANG_AR como respaldo documentado).
+    var arM=(acc && acc.aspect!=null)?acc.aspect:(_ANG_AR||1);
     var visPct=acc.frames?Math.round(acc.framesValidos/acc.frames*100):0;
     var orientOK=acc.orientN?((acc.orientPerfilN/acc.orientN)>=0.6):null;
     out.calidad={ framesValidos:acc.framesValidos, frames:acc.frames, visPct:visPct, orientPerfilOK:orientOK };
@@ -702,7 +708,7 @@
     var hPx=altSorted.length?altSorted[Math.floor(0.90*(altSorted.length-1))]:null, hFull=hPx?hPx/0.88:null;
     var pxToM=(estaturaCm&&hFull)?(estaturaCm/100)/hFull:null;
     function nearestV(serie,t){ var best=null,bd=1e9; for(var k=0;k<serie.length;k++){ var d=Math.abs(serie[k].t-t); if(d<bd){bd=d;best=serie[k].v;} } return best; }
-    var stepPx=[]; allHS.forEach(function(t){ var a=nearestV(fI,t), b=nearestV(fD,t); if(a!=null&&b!=null) stepPx.push(Math.abs(a-b)); });
+    var stepPx=[]; allHS.forEach(function(t){ var a=nearestV(fI,t), b=nearestV(fD,t); if(a!=null&&b!=null) stepPx.push(Math.abs(a-b)*arM); });   // distancia AP (X) · aspecto (Fase 2)
     var stepLenPx=stepPx.length?_media(stepPx):null;
     out.espacial.stepLenM=(stepLenPx!=null&&pxToM)?_r2(stepLenPx*pxToM):null;
     if(treadmillKmh){ out.velocidad=_r2(treadmillKmh/3.6); }
