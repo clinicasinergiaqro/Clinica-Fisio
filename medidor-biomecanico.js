@@ -68,7 +68,7 @@
   var MP_BASE = 'https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5';
 
   // Sello de versión del algoritmo 2D (para trazabilidad en cada medición guardada).
-  var BIO_ALGO_VER = 'bio-2d-2026-11-13';
+  var BIO_ALGO_VER = 'bio-2d-2026-11-13b';   // Fase 1 auditoría: validez de entrada (entradas no-finitas/degeneradas → no medible)
   // CORRECCIÓN DE ASPECTO (H1): las coords de MediaPipe vienen normalizadas 0–1 por ANCHO (x) y por
   // ALTO (y) de forma INDEPENDIENTE. En un cuadro NO cuadrado (p.ej. 9:16 vertical del celular) eso
   // deforma los ángulos de segmentos oblicuos hasta ~20°. Reescalando x por (ancho/alto) se recupera
@@ -340,6 +340,13 @@
   // Longitud del segmento a–b en el espacio con aspecto corregido (para detectar puntos encimados).
   function _seg2D(a,b){ var ar=_ANG_AR||1; return Math.hypot((a.x-b.x)*ar, a.y-b.y); }
   function _dist2D(a,b){ return Math.hypot(a.x-b.x, a.y-b.y); }
+  // VALIDEZ DE ENTRADA (Fase 1): un punto con coord NaN/Infinity o dos puntos casi encimados producían
+  // antes un ángulo FALSO de 180° con ok:true (en _ang2D, !m1 con m1=NaN devuelve 0 → el llamador hace
+  // 180-0=180, y ese 180 gana como "pico"). _finP = punto finito; _medible3 = 3 puntos finitos y con
+  // ambos segmentos NO degenerados (umbral 0.03 en espacio con aspecto, igual que la guarda del goniómetro).
+  // Los llamadores usan _medible3 para devolver {ok:false} en vez de un número inventado.
+  function _finP(p){ return !!p && isFinite(p.x) && isFinite(p.y); }
+  function _medible3(a,b,c){ return _finP(a) && _finP(b) && _finP(c) && _seg2D(a,b)>=0.03 && _seg2D(b,c)>=0.03; }
   // Cadencia inverosímil → los TIEMPOS del video no son fiables (cámara lenta/acelerada o fps irregular).
   function _cadenciaDudosa(cad){ return (cad!=null && !(cad>=20 && cad<=220)); }
   // Resume cada movimiento como la MEDIA de los picos de sus repeticiones (más reproducible que un
@@ -408,6 +415,7 @@
     // Pierna en frontal: FPPA con signo + MKD (% ancho pelvis). midX = línea media del cuerpo.
     var anchoPelvis = (vis(23)&&vis(24)) ? Math.abs(lm[23].x-lm[24].x) : null;
     function pierna(hip,knee,ank,midX){
+      if(!_medible3(hip,knee,ank)) return { ok:false, fppa:null, mkdPct:null };   // rodilla encimada / NaN → no medible (Fase 1)
       var interior=_ang2D(hip,knee,ank), mag=180-interior;
       var dy=(ank.y-hip.y);
       var t=Math.abs(dy)<1e-6 ? 0.5 : (knee.y-hip.y)/dy;
@@ -415,11 +423,11 @@
       var dirMedial=(midX-xLine)>=0?1:-1;                 // hacia la línea media del cuerpo
       var despl=(knee.x-xLine)*dirMedial;                 // + = rodilla medial
       var signo=despl>=0?1:-1;
-      return { fppa:mag*signo, mkdPct:(anchoPelvis&&anchoPelvis>0.01)?(despl/anchoPelvis*100):null };
+      return { ok:true, fppa:mag*signo, mkdPct:(anchoPelvis&&anchoPelvis>0.01)?(despl/anchoPelvis*100):null };
     }
     if(midHip){
-      if(vis(23)&&vis(25)&&vis(27)){ var pi=pierna(lm[23],lm[25],lm[27],midHip.x); out.fppaIzq={val:pi.fppa,ok:true}; if(pi.mkdPct!=null) out.mkdIzq={val:pi.mkdPct,ok:true}; }
-      if(vis(24)&&vis(26)&&vis(28)){ var pd=pierna(lm[24],lm[26],lm[28],midHip.x); out.fppaDer={val:pd.fppa,ok:true}; if(pd.mkdPct!=null) out.mkdDer={val:pd.mkdPct,ok:true}; }
+      if(vis(23)&&vis(25)&&vis(27)){ var pi=pierna(lm[23],lm[25],lm[27],midHip.x); if(pi.ok){ out.fppaIzq={val:pi.fppa,ok:true}; if(pi.mkdPct!=null) out.mkdIzq={val:pi.mkdPct,ok:true}; } }
+      if(vis(24)&&vis(26)&&vis(28)){ var pd=pierna(lm[24],lm[26],lm[28],midHip.x); if(pd.ok){ out.fppaDer={val:pd.fppa,ok:true}; if(pd.mkdPct!=null) out.mkdDer={val:pd.mkdPct,ok:true}; } }
     }
     if(vis(25)&&vis(26)&&vis(27)&&vis(28)){
       var dA=_dist2D(lm[27],lm[28]);
@@ -573,14 +581,15 @@
     function hipAng(hip,knee){ if(!midSh) return null;
       var tdx=hip.x-midSh.x, tdy=hip.y-midSh.y, thx=knee.x-hip.x, thy=knee.y-hip.y;
       var cross=tdx*thy-tdy*thx, dot=tdx*thx+tdy*thy; return Math.atan2(cross,dot)*180/Math.PI; }
-    if(vis(23)&&vis(25)){ var hI=hipAng(lm[23],lm[25]); if(hI!=null) out.hipIzq={val:hI,ok:true}; }
-    if(vis(24)&&vis(26)){ var hD=hipAng(lm[24],lm[26]); if(hD!=null) out.hipDer={val:hD,ok:true}; }
-    if(vis(23)&&vis(25)&&vis(27)) out.rodIzq={val:180-_ang2D(lm[23],lm[25],lm[27]), ok:true};   // rodilla flex-ext
-    if(vis(24)&&vis(26)&&vis(28)) out.rodDer={val:180-_ang2D(lm[24],lm[26],lm[28]), ok:true};
-    if(vis(25)&&vis(27)&&vis(31)) out.tobIzq={val:_ang2D(lm[25],lm[27],lm[31]), ok:true};        // tobillo (interior pantorrilla-pie)
-    if(vis(26)&&vis(28)&&vis(32)) out.tobDer={val:_ang2D(lm[26],lm[28],lm[32]), ok:true};
-    if(vis(27)) out.footIzq={val:lm[27].x-midHip.x, ok:true};   // pos AP del pie vs sacro (eventos)
-    if(vis(28)) out.footDer={val:lm[28].x-midHip.x, ok:true};
+    // Guarda de validez (Fase 1): finitud + segmento mínimo → sin esto, puntos coincidentes/NaN daban 180° ok:true.
+    if(vis(23)&&vis(25)&&midSh&&_medible3(midSh,lm[23],lm[25])){ var hI=hipAng(lm[23],lm[25]); if(hI!=null) out.hipIzq={val:hI,ok:true}; }
+    if(vis(24)&&vis(26)&&midSh&&_medible3(midSh,lm[24],lm[26])){ var hD=hipAng(lm[24],lm[26]); if(hD!=null) out.hipDer={val:hD,ok:true}; }
+    if(vis(23)&&vis(25)&&vis(27)&&_medible3(lm[23],lm[25],lm[27])) out.rodIzq={val:180-_ang2D(lm[23],lm[25],lm[27]), ok:true};   // rodilla flex-ext
+    if(vis(24)&&vis(26)&&vis(28)&&_medible3(lm[24],lm[26],lm[28])) out.rodDer={val:180-_ang2D(lm[24],lm[26],lm[28]), ok:true};
+    if(vis(25)&&vis(27)&&vis(31)&&_medible3(lm[25],lm[27],lm[31])) out.tobIzq={val:_ang2D(lm[25],lm[27],lm[31]), ok:true};        // tobillo (interior pantorrilla-pie)
+    if(vis(26)&&vis(28)&&vis(32)&&_medible3(lm[26],lm[28],lm[32])) out.tobDer={val:_ang2D(lm[26],lm[28],lm[32]), ok:true};
+    if(vis(27)&&_finP(lm[27])) out.footIzq={val:lm[27].x-midHip.x, ok:true};   // pos AP del pie vs sacro (eventos)
+    if(vis(28)&&_finP(lm[28])) out.footDer={val:lm[28].x-midHip.x, ok:true};
     if(vis(0)&&(vis(27)||vis(28))){ var ay=vis(27)?lm[27].y:lm[28].y; out.alturaPx=Math.abs(ay-lm[0].y); }
     out.ok=!!(out.rodIzq.ok||out.rodDer.ok);
     out.p={ nariz:vis(0)?lm[0]:null, sacro:midHip, hombroIzq:vis(11)?lm[11]:null, hombroDer:vis(12)?lm[12]:null,
@@ -2216,7 +2225,7 @@
     function v(i){ return _vis(lm,i); }
     // Guarda de geometría degenerada: si dos puntos quedan casi encimados (tracking fallido, articulación
     // fuera de cuadro o doblada sobre sí misma) el ángulo es basura → "no medible" en vez de un número falso.
-    function deg(i,j,k){ return _seg2D(lm[i],lm[j])<0.03 || _seg2D(lm[j],lm[k])<0.03; }
+    function deg(i,j,k){ return !_medible3(lm[i],lm[j],lm[k]); }   // degenerado O no-finito (NaN/Infinity) → no medible
     if(grupo==='Cadera'){
       if(!(v(P.S)&&v(P.H)&&v(P.K))) return { ok:false, val:null };
       if(deg(P.S,P.H,P.K)) return { ok:false, val:null };
