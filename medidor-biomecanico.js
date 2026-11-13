@@ -751,12 +751,27 @@
   }
   // ═════════════ fin núcleo marcha ═════════════
 
+  // ── Identidad de generación (P1-6): descarta resultados TARDÍOS de una medición anterior ──
+  // Cada cambio de fuente o selección (cámara/video/foto/voltear/tipo/goniómetro) incrementa BIO.gen.
+  // Cada send() de streaming encola su gen; onResults saca el más viejo (FIFO) y, si no coincide con
+  // la generación vigente, el cuadro quedó en vuelo de una medición anterior → se descarta (framesDescartados).
+  function _bumpGen(){ BIO.gen = (BIO.gen||0) + 1; }
+  function _genSend(img){
+    (BIO._genQ || (BIO._genQ=[])).push(BIO.gen||0);
+    if(BIO._genQ.length > 32) BIO._genQ.shift();   // candado: un send() colgado que nunca devolvió no crece la cola sin fin
+    return BIO.pose.send({ image: img });
+  }
+
   // ── Callback único de resultados de MediaPipe ──────────────────────────────
   function onResults(res){
     // MODO FOTO: una sola imagen estática → solo guardamos el resultado y salimos (lo procesa procesarFoto).
+    // La foto está serializada con pose.reset() y se consume por BIO._fotoRes → NO pasa por la cola de generación.
     if(BIO.modo==='foto'){ BIO._fotoRes = res; return; }
-    // Descarta UN cuadro si el watchdog liberó un send() colgado → evita pintar un resultado TARDÍO/stale.
-    if(BIO._dropStale){ BIO._dropStale=false; return; }
+    // IDENTIDAD DE GENERACIÓN (P1-6): saca el gen más viejo encolado por su send(); si NO es la generación
+    // vigente, el cuadro quedó en vuelo de una medición anterior (cambió fuente/selección, o el watchdog
+    // liberó un send colgado) → se DESCARTA para no contaminar el acumulador nuevo. Sustituye a _dropStale.
+    var _gi = (BIO._genQ && BIO._genQ.length) ? BIO._genQ.shift() : (BIO.gen||0);
+    if(_gi !== (BIO.gen||0)){ BIO.framesDescartados=(BIO.framesDescartados||0)+1; return; }
     // Fija el aspecto real de la fuente (ancho/alto) para que los ángulos 2D no se deformen en vertical (H1).
     if(BIO.srcEl && BIO.srcEl.videoWidth){ _setAspect(BIO.srcEl.videoWidth, BIO.srcEl.videoHeight); }
     var lm = res && res.poseLandmarks;
@@ -1048,6 +1063,7 @@
   // Selector de tipo de medición: ROM de brazos · sentadilla frontal · marcha sagital.
   function aplicarTipoMedicion(t){
     BIO.tipoMedicion = (t==='sent'||t==='marcha'||t==='gonio') ? t : 'rom';
+    _bumpGen();   // cambia el tipo de medición: un cuadro tardío calculado para el tipo anterior no debe acumular
     var bR=document.getElementById('bio-tipo-rom'), bS=document.getElementById('bio-tipo-sent'), bM=document.getElementById('bio-tipo-marcha'), bG=document.getElementById('bio-tipo-gonio');
     if(bR) bR.classList.toggle('on', BIO.tipoMedicion==='rom');
     if(bS) bS.classList.toggle('on', BIO.tipoMedicion==='sent');
@@ -1078,6 +1094,7 @@
     return (isFinite(v) && v>=80 && v<=230) ? v : null;
   }
   function resetEstado(){
+    _bumpGen(); BIO.framesDescartados=0;   // nueva generación: cualquier cuadro en vuelo de la medición anterior se descartará
     BIO.modo=null; BIO.recording=false; BIO.procesandoVideo=false; BIO.cancelVideo=false; BIO.finalizando=false;
     BIO.acc=null; BIO.accS=null; BIO.accM=null; BIO.accG=null; BIO.framesTotales=0; BIO.srcEl=null; BIO.sending=false;
     BIO._estaticoBase=null; BIO._estaticoLm=null; BIO._estaticoImg=null; BIO._estaticoFuente=null; BIO._peakFrameCanvas=null; BIO._peakFrameLm=null; BIO._fotoRes=null;
@@ -1106,7 +1123,7 @@
 
   // ── MODO A: cámara en vivo ─────────────────────────────────────────────────
   async function iniciarCamara(){
-    BIO.modo='camara';
+    BIO.modo='camara'; _bumpGen();
     BIO.facing = BIO.facing || 'environment';   // TRASERA por defecto (se apunta al paciente)
     mostrarVista('bio-vista-camara');
     // Reset del botón de grabar y cronómetro (evita estado viejo al volver a grabar).
@@ -1164,6 +1181,7 @@
   async function voltearCamara(){
     if(BIO.recording){ toast('Detén la grabación para cambiar de cámara','warning'); return; }
     BIO.facing = (BIO.facing==='environment') ? 'user' : 'environment';
+    _bumpGen();   // cambia la fuente (trasera/frontal): descarta cuadros en vuelo de la cámara anterior
     var estado=document.getElementById('bio-estado');
     if(estado) estado.textContent = (BIO.facing==='environment') ? 'Cámara trasera' : 'Cámara frontal';
     await abrirStreamCamara(BIO.facing);
@@ -1180,7 +1198,7 @@
       // (síntoma: "no graba / se queda pegado / 0 cuadros"). Si lleva >2.5 s sin resolver, lo liberamos
       // y dejamos que el SIGUIENTE tick envíe un frame fresco (sin enviar dos a la vez).
       if(BIO.sending){
-        if(BIO._sendAt && (Date.now()-BIO._sendAt)>2500){ BIO.sending=false; BIO._sendStuck=(BIO._sendStuck||0)+1; BIO._dropStale=true; }
+        if(BIO._sendAt && (Date.now()-BIO._sendAt)>2500){ BIO.sending=false; BIO._sendStuck=(BIO._sendStuck||0)+1; if(BIO._genQ && BIO._genQ.length) BIO._genQ.shift(); }
         return;
       }
       // Si el <video> se pausó (iOS al volver de segundo plano / bloqueo de pantalla), reintenta.
@@ -1188,7 +1206,7 @@
       if(!BIO.pose || !BIO.video || BIO.video.videoWidth===0) return;
       BIO.sending = true; BIO._sendAt = Date.now();
       BIO.framesTotales++;
-      BIO.pose.send({ image: BIO.video }).then(function(){ BIO.sending=false; }).catch(function(){ BIO.sending=false; });
+      _genSend(BIO.video).then(function(){ BIO.sending=false; }).catch(function(){ BIO.sending=false; });
     }
     BIO.rafId = requestAnimationFrame(tick);
   }
@@ -1370,7 +1388,7 @@
   // ── MODO B: analizar video subido ──────────────────────────────────────────
   async function procesarVideo(file){
     if(!file.type || file.type.indexOf('video')!==0){ toast('Selecciona un archivo de video','error'); return; }
-    BIO.modo='video';
+    BIO.modo='video'; _bumpGen();
     // Guardar el archivo elegido para subirlo al expediente al guardar (antes/después visual).
     var _ext=(String(file.name||'').split('.').pop()||'').toLowerCase().replace(/[^a-z0-9]/g,'') || (file.type.indexOf('mp4')>=0?'mp4':(file.type.indexOf('quicktime')>=0?'mov':'webm'));
     BIO.pendingVideo = { file:file, mime:file.type||'video/mp4', ext:_ext };
@@ -1438,10 +1456,10 @@
         if(BIO.cancelVideo){ terminar(); return; }
         var t = v.currentTime || 0;
         // Mismo watchdog que en vivo: libera un send() colgado para no congelar el muestreo del video.
-        if(BIO.sending && BIO._sendAt && (Date.now()-BIO._sendAt)>2500){ BIO.sending=false; }
+        if(BIO.sending && BIO._sendAt && (Date.now()-BIO._sendAt)>2500){ BIO.sending=false; if(BIO._genQ && BIO._genQ.length) BIO._genQ.shift(); }
         if(!BIO.sending && BIO.pose && v.videoWidth>0 && (t - lastSample) >= minGap){
           lastSample = t; BIO.sending = true; BIO._sendAt = Date.now(); BIO.framesTotales++;
-          BIO.pose.send({ image:v }).then(function(){ BIO.sending=false; }).catch(function(){ BIO.sending=false; });
+          _genSend(v).then(function(){ BIO.sending=false; }).catch(function(){ BIO.sending=false; });
         }
         var pct = Math.min(99, Math.round((t/dur)*100));
         fill.style.width = pct+'%';
@@ -1564,6 +1582,7 @@
       if(!sesion.calidad || typeof sesion.calidad!=='object') sesion.calidad={};
       if(!sesion.calidad.algoVersion) sesion.calidad.algoVersion=BIO_ALGO_VER;
       if(!sesion.calidad.captura && sesion.fuente==='camara' && typeof BIO!=='undefined' && BIO.camSettings) sesion.calidad.captura=BIO.camSettings;
+      if(sesion.calidad.framesDescartados==null && typeof BIO!=='undefined' && BIO.framesDescartados) sesion.calidad.framesDescartados=BIO.framesDescartados;
     }catch(_s){}
     p.biomecanica.push(sesion);
     if(!Array.isArray(p.historialCambios)) p.historialCambios=[];
@@ -2461,6 +2480,7 @@
   // MODO C: subir una FOTO (ideal camilla / decúbito prono) → pose en imagen estática → ángulo + foto anotada.
   async function procesarFoto(file){
     if(!file || !file.type || file.type.indexOf('image')!==0){ toast('Selecciona una imagen (JPG/PNG)','error'); return; }
+    _bumpGen();   // nueva generación: aunque la foto está exenta de la cola, invalida cuadros de streaming previos
     if(!BIO.accG) BIO.accG=nuevoAccGonio();
     _gonioSelDefault(BIO.accG);
     mostrarVista('bio-vista-progreso');
@@ -2516,6 +2536,7 @@
   function BIO_gonioSel(kind, val){
     if(!BIO.accG) BIO.accG=nuevoAccGonio();
     var g=BIO.accG; if(!g.sel) _gonioSelDefault(g);
+    _bumpGen();   // cambió articulación/movimiento/lado: descarta cuadros en vuelo de la selección anterior
     if(kind==='grupo'){ g.sel.grupo=val; g.sel.mov=_gonioMovs(val)[0].mov; }
     else if(kind==='mov'){ g.sel.mov=val; }
     else if(kind==='lado'){ g.sel.lado=val; }
