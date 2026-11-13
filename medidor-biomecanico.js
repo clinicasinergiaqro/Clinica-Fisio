@@ -803,7 +803,7 @@
       // Al mejorar el pico guardamos los landmarks de ESE cuadro (trazabilidad: qué puntos produjeron el grado).
       if(mejoroG && lm){ try{ BIO._peakGonioLm=_copiaLm(lm); BIO._peakGonioAR=_ANG_AR; }catch(_g){} }
       // Al analizar un VIDEO, además guardamos la IMAGEN del cuadro-pico para anotarla.
-      if(BIO.modo==='video' && mejoroG && lm && BIO.srcEl){ try{ BIO._peakFrameCanvas=_canvasDeImagen(BIO.srcEl); BIO._peakFrameLm=_copiaLm(lm); }catch(_e){} }
+      if(BIO.modo==='video' && mejoroG && lm && BIO.srcEl){ try{ BIO._peakFrameCanvas=_canvasDeImagen(BIO.srcEl); BIO._peakFrameLm=_copiaLm(lm); BIO._peakTSeg=(BIO.srcEl.currentTime||0); }catch(_e){} }
       if(BIO.canvas && BIO.srcEl){ dibujar(lm, null); dibujarGonioVivo(lm, rg); }
       return;
     }
@@ -1097,7 +1097,7 @@
     _bumpGen(); BIO.framesDescartados=0;   // nueva generación: cualquier cuadro en vuelo de la medición anterior se descartará
     BIO.modo=null; BIO.recording=false; BIO.procesandoVideo=false; BIO.cancelVideo=false; BIO.finalizando=false;
     BIO.acc=null; BIO.accS=null; BIO.accM=null; BIO.accG=null; BIO.framesTotales=0; BIO.srcEl=null; BIO.sending=false;
-    BIO._estaticoBase=null; BIO._estaticoLm=null; BIO._estaticoImg=null; BIO._estaticoFuente=null; BIO._peakFrameCanvas=null; BIO._peakFrameLm=null; BIO._fotoRes=null;
+    BIO._estaticoBase=null; BIO._estaticoLm=null; BIO._estaticoImg=null; BIO._estaticoFuente=null; BIO._peakFrameCanvas=null; BIO._peakFrameLm=null; BIO._peakTSeg=null; BIO._fotoRes=null;
     BIO.facing='environment';           // cada medición arranca con la cámara TRASERA
     detenerGrabadorVideo(); BIO.pendingVideo=null;
     detenerLoopCamara(); pararCronometro();
@@ -1425,7 +1425,7 @@
 
     if(BIO.tipoMedicion==='sent'){ BIO.accS=nuevoAccSent(); }
     else if(BIO.tipoMedicion==='marcha'){ BIO.accM=nuevoAccMarcha(); }
-    else if(BIO.tipoMedicion==='gonio'){ if(!BIO.accG) BIO.accG=nuevoAccGonio(); _gonioSelDefault(BIO.accG); BIO.accG.peak=null; BIO.accG.run=0; BIO._peakFrameCanvas=null; BIO._peakFrameLm=null; }
+    else if(BIO.tipoMedicion==='gonio'){ if(!BIO.accG) BIO.accG=nuevoAccGonio(); _gonioSelDefault(BIO.accG); BIO.accG.peak=null; BIO.accG.run=0; BIO._peakFrameCanvas=null; BIO._peakFrameLm=null; BIO._peakTSeg=null; }
     else { BIO.acc = nuevoAcumulador(); }
     BIO.framesTotales=0;
     BIO.procesandoVideo=true; BIO.cancelVideo=false;
@@ -2426,6 +2426,9 @@
       +   '<button class="bio-gcap-btn" onclick="BIO_gonioCapturar()">◉ Capturar</button>'
       +   '<button class="bio-gfin-btn" onclick="BIO_gonioFinish()">✓ Terminar y guardar</button>'
       + '</div>'
+      + (BIO.modo==='estatico' && BIO._estaticoFuente==='video' && BIO.pendingVideo && BIO.pendingVideo.file
+          ? '<div class="bio-grow" style="margin-bottom:8px"><button class="bio-gchip" style="width:100%;text-align:center;background:#1b5e20;color:#fff;border-color:#1b5e20" onclick="BIO_gonioReanalizarVideo()">🔁 Reanalizar este video para '+esc(sel.grupo+' '+sel.mov+' '+(sel.lado==='izq'?'Izq':'Der'))+'</button></div>'
+          : '')
       + (BIO.modo==='estatico' ? '<div class="bio-grow" style="margin-bottom:8px"><button class="bio-gchip" style="width:100%;text-align:center" onclick="BIO_gonioVolverInicio()">↩︎ Medir otra (subir otra foto/video o cámara)</button></div>' : '')
       + _gonioCapsHTML(g);
     pintarPanelGonio();
@@ -2445,6 +2448,7 @@
     }
   }
   // Muestra el resultado de una FOTO o del cuadro-pico de un VIDEO en la vista de cámara (cuadro congelado + control).
+  function _mmss(s){ s=Math.max(0,Math.round(s||0)); return Math.floor(s/60)+':'+('0'+(s%60)).slice(-2); }   // 7 → "0:07"
   function _mostrarGonioEstatico(baseCanvas, lm, fuente){
     detenerCamaraStream(); detenerLoopCamara();
     BIO.modo='estatico'; BIO._estaticoBase=baseCanvas; BIO._estaticoLm=lm; BIO._estaticoFuente=fuente;
@@ -2460,7 +2464,7 @@
     var est=document.getElementById('bio-estado');
     if(est) est.textContent = (fuente==='foto')
       ? '📷 Foto analizada · cambia la articulación/lado para medir otra, o toca Capturar'
-      : '📁 Video analizado · toca Capturar (para otro movimiento sube otra foto/video)';
+      : ('📁 Video analizado'+(BIO._peakTSeg!=null?' · pico a '+_mmss(BIO._peakTSeg):'')+' · toca Capturar; para OTRO movimiento cambia la selección y toca 🔁 Reanalizar este video');
   }
   // Recalcula el ángulo del movimiento seleccionado SOBRE el cuadro estático (foto o pico de video) y lo dibuja.
   function _recalcEstatico(){
@@ -2543,7 +2547,18 @@
     _gonioSelDefault(g);
     if(BIO.modo==='estatico'){
       if(BIO._estaticoFuente==='foto'){ pintarGonioCtrl(); _recalcEstatico(); return; }   // misma foto: recalcula el nuevo movimiento
-      // VIDEO: el pico está atado al movimiento analizado → pide una fuente nueva para el movimiento elegido.
+      // VIDEO: el cuadro-pico está atado al movimiento ANALIZADO (no vale para otro movimiento). Si conservamos
+      // el archivo (P1-11), ofrecemos REANALIZAR el MISMO video para el nuevo movimiento en vez de pedir otra fuente.
+      if(BIO.pendingVideo && BIO.pendingVideo.file){
+        g.peak=null; g.run=0; BIO._estaticoImg=null;
+        if(BIO.canvas && BIO.ctx && BIO._estaticoBase){ try{ BIO.ctx.clearRect(0,0,BIO.canvas.width,BIO.canvas.height); BIO.ctx.drawImage(BIO._estaticoBase,0,0); }catch(_e){} }  // quita el arco viejo (no aplica al nuevo mov)
+        var _lv=document.getElementById('bg-live'); if(_lv) _lv.textContent='—';
+        var _mx=document.getElementById('bg-max'); if(_mx) _mx.textContent='—';
+        pintarGonioCtrl();   // re-pinta con el botón "🔁 Reanalizar este video"
+        var _es=document.getElementById('bio-estado'); if(_es) _es.textContent='Cambiaste a '+g.sel.grupo+' '+g.sel.mov+'. Toca 🔁 Reanalizar este video para medirlo (o ↩︎ sube otra fuente).';
+        return;
+      }
+      // Sin archivo conservado: comportamiento anterior (pedir otra fuente).
       BIO.modo=null; BIO._estaticoBase=null; BIO._estaticoLm=null; BIO._estaticoImg=null; BIO._estaticoFuente=null;
       mostrarVista('bio-vista-inicio'); pintarGonioInicio();
       toast('Sube otra foto o video para medir '+g.sel.grupo+' '+g.sel.mov,'info'); return;
@@ -2556,6 +2571,14 @@
     detenerCamaraStream(); detenerLoopCamara();
     mostrarVista('bio-vista-inicio'); pintarGonioInicio();
   }
+  // P1-11: reanaliza el MISMO archivo de video ya subido para el movimiento ACTUAL (recorre el video completo de
+  // nuevo; el pico es POR-MOVIMIENTO, NO reutiliza el cuadro-pico de otro movimiento). Conserva las capturas ya hechas.
+  function BIO_gonioReanalizarVideo(){
+    if(!(BIO.pendingVideo && BIO.pendingVideo.file)){ toast('No hay un video guardado; sube uno nuevo','warning'); mostrarVista('bio-vista-inicio'); pintarGonioInicio(); return; }
+    var sel=(BIO.accG&&BIO.accG.sel)||{};
+    toast('Reanalizando el video para '+(sel.grupo||'')+' '+(sel.mov||'')+'…','info');
+    procesarVideo(BIO.pendingVideo.file);   // g.sel ya es la selección nueva; procesarVideo resetea el pico y re-mide el movimiento actual
+  }
   function BIO_gonioCapturar(){
     var g=BIO.accG; if(!g||!g.sel){ return; }
     if(g.peak==null){ toast(BIO.modo==='estatico' ? 'No se detecta esa articulación en la imagen; cambia de movimiento/lado o sube otra' : 'Mueve la articulación hasta el tope para medir','warning'); return; }
@@ -2565,10 +2588,13 @@
     // para poder re-verificar la medición después. Cuadro estático → BIO._estaticoLm; vivo → pico BIO._peakGonioLm.
     var lmCap = (BIO.modo==='estatico') ? BIO._estaticoLm : BIO._peakGonioLm;
     var arCap = (BIO.modo==='estatico') ? (_ANG_AR||1) : (BIO._peakGonioAR||_ANG_AR||1);
+    // Marca de tiempo del cuadro-pico (solo video): deja trazable a qué segundo del clip salió el grado.
+    var tSegCap = (BIO.modo==='estatico' && BIO._estaticoFuente==='video' && BIO._peakTSeg!=null) ? Math.round(BIO._peakTSeg*10)/10 : null;
     g.medidas[key] = { key:g.sel.key, grupo:g.sel.grupo, mov:g.sel.mov, lado:g.sel.lado,
       grado:Math.round(g.peak*10)/10, ref:e.ref, lim:e.lim, defic:!!e.defic, hiperext:!!e.hiperext, normTxt:e.normTxt,
       traza:{ algoVersion:BIO_ALGO_VER, aspect:Math.round(arCap*1e4)/1e4,
               fuente:(BIO.modo==='estatico'?(BIO._estaticoFuente||'estatico'):'camara'),
+              tSeg:tSegCap,
               lmUsados:_gonioLmUsados(lmCap, g.sel.grupo, g.sel.lado) } };
     // Si viene de foto/video, guarda la IMAGEN ANOTADA de esta captura (copia del canvas actual).
     if(BIO.modo==='estatico' && BIO._estaticoImg){
@@ -3239,6 +3265,7 @@
   window.BIO_gonioFinish = BIO_gonioFinish;
   window.BIO_gonioVolver = BIO_gonioVolver;
   window.BIO_gonioVolverInicio = BIO_gonioVolverInicio;
+  window.BIO_gonioReanalizarVideo = BIO_gonioReanalizarVideo;
   window.BIO_gonioGuardar = guardarSesionGonio;
   window.BIO_comparar = BIO_comparar;
   window.BIO_cmpSel = BIO_cmpSel;
