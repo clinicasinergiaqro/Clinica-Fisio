@@ -2893,7 +2893,9 @@
   function renderPestana(p){
     // Catch-up de sync: al abrir la pestaña, empuja a la nube cualquier medición local-only y jala las
     // de otros equipos (unión). Fire-and-forget; si las reglas aún no permiten 'biomecanica', se queda local.
-    try{ if(typeof window!=='undefined' && typeof window._syncBiomecanicaFS==='function' && p && Array.isArray(p.biomecanica) && p.biomecanica.length){ window._syncBiomecanicaFS(p); } }catch(e){}
+    // CROSS-DEVICE (fix 2026-11-14): corre SIEMPRE, aunque este equipo NO tenga mediciones locales — si no,
+    // un equipo que no midió nunca JALA lo que otro equipo guardó (bug "Sin mediciones" en el 2º equipo).
+    try{ if(typeof window!=='undefined' && typeof window._syncBiomecanicaFS==='function' && p){ if(!Array.isArray(p.biomecanica)) p.biomecanica=[]; window._syncBiomecanicaFS(p); } }catch(e){}
     var lista = Array.isArray(p.biomecanica) ? p.biomecanica.filter(function(s){ return s && !s.eliminado; }) : [];
     var html = ''
       + '<button class="btn-gold" style="width:100%;margin-bottom:12px;font-size:15px;font-weight:800;border:none;border-radius:var(--radius);padding:14px;cursor:pointer;background:var(--gold);color:var(--navy-dark)" onclick="abrirMedidorBiomecanico()">▶️ Nueva medición ROM</button>';
