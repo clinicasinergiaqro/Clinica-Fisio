@@ -2127,6 +2127,8 @@
   // Tarjeta de una sesión de SENTADILLA en la pestaña (misma familia visual que las de ROM).
   // Badge de estado de sincronización (P1-10): ☁️ en la nube / 📱 solo en este equipo. Sesiones viejas
   // (sin el campo _estadoSync) NO muestran badge, para no afirmar un estado que no se registró.
+  // Multi-equipo (N2): una sesión traída de la nube puede verse 📱 un instante en el equipo B hasta que su propio
+  // catch-up (renderPestana dispara _syncBiomecanicaFS al abrir la pestaña) la marque 'sincronizada' → converge solo.
   function _syncBadge(s){
     if(!s || s._estadoSync==null) return '';
     return (s._estadoSync==='sincronizada')
