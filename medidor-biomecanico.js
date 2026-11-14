@@ -1593,6 +1593,7 @@
       if(!sesion.calidad.algoVersion) sesion.calidad.algoVersion=BIO_ALGO_VER;
       if(!sesion.calidad.captura && sesion.fuente==='camara' && typeof BIO!=='undefined' && BIO.camSettings) sesion.calidad.captura=BIO.camSettings;
       if(sesion.calidad.framesDescartados==null && typeof BIO!=='undefined' && BIO.framesDescartados) sesion.calidad.framesDescartados=BIO.framesDescartados;
+      if(sesion._estadoSync==null){ sesion._estadoSync='local'; sesion._estadoSyncFecha=null; }   // P1-10: estado real de sync; _syncBiomecanicaFS lo pone 'sincronizada' al confirmar la nube
     }catch(_s){}
     p.biomecanica.push(sesion);
     if(!Array.isArray(p.historialCambios)) p.historialCambios=[];
@@ -1833,7 +1834,7 @@
       duracionSeg:meta.duracionSeg||0,
       nCiclos:res.nCiclos, cadencia:res.cadencia, velocidad:res.velocidad,
       temporal:res.temporal, espacial:res.espacial, sagital:res.sagital, simetria:res.simetria,
-      medidas:res.medidas, calibracion:res.calibracion, calidad:meta.calidad||{},
+      medidas:res.medidas, calibracion:res.calibracion, calidad:Object.assign({}, res.calidad||{}, meta.calidad||{}),   // P1-9: conserva tiempoDudoso/visPct/orientPerfilOK de res.calidad
       reportePdf:null, video:null, eliminado:false
     };
     sesion.video = await _subirVideoSesion(p, meta, btn, 'marcha');
@@ -2121,6 +2122,14 @@
       .map(function(g){ return fila(g[0], a[g[1]], a[g[2]]); }).join('');
   }
   // Tarjeta de una sesión de SENTADILLA en la pestaña (misma familia visual que las de ROM).
+  // Badge de estado de sincronización (P1-10): ☁️ en la nube / 📱 solo en este equipo. Sesiones viejas
+  // (sin el campo _estadoSync) NO muestran badge, para no afirmar un estado que no se registró.
+  function _syncBadge(s){
+    if(!s || s._estadoSync==null) return '';
+    return (s._estadoSync==='sincronizada')
+      ? ' · <span title="Sincronizada a la nube'+(s._estadoSyncFecha?(' ('+String(s._estadoSyncFecha).slice(0,10)+')'):'')+'" style="color:var(--green)">☁️</span>'
+      : ' · <span title="Solo en este equipo (aún sin confirmar en la nube)" style="color:#B45309">📱</span>';
+  }
   function tarjetaSentHTML(s){
     var by={}; (s.medidas||[]).forEach(function(m){ by[m.key]=m; });
     function fmtS(m, etqExt){
@@ -2153,7 +2162,7 @@
     return '<div class="section-card" style="margin-bottom:10px">'
       + '<div class="section-title" style="display:flex;align-items:center;justify-content:space-between">'
       +   '<span>🏋️ Sentadilla · '+esc(s.fecha)+' '+esc(s.horaCreacion||'')+'</span>'
-      +   '<span style="font-weight:600;text-transform:none;letter-spacing:0;color:var(--gray-400)">'+fuente+'</span>'
+      +   '<span style="font-weight:600;text-transform:none;letter-spacing:0;color:var(--gray-400)">'+fuente+_syncBadge(s)+'</span>'
       + '</div>'
       + '<div class="field-row"><div class="field-label">Terapeuta</div><div class="field-value">'+esc(s.terapeuta||'—')+' · '+(s.duracionSeg||0)+' s · '+nReps+' rep'+(nReps===1?'':'s')+' (vista frontal)'+(avisos.length?(' · <span style="color:#B45309">⚠️ '+esc(avisos.join(', '))+'</span>'):'')+'</div></div>'
       + fila('Valgo FPPA (media bajada)', fmtS(by['fppa_izq'],'peor'), fmtS(by['fppa_der'],'peor'))
@@ -2195,7 +2204,7 @@
     return '<div class="section-card" style="margin-bottom:10px">'
       + '<div class="section-title" style="display:flex;align-items:center;justify-content:space-between">'
       +   '<span>🚶 Marcha · '+esc(s.fecha)+' '+esc(s.horaCreacion||'')+'</span>'
-      +   '<span style="font-weight:600;text-transform:none;letter-spacing:0;color:var(--gray-400)">'+fuente+'</span>'
+      +   '<span style="font-weight:600;text-transform:none;letter-spacing:0;color:var(--gray-400)">'+fuente+_syncBadge(s)+'</span>'
       + '</div>'
       + '<div class="field-row"><div class="field-label">Terapeuta</div><div class="field-value">'+esc(s.terapeuta||'—')+' · '+(s.duracionSeg||0)+' s · '+(s.nCiclos||0)+' ciclo'+((s.nCiclos===1)?'':'s')+' (vista sagital)'+(avisos.length?(' · <span style="color:#B45309">⚠️ '+esc(avisos.join(', '))+'</span>'):'')+'</div></div>'
       + fila('Cadencia · velocidad', cadTxt+' · '+velTxt)
@@ -2542,7 +2551,16 @@
           var task=_ref.put(blob,{contentType:'image/jpeg'});
           task.on('state_changed', null, function(err){ reject(err); }, function(){ task.snapshot.ref.getDownloadURL().then(resolve).catch(reject); });
         });
-        out.push({ key:keys[i], grupo:it.grupo, mov:it.mov, lado:it.lado, grado:it.grado, etq:it.etq, url:_url, fbPath:_path, mime:'image/jpeg' });
+        // P1-8: sube TAMBIÉN el original sin anotar (mismo path con sufijo _orig). Si falla, se conserva lo anotado + las métricas.
+        var _urlOrig=null, _pathOrig=null;
+        if(it.orig){ try{
+          var blobO=await new Promise(function(resolve){ try{ it.orig.toBlob(function(b){ resolve(b); }, 'image/jpeg', 0.85); }catch(e){ resolve(null); } });
+          if(blobO){ _pathOrig='clinica/sinergia/'+p.id+'/biomecanica/gonio_'+(it.key||('img'+i))+'_'+_ts+'_orig.jpg';
+            var _refO=fbStorage.ref(_pathOrig);
+            _urlOrig=await new Promise(function(resolve,reject){ var t=_refO.put(blobO,{contentType:'image/jpeg'}); t.on('state_changed', null, function(err){ reject(err); }, function(){ t.snapshot.ref.getDownloadURL().then(resolve).catch(reject); }); });
+          }
+        }catch(eo){ console.warn('[BIO] subida del original falló (se conserva lo anotado):', eo && eo.message); _urlOrig=null; _pathOrig=null; } }
+        out.push({ key:keys[i], grupo:it.grupo, mov:it.mov, lado:it.lado, grado:it.grado, etq:it.etq, url:_url, fbPath:_path, urlOrig:_urlOrig, fbPathOrig:_pathOrig, mime:'image/jpeg' });
       }catch(e){ console.warn('[BIO] subida de imagen gonio falló:', e && e.message); }
     }
     return out;
@@ -2606,13 +2624,15 @@
               fuente:(BIO.modo==='estatico'?(BIO._estaticoFuente||'estatico'):'camara'),
               tSeg:tSegCap,
               lmUsados:_gonioLmUsados(lmCap, g.sel.grupo, g.sel.lado) } };
-    // Si viene de foto/video, guarda la IMAGEN ANOTADA de esta captura (copia del canvas actual).
+    // Si viene de foto/video, guarda la IMAGEN ANOTADA de esta captura (copia del canvas actual) + el ORIGINAL sin anotar (P1-8).
     if(BIO.modo==='estatico' && BIO._estaticoImg){
       try{
         var src=BIO._estaticoImg, cc=document.createElement('canvas'); cc.width=src.width; cc.height=src.height;
         cc.getContext('2d').drawImage(src,0,0);
+        var origCv=null;   // P1-8: conserva también el cuadro ORIGINAL sin anotar (BIO._estaticoBase)
+        if(BIO._estaticoBase){ try{ var ob=BIO._estaticoBase; origCv=document.createElement('canvas'); origCv.width=ob.width; origCv.height=ob.height; origCv.getContext('2d').drawImage(ob,0,0); }catch(_o){ origCv=null; } }
         if(!g.imgs) g.imgs={};
-        g.imgs[key] = { canvas:cc, grupo:g.sel.grupo, mov:g.sel.mov, lado:g.sel.lado, grado:g.medidas[key].grado, etq:g.sel.grupo+' '+g.sel.mov+' '+(g.sel.lado==='izq'?'Izq':'Der') };
+        g.imgs[key] = { canvas:cc, orig:origCv, grupo:g.sel.grupo, mov:g.sel.mov, lado:g.sel.lado, grado:g.medidas[key].grado, etq:g.sel.grupo+' '+g.sel.mov+' '+(g.sel.lado==='izq'?'Izq':'Der') };
       }catch(_e){}
     }
     toast('Capturado: '+g.sel.grupo+' '+g.sel.mov+' '+(g.sel.lado==='izq'?'Izq':'Der'),'success');
@@ -2688,13 +2708,23 @@
     if(BIO.stream){ BIO.modo='camara'; mostrarVista('bio-vista-camara'); try{ BIO.video&&BIO.video.play(); }catch(e){} if(!BIO.rafId) loopCamara(); pintarGonioCtrl(); }
     else { BIO_gonioVolverInicio(); }
   }
+  // P1-7: la fuente de la sesión gonio se DERIVA de las trazas por medida (no de si hubo imágenes):
+  // todas 'camara' → 'camara'; todas 'foto'/'video' → esa; mezcla → 'mixta'.
+  function _fuenteDeTrazas(g){
+    var set={}, med=(g&&g.medidas)||{};
+    for(var k in med){ var t=med[k]&&med[k].traza, f=(t&&t.fuente)||'camara'; if(f==='estatico') f='foto'; set[f]=1; }
+    var ks=Object.keys(set);
+    if(ks.length===0) return 'camara';
+    if(ks.length===1) return ks[0];
+    return 'mixta';
+  }
   async function guardarSesionGonio(){
     var p=(typeof currentPatient!=='undefined')?currentPatient:null; if(!p){ toast('Sin paciente activo','error'); return; }
     var g=BIO.accG, arr=_gonioMedidasArr(g);
     if(!arr.length){ toast('Sin medidas que guardar','warning'); return; }
     var btn=document.getElementById('bio-gonio-guardar'); if(btn){ btn.disabled=true; btn.textContent='⏳ Guardando…'; }
     var imagenes = await _subirImagenesGonio(p, g, btn);   // fotos anotadas (foto/cuadro-pico); [] si no hubo o falló (las métricas igual se guardan)
-    var fuenteG = (g.imgs && Object.keys(g.imgs).length) ? 'imagen' : 'camara';
+    var fuenteG = _fuenteDeTrazas(g);   // P1-7: derivada de las trazas por medida (camara/foto/video/mixta)
     var sesion={
       id:'bm_'+p.id+'_'+Date.now(), tipo:'goniometria', fuente:fuenteG,
       fecha:fechaHoy(), horaCreacion:horaAhora(), fechaHoraISO:new Date().toISOString(),
@@ -2727,16 +2757,16 @@
     var filas=GONIO_CAT.map(fila).join('');
     var _imgs=(s.imagenes||[]).filter(function(x){ return x && x.url; });
     var imgHTML = _imgs.length ? ('<div class="field-row"><div class="field-label">Imágenes</div><div class="field-value" style="display:flex;gap:10px;flex-wrap:wrap">'
-      + _imgs.map(function(im){ return '<a href="'+esc(im.url)+'" target="_blank" rel="noopener" style="text-decoration:none"><img src="'+esc(im.url)+'" alt="'+esc(im.etq||'')+'" style="width:96px;height:96px;object-fit:cover;border-radius:10px;border:1.5px solid var(--gray-200);display:block"><div style="font-size:10px;color:var(--gray-400);text-align:center;max-width:96px;margin-top:2px">'+esc(im.etq||'')+(im.grado!=null?(' '+Math.round(im.grado)+'°'):'')+'</div></a>'; }).join('')
+      + _imgs.map(function(im){ return '<div style="display:inline-block"><a href="'+esc(im.url)+'" target="_blank" rel="noopener" style="text-decoration:none"><img src="'+esc(im.url)+'" alt="'+esc(im.etq||'')+'" style="width:96px;height:96px;object-fit:cover;border-radius:10px;border:1.5px solid var(--gray-200);display:block"><div style="font-size:10px;color:var(--gray-400);text-align:center;max-width:96px;margin-top:2px">'+esc(im.etq||'')+(im.grado!=null?(' '+Math.round(im.grado)+'°'):'')+'</div></a>'+(im.urlOrig?('<a href="'+esc(im.urlOrig)+'" target="_blank" rel="noopener" style="display:block;text-align:center;font-size:10px;color:var(--navy);max-width:96px">ver original</a>'):'')+'</div>'; }).join('')
       + '</div></div>') : '';
-    var fuenteLbl = s.fuente==='imagen' ? '📷 Imagen' : (s.fuente==='video' ? '📁 Video' : '📷 Cámara');
+    var fuenteLbl = s.fuente==='foto' ? '📷 Foto' : (s.fuente==='video' ? '📁 Video' : (s.fuente==='mixta' ? '🔀 Mixta' : (s.fuente==='imagen' ? '📷 Imagen' : '📷 Cámara')));   // P1-7: 'imagen' = sesiones viejas
     var pdfBtn = (s.reportePdf && s.reportePdf.url)
       ? '<button data-url="'+esc(s.reportePdf.url)+'" onclick="window.open(this.dataset.url,\'_blank\')" style="background:var(--navy);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer">📄 Ver PDF</button>'
       : '<button data-sid="'+esc(s.id)+'" onclick="BIO_pdf(this.dataset.sid)" style="background:var(--white);color:var(--navy);border:1.5px solid var(--gray-200);border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer">📄 Generar PDF</button>';
     return '<div class="section-card" style="margin-bottom:10px">'
       + '<div class="section-title" style="display:flex;align-items:center;justify-content:space-between">'
       +   '<span>📐 Goniometría · '+esc(s.fecha)+' '+esc(s.horaCreacion||'')+'</span>'
-      +   '<span style="font-weight:600;text-transform:none;letter-spacing:0;color:var(--gray-400)">'+fuenteLbl+' · sagital</span>'
+      +   '<span style="font-weight:600;text-transform:none;letter-spacing:0;color:var(--gray-400)">'+fuenteLbl+_syncBadge(s)+' · sagital</span>'
       + '</div>'
       + '<div class="field-row"><div class="field-label">Terapeuta</div><div class="field-value">'+esc(s.terapeuta||'—')+' · '+((s.medidas||[]).length)+' medidas</div></div>'
       + filas
@@ -2824,7 +2854,7 @@
       return '<div class="section-card" style="margin-bottom:10px">'
         + '<div class="section-title" style="display:flex;align-items:center;justify-content:space-between">'
         +   '<span>🦴 ROM · '+esc(s.fecha)+' '+esc(s.horaCreacion||'')+'</span>'
-        +   '<span style="font-weight:600;text-transform:none;letter-spacing:0;color:var(--gray-400)">'+fuente+'</span>'
+        +   '<span style="font-weight:600;text-transform:none;letter-spacing:0;color:var(--gray-400)">'+fuente+_syncBadge(s)+'</span>'
         + '</div>'
         + '<div class="field-row"><div class="field-label">Terapeuta</div><div class="field-value">'+esc(s.terapeuta||'—')+' · '+(s.duracionSeg||0)+' s · '+((s.calidad&&s.calidad.framesValidos)||0)+' cuadros</div></div>'
         + filas

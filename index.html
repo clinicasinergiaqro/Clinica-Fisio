@@ -17556,7 +17556,13 @@ async function _syncBiomecanicaFS(p){
         tx.set(ref, _sinUndefined({ biomecanica: fusionFinal }), { merge:true });
       });
     }), 10000);
-    if(fusionFinal) p.biomecanica = fusionFinal;                          // local refleja la unión (trae lo de otros equipos)
+    if(fusionFinal){
+      // P1-10: la transacción confirmó → estas sesiones YA están en la nube. Marca su estado de sync SOLO
+      // tras el éxito (nunca si la tx falló). Campo nuevo; sesiones viejas sin el campo se dejan sin marcar.
+      var _nowISO=(new Date()).toISOString();
+      fusionFinal.forEach(function(s){ if(s && !s.eliminado && s._estadoSync!=='sincronizada'){ s._estadoSync='sincronizada'; s._estadoSyncFecha=_nowISO; } });
+      p.biomecanica = fusionFinal;                                        // local refleja la unión (trae lo de otros equipos)
+    }
     return {ok:true};
   }catch(e){
     if(e && (e.code==='permission-denied' || /permission|insufficient/i.test(String((e&&e.message)||'')))){
