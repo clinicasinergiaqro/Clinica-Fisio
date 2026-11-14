@@ -355,6 +355,10 @@
   // Resume cada movimiento como la MEDIA de los picos de sus repeticiones (más reproducible que un
   // máximo suelto y robusto al ruido). Codo añade extensión (mínimo robusto). Mantiene min/max/rango
   // por compatibilidad con el render/PDF y con sesiones ya guardadas.
+  // (i) Gate de confiable de ROM de brazos: además de ≥1 rep y ≥12 muestras, exige un PISO de visibilidad.
+  // Un valor con muy pocos frames visibles (p.ej. hombro ext 174° a 8% de visibilidad) NO es confiable aunque
+  // haya cruzado 12 muestras. Solo puede BAJAR confiable, nunca re-habilitarla. Pura para pruebas.
+  function _romConfiable(reps, muestras, visPct){ return (reps>=1 && muestras>=12 && visPct>=25); }
   function finalizarMedidas(acc){
     return MEDIDAS.map(function(m){
       var s = acc && acc[m.key];
@@ -379,7 +383,7 @@
         base.min=0; base.max=base.mejor; base.rango=base.media;
       }
       base.visPct = (acc && acc._frame) ? Math.round(base.muestras/acc._frame*100) : 0;
-      base.confiable = (base.reps>=1 && base.muestras>=12);   // suficientes muestras y ≥1 repetición
+      base.confiable = _romConfiable(base.reps, base.muestras, base.visPct);   // (i) ≥1 rep, ≥12 muestras y ≥25% visibilidad
       return base;
     });
   }
@@ -2374,14 +2378,22 @@
     g.peak=null; g.run=0; g.ema={};
   }
   function _gonioSelKey(g){ return g && g.sel ? (g.sel.key+'_'+g.sel.lado) : ''; }
+  // (h) Posible ESCORZO / fuera de plano: el goniómetro 2D colapsa hacia ~180° cuando el segmento queda casi
+  // paralelo al eje de la cámara (p.ej. cadera ext 160°, rodilla flex 172°). Se marca "revisar" cuando el grado
+  // rebasa MUCHO el rango normal (ref + 15°) en un mov que NO es déficit ni hiperextensión. Se computa de los
+  // campos ya guardados (grado/ref) → aplica también a sesiones viejas. No borra el número; lo señala.
+  function _gonioFueraRango(m){
+    return !!(m && m.grado!=null && m.ref!=null && !m.defic && !m.hiperext && m.grado > m.ref + 15);
+  }
   function _gonioFmtGrado(m){
     if(!m || m.grado==null) return '—';
     if(m.hiperext){ return (m.grado<=1) ? '0° (neutro)' : ('+'+Math.round(m.grado)+'° hiperext'); }
     if(m.defic){ return (m.grado<=1) ? '0° (completa)' : ('déficit '+Math.round(m.grado)+'°'); }
-    return Math.round(m.grado)+'°';
+    return Math.round(m.grado)+'°'+(_gonioFueraRango(m)?' (revisar)':'');
   }
   function _gonioAlerta(m){
     if(!m || m.grado==null) return false;
+    if(_gonioFueraRango(m)) return true;              // (h) fuera de rango (posible escorzo) → alerta
     if(m.hiperext) return m.grado>m.lim;              // hiperextensión: alerta si rebasa el umbral
     return m.defic ? (m.grado>m.lim) : (m.grado<m.lim);
   }
@@ -3390,12 +3402,13 @@
   window.BIO_comparar = BIO_comparar;
   window.BIO_cmpSel = BIO_cmpSel;
   window.BIO_cmpCerrar = BIO_cmpCerrar;
-  window.__BIO_GONIO = { calcularGonio:calcularGonio, nuevoAccGonio:nuevoAccGonio, GONIO_CAT:GONIO_CAT, _gonioTexto:_gonioTexto, _gonioAlerta:_gonioAlerta, _gonioFmtGrado:_gonioFmtGrado };  // hook de pruebas
+  window.__BIO_GONIO = { calcularGonio:calcularGonio, nuevoAccGonio:nuevoAccGonio, GONIO_CAT:GONIO_CAT, _gonioTexto:_gonioTexto, _gonioAlerta:_gonioAlerta, _gonioFmtGrado:_gonioFmtGrado, _gonioFueraRango:_gonioFueraRango };  // hook de pruebas
   // Hook de PRUEBAS (geometría pura, sin DOM/MediaPipe) — lo usa pruebas/geometria.test.js.
   window.__BIO_TEST = {
     setAspect:_setAspect, ang2D:_ang2D, seg2D:_seg2D,
     calcularGonio:calcularGonio, cmpExtraer:_cmpExtraer, cmpTablaHTML:_cmpTablaHTML,
     cadenciaDudosa:_cadenciaDudosa, gonioFmtGrado:_gonioFmtGrado, gonioAlerta:_gonioAlerta,
+    gonioFueraRango:_gonioFueraRango, romConfiable:_romConfiable,
     GONIO_CAT:GONIO_CAT, ALGO_VER:BIO_ALGO_VER
   };
 

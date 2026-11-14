@@ -39,18 +39,16 @@ Fix cross-device (`b49de55`) auto-revisado el 2026-11-14 → LIMPIO (ver `audito
 
 Del análisis de las 12 mediciones de prueba (ver `auditoria/02_analisis_mediciones.md`). Misma clase:
 "el 2D da un número confiado pero clínicamente imposible cuando la pose está escorzada / mal orientada / poco visible".
-- **(h) Goniómetro: valor imposible igual se escribe a `valoracion.rom`** (p. ej. cadera ext 160°, rodilla flex 172°).
-  El escorzo (segmento casi paralelo al eje de cámara) colapsa el ángulo 2D hacia ~180°. La guarda de geometría
-  degenerada y el gate de visibilidad (≥0.5) no lo atrapan. Candidato: marcar "revisar / fuera de rango, posible
-  escorzo" cuando `grado > ref + ~15°` y no sea `hiperext`.
-- **(i) Gate `confiable` de ROM brazos demasiado laxo** (`medidor-biomecanico.js:382` = `reps>=1 && muestras>=12`).
-  Un hombro ext 174° a visPct 8% salió `confiable:true`. Candidato: piso de `visPct` (≥25–30%) y/o clamp de
-  plausibilidad vs rango normal.
-- **(j) Marcha con `orientPerfilOK:false` igual computa y guarda ROM sagital inflado** (hip ROM 97.6°). Candidato:
-  gatear `confiable:false` en ROM sagitales cuando `orientPerfilOK===false` (análogo a `tiempoDudoso` → temporales).
+- **(h) Goniómetro: "(revisar)" fuera de rango (posible escorzo) — ✅ FIX PREPARADO en rama** (no desplegado).
+  `_gonioFueraRango` marca "(revisar)" + alerta cuando `grado > ref+15°` (no defic/hiperext). Retroactivo.
+  Verificado contra datos reales (marca 160° cadera / 172° rodilla; deja 129° borderline). Ver `auditoria/03_fixes_preparados.md`.
+- **(i) Gate `confiable` de ROM brazos — ✅ FIX PREPARADO en rama** (no desplegado).
+  `_romConfiable` ahora exige `visPct>=25` además de `reps>=1 && muestras>=12` (`:386`). Baja a no-confiable 6
+  medidas de hombro de baja visibilidad en los datos reales (incluida abd 179° a 16% y ext 174° a 8%).
+- **(j) Marcha con `orientPerfilOK:false`** → **CORREGIDO EL DIAGNÓSTICO: ya está cubierto.** Las medidas salen
+  `confiable:false` por el gate `orientOK!==false` (`:741`) + aviso "no se vio DE PERFIL" (`:1795`). No requiere fix.
 
-Ninguno se parcha sin OK de Carlos. Son residual de la misma clase del track; el etiquetado "cribado ±5–10°,
-no validado" ya advierte, pero el número crudo sigue visible.
+(h) e (i) están en la rama, **sin merge a main ni deploy**, esperando OK de Carlos (punto 5). Suites 104/0.
 
 ## Notas de deploy
 - Al mergear: bump doble `sw.js` + `window.APP_VERSION`; agregar `pruebas/`, `ejemplos/`, este `PENDIENTES.md`,

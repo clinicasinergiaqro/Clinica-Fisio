@@ -54,20 +54,22 @@ Resumen: **plausibles** 0,1,6,7,10 (+2 plausible-pobre) · **sospechosas/imposib
    → **Candidato de fix (misma clase, NO aplicado):** añadir piso de `visPct` (p. ej. ≥25–30%) y/o clamp de
    plausibilidad contra el rango normal del movimiento. Reportado; requiere OK de Carlos.
 
-3. **[3] marcha hip ROM 97.6° con `orientPerfilOK:false`** → **captura con mala orientación de perfil.**
-   El módulo YA detecta y expone `orientPerfilOK:false`, pero igual computa y guarda el ROM sagital inflado
-   (y la cadencia/ángulos salen raros). Es análogo al patrón de `tiempoDudoso` (Hallazgo D) pero para la
-   geometría sagital.
-   → **Candidato de fix (misma clase, NO aplicado):** gatear `confiable:false` en los ROM sagitales cuando
-   `orientPerfilOK===false` (como `tiempoDudoso` gatea los temporales). Reportado; requiere OK de Carlos.
+3. **[3] marcha hip ROM 97.6° con `orientPerfilOK:false`** → **CORRECCIÓN: esto YA está cubierto.**
+   Revisando el array `medidas` de [3], TODAS las medidas (temporales Y ángulos) salen `confiable:false`
+   porque la confianza del ángulo exige `orientOK!==false` (`medidor-biomecanico.js:741`), y además la vista de
+   marcha muestra el aviso "⚠️ La toma no se vio DE PERFIL…" (`:1795`). El valor crudo 97.6° sigue guardado en
+   `sagital`/`simetria` pero se RENDERIZA con `baja conf.`. → **No requiere fix.** (Mi marcado inicial de (j)
+   como gap era incorrecto; se corrige aquí por honestidad.)
 
 4. **[2] marcha corta (1 ciclo)** y **[9] codo de=31 (variabilidad entre reps)** → no son bugs: captura
    incompleta / esfuerzo inconsistente del tester. Informativo.
 
-Nota: los 3 candidatos de fix son de la **misma clase** ("el 2D produce un número confiado pero clínicamente
+Nota: los candidatos de fix son de la **misma clase** ("el 2D produce un número confiado pero clínicamente
 imposible cuando la pose está mal / escorzada / poco visible"). El track previo ya añadió los `[verificar]` y el
-"no-medible" por geometría degenerada; estos 3 son el residual de esa clase. **No se parchan sin confirmación de
-Carlos** (regla 5 + "NO parchar por un dato raro sin confirmación").
+"no-medible" por geometría degenerada; estos son el residual de esa clase.
+
+**Resultado tras el OK de Carlos (prepara los 3 para revisar):** de los 3, (j) resultó **ya cubierto** (arriba),
+así que se prepararon **2 fixes reales — (h) y (i)** — en la rama (NO en main/deploy); ver `03_fixes_preparados.md`.
 
 ## Cobertura del checklist del equipo (por tipo × fuente)
 
