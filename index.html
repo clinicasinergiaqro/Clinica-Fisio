@@ -17546,6 +17546,7 @@ async function _syncBiomecanicaFS(p){
     if(!ok || !window._fstDb) return {ok:false, pendiente:true};          // offline → queda local, se sube luego
     var ref = window._fstDb.collection('pacientes').doc(p.id);
     var fusionFinal = null;
+    var _idsAntes={}; p.biomecanica.forEach(function(s){ if(s&&s.id) _idsAntes[s.id]=1; });   // P2-14: para detectar sesiones nuevas que trae la fusión
     // TRANSACCIÓN ATÓMICA (H3): lee→fusiona→escribe en una sola operación. El get+set no transaccional de
     // antes tenía una carrera read-modify-write: dos equipos guardando a la vez leían el mismo remoto y el
     // segundo pisaba la medición del primero. La transacción reintenta sola ante contención → no se pierde ninguna.
@@ -17562,6 +17563,13 @@ async function _syncBiomecanicaFS(p){
       var _nowISO=(new Date()).toISOString();
       fusionFinal.forEach(function(s){ if(s && !s.eliminado && s._estadoSync!=='sincronizada'){ s._estadoSync='sincronizada'; s._estadoSyncFecha=_nowISO; } });
       p.biomecanica = fusionFinal;                                        // local refleja la unión (trae lo de otros equipos)
+      // P2-14: si la fusión trajo sesiones NUEVAS de otros equipos, persístelas en local con un saveDB DIFERIDO
+      // (si no, viven solo en memoria hasta el próximo guardado). Debounce por paciente; saveDB no re-dispara este sync.
+      var _hayNuevas = fusionFinal.some(function(s){ return s && s.id && !_idsAntes[s.id]; });
+      if(_hayNuevas && typeof saveDB==='function' && !p._bmSavePend){
+        p._bmSavePend=true;
+        setTimeout(function(){ p._bmSavePend=false; try{ saveDB('pts',[p]); }catch(_e){} }, 1500);
+      }
     }
     return {ok:true};
   }catch(e){

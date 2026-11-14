@@ -1856,7 +1856,7 @@
     var hEst = hs.length ? (hs[Math.floor(0.90*(hs.length-1))]/0.88)*1000 : null;
     return { v:1, fps:(meta&&meta.calidad&&(meta.calidad.fpsPromedio||meta.calidad.fpsMuestreo))||12,
       aspect:accS.aspect||0.5625, nReps:(res&&res.nReps)||0, fondo:fondo, n:accS.trayN, puntos:accS.tray,
-      porRep:(res&&res.porRep)||[], escala:{ yBase:yBase, hEst:hEst, estaturaCm:(res&&res.calibracion&&res.calibracion.estaturaCm)||null } };
+      porRep:(res&&res.porRep)||[], trayFrame:accS.trayFrame||[], escala:{ yBase:yBase, hEst:hEst, estaturaCm:(res&&res.calibracion&&res.calibracion.estaturaCm)||null } };   // P2-14: trayFrame (posición→nº de cuadro) lo usa _dibujarSacro para ubicar el fondo
   }
   // Persiste el paquete: memoria (replay inmediato) + IndexedDB (offline, mismo dispositivo) +
   // Storage (viaja entre dispositivos). En la sesión solo queda el puntero.
@@ -1972,8 +1972,11 @@
     // fondos de cada rep (rojo) + etiqueta de profundidad
     ctx.textAlign='center'; ctx.textBaseline='top';
     (paq.porRep||[]).forEach(function(rp){
-      var idx=null; for(var q=0;q<(paq.trayFrame?paq.trayFrame.length:0);q++){ if(paq.trayFrame[q]===rp.frameFondo){ idx=q; break; } }
-      if(idx==null && rp.frameFondo!=null && rp.frameFondo<serie.length) idx=rp.frameFondo;
+      var idx=null;
+      if(paq.trayFrame && paq.trayFrame.length){
+        for(var q=0;q<paq.trayFrame.length;q++){ if(paq.trayFrame[q]===rp.frameFondo){ idx=q; break; } }
+        if(idx==null && rp.frameFondo!=null){ var _best=-1,_bd=Infinity; for(var q2=0;q2<paq.trayFrame.length;q2++){ var _dd=Math.abs(paq.trayFrame[q2]-rp.frameFondo); if(_dd<_bd){_bd=_dd;_best=q2;} } if(_best>=0) idx=_best; }   // P2-14: cuadro capturado MÁS CERCANO (no el nº de cuadro crudo como posición)
+      } else if(rp.frameFondo!=null && rp.frameFondo<serie.length){ idx=rp.frameFondo; }   // compat: paquetes viejos sin trayFrame
       if(idx==null || serie[idx]==null) return;
       var x=X(idx), y=Y(serie[idx]);
       ctx.fillStyle='#E23B3B'; ctx.beginPath(); ctx.arc(x,y,Math.max(3,W*0.01),0,7); ctx.fill();
