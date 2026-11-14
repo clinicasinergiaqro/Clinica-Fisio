@@ -30,8 +30,12 @@ Fix cross-device (`b49de55`) auto-revisado el 2026-11-14 → LIMPIO (ver `audito
 - **(d) Validación física de los márgenes ±5–10°** del goniómetro 2D contra un **goniómetro físico**. Hasta
   entonces, toda etiqueta dice "margen estimado, no validado contra goniómetro físico" (UI, resumen gonio,
   `valoracion.rom`, PDF, comparador).
-- **(e) Prueba manual con un slow-mo REAL de iPhone** antes del deploy (Hallazgo D): medir un video en cámara
-  lenta y confirmar que los tiempos quedan `confiable:false` / `tiempoVerificado:false` y los ángulos no.
+- **(e) Prueba slow-mo — ✅ ACEPTADA por Carlos (2026-11-14) con captura real.** La marcha
+  `bm_p1781814958552_1794670219101` (`fuenteTiempo:"video-sin-confirmar"`, `tiempoVerificado:false`) dejó las
+  medidas Temporal/Espacial en `confiable:false` → salvaguarda del Hallazgo D verificada con captura real. Caveat:
+  sus ángulos también salieron `confiable:false`, pero por tener 1 solo ciclo (`nCic>=2` aparte), no por el tiempo;
+  Carlos la aceptó como suficiente. Bloqueador de deploy por este punto: LEVANTADO. (Opcional a futuro: una
+  slow-mo con ≥2 ciclos para la demostración limpia "tiempos no fiables + ángulos fiables".)
 - **(f) Verificación VISUAL del arco del goniómetro en 9:16** (que la corrección de aspecto no deforme el dibujo;
   el dibujo usa coords originales — verificado por código, falta confirmación visual en equipo real).
 
