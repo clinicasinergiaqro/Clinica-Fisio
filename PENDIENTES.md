@@ -5,7 +5,7 @@ Registro vivo de lo que quedó deferido o pendiente de validar en las correccion
 revisar esta lista para que nada se pierda.
 
 Estado del track: Fases 1, 1b, 2, 3, 4, 5, 6, 7 cerradas en rama; suite del auditor 18/18. Hallazgo D en curso.
-`BIO_ALGO_VER` actual = `bio-2d-2026-11-14a`. NO desplegado (nada en main).
+`BIO_ALGO_VER` actual = `bio-2d-2026-11-14b` (subido por el Hallazgo D). NO desplegado (nada en main).
 
 ## Deferido con intención (reportado, no aplicado)
 
@@ -20,6 +20,9 @@ Estado del track: Fases 1, 1b, 2, 3, 4, 5, 6, 7 cerradas en rama; suite del audi
   TARDE (<2.5 s), su callback consume el gen del send fresco y un cuadro algo viejo de la MISMA medición se acepta
   (el fresco cae al fallback). Cross-generación YA resuelto; esto es intra-medición y acotado a 2.5 s. **Ya
   documentado en el código** (comentario del bloque de generación). Sin acción salvo que aparezca en la práctica.
+- **(g) La marcha NO tiene PDF propio (preexistente).** El botón PDF de marcha cae al constructor genérico de
+  ROM; no se introdujo en la auditoría. Por eso el reetiquetado de márgenes "no validado contra goniómetro físico"
+  no aplica a un "PDF de marcha" (no existe como tal). Sin acción; nota para no buscar un PDF de marcha inexistente.
 
 ## Pendiente de validar EN VIVO (no testeable en sandbox)
 
