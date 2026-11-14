@@ -35,6 +35,23 @@ Fix cross-device (`b49de55`) auto-revisado el 2026-11-14 → LIMPIO (ver `audito
 - **(f) Verificación VISUAL del arco del goniómetro en 9:16** (que la corrección de aspecto no deforme el dibujo;
   el dibujo usa coords originales — verificado por código, falta confirmación visual en equipo real).
 
+## Hallazgos del análisis de datos 2026-11-14 (reportados, NO aplicados — decide Carlos)
+
+Del análisis de las 12 mediciones de prueba (ver `auditoria/02_analisis_mediciones.md`). Misma clase:
+"el 2D da un número confiado pero clínicamente imposible cuando la pose está escorzada / mal orientada / poco visible".
+- **(h) Goniómetro: valor imposible igual se escribe a `valoracion.rom`** (p. ej. cadera ext 160°, rodilla flex 172°).
+  El escorzo (segmento casi paralelo al eje de cámara) colapsa el ángulo 2D hacia ~180°. La guarda de geometría
+  degenerada y el gate de visibilidad (≥0.5) no lo atrapan. Candidato: marcar "revisar / fuera de rango, posible
+  escorzo" cuando `grado > ref + ~15°` y no sea `hiperext`.
+- **(i) Gate `confiable` de ROM brazos demasiado laxo** (`medidor-biomecanico.js:382` = `reps>=1 && muestras>=12`).
+  Un hombro ext 174° a visPct 8% salió `confiable:true`. Candidato: piso de `visPct` (≥25–30%) y/o clamp de
+  plausibilidad vs rango normal.
+- **(j) Marcha con `orientPerfilOK:false` igual computa y guarda ROM sagital inflado** (hip ROM 97.6°). Candidato:
+  gatear `confiable:false` en ROM sagitales cuando `orientPerfilOK===false` (análogo a `tiempoDudoso` → temporales).
+
+Ninguno se parcha sin OK de Carlos. Son residual de la misma clase del track; el etiquetado "cribado ±5–10°,
+no validado" ya advierte, pero el número crudo sigue visible.
+
 ## Notas de deploy
 - Al mergear: bump doble `sw.js` + `window.APP_VERSION`; agregar `pruebas/`, `ejemplos/`, este `PENDIENTES.md`,
   `auditoria/` y `validacion/` al `ignore` de `firebase.json` (como `docs/**`) para no servirlos en Hosting.
