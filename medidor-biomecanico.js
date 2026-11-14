@@ -68,7 +68,7 @@
   var MP_BASE = 'https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5';
 
   // Sello de versión del algoritmo 2D (para trazabilidad en cada medición guardada).
-  var BIO_ALGO_VER = 'bio-2d-2026-11-13c';   // Fase 2 auditoría: geometría coherente con aspecto (cadera/tronco/abducción/cuello/longitud de paso)
+  var BIO_ALGO_VER = 'bio-2d-2026-11-14a';   // Fase 1b auditoría: validez de puntos medios + codo/hombro no-medible + reset de descartes + sellado de aspecto (sobre Fase 2)
   // CORRECCIÓN DE ASPECTO (H1): las coords de MediaPipe vienen normalizadas 0–1 por ANCHO (x) y por
   // ALTO (y) de forma INDEPENDIENTE. En un cuadro NO cuadrado (p.ej. 9:16 vertical del celular) eso
   // deforma los ángulos de segmentos oblicuos hasta ~20°. Reescalando x por (ancho/alto) se recupera
@@ -178,6 +178,7 @@
     var au=_dot(arm, marco.up), al=_dot(arm, marco.lateral), af=_dot(arm, marco.forward);
     var h=Math.sqrt(al*al+af*af);
     var theta3D=Math.atan2(h, -au)*180/Math.PI;   // 0=abajo, 90=horizontal, 180=arriba
+    if(!isFinite(theta3D)) return { theta:NaN, dir:null };   // Fase 1b: brazo no finito (NaN) → sin dirección (la métrica no se llena)
     var dir=null;
     if(theta3D>=12){ dir = (Math.abs(al)>=Math.abs(af)) ? 'abd' : (af>0 ? 'flex' : 'ext'); }
     var theta=theta3D;
@@ -202,7 +203,7 @@
       var m=MEDIDAS[i], val=null, ok=false;
       if(m.calc==='codo'){
         var p1=m.pts[0], p2=m.pts[1], p3=m.pts[2];
-        if(_vis(lm,p1)&&_vis(lm,p2)&&_vis(lm,p3) && world && world[p1]&&world[p2]&&world[p3]){
+        if(_vis(lm,p1)&&_vis(lm,p2)&&_vis(lm,p3) && world && world[p1]&&world[p2]&&world[p3] && _medible3(lm[p1],lm[p2],lm[p3])){   // Fase 1b: codo degenerado/NaN → no medible (evita 180 falso)
           var interior = angulo3D(world[p1], world[p2], world[p3]);
           // Codo en 2D cuando el brazo está EN EL PLANO de la imagen (de frente, al costado o en
           // abducción): sin ruido de z, un brazo recto da ~0°. Si el antebrazo apunta a la cámara
@@ -232,6 +233,7 @@
           if(est.dir === m.dir){ val = est.theta; if(val<0) val=0; ok=true; }
         }
       }
+      if(ok && !isFinite(val)){ ok=false; val=null; }   // Fase 1b: cualquier val no finito (p.ej. mundo NaN en codo/hombro) → no medible
       out[m.key] = { val:val, ok:ok };
       if(ok) out._algunoValido = true;
     }
@@ -408,7 +410,7 @@
     var midSh =(vis(11)&&vis(12))?{x:(lm[11].x+lm[12].x)/2, y:(lm[11].y+lm[12].y)/2}:null;
     var midAnk=(vis(27)&&vis(28))?{x:(lm[27].x+lm[28].x)/2, y:(lm[27].y+lm[28].y)/2}:null;
     // Orientación: ancho proyectado (hombros+caderas) vs alto del tronco. De frente ≈ ≥0.45.
-    if(midSh && midHip){
+    if(midSh && midHip && _finP(midSh) && _finP(midHip)){
       var ancho=(Math.abs(lm[11].x-lm[12].x)+Math.abs(lm[23].x-lm[24].x))/2;
       var alto=Math.abs(midSh.y-midHip.y)||1e-6;
       out.orientFrontal=(ancho/alto)>=0.45;
@@ -416,7 +418,7 @@
     // Pierna en frontal: FPPA con signo + MKD (% ancho pelvis). midX = línea media del cuerpo.
     var anchoPelvis = (vis(23)&&vis(24)) ? Math.abs(lm[23].x-lm[24].x) : null;
     function pierna(hip,knee,ank,midX){
-      if(!_medible3(hip,knee,ank)) return { ok:false, fppa:null, mkdPct:null };   // rodilla encimada / NaN → no medible (Fase 1)
+      if(!_medible3(hip,knee,ank) || !isFinite(midX)) return { ok:false, fppa:null, mkdPct:null };   // rodilla encimada/NaN, o línea media NO finita (O1: el signo valgo/varo no debe invertirse) → no medible
       var interior=_ang2D(hip,knee,ank), mag=180-interior;
       var dy=(ank.y-hip.y);
       var t=Math.abs(dy)<1e-6 ? 0.5 : (knee.y-hip.y)/dy;
@@ -434,13 +436,13 @@
       var dA=_dist2D(lm[27],lm[28]);
       if(dA>0.01) out.sepRatio={val:_dist2D(lm[25],lm[26])/dA, ok:true};
     }
-    if(midSh && midHip){
+    if(midSh && midHip && _finP(midSh) && _finP(midHip)){
       var dx=(midSh.x-midHip.x)*(_ANG_AR||1), dyT=midHip.y-midSh.y;   // x escalada por aspecto (Fase 2)
       if(dyT>1e-6) out.troncoLat={val:Math.atan2(dx,dyT)*180/Math.PI, ok:true};   // + = hacia un lado de la imagen
     }
-    if(midHip) out.sacro={x:midHip.x, y:midHip.y, ok:true};
-    if(midAnk && vis(0)) out.alturaPx=Math.abs(midAnk.y-lm[0].y);   // proxy nariz→tobillos
-    out.midAnk=midAnk;
+    if(midHip && _finP(midHip)) out.sacro={x:midHip.x, y:midHip.y, ok:true};
+    if(midAnk && _finP(midAnk) && vis(0) && _finP(lm[0])) out.alturaPx=Math.abs(midAnk.y-lm[0].y);   // proxy nariz→tobillos; O1: tobillo NaN no propaga
+    out.midAnk=(midAnk && _finP(midAnk))?midAnk:null;
     out.p={ sacro:midHip,
             nariz:vis(0)?lm[0]:null, hombroIzq:vis(11)?lm[11]:null, hombroDer:vis(12)?lm[12]:null,
             codoIzq:vis(13)?lm[13]:null, codoDer:vis(14)?lm[14]:null, munecaIzq:vis(15)?lm[15]:null, munecaDer:vis(16)?lm[16]:null,
@@ -574,10 +576,11 @@
     var midHip=(vis(23)&&vis(24))?{x:(lm[23].x+lm[24].x)/2,y:(lm[23].y+lm[24].y)/2}:null;
     var midSh =(vis(11)&&vis(12))?{x:(lm[11].x+lm[12].x)/2,y:(lm[11].y+lm[12].y)/2}:null;
     if(!midHip) return out;
-    out.sacroX=midHip.x;
+    var midHipOk=_finP(midHip);   // O1 (Fase 1b): cadera NaN con visibilidad alta → punto medio NO finito; no propagues NaN
+    out.sacroX=midHipOk?midHip.x:null;
     // Orientación: de PERFIL los hombros/caderas se ven ESTRECHOS (ancho/alto pequeño). Inverso al frontal.
-    if(midSh){ var ancho=(Math.abs(lm[11].x-lm[12].x)+Math.abs(lm[23].x-lm[24].x))/2, alto=Math.abs(midSh.y-midHip.y)||1e-6; out.orientPerfil=(ancho/alto)<0.35; }
-    if(vis(0)) out.noseRel=lm[0].x-midHip.x;                 // nariz vs sacro → dirección de marcha
+    if(midSh && _finP(midSh) && midHipOk){ var ancho=(Math.abs(lm[11].x-lm[12].x)+Math.abs(lm[23].x-lm[24].x))/2, alto=Math.abs(midSh.y-midHip.y)||1e-6; out.orientPerfil=(ancho/alto)<0.35; }
+    if(vis(0) && midHipOk) out.noseRel=lm[0].x-midHip.x;     // nariz vs sacro → dirección de marcha (O1: exige sacro finito)
     // Cadera flexo-ext = ángulo SIGNADO muslo vs eje del tronco (ROM usa max−min → el signo no importa).
     function hipAng(hip,knee){ if(!midSh) return null; var ar=_ANG_AR||1;   // x escalada por aspecto (Fase 2): ángulo muslo–tronco real
       var tdx=(hip.x-midSh.x)*ar, tdy=hip.y-midSh.y, thx=(knee.x-hip.x)*ar, thy=knee.y-hip.y;
@@ -589,11 +592,11 @@
     if(vis(24)&&vis(26)&&vis(28)&&_medible3(lm[24],lm[26],lm[28])) out.rodDer={val:180-_ang2D(lm[24],lm[26],lm[28]), ok:true};
     if(vis(25)&&vis(27)&&vis(31)&&_medible3(lm[25],lm[27],lm[31])) out.tobIzq={val:_ang2D(lm[25],lm[27],lm[31]), ok:true};        // tobillo (interior pantorrilla-pie)
     if(vis(26)&&vis(28)&&vis(32)&&_medible3(lm[26],lm[28],lm[32])) out.tobDer={val:_ang2D(lm[26],lm[28],lm[32]), ok:true};
-    if(vis(27)&&_finP(lm[27])) out.footIzq={val:lm[27].x-midHip.x, ok:true};   // pos AP del pie vs sacro (eventos)
-    if(vis(28)&&_finP(lm[28])) out.footDer={val:lm[28].x-midHip.x, ok:true};
+    if(vis(27)&&_finP(lm[27])&&midHipOk) out.footIzq={val:lm[27].x-midHip.x, ok:true};   // pos AP del pie vs sacro (eventos); O1: exige sacro finito
+    if(vis(28)&&_finP(lm[28])&&midHipOk) out.footDer={val:lm[28].x-midHip.x, ok:true};
     if(vis(0)&&(vis(27)||vis(28))){ var ay=vis(27)?lm[27].y:lm[28].y; out.alturaPx=Math.abs(ay-lm[0].y); }
     out.ok=!!(out.rodIzq.ok||out.rodDer.ok);
-    out.p={ nariz:vis(0)?lm[0]:null, sacro:midHip, hombroIzq:vis(11)?lm[11]:null, hombroDer:vis(12)?lm[12]:null,
+    out.p={ nariz:vis(0)?lm[0]:null, sacro:midHipOk?midHip:null, hombroIzq:vis(11)?lm[11]:null, hombroDer:vis(12)?lm[12]:null,
       caderaIzq:vis(23)?lm[23]:null, caderaDer:vis(24)?lm[24]:null, rodillaIzq:vis(25)?lm[25]:null, rodillaDer:vis(26)?lm[26]:null,
       tobilloIzq:vis(27)?lm[27]:null, tobilloDer:vis(28)?lm[28]:null };
     return out;
@@ -607,7 +610,9 @@
   function acumularMarcha(acc,f,tSec){
     if(!acc||!f) return;
     acc._frame++; acc.frames++;
-    if(acc.aspect==null) acc.aspect=(_ANG_AR||1);   // aspecto de la fuente al capturar (Fase 2): lo usa finalizarMarcha para la longitud de paso
+    // O5: sella el aspecto desde la fuente REAL cuando ya hay dimensiones (no hereda el aspecto de la fuente anterior);
+    // si aún no las hay, queda null y se sella en un cuadro posterior (finalizarMarcha cae a _ANG_AR si nunca llegan).
+    if(acc.aspect==null && BIO.srcEl && BIO.srcEl.videoWidth>0 && BIO.srcEl.videoHeight>0) acc.aspect=BIO.srcEl.videoWidth/BIO.srcEl.videoHeight;
     if(tSec==null) tSec=acc._frame/(FPS_CAMARA||20);
     if(f.orientPerfil!=null){ acc.orientN++; if(f.orientPerfil) acc.orientPerfilN++; }
     var i=acc._frame, R=acc._run, alguno=false;
@@ -755,6 +760,11 @@
   // Cada cambio de fuente o selección (cámara/video/foto/voltear/tipo/goniómetro) incrementa BIO.gen.
   // Cada send() de streaming encola su gen; onResults saca el más viejo (FIFO) y, si no coincide con
   // la generación vigente, el cuadro quedó en vuelo de una medición anterior → se descarta (framesDescartados).
+  // Supuesto FIFO (MediaPipe no ecoa metadatos): send()→onResults es 1:1 y en orden; el candado de 32 + el
+  // shift del watchdog mantienen la cola acotada y auto-sanable. RESIDUAL conocido (O3; cross-generación YA
+  // resuelto): si un send colgado que el watchdog ya "soltó" (shift) resuelve TARDE (<2.5 s), su callback
+  // consume el gen del send fresco y un cuadro algo viejo de la MISMA medición se acepta (y el fresco cae al
+  // fallback). Es intra-medición y acotado a 2.5 s; NO mezcla mediciones de generaciones distintas.
   function _bumpGen(){ BIO.gen = (BIO.gen||0) + 1; }
   function _genSend(img){
     (BIO._genQ || (BIO._genQ=[])).push(BIO.gen||0);
@@ -1289,7 +1299,7 @@
       if(BIO.tipoMedicion==='sent'){ BIO.accS=nuevoAccSent(); }
       else if(BIO.tipoMedicion==='marcha'){ BIO.accM=nuevoAccMarcha(); }
       else { BIO.acc = nuevoAcumulador(); }
-      BIO.framesTotales=0; BIO.tStart=Date.now();
+      BIO.framesTotales=0; BIO.framesDescartados=0; BIO.tStart=Date.now();   // O4: los descartes por generación empiezan en 0 en cada grabación
       BIO.pendingVideo=null; iniciarGrabadorVideo();     // graba el clip de cámara en paralelo
       BIO.recording=true;
       if(fb) fb.disabled=true;                            // no cambiar de cámara a media grabación
@@ -1427,7 +1437,7 @@
     else if(BIO.tipoMedicion==='marcha'){ BIO.accM=nuevoAccMarcha(); }
     else if(BIO.tipoMedicion==='gonio'){ if(!BIO.accG) BIO.accG=nuevoAccGonio(); _gonioSelDefault(BIO.accG); BIO.accG.peak=null; BIO.accG.run=0; BIO._peakFrameCanvas=null; BIO._peakFrameLm=null; BIO._peakTSeg=null; }
     else { BIO.acc = nuevoAcumulador(); }
-    BIO.framesTotales=0;
+    BIO.framesTotales=0; BIO.framesDescartados=0;   // O4: reinicia descartes al empezar el análisis de video
     BIO.procesandoVideo=true; BIO.cancelVideo=false;
     txt.textContent='0%';
     // MUESTREO DURANTE REPRODUCCIÓN (robusto en iOS). El método anterior (seek cuadro-a-cuadro
@@ -2484,7 +2494,7 @@
   // MODO C: subir una FOTO (ideal camilla / decúbito prono) → pose en imagen estática → ángulo + foto anotada.
   async function procesarFoto(file){
     if(!file || !file.type || file.type.indexOf('image')!==0){ toast('Selecciona una imagen (JPG/PNG)','error'); return; }
-    _bumpGen();   // nueva generación: aunque la foto está exenta de la cola, invalida cuadros de streaming previos
+    _bumpGen(); BIO.framesDescartados=0;   // nueva generación (foto exenta de la cola); O4: reinicia descartes
     if(!BIO.accG) BIO.accG=nuevoAccGonio();
     _gonioSelDefault(BIO.accG);
     mostrarVista('bio-vista-progreso');
