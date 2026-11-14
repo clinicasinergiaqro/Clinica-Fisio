@@ -68,7 +68,7 @@
   var MP_BASE = 'https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5';
 
   // Sello de versión del algoritmo 2D (para trazabilidad en cada medición guardada).
-  var BIO_ALGO_VER = 'bio-2d-2026-11-14a';   // Fase 1b auditoría: validez de puntos medios + codo/hombro no-medible + reset de descartes + sellado de aspecto (sobre Fase 2)
+  var BIO_ALGO_VER = 'bio-2d-2026-11-14b';   // Hallazgo D: verificación del tiempo físico del video (slow-mo) → gatea confiabilidad de métricas temporales (sobre Fase 1b)
   // CORRECCIÓN DE ASPECTO (H1): las coords de MediaPipe vienen normalizadas 0–1 por ANCHO (x) y por
   // ALTO (y) de forma INDEPENDIENTE. En un cuadro NO cuadrado (p.ej. 9:16 vertical del celular) eso
   // deforma los ángulos de segmentos oblicuos hasta ~20°. Reescalando x por (ancho/alto) se recupera
@@ -1796,6 +1796,7 @@
     if(!res.nCiclos) avisos.push('⚠️ No se detectaron ciclos de marcha completos. Repite DE PERFIL, con el cuerpo completo en cuadro y 8–10 pasos (o en caminadora).');
     if(res.nCiclos && q.framesValidos!=null && q.framesValidos<20) avisos.push('⚠️ Pocos cuadros válidos ('+q.framesValidos+'). Repite con mejor luz y el cuerpo completo en cuadro.');
     if(q.tiempoDudoso) avisos.push('⚠️ '+(q.tiempoDudosoMsg||'Ritmo atípico: si el video es en cámara lenta o acelerada, los tiempos no son fiables.'));
+    if(meta && meta.fuente==='video') avisos.push('⏱️ Al guardar se te preguntará si el video es a velocidad normal (afecta solo los tiempos; los ángulos no).');
     var vel=(res.velocidad!=null)?(res.velocidad+' m/s'):'—';
     cont.innerHTML =
       '<h3>Resumen — Marcha (análisis sagital)</h3>'
@@ -1821,10 +1822,68 @@
     var g=document.getElementById('bio-res-guardar');
     if(g) g.addEventListener('click', function(){ guardarSesionMarcha(res, meta); });
   }
+  // ── Hallazgo D: verificación del TIEMPO físico del video (cámara lenta / VFR) ──────────────
+  // Un slow-mo ya re-muxeado NO se puede auto-detectar (duración y fps del contenedor son los del archivo).
+  // Separamos (a) plausibilidad del movimiento (_cadenciaDudosa 20–220, ya existente) de (b) verificación del
+  // tiempo real: cámara en vivo = reloj real (confiable); video subido = se PREGUNTA al terapeuta UNA vez por
+  // archivo, con default seguro "No sé". Solo afecta métricas TEMPORALES/ESPACIALES; los ángulos no.
+  function _sigArchivo(f){ return f ? ((f.name||'')+'|'+(f.size||0)+'|'+(f.lastModified||0)) : ''; }
+  function _tiempoMeta(fuente, confirmado){
+    if(fuente==='camara') return { tiempoVerificado:true, fuenteTiempo:'camara-vivo' };
+    return (confirmado===true) ? { tiempoVerificado:true, fuenteTiempo:'video-confirmado' }
+                               : { tiempoVerificado:false, fuenteTiempo:'video-sin-confirmar' };
+  }
+  // AND con la plausibilidad: una temporal queda confiable SOLO si tiempoVerificado (finalizarMarcha ya aplicó
+  // !_cadenciaDudosa). Este gate solo puede BAJAR confiable a false, NUNCA re-habilitarla.
+  function _gatearTemporalPorTiempo(medidas, tiempoVerificado){
+    (medidas||[]).forEach(function(m){ if(m && (m.grupo==='Temporal'||m.grupo==='Espacial') && !tiempoVerificado){ m.confiable=false; } });
+    return medidas;
+  }
+  // Modal de confirmación (NO confirm(): su botón por defecto es Aceptar → sesgo a "Sí"/click-through). El botón
+  // prominente/por defecto es "No sé" (seguro); "Sí" exige un clic deliberado. Tocar fuera → "No sé". Promise<bool>.
+  function _preguntarVelocidadNormal(pistaDudosa){
+    return new Promise(function(resolve){
+      var prev=document.getElementById('bio-vel-modal'); if(prev&&prev.parentNode) prev.parentNode.removeChild(prev);
+      var ov=document.createElement('div'); ov.id='bio-vel-modal';
+      ov.style.cssText='position:fixed;inset:0;z-index:100002;background:rgba(13,22,38,.72);display:flex;align-items:center;justify-content:center;padding:18px';
+      var pista=pistaDudosa ? '<div style="background:#FEF3C7;border:1px solid #FCD34D;color:#92400E;font-size:12px;padding:7px 9px;border-radius:8px;margin-bottom:10px">⚠️ La cadencia calculada es atípica — si el video es en cámara lenta, los tiempos no son fiables.</div>' : '';
+      ov.innerHTML='<div style="background:#fff;border-radius:14px;max-width:420px;width:100%;padding:18px 18px 14px;box-shadow:0 10px 40px rgba(0,0,0,.4)">'
+        +'<div style="font-weight:800;color:#1B3A6B;font-size:16px;margin-bottom:8px">⏱️ ¿Velocidad del video?</div>'
+        +'<div style="color:#444;font-size:13.5px;line-height:1.5;margin-bottom:12px">Para que la cadencia, las fases de apoyo, la longitud de paso y la velocidad sean fiables, el video debe estar a <b>velocidad normal</b> (no cámara lenta). Un video en cámara lenta ya re-muxeado no se puede detectar solo.</div>'
+        +pista
+        +'<button id="bio-vel-nose" style="width:100%;background:#1B3A6B;color:#fff;border:none;border-radius:10px;padding:12px;font-size:14px;font-weight:800;cursor:pointer;margin-bottom:8px">No sé / puede ser cámara lenta</button>'
+        +'<button id="bio-vel-si" style="width:100%;background:#fff;color:#1B3A6B;border:1.5px solid #c9d2e8;border-radius:10px;padding:11px;font-size:13.5px;font-weight:700;cursor:pointer">Sí, se grabó a velocidad normal</button>'
+        +'<div style="font-size:11px;color:#9BA3B5;margin-top:9px">Los ángulos (rodilla, cadera, tobillo) son fiables en cualquier caso.</div>'
+        +'</div>';
+      document.body.appendChild(ov);
+      function done(v){ try{ if(ov.parentNode) ov.parentNode.removeChild(ov); }catch(_e){} resolve(v); }
+      var bN=ov.querySelector('#bio-vel-nose'), bS=ov.querySelector('#bio-vel-si');
+      if(bN) bN.onclick=function(){ done(false); };
+      if(bS) bS.onclick=function(){ done(true); };
+      ov.onclick=function(e){ if(e.target===ov) done(false); };
+    });
+  }
+  // Pregunta UNA vez POR ARCHIVO (firma nombre+tamaño+lastModified). Reanálisis del mismo video no re-pregunta.
+  async function _confirmarVelocidadArchivo(pendingVideo, pistaDudosa){
+    var sig=_sigArchivo(pendingVideo && pendingVideo.file);
+    if(!sig) return false;                                   // sin archivo identificable → conservador
+    if(!BIO._velTiempo) BIO._velTiempo={};
+    if(Object.prototype.hasOwnProperty.call(BIO._velTiempo, sig)) return BIO._velTiempo[sig];   // ya se preguntó por ESTE archivo
+    var r = await _preguntarVelocidadNormal(!!pistaDudosa);
+    BIO._velTiempo[sig]=r;
+    return r;
+  }
   async function guardarSesionMarcha(res, meta){
     var p = (typeof currentPatient!=='undefined') ? currentPatient : null;
     if(!p){ toast('Sin paciente activo','error'); return; }
     var btn=document.getElementById('bio-res-guardar'); if(btn){ btn.disabled=true; btn.textContent='⏳ Guardando…'; }
+    // Hallazgo D: verifica el tiempo físico (gatea SOLO temporales/espaciales; los ángulos no se tocan).
+    var _tv;
+    if(meta.fuente==='camara'){ _tv=_tiempoMeta('camara'); }
+    else { var _pista=!!(res && res.calidad && res.calidad.tiempoDudoso); var _c=await _confirmarVelocidadArchivo(BIO.pendingVideo, _pista); _tv=_tiempoMeta('video', _c); }
+    res.calidad = res.calidad || {};
+    res.calidad.tiempoVerificado=_tv.tiempoVerificado; res.calidad.fuenteTiempo=_tv.fuenteTiempo;
+    _gatearTemporalPorTiempo(res.medidas, _tv.tiempoVerificado);
     var sesion = {
       id:'bm_'+p.id+'_'+Date.now(),
       tipo:'marcha',
@@ -2202,6 +2261,7 @@
     function simTxt(v){ if(v==null) return '—'; var c=(v>=90)?'var(--green)':(v>=80?'#B45309':'var(--red)'); return '<b style="color:'+c+'">'+v+'%</b>'; }
     var fuente=s.fuente==='video'?'📁 Video':'📷 Cámara', sm=s.simetria||{}, q=s.calidad||{}, avisos=[];
     if(q.orientPerfilOK===false) avisos.push('toma no de perfil');
+    if(q.fuenteTiempo==='video-sin-confirmar') avisos.push('tiempos sin confirmar (video subido)');   // Hallazgo D
     var velTxt=(s.velocidad!=null)?(s.velocidad+' m/s'):'—', cadTxt=(s.cadencia!=null)?(s.cadencia+' pasos/min'):'—';
     var videoBtn = (s.video && s.video.url)
       ? '<button data-url="'+esc(s.video.url)+'" onclick="window.open(this.dataset.url,\'_blank\')" style="background:var(--green);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer">▶️ Ver video</button>'
@@ -2212,6 +2272,7 @@
       +   '<span style="font-weight:600;text-transform:none;letter-spacing:0;color:var(--gray-400)">'+fuente+_syncBadge(s)+'</span>'
       + '</div>'
       + '<div class="field-row"><div class="field-label">Terapeuta</div><div class="field-value">'+esc(s.terapeuta||'—')+' · '+(s.duracionSeg||0)+' s · '+(s.nCiclos||0)+' ciclo'+((s.nCiclos===1)?'':'s')+' (vista sagital)'+(avisos.length?(' · <span style="color:#B45309">⚠️ '+esc(avisos.join(', '))+'</span>'):'')+'</div></div>'
+      + ((q.fuenteTiempo==='video-confirmado')?'<div class="field-row"><div class="field-label">Tiempos</div><div class="field-value" style="color:var(--gray-400);font-size:12px">⏱️ confirmados por el terapeuta (velocidad normal) — no es verificación instrumental</div></div>':'')
       + fila('Cadencia · velocidad', cadTxt+' · '+velTxt)
       + fila('Fase de apoyo', fmtM(by['stance_izq']), fmtM(by['stance_der']))
       + fila('Rodilla · flexión pico', fmtM(by['rod_pico_izq']), fmtM(by['rod_pico_der']))
