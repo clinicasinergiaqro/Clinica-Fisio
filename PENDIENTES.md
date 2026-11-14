@@ -4,8 +4,9 @@ Registro vivo de lo que quedó deferido o pendiente de validar en las correccion
 `medidor-biomecanico.js` (rama `claude/medidor-correcciones-auditoria`). Mantener al día: cada deploy debe
 revisar esta lista para que nada se pierda.
 
-Estado del track: Fases 1, 1b, 2, 3, 4, 5, 6, 7 cerradas en rama; suite del auditor 18/18. Hallazgo D en curso.
-`BIO_ALGO_VER` actual = `bio-2d-2026-11-14b` (subido por el Hallazgo D). NO desplegado (nada en main).
+Estado del track: Fases 1, 1b, 2, 3, 4, 5, 6, 7 y Hallazgo D (`6d8b13d`) cerradas en rama; suite del auditor 18/18.
+Fix cross-device (`b49de55`) auto-revisado el 2026-11-14 → LIMPIO (ver `auditoria/01_autorevision_b49de55.md`); puertas 85/0.
+`BIO_ALGO_VER` actual = `bio-2d-2026-11-14b`. NO desplegado (nada en main).
 
 ## Deferido con intención (reportado, no aplicado)
 
@@ -35,5 +36,5 @@ Estado del track: Fases 1, 1b, 2, 3, 4, 5, 6, 7 cerradas en rama; suite del audi
   el dibujo usa coords originales — verificado por código, falta confirmación visual en equipo real).
 
 ## Notas de deploy
-- Al mergear: bump doble `sw.js` + `window.APP_VERSION`; agregar `pruebas/`, `ejemplos/` y este `PENDIENTES.md`
-  al `ignore` de `firebase.json` (como `docs/**`) para no servirlos en Hosting.
+- Al mergear: bump doble `sw.js` + `window.APP_VERSION`; agregar `pruebas/`, `ejemplos/`, este `PENDIENTES.md`,
+  `auditoria/` y `validacion/` al `ignore` de `firebase.json` (como `docs/**`) para no servirlos en Hosting.
