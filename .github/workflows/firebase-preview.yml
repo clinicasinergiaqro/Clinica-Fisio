@@ -1,0 +1,37 @@
+# Deploy a un canal de PREVIEW de Firebase Hosting (NO toca producción / canal live).
+# Sirve el código de la rama en una URL de prueba aparte, para validar en vivo
+# antes de desplegar. Se dispara al hacer push a la rama de preview.
+# Usa el mismo secreto FIREBASE_SERVICE_ACCOUNT que el deploy live.
+name: Preview de prueba — medidor
+
+on:
+  push:
+    branches: [ preview-prueba-medidor ]
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  preview:
+    runs-on: ubuntu-latest
+    env:
+      HAS_SA: ${{ secrets.FIREBASE_SERVICE_ACCOUNT != '' }}
+    steps:
+      - name: Aviso si falta el secreto
+        if: env.HAS_SA != 'true'
+        run: echo "Falta el secreto FIREBASE_SERVICE_ACCOUNT — no se puede crear el preview (esto NO es un error)."
+
+      - name: Checkout
+        if: env.HAS_SA == 'true'
+        uses: actions/checkout@v4
+
+      - name: Deploy a canal de PREVIEW (no toca el canal live)
+        if: env.HAS_SA == 'true'
+        uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: ${{ secrets.GITHUB_TOKEN }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          projectId: clinicasinergia-ec2cf
+          channelId: prueba-medidor
+          expires: 30d

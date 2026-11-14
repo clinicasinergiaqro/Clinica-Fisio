@@ -8,6 +8,9 @@
       "**/node_modules/**",
       "config/**",
       "docs/**",
+      "pruebas/**",
+      "ejemplos/**",
+      "PENDIENTES.md",
       "CLAUDE.md",
       "README*"
     ],
