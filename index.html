@@ -17567,9 +17567,16 @@ async function _syncBiomecanicaFS(p){
       // P2-14: si la fusión trajo sesiones NUEVAS de otros equipos, persístelas en local con un saveDB DIFERIDO
       // (si no, viven solo en memoria hasta el próximo guardado). Debounce por paciente; saveDB no re-dispara este sync.
       var _hayNuevas = fusionFinal.some(function(s){ return s && s.id && !_idsAntes[s.id]; });
-      if(_hayNuevas && typeof saveDB==='function' && !_bmSaveDeferPend[p.id]){
-        _bmSaveDeferPend[p.id]=true;
-        setTimeout(function(){ delete _bmSaveDeferPend[p.id]; try{ saveDB('pts',[p]); }catch(_e){} }, 1500);
+      if(_hayNuevas){
+        if(typeof saveDB==='function' && !_bmSaveDeferPend[p.id]){
+          _bmSaveDeferPend[p.id]=true;
+          setTimeout(function(){ delete _bmSaveDeferPend[p.id]; try{ saveDB('pts',[p]); }catch(_e){} }, 1500);
+        }
+        // CROSS-DEVICE (fix 2026-11-14): el pull trajo sesiones de OTRO equipo. La pestaña 🦴 ya se había
+        // pintado "Sin mediciones" cuando se disparó este sync (p.biomecanica estaba vacío) → REPINTAR para
+        // que aparezcan. Solo si seguimos en el MISMO paciente con el expediente abierto. _hayNuevas evita
+        // el bucle: en el re-render, p.biomecanica ya trae las sesiones → la fusión no reporta novedades.
+        try{ if(typeof currentPatient!=='undefined' && currentPatient && currentPatient.id===p.id && document.getElementById('content-expediente') && typeof renderExpediente==='function'){ renderExpediente((typeof currentTab!=='undefined' && currentTab) || 'biomecanica'); } }catch(_e){}
       }
     }
     return {ok:true};
