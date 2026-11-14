@@ -1548,7 +1548,7 @@
     var hayDato = (medidas||[]).some(function(x){ return x && x.min!==null; });
     cont.innerHTML =
       '<h3>Resumen de la medición</h3>'
-      + '<div style="color:#9BA3B5;font-size:13px;margin-bottom:10px">'+fuenteTxt+' · '+meta.duracionSeg+' s · '+(meta.calidad.framesValidos||0)+' cuadros válidos · convención clínica (0° neutro)<br>ROM = <b style="color:#C9D2E8">media de los picos</b> de cada repetición · máx = mejor intento · ± = consistencia entre reps<br><span style="color:#E8C96A">Margen 2D honesto:</span> abducción/codo/cuello ±5°, flexión/extensión de hombro ±10° (de frente van fuera de plano → para finura, de PERFIL). Diferencias entre sesiones &lt; ~8° pueden ser ruido.</div>'
+      + '<div style="color:#9BA3B5;font-size:13px;margin-bottom:10px">'+fuenteTxt+' · '+meta.duracionSeg+' s · '+(meta.calidad.framesValidos||0)+' cuadros válidos · convención clínica (0° neutro)<br>ROM = <b style="color:#C9D2E8">media de los picos</b> de cada repetición · máx = mejor intento · ± = consistencia entre reps<br><span style="color:#E8C96A">Margen 2D honesto:</span> abducción/codo/cuello ±5°, flexión/extensión de hombro ±10° (de frente van fuera de plano → para finura, de PERFIL). Diferencias entre sesiones &lt; ~8° pueden ser ruido. Margen estimado, no validado contra goniómetro físico.</div>'
       + '<table class="bio-tabla-res"><thead><tr><th>Movimiento</th><th>Izquierda</th><th>Derecha</th></tr></thead><tbody>'+filas+'</tbody></table>'
       + (hayDato ? '' : '<div style="color:#E8C96A;font-size:13px;margin-top:10px">⚠️ No se detectó tronco + brazos con suficiente visibilidad. Repite con hombros, codos y caderas en cuadro y buena luz.</div>')
       + ((hayDato && (meta.calidad.framesValidos||0)<20) ? '<div style="color:#E8C96A;font-size:12px;margin-top:8px">⚠️ Pocos cuadros válidos ('+(meta.calidad.framesValidos||0)+'). La medición puede ser inestable: repite con el paciente más cerca, buena luz y movimientos algo más lentos.</div>' : '')
@@ -2695,7 +2695,7 @@
       + '<div style="color:#9BA3B5;font-size:13px;margin-bottom:10px">📷 Cámara · plano sagital · '+arr.length+' medida'+(arr.length===1?'':'s')+'</div>'
       + '<table class="bio-tabla-res"><thead><tr><th>Articulación / movimiento</th><th style="text-align:center">Der</th><th style="text-align:center">Izq</th><th style="text-align:center">Normal</th></tr></thead><tbody>'+filas+'</tbody></table>'
       + '<div style="margin-top:12px;background:rgba(255,255,255,.05);border-radius:10px;padding:10px 12px;font-size:13px;color:#cfd6e4">'+esc(interp)+'</div>'
-      + '<div style="font-size:11px;color:#9BA3B5;margin-top:8px;font-style:italic">Referencia: '+esc(GONIO_CITA)+' · Medición 2D (cribado), ±5° en plano.</div>'
+      + '<div style="font-size:11px;color:#9BA3B5;margin-top:8px;font-style:italic">Referencia: '+esc(GONIO_CITA)+' · Medición 2D (cribado), ±5° en plano; margen estimado, no validado contra goniómetro físico.</div>'
       + '<div style="color:#9BA3B5;font-size:12px;margin-top:10px">Se escribirá en el campo <b>ROM</b> de la Valoración y quedará en Biomecánica.</div>'
       + '<div class="bio-acciones" style="padding-top:14px">'
       +   '<button class="bio-b-sec" onclick="BIO_gonioVolver()">← Seguir midiendo</button>'
@@ -2736,7 +2736,7 @@
     // reemplaza solo una línea previa de "Goniometría (" para no acumular en re-mediciones).
     try{
       if(!p.valoracion || typeof p.valoracion!=='object') p.valoracion={};
-      var linea='Goniometría cámara 2D ('+sesion.fecha+', cribado ±5–10°): '+_gonioTexto(arr);
+      var linea='Goniometría cámara 2D ('+sesion.fecha+', cribado ±5–10°, no validado contra goniómetro físico): '+_gonioTexto(arr);
       var prev=String(p.valoracion.rom||'').split('\n').filter(function(l){ var t=l.trim(); return t && t.indexOf('Goniometría')!==0; });
       prev.push(linea);
       p.valoracion.rom = prev.join('\n');
@@ -2820,7 +2820,7 @@
     var hall=(s.hallazgos&&s.hallazgos.length)?('Hallazgos: '+s.hallazgos.join('; ')+'. El resto de los arcos dentro de rangos de referencia.'):'Todos los arcos medidos se encuentran dentro de rangos de referencia, con buena simetría.';
     doc.splitTextToSize(hall, W-2*M).forEach(function(ln){ doc.text(ln, M, y); y+=15; });
     y+=8; doc.setFontSize(9); doc.setTextColor(GRIS[0],GRIS[1],GRIS[2]);
-    doc.splitTextToSize('Referencia de rangos: '+GONIO_CITA+' Medición 2D con cámara (cribado); margen ±5° en el plano de la cámara. No sustituye la exploración clínica.', W-2*M).forEach(function(ln){ doc.text(ln, M, y); y+=12; });
+    doc.splitTextToSize('Referencia de rangos: '+GONIO_CITA+' Medición 2D con cámara (cribado); margen ±5° en el plano de la cámara, estimado y no validado contra goniómetro físico. No sustituye la exploración clínica.', W-2*M).forEach(function(ln){ doc.text(ln, M, y); y+=12; });
     return doc;
   }
 
@@ -2886,26 +2886,26 @@
     if(s.tipo==='goniometria'){
       med.forEach(function(m){ var l=/izq/i.test(m.lado)?'Izq':'Der';
         var dir = m.defic ? 'down' : (m.hiperext ? '' : 'up');   // más ROM mejor; menos déficit mejor; hiperext neutro
-        out.push({ k:(m.key||'')+'_'+m.lado, etq:(m.grupo||'')+' '+(m.mov||'')+' '+l, num:(m.grado==null?null:m.grado), disp:_gonioFmtGrado(m), dir:dir }); });
+        out.push({ k:(m.key||'')+'_'+m.lado, etq:(m.grupo||'')+' '+(m.mov||'')+' '+l, num:(m.grado==null?null:m.grado), disp:_gonioFmtGrado(m), dir:dir, margen:(m.margen!=null?m.margen:5) }); });
     } else if(s.tipo==='sentadilla'){
       var L={ fppa_izq:'Valgo FPPA Izq', fppa_der:'Valgo FPPA Der', mkd_izq:'Desplaz. medial Izq', mkd_der:'Desplaz. medial Der', sep_rodillas:'Separación rodillas', tronco_lateral:'Tronco lateral', sacro_descenso:'Descenso del sacro' };
       var Ds={ fppa_izq:'down', fppa_der:'down', mkd_izq:'down', mkd_der:'down', tronco_lateral:'down' };   // menos valgo/inclinación = mejor
       med.forEach(function(m){ var etq=L[m.key]; if(!etq || m.media==null) return;
         var r=(m.unidad==='ratio'), suf=r?'':(m.unidad==='%'?'%':'°');
-        out.push({ k:m.key, etq:etq, num:m.media, disp:(r?m.media.toFixed(2):(_r1(m.media)+suf)), dir:(Ds[m.key]||'') }); });
+        out.push({ k:m.key, etq:etq, num:m.media, disp:(r?m.media.toFixed(2):(_r1(m.media)+suf)), dir:(Ds[m.key]||''), margen:(r?0.1:5), signed:(m.key==='fppa_izq'||m.key==='fppa_der') }); });   // P2-12: fppa es signado (valgo+/varo−)
     } else if(s.tipo==='marcha'){
       if(s.cadencia!=null) out.push({ k:'cadencia', etq:'Cadencia', num:s.cadencia, disp:s.cadencia+' pasos/min', dir:'' });
-      if(s.velocidad!=null) out.push({ k:'velocidad', etq:'Velocidad', num:s.velocidad, disp:s.velocidad+' m/s', dir:'up' });
+      if(s.velocidad!=null) out.push({ k:'velocidad', etq:'Velocidad', num:s.velocidad, disp:s.velocidad+' m/s', dir:'up', margen:0.1 });
       var LM={ stance_izq:'Fase apoyo Izq', stance_der:'Fase apoyo Der', rod_pico_izq:'Rodilla pico Izq', rod_pico_der:'Rodilla pico Der', cadera_rom_izq:'Cadera ROM Izq', cadera_rom_der:'Cadera ROM Der' };
       var DM={ rod_pico_izq:'up', rod_pico_der:'up', cadera_rom_izq:'up', cadera_rom_der:'up' };   // más ROM = mejor; apoyo neutro
       med.forEach(function(m){ var etq=LM[m.key]; if(!etq || m.valor==null) return;
         var u=(m.unidad==='m')?' m':(m.unidad==='%'?'%':(m.unidad==='pasos/min'?'':'°'));
-        out.push({ k:m.key, etq:etq, num:m.valor, disp:m.valor+u, dir:(DM[m.key]||'') }); });
+        out.push({ k:m.key, etq:etq, num:m.valor, disp:m.valor+u, dir:(DM[m.key]||''), margen:(m.unidad==='m'?0.1:5) }); });
     } else { // rom
       med.forEach(function(m){ var l=/izq/i.test(m.lado)?'Izq':'Der', etq=(m.grupo||'')+' '+(m.mov||'')+' '+l, num, disp;
         if(m.grupo==='Codo'){ num=(m.max!=null?m.max:m.media); disp=(m.min!=null&&m.max!=null)?(m.min+'°–'+m.max+'°'):(num!=null?num+'°':'—'); }
         else { num=(m.media!=null?m.media:m.max); disp=(num!=null?num+'°':'—'); }
-        out.push({ k:m.key||etq, etq:etq, num:(num==null?null:num), disp:disp, dir:'up' }); });   // más ROM = mejor
+        out.push({ k:m.key||etq, etq:etq, num:(num==null?null:num), disp:disp, dir:'up', margen:(m.margen!=null?m.margen:5) }); });   // más ROM = mejor
     }
     return out;
   }
@@ -2929,10 +2929,17 @@
       var da=a?esc(a.disp):'<span class="cmp-eq">—</span>', db=b?esc(b.disp):'<span class="cmp-eq">—</span>';
       var dcell='<span class="cmp-eq">—</span>';
       if(a&&b&&a.num!=null&&b.num!=null){ var d=Math.round((b.num-a.num)*10)/10;
-        if(d===0){ dcell='<span class="cmp-eq">0</span>'; }
-        else {
+        var ar=d>0?'▲':'▼', sg=d>0?'+':'';
+        var mg=(b&&b.margen!=null)?b.margen:((a&&a.margen!=null)?a.margen:5);   // P2-12: margen de la métrica (m.margen o 5°)
+        var signed=(a&&a.signed)||(b&&b.signed);
+        var cruzaSigno = signed && a.num!==0 && b.num!==0 && ((a.num>0)!==(b.num>0));   // FPPA: cruce valgo(+)↔varo(−) NO es mejora directa
+        if(cruzaSigno){
+          dcell='<span class="cmp-eq" title="Cruzó de valgo a varo (o viceversa): revisar, no es una mejora directa">'+sg+d+' ⚠︎</span>';
+        } else if(d===0){ dcell='<span class="cmp-eq">0</span>'; }
+        else if(Math.abs(d) < mg){   // P2-12: dentro del margen de error → gris, no se colorea como cambio real
+          dcell='<span class="cmp-eq" title="Δ dentro del margen estimado (±'+mg+'); puede ser ruido">'+sg+d+' '+ar+'</span>';
+        } else {
           var dir=(b&&b.dir)||(a&&a.dir)||'';   // sentido clínico de mejora
-          var ar=d>0?'▲':'▼', sg=d>0?'+':'';
           // 'up' → subir es verde; 'down' → bajar es verde; '' (neutro) → gris, solo muestra el cambio.
           var cls='cmp-eq';
           if(dir==='up') cls=(d>0?'cmp-up':'cmp-dn');
@@ -2942,7 +2949,12 @@
       }
       return '<tr><td>'+esc(etq)+'</td><td class="n">'+da+'</td><td class="n">'+db+'</td><td class="n">'+dcell+'</td></tr>';
     }).join('');
-    return '<table class="cmp-tbl"><thead><tr><th>Movimiento</th><th class="n">Antes</th><th class="n">Después</th><th class="n">Δ</th></tr></thead><tbody>'+filas+'</tbody></table>';
+    var avA=(A.calidad&&A.calidad.algoVersion)||null, avB=(B.calidad&&B.calidad.algoVersion)||null;
+    var bannerVer = (avA&&avB&&avA!==avB)
+      ? '<div style="background:#FEF3C7;border:1px solid #FCD34D;color:#92400E;font-size:11px;padding:6px 9px;border-radius:8px;margin-bottom:8px">⚠️ Versiones de algoritmo distintas (A: '+esc(avA)+' · B: '+esc(avB)+'): la comparación puede no ser directa.</div>'
+      : '';
+    var pie = '<div style="color:#9BA3B5;font-size:11px;margin-top:8px">Δ en gris = dentro del margen estimado (±5–10°, no validado contra goniómetro físico) o cruce de signo (valgo↔varo): posible ruido, revisar.</div>';
+    return bannerVer + '<table class="cmp-tbl"><thead><tr><th>Movimiento</th><th class="n">Antes</th><th class="n">Después</th><th class="n">Δ</th></tr></thead><tbody>'+filas+'</tbody></table>' + pie;
   }
   function _cmpOpt(ses, selId){
     return ses.map(function(s){ var sel=(s.id===selId)?' selected':'', vid=(s.video&&s.video.url)?' · 🎥':'';
