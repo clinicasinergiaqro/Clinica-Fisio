@@ -68,7 +68,7 @@
   var MP_BASE = 'https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5';
 
   // Sello de versión del algoritmo 2D (para trazabilidad en cada medición guardada).
-  var BIO_ALGO_VER = 'bio-2d-2026-11-13';
+  var BIO_ALGO_VER = 'bio-2d-2026-11-14b';   // Hallazgo D: verificación del tiempo físico del video (slow-mo) → gatea confiabilidad de métricas temporales (sobre Fase 1b)
   // CORRECCIÓN DE ASPECTO (H1): las coords de MediaPipe vienen normalizadas 0–1 por ANCHO (x) y por
   // ALTO (y) de forma INDEPENDIENTE. En un cuadro NO cuadrado (p.ej. 9:16 vertical del celular) eso
   // deforma los ángulos de segmentos oblicuos hasta ~20°. Reescalando x por (ancho/alto) se recupera
@@ -178,12 +178,14 @@
     var au=_dot(arm, marco.up), al=_dot(arm, marco.lateral), af=_dot(arm, marco.forward);
     var h=Math.sqrt(al*al+af*af);
     var theta3D=Math.atan2(h, -au)*180/Math.PI;   // 0=abajo, 90=horizontal, 180=arriba
+    if(!isFinite(theta3D)) return { theta:NaN, dir:null };   // Fase 1b: brazo no finito (NaN) → sin dirección (la métrica no se llena)
     var dir=null;
     if(theta3D>=12){ dir = (Math.abs(al)>=Math.abs(af)) ? 'abd' : (af>0 ? 'flex' : 'ext'); }
     var theta=theta3D;
     if(dir==='abd' && lm && lm[sIdx] && lm[eIdx] && lm[11] && lm[12] && lm[23] && lm[24]){
-      var downX=((lm[23].x+lm[24].x)/2)-((lm[11].x+lm[12].x)/2), downY=((lm[23].y+lm[24].y)/2)-((lm[11].y+lm[12].y)/2); // hombros→caderas (abajo)
-      var armX=lm[eIdx].x-lm[sIdx].x, armY=lm[eIdx].y-lm[sIdx].y;
+      var ar=_ANG_AR||1;   // x escalada por aspecto (Fase 2): abducción in-plane real en cuadro no cuadrado
+      var downX=(((lm[23].x+lm[24].x)/2)-((lm[11].x+lm[12].x)/2))*ar, downY=((lm[23].y+lm[24].y)/2)-((lm[11].y+lm[12].y)/2); // hombros→caderas (abajo)
+      var armX=(lm[eIdx].x-lm[sIdx].x)*ar, armY=lm[eIdx].y-lm[sIdx].y;
       var md=Math.hypot(downX,downY), ma=Math.hypot(armX,armY);
       if(md>1e-6 && ma>1e-6){
         var cos=(downX*armX+downY*armY)/(md*ma); if(cos>1)cos=1; if(cos<-1)cos=-1;
@@ -201,7 +203,7 @@
       var m=MEDIDAS[i], val=null, ok=false;
       if(m.calc==='codo'){
         var p1=m.pts[0], p2=m.pts[1], p3=m.pts[2];
-        if(_vis(lm,p1)&&_vis(lm,p2)&&_vis(lm,p3) && world && world[p1]&&world[p2]&&world[p3]){
+        if(_vis(lm,p1)&&_vis(lm,p2)&&_vis(lm,p3) && world && world[p1]&&world[p2]&&world[p3] && _medible3(lm[p1],lm[p2],lm[p3])){   // Fase 1b: codo degenerado/NaN → no medible (evita 180 falso)
           var interior = angulo3D(world[p1], world[p2], world[p3]);
           // Codo en 2D cuando el brazo está EN EL PLANO de la imagen (de frente, al costado o en
           // abducción): sin ruido de z, un brazo recto da ~0°. Si el antebrazo apunta a la cámara
@@ -217,7 +219,7 @@
       } else if(m.calc==='cuello'){ // lateralización cervical: eje nariz→hombros vs vertical, en 2D (frontal)
         if(_vis(lm,0)&&_vis(lm,11)&&_vis(lm,12)){
           var mSx=(lm[11].x+lm[12].x)/2, mSy=(lm[11].y+lm[12].y)/2;
-          var hx=lm[0].x-mSx, hy=lm[0].y-mSy;                 // eje cabeza (nariz) respecto a mitad de hombros
+          var hx=(lm[0].x-mSx)*(_ANG_AR||1), hy=lm[0].y-mSy;  // eje cabeza vs hombros; x escalada por aspecto (Fase 2)
           if(Math.hypot(hx,hy)>1e-4){
             var tilt=Math.atan2(hx, -hy)*180/Math.PI;          // 0=recto; + = hacia +x (hombro IZQ del paciente, imagen espejada)
             var mag=Math.abs(tilt), ladoDir=(tilt>=0)?'izq':'der';
@@ -231,6 +233,7 @@
           if(est.dir === m.dir){ val = est.theta; if(val<0) val=0; ok=true; }
         }
       }
+      if(ok && !isFinite(val)){ ok=false; val=null; }   // Fase 1b: cualquier val no finito (p.ej. mundo NaN en codo/hombro) → no medible
       out[m.key] = { val:val, ok:ok };
       if(ok) out._algunoValido = true;
     }
@@ -340,11 +343,22 @@
   // Longitud del segmento a–b en el espacio con aspecto corregido (para detectar puntos encimados).
   function _seg2D(a,b){ var ar=_ANG_AR||1; return Math.hypot((a.x-b.x)*ar, a.y-b.y); }
   function _dist2D(a,b){ return Math.hypot(a.x-b.x, a.y-b.y); }
+  // VALIDEZ DE ENTRADA (Fase 1): un punto con coord NaN/Infinity o dos puntos casi encimados producían
+  // antes un ángulo FALSO de 180° con ok:true (en _ang2D, !m1 con m1=NaN devuelve 0 → el llamador hace
+  // 180-0=180, y ese 180 gana como "pico"). _finP = punto finito; _medible3 = 3 puntos finitos y con
+  // ambos segmentos NO degenerados (umbral 0.03 en espacio con aspecto, igual que la guarda del goniómetro).
+  // Los llamadores usan _medible3 para devolver {ok:false} en vez de un número inventado.
+  function _finP(p){ return !!p && isFinite(p.x) && isFinite(p.y); }
+  function _medible3(a,b,c){ return _finP(a) && _finP(b) && _finP(c) && _seg2D(a,b)>=0.03 && _seg2D(b,c)>=0.03; }
   // Cadencia inverosímil → los TIEMPOS del video no son fiables (cámara lenta/acelerada o fps irregular).
   function _cadenciaDudosa(cad){ return (cad!=null && !(cad>=20 && cad<=220)); }
   // Resume cada movimiento como la MEDIA de los picos de sus repeticiones (más reproducible que un
   // máximo suelto y robusto al ruido). Codo añade extensión (mínimo robusto). Mantiene min/max/rango
   // por compatibilidad con el render/PDF y con sesiones ya guardadas.
+  // (i) Gate de confiable de ROM de brazos: además de ≥1 rep y ≥12 muestras, exige un PISO de visibilidad.
+  // Un valor con muy pocos frames visibles (p.ej. hombro ext 174° a 8% de visibilidad) NO es confiable aunque
+  // haya cruzado 12 muestras. Solo puede BAJAR confiable, nunca re-habilitarla. Pura para pruebas.
+  function _romConfiable(reps, muestras, visPct){ return (reps>=1 && muestras>=12 && visPct>=25); }
   function finalizarMedidas(acc){
     return MEDIDAS.map(function(m){
       var s = acc && acc[m.key];
@@ -369,7 +383,7 @@
         base.min=0; base.max=base.mejor; base.rango=base.media;
       }
       base.visPct = (acc && acc._frame) ? Math.round(base.muestras/acc._frame*100) : 0;
-      base.confiable = (base.reps>=1 && base.muestras>=12);   // suficientes muestras y ≥1 repetición
+      base.confiable = _romConfiable(base.reps, base.muestras, base.visPct);   // (i) ≥1 rep, ≥12 muestras y ≥25% visibilidad
       return base;
     });
   }
@@ -400,7 +414,7 @@
     var midSh =(vis(11)&&vis(12))?{x:(lm[11].x+lm[12].x)/2, y:(lm[11].y+lm[12].y)/2}:null;
     var midAnk=(vis(27)&&vis(28))?{x:(lm[27].x+lm[28].x)/2, y:(lm[27].y+lm[28].y)/2}:null;
     // Orientación: ancho proyectado (hombros+caderas) vs alto del tronco. De frente ≈ ≥0.45.
-    if(midSh && midHip){
+    if(midSh && midHip && _finP(midSh) && _finP(midHip)){
       var ancho=(Math.abs(lm[11].x-lm[12].x)+Math.abs(lm[23].x-lm[24].x))/2;
       var alto=Math.abs(midSh.y-midHip.y)||1e-6;
       out.orientFrontal=(ancho/alto)>=0.45;
@@ -408,6 +422,7 @@
     // Pierna en frontal: FPPA con signo + MKD (% ancho pelvis). midX = línea media del cuerpo.
     var anchoPelvis = (vis(23)&&vis(24)) ? Math.abs(lm[23].x-lm[24].x) : null;
     function pierna(hip,knee,ank,midX){
+      if(!_medible3(hip,knee,ank) || !isFinite(midX)) return { ok:false, fppa:null, mkdPct:null };   // rodilla encimada/NaN, o línea media NO finita (O1: el signo valgo/varo no debe invertirse) → no medible
       var interior=_ang2D(hip,knee,ank), mag=180-interior;
       var dy=(ank.y-hip.y);
       var t=Math.abs(dy)<1e-6 ? 0.5 : (knee.y-hip.y)/dy;
@@ -415,23 +430,23 @@
       var dirMedial=(midX-xLine)>=0?1:-1;                 // hacia la línea media del cuerpo
       var despl=(knee.x-xLine)*dirMedial;                 // + = rodilla medial
       var signo=despl>=0?1:-1;
-      return { fppa:mag*signo, mkdPct:(anchoPelvis&&anchoPelvis>0.01)?(despl/anchoPelvis*100):null };
+      return { ok:true, fppa:mag*signo, mkdPct:(anchoPelvis&&anchoPelvis>0.01)?(despl/anchoPelvis*100):null };
     }
     if(midHip){
-      if(vis(23)&&vis(25)&&vis(27)){ var pi=pierna(lm[23],lm[25],lm[27],midHip.x); out.fppaIzq={val:pi.fppa,ok:true}; if(pi.mkdPct!=null) out.mkdIzq={val:pi.mkdPct,ok:true}; }
-      if(vis(24)&&vis(26)&&vis(28)){ var pd=pierna(lm[24],lm[26],lm[28],midHip.x); out.fppaDer={val:pd.fppa,ok:true}; if(pd.mkdPct!=null) out.mkdDer={val:pd.mkdPct,ok:true}; }
+      if(vis(23)&&vis(25)&&vis(27)){ var pi=pierna(lm[23],lm[25],lm[27],midHip.x); if(pi.ok){ out.fppaIzq={val:pi.fppa,ok:true}; if(pi.mkdPct!=null) out.mkdIzq={val:pi.mkdPct,ok:true}; } }
+      if(vis(24)&&vis(26)&&vis(28)){ var pd=pierna(lm[24],lm[26],lm[28],midHip.x); if(pd.ok){ out.fppaDer={val:pd.fppa,ok:true}; if(pd.mkdPct!=null) out.mkdDer={val:pd.mkdPct,ok:true}; } }
     }
     if(vis(25)&&vis(26)&&vis(27)&&vis(28)){
       var dA=_dist2D(lm[27],lm[28]);
       if(dA>0.01) out.sepRatio={val:_dist2D(lm[25],lm[26])/dA, ok:true};
     }
-    if(midSh && midHip){
-      var dx=midSh.x-midHip.x, dyT=midHip.y-midSh.y;
+    if(midSh && midHip && _finP(midSh) && _finP(midHip)){
+      var dx=(midSh.x-midHip.x)*(_ANG_AR||1), dyT=midHip.y-midSh.y;   // x escalada por aspecto (Fase 2)
       if(dyT>1e-6) out.troncoLat={val:Math.atan2(dx,dyT)*180/Math.PI, ok:true};   // + = hacia un lado de la imagen
     }
-    if(midHip) out.sacro={x:midHip.x, y:midHip.y, ok:true};
-    if(midAnk && vis(0)) out.alturaPx=Math.abs(midAnk.y-lm[0].y);   // proxy nariz→tobillos
-    out.midAnk=midAnk;
+    if(midHip && _finP(midHip)) out.sacro={x:midHip.x, y:midHip.y, ok:true};
+    if(midAnk && _finP(midAnk) && vis(0) && _finP(lm[0])) out.alturaPx=Math.abs(midAnk.y-lm[0].y);   // proxy nariz→tobillos; O1: tobillo NaN no propaga
+    out.midAnk=(midAnk && _finP(midAnk))?midAnk:null;
     out.p={ sacro:midHip,
             nariz:vis(0)?lm[0]:null, hombroIzq:vis(11)?lm[11]:null, hombroDer:vis(12)?lm[12]:null,
             codoIzq:vis(13)?lm[13]:null, codoDer:vis(14)?lm[14]:null, munecaIzq:vis(15)?lm[15]:null, munecaDer:vis(16)?lm[16]:null,
@@ -565,25 +580,27 @@
     var midHip=(vis(23)&&vis(24))?{x:(lm[23].x+lm[24].x)/2,y:(lm[23].y+lm[24].y)/2}:null;
     var midSh =(vis(11)&&vis(12))?{x:(lm[11].x+lm[12].x)/2,y:(lm[11].y+lm[12].y)/2}:null;
     if(!midHip) return out;
-    out.sacroX=midHip.x;
+    var midHipOk=_finP(midHip);   // O1 (Fase 1b): cadera NaN con visibilidad alta → punto medio NO finito; no propagues NaN
+    out.sacroX=midHipOk?midHip.x:null;
     // Orientación: de PERFIL los hombros/caderas se ven ESTRECHOS (ancho/alto pequeño). Inverso al frontal.
-    if(midSh){ var ancho=(Math.abs(lm[11].x-lm[12].x)+Math.abs(lm[23].x-lm[24].x))/2, alto=Math.abs(midSh.y-midHip.y)||1e-6; out.orientPerfil=(ancho/alto)<0.35; }
-    if(vis(0)) out.noseRel=lm[0].x-midHip.x;                 // nariz vs sacro → dirección de marcha
+    if(midSh && _finP(midSh) && midHipOk){ var ancho=(Math.abs(lm[11].x-lm[12].x)+Math.abs(lm[23].x-lm[24].x))/2, alto=Math.abs(midSh.y-midHip.y)||1e-6; out.orientPerfil=(ancho/alto)<0.35; }
+    if(vis(0) && midHipOk) out.noseRel=lm[0].x-midHip.x;     // nariz vs sacro → dirección de marcha (O1: exige sacro finito)
     // Cadera flexo-ext = ángulo SIGNADO muslo vs eje del tronco (ROM usa max−min → el signo no importa).
-    function hipAng(hip,knee){ if(!midSh) return null;
-      var tdx=hip.x-midSh.x, tdy=hip.y-midSh.y, thx=knee.x-hip.x, thy=knee.y-hip.y;
+    function hipAng(hip,knee){ if(!midSh) return null; var ar=_ANG_AR||1;   // x escalada por aspecto (Fase 2): ángulo muslo–tronco real
+      var tdx=(hip.x-midSh.x)*ar, tdy=hip.y-midSh.y, thx=(knee.x-hip.x)*ar, thy=knee.y-hip.y;
       var cross=tdx*thy-tdy*thx, dot=tdx*thx+tdy*thy; return Math.atan2(cross,dot)*180/Math.PI; }
-    if(vis(23)&&vis(25)){ var hI=hipAng(lm[23],lm[25]); if(hI!=null) out.hipIzq={val:hI,ok:true}; }
-    if(vis(24)&&vis(26)){ var hD=hipAng(lm[24],lm[26]); if(hD!=null) out.hipDer={val:hD,ok:true}; }
-    if(vis(23)&&vis(25)&&vis(27)) out.rodIzq={val:180-_ang2D(lm[23],lm[25],lm[27]), ok:true};   // rodilla flex-ext
-    if(vis(24)&&vis(26)&&vis(28)) out.rodDer={val:180-_ang2D(lm[24],lm[26],lm[28]), ok:true};
-    if(vis(25)&&vis(27)&&vis(31)) out.tobIzq={val:_ang2D(lm[25],lm[27],lm[31]), ok:true};        // tobillo (interior pantorrilla-pie)
-    if(vis(26)&&vis(28)&&vis(32)) out.tobDer={val:_ang2D(lm[26],lm[28],lm[32]), ok:true};
-    if(vis(27)) out.footIzq={val:lm[27].x-midHip.x, ok:true};   // pos AP del pie vs sacro (eventos)
-    if(vis(28)) out.footDer={val:lm[28].x-midHip.x, ok:true};
+    // Guarda de validez (Fase 1): finitud + segmento mínimo → sin esto, puntos coincidentes/NaN daban 180° ok:true.
+    if(vis(23)&&vis(25)&&midSh&&_medible3(midSh,lm[23],lm[25])){ var hI=hipAng(lm[23],lm[25]); if(hI!=null) out.hipIzq={val:hI,ok:true}; }
+    if(vis(24)&&vis(26)&&midSh&&_medible3(midSh,lm[24],lm[26])){ var hD=hipAng(lm[24],lm[26]); if(hD!=null) out.hipDer={val:hD,ok:true}; }
+    if(vis(23)&&vis(25)&&vis(27)&&_medible3(lm[23],lm[25],lm[27])) out.rodIzq={val:180-_ang2D(lm[23],lm[25],lm[27]), ok:true};   // rodilla flex-ext
+    if(vis(24)&&vis(26)&&vis(28)&&_medible3(lm[24],lm[26],lm[28])) out.rodDer={val:180-_ang2D(lm[24],lm[26],lm[28]), ok:true};
+    if(vis(25)&&vis(27)&&vis(31)&&_medible3(lm[25],lm[27],lm[31])) out.tobIzq={val:_ang2D(lm[25],lm[27],lm[31]), ok:true};        // tobillo (interior pantorrilla-pie)
+    if(vis(26)&&vis(28)&&vis(32)&&_medible3(lm[26],lm[28],lm[32])) out.tobDer={val:_ang2D(lm[26],lm[28],lm[32]), ok:true};
+    if(vis(27)&&_finP(lm[27])&&midHipOk) out.footIzq={val:lm[27].x-midHip.x, ok:true};   // pos AP del pie vs sacro (eventos); O1: exige sacro finito
+    if(vis(28)&&_finP(lm[28])&&midHipOk) out.footDer={val:lm[28].x-midHip.x, ok:true};
     if(vis(0)&&(vis(27)||vis(28))){ var ay=vis(27)?lm[27].y:lm[28].y; out.alturaPx=Math.abs(ay-lm[0].y); }
     out.ok=!!(out.rodIzq.ok||out.rodDer.ok);
-    out.p={ nariz:vis(0)?lm[0]:null, sacro:midHip, hombroIzq:vis(11)?lm[11]:null, hombroDer:vis(12)?lm[12]:null,
+    out.p={ nariz:vis(0)?lm[0]:null, sacro:midHipOk?midHip:null, hombroIzq:vis(11)?lm[11]:null, hombroDer:vis(12)?lm[12]:null,
       caderaIzq:vis(23)?lm[23]:null, caderaDer:vis(24)?lm[24]:null, rodillaIzq:vis(25)?lm[25]:null, rodillaDer:vis(26)?lm[26]:null,
       tobilloIzq:vis(27)?lm[27]:null, tobilloDer:vis(28)?lm[28]:null };
     return out;
@@ -597,6 +614,9 @@
   function acumularMarcha(acc,f,tSec){
     if(!acc||!f) return;
     acc._frame++; acc.frames++;
+    // O5: sella el aspecto desde la fuente REAL cuando ya hay dimensiones (no hereda el aspecto de la fuente anterior);
+    // si aún no las hay, queda null y se sella en un cuadro posterior (finalizarMarcha cae a _ANG_AR si nunca llegan).
+    if(acc.aspect==null && BIO.srcEl && BIO.srcEl.videoWidth>0 && BIO.srcEl.videoHeight>0) acc.aspect=BIO.srcEl.videoWidth/BIO.srcEl.videoHeight;
     if(tSec==null) tSec=acc._frame/(FPS_CAMARA||20);
     if(f.orientPerfil!=null){ acc.orientN++; if(f.orientPerfil) acc.orientPerfilN++; }
     var i=acc._frame, R=acc._run, alguno=false;
@@ -651,6 +671,10 @@
       calidad:{framesValidos:(acc&&acc.framesValidos)||0},
       calibracion:{estaturaCm:estaturaCm||null, treadmillKmh:treadmillKmh||null} };
     if(!acc) return out;
+    // ASPECTO (Fase 2): la longitud de paso mezclaba una distancia X (fracción de ANCHO) con una escala
+    // derivada de Y (altura-proxy). Sin corregir, 9:16 y 16:9 daban el mismo metraje (falso). Se escala la
+    // distancia X por el aspecto de la fuente (acc.aspect; global _ANG_AR como respaldo documentado).
+    var arM=(acc && acc.aspect!=null)?acc.aspect:(_ANG_AR||1);
     var visPct=acc.frames?Math.round(acc.framesValidos/acc.frames*100):0;
     var orientOK=acc.orientN?((acc.orientPerfilN/acc.orientN)>=0.6):null;
     out.calidad={ framesValidos:acc.framesValidos, frames:acc.frames, visPct:visPct, orientPerfilOK:orientOK };
@@ -693,7 +717,7 @@
     var hPx=altSorted.length?altSorted[Math.floor(0.90*(altSorted.length-1))]:null, hFull=hPx?hPx/0.88:null;
     var pxToM=(estaturaCm&&hFull)?(estaturaCm/100)/hFull:null;
     function nearestV(serie,t){ var best=null,bd=1e9; for(var k=0;k<serie.length;k++){ var d=Math.abs(serie[k].t-t); if(d<bd){bd=d;best=serie[k].v;} } return best; }
-    var stepPx=[]; allHS.forEach(function(t){ var a=nearestV(fI,t), b=nearestV(fD,t); if(a!=null&&b!=null) stepPx.push(Math.abs(a-b)); });
+    var stepPx=[]; allHS.forEach(function(t){ var a=nearestV(fI,t), b=nearestV(fD,t); if(a!=null&&b!=null) stepPx.push(Math.abs(a-b)*arM); });   // distancia AP (X) · aspecto (Fase 2)
     var stepLenPx=stepPx.length?_media(stepPx):null;
     out.espacial.stepLenM=(stepLenPx!=null&&pxToM)?_r2(stepLenPx*pxToM):null;
     if(treadmillKmh){ out.velocidad=_r2(treadmillKmh/3.6); }
@@ -736,12 +760,32 @@
   }
   // ═════════════ fin núcleo marcha ═════════════
 
+  // ── Identidad de generación (P1-6): descarta resultados TARDÍOS de una medición anterior ──
+  // Cada cambio de fuente o selección (cámara/video/foto/voltear/tipo/goniómetro) incrementa BIO.gen.
+  // Cada send() de streaming encola su gen; onResults saca el más viejo (FIFO) y, si no coincide con
+  // la generación vigente, el cuadro quedó en vuelo de una medición anterior → se descarta (framesDescartados).
+  // Supuesto FIFO (MediaPipe no ecoa metadatos): send()→onResults es 1:1 y en orden; el candado de 32 + el
+  // shift del watchdog mantienen la cola acotada y auto-sanable. RESIDUAL conocido (O3; cross-generación YA
+  // resuelto): si un send colgado que el watchdog ya "soltó" (shift) resuelve TARDE (<2.5 s), su callback
+  // consume el gen del send fresco y un cuadro algo viejo de la MISMA medición se acepta (y el fresco cae al
+  // fallback). Es intra-medición y acotado a 2.5 s; NO mezcla mediciones de generaciones distintas.
+  function _bumpGen(){ BIO.gen = (BIO.gen||0) + 1; }
+  function _genSend(img){
+    (BIO._genQ || (BIO._genQ=[])).push(BIO.gen||0);
+    if(BIO._genQ.length > 32) BIO._genQ.shift();   // candado: un send() colgado que nunca devolvió no crece la cola sin fin
+    return BIO.pose.send({ image: img });
+  }
+
   // ── Callback único de resultados de MediaPipe ──────────────────────────────
   function onResults(res){
     // MODO FOTO: una sola imagen estática → solo guardamos el resultado y salimos (lo procesa procesarFoto).
+    // La foto está serializada con pose.reset() y se consume por BIO._fotoRes → NO pasa por la cola de generación.
     if(BIO.modo==='foto'){ BIO._fotoRes = res; return; }
-    // Descarta UN cuadro si el watchdog liberó un send() colgado → evita pintar un resultado TARDÍO/stale.
-    if(BIO._dropStale){ BIO._dropStale=false; return; }
+    // IDENTIDAD DE GENERACIÓN (P1-6): saca el gen más viejo encolado por su send(); si NO es la generación
+    // vigente, el cuadro quedó en vuelo de una medición anterior (cambió fuente/selección, o el watchdog
+    // liberó un send colgado) → se DESCARTA para no contaminar el acumulador nuevo. Sustituye a _dropStale.
+    var _gi = (BIO._genQ && BIO._genQ.length) ? BIO._genQ.shift() : (BIO.gen||0);
+    if(_gi !== (BIO.gen||0)){ BIO.framesDescartados=(BIO.framesDescartados||0)+1; return; }
     // Fija el aspecto real de la fuente (ancho/alto) para que los ángulos 2D no se deformen en vertical (H1).
     if(BIO.srcEl && BIO.srcEl.videoWidth){ _setAspect(BIO.srcEl.videoWidth, BIO.srcEl.videoHeight); }
     var lm = res && res.poseLandmarks;
@@ -773,7 +817,7 @@
       // Al mejorar el pico guardamos los landmarks de ESE cuadro (trazabilidad: qué puntos produjeron el grado).
       if(mejoroG && lm){ try{ BIO._peakGonioLm=_copiaLm(lm); BIO._peakGonioAR=_ANG_AR; }catch(_g){} }
       // Al analizar un VIDEO, además guardamos la IMAGEN del cuadro-pico para anotarla.
-      if(BIO.modo==='video' && mejoroG && lm && BIO.srcEl){ try{ BIO._peakFrameCanvas=_canvasDeImagen(BIO.srcEl); BIO._peakFrameLm=_copiaLm(lm); }catch(_e){} }
+      if(BIO.modo==='video' && mejoroG && lm && BIO.srcEl){ try{ BIO._peakFrameCanvas=_canvasDeImagen(BIO.srcEl); BIO._peakFrameLm=_copiaLm(lm); BIO._peakTSeg=(BIO.srcEl.currentTime||0); }catch(_e){} }
       if(BIO.canvas && BIO.srcEl){ dibujar(lm, null); dibujarGonioVivo(lm, rg); }
       return;
     }
@@ -1033,6 +1077,7 @@
   // Selector de tipo de medición: ROM de brazos · sentadilla frontal · marcha sagital.
   function aplicarTipoMedicion(t){
     BIO.tipoMedicion = (t==='sent'||t==='marcha'||t==='gonio') ? t : 'rom';
+    _bumpGen();   // cambia el tipo de medición: un cuadro tardío calculado para el tipo anterior no debe acumular
     var bR=document.getElementById('bio-tipo-rom'), bS=document.getElementById('bio-tipo-sent'), bM=document.getElementById('bio-tipo-marcha'), bG=document.getElementById('bio-tipo-gonio');
     if(bR) bR.classList.toggle('on', BIO.tipoMedicion==='rom');
     if(bS) bS.classList.toggle('on', BIO.tipoMedicion==='sent');
@@ -1063,9 +1108,10 @@
     return (isFinite(v) && v>=80 && v<=230) ? v : null;
   }
   function resetEstado(){
+    _bumpGen(); BIO.framesDescartados=0;   // nueva generación: cualquier cuadro en vuelo de la medición anterior se descartará
     BIO.modo=null; BIO.recording=false; BIO.procesandoVideo=false; BIO.cancelVideo=false; BIO.finalizando=false;
     BIO.acc=null; BIO.accS=null; BIO.accM=null; BIO.accG=null; BIO.framesTotales=0; BIO.srcEl=null; BIO.sending=false;
-    BIO._estaticoBase=null; BIO._estaticoLm=null; BIO._estaticoImg=null; BIO._estaticoFuente=null; BIO._peakFrameCanvas=null; BIO._peakFrameLm=null; BIO._fotoRes=null;
+    BIO._estaticoBase=null; BIO._estaticoLm=null; BIO._estaticoImg=null; BIO._estaticoFuente=null; BIO._peakFrameCanvas=null; BIO._peakFrameLm=null; BIO._peakTSeg=null; BIO._fotoRes=null;
     BIO.facing='environment';           // cada medición arranca con la cámara TRASERA
     detenerGrabadorVideo(); BIO.pendingVideo=null;
     detenerLoopCamara(); pararCronometro();
@@ -1091,7 +1137,7 @@
 
   // ── MODO A: cámara en vivo ─────────────────────────────────────────────────
   async function iniciarCamara(){
-    BIO.modo='camara';
+    BIO.modo='camara'; _bumpGen();
     BIO.facing = BIO.facing || 'environment';   // TRASERA por defecto (se apunta al paciente)
     mostrarVista('bio-vista-camara');
     // Reset del botón de grabar y cronómetro (evita estado viejo al volver a grabar).
@@ -1149,6 +1195,7 @@
   async function voltearCamara(){
     if(BIO.recording){ toast('Detén la grabación para cambiar de cámara','warning'); return; }
     BIO.facing = (BIO.facing==='environment') ? 'user' : 'environment';
+    _bumpGen();   // cambia la fuente (trasera/frontal): descarta cuadros en vuelo de la cámara anterior
     var estado=document.getElementById('bio-estado');
     if(estado) estado.textContent = (BIO.facing==='environment') ? 'Cámara trasera' : 'Cámara frontal';
     await abrirStreamCamara(BIO.facing);
@@ -1165,7 +1212,7 @@
       // (síntoma: "no graba / se queda pegado / 0 cuadros"). Si lleva >2.5 s sin resolver, lo liberamos
       // y dejamos que el SIGUIENTE tick envíe un frame fresco (sin enviar dos a la vez).
       if(BIO.sending){
-        if(BIO._sendAt && (Date.now()-BIO._sendAt)>2500){ BIO.sending=false; BIO._sendStuck=(BIO._sendStuck||0)+1; BIO._dropStale=true; }
+        if(BIO._sendAt && (Date.now()-BIO._sendAt)>2500){ BIO.sending=false; BIO._sendStuck=(BIO._sendStuck||0)+1; if(BIO._genQ && BIO._genQ.length) BIO._genQ.shift(); }
         return;
       }
       // Si el <video> se pausó (iOS al volver de segundo plano / bloqueo de pantalla), reintenta.
@@ -1173,7 +1220,7 @@
       if(!BIO.pose || !BIO.video || BIO.video.videoWidth===0) return;
       BIO.sending = true; BIO._sendAt = Date.now();
       BIO.framesTotales++;
-      BIO.pose.send({ image: BIO.video }).then(function(){ BIO.sending=false; }).catch(function(){ BIO.sending=false; });
+      _genSend(BIO.video).then(function(){ BIO.sending=false; }).catch(function(){ BIO.sending=false; });
     }
     BIO.rafId = requestAnimationFrame(tick);
   }
@@ -1256,7 +1303,7 @@
       if(BIO.tipoMedicion==='sent'){ BIO.accS=nuevoAccSent(); }
       else if(BIO.tipoMedicion==='marcha'){ BIO.accM=nuevoAccMarcha(); }
       else { BIO.acc = nuevoAcumulador(); }
-      BIO.framesTotales=0; BIO.tStart=Date.now();
+      BIO.framesTotales=0; BIO.framesDescartados=0; BIO.tStart=Date.now();   // O4: los descartes por generación empiezan en 0 en cada grabación
       BIO.pendingVideo=null; iniciarGrabadorVideo();     // graba el clip de cámara en paralelo
       BIO.recording=true;
       if(fb) fb.disabled=true;                            // no cambiar de cámara a media grabación
@@ -1355,7 +1402,7 @@
   // ── MODO B: analizar video subido ──────────────────────────────────────────
   async function procesarVideo(file){
     if(!file.type || file.type.indexOf('video')!==0){ toast('Selecciona un archivo de video','error'); return; }
-    BIO.modo='video';
+    BIO.modo='video'; _bumpGen();
     // Guardar el archivo elegido para subirlo al expediente al guardar (antes/después visual).
     var _ext=(String(file.name||'').split('.').pop()||'').toLowerCase().replace(/[^a-z0-9]/g,'') || (file.type.indexOf('mp4')>=0?'mp4':(file.type.indexOf('quicktime')>=0?'mov':'webm'));
     BIO.pendingVideo = { file:file, mime:file.type||'video/mp4', ext:_ext };
@@ -1392,9 +1439,9 @@
 
     if(BIO.tipoMedicion==='sent'){ BIO.accS=nuevoAccSent(); }
     else if(BIO.tipoMedicion==='marcha'){ BIO.accM=nuevoAccMarcha(); }
-    else if(BIO.tipoMedicion==='gonio'){ if(!BIO.accG) BIO.accG=nuevoAccGonio(); _gonioSelDefault(BIO.accG); BIO.accG.peak=null; BIO.accG.run=0; BIO._peakFrameCanvas=null; BIO._peakFrameLm=null; }
+    else if(BIO.tipoMedicion==='gonio'){ if(!BIO.accG) BIO.accG=nuevoAccGonio(); _gonioSelDefault(BIO.accG); BIO.accG.peak=null; BIO.accG.run=0; BIO._peakFrameCanvas=null; BIO._peakFrameLm=null; BIO._peakTSeg=null; }
     else { BIO.acc = nuevoAcumulador(); }
-    BIO.framesTotales=0;
+    BIO.framesTotales=0; BIO.framesDescartados=0;   // O4: reinicia descartes al empezar el análisis de video
     BIO.procesandoVideo=true; BIO.cancelVideo=false;
     txt.textContent='0%';
     // MUESTREO DURANTE REPRODUCCIÓN (robusto en iOS). El método anterior (seek cuadro-a-cuadro
@@ -1423,10 +1470,10 @@
         if(BIO.cancelVideo){ terminar(); return; }
         var t = v.currentTime || 0;
         // Mismo watchdog que en vivo: libera un send() colgado para no congelar el muestreo del video.
-        if(BIO.sending && BIO._sendAt && (Date.now()-BIO._sendAt)>2500){ BIO.sending=false; }
+        if(BIO.sending && BIO._sendAt && (Date.now()-BIO._sendAt)>2500){ BIO.sending=false; if(BIO._genQ && BIO._genQ.length) BIO._genQ.shift(); }
         if(!BIO.sending && BIO.pose && v.videoWidth>0 && (t - lastSample) >= minGap){
           lastSample = t; BIO.sending = true; BIO._sendAt = Date.now(); BIO.framesTotales++;
-          BIO.pose.send({ image:v }).then(function(){ BIO.sending=false; }).catch(function(){ BIO.sending=false; });
+          _genSend(v).then(function(){ BIO.sending=false; }).catch(function(){ BIO.sending=false; });
         }
         var pct = Math.min(99, Math.round((t/dur)*100));
         fill.style.width = pct+'%';
@@ -1505,7 +1552,7 @@
     var hayDato = (medidas||[]).some(function(x){ return x && x.min!==null; });
     cont.innerHTML =
       '<h3>Resumen de la medición</h3>'
-      + '<div style="color:#9BA3B5;font-size:13px;margin-bottom:10px">'+fuenteTxt+' · '+meta.duracionSeg+' s · '+(meta.calidad.framesValidos||0)+' cuadros válidos · convención clínica (0° neutro)<br>ROM = <b style="color:#C9D2E8">media de los picos</b> de cada repetición · máx = mejor intento · ± = consistencia entre reps<br><span style="color:#E8C96A">Margen 2D honesto:</span> abducción/codo/cuello ±5°, flexión/extensión de hombro ±10° (de frente van fuera de plano → para finura, de PERFIL). Diferencias entre sesiones &lt; ~8° pueden ser ruido.</div>'
+      + '<div style="color:#9BA3B5;font-size:13px;margin-bottom:10px">'+fuenteTxt+' · '+meta.duracionSeg+' s · '+(meta.calidad.framesValidos||0)+' cuadros válidos · convención clínica (0° neutro)<br>ROM = <b style="color:#C9D2E8">media de los picos</b> de cada repetición · máx = mejor intento · ± = consistencia entre reps<br><span style="color:#E8C96A">Margen 2D honesto:</span> abducción/codo/cuello ±5°, flexión/extensión de hombro ±10° (de frente van fuera de plano → para finura, de PERFIL). Diferencias entre sesiones &lt; ~8° pueden ser ruido. Margen estimado, no validado contra goniómetro físico.</div>'
       + '<table class="bio-tabla-res"><thead><tr><th>Movimiento</th><th>Izquierda</th><th>Derecha</th></tr></thead><tbody>'+filas+'</tbody></table>'
       + (hayDato ? '' : '<div style="color:#E8C96A;font-size:13px;margin-top:10px">⚠️ No se detectó tronco + brazos con suficiente visibilidad. Repite con hombros, codos y caderas en cuadro y buena luz.</div>')
       + ((hayDato && (meta.calidad.framesValidos||0)<20) ? '<div style="color:#E8C96A;font-size:12px;margin-top:8px">⚠️ Pocos cuadros válidos ('+(meta.calidad.framesValidos||0)+'). La medición puede ser inestable: repite con el paciente más cerca, buena luz y movimientos algo más lentos.</div>' : '')
@@ -1549,6 +1596,8 @@
       if(!sesion.calidad || typeof sesion.calidad!=='object') sesion.calidad={};
       if(!sesion.calidad.algoVersion) sesion.calidad.algoVersion=BIO_ALGO_VER;
       if(!sesion.calidad.captura && sesion.fuente==='camara' && typeof BIO!=='undefined' && BIO.camSettings) sesion.calidad.captura=BIO.camSettings;
+      if(sesion.calidad.framesDescartados==null && typeof BIO!=='undefined' && BIO.framesDescartados) sesion.calidad.framesDescartados=BIO.framesDescartados;
+      if(sesion._estadoSync==null){ sesion._estadoSync='local'; sesion._estadoSyncFecha=null; }   // P1-10: estado real de sync; _syncBiomecanicaFS lo pone 'sincronizada' al confirmar la nube
     }catch(_s){}
     p.biomecanica.push(sesion);
     if(!Array.isArray(p.historialCambios)) p.historialCambios=[];
@@ -1751,6 +1800,7 @@
     if(!res.nCiclos) avisos.push('⚠️ No se detectaron ciclos de marcha completos. Repite DE PERFIL, con el cuerpo completo en cuadro y 8–10 pasos (o en caminadora).');
     if(res.nCiclos && q.framesValidos!=null && q.framesValidos<20) avisos.push('⚠️ Pocos cuadros válidos ('+q.framesValidos+'). Repite con mejor luz y el cuerpo completo en cuadro.');
     if(q.tiempoDudoso) avisos.push('⚠️ '+(q.tiempoDudosoMsg||'Ritmo atípico: si el video es en cámara lenta o acelerada, los tiempos no son fiables.'));
+    if(meta && meta.fuente==='video') avisos.push('⏱️ Al guardar se te preguntará si el video es a velocidad normal (afecta solo los tiempos; los ángulos no).');
     var vel=(res.velocidad!=null)?(res.velocidad+' m/s'):'—';
     cont.innerHTML =
       '<h3>Resumen — Marcha (análisis sagital)</h3>'
@@ -1776,10 +1826,68 @@
     var g=document.getElementById('bio-res-guardar');
     if(g) g.addEventListener('click', function(){ guardarSesionMarcha(res, meta); });
   }
+  // ── Hallazgo D: verificación del TIEMPO físico del video (cámara lenta / VFR) ──────────────
+  // Un slow-mo ya re-muxeado NO se puede auto-detectar (duración y fps del contenedor son los del archivo).
+  // Separamos (a) plausibilidad del movimiento (_cadenciaDudosa 20–220, ya existente) de (b) verificación del
+  // tiempo real: cámara en vivo = reloj real (confiable); video subido = se PREGUNTA al terapeuta UNA vez por
+  // archivo, con default seguro "No sé". Solo afecta métricas TEMPORALES/ESPACIALES; los ángulos no.
+  function _sigArchivo(f){ return f ? ((f.name||'')+'|'+(f.size||0)+'|'+(f.lastModified||0)) : ''; }
+  function _tiempoMeta(fuente, confirmado){
+    if(fuente==='camara') return { tiempoVerificado:true, fuenteTiempo:'camara-vivo' };
+    return (confirmado===true) ? { tiempoVerificado:true, fuenteTiempo:'video-confirmado' }
+                               : { tiempoVerificado:false, fuenteTiempo:'video-sin-confirmar' };
+  }
+  // AND con la plausibilidad: una temporal queda confiable SOLO si tiempoVerificado (finalizarMarcha ya aplicó
+  // !_cadenciaDudosa). Este gate solo puede BAJAR confiable a false, NUNCA re-habilitarla.
+  function _gatearTemporalPorTiempo(medidas, tiempoVerificado){
+    (medidas||[]).forEach(function(m){ if(m && (m.grupo==='Temporal'||m.grupo==='Espacial') && !tiempoVerificado){ m.confiable=false; } });
+    return medidas;
+  }
+  // Modal de confirmación (NO confirm(): su botón por defecto es Aceptar → sesgo a "Sí"/click-through). El botón
+  // prominente/por defecto es "No sé" (seguro); "Sí" exige un clic deliberado. Tocar fuera → "No sé". Promise<bool>.
+  function _preguntarVelocidadNormal(pistaDudosa){
+    return new Promise(function(resolve){
+      var prev=document.getElementById('bio-vel-modal'); if(prev&&prev.parentNode) prev.parentNode.removeChild(prev);
+      var ov=document.createElement('div'); ov.id='bio-vel-modal';
+      ov.style.cssText='position:fixed;inset:0;z-index:100002;background:rgba(13,22,38,.72);display:flex;align-items:center;justify-content:center;padding:18px';
+      var pista=pistaDudosa ? '<div style="background:#FEF3C7;border:1px solid #FCD34D;color:#92400E;font-size:12px;padding:7px 9px;border-radius:8px;margin-bottom:10px">⚠️ La cadencia calculada es atípica — si el video es en cámara lenta, los tiempos no son fiables.</div>' : '';
+      ov.innerHTML='<div style="background:#fff;border-radius:14px;max-width:420px;width:100%;padding:18px 18px 14px;box-shadow:0 10px 40px rgba(0,0,0,.4)">'
+        +'<div style="font-weight:800;color:#1B3A6B;font-size:16px;margin-bottom:8px">⏱️ ¿Velocidad del video?</div>'
+        +'<div style="color:#444;font-size:13.5px;line-height:1.5;margin-bottom:12px">Para que la cadencia, las fases de apoyo, la longitud de paso y la velocidad sean fiables, el video debe estar a <b>velocidad normal</b> (no cámara lenta). Un video en cámara lenta ya re-muxeado no se puede detectar solo.</div>'
+        +pista
+        +'<button id="bio-vel-nose" style="width:100%;background:#1B3A6B;color:#fff;border:none;border-radius:10px;padding:12px;font-size:14px;font-weight:800;cursor:pointer;margin-bottom:8px">No sé / puede ser cámara lenta</button>'
+        +'<button id="bio-vel-si" style="width:100%;background:#fff;color:#1B3A6B;border:1.5px solid #c9d2e8;border-radius:10px;padding:11px;font-size:13.5px;font-weight:700;cursor:pointer">Sí, se grabó a velocidad normal</button>'
+        +'<div style="font-size:11px;color:#9BA3B5;margin-top:9px">Los ángulos (rodilla, cadera, tobillo) son fiables en cualquier caso.</div>'
+        +'</div>';
+      document.body.appendChild(ov);
+      function done(v){ try{ if(ov.parentNode) ov.parentNode.removeChild(ov); }catch(_e){} resolve(v); }
+      var bN=ov.querySelector('#bio-vel-nose'), bS=ov.querySelector('#bio-vel-si');
+      if(bN) bN.onclick=function(){ done(false); };
+      if(bS) bS.onclick=function(){ done(true); };
+      ov.onclick=function(e){ if(e.target===ov) done(false); };
+    });
+  }
+  // Pregunta UNA vez POR ARCHIVO (firma nombre+tamaño+lastModified). Reanálisis del mismo video no re-pregunta.
+  async function _confirmarVelocidadArchivo(pendingVideo, pistaDudosa){
+    var sig=_sigArchivo(pendingVideo && pendingVideo.file);
+    if(!sig) return false;                                   // sin archivo identificable → conservador
+    if(!BIO._velTiempo) BIO._velTiempo={};
+    if(Object.prototype.hasOwnProperty.call(BIO._velTiempo, sig)) return BIO._velTiempo[sig];   // ya se preguntó por ESTE archivo
+    var r = await _preguntarVelocidadNormal(!!pistaDudosa);
+    BIO._velTiempo[sig]=r;
+    return r;
+  }
   async function guardarSesionMarcha(res, meta){
     var p = (typeof currentPatient!=='undefined') ? currentPatient : null;
     if(!p){ toast('Sin paciente activo','error'); return; }
     var btn=document.getElementById('bio-res-guardar'); if(btn){ btn.disabled=true; btn.textContent='⏳ Guardando…'; }
+    // Hallazgo D: verifica el tiempo físico (gatea SOLO temporales/espaciales; los ángulos no se tocan).
+    var _tv;
+    if(meta.fuente==='camara'){ _tv=_tiempoMeta('camara'); }
+    else { var _pista=!!(res && res.calidad && res.calidad.tiempoDudoso); var _c=await _confirmarVelocidadArchivo(BIO.pendingVideo, _pista); _tv=_tiempoMeta('video', _c); }
+    res.calidad = res.calidad || {};
+    res.calidad.tiempoVerificado=_tv.tiempoVerificado; res.calidad.fuenteTiempo=_tv.fuenteTiempo;
+    _gatearTemporalPorTiempo(res.medidas, _tv.tiempoVerificado);
     var sesion = {
       id:'bm_'+p.id+'_'+Date.now(),
       tipo:'marcha',
@@ -1789,7 +1897,7 @@
       duracionSeg:meta.duracionSeg||0,
       nCiclos:res.nCiclos, cadencia:res.cadencia, velocidad:res.velocidad,
       temporal:res.temporal, espacial:res.espacial, sagital:res.sagital, simetria:res.simetria,
-      medidas:res.medidas, calibracion:res.calibracion, calidad:meta.calidad||{},
+      medidas:res.medidas, calibracion:res.calibracion, calidad:Object.assign({}, res.calidad||{}, meta.calidad||{}),   // P1-9: conserva tiempoDudoso/visPct/orientPerfilOK de res.calidad
       reportePdf:null, video:null, eliminado:false
     };
     sesion.video = await _subirVideoSesion(p, meta, btn, 'marcha');
@@ -1811,7 +1919,7 @@
     var hEst = hs.length ? (hs[Math.floor(0.90*(hs.length-1))]/0.88)*1000 : null;
     return { v:1, fps:(meta&&meta.calidad&&(meta.calidad.fpsPromedio||meta.calidad.fpsMuestreo))||12,
       aspect:accS.aspect||0.5625, nReps:(res&&res.nReps)||0, fondo:fondo, n:accS.trayN, puntos:accS.tray,
-      porRep:(res&&res.porRep)||[], escala:{ yBase:yBase, hEst:hEst, estaturaCm:(res&&res.calibracion&&res.calibracion.estaturaCm)||null } };
+      porRep:(res&&res.porRep)||[], trayFrame:accS.trayFrame||[], escala:{ yBase:yBase, hEst:hEst, estaturaCm:(res&&res.calibracion&&res.calibracion.estaturaCm)||null } };   // P2-14: trayFrame (posición→nº de cuadro) lo usa _dibujarSacro para ubicar el fondo
   }
   // Persiste el paquete: memoria (replay inmediato) + IndexedDB (offline, mismo dispositivo) +
   // Storage (viaja entre dispositivos). En la sesión solo queda el puntero.
@@ -1927,8 +2035,11 @@
     // fondos de cada rep (rojo) + etiqueta de profundidad
     ctx.textAlign='center'; ctx.textBaseline='top';
     (paq.porRep||[]).forEach(function(rp){
-      var idx=null; for(var q=0;q<(paq.trayFrame?paq.trayFrame.length:0);q++){ if(paq.trayFrame[q]===rp.frameFondo){ idx=q; break; } }
-      if(idx==null && rp.frameFondo!=null && rp.frameFondo<serie.length) idx=rp.frameFondo;
+      var idx=null;
+      if(paq.trayFrame && paq.trayFrame.length){
+        for(var q=0;q<paq.trayFrame.length;q++){ if(paq.trayFrame[q]===rp.frameFondo){ idx=q; break; } }
+        if(idx==null && rp.frameFondo!=null){ var _best=-1,_bd=Infinity; for(var q2=0;q2<paq.trayFrame.length;q2++){ var _dd=Math.abs(paq.trayFrame[q2]-rp.frameFondo); if(_dd<_bd){_bd=_dd;_best=q2;} } if(_best>=0) idx=_best; }   // P2-14: cuadro capturado MÁS CERCANO (no el nº de cuadro crudo como posición)
+      } else if(rp.frameFondo!=null && rp.frameFondo<serie.length){ idx=rp.frameFondo; }   // compat: paquetes viejos sin trayFrame
       if(idx==null || serie[idx]==null) return;
       var x=X(idx), y=Y(serie[idx]);
       ctx.fillStyle='#E23B3B'; ctx.beginPath(); ctx.arc(x,y,Math.max(3,W*0.01),0,7); ctx.fill();
@@ -2077,6 +2188,16 @@
       .map(function(g){ return fila(g[0], a[g[1]], a[g[2]]); }).join('');
   }
   // Tarjeta de una sesión de SENTADILLA en la pestaña (misma familia visual que las de ROM).
+  // Badge de estado de sincronización (P1-10): ☁️ en la nube / 📱 solo en este equipo. Sesiones viejas
+  // (sin el campo _estadoSync) NO muestran badge, para no afirmar un estado que no se registró.
+  // Multi-equipo (N2): una sesión traída de la nube puede verse 📱 un instante en el equipo B hasta que su propio
+  // catch-up (renderPestana dispara _syncBiomecanicaFS al abrir la pestaña) la marque 'sincronizada' → converge solo.
+  function _syncBadge(s){
+    if(!s || s._estadoSync==null) return '';
+    return (s._estadoSync==='sincronizada')
+      ? ' · <span title="Sincronizada a la nube'+(s._estadoSyncFecha?(' ('+String(s._estadoSyncFecha).slice(0,10)+')'):'')+'" style="color:var(--green)">☁️</span>'
+      : ' · <span title="Solo en este equipo (aún sin confirmar en la nube)" style="color:#B45309">📱</span>';
+  }
   function tarjetaSentHTML(s){
     var by={}; (s.medidas||[]).forEach(function(m){ by[m.key]=m; });
     function fmtS(m, etqExt){
@@ -2109,7 +2230,7 @@
     return '<div class="section-card" style="margin-bottom:10px">'
       + '<div class="section-title" style="display:flex;align-items:center;justify-content:space-between">'
       +   '<span>🏋️ Sentadilla · '+esc(s.fecha)+' '+esc(s.horaCreacion||'')+'</span>'
-      +   '<span style="font-weight:600;text-transform:none;letter-spacing:0;color:var(--gray-400)">'+fuente+'</span>'
+      +   '<span style="font-weight:600;text-transform:none;letter-spacing:0;color:var(--gray-400)">'+fuente+_syncBadge(s)+'</span>'
       + '</div>'
       + '<div class="field-row"><div class="field-label">Terapeuta</div><div class="field-value">'+esc(s.terapeuta||'—')+' · '+(s.duracionSeg||0)+' s · '+nReps+' rep'+(nReps===1?'':'s')+' (vista frontal)'+(avisos.length?(' · <span style="color:#B45309">⚠️ '+esc(avisos.join(', '))+'</span>'):'')+'</div></div>'
       + fila('Valgo FPPA (media bajada)', fmtS(by['fppa_izq'],'peor'), fmtS(by['fppa_der'],'peor'))
@@ -2144,6 +2265,7 @@
     function simTxt(v){ if(v==null) return '—'; var c=(v>=90)?'var(--green)':(v>=80?'#B45309':'var(--red)'); return '<b style="color:'+c+'">'+v+'%</b>'; }
     var fuente=s.fuente==='video'?'📁 Video':'📷 Cámara', sm=s.simetria||{}, q=s.calidad||{}, avisos=[];
     if(q.orientPerfilOK===false) avisos.push('toma no de perfil');
+    if(q.fuenteTiempo==='video-sin-confirmar') avisos.push('tiempos sin confirmar (video subido)');   // Hallazgo D
     var velTxt=(s.velocidad!=null)?(s.velocidad+' m/s'):'—', cadTxt=(s.cadencia!=null)?(s.cadencia+' pasos/min'):'—';
     var videoBtn = (s.video && s.video.url)
       ? '<button data-url="'+esc(s.video.url)+'" onclick="window.open(this.dataset.url,\'_blank\')" style="background:var(--green);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer">▶️ Ver video</button>'
@@ -2151,9 +2273,10 @@
     return '<div class="section-card" style="margin-bottom:10px">'
       + '<div class="section-title" style="display:flex;align-items:center;justify-content:space-between">'
       +   '<span>🚶 Marcha · '+esc(s.fecha)+' '+esc(s.horaCreacion||'')+'</span>'
-      +   '<span style="font-weight:600;text-transform:none;letter-spacing:0;color:var(--gray-400)">'+fuente+'</span>'
+      +   '<span style="font-weight:600;text-transform:none;letter-spacing:0;color:var(--gray-400)">'+fuente+_syncBadge(s)+'</span>'
       + '</div>'
       + '<div class="field-row"><div class="field-label">Terapeuta</div><div class="field-value">'+esc(s.terapeuta||'—')+' · '+(s.duracionSeg||0)+' s · '+(s.nCiclos||0)+' ciclo'+((s.nCiclos===1)?'':'s')+' (vista sagital)'+(avisos.length?(' · <span style="color:#B45309">⚠️ '+esc(avisos.join(', '))+'</span>'):'')+'</div></div>'
+      + ((q.fuenteTiempo==='video-confirmado')?'<div class="field-row"><div class="field-label">Tiempos</div><div class="field-value" style="color:var(--gray-400);font-size:12px">⏱️ confirmados por el terapeuta (velocidad normal) — no es verificación instrumental</div></div>':'')
       + fila('Cadencia · velocidad', cadTxt+' · '+velTxt)
       + fila('Fase de apoyo', fmtM(by['stance_izq']), fmtM(by['stance_der']))
       + fila('Rodilla · flexión pico', fmtM(by['rod_pico_izq']), fmtM(by['rod_pico_der']))
@@ -2216,7 +2339,7 @@
     function v(i){ return _vis(lm,i); }
     // Guarda de geometría degenerada: si dos puntos quedan casi encimados (tracking fallido, articulación
     // fuera de cuadro o doblada sobre sí misma) el ángulo es basura → "no medible" en vez de un número falso.
-    function deg(i,j,k){ return _seg2D(lm[i],lm[j])<0.03 || _seg2D(lm[j],lm[k])<0.03; }
+    function deg(i,j,k){ return !_medible3(lm[i],lm[j],lm[k]); }   // degenerado O no-finito (NaN/Infinity) → no medible
     if(grupo==='Cadera'){
       if(!(v(P.S)&&v(P.H)&&v(P.K))) return { ok:false, val:null };
       if(deg(P.S,P.H,P.K)) return { ok:false, val:null };
@@ -2255,14 +2378,22 @@
     g.peak=null; g.run=0; g.ema={};
   }
   function _gonioSelKey(g){ return g && g.sel ? (g.sel.key+'_'+g.sel.lado) : ''; }
+  // (h) Posible ESCORZO / fuera de plano: el goniómetro 2D colapsa hacia ~180° cuando el segmento queda casi
+  // paralelo al eje de la cámara (p.ej. cadera ext 160°, rodilla flex 172°). Se marca "revisar" cuando el grado
+  // rebasa MUCHO el rango normal (ref + 15°) en un mov que NO es déficit ni hiperextensión. Se computa de los
+  // campos ya guardados (grado/ref) → aplica también a sesiones viejas. No borra el número; lo señala.
+  function _gonioFueraRango(m){
+    return !!(m && m.grado!=null && m.ref!=null && !m.defic && !m.hiperext && m.grado > m.ref + 15);
+  }
   function _gonioFmtGrado(m){
     if(!m || m.grado==null) return '—';
     if(m.hiperext){ return (m.grado<=1) ? '0° (neutro)' : ('+'+Math.round(m.grado)+'° hiperext'); }
     if(m.defic){ return (m.grado<=1) ? '0° (completa)' : ('déficit '+Math.round(m.grado)+'°'); }
-    return Math.round(m.grado)+'°';
+    return Math.round(m.grado)+'°'+(_gonioFueraRango(m)?' (revisar)':'');
   }
   function _gonioAlerta(m){
     if(!m || m.grado==null) return false;
+    if(_gonioFueraRango(m)) return true;              // (h) fuera de rango (posible escorzo) → alerta
     if(m.hiperext) return m.grado>m.lim;              // hiperextensión: alerta si rebasa el umbral
     return m.defic ? (m.grado>m.lim) : (m.grado<m.lim);
   }
@@ -2392,6 +2523,9 @@
       +   '<button class="bio-gcap-btn" onclick="BIO_gonioCapturar()">◉ Capturar</button>'
       +   '<button class="bio-gfin-btn" onclick="BIO_gonioFinish()">✓ Terminar y guardar</button>'
       + '</div>'
+      + (BIO.modo==='estatico' && BIO._estaticoFuente==='video' && BIO.pendingVideo && BIO.pendingVideo.file
+          ? '<div class="bio-grow" style="margin-bottom:8px"><button class="bio-gchip" style="width:100%;text-align:center;background:#1b5e20;color:#fff;border-color:#1b5e20" onclick="BIO_gonioReanalizarVideo()">🔁 Reanalizar este video para '+esc(sel.grupo+' '+sel.mov+' '+(sel.lado==='izq'?'Izq':'Der'))+'</button></div>'
+          : '')
       + (BIO.modo==='estatico' ? '<div class="bio-grow" style="margin-bottom:8px"><button class="bio-gchip" style="width:100%;text-align:center" onclick="BIO_gonioVolverInicio()">↩︎ Medir otra (subir otra foto/video o cámara)</button></div>' : '')
       + _gonioCapsHTML(g);
     pintarPanelGonio();
@@ -2411,6 +2545,7 @@
     }
   }
   // Muestra el resultado de una FOTO o del cuadro-pico de un VIDEO en la vista de cámara (cuadro congelado + control).
+  function _mmss(s){ s=Math.max(0,Math.round(s||0)); return Math.floor(s/60)+':'+('0'+(s%60)).slice(-2); }   // 7 → "0:07"
   function _mostrarGonioEstatico(baseCanvas, lm, fuente){
     detenerCamaraStream(); detenerLoopCamara();
     BIO.modo='estatico'; BIO._estaticoBase=baseCanvas; BIO._estaticoLm=lm; BIO._estaticoFuente=fuente;
@@ -2426,7 +2561,7 @@
     var est=document.getElementById('bio-estado');
     if(est) est.textContent = (fuente==='foto')
       ? '📷 Foto analizada · cambia la articulación/lado para medir otra, o toca Capturar'
-      : '📁 Video analizado · toca Capturar (para otro movimiento sube otra foto/video)';
+      : ('📁 Video analizado'+(BIO._peakTSeg!=null?' · pico a '+_mmss(BIO._peakTSeg):'')+' · toca Capturar; para OTRO movimiento cambia la selección y toca 🔁 Reanalizar este video');
   }
   // Recalcula el ángulo del movimiento seleccionado SOBRE el cuadro estático (foto o pico de video) y lo dibuja.
   function _recalcEstatico(){
@@ -2446,6 +2581,7 @@
   // MODO C: subir una FOTO (ideal camilla / decúbito prono) → pose en imagen estática → ángulo + foto anotada.
   async function procesarFoto(file){
     if(!file || !file.type || file.type.indexOf('image')!==0){ toast('Selecciona una imagen (JPG/PNG)','error'); return; }
+    _bumpGen(); BIO.framesDescartados=0;   // nueva generación (foto exenta de la cola); O4: reinicia descartes
     if(!BIO.accG) BIO.accG=nuevoAccGonio();
     _gonioSelDefault(BIO.accG);
     mostrarVista('bio-vista-progreso');
@@ -2493,7 +2629,16 @@
           var task=_ref.put(blob,{contentType:'image/jpeg'});
           task.on('state_changed', null, function(err){ reject(err); }, function(){ task.snapshot.ref.getDownloadURL().then(resolve).catch(reject); });
         });
-        out.push({ key:keys[i], grupo:it.grupo, mov:it.mov, lado:it.lado, grado:it.grado, etq:it.etq, url:_url, fbPath:_path, mime:'image/jpeg' });
+        // P1-8: sube TAMBIÉN el original sin anotar (mismo path con sufijo _orig). Si falla, se conserva lo anotado + las métricas.
+        var _urlOrig=null, _pathOrig=null;
+        if(it.orig){ try{
+          var blobO=await new Promise(function(resolve){ try{ it.orig.toBlob(function(b){ resolve(b); }, 'image/jpeg', 0.85); }catch(e){ resolve(null); } });
+          if(blobO){ _pathOrig='clinica/sinergia/'+p.id+'/biomecanica/gonio_'+(it.key||('img'+i))+'_'+_ts+'_orig.jpg';
+            var _refO=fbStorage.ref(_pathOrig);
+            _urlOrig=await new Promise(function(resolve,reject){ var t=_refO.put(blobO,{contentType:'image/jpeg'}); t.on('state_changed', null, function(err){ reject(err); }, function(){ t.snapshot.ref.getDownloadURL().then(resolve).catch(reject); }); });
+          }
+        }catch(eo){ console.warn('[BIO] subida del original falló (se conserva lo anotado):', eo && eo.message); _urlOrig=null; _pathOrig=null; } }
+        out.push({ key:keys[i], grupo:it.grupo, mov:it.mov, lado:it.lado, grado:it.grado, etq:it.etq, url:_url, fbPath:_path, urlOrig:_urlOrig, fbPathOrig:_pathOrig, mime:'image/jpeg' });
       }catch(e){ console.warn('[BIO] subida de imagen gonio falló:', e && e.message); }
     }
     return out;
@@ -2501,13 +2646,25 @@
   function BIO_gonioSel(kind, val){
     if(!BIO.accG) BIO.accG=nuevoAccGonio();
     var g=BIO.accG; if(!g.sel) _gonioSelDefault(g);
+    _bumpGen();   // cambió articulación/movimiento/lado: descarta cuadros en vuelo de la selección anterior
     if(kind==='grupo'){ g.sel.grupo=val; g.sel.mov=_gonioMovs(val)[0].mov; }
     else if(kind==='mov'){ g.sel.mov=val; }
     else if(kind==='lado'){ g.sel.lado=val; }
     _gonioSelDefault(g);
     if(BIO.modo==='estatico'){
       if(BIO._estaticoFuente==='foto'){ pintarGonioCtrl(); _recalcEstatico(); return; }   // misma foto: recalcula el nuevo movimiento
-      // VIDEO: el pico está atado al movimiento analizado → pide una fuente nueva para el movimiento elegido.
+      // VIDEO: el cuadro-pico está atado al movimiento ANALIZADO (no vale para otro movimiento). Si conservamos
+      // el archivo (P1-11), ofrecemos REANALIZAR el MISMO video para el nuevo movimiento en vez de pedir otra fuente.
+      if(BIO.pendingVideo && BIO.pendingVideo.file){
+        g.peak=null; g.run=0; BIO._estaticoImg=null;
+        if(BIO.canvas && BIO.ctx && BIO._estaticoBase){ try{ BIO.ctx.clearRect(0,0,BIO.canvas.width,BIO.canvas.height); BIO.ctx.drawImage(BIO._estaticoBase,0,0); }catch(_e){} }  // quita el arco viejo (no aplica al nuevo mov)
+        var _lv=document.getElementById('bg-live'); if(_lv) _lv.textContent='—';
+        var _mx=document.getElementById('bg-max'); if(_mx) _mx.textContent='—';
+        pintarGonioCtrl();   // re-pinta con el botón "🔁 Reanalizar este video"
+        var _es=document.getElementById('bio-estado'); if(_es) _es.textContent='Cambiaste a '+g.sel.grupo+' '+g.sel.mov+'. Toca 🔁 Reanalizar este video para medirlo (o ↩︎ sube otra fuente).';
+        return;
+      }
+      // Sin archivo conservado: comportamiento anterior (pedir otra fuente).
       BIO.modo=null; BIO._estaticoBase=null; BIO._estaticoLm=null; BIO._estaticoImg=null; BIO._estaticoFuente=null;
       mostrarVista('bio-vista-inicio'); pintarGonioInicio();
       toast('Sube otra foto o video para medir '+g.sel.grupo+' '+g.sel.mov,'info'); return;
@@ -2520,6 +2677,14 @@
     detenerCamaraStream(); detenerLoopCamara();
     mostrarVista('bio-vista-inicio'); pintarGonioInicio();
   }
+  // P1-11: reanaliza el MISMO archivo de video ya subido para el movimiento ACTUAL (recorre el video completo de
+  // nuevo; el pico es POR-MOVIMIENTO, NO reutiliza el cuadro-pico de otro movimiento). Conserva las capturas ya hechas.
+  function BIO_gonioReanalizarVideo(){
+    if(!(BIO.pendingVideo && BIO.pendingVideo.file)){ toast('No hay un video guardado; sube uno nuevo','warning'); mostrarVista('bio-vista-inicio'); pintarGonioInicio(); return; }
+    var sel=(BIO.accG&&BIO.accG.sel)||{};
+    toast('Reanalizando el video para '+(sel.grupo||'')+' '+(sel.mov||'')+'…','info');
+    procesarVideo(BIO.pendingVideo.file);   // g.sel ya es la selección nueva; procesarVideo resetea el pico y re-mide el movimiento actual
+  }
   function BIO_gonioCapturar(){
     var g=BIO.accG; if(!g||!g.sel){ return; }
     if(g.peak==null){ toast(BIO.modo==='estatico' ? 'No se detecta esa articulación en la imagen; cambia de movimiento/lado o sube otra' : 'Mueve la articulación hasta el tope para medir','warning'); return; }
@@ -2529,18 +2694,23 @@
     // para poder re-verificar la medición después. Cuadro estático → BIO._estaticoLm; vivo → pico BIO._peakGonioLm.
     var lmCap = (BIO.modo==='estatico') ? BIO._estaticoLm : BIO._peakGonioLm;
     var arCap = (BIO.modo==='estatico') ? (_ANG_AR||1) : (BIO._peakGonioAR||_ANG_AR||1);
+    // Marca de tiempo del cuadro-pico (solo video): deja trazable a qué segundo del clip salió el grado.
+    var tSegCap = (BIO.modo==='estatico' && BIO._estaticoFuente==='video' && BIO._peakTSeg!=null) ? Math.round(BIO._peakTSeg*10)/10 : null;
     g.medidas[key] = { key:g.sel.key, grupo:g.sel.grupo, mov:g.sel.mov, lado:g.sel.lado,
       grado:Math.round(g.peak*10)/10, ref:e.ref, lim:e.lim, defic:!!e.defic, hiperext:!!e.hiperext, normTxt:e.normTxt,
       traza:{ algoVersion:BIO_ALGO_VER, aspect:Math.round(arCap*1e4)/1e4,
               fuente:(BIO.modo==='estatico'?(BIO._estaticoFuente||'estatico'):'camara'),
+              tSeg:tSegCap,
               lmUsados:_gonioLmUsados(lmCap, g.sel.grupo, g.sel.lado) } };
-    // Si viene de foto/video, guarda la IMAGEN ANOTADA de esta captura (copia del canvas actual).
+    // Si viene de foto/video, guarda la IMAGEN ANOTADA de esta captura (copia del canvas actual) + el ORIGINAL sin anotar (P1-8).
     if(BIO.modo==='estatico' && BIO._estaticoImg){
       try{
         var src=BIO._estaticoImg, cc=document.createElement('canvas'); cc.width=src.width; cc.height=src.height;
         cc.getContext('2d').drawImage(src,0,0);
+        var origCv=null;   // P1-8: conserva también el cuadro ORIGINAL sin anotar (BIO._estaticoBase)
+        if(BIO._estaticoBase){ try{ var ob=BIO._estaticoBase; origCv=document.createElement('canvas'); origCv.width=ob.width; origCv.height=ob.height; origCv.getContext('2d').drawImage(ob,0,0); }catch(_o){ origCv=null; } }
         if(!g.imgs) g.imgs={};
-        g.imgs[key] = { canvas:cc, grupo:g.sel.grupo, mov:g.sel.mov, lado:g.sel.lado, grado:g.medidas[key].grado, etq:g.sel.grupo+' '+g.sel.mov+' '+(g.sel.lado==='izq'?'Izq':'Der') };
+        g.imgs[key] = { canvas:cc, orig:origCv, grupo:g.sel.grupo, mov:g.sel.mov, lado:g.sel.lado, grado:g.medidas[key].grado, etq:g.sel.grupo+' '+g.sel.mov+' '+(g.sel.lado==='izq'?'Izq':'Der') };
       }catch(_e){}
     }
     toast('Capturado: '+g.sel.grupo+' '+g.sel.mov+' '+(g.sel.lado==='izq'?'Izq':'Der'),'success');
@@ -2603,7 +2773,7 @@
       + '<div style="color:#9BA3B5;font-size:13px;margin-bottom:10px">📷 Cámara · plano sagital · '+arr.length+' medida'+(arr.length===1?'':'s')+'</div>'
       + '<table class="bio-tabla-res"><thead><tr><th>Articulación / movimiento</th><th style="text-align:center">Der</th><th style="text-align:center">Izq</th><th style="text-align:center">Normal</th></tr></thead><tbody>'+filas+'</tbody></table>'
       + '<div style="margin-top:12px;background:rgba(255,255,255,.05);border-radius:10px;padding:10px 12px;font-size:13px;color:#cfd6e4">'+esc(interp)+'</div>'
-      + '<div style="font-size:11px;color:#9BA3B5;margin-top:8px;font-style:italic">Referencia: '+esc(GONIO_CITA)+' · Medición 2D (cribado), ±5° en plano.</div>'
+      + '<div style="font-size:11px;color:#9BA3B5;margin-top:8px;font-style:italic">Referencia: '+esc(GONIO_CITA)+' · Medición 2D (cribado), ±5° en plano; margen estimado, no validado contra goniómetro físico.</div>'
       + '<div style="color:#9BA3B5;font-size:12px;margin-top:10px">Se escribirá en el campo <b>ROM</b> de la Valoración y quedará en Biomecánica.</div>'
       + '<div class="bio-acciones" style="padding-top:14px">'
       +   '<button class="bio-b-sec" onclick="BIO_gonioVolver()">← Seguir midiendo</button>'
@@ -2616,13 +2786,23 @@
     if(BIO.stream){ BIO.modo='camara'; mostrarVista('bio-vista-camara'); try{ BIO.video&&BIO.video.play(); }catch(e){} if(!BIO.rafId) loopCamara(); pintarGonioCtrl(); }
     else { BIO_gonioVolverInicio(); }
   }
+  // P1-7: la fuente de la sesión gonio se DERIVA de las trazas por medida (no de si hubo imágenes):
+  // todas 'camara' → 'camara'; todas 'foto'/'video' → esa; mezcla → 'mixta'.
+  function _fuenteDeTrazas(g){
+    var set={}, med=(g&&g.medidas)||{};
+    for(var k in med){ var t=med[k]&&med[k].traza, f=(t&&t.fuente)||'camara'; if(f==='estatico') f='foto'; set[f]=1; }
+    var ks=Object.keys(set);
+    if(ks.length===0) return 'camara';
+    if(ks.length===1) return ks[0];
+    return 'mixta';
+  }
   async function guardarSesionGonio(){
     var p=(typeof currentPatient!=='undefined')?currentPatient:null; if(!p){ toast('Sin paciente activo','error'); return; }
     var g=BIO.accG, arr=_gonioMedidasArr(g);
     if(!arr.length){ toast('Sin medidas que guardar','warning'); return; }
     var btn=document.getElementById('bio-gonio-guardar'); if(btn){ btn.disabled=true; btn.textContent='⏳ Guardando…'; }
     var imagenes = await _subirImagenesGonio(p, g, btn);   // fotos anotadas (foto/cuadro-pico); [] si no hubo o falló (las métricas igual se guardan)
-    var fuenteG = (g.imgs && Object.keys(g.imgs).length) ? 'imagen' : 'camara';
+    var fuenteG = _fuenteDeTrazas(g);   // P1-7: derivada de las trazas por medida (camara/foto/video/mixta)
     var sesion={
       id:'bm_'+p.id+'_'+Date.now(), tipo:'goniometria', fuente:fuenteG,
       fecha:fechaHoy(), horaCreacion:horaAhora(), fechaHoraISO:new Date().toISOString(),
@@ -2634,7 +2814,7 @@
     // reemplaza solo una línea previa de "Goniometría (" para no acumular en re-mediciones).
     try{
       if(!p.valoracion || typeof p.valoracion!=='object') p.valoracion={};
-      var linea='Goniometría cámara 2D ('+sesion.fecha+', cribado ±5–10°): '+_gonioTexto(arr);
+      var linea='Goniometría cámara 2D ('+sesion.fecha+', cribado ±5–10°, no validado contra goniómetro físico): '+_gonioTexto(arr);
       var prev=String(p.valoracion.rom||'').split('\n').filter(function(l){ var t=l.trim(); return t && t.indexOf('Goniometría')!==0; });
       prev.push(linea);
       p.valoracion.rom = prev.join('\n');
@@ -2655,16 +2835,16 @@
     var filas=GONIO_CAT.map(fila).join('');
     var _imgs=(s.imagenes||[]).filter(function(x){ return x && x.url; });
     var imgHTML = _imgs.length ? ('<div class="field-row"><div class="field-label">Imágenes</div><div class="field-value" style="display:flex;gap:10px;flex-wrap:wrap">'
-      + _imgs.map(function(im){ return '<a href="'+esc(im.url)+'" target="_blank" rel="noopener" style="text-decoration:none"><img src="'+esc(im.url)+'" alt="'+esc(im.etq||'')+'" style="width:96px;height:96px;object-fit:cover;border-radius:10px;border:1.5px solid var(--gray-200);display:block"><div style="font-size:10px;color:var(--gray-400);text-align:center;max-width:96px;margin-top:2px">'+esc(im.etq||'')+(im.grado!=null?(' '+Math.round(im.grado)+'°'):'')+'</div></a>'; }).join('')
+      + _imgs.map(function(im){ return '<div style="display:inline-block"><a href="'+esc(im.url)+'" target="_blank" rel="noopener" style="text-decoration:none"><img src="'+esc(im.url)+'" alt="'+esc(im.etq||'')+'" style="width:96px;height:96px;object-fit:cover;border-radius:10px;border:1.5px solid var(--gray-200);display:block"><div style="font-size:10px;color:var(--gray-400);text-align:center;max-width:96px;margin-top:2px">'+esc(im.etq||'')+(im.grado!=null?(' '+Math.round(im.grado)+'°'):'')+'</div></a>'+(im.urlOrig?('<a href="'+esc(im.urlOrig)+'" target="_blank" rel="noopener" style="display:block;text-align:center;font-size:10px;color:var(--navy);max-width:96px">ver original</a>'):'')+'</div>'; }).join('')
       + '</div></div>') : '';
-    var fuenteLbl = s.fuente==='imagen' ? '📷 Imagen' : (s.fuente==='video' ? '📁 Video' : '📷 Cámara');
+    var fuenteLbl = s.fuente==='foto' ? '📷 Foto' : (s.fuente==='video' ? '📁 Video' : (s.fuente==='mixta' ? '🔀 Mixta' : (s.fuente==='imagen' ? '📷 Imagen' : '📷 Cámara')));   // P1-7: 'imagen' = sesiones viejas
     var pdfBtn = (s.reportePdf && s.reportePdf.url)
       ? '<button data-url="'+esc(s.reportePdf.url)+'" onclick="window.open(this.dataset.url,\'_blank\')" style="background:var(--navy);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer">📄 Ver PDF</button>'
       : '<button data-sid="'+esc(s.id)+'" onclick="BIO_pdf(this.dataset.sid)" style="background:var(--white);color:var(--navy);border:1.5px solid var(--gray-200);border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer">📄 Generar PDF</button>';
     return '<div class="section-card" style="margin-bottom:10px">'
       + '<div class="section-title" style="display:flex;align-items:center;justify-content:space-between">'
       +   '<span>📐 Goniometría · '+esc(s.fecha)+' '+esc(s.horaCreacion||'')+'</span>'
-      +   '<span style="font-weight:600;text-transform:none;letter-spacing:0;color:var(--gray-400)">'+fuenteLbl+' · sagital</span>'
+      +   '<span style="font-weight:600;text-transform:none;letter-spacing:0;color:var(--gray-400)">'+fuenteLbl+_syncBadge(s)+' · sagital</span>'
       + '</div>'
       + '<div class="field-row"><div class="field-label">Terapeuta</div><div class="field-value">'+esc(s.terapeuta||'—')+' · '+((s.medidas||[]).length)+' medidas</div></div>'
       + filas
@@ -2718,14 +2898,16 @@
     var hall=(s.hallazgos&&s.hallazgos.length)?('Hallazgos: '+s.hallazgos.join('; ')+'. El resto de los arcos dentro de rangos de referencia.'):'Todos los arcos medidos se encuentran dentro de rangos de referencia, con buena simetría.';
     doc.splitTextToSize(hall, W-2*M).forEach(function(ln){ doc.text(ln, M, y); y+=15; });
     y+=8; doc.setFontSize(9); doc.setTextColor(GRIS[0],GRIS[1],GRIS[2]);
-    doc.splitTextToSize('Referencia de rangos: '+GONIO_CITA+' Medición 2D con cámara (cribado); margen ±5° en el plano de la cámara. No sustituye la exploración clínica.', W-2*M).forEach(function(ln){ doc.text(ln, M, y); y+=12; });
+    doc.splitTextToSize('Referencia de rangos: '+GONIO_CITA+' Medición 2D con cámara (cribado); margen ±5° en el plano de la cámara, estimado y no validado contra goniómetro físico. No sustituye la exploración clínica.', W-2*M).forEach(function(ln){ doc.text(ln, M, y); y+=12; });
     return doc;
   }
 
   function renderPestana(p){
     // Catch-up de sync: al abrir la pestaña, empuja a la nube cualquier medición local-only y jala las
     // de otros equipos (unión). Fire-and-forget; si las reglas aún no permiten 'biomecanica', se queda local.
-    try{ if(typeof window!=='undefined' && typeof window._syncBiomecanicaFS==='function' && p && Array.isArray(p.biomecanica) && p.biomecanica.length){ window._syncBiomecanicaFS(p); } }catch(e){}
+    // CROSS-DEVICE (fix 2026-11-14): corre SIEMPRE, aunque este equipo NO tenga mediciones locales — si no,
+    // un equipo que no midió nunca JALA lo que otro equipo guardó (bug "Sin mediciones" en el 2º equipo).
+    try{ if(typeof window!=='undefined' && typeof window._syncBiomecanicaFS==='function' && p){ if(!Array.isArray(p.biomecanica)) p.biomecanica=[]; window._syncBiomecanicaFS(p); } }catch(e){}
     var lista = Array.isArray(p.biomecanica) ? p.biomecanica.filter(function(s){ return s && !s.eliminado; }) : [];
     var html = ''
       + '<button class="btn-gold" style="width:100%;margin-bottom:12px;font-size:15px;font-weight:800;border:none;border-radius:var(--radius);padding:14px;cursor:pointer;background:var(--gold);color:var(--navy-dark)" onclick="abrirMedidorBiomecanico()">▶️ Nueva medición ROM</button>';
@@ -2752,7 +2934,7 @@
       return '<div class="section-card" style="margin-bottom:10px">'
         + '<div class="section-title" style="display:flex;align-items:center;justify-content:space-between">'
         +   '<span>🦴 ROM · '+esc(s.fecha)+' '+esc(s.horaCreacion||'')+'</span>'
-        +   '<span style="font-weight:600;text-transform:none;letter-spacing:0;color:var(--gray-400)">'+fuente+'</span>'
+        +   '<span style="font-weight:600;text-transform:none;letter-spacing:0;color:var(--gray-400)">'+fuente+_syncBadge(s)+'</span>'
         + '</div>'
         + '<div class="field-row"><div class="field-label">Terapeuta</div><div class="field-value">'+esc(s.terapeuta||'—')+' · '+(s.duracionSeg||0)+' s · '+((s.calidad&&s.calidad.framesValidos)||0)+' cuadros</div></div>'
         + filas
@@ -2784,26 +2966,26 @@
     if(s.tipo==='goniometria'){
       med.forEach(function(m){ var l=/izq/i.test(m.lado)?'Izq':'Der';
         var dir = m.defic ? 'down' : (m.hiperext ? '' : 'up');   // más ROM mejor; menos déficit mejor; hiperext neutro
-        out.push({ k:(m.key||'')+'_'+m.lado, etq:(m.grupo||'')+' '+(m.mov||'')+' '+l, num:(m.grado==null?null:m.grado), disp:_gonioFmtGrado(m), dir:dir }); });
+        out.push({ k:(m.key||'')+'_'+m.lado, etq:(m.grupo||'')+' '+(m.mov||'')+' '+l, num:(m.grado==null?null:m.grado), disp:_gonioFmtGrado(m), dir:dir, margen:(m.margen!=null?m.margen:5) }); });
     } else if(s.tipo==='sentadilla'){
       var L={ fppa_izq:'Valgo FPPA Izq', fppa_der:'Valgo FPPA Der', mkd_izq:'Desplaz. medial Izq', mkd_der:'Desplaz. medial Der', sep_rodillas:'Separación rodillas', tronco_lateral:'Tronco lateral', sacro_descenso:'Descenso del sacro' };
       var Ds={ fppa_izq:'down', fppa_der:'down', mkd_izq:'down', mkd_der:'down', tronco_lateral:'down' };   // menos valgo/inclinación = mejor
       med.forEach(function(m){ var etq=L[m.key]; if(!etq || m.media==null) return;
         var r=(m.unidad==='ratio'), suf=r?'':(m.unidad==='%'?'%':'°');
-        out.push({ k:m.key, etq:etq, num:m.media, disp:(r?m.media.toFixed(2):(_r1(m.media)+suf)), dir:(Ds[m.key]||'') }); });
+        out.push({ k:m.key, etq:etq, num:m.media, disp:(r?m.media.toFixed(2):(_r1(m.media)+suf)), dir:(Ds[m.key]||''), margen:(r?0.1:5), signed:(m.key==='fppa_izq'||m.key==='fppa_der') }); });   // P2-12: fppa es signado (valgo+/varo−)
     } else if(s.tipo==='marcha'){
       if(s.cadencia!=null) out.push({ k:'cadencia', etq:'Cadencia', num:s.cadencia, disp:s.cadencia+' pasos/min', dir:'' });
-      if(s.velocidad!=null) out.push({ k:'velocidad', etq:'Velocidad', num:s.velocidad, disp:s.velocidad+' m/s', dir:'up' });
+      if(s.velocidad!=null) out.push({ k:'velocidad', etq:'Velocidad', num:s.velocidad, disp:s.velocidad+' m/s', dir:'up', margen:0.1 });
       var LM={ stance_izq:'Fase apoyo Izq', stance_der:'Fase apoyo Der', rod_pico_izq:'Rodilla pico Izq', rod_pico_der:'Rodilla pico Der', cadera_rom_izq:'Cadera ROM Izq', cadera_rom_der:'Cadera ROM Der' };
       var DM={ rod_pico_izq:'up', rod_pico_der:'up', cadera_rom_izq:'up', cadera_rom_der:'up' };   // más ROM = mejor; apoyo neutro
       med.forEach(function(m){ var etq=LM[m.key]; if(!etq || m.valor==null) return;
         var u=(m.unidad==='m')?' m':(m.unidad==='%'?'%':(m.unidad==='pasos/min'?'':'°'));
-        out.push({ k:m.key, etq:etq, num:m.valor, disp:m.valor+u, dir:(DM[m.key]||'') }); });
+        out.push({ k:m.key, etq:etq, num:m.valor, disp:m.valor+u, dir:(DM[m.key]||''), margen:(m.unidad==='m'?0.1:5) }); });
     } else { // rom
       med.forEach(function(m){ var l=/izq/i.test(m.lado)?'Izq':'Der', etq=(m.grupo||'')+' '+(m.mov||'')+' '+l, num, disp;
         if(m.grupo==='Codo'){ num=(m.max!=null?m.max:m.media); disp=(m.min!=null&&m.max!=null)?(m.min+'°–'+m.max+'°'):(num!=null?num+'°':'—'); }
         else { num=(m.media!=null?m.media:m.max); disp=(num!=null?num+'°':'—'); }
-        out.push({ k:m.key||etq, etq:etq, num:(num==null?null:num), disp:disp, dir:'up' }); });   // más ROM = mejor
+        out.push({ k:m.key||etq, etq:etq, num:(num==null?null:num), disp:disp, dir:'up', margen:(m.margen!=null?m.margen:5) }); });   // más ROM = mejor
     }
     return out;
   }
@@ -2827,10 +3009,17 @@
       var da=a?esc(a.disp):'<span class="cmp-eq">—</span>', db=b?esc(b.disp):'<span class="cmp-eq">—</span>';
       var dcell='<span class="cmp-eq">—</span>';
       if(a&&b&&a.num!=null&&b.num!=null){ var d=Math.round((b.num-a.num)*10)/10;
-        if(d===0){ dcell='<span class="cmp-eq">0</span>'; }
-        else {
+        var ar=d>0?'▲':'▼', sg=d>0?'+':'';
+        var mg=(b&&b.margen!=null)?b.margen:((a&&a.margen!=null)?a.margen:5);   // P2-12: margen de la métrica (m.margen o 5°)
+        var signed=(a&&a.signed)||(b&&b.signed);
+        var cruzaSigno = signed && a.num!==0 && b.num!==0 && ((a.num>0)!==(b.num>0));   // FPPA: cruce valgo(+)↔varo(−) NO es mejora directa
+        if(cruzaSigno){
+          dcell='<span class="cmp-eq" title="Cruzó de valgo a varo (o viceversa): revisar, no es una mejora directa">'+sg+d+' ⚠︎</span>';
+        } else if(d===0){ dcell='<span class="cmp-eq">0</span>'; }
+        else if(Math.abs(d) < mg){   // P2-12: dentro del margen de error → gris, no se colorea como cambio real
+          dcell='<span class="cmp-eq" title="Δ dentro del margen estimado (±'+mg+'); puede ser ruido">'+sg+d+' '+ar+'</span>';
+        } else {
           var dir=(b&&b.dir)||(a&&a.dir)||'';   // sentido clínico de mejora
-          var ar=d>0?'▲':'▼', sg=d>0?'+':'';
           // 'up' → subir es verde; 'down' → bajar es verde; '' (neutro) → gris, solo muestra el cambio.
           var cls='cmp-eq';
           if(dir==='up') cls=(d>0?'cmp-up':'cmp-dn');
@@ -2840,7 +3029,12 @@
       }
       return '<tr><td>'+esc(etq)+'</td><td class="n">'+da+'</td><td class="n">'+db+'</td><td class="n">'+dcell+'</td></tr>';
     }).join('');
-    return '<table class="cmp-tbl"><thead><tr><th>Movimiento</th><th class="n">Antes</th><th class="n">Después</th><th class="n">Δ</th></tr></thead><tbody>'+filas+'</tbody></table>';
+    var avA=(A.calidad&&A.calidad.algoVersion)||null, avB=(B.calidad&&B.calidad.algoVersion)||null;
+    var bannerVer = (avA&&avB&&avA!==avB)
+      ? '<div style="background:#FEF3C7;border:1px solid #FCD34D;color:#92400E;font-size:11px;padding:6px 9px;border-radius:8px;margin-bottom:8px">⚠️ Versiones de algoritmo distintas (A: '+esc(avA)+' · B: '+esc(avB)+'): la comparación puede no ser directa.</div>'
+      : '';
+    var pie = '<div style="color:#9BA3B5;font-size:11px;margin-top:8px">Δ en gris = dentro del margen estimado (±5–10°, no validado contra goniómetro físico) o cruce de signo (valgo↔varo): posible ruido, revisar.</div>';
+    return bannerVer + '<table class="cmp-tbl"><thead><tr><th>Movimiento</th><th class="n">Antes</th><th class="n">Después</th><th class="n">Δ</th></tr></thead><tbody>'+filas+'</tbody></table>' + pie;
   }
   function _cmpOpt(ses, selId){
     return ses.map(function(s){ var sel=(s.id===selId)?' selected':'', vid=(s.video&&s.video.url)?' · 🎥':'';
@@ -3203,16 +3397,18 @@
   window.BIO_gonioFinish = BIO_gonioFinish;
   window.BIO_gonioVolver = BIO_gonioVolver;
   window.BIO_gonioVolverInicio = BIO_gonioVolverInicio;
+  window.BIO_gonioReanalizarVideo = BIO_gonioReanalizarVideo;
   window.BIO_gonioGuardar = guardarSesionGonio;
   window.BIO_comparar = BIO_comparar;
   window.BIO_cmpSel = BIO_cmpSel;
   window.BIO_cmpCerrar = BIO_cmpCerrar;
-  window.__BIO_GONIO = { calcularGonio:calcularGonio, nuevoAccGonio:nuevoAccGonio, GONIO_CAT:GONIO_CAT, _gonioTexto:_gonioTexto, _gonioAlerta:_gonioAlerta, _gonioFmtGrado:_gonioFmtGrado };  // hook de pruebas
+  window.__BIO_GONIO = { calcularGonio:calcularGonio, nuevoAccGonio:nuevoAccGonio, GONIO_CAT:GONIO_CAT, _gonioTexto:_gonioTexto, _gonioAlerta:_gonioAlerta, _gonioFmtGrado:_gonioFmtGrado, _gonioFueraRango:_gonioFueraRango };  // hook de pruebas
   // Hook de PRUEBAS (geometría pura, sin DOM/MediaPipe) — lo usa pruebas/geometria.test.js.
   window.__BIO_TEST = {
     setAspect:_setAspect, ang2D:_ang2D, seg2D:_seg2D,
     calcularGonio:calcularGonio, cmpExtraer:_cmpExtraer, cmpTablaHTML:_cmpTablaHTML,
     cadenciaDudosa:_cadenciaDudosa, gonioFmtGrado:_gonioFmtGrado, gonioAlerta:_gonioAlerta,
+    gonioFueraRango:_gonioFueraRango, romConfiable:_romConfiable,
     GONIO_CAT:GONIO_CAT, ALGO_VER:BIO_ALGO_VER
   };
 

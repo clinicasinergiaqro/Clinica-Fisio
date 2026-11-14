@@ -1,0 +1,18 @@
+=== Puertas sobre b49de55 — 2026-11-14T16:19:30Z ===
+HEAD: b49de559f66552231903c7c786a49d3332f17000
+
+[node --check medidor-biomecanico.js]
+OK
+[node --check sw.js]
+OK
+
+
+Pruebas geometría biomecánica: 23 OK, 0 fallidas.
+Aceptación auditoría: 18 OK, 0 fallidas.
+Hallazgo D verificación de tiempo: 9 OK, 0 fallidas.
+Fase 5 procedencia/estado: 9 OK, 0 fallidas.
+Fase 1b validez de puntos medios: 8 OK, 0 fallidas.
+Fase 3 identidad de generación: 5 OK, 0 fallidas.
+Fase 4 reutilizar video: 5 OK, 0 fallidas.
+Fase 6 comparador honesto: 5 OK, 0 fallidas.
+Fase 7 trayectoria/fondo: 3 OK, 0 fallidas.
