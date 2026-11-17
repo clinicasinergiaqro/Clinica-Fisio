@@ -2325,6 +2325,21 @@
   ];
   var GONIO_CITA = 'AAOS; Norkin & White, Measurement of Joint Motion.';
   var GONIO_JOINTS = ['Cadera','Rodilla','Tobillo','Codo','Muñeca'];
+  // (CANDADO 2026-11-17) Techo FISIOLÓGICO por movimiento. Por encima de esto el grado 2D es casi seguro un
+  // ARTEFACTO (escorzo / landmark equivocado / lado reflejo), NO una medición real → se trata como "no medible"
+  // y NO se guarda (ni a la sesión ni al ROM del expediente). Es un escalón MÁS DURO que (h) "(revisar)", que
+  // solo señala lo ligeramente alto. Hallazgo real: un "Cadera ext 160°" (máx ~30°) llegó limpio al ROM. Los
+  // topes son holgados (dejan pasar hipermovilidad real; solo frenan lo anatómicamente imposible).
+  var GONIO_TECHO = {
+    cad_flex:150, cad_ext:50, rod_flex:160, rod_ext:30, rod_hext:40,
+    tob_df:45, tob_pf:80, cod_flex:160, cod_ext:30, cod_hext:40, mun_flex:100, mun_ext:95
+  };
+  function _gonioTecho(grupo, mov, val){
+    if(val==null || !isFinite(val)) return { ok:false, val:null };
+    var e=_gonioEntry(grupo, mov); var techo = e && GONIO_TECHO[e.key];
+    if(techo!=null && val > techo) return { ok:false, val:null, fueraFisio:true };   // grado físicamente imposible → no medible
+    return { ok:true, val: val };
+  }
   function _gonioMovs(grupo){ return GONIO_CAT.filter(function(m){ return m.grupo===grupo; }); }
   function _gonioEntry(grupo, mov){ for(var i=0;i<GONIO_CAT.length;i++){ if(GONIO_CAT[i].grupo===grupo && GONIO_CAT[i].mov===mov) return GONIO_CAT[i]; } return null; }
   function _gonioPts(lado){
@@ -2343,28 +2358,28 @@
     if(grupo==='Cadera'){
       if(!(v(P.S)&&v(P.H)&&v(P.K))) return { ok:false, val:null };
       if(deg(P.S,P.H,P.K)) return { ok:false, val:null };
-      return { ok:true, val: 180 - _ang2D(lm[P.S], lm[P.H], lm[P.K]) };   // flex/ext desde tronco alineado
+      return _gonioTecho(grupo, mov, 180 - _ang2D(lm[P.S], lm[P.H], lm[P.K]));   // flex/ext desde tronco alineado (+ techo fisiológico)
     }
     if(grupo==='Rodilla'){                                                 // flexión, déficit de extensión E hiperextensión (misma geometría; el fisio elige el mov)
       if(!(v(P.H)&&v(P.K)&&v(P.A))) return { ok:false, val:null };
       if(deg(P.H,P.K,P.A)) return { ok:false, val:null };
-      return { ok:true, val: 180 - _ang2D(lm[P.H], lm[P.K], lm[P.A]) };   // magnitud de desviación respecto a la recta (0°=extendido)
+      return _gonioTecho(grupo, mov, 180 - _ang2D(lm[P.H], lm[P.K], lm[P.A]));   // magnitud de desviación respecto a la recta (0°=extendido; + techo fisiológico)
     }
     if(grupo==='Tobillo'){
       if(!(v(P.K)&&v(P.A)&&v(P.F))) return { ok:false, val:null };
       if(deg(P.K,P.A,P.F)) return { ok:false, val:null };
       var ia=_ang2D(lm[P.K], lm[P.A], lm[P.F]);                            // interior pierna–tobillo–pie
-      return (mov==='Dorsiflexión') ? { ok:true, val: Math.max(0, 90-ia) } : { ok:true, val: Math.max(0, ia-90) };
+      return (mov==='Dorsiflexión') ? _gonioTecho(grupo, mov, Math.max(0, 90-ia)) : _gonioTecho(grupo, mov, Math.max(0, ia-90));
     }
     if(grupo==='Codo'){                                                    // flexión, déficit de extensión E hiperextensión (el fisio elige el mov)
       if(!(v(P.S)&&v(P.E)&&v(P.W))) return { ok:false, val:null };
       if(deg(P.S,P.E,P.W)) return { ok:false, val:null };
-      return { ok:true, val: 180 - _ang2D(lm[P.S], lm[P.E], lm[P.W]) };    // hombro–codo–muñeca; magnitud respecto a la recta
+      return _gonioTecho(grupo, mov, 180 - _ang2D(lm[P.S], lm[P.E], lm[P.W]));    // hombro–codo–muñeca; magnitud respecto a la recta (+ techo fisiológico)
     }
     if(grupo==='Muñeca'){
       if(!(v(P.E)&&v(P.W)&&v(P.Ix))) return { ok:false, val:null };
       if(deg(P.E,P.W,P.Ix)) return { ok:false, val:null };
-      return { ok:true, val: Math.max(0, 180 - _ang2D(lm[P.E], lm[P.W], lm[P.Ix])) };  // antebrazo–muñeca–mano; el fisio elige flex/ext
+      return _gonioTecho(grupo, mov, Math.max(0, 180 - _ang2D(lm[P.E], lm[P.W], lm[P.Ix])));  // antebrazo–muñeca–mano; el fisio elige flex/ext (+ techo fisiológico)
     }
     return { ok:false, val:null };
   }
@@ -3402,7 +3417,7 @@
   window.BIO_comparar = BIO_comparar;
   window.BIO_cmpSel = BIO_cmpSel;
   window.BIO_cmpCerrar = BIO_cmpCerrar;
-  window.__BIO_GONIO = { calcularGonio:calcularGonio, nuevoAccGonio:nuevoAccGonio, GONIO_CAT:GONIO_CAT, _gonioTexto:_gonioTexto, _gonioAlerta:_gonioAlerta, _gonioFmtGrado:_gonioFmtGrado, _gonioFueraRango:_gonioFueraRango };  // hook de pruebas
+  window.__BIO_GONIO = { calcularGonio:calcularGonio, nuevoAccGonio:nuevoAccGonio, GONIO_CAT:GONIO_CAT, _gonioTexto:_gonioTexto, _gonioAlerta:_gonioAlerta, _gonioFmtGrado:_gonioFmtGrado, _gonioFueraRango:_gonioFueraRango, _gonioTecho:_gonioTecho, GONIO_TECHO:GONIO_TECHO };  // hook de pruebas
   // Hook de PRUEBAS (geometría pura, sin DOM/MediaPipe) — lo usa pruebas/geometria.test.js.
   window.__BIO_TEST = {
     setAspect:_setAspect, ang2D:_ang2D, seg2D:_seg2D,
