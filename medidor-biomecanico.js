@@ -2717,17 +2717,25 @@
               fuente:(BIO.modo==='estatico'?(BIO._estaticoFuente||'estatico'):'camara'),
               tSeg:tSegCap,
               lmUsados:_gonioLmUsados(lmCap, g.sel.grupo, g.sel.lado) } };
-    // Si viene de foto/video, guarda la IMAGEN ANOTADA de esta captura (copia del canvas actual) + el ORIGINAL sin anotar (P1-8).
-    if(BIO.modo==='estatico' && BIO._estaticoImg){
-      try{
-        var src=BIO._estaticoImg, cc=document.createElement('canvas'); cc.width=src.width; cc.height=src.height;
-        cc.getContext('2d').drawImage(src,0,0);
-        var origCv=null;   // P1-8: conserva también el cuadro ORIGINAL sin anotar (BIO._estaticoBase)
-        if(BIO._estaticoBase){ try{ var ob=BIO._estaticoBase; origCv=document.createElement('canvas'); origCv.width=ob.width; origCv.height=ob.height; origCv.getContext('2d').drawImage(ob,0,0); }catch(_o){ origCv=null; } }
-        if(!g.imgs) g.imgs={};
-        g.imgs[key] = { canvas:cc, orig:origCv, grupo:g.sel.grupo, mov:g.sel.mov, lado:g.sel.lado, grado:g.medidas[key].grado, etq:g.sel.grupo+' '+g.sel.mov+' '+(g.sel.lado==='izq'?'Izq':'Der') };
-      }catch(_e){}
-    }
+    // Guarda la IMAGEN ANOTADA de esta captura + el ORIGINAL sin anotar, para TODA fuente (antes/después + auditoría).
+    //  · Foto/Video (estatico): usa el cuadro estático analizado (BIO._estaticoImg / BIO._estaticoBase).
+    //  · Cámara EN VIVO ('camara'): copia el cuadro COMPUESTO de BIO.canvas (video+esqueleto+arco, lo que ve el
+    //    terapeuta) + el cuadro ORIGINAL del video. Antes la cámara en vivo NO guardaba foto (solo el número) — pedido de Carlos.
+    try{
+      var _annot=null, _orig=null;
+      if(BIO.modo==='estatico' && BIO._estaticoImg){
+        var src=BIO._estaticoImg; _annot=document.createElement('canvas'); _annot.width=src.width; _annot.height=src.height;
+        _annot.getContext('2d').drawImage(src,0,0);
+        if(BIO._estaticoBase){ try{ var ob=BIO._estaticoBase; _orig=document.createElement('canvas'); _orig.width=ob.width; _orig.height=ob.height; _orig.getContext('2d').drawImage(ob,0,0); }catch(_o){ _orig=null; } }
+      } else if(BIO.modo==='camara' && BIO.canvas && BIO.canvas.width){
+        _annot=document.createElement('canvas'); _annot.width=BIO.canvas.width; _annot.height=BIO.canvas.height;
+        _annot.getContext('2d').drawImage(BIO.canvas,0,0);
+        try{ var _sv=BIO.srcEl||BIO.video; if(_sv && (_sv.videoWidth||_sv.naturalWidth)) _orig=_canvasDeImagen(_sv); }catch(_o){ _orig=null; }
+      }
+      if(_annot){ if(!g.imgs) g.imgs={};
+        g.imgs[key] = { canvas:_annot, orig:_orig, grupo:g.sel.grupo, mov:g.sel.mov, lado:g.sel.lado, grado:g.medidas[key].grado, etq:g.sel.grupo+' '+g.sel.mov+' '+(g.sel.lado==='izq'?'Izq':'Der') };
+      }
+    }catch(_e){}
     toast('Capturado: '+g.sel.grupo+' '+g.sel.mov+' '+(g.sel.lado==='izq'?'Izq':'Der'),'success');
     if(BIO.modo==='estatico'){ pintarGonioCtrl(); _recalcEstatico(); }   // conserva la foto para medir otra
     else { g.peak=null; g.run=0; pintarGonioCtrl(); }
