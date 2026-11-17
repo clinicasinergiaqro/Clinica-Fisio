@@ -94,8 +94,8 @@ def enrich(html):
     html=re.sub(r'\[verificar([^\]<]*)\]',
                 r'<span class="bib-verif" title="dato a confirmar contra la fuente">verificar\1</span>', html)
     # ENCUADRE (bloque "de un vistazo" al inicio del protocolo): marcar el blockquote y sus 3 líneas
-    html=re.sub(r'<blockquote>\s*<p><strong>📋 Encuadre</strong></p>',
-                '<blockquote class="bib-encuadre">\n<p class="enc-h"><strong>📋 Encuadre</strong></p>', html)
+    html=re.sub(r'<blockquote>\s*<p><strong>(📋 Encuadre[^<]*)</strong></p>',
+                r'<blockquote class="bib-encuadre">\n<p class="enc-h"><strong>\1</strong></p>', html)
     html=re.sub(r'<p><strong>(🎯[^<]*)</strong>', r'<p class="enc-ind"><strong>\1</strong>', html)
     html=re.sub(r'<p><strong>(⛔[^<]*)</strong>', r'<p class="enc-ci"><strong>\1</strong>', html)
     html=re.sub(r'<p><strong>(⚠️[^<]*)</strong>', r'<p class="enc-prec"><strong>\1</strong>', html)
@@ -106,11 +106,35 @@ def enrich(html):
     # encabezados de FASE (p en negrita y h4/h5)
     html=re.sub(r'<p><strong>((?:Fase|FASE)\b[^<]*)</strong>', r'<p class="ph"><strong>\1</strong>', html)
     html=re.sub(r'<(h[3-5])([^>]*)>(\s*(?:Fase|FASE)\b[^<]*)</\1>', r'<\1\2 class="ph">\3</\1>', html)
+    # MOLDE semana-a-semana (guías operativas tipo "guía master"): bandas navy por ventana temporal
+    html=re.sub(r'<(h[3-6])([^>]*)>(\s*(?:RUTA\b|SEMANA\b|SEM\b|MES\b|MESES\b|D[IÍ]A\b|D[IÍ]AS\b)[^<]*)</\1>',
+                r'<\1\2 class="ph">\3</\1>', html, flags=re.I)
+    # nota de "Apoyo / muletas" (estado de carga de la ventana)
+    html=re.sub(r'<p><strong>(Apoyo\b[^<]*)</strong>', r'<p class="bib-apoyo"><strong>\1</strong>', html)
     # encabezados de peligro (banderas rojas / contraindicaciones) — insensible a may/min
     html=re.sub(r'<(h[3-5])([^>]*)>([^<]*(?:bandera|contraindicac|🚩|🛑|⛔)[^<]*)</\1>', r'<\1\2 class="danger">\3</\1>', html, flags=re.I)
     # items de lista por etiqueta (evita los que contienen sub-listas)
     html=re.sub(r'<li>((?:(?!</li>|<[uo]l[ >]).)*?)</li>', _tag_li, html, flags=re.S)
     return html
+
+def _tarjetas_molde(html):
+    """MOLDE semana-a-semana: convierte los blockquotes de tarjeta en verde (YA PUEDE) y rojo
+    (TODAVÍA NO). markdown FUNDE blockquotes contiguos separados por 1 línea en blanco → el
+    'TODAVÍA NO' queda dentro del mismo <blockquote> que 'YA PUEDE'; aquí se PARTE en dos."""
+    def per_bq(m):
+        inner=m.group(1)
+        if not re.match(r'\s*<p><strong>\s*(?:✅|✓)\s*YA PUEDE', inner):
+            return m.group(0)
+        inner=re.sub(r'^(\s*)<p><strong>\s*(?:✅|✓)\s*YA PUEDE',
+                     r'\1<p class="yp-h"><strong>✅ YA PUEDE', inner, count=1)
+        inner=re.sub(r'<p><strong>\s*(?:🚫|✗|❌|⛔)\s*TODAV[IÍ]A NO\s*</strong></p>',
+                     '</blockquote>\n<blockquote class="bib-todavia"><p class="tn-h"><strong>🚫 TODAVÍA NO</strong></p>',
+                     inner, count=1)
+        # dentro de una tarjeta los bullets van PLANOS (el color de la tarjeta ya dice sí/no):
+        # quita las etiquetas L-* que _tag_li pudo poner (p.ej. "Progresar…" → L-goal)
+        inner=re.sub(r'<li class="L-[a-z]+">', '<li>', inner)
+        return '<blockquote class="bib-yapuede">'+inner+'</blockquote>'
+    return re.sub(r'<blockquote>(.*?)</blockquote>', per_bq, html, flags=re.S)
 
 def _danger_zone(html):
     """Propaga el rojo de peligro a las SUBsecciones dentro de una sección de banderas rojas /
@@ -158,7 +182,7 @@ def _mark_urgente(html):
     """Resalta marcadores EXPLÍCITOS de urgencia escritos por el autor (bajo falso-positivo)
     para que, dentro de un bloque rojo, la EMERGENCIA salte por encima del 'derivar de rutina'.
     Solo toca texto (los términos no aparecen en atributos de etiqueta)."""
-    pat=re.compile(r'(\(urgencia\)|urgencias?\s+HOY|→\s*urgencias?\b|=\s*urgencia\b|\bURGENTE\b)')
+    pat=re.compile(r'(\(urgencia\)|\(URGENCIA\)|urgencias?\s+HOY|→\s*urgencias?\b|=\s*urgencia\b|\bURGENTE\b)')
     return pat.sub(r'<span class="bib-urge">\1</span>', html)
 
 def _sep_lists(md):
@@ -280,7 +304,7 @@ def _color_semaforo(html):
         elif first.startswith(('CONTRAINDICAC','NUNCA','🛑','⛔','🚩')) or 'BANDERA ROJA' in first or 'BANDERAS ROJAS' in first: cls=' class="sem-r"'
         else: cls=''
         return '<tr'+cls+'><td'+m.group('rest')
-    return re.sub(r'<tr><td(?P<rest>[^>]*>(?P<first>.*?)</td>)', rep, html, flags=re.S)
+    return re.sub(r'<tr>\s*<td(?P<rest>[^>]*>(?P<first>.*?)</td>)', rep, html, flags=re.S)
 
 def _link_xrefs(html):
     """Convierte las referencias internas «§N» / «§N.M» en enlaces que saltan a esa sección."""
@@ -299,7 +323,7 @@ def _link_xrefs(html):
 
 def md2html(body):
     _MD.reset()
-    html=_fold_mech(_declutter(_mark_urgente(_danger_zone(enrich(_MD.convert(_sep_lists(body)))))))
+    html=_fold_mech(_declutter(_mark_urgente(_danger_zone(_tarjetas_molde(enrich(_MD.convert(_sep_lists(body))))))))
     html=re.sub(r'<pre><code>(.*?)</code></pre>', _conv_pre, html, flags=re.S)
     html=_add_table_labels(html)
     html=_color_semaforo(html)

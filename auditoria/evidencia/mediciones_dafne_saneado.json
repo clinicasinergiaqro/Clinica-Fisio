@@ -1,0 +1,1560 @@
+{
+ "_nota": "Copia SANEADA (ficticio): removidos video/reportePdf/imagenes/hallazgos/trayectorias (urls). Solo metricas del punto 2.",
+ "paciente": "p1781814958552 (ficticio Dafne)",
+ "biomecanica": [
+  {
+   "id": "bm_p1781814958552_1794669840848",
+   "tipo": "goniometria",
+   "fuente": "video",
+   "fecha": "14/11/2026",
+   "horaCreacion": "09:24 a.m.",
+   "fechaHoraISO": "2026-11-14T15:24:00.863Z",
+   "terapeuta": "DUL",
+   "convencion": "clinica",
+   "plano": "sagital",
+   "medidas": [
+    {
+     "key": "cad_ext",
+     "grupo": "Cadera",
+     "mov": "Extensión",
+     "lado": "izq",
+     "grado": 19.8,
+     "ref": 30,
+     "lim": 15,
+     "defic": false,
+     "hiperext": false,
+     "normTxt": "0–30°",
+     "traza": {
+      "algoVersion": "bio-2d-2026-11-14b",
+      "aspect": 0.5624,
+      "fuente": "video",
+      "tSeg": 3.6,
+      "lmUsados": {
+       "a": {
+        "i": 11,
+        "x": 0.4566,
+        "y": 0.2406,
+        "v": 1
+       },
+       "vtx": {
+        "i": 23,
+        "x": 0.4991,
+        "y": 0.4212,
+        "v": 1
+       },
+       "b": {
+        "i": 25,
+        "x": 0.6193,
+        "y": 0.5521,
+        "v": 0.97
+       }
+      }
+     }
+    }
+   ],
+   "cita": "AAOS; Norkin & White, Measurement of Joint Motion.",
+   "calidad": {
+    "nMedidas": 1,
+    "algoVersion": "bio-2d-2026-11-14b"
+   },
+   "eliminado": false,
+   "_estadoSync": "sincronizada",
+   "_estadoSyncFecha": "2026-11-14T15:25:13.049Z"
+  },
+  {
+   "id": "bm_p1781814958552_1794669997277",
+   "tipo": "sentadilla",
+   "fuente": "camara",
+   "fecha": "14/11/2026",
+   "horaCreacion": "09:26 a.m.",
+   "fechaHoraISO": "2026-11-14T15:26:37.279Z",
+   "terapeuta": "DUL",
+   "convencion": "clinica",
+   "vistas": {
+    "frontal": {
+     "duracionSeg": 6,
+     "nReps": 1,
+     "calidad": {
+      "framesValidos": 82,
+      "frames": 82,
+      "visPctPiernas": 100,
+      "visPctTronco": 100,
+      "orientacionOK": true,
+      "camaraMovida": false
+     }
+    }
+   },
+   "duracionSeg": 6,
+   "medidas": [
+    {
+     "key": "fppa_izq",
+     "grupo": "Rodilla",
+     "mov": "Valgo dinámico FPPA (media bajada)",
+     "lado": "Izq",
+     "vista": "frontal",
+     "unidad": "°",
+     "media": -13.1,
+     "extremo": -13.1,
+     "de": null,
+     "reps": 1,
+     "confiable": true,
+     "visPct": 100,
+     "muestras": 80
+    },
+    {
+     "key": "fppa_der",
+     "grupo": "Rodilla",
+     "mov": "Valgo dinámico FPPA (media bajada)",
+     "lado": "Der",
+     "vista": "frontal",
+     "unidad": "°",
+     "media": -20.9,
+     "extremo": -20.9,
+     "de": null,
+     "reps": 1,
+     "confiable": true,
+     "visPct": 100,
+     "muestras": 80
+    },
+    {
+     "key": "mkd_izq",
+     "grupo": "Rodilla",
+     "mov": "Desplaz. medial en fondo (MKD)",
+     "lado": "Izq",
+     "vista": "frontal",
+     "unidad": "%pelvis",
+     "media": -36.9,
+     "extremo": -36.9,
+     "de": null,
+     "reps": 1,
+     "confiable": true,
+     "visPct": 100,
+     "muestras": 80
+    },
+    {
+     "key": "mkd_der",
+     "grupo": "Rodilla",
+     "mov": "Desplaz. medial en fondo (MKD)",
+     "lado": "Der",
+     "vista": "frontal",
+     "unidad": "%pelvis",
+     "media": -47.4,
+     "extremo": -47.4,
+     "de": null,
+     "reps": 1,
+     "confiable": true,
+     "visPct": 100,
+     "muestras": 80
+    },
+    {
+     "key": "sep_rodillas",
+     "grupo": "Rodilla",
+     "mov": "Separación rodillas/tobillos (fondo)",
+     "lado": "—",
+     "vista": "frontal",
+     "unidad": "ratio",
+     "media": 1.3,
+     "extremo": 1.3,
+     "de": null,
+     "reps": 1,
+     "confiable": true,
+     "visPct": 100,
+     "muestras": 80
+    },
+    {
+     "key": "tronco_lateral",
+     "grupo": "Tronco",
+     "mov": "Inclinación lateral (fondo)",
+     "lado": "—",
+     "vista": "frontal",
+     "unidad": "°",
+     "media": 2.5,
+     "extremo": 2.5,
+     "de": null,
+     "reps": 1,
+     "confiable": true,
+     "visPct": 100,
+     "muestras": 80
+    },
+    {
+     "key": "sacro_descenso",
+     "grupo": "Pelvis",
+     "mov": "Descenso del sacro",
+     "lado": "—",
+     "vista": "frontal",
+     "unidad": "%",
+     "media": 20,
+     "extremo": 20,
+     "de": null,
+     "reps": 1,
+     "confiable": true,
+     "visPct": 100,
+     "muestras": 82
+    }
+   ],
+   "porRep": [
+    {
+     "n": 1,
+     "frameFondo": 47,
+     "fppaIzq": -13.1,
+     "fppaDer": -20.9,
+     "mkdIzq": -36.9,
+     "mkdDer": -47.4,
+     "sepRatio": 1.29,
+     "troncoLat": -2.5,
+     "descPct": 20,
+     "descCm": null
+    }
+   ],
+   "calibracion": {
+    "estaturaCm": null
+   },
+   "calidad": {
+    "fpsPromedio": 14,
+    "framesTotales": 83,
+    "framesValidos": 82,
+    "algoVersion": "bio-2d-2026-11-14b",
+    "captura": {
+     "width": 480,
+     "height": 640,
+     "frameRate": 60,
+     "facingMode": "environment"
+    }
+   },
+   "eliminado": false,
+   "_estadoSync": "sincronizada",
+   "_estadoSyncFecha": "2026-11-14T15:27:38.103Z"
+  },
+  {
+   "id": "bm_p1781814958552_1794670219101",
+   "tipo": "marcha",
+   "fuente": "video",
+   "fecha": "14/11/2026",
+   "horaCreacion": "09:30 a.m.",
+   "fechaHoraISO": "2026-11-14T15:30:19.106Z",
+   "terapeuta": "DUL",
+   "convencion": "clinica",
+   "duracionSeg": 3,
+   "nCiclos": 1,
+   "cadencia": 56,
+   "velocidad": null,
+   "temporal": {
+    "izq": {
+     "nCiclos": 1,
+     "strideT": 1.2473070000000002,
+     "stanceT": 0.746421,
+     "swingT": 0.5008860000000002,
+     "stancePct": 59.84260490801382,
+     "swingPct": 40.15739509198618
+    },
+    "der": null
+   },
+   "espacial": {
+    "dobleApoyoPct": 0,
+    "stepLenM": null
+   },
+   "sagital": {
+    "rodIzqPeak": 38.5,
+    "rodDerPeak": 46.8,
+    "rodIzqROM": 36,
+    "rodDerROM": 44.6,
+    "hipIzqROM": 32.4,
+    "hipDerROM": 45.4,
+    "tobIzqROM": 47.3,
+    "tobDerROM": 62.3
+   },
+   "simetria": {
+    "stancePct": null,
+    "rodPeak": 81,
+    "hipROM": 67,
+    "strideT": null
+   },
+   "medidas": [
+    {
+     "key": "cadencia",
+     "grupo": "Temporal",
+     "mov": "Cadencia",
+     "lado": "—",
+     "vista": "sagital",
+     "unidad": "pasos/min",
+     "valor": 56,
+     "confiable": false,
+     "nCiclos": 1
+    },
+    {
+     "key": "doble_apoyo",
+     "grupo": "Temporal",
+     "mov": "Doble apoyo",
+     "lado": "—",
+     "vista": "sagital",
+     "unidad": "%",
+     "valor": 0,
+     "confiable": false,
+     "nCiclos": 1
+    },
+    {
+     "key": "stance_izq",
+     "grupo": "Temporal",
+     "mov": "Fase de apoyo",
+     "lado": "Izq",
+     "vista": "sagital",
+     "unidad": "%",
+     "valor": 59.8,
+     "confiable": false,
+     "nCiclos": 1
+    },
+    {
+     "key": "stance_der",
+     "grupo": "Temporal",
+     "mov": "Fase de apoyo",
+     "lado": "Der",
+     "vista": "sagital",
+     "unidad": "%",
+     "valor": null,
+     "confiable": false,
+     "nCiclos": 0
+    },
+    {
+     "key": "paso_long",
+     "grupo": "Espacial",
+     "mov": "Longitud de paso",
+     "lado": "—",
+     "vista": "sagital",
+     "unidad": "m",
+     "valor": null,
+     "confiable": false,
+     "nCiclos": 1
+    },
+    {
+     "key": "rod_pico_izq",
+     "grupo": "Rodilla",
+     "mov": "Flexión pico",
+     "lado": "Izq",
+     "vista": "sagital",
+     "unidad": "°",
+     "valor": 38.5,
+     "confiable": false,
+     "nCiclos": 1
+    },
+    {
+     "key": "rod_pico_der",
+     "grupo": "Rodilla",
+     "mov": "Flexión pico",
+     "lado": "Der",
+     "vista": "sagital",
+     "unidad": "°",
+     "valor": 46.8,
+     "confiable": false,
+     "nCiclos": 1
+    },
+    {
+     "key": "cadera_rom_izq",
+     "grupo": "Cadera",
+     "mov": "ROM flexo-ext",
+     "lado": "Izq",
+     "vista": "sagital",
+     "unidad": "°",
+     "valor": 32.4,
+     "confiable": false,
+     "nCiclos": 1
+    },
+    {
+     "key": "cadera_rom_der",
+     "grupo": "Cadera",
+     "mov": "ROM flexo-ext",
+     "lado": "Der",
+     "vista": "sagital",
+     "unidad": "°",
+     "valor": 45.4,
+     "confiable": false,
+     "nCiclos": 1
+    },
+    {
+     "key": "tobillo_rom_izq",
+     "grupo": "Tobillo",
+     "mov": "ROM (menos fiable)",
+     "lado": "Izq",
+     "vista": "sagital",
+     "unidad": "°",
+     "valor": 47.3,
+     "confiable": false,
+     "nCiclos": 1
+    },
+    {
+     "key": "tobillo_rom_der",
+     "grupo": "Tobillo",
+     "mov": "ROM (menos fiable)",
+     "lado": "Der",
+     "vista": "sagital",
+     "unidad": "°",
+     "valor": 62.3,
+     "confiable": false,
+     "nCiclos": 1
+    }
+   ],
+   "calibracion": {
+    "estaturaCm": null,
+    "treadmillKmh": null
+   },
+   "calidad": {
+    "framesValidos": 35,
+    "frames": 37,
+    "visPct": 95,
+    "orientPerfilOK": true,
+    "tiempoDudoso": false,
+    "tiempoVerificado": false,
+    "fuenteTiempo": "video-sin-confirmar",
+    "fpsMuestreo": 12,
+    "framesTotales": 37,
+    "algoVersion": "bio-2d-2026-11-14b"
+   },
+   "eliminado": false,
+   "_estadoSync": "sincronizada",
+   "_estadoSyncFecha": "2026-11-14T15:30:33.150Z"
+  },
+  {
+   "id": "bm_p1781814958552_1794670452114",
+   "tipo": "marcha",
+   "fuente": "video",
+   "fecha": "14/11/2026",
+   "horaCreacion": "09:34 a.m.",
+   "fechaHoraISO": "2026-11-14T15:34:12.119Z",
+   "terapeuta": "DUL",
+   "convencion": "clinica",
+   "duracionSeg": 13,
+   "nCiclos": 2,
+   "cadencia": 47,
+   "velocidad": null,
+   "temporal": {
+    "izq": {
+     "nCiclos": 1,
+     "strideT": 1.2273919999999998,
+     "stanceT": 0.7425569999999999,
+     "swingT": 0.4848349999999999,
+     "stancePct": 60.498764860777975,
+     "swingPct": 39.501235139222025
+    },
+    "der": {
+     "nCiclos": 2,
+     "strideT": 1.1743744999999999,
+     "stanceT": 0.568659,
+     "swingT": 0.6057154999999999,
+     "stancePct": 48.42228777957969,
+     "swingPct": 51.57771222042031
+    }
+   },
+   "espacial": {
+    "dobleApoyoPct": 1,
+    "stepLenM": null
+   },
+   "sagital": {
+    "rodIzqPeak": 59.1,
+    "rodDerPeak": 61.4,
+    "rodIzqROM": 58,
+    "rodDerROM": 60.1,
+    "hipIzqROM": 50.9,
+    "hipDerROM": 97.6,
+    "tobIzqROM": 24.1,
+    "tobDerROM": 24.4
+   },
+   "simetria": {
+    "stancePct": 78,
+    "rodPeak": 96,
+    "hipROM": 37,
+    "strideT": 96
+   },
+   "medidas": [
+    {
+     "key": "cadencia",
+     "grupo": "Temporal",
+     "mov": "Cadencia",
+     "lado": "—",
+     "vista": "sagital",
+     "unidad": "pasos/min",
+     "valor": 47,
+     "confiable": false,
+     "nCiclos": 2
+    },
+    {
+     "key": "doble_apoyo",
+     "grupo": "Temporal",
+     "mov": "Doble apoyo",
+     "lado": "—",
+     "vista": "sagital",
+     "unidad": "%",
+     "valor": 1,
+     "confiable": false,
+     "nCiclos": 2
+    },
+    {
+     "key": "stance_izq",
+     "grupo": "Temporal",
+     "mov": "Fase de apoyo",
+     "lado": "Izq",
+     "vista": "sagital",
+     "unidad": "%",
+     "valor": 60.5,
+     "confiable": false,
+     "nCiclos": 1
+    },
+    {
+     "key": "stance_der",
+     "grupo": "Temporal",
+     "mov": "Fase de apoyo",
+     "lado": "Der",
+     "vista": "sagital",
+     "unidad": "%",
+     "valor": 48.4,
+     "confiable": false,
+     "nCiclos": 2
+    },
+    {
+     "key": "paso_long",
+     "grupo": "Espacial",
+     "mov": "Longitud de paso",
+     "lado": "—",
+     "vista": "sagital",
+     "unidad": "m",
+     "valor": null,
+     "confiable": false,
+     "nCiclos": 2
+    },
+    {
+     "key": "rod_pico_izq",
+     "grupo": "Rodilla",
+     "mov": "Flexión pico",
+     "lado": "Izq",
+     "vista": "sagital",
+     "unidad": "°",
+     "valor": 59.1,
+     "confiable": false,
+     "nCiclos": 3
+    },
+    {
+     "key": "rod_pico_der",
+     "grupo": "Rodilla",
+     "mov": "Flexión pico",
+     "lado": "Der",
+     "vista": "sagital",
+     "unidad": "°",
+     "valor": 61.4,
+     "confiable": false,
+     "nCiclos": 4
+    },
+    {
+     "key": "cadera_rom_izq",
+     "grupo": "Cadera",
+     "mov": "ROM flexo-ext",
+     "lado": "Izq",
+     "vista": "sagital",
+     "unidad": "°",
+     "valor": 50.9,
+     "confiable": false,
+     "nCiclos": 3
+    },
+    {
+     "key": "cadera_rom_der",
+     "grupo": "Cadera",
+     "mov": "ROM flexo-ext",
+     "lado": "Der",
+     "vista": "sagital",
+     "unidad": "°",
+     "valor": 97.6,
+     "confiable": false,
+     "nCiclos": 4
+    },
+    {
+     "key": "tobillo_rom_izq",
+     "grupo": "Tobillo",
+     "mov": "ROM (menos fiable)",
+     "lado": "Izq",
+     "vista": "sagital",
+     "unidad": "°",
+     "valor": 24.1,
+     "confiable": false,
+     "nCiclos": 3
+    },
+    {
+     "key": "tobillo_rom_der",
+     "grupo": "Tobillo",
+     "mov": "ROM (menos fiable)",
+     "lado": "Der",
+     "vista": "sagital",
+     "unidad": "°",
+     "valor": 24.4,
+     "confiable": false,
+     "nCiclos": 3
+    }
+   ],
+   "calibracion": {
+    "estaturaCm": null,
+    "treadmillKmh": null
+   },
+   "calidad": {
+    "framesValidos": 92,
+    "frames": 119,
+    "visPct": 77,
+    "orientPerfilOK": false,
+    "tiempoDudoso": false,
+    "tiempoVerificado": true,
+    "fuenteTiempo": "video-confirmado",
+    "fpsMuestreo": 12,
+    "framesTotales": 137,
+    "algoVersion": "bio-2d-2026-11-14b"
+   },
+   "eliminado": false,
+   "_estadoSync": "sincronizada",
+   "_estadoSyncFecha": "2026-11-14T15:37:25.924Z"
+  },
+  {
+   "id": "bm_p1781814958552_1794670768298",
+   "tipo": "rom",
+   "fuente": "camara",
+   "fecha": "14/11/2026",
+   "horaCreacion": "09:39 a.m.",
+   "fechaHoraISO": "2026-11-14T15:39:28.306Z",
+   "terapeuta": "DUL",
+   "convencion": "clinica",
+   "duracionSeg": 11,
+   "medidas": [
+    {
+     "key": "codo_flex_izq",
+     "grupo": "Codo",
+     "mov": "Flexión",
+     "lado": "Izq",
+     "media": null,
+     "mejor": null,
+     "de": null,
+     "reps": 0,
+     "ext": null,
+     "min": null,
+     "max": null,
+     "rango": null,
+     "muestras": 73,
+     "visPct": 0,
+     "confiable": false,
+     "margen": 5
+    },
+    {
+     "key": "codo_flex_der",
+     "grupo": "Codo",
+     "mov": "Flexión",
+     "lado": "Der",
+     "media": 43,
+     "mejor": 46,
+     "de": 5,
+     "reps": 2,
+     "ext": 1,
+     "min": 1,
+     "max": 43,
+     "rango": 42,
+     "muestras": 180,
+     "visPct": 99,
+     "confiable": true,
+     "margen": 5
+    },
+    {
+     "key": "hombro_flex_izq",
+     "grupo": "Hombro",
+     "mov": "Flexión",
+     "lado": "Izq",
+     "media": 128,
+     "mejor": 128,
+     "de": null,
+     "reps": 1,
+     "ext": null,
+     "min": 0,
+     "max": 128,
+     "rango": 128,
+     "muestras": 19,
+     "visPct": 10,
+     "confiable": true,
+     "margen": 10
+    },
+    {
+     "key": "hombro_flex_der",
+     "grupo": "Hombro",
+     "mov": "Flexión",
+     "lado": "Der",
+     "media": 167,
+     "mejor": 172,
+     "de": 7,
+     "reps": 2,
+     "ext": null,
+     "min": 0,
+     "max": 172,
+     "rango": 167,
+     "muestras": 77,
+     "visPct": 42,
+     "confiable": true,
+     "margen": 10
+    },
+    {
+     "key": "hombro_ext_izq",
+     "grupo": "Hombro",
+     "mov": "Extensión",
+     "lado": "Izq",
+     "media": 172,
+     "mejor": 172,
+     "de": null,
+     "reps": 1,
+     "ext": null,
+     "min": 0,
+     "max": 172,
+     "rango": 172,
+     "muestras": 8,
+     "visPct": 4,
+     "confiable": false,
+     "margen": 10
+    },
+    {
+     "key": "hombro_ext_der",
+     "grupo": "Hombro",
+     "mov": "Extensión",
+     "lado": "Der",
+     "media": 55,
+     "mejor": 55,
+     "de": null,
+     "reps": 1,
+     "ext": null,
+     "min": 0,
+     "max": 55,
+     "rango": 55,
+     "muestras": 54,
+     "visPct": 30,
+     "confiable": true,
+     "margen": 10
+    },
+    {
+     "key": "hombro_abd_izq",
+     "grupo": "Hombro",
+     "mov": "Abducción",
+     "lado": "Izq",
+     "media": 179,
+     "mejor": 179,
+     "de": 1,
+     "reps": 2,
+     "ext": null,
+     "min": 0,
+     "max": 179,
+     "rango": 179,
+     "muestras": 29,
+     "visPct": 16,
+     "confiable": true,
+     "margen": 5
+    },
+    {
+     "key": "hombro_abd_der",
+     "grupo": "Hombro",
+     "mov": "Abducción",
+     "lado": "Der",
+     "media": 168,
+     "mejor": 168,
+     "de": null,
+     "reps": 1,
+     "ext": null,
+     "min": 0,
+     "max": 168,
+     "rango": 168,
+     "muestras": 16,
+     "visPct": 9,
+     "confiable": true,
+     "margen": 5
+    },
+    {
+     "key": "cuello_lat_izq",
+     "grupo": "Cuello",
+     "mov": "Lateralización",
+     "lado": "Izq",
+     "media": 39,
+     "mejor": 45,
+     "de": 4,
+     "reps": 4,
+     "ext": null,
+     "min": 0,
+     "max": 45,
+     "rango": 39,
+     "muestras": 180,
+     "visPct": 99,
+     "confiable": true,
+     "margen": 5
+    },
+    {
+     "key": "cuello_lat_der",
+     "grupo": "Cuello",
+     "mov": "Lateralización",
+     "lado": "Der",
+     "media": null,
+     "mejor": null,
+     "de": null,
+     "reps": 0,
+     "ext": null,
+     "min": null,
+     "max": null,
+     "rango": null,
+     "muestras": 0,
+     "visPct": 0,
+     "confiable": false,
+     "margen": 5
+    }
+   ],
+   "calidad": {
+    "fpsPromedio": 17,
+    "framesTotales": 184,
+    "framesValidos": 180,
+    "algoVersion": "bio-2d-2026-11-14b",
+    "captura": {
+     "width": 480,
+     "height": 640,
+     "frameRate": 60,
+     "facingMode": "environment"
+    }
+   },
+   "eliminado": false,
+   "_estadoSync": "sincronizada",
+   "_estadoSyncFecha": "2026-11-14T15:39:37.175Z"
+  },
+  {
+   "id": "bm_p1781814958552_1794670919313",
+   "tipo": "rom",
+   "fuente": "camara",
+   "fecha": "14/11/2026",
+   "horaCreacion": "09:41 a.m.",
+   "fechaHoraISO": "2026-11-14T15:41:59.315Z",
+   "terapeuta": "DUL",
+   "convencion": "clinica",
+   "duracionSeg": 9,
+   "medidas": [
+    {
+     "key": "codo_flex_izq",
+     "grupo": "Codo",
+     "mov": "Flexión",
+     "lado": "Izq",
+     "media": 21,
+     "mejor": 21,
+     "de": null,
+     "reps": 1,
+     "ext": 1,
+     "min": 1,
+     "max": 21,
+     "rango": 20,
+     "muestras": 154,
+     "visPct": 99,
+     "confiable": true,
+     "margen": 5
+    },
+    {
+     "key": "codo_flex_der",
+     "grupo": "Codo",
+     "mov": "Flexión",
+     "lado": "Der",
+     "media": 20,
+     "mejor": 20,
+     "de": null,
+     "reps": 1,
+     "ext": 2,
+     "min": 2,
+     "max": 20,
+     "rango": 18,
+     "muestras": 154,
+     "visPct": 99,
+     "confiable": true,
+     "margen": 5
+    },
+    {
+     "key": "hombro_flex_izq",
+     "grupo": "Hombro",
+     "mov": "Flexión",
+     "lado": "Izq",
+     "media": 23,
+     "mejor": 23,
+     "de": null,
+     "reps": 1,
+     "ext": null,
+     "min": 0,
+     "max": 23,
+     "rango": 23,
+     "muestras": 77,
+     "visPct": 49,
+     "confiable": true,
+     "margen": 10
+    },
+    {
+     "key": "hombro_flex_der",
+     "grupo": "Hombro",
+     "mov": "Flexión",
+     "lado": "Der",
+     "media": 21,
+     "mejor": 21,
+     "de": null,
+     "reps": 1,
+     "ext": null,
+     "min": 0,
+     "max": 21,
+     "rango": 21,
+     "muestras": 58,
+     "visPct": 37,
+     "confiable": true,
+     "margen": 10
+    },
+    {
+     "key": "hombro_ext_izq",
+     "grupo": "Hombro",
+     "mov": "Extensión",
+     "lado": "Izq",
+     "media": 174,
+     "mejor": 174,
+     "de": null,
+     "reps": 1,
+     "ext": null,
+     "min": 0,
+     "max": 174,
+     "rango": 174,
+     "muestras": 12,
+     "visPct": 8,
+     "confiable": true,
+     "margen": 10
+    },
+    {
+     "key": "hombro_ext_der",
+     "grupo": "Hombro",
+     "mov": "Extensión",
+     "lado": "Der",
+     "media": null,
+     "mejor": null,
+     "de": null,
+     "reps": 0,
+     "ext": null,
+     "min": null,
+     "max": null,
+     "rango": null,
+     "muestras": 0,
+     "visPct": 0,
+     "confiable": false,
+     "margen": 10
+    },
+    {
+     "key": "hombro_abd_izq",
+     "grupo": "Hombro",
+     "mov": "Abducción",
+     "lado": "Izq",
+     "media": 163,
+     "mejor": 163,
+     "de": 1,
+     "reps": 2,
+     "ext": null,
+     "min": 0,
+     "max": 163,
+     "rango": 163,
+     "muestras": 50,
+     "visPct": 32,
+     "confiable": true,
+     "margen": 5
+    },
+    {
+     "key": "hombro_abd_der",
+     "grupo": "Hombro",
+     "mov": "Abducción",
+     "lado": "Der",
+     "media": 178,
+     "mejor": 178,
+     "de": null,
+     "reps": 1,
+     "ext": null,
+     "min": 0,
+     "max": 178,
+     "rango": 178,
+     "muestras": 88,
+     "visPct": 56,
+     "confiable": true,
+     "margen": 5
+    },
+    {
+     "key": "cuello_lat_izq",
+     "grupo": "Cuello",
+     "mov": "Lateralización",
+     "lado": "Izq",
+     "media": null,
+     "mejor": null,
+     "de": null,
+     "reps": 0,
+     "ext": null,
+     "min": null,
+     "max": null,
+     "rango": null,
+     "muestras": 24,
+     "visPct": 0,
+     "confiable": false,
+     "margen": 5
+    },
+    {
+     "key": "cuello_lat_der",
+     "grupo": "Cuello",
+     "mov": "Lateralización",
+     "lado": "Der",
+     "media": null,
+     "mejor": null,
+     "de": null,
+     "reps": 0,
+     "ext": null,
+     "min": null,
+     "max": null,
+     "rango": null,
+     "muestras": 17,
+     "visPct": 0,
+     "confiable": false,
+     "margen": 5
+    }
+   ],
+   "calidad": {
+    "fpsPromedio": 17,
+    "framesTotales": 157,
+    "framesValidos": 154,
+    "algoVersion": "bio-2d-2026-11-14b",
+    "captura": {
+     "width": 480,
+     "height": 640,
+     "frameRate": 60,
+     "facingMode": "environment"
+    }
+   },
+   "eliminado": false,
+   "_estadoSync": "sincronizada",
+   "_estadoSyncFecha": "2026-11-14T15:42:07.023Z"
+  },
+  {
+   "id": "bm_p1781814958552_1794671006627",
+   "tipo": "goniometria",
+   "fuente": "camara",
+   "fecha": "14/11/2026",
+   "horaCreacion": "09:43 a.m.",
+   "fechaHoraISO": "2026-11-14T15:43:26.630Z",
+   "terapeuta": "DUL",
+   "convencion": "clinica",
+   "plano": "sagital",
+   "medidas": [
+    {
+     "key": "rod_flex",
+     "grupo": "Rodilla",
+     "mov": "Flexión",
+     "lado": "der",
+     "grado": 106.1,
+     "ref": 135,
+     "lim": 120,
+     "defic": false,
+     "hiperext": false,
+     "normTxt": "0–135°",
+     "traza": {
+      "algoVersion": "bio-2d-2026-11-14b",
+      "aspect": 0.75,
+      "fuente": "camara",
+      "tSeg": null,
+      "lmUsados": {
+       "a": {
+        "i": 24,
+        "x": 0.5156,
+        "y": 0.5122,
+        "v": 1
+       },
+       "vtx": {
+        "i": 26,
+        "x": 0.3411,
+        "y": 0.5217,
+        "v": 0.89
+       },
+       "b": {
+        "i": 28,
+        "x": 0.3757,
+        "y": 0.3991,
+        "v": 0.88
+       }
+      }
+     }
+    }
+   ],
+   "cita": "AAOS; Norkin & White, Measurement of Joint Motion.",
+   "calidad": {
+    "nMedidas": 1,
+    "algoVersion": "bio-2d-2026-11-14b",
+    "captura": {
+     "width": 480,
+     "height": 640,
+     "frameRate": 60,
+     "facingMode": "environment"
+    }
+   },
+   "eliminado": false,
+   "_estadoSync": "sincronizada",
+   "_estadoSyncFecha": "2026-11-14T15:43:30.771Z"
+  },
+  {
+   "id": "bm_p1781814958552_1794671129577",
+   "tipo": "goniometria",
+   "fuente": "camara",
+   "fecha": "14/11/2026",
+   "horaCreacion": "09:45 a.m.",
+   "fechaHoraISO": "2026-11-14T15:45:29.579Z",
+   "terapeuta": "DUL",
+   "convencion": "clinica",
+   "plano": "sagital",
+   "medidas": [
+    {
+     "key": "rod_flex",
+     "grupo": "Rodilla",
+     "mov": "Flexión",
+     "lado": "izq",
+     "grado": 114.3,
+     "ref": 135,
+     "lim": 120,
+     "defic": false,
+     "hiperext": false,
+     "normTxt": "0–135°",
+     "traza": {
+      "algoVersion": "bio-2d-2026-11-14b",
+      "aspect": 0.75,
+      "fuente": "camara",
+      "tSeg": null,
+      "lmUsados": {
+       "a": {
+        "i": 23,
+        "x": 0.4364,
+        "y": 0.5246,
+        "v": 1
+       },
+       "vtx": {
+        "i": 25,
+        "x": 0.6447,
+        "y": 0.5517,
+        "v": 0.97
+       },
+       "b": {
+        "i": 27,
+        "x": 0.597,
+        "y": 0.413,
+        "v": 0.95
+       }
+      }
+     }
+    }
+   ],
+   "cita": "AAOS; Norkin & White, Measurement of Joint Motion.",
+   "calidad": {
+    "nMedidas": 1,
+    "algoVersion": "bio-2d-2026-11-14b",
+    "captura": {
+     "width": 480,
+     "height": 640,
+     "frameRate": 60,
+     "facingMode": "environment"
+    }
+   },
+   "eliminado": false,
+   "_estadoSync": "sincronizada",
+   "_estadoSyncFecha": "2026-11-14T15:45:33.739Z"
+  },
+  {
+   "id": "bm_p1781814958552_1794671165526",
+   "tipo": "goniometria",
+   "fuente": "camara",
+   "fecha": "14/11/2026",
+   "horaCreacion": "09:46 a.m.",
+   "fechaHoraISO": "2026-11-14T15:46:05.527Z",
+   "terapeuta": "DUL",
+   "convencion": "clinica",
+   "plano": "sagital",
+   "medidas": [
+    {
+     "key": "rod_flex",
+     "grupo": "Rodilla",
+     "mov": "Flexión",
+     "lado": "der",
+     "grado": 172.6,
+     "ref": 135,
+     "lim": 120,
+     "defic": false,
+     "hiperext": false,
+     "normTxt": "0–135°",
+     "traza": {
+      "algoVersion": "bio-2d-2026-11-14b",
+      "aspect": 0.75,
+      "fuente": "camara",
+      "tSeg": null,
+      "lmUsados": {
+       "a": {
+        "i": 24,
+        "x": 0.5254,
+        "y": 0.5829,
+        "v": 1
+       },
+       "vtx": {
+        "i": 26,
+        "x": 0.4371,
+        "y": 0.5616,
+        "v": 0.6
+       },
+       "b": {
+        "i": 28,
+        "x": 0.476,
+        "y": 0.5754,
+        "v": 0.55
+       }
+      }
+     }
+    }
+   ],
+   "cita": "AAOS; Norkin & White, Measurement of Joint Motion.",
+   "calidad": {
+    "nMedidas": 1,
+    "algoVersion": "bio-2d-2026-11-14b",
+    "captura": {
+     "width": 480,
+     "height": 640,
+     "frameRate": 60,
+     "facingMode": "environment"
+    }
+   },
+   "eliminado": false,
+   "_estadoSync": "sincronizada",
+   "_estadoSyncFecha": "2026-11-14T15:49:16.103Z"
+  },
+  {
+   "id": "bm_p1781814958552_1794671569192",
+   "tipo": "rom",
+   "fuente": "camara",
+   "fecha": "14/11/2026",
+   "horaCreacion": "09:52 a.m.",
+   "fechaHoraISO": "2026-11-14T15:52:49.208Z",
+   "terapeuta": "DUL",
+   "convencion": "clinica",
+   "duracionSeg": 8,
+   "medidas": [
+    {
+     "key": "codo_flex_izq",
+     "grupo": "Codo",
+     "mov": "Flexión",
+     "lado": "Izq",
+     "media": 64,
+     "mejor": 117,
+     "de": 31,
+     "reps": 5,
+     "ext": 9,
+     "min": 9,
+     "max": 64,
+     "rango": 55,
+     "muestras": 130,
+     "visPct": 94,
+     "confiable": true,
+     "margen": 5
+    },
+    {
+     "key": "codo_flex_der",
+     "grupo": "Codo",
+     "mov": "Flexión",
+     "lado": "Der",
+     "media": 21,
+     "mejor": 21,
+     "de": 0,
+     "reps": 2,
+     "ext": 3,
+     "min": 3,
+     "max": 21,
+     "rango": 18,
+     "muestras": 36,
+     "visPct": 26,
+     "confiable": true,
+     "margen": 5
+    },
+    {
+     "key": "hombro_flex_izq",
+     "grupo": "Hombro",
+     "mov": "Flexión",
+     "lado": "Izq",
+     "media": 147,
+     "mejor": 165,
+     "de": 25,
+     "reps": 3,
+     "ext": null,
+     "min": 0,
+     "max": 165,
+     "rango": 147,
+     "muestras": 26,
+     "visPct": 19,
+     "confiable": true,
+     "margen": 10
+    },
+    {
+     "key": "hombro_flex_der",
+     "grupo": "Hombro",
+     "mov": "Flexión",
+     "lado": "Der",
+     "media": null,
+     "mejor": null,
+     "de": null,
+     "reps": 0,
+     "ext": null,
+     "min": null,
+     "max": null,
+     "rango": null,
+     "muestras": 0,
+     "visPct": 0,
+     "confiable": false,
+     "margen": 10
+    },
+    {
+     "key": "hombro_ext_izq",
+     "grupo": "Hombro",
+     "mov": "Extensión",
+     "lado": "Izq",
+     "media": null,
+     "mejor": null,
+     "de": null,
+     "reps": 0,
+     "ext": null,
+     "min": null,
+     "max": null,
+     "rango": null,
+     "muestras": 0,
+     "visPct": 0,
+     "confiable": false,
+     "margen": 10
+    },
+    {
+     "key": "hombro_ext_der",
+     "grupo": "Hombro",
+     "mov": "Extensión",
+     "lado": "Der",
+     "media": 168,
+     "mejor": 173,
+     "de": 7,
+     "reps": 2,
+     "ext": null,
+     "min": 0,
+     "max": 173,
+     "rango": 168,
+     "muestras": 20,
+     "visPct": 14,
+     "confiable": true,
+     "margen": 10
+    },
+    {
+     "key": "hombro_abd_izq",
+     "grupo": "Hombro",
+     "mov": "Abducción",
+     "lado": "Izq",
+     "media": 169,
+     "mejor": 169,
+     "de": null,
+     "reps": 1,
+     "ext": null,
+     "min": 0,
+     "max": 169,
+     "rango": 169,
+     "muestras": 85,
+     "visPct": 62,
+     "confiable": true,
+     "margen": 5
+    },
+    {
+     "key": "hombro_abd_der",
+     "grupo": "Hombro",
+     "mov": "Abducción",
+     "lado": "Der",
+     "media": 177,
+     "mejor": 177,
+     "de": null,
+     "reps": 1,
+     "ext": null,
+     "min": 0,
+     "max": 177,
+     "rango": 177,
+     "muestras": 36,
+     "visPct": 26,
+     "confiable": true,
+     "margen": 5
+    },
+    {
+     "key": "cuello_lat_izq",
+     "grupo": "Cuello",
+     "mov": "Lateralización",
+     "lado": "Izq",
+     "media": 82,
+     "mejor": 114,
+     "de": 46,
+     "reps": 2,
+     "ext": null,
+     "min": 0,
+     "max": 114,
+     "rango": 82,
+     "muestras": 136,
+     "visPct": 99,
+     "confiable": true,
+     "margen": 5
+    },
+    {
+     "key": "cuello_lat_der",
+     "grupo": "Cuello",
+     "mov": "Lateralización",
+     "lado": "Der",
+     "media": null,
+     "mejor": null,
+     "de": null,
+     "reps": 0,
+     "ext": null,
+     "min": null,
+     "max": null,
+     "rango": null,
+     "muestras": 0,
+     "visPct": 0,
+     "confiable": false,
+     "margen": 5
+    }
+   ],
+   "calidad": {
+    "fpsPromedio": 17,
+    "framesTotales": 139,
+    "framesValidos": 136,
+    "algoVersion": "bio-2d-2026-11-14b",
+    "captura": {
+     "width": 480,
+     "height": 640,
+     "frameRate": 60,
+     "facingMode": "environment"
+    }
+   },
+   "eliminado": false,
+   "_estadoSync": "sincronizada",
+   "_estadoSyncFecha": "2026-11-14T15:52:57.414Z"
+  },
+  {
+   "id": "bm_p1781814958552_1794671652065",
+   "tipo": "goniometria",
+   "fuente": "camara",
+   "fecha": "14/11/2026",
+   "horaCreacion": "09:54 a.m.",
+   "fechaHoraISO": "2026-11-14T15:54:12.067Z",
+   "terapeuta": "DUL",
+   "convencion": "clinica",
+   "plano": "sagital",
+   "medidas": [
+    {
+     "key": "cad_flex",
+     "grupo": "Cadera",
+     "mov": "Flexión",
+     "lado": "izq",
+     "grado": 129.3,
+     "ref": 120,
+     "lim": 105,
+     "defic": false,
+     "hiperext": false,
+     "normTxt": "0–120°",
+     "traza": {
+      "algoVersion": "bio-2d-2026-11-14b",
+      "aspect": 0.75,
+      "fuente": "camara",
+      "tSeg": null,
+      "lmUsados": {
+       "a": {
+        "i": 11,
+        "x": 0.9222,
+        "y": 0.4651,
+        "v": 1
+       },
+       "vtx": {
+        "i": 23,
+        "x": 0.6466,
+        "y": 0.4479,
+        "v": 1
+       },
+       "b": {
+        "i": 25,
+        "x": 0.8219,
+        "y": 0.3119,
+        "v": 0.8
+       }
+      }
+     }
+    }
+   ],
+   "cita": "AAOS; Norkin & White, Measurement of Joint Motion.",
+   "calidad": {
+    "nMedidas": 1,
+    "algoVersion": "bio-2d-2026-11-14b",
+    "captura": {
+     "width": 480,
+     "height": 640,
+     "frameRate": 60,
+     "facingMode": "environment"
+    }
+   },
+   "eliminado": false,
+   "_estadoSync": "sincronizada",
+   "_estadoSyncFecha": "2026-11-14T15:54:18.016Z"
+  },
+  {
+   "id": "bm_p1781814958552_1794671818518",
+   "tipo": "goniometria",
+   "fuente": "camara",
+   "fecha": "14/11/2026",
+   "horaCreacion": "09:56 a.m.",
+   "fechaHoraISO": "2026-11-14T15:56:58.519Z",
+   "terapeuta": "DUL",
+   "convencion": "clinica",
+   "plano": "sagital",
+   "medidas": [
+    {
+     "key": "cad_ext",
+     "grupo": "Cadera",
+     "mov": "Extensión",
+     "lado": "der",
+     "grado": 160.1,
+     "ref": 30,
+     "lim": 15,
+     "defic": false,
+     "hiperext": false,
+     "normTxt": "0–30°",
+     "traza": {
+      "algoVersion": "bio-2d-2026-11-14b",
+      "aspect": 0.75,
+      "fuente": "camara",
+      "tSeg": null,
+      "lmUsados": {
+       "a": {
+        "i": 12,
+        "x": 0.2832,
+        "y": 0.629,
+        "v": 1
+       },
+       "vtx": {
+        "i": 24,
+        "x": 0.4784,
+        "y": 0.6374,
+        "v": 1
+       },
+       "b": {
+        "i": 26,
+        "x": 0.3781,
+        "y": 0.6051,
+        "v": 0.68
+       }
+      }
+     }
+    }
+   ],
+   "cita": "AAOS; Norkin & White, Measurement of Joint Motion.",
+   "calidad": {
+    "nMedidas": 1,
+    "algoVersion": "bio-2d-2026-11-14b",
+    "captura": {
+     "width": 480,
+     "height": 640,
+     "frameRate": 60,
+     "facingMode": "environment"
+    }
+   },
+   "eliminado": false,
+   "_estadoSync": "sincronizada",
+   "_estadoSyncFecha": "2026-11-14T15:57:02.567Z"
+  }
+ ],
+ "valoracion_rom": "Completos\nGoniometría cámara 2D (14/11/2026, cribado ±5–10°, no validado contra goniómetro físico): Cadera ext D160°"
+}
