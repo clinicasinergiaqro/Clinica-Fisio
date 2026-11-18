@@ -976,7 +976,7 @@
       +   '<button class="bio-modo-btn bio-modo-cam" id="bio-go-cam">▶️ Cámara en vivo</button>'
       +   '<button class="bio-modo-btn bio-modo-vid" id="bio-go-vid">📁 Subir video</button>'
       +   '<button class="bio-modo-btn bio-modo-foto" id="bio-go-foto" style="display:none">📷 Subir foto</button>'
-      +   '<input type="file" id="bio-file" accept="video/*" style="display:none">'
+      +   '<input type="file" id="bio-file" accept="video/*" multiple style="display:none">'
       +   '<input type="file" id="bio-file-foto" accept="image/*" style="display:none">'
       +   '<div id="bio-gonio-caps" style="display:none;width:100%;max-width:400px;margin-top:2px"></div>'
       + '</div>'
@@ -1032,8 +1032,19 @@
     document.getElementById('bio-go-cam').addEventListener('click', iniciarCamara);
     document.getElementById('bio-go-vid').addEventListener('click', function(){ document.getElementById('bio-file').click(); });
     document.getElementById('bio-file').addEventListener('change', function(ev){
-      var f = ev.target.files && ev.target.files[0]; ev.target.value='';
-      if(f) procesarVideo(f);
+      var files = Array.prototype.slice.call(ev.target.files||[]); ev.target.value='';
+      if(!files.length) return;
+      // Goniómetro: se pueden elegir VARIOS videos de una (cada uno es una medición distinta:
+      // codo flexión, muñeca ext, etc.). La app procesa el 1º y deja los demás en cola; tras capturar
+      // cada uno, un botón "📹 Siguiente video" pasa al siguiente SIN re-abrir el selector.
+      if(BIO.tipoMedicion==='gonio' && files.length>1){
+        BIO.videoCola = files.slice(1);
+        toast('📹 '+files.length+' videos en cola. Mide el 1º (elige articulación/movimiento) y toca "Siguiente video".','info');
+      } else {
+        BIO.videoCola = [];
+        if(files.length>1) toast('Se analizará el primer video.','info');
+      }
+      procesarVideo(files[0]);
     });
     document.getElementById('bio-go-foto').addEventListener('click', function(){ document.getElementById('bio-file-foto').click(); });
     document.getElementById('bio-file-foto').addEventListener('change', function(ev){
@@ -1113,13 +1124,13 @@
     BIO.acc=null; BIO.accS=null; BIO.accM=null; BIO.accG=null; BIO.framesTotales=0; BIO.srcEl=null; BIO.sending=false;
     BIO._estaticoBase=null; BIO._estaticoLm=null; BIO._estaticoImg=null; BIO._estaticoFuente=null; BIO._peakFrameCanvas=null; BIO._peakFrameLm=null; BIO._peakTSeg=null; BIO._fotoRes=null;
     BIO.facing='environment';           // cada medición arranca con la cámara TRASERA
-    detenerGrabadorVideo(); BIO.pendingVideo=null;
+    detenerGrabadorVideo(); BIO.pendingVideo=null; BIO.videoCola=[];
     detenerLoopCamara(); pararCronometro();
   }
   function cerrarMedidor(){
     BIO.cancelVideo=true;
     _reconStop();
-    detenerGrabadorVideo(); BIO.pendingVideo=null;
+    detenerGrabadorVideo(); BIO.pendingVideo=null; BIO.videoCola=[];
     detenerCamaraStream(); detenerLoopCamara(); pararCronometro();
     BIO.recording=false; BIO.procesandoVideo=false; BIO.modo=null; BIO.srcEl=null;
     var ov=document.getElementById('bio-overlay'); if(ov) ov.style.display='none';
@@ -2554,6 +2565,9 @@
       + (BIO.modo==='estatico' && BIO._estaticoFuente==='video' && BIO.pendingVideo && BIO.pendingVideo.file
           ? '<div class="bio-grow" style="margin-bottom:8px"><button class="bio-gchip" style="width:100%;text-align:center;background:#1b5e20;color:#fff;border-color:#1b5e20" onclick="BIO_gonioReanalizarVideo()">🔁 Reanalizar este video para '+esc(sel.grupo+' '+sel.mov+' '+(sel.lado==='izq'?'Izq':'Der'))+'</button></div>'
           : '')
+      + ((BIO.videoCola && BIO.videoCola.length)
+          ? '<div class="bio-grow" style="margin-bottom:8px"><button class="bio-gchip" style="width:100%;text-align:center;background:#0d47a1;color:#fff;border-color:#0d47a1" onclick="BIO_gonioSiguienteVideo()">📹 Siguiente video ('+BIO.videoCola.length+' en cola)</button></div>'
+          : '')
       + (BIO.modo==='estatico' ? '<div class="bio-grow" style="margin-bottom:8px"><button class="bio-gchip" style="width:100%;text-align:center" onclick="BIO_gonioVolverInicio()">↩︎ Medir otra (subir otra foto/video o cámara)</button></div>' : '')
       + _gonioCapsHTML(g);
     pintarPanelGonio();
@@ -2569,6 +2583,7 @@
     if(capBox){
       var arr=_gonioMedidasArr(BIO.accG);
       capBox.innerHTML = _gonioCapsHTML(BIO.accG)
+        + ((BIO.videoCola && BIO.videoCola.length) ? '<button class="bio-gchip" style="width:100%;text-align:center;margin-top:10px;background:#0d47a1;color:#fff;border-color:#0d47a1" onclick="BIO_gonioSiguienteVideo()">📹 Siguiente video ('+BIO.videoCola.length+' en cola)</button>' : '')
         + (arr.length ? '<button class="bio-gfin-btn" style="width:100%;margin-top:10px" onclick="BIO_gonioFinish()">✓ Terminar y guardar ('+arr.length+')</button>' : '');
     }
   }
@@ -2712,6 +2727,15 @@
     var sel=(BIO.accG&&BIO.accG.sel)||{};
     toast('Reanalizando el video para '+(sel.grupo||'')+' '+(sel.mov||'')+'…','info');
     procesarVideo(BIO.pendingVideo.file);   // g.sel ya es la selección nueva; procesarVideo resetea el pico y re-mide el movimiento actual
+  }
+  // Cola de VARIOS videos (se eligieron varios de una): procesa el siguiente del lote. Las capturas ya
+  // hechas viven en BIO.accG.medidas → se conservan; cada video es una medición nueva (otra articulación/mov).
+  function BIO_gonioSiguienteVideo(){
+    if(!(BIO.videoCola && BIO.videoCola.length)){ mostrarVista('bio-vista-inicio'); pintarGonioInicio(); return; }
+    var next = BIO.videoCola.shift();
+    if(!next){ mostrarVista('bio-vista-inicio'); pintarGonioInicio(); return; }
+    toast('📹 Video siguiente ('+BIO.videoCola.length+' en cola). Elige su articulación/movimiento y captura.','info');
+    procesarVideo(next);
   }
   function BIO_gonioCapturar(){
     var g=BIO.accG; if(!g||!g.sel){ return; }
@@ -3434,6 +3458,7 @@
   window.BIO_gonioVolver = BIO_gonioVolver;
   window.BIO_gonioVolverInicio = BIO_gonioVolverInicio;
   window.BIO_gonioReanalizarVideo = BIO_gonioReanalizarVideo;
+  window.BIO_gonioSiguienteVideo = BIO_gonioSiguienteVideo;
   window.BIO_gonioGuardar = guardarSesionGonio;
   window.BIO_comparar = BIO_comparar;
   window.BIO_cmpSel = BIO_cmpSel;
