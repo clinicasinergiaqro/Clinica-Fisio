@@ -6,6 +6,8 @@
 **OJO de versión:** el prompt citaba el módulo `6d8b13d` (SHA `4a8ecb59…2859b8e`). Ese hash quedó atrás: los cambios `-18a/-18b` (video iPhone HEVC, cola de varios videos, candado de techo del goniómetro) aterrizaron después y crecieron el archivo de ~3290 a 3493 líneas. **Se auditó el módulo VIVO desplegado**, no el hash del prompt. Las líneas citadas son de `db802d0c`.
 **Red anti-regresión (verde en baseline):** `geometria` 23/0 · `verificacion-auditoria` 18/0 · `datos-sospechosos` 19/0 · `goniometro-techo` 11/0 · (todas las demás suites de `pruebas/` también verdes: comparador-honesto, gen-identidad, procedencia-estado, reanalisis-video, tiempo-verificado, trayectoria-fondo, validez-puntos-medios).
 
+**Contra-revisión (2026-11-18):** el auditor verificó el módulo vivo (SHA `db802d0c` confirmado) y señaló que el tramo `-18a`/`-18b` llegó a producción SIN contra-revisión. La defecto-auditoría de ese tramo (las 4 preguntas de la cola de varios videos + fix HEVC + candado de techo + mapeo de cobertura + la respuesta de cámara lenta) está en **`auditoria/contrarevision_18/CONTRAREVISION_18.md`**, con los diffs `diff_6d8b13d__486ef8a.patch` (completo) y `diff_18a_18b_solo.patch` (el delta realmente sin revisar). De ahí salen dos ajustes a este reporte: el hallazgo nuevo **ALGO-VER (P1)** y **SEC-1 sube a P1**.
+
 ---
 
 ## 1. Veredicto ejecutivo
@@ -16,6 +18,10 @@ Los 3 hallazgos que más importan (en este orden):
 1. **CLIN-2 / CLIN-1 (validez clínica):** ninguna métrica tiene **validación física contra patrón de oro** todavía, y el **proxy de estatura fijo 88%** sesga todo valor en **cm absolutos**. La exactitud absoluta es, hoy, *desconocida*; el uso defendible es cribado + comparación antes/después (relativo), no número goniométrico.
 2. **TEST-1 (calidad de código):** los **3 pipelines dinámicos** (clasificación de hombro flex/ext/abd, **signo del FPPA** valgo/varo, **eventos de marcha** heel-strike/toe-off) **no tienen ningún assert unitario**. Es la geometría más intrincada y la más fácil de romper en silencio al mejorar. **Hay que crecer la red de pruebas ANTES de tocar nada.**
 3. **MANT-1 (calidad de código):** los umbrales clínicos/heurísticos (0.45/0.35/0.38, 0.88, 0.06, …) están **dispersos como números mágicos**. Extraerlos a un `BIO_CFG` nombrado habilita la validación física en un solo lugar y es rename puro, riesgo casi nulo.
+
+**La contra-revisión agregó dos P1 que tocan trazabilidad (código ya en manos de pacientes):**
+- **ALGO-VER (P1):** `BIO_ALGO_VER` sigue en `'bio-2d-2026-11-14b'` (`:71`) aunque `-18a` cambió el comportamiento de medición (candado de techo + decodificación HEVC) → el sello que se estampa en cada sesión **miente** sobre qué algoritmo la produjo. Bump agendado junto a MANT-1 (no aplicado en este pase).
+- **SEC-1 → P1:** la versión FLOTANTE de MediaPipe (`@0.5`, `:68`) deja de ser solo "reproducibilidad teórica": como `BIO_ALGO_VER` tampoco captura el parche de MediaPipe, dos mediciones selladas "mismo algoritmo" pueden haberse hecho con wasm distinto → mina la comparación antes/después, que es JUSTO el uso defendible del módulo.
 
 **Qué NO tocar:** el hot-path per-frame (ya se auto-regula; micro-optimizar es esfuerzo perdido, MediaPipe domina el presupuesto), las guardas de degeneración de ROM (Fase 1b ya las cerró), la ruta de sync (ya auditada y cerrada), y **no** hacer el refactor grande de los 4 pipelines a tabla-descriptor (alto riesgo sobre código auditado, bajo retorno).
 
@@ -34,11 +40,13 @@ Naturaleza: 🟦 **Código** (sube calidad del código) · 🟥 **Clínico** (su
 | CLIN-2 | 6 validez | **P1** | 🟥 | [Fis] | Ninguna métrica validada vs patrón de oro | (todo el módulo) |
 | CLIN-1 | 6 validez | **P1** | 🟥 | [Fis] | Proxy de estatura fijo 88% sesga todo cm absoluto | `:522`, `:717` |
 | TEST-1 | 4 pruebas | **P1** | 🟦 | [Insp] | Los 3 pipelines dinámicos sin assert unitario | `:198`,`:405`,`:571`,`:3485` |
+| ALGO-VER | 2 mant. / 5 trazab. | **P1** | 🟦🟥 | [Insp] | `BIO_ALGO_VER` sellado en `14b` aunque el código es `-18c` (techo + HEVC cambiaron la medición) | `:71` |
 | MANT-1 | 2 mant. | **P2** | 🟦 | [Insp] | Umbrales clínicos como números mágicos dispersos | (varias) |
 | ROB-1 | 3 robustez | **P2** | 🟥🟦 | [Fis] | Umbrales de orientación 0.45/0.35/0.38 sin calibrar | `:420`,`:586`,`:1259` |
+| ROB-4 | 3 robustez | **P2** | 🟦 | [Insp] | Cola de varios videos y decode HEVC sin suite (verificadas solo por inspección) | `:1041`,`:1451`,`:1642` |
 | CLIN-3 | 6 validez | **P2** | 🟥 | [Fis] | Tobillo sagital = el ángulo de marcha menos fiable | `:597-598` |
 | CLIN-4 | 6 validez | **P2** | 🟥 | [Insp] | FPPA = ángulo de proyección (no goniometría de valgo) | `:426`,`:395` |
-| SEC-1 | 5 seguridad | **P2** | 🟦🟥 | [Insp] | MediaPipe en versión FLOTANTE `@0.5`, sin SRI (reproducibilidad + supply-chain) | `:68` |
+| SEC-1 | 5 seguridad | **P1** | 🟦🟥 | [Insp] | MediaPipe en versión FLOTANTE `@0.5`, sin SRI → mina trazabilidad y antes/después | `:68` |
 | SEC-2 | 5 privacidad | **P2** | 🟦 | [Insp] | Nombre del paciente en el nombre de archivo de los PDF en Storage | `:3394`,`:3412` |
 | TEST-2 | 4 pruebas | **P2** | 🟦 | [Insp] | Detector de picos y filtros sin test | `:273`,`:308`,`:321` |
 | PERF-2 | 1 perf | **P3** | 🟦 | [Insp] | Truncamiento SILENCIOSO más allá de los topes | `:263`,`:494`,`:624` |
@@ -64,6 +72,7 @@ Naturaleza: 🟦 **Código** (sube calidad del código) · 🟥 **Clínico** (su
 **CLIN-1 · P1 · [Fis] · Proxy de estatura fijo 88%.**
 *Evidencia:* `var hEst=hPx?hPx/0.88` (`:522`, sentadilla) y `hFull=hPx?hPx/0.88` (`:717`, marcha) — el factor "nariz→tobillos ≈ 88% de la estatura" es **constante**. De ahí salen `descCm` (`:545`) y `pxToM` → longitud de paso en metros.
 *Impacto clínico:* los **cm/metros absolutos** se desvían sistemáticamente según las proporciones del individuo (índice tronco/pierna varía bastante entre personas). Los **porcentajes** (descenso % de estatura) y los **ángulos** NO dependen de esto.
+*Regla explícita (contra-revisión):* **no citar la VELOCIDAD de marcha ni la longitud de paso absolutas como medida clínica** — ambas cuelgan del proxy 88% (`pxToM` sale de `hFull=hPx/0.88`, `:717`) y del gateo de tiempo (VFR). Son orientativas y relativas al MISMO encuadre; presentarlas como m/s o cm "de verdad" no está respaldado hasta la Fase C. Lo defendible es cadencia/simetría del mismo video y comparación antes/después.
 *Esfuerzo:* validación física + eventualmente factor por sexo/altura (no código grande).
 *Riesgo de "corregir":* **alto si se cambia el 0.88 sin datos reales** (se empeora a ojo). Mejor dejar 88% hasta tener pares medidos.
 
@@ -98,6 +107,13 @@ Naturaleza: 🟦 **Código** (sube calidad del código) · 🟥 **Clínico** (su
 *Impacto:* **marginal** — `sepRatio` es un RATIO de dos distancias casi-horizontales, el aspecto se cancela casi del todo; `camMov` puede ser ligeramente anisótropo en 9:16 (un movimiento vertical de cámara pesa distinto que horizontal). Inconsistente con la corrección H1 aplicada en todo lo demás.
 *Esfuerzo:* trivial (usar `_seg2D` / escalar el eje x por `_ANG_AR`).
 *Riesgo:* bajo, PERO **cambia valores guardados** → debe ir con un test que fije el antes/después.
+
+**ROB-4 · P2 · [Insp] · Cola de varios videos y decode HEVC sin suite (verificadas solo por inspección).** *(contra-revisión)*
+*Evidencia:* del tramo `-18a`/`-18b`, solo el candado de techo tiene suite (`pruebas/goniometro-techo.test.js`, 11 asserts). La **cola de varios videos** (`BIO.videoCola` `:1041`, reseteo por video `:1451`, auto-avance `_persistirSesion` `:1642`, `BIO_colaSiguiente`, "Saltar video") y la **decodificación HEVC por canvas** (iOS, en `procesarVideo`) **no tienen ningún assert**. La cola es la clase async/estado que ya falló en Fase 3; el HEVC es runtime de iOS.
+*Verificación hecha (CONTRAREVISION_18.md §2–§3):* las 4 preguntas de la cola resuelven SEGURO por inspección (identidad-de-generación `_bumpGen` mata resultados tardíos; reseteo explícito de `peak/run/_peakTSeg/_peakFrameCanvas` por video; firma por-archivo `_sigArchivo` distingue cada encolado; cancelar a media cola deja todo limpio). El HEVC es correcto por construcción (canvas 2D reutilizado + `try/catch` → cae a video crudo + gen-tagged), **pendiente de iPhone real**.
+*Impacto:* sin suite, una mejora futura puede regresar en silencio la cola o el decode; hoy la única garantía es esta inspección + el smoke de carga.
+*Esfuerzo:* medio (la cola es DOM/async → test con stubs de `procesarVideo`/`File`; el HEVC no es testeable sin iOS → queda como validación física). Nota de claridad: añadir `_peakGonioLm`/`_peakGonioAR` a la línea de reset `:1451` (hoy seguros por el guard `peak==null`, pero no evidentes).
+*Riesgo:* ninguno (aditivo). Refuerza TEST-1.
 
 ### 🟦 Performance
 
@@ -134,11 +150,17 @@ Naturaleza: 🟦 **Código** (sube calidad del código) · 🟥 **Clínico** (su
 
 ### 🟦🟥 Seguridad / privacidad
 
-**SEC-1 · P2 · [Insp] · MediaPipe en versión FLOTANTE, sin SRI.**
+**SEC-1 · P1 · [Insp] · MediaPipe en versión FLOTANTE, sin SRI.** *(subido de P2 a P1 en la contra-revisión)*
 *Evidencia:* `var MP_BASE = 'https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5'` (`:68`) — rango semver, no versión exacta ni Subresource Integrity. El wasm + los modelos se resuelven al último parche `0.5.x` en tiempo de carga.
-*Impacto:* (a) **reproducibilidad** — un mismo video puede dar landmarks ligeramente distintos tras una actualización silenciosa del parche, y el sello `BIO_ALGO_VER` (`:71`) **no captura** la versión de MediaPipe; dos mediciones "mismo algoritmo" podrían no serlo. (b) **supply-chain** — se ejecuta wasm de tercero, sin fijar, sobre video de paciente real.
-*Esfuerzo:* bajo (fijar versión exacta, ej. `@0.5.1675469404`), pero **requiere probar que la versión exacta carga en iOS** (algunas combinaciones de parche fallan en Safari).
+*Impacto:* (a) **trazabilidad / antes-después (lo que lo sube a P1)** — el sello `BIO_ALGO_VER` (`:71`) **no captura** la versión de MediaPipe; con el rango flotante, dos mediciones selladas "mismo algoritmo" pueden haberse hecho con wasm de parches distintos → un mismo video puede dar landmarks ligeramente distintos tras una actualización silenciosa, y eso **contamina justo la comparación antes/después** que es el uso defendible del módulo (CLIN-2). Va de la mano de ALGO-VER: el sello debe incluir también el parche de MediaPipe. (b) **supply-chain** — se ejecuta wasm de tercero, sin fijar, sobre video de paciente real.
+*Esfuerzo:* bajo (fijar versión exacta, ej. `@0.5.1675469404`, y meter esa versión en el sello), pero **requiere probar que la versión exacta carga en iOS** (algunas combinaciones de parche fallan en Safari).
 *Riesgo de corregir:* medio-bajo (hay que validar la carga en dispositivo antes de fijar).
+
+**ALGO-VER · P1 · [Insp] · El sello `BIO_ALGO_VER` miente sobre qué algoritmo produjo la medición.** *(hallazgo de la contra-revisión)*
+*Evidencia:* `BIO_ALGO_VER = 'bio-2d-2026-11-14b'` (`:71`). Sigue en `14b` pero el código desplegado es `-18c`. El sello se estampa en `calidad.algoVersion` de CADA sesión (`_persistirSesion`) y en el texto de goniometría que va a `valoracion.rom` → es la trazabilidad clínica. Entre `14b` y el código vivo, DOS cambios alteran el valor o la admisibilidad de una medida: el **candado de techo** (`-18a`: un valor sobre el techo ahora → `ok:false`, no medible; antes registraba un número) y la **decodificación HEVC por canvas** (`-18a`: en iPhone cambió los cuadros que MediaPipe ve → los ángulos medidos). Misma entrada → resultado distinto, mismo sello.
+*Impacto:* una sesión medida con `-18x` queda sellada `14b` → la procedencia asegura algo falso; invalida cualquier auditoría que confíe en `algoVersion`.
+*Esfuerzo:* trivial (bumpear a `'bio-2d-2026-11-18'`), pero conviene que **viaje con el bump de MediaPipe (SEC-1) y el refactor `BIO_CFG` (MANT-1)** en un solo commit, y con el deploy que Carlos apruebe (no suelto). Detalle en `CONTRAREVISION_18.md` §1.
+*Riesgo:* ninguno. **No aplicado en este pase** (report-only); agendado en la secuencia (§4, paso 2).
 
 **SEC-2 · P2 · [Insp] · Nombre del paciente en el nombre de archivo de los PDF.**
 *Evidencia:* `'sentadilla_'+String(p.name||'paciente').replace(/[^\w]/g,'_')+'_'+t2+'.pdf'` → ruta `clinica/sinergia/<p.id>/biomecanica/…` (`:3394`); igual para goniometría (`:3412`). El objeto vive bajo la carpeta del `id` (controlado por Storage rules), **pero la URL de descarga lleva el nombre** si se comparte/filtra. Video (`:1602`), trayectorias (`:1972`) e imágenes gonio (`:2682`) usan **solo `p.id`** — correcto.
@@ -171,21 +193,29 @@ Naturaleza: 🟦 **Código** (sube calidad del código) · 🟥 **Clínico** (su
 
 > Todas las mejoras van en rama **`claude/medidor-mejoras`** sobre main ya desplegado. **No** se mueve el hash de deploy: si Carlos decide desplegar lo auditado, se despliega `486ef8a`/`b49de55` tal cual. Las suites congeladas (23/18) son la red en cada fase.
 
-**Fase A — de-risk (bajo riesgo, alto retorno, CÓDIGO aditivo puro, cero cambio de comportamiento):**
-- **TEST-1** — exponer los 3 pipelines en `__BIO_TEST` + asserts con landmarks sintéticos (hombro, signo FPPA, eventos de marcha). *Crece la red ANTES de tocar nada.*
-- **TEST-2** — tests del detector de picos y filtros.
-- **MANT-1** — extraer `BIO_CFG` (rename de umbrales a constantes nombradas). Verificar con las suites que los valores son idénticos.
+**Orden definitivo (fijado en la contra-revisión):** `(0)` revisar el tramo nuevo → `(1)` TEST-1 + TEST-2 → `(2)` MANT-1 `BIO_CFG` + bump de `BIO_ALGO_VER` → `(3)` SEC-2 + aviso de truncamiento + SEC-1 → `(4)` Fase C.
 
-**Fase B — arreglos chicos de bajo riesgo:**
-- **SEC-2** — `p.id` en la ruta del objeto PDF (nombre amistoso solo en el download del cliente).
-- **PERF-2** — marcar `calidad.truncado` + aviso al topar los caps.
-- **SEC-1** — fijar versión exacta de MediaPipe **tras probar la carga en iOS**.
+**Paso (0) — defecto-auditoría del tramo `-18a`/`-18b` en producción — ✅ HECHO (este pase, report-only).**
+- `auditoria/contrarevision_18/CONTRAREVISION_18.md`: 4 preguntas de la cola (SEGURAS por inspección), fix HEVC (correcto por construcción, pendiente iPhone), candado de techo (correcto, cubierto), mapeo de cobertura, respuesta de cámara lenta, y el hallazgo ALGO-VER. Diffs completos en la misma carpeta. **Sin cambios de código.**
 
-**Fase C — validación física (ALTO valor clínico; mayormente datos, no código):**
-- **CLIN-2 / CLIN-1 / CLIN-3 / ROB-1** — protocolo de pares goniómetro + distancias conocidas + casos 9:16 reales → sesgo + Bland-Altman → **recalibrar** proxy 88%, umbrales 0.45/0.35/0.38 y etiquetas de confianza **con datos reales** (no a ojo). Afinar la confianza del tobillo < rodilla/cadera (CLIN-3).
+**Paso (1) — de-risk: crecer la red de pruebas ANTES de tocar nada (CÓDIGO aditivo puro, cero cambio de comportamiento):**
+- **TEST-1** — exponer los 3 pipelines dinámicos en `__BIO_TEST` + asserts con landmarks sintéticos (clasificación de hombro, signo del FPPA, eventos de marcha).
+- **TEST-2** — tests del detector de picos y filtros (`_detPicosIdx`/`_medFilt5`/`_quitaChispazos`).
+- *(ROB-4: la cola de varios videos se puede caracterizar aquí con stubs; el decode HEVC queda para validación en iPhone, no es testeable sin iOS.)*
 
-**Fase D — opcional, evaluar caso por caso (solo con Fase A verde):**
-- **ROB-2** (guarda de degeneración del tronco), **ROB-3** (aspecto en sepRatio/camMov — con test de antes/después porque cambia valores guardados), **MANT-2** (helpers chicos compartidos, nunca el refactor grande).
+**Paso (2) — mantenibilidad + trazabilidad (rename puro + sello), con la red del paso 1 en verde:**
+- **MANT-1** — extraer `BIO_CFG` (umbrales 0.45/0.35/0.38, 0.88, 0.06, caps, histéresis… a constantes nombradas). Verificar con las suites que los valores son idénticos.
+- **ALGO-VER** — en el MISMO commit, bumpear `BIO_ALGO_VER` a `'bio-2d-2026-11-18'` e incluir el parche de MediaPipe en el sello (ata con SEC-1).
+
+**Paso (3) — arreglos chicos de bajo riesgo:**
+- **SEC-2** — `p.id` en la ruta del objeto PDF (nombre amistoso solo en el `download`/`share` del cliente).
+- **PERF-2** — marcar `calidad.truncado=true` + aviso al topar los caps.
+- **SEC-1** — fijar versión exacta de MediaPipe **tras probar la carga en iOS**, y reflejarla en el sello.
+
+**Paso (4) — Fase C: validación física (ALTO valor clínico; mayormente datos, no código):**
+- **CLIN-2 / CLIN-1 / CLIN-3 / ROB-1** — protocolo de pares goniómetro + distancias conocidas + casos 9:16 reales → sesgo + Bland-Altman → **recalibrar** proxy 88%, umbrales 0.45/0.35/0.38 y etiquetas de confianza **con datos reales** (no a ojo). Afinar la confianza del tobillo < rodilla/cadera (CLIN-3). Incluye la validación en vivo de cámara lenta sobre `-18x` (pendiente §6 de la contra-revisión).
+
+**Opcional, caso por caso (solo con el paso 1 en verde):** **ROB-2** (guarda de degeneración del tronco), **ROB-3** (aspecto en sepRatio/camMov — con test de antes/después porque cambia valores guardados), **MANT-2** (helpers chicos compartidos, nunca el refactor grande).
 
 ---
 
