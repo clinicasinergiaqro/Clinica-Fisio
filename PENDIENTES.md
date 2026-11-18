@@ -8,6 +8,14 @@ Estado del track: Fases 1, 1b, 2, 3, 4, 5, 6, 7 y Hallazgo D (`6d8b13d`) cerrada
 Fix cross-device (`b49de55`) auto-revisado el 2026-11-14 → LIMPIO (ver `auditoria/01_autorevision_b49de55.md`); puertas 85/0.
 `BIO_ALGO_VER` actual = `bio-2d-2026-11-18` (bump 2026-11-18, `v1-2026-11-18d`). El track de auditoría se desplegó a main (`v1-2026-11-14a`) y encima llegaron `-18a/-18b/-18c`; el sello se había quedado en `bio-2d-2026-11-14b` hasta este bump (ver "Trazabilidad — ventana de sesiones mal-selladas" abajo).
 
+## 🔴 OPERATIVO ABIERTO — retirar el canal de preview `preview-prueba-medidor` (acción MANUAL de Carlos)
+
+**Estado: ABIERTO.** Lo retira **Carlos a mano** — el CI NO tiene acceso a canales de preview (`firebase-hosting.yml` solo deploya a `channelId: live`) y Claude no tiene credenciales de Firebase. **NO intentar borrarlo desde Claude/CI.**
+
+- **Qué pasa:** el canal de preview de Firebase Hosting `preview-prueba-medidor` sigue **VIVO** (no expiró; verificado por el auditor 2026-11-18 por navegador) sirviendo un **build VIEJO**: sello `bio-2d-2026-11-14b`, `v1-2026-11-14a`, ~3403 líneas del módulo — **anterior a `-18a`**: SIN candado de techo, SIN fix de decodificación HEVC/iOS, SIN cola de varios videos.
+- **Por qué importa:** ese canal **escribe a la base de datos REAL** (mismo Firestore/Storage que producción). Riesgo **PASIVO** pero real: código viejo alcanzable que, si alguien mide desde esa URL, **sella `14b` en datos reales** con el cálculo viejo → ensucia justo la trazabilidad que el bump `v1-2026-11-18d` vino a arreglar.
+- **Acción (Carlos):** `firebase hosting:channel:delete preview-prueba-medidor` en su equipo, o Consola Firebase → Hosting → canales → eliminar. (El sandbox no puede: sin creds de Firebase + la URL del canal está bloqueada por la política de red → por eso lo confirmó el auditor, no Claude.)
+
 ## Deferido con intención (reportado, no aplicado)
 
 - **(a) Umbrales de orientación 0.45 / 0.35 / 0.38 sin recalibrar.** El plan de Fase 2 los listaba; se dejaron
