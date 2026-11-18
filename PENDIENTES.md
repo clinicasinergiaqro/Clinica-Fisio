@@ -6,7 +6,7 @@ revisar esta lista para que nada se pierda.
 
 Estado del track: Fases 1, 1b, 2, 3, 4, 5, 6, 7 y Hallazgo D (`6d8b13d`) cerradas en rama; suite del auditor 18/18.
 Fix cross-device (`b49de55`) auto-revisado el 2026-11-14 → LIMPIO (ver `auditoria/01_autorevision_b49de55.md`); puertas 85/0.
-`BIO_ALGO_VER` actual = `bio-2d-2026-11-14b`. NO desplegado (nada en main).
+`BIO_ALGO_VER` actual = `bio-2d-2026-11-18` (bump 2026-11-18, `v1-2026-11-18d`). El track de auditoría se desplegó a main (`v1-2026-11-14a`) y encima llegaron `-18a/-18b/-18c`; el sello se había quedado en `bio-2d-2026-11-14b` hasta este bump (ver "Trazabilidad — ventana de sesiones mal-selladas" abajo).
 
 ## Deferido con intención (reportado, no aplicado)
 
@@ -53,6 +53,18 @@ Del análisis de las 12 mediciones de prueba (ver `auditoria/02_analisis_medicio
   `confiable:false` por el gate `orientOK!==false` (`:741`) + aviso "no se vio DE PERFIL" (`:1795`). No requiere fix.
 
 (h) e (i) están en la rama, **sin merge a main ni deploy**, esperando OK de Carlos (punto 5). Suites 104/0.
+
+## Trazabilidad — ventana de sesiones mal-selladas (`BIO_ALGO_VER`)
+
+**Qué pasó:** desde el sello `bio-2d-2026-11-14b`, el cálculo cambió en **`-18a` (#581, `fedeb9f`, merge a main 2026-11-17 18:25 CST, versión `v1-2026-11-18a`)** pero el sello NO se subió hasta **`v1-2026-11-18d` (2026-11-18)**. Dos cambios de `-18a` tocan la medición:
+- **Candado de techo del goniómetro:** un grado por encima del techo anatómico ahora → `ok:false` (no medible, no se guarda); antes registraba un número.
+- **Decodificación HEVC por canvas (iOS):** en iPhone, mandar el `<video>` a canvas 2D cambia los cuadros que ve MediaPipe → cambia los ángulos medidos (antes daba cuadros negros / 0 válidos).
+
+**Ventana afectada:** biomecánica guardada **entre el 2026-11-17 ~18:25 CST (deploy de `-18a`/`v1-2026-11-18a`) y el deploy de `v1-2026-11-18d` (2026-11-18)**. Esas sesiones llevan `calidad.algoVersion = 'bio-2d-2026-11-14b'` pero las produjo código `-18x` → **procedencia incierta para ese rango**. Carlos: NO comparar una sesión de esa ventana contra una genuinamente `14b` (pre-`-18a`) como "mismo algoritmo".
+
+**Dónde pega de verdad (acotación honesta):** el techo solo afecta **goniometría**; el decode HEVC solo afecta **videos capturados en iPhone**. Una medición de ROM/sentadilla/marcha hecha en Android/PC en esa ventana es numéricamente idéntica a `14b`. Aun así, por el sello, trátese toda la ventana como procedencia incierta.
+
+**NO se reescriben datos históricos** (append-only; reescribir el sello de sesiones viejas inventaría procedencia). El comparador ⚖️ YA avisa "Versiones de algoritmo distintas" cuando dos sesiones difieren de sello (`comparador-honesto.test.js` H1) → tras el bump, una sesión nueva (`bio-2d-2026-11-18`) vs una vieja (`14b`) se marca sola; lo que NO se puede distinguir automáticamente es, dentro del cubo `14b`, cuál es genuina y cuál es de la ventana → por eso queda aquí anotado.
 
 ## Notas de deploy
 - Al mergear: bump doble `sw.js` + `window.APP_VERSION`; agregar `pruebas/`, `ejemplos/`, este `PENDIENTES.md`,

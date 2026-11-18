@@ -68,7 +68,11 @@
   var MP_BASE = 'https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5';
 
   // Sello de versión del algoritmo 2D (para trazabilidad en cada medición guardada).
-  var BIO_ALGO_VER = 'bio-2d-2026-11-14b';   // Hallazgo D: verificación del tiempo físico del video (slow-mo) → gatea confiabilidad de métricas temporales (sobre Fase 1b)
+  // ⚠️ REGLA: subir esta versión en TODO cambio que toque la MEDICIÓN — geometría, decodificación de
+  //    cuadros (p.ej. el canvas HEVC/iOS), gateo de tiempo (VFR), o caps/techos que cambien el resultado —
+  //    NO solo en "correcciones". Si el cálculo cambia y el sello no, la procedencia de los datos clínicos
+  //    miente (una sesión diría "mismo algoritmo" que otra medida con código distinto).
+  var BIO_ALGO_VER = 'bio-2d-2026-11-18';   // 2026-11-18: refleja el código REALMENTE desplegado (-18x). Desde 'bio-2d-2026-11-14b' el cálculo cambió en -18a (#581): candado de techo del goniómetro (grado sobre el techo anatómico → ok:false; antes registraba un número) + decodificación HEVC por canvas en iOS (cambia los cuadros que ve MediaPipe → los ángulos). El sello 14b quedó desfasado y se corrige aquí (metadata pura, no cambia ningún cálculo).
   // CORRECCIÓN DE ASPECTO (H1): las coords de MediaPipe vienen normalizadas 0–1 por ANCHO (x) y por
   // ALTO (y) de forma INDEPENDIENTE. En un cuadro NO cuadrado (p.ej. 9:16 vertical del celular) eso
   // deforma los ángulos de segmentos oblicuos hasta ~20°. Reescalando x por (ancho/alto) se recupera
