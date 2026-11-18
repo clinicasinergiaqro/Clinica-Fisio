@@ -383,6 +383,16 @@ for L in LIBS:
     print(f"{L['id']:10} {len(render):2} áreas:")
     for a in render: print(f"   · {a['titulo'][:70]}  ({len(a['html'])} B)")
 
+# Biblioteca "medidor" (guía del medidor biomecánico): HTML PRE-RENDERIZADO con CSS scopeado en .mg,
+# NO pasa por el pipeline markdown (es visual: esquemas SVG + fichas). Fuente: docs/guia_medidor.json
+# (regenerable con docs/guia_medidor_app.py, que importa docs/guia_medidor_figs.py). Va al INICIO de la lista.
+try:
+    _med=json.load(open(f'{DOCS}/guia_medidor.json',encoding='utf-8'))
+    out['bibliotecas'].insert(0,_med)
+    print(f"medidor     {len(_med['areas']):2} áreas (pre-render): · {_med['areas'][0]['titulo'][:60]}")
+except Exception as _e:
+    print('medidor: SKIP ('+str(_e)+')')
+
 json.dump(out, open(OUT,'w',encoding='utf-8'), ensure_ascii=False, separators=(',',':'))
 import os
 print(f"\nWROTE {OUT}  {os.path.getsize(OUT)//1024} KB")
