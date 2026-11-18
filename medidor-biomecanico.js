@@ -1471,9 +1471,22 @@
         var t = v.currentTime || 0;
         // Mismo watchdog que en vivo: libera un send() colgado para no congelar el muestreo del video.
         if(BIO.sending && BIO._sendAt && (Date.now()-BIO._sendAt)>2500){ BIO.sending=false; if(BIO._genQ && BIO._genQ.length) BIO._genQ.shift(); }
+        // iOS: si el video no arrancó (currentTime pegado en 0), reintenta reproducir dentro del loop
+        // (muteado+playsinline suele autoplay, pero algunos iOS exigen reintentos). Throttle 700ms.
+        if(t < 0.05 && (Date.now()-arranque) > 1000 && (Date.now()-(BIO._lastPlayTry||0)) > 700){ BIO._lastPlayTry=Date.now(); intentarPlay(); }
         if(!BIO.sending && BIO.pose && v.videoWidth>0 && (t - lastSample) >= minGap){
           lastSample = t; BIO.sending = true; BIO._sendAt = Date.now(); BIO.framesTotales++;
-          _genSend(v).then(function(){ BIO.sending=false; }).catch(function(){ BIO.sending=false; });
+          // 🔑 iOS/HEVC (.MOV del iPhone): mandar el <video> DIRECTO a MediaPipe da cuadros NEGROS (iOS no
+          // texturiza el video) → 0 válidos aunque el video sea perfecto. Se dibuja el cuadro a un CANVAS 2D
+          // (drawImage de <video> a 2D SÍ funciona en iOS) y se manda el CANVAS. Android/PC: equivalente.
+          var _fsrc = v;
+          try{
+            var _vc = BIO._vidSampleCv || (BIO._vidSampleCv = document.createElement('canvas'));
+            if(_vc.width!==v.videoWidth || _vc.height!==v.videoHeight){ _vc.width=v.videoWidth; _vc.height=v.videoHeight; }
+            (BIO._vidSampleCtx || (BIO._vidSampleCtx=_vc.getContext('2d'))).drawImage(v,0,0,_vc.width,_vc.height);
+            _fsrc = _vc;
+          }catch(_df){ _fsrc = v; }
+          _genSend(_fsrc).then(function(){ BIO.sending=false; }).catch(function(){ BIO.sending=false; });
         }
         var pct = Math.min(99, Math.round((t/dur)*100));
         fill.style.width = pct+'%';
@@ -1554,7 +1567,7 @@
       '<h3>Resumen de la medición</h3>'
       + '<div style="color:#9BA3B5;font-size:13px;margin-bottom:10px">'+fuenteTxt+' · '+meta.duracionSeg+' s · '+(meta.calidad.framesValidos||0)+' cuadros válidos · convención clínica (0° neutro)<br>ROM = <b style="color:#C9D2E8">media de los picos</b> de cada repetición · máx = mejor intento · ± = consistencia entre reps<br><span style="color:#E8C96A">Margen 2D honesto:</span> abducción/codo/cuello ±5°, flexión/extensión de hombro ±10° (de frente van fuera de plano → para finura, de PERFIL). Diferencias entre sesiones &lt; ~8° pueden ser ruido. Margen estimado, no validado contra goniómetro físico.</div>'
       + '<table class="bio-tabla-res"><thead><tr><th>Movimiento</th><th>Izquierda</th><th>Derecha</th></tr></thead><tbody>'+filas+'</tbody></table>'
-      + (hayDato ? '' : '<div style="color:#E8C96A;font-size:13px;margin-top:10px">⚠️ No se detectó tronco + brazos con suficiente visibilidad. Repite con hombros, codos y caderas en cuadro y buena luz.</div>')
+      + (hayDato ? '' : ('<div style="color:#E8C96A;font-size:13px;margin-top:10px">⚠️ No se detectó tronco + brazos con suficiente visibilidad'+((meta.calidad.framesTotales!=null)?(' ('+meta.calidad.framesTotales+' cuadros leídos'+((meta.calidad.framesTotales||0)===0?'; el video no se reprodujo — tócalo para reproducir y reintenta':'')+')'):'')+'. Repite con hombros, codos y caderas en cuadro y buena luz.</div>'))
       + ((hayDato && (meta.calidad.framesValidos||0)<20) ? '<div style="color:#E8C96A;font-size:12px;margin-top:8px">⚠️ Pocos cuadros válidos ('+(meta.calidad.framesValidos||0)+'). La medición puede ser inestable: repite con el paciente más cerca, buena luz y movimientos algo más lentos.</div>' : '')
       + '<div class="bio-acciones">'
       +   '<button class="bio-b-sec" id="bio-res-repetir">🔄 Repetir</button>'
@@ -2325,6 +2338,21 @@
   ];
   var GONIO_CITA = 'AAOS; Norkin & White, Measurement of Joint Motion.';
   var GONIO_JOINTS = ['Cadera','Rodilla','Tobillo','Codo','Muñeca'];
+  // (CANDADO 2026-11-17) Techo FISIOLÓGICO por movimiento. Por encima de esto el grado 2D es casi seguro un
+  // ARTEFACTO (escorzo / landmark equivocado / lado reflejo), NO una medición real → se trata como "no medible"
+  // y NO se guarda (ni a la sesión ni al ROM del expediente). Es un escalón MÁS DURO que (h) "(revisar)", que
+  // solo señala lo ligeramente alto. Hallazgo real: un "Cadera ext 160°" (máx ~30°) llegó limpio al ROM. Los
+  // topes son holgados (dejan pasar hipermovilidad real; solo frenan lo anatómicamente imposible).
+  var GONIO_TECHO = {
+    cad_flex:150, cad_ext:50, rod_flex:160, rod_ext:30, rod_hext:40,
+    tob_df:45, tob_pf:80, cod_flex:160, cod_ext:30, cod_hext:40, mun_flex:100, mun_ext:95
+  };
+  function _gonioTecho(grupo, mov, val){
+    if(val==null || !isFinite(val)) return { ok:false, val:null };
+    var e=_gonioEntry(grupo, mov); var techo = e && GONIO_TECHO[e.key];
+    if(techo!=null && val > techo) return { ok:false, val:null, fueraFisio:true };   // grado físicamente imposible → no medible
+    return { ok:true, val: val };
+  }
   function _gonioMovs(grupo){ return GONIO_CAT.filter(function(m){ return m.grupo===grupo; }); }
   function _gonioEntry(grupo, mov){ for(var i=0;i<GONIO_CAT.length;i++){ if(GONIO_CAT[i].grupo===grupo && GONIO_CAT[i].mov===mov) return GONIO_CAT[i]; } return null; }
   function _gonioPts(lado){
@@ -2343,28 +2371,28 @@
     if(grupo==='Cadera'){
       if(!(v(P.S)&&v(P.H)&&v(P.K))) return { ok:false, val:null };
       if(deg(P.S,P.H,P.K)) return { ok:false, val:null };
-      return { ok:true, val: 180 - _ang2D(lm[P.S], lm[P.H], lm[P.K]) };   // flex/ext desde tronco alineado
+      return _gonioTecho(grupo, mov, 180 - _ang2D(lm[P.S], lm[P.H], lm[P.K]));   // flex/ext desde tronco alineado (+ techo fisiológico)
     }
     if(grupo==='Rodilla'){                                                 // flexión, déficit de extensión E hiperextensión (misma geometría; el fisio elige el mov)
       if(!(v(P.H)&&v(P.K)&&v(P.A))) return { ok:false, val:null };
       if(deg(P.H,P.K,P.A)) return { ok:false, val:null };
-      return { ok:true, val: 180 - _ang2D(lm[P.H], lm[P.K], lm[P.A]) };   // magnitud de desviación respecto a la recta (0°=extendido)
+      return _gonioTecho(grupo, mov, 180 - _ang2D(lm[P.H], lm[P.K], lm[P.A]));   // magnitud de desviación respecto a la recta (0°=extendido; + techo fisiológico)
     }
     if(grupo==='Tobillo'){
       if(!(v(P.K)&&v(P.A)&&v(P.F))) return { ok:false, val:null };
       if(deg(P.K,P.A,P.F)) return { ok:false, val:null };
       var ia=_ang2D(lm[P.K], lm[P.A], lm[P.F]);                            // interior pierna–tobillo–pie
-      return (mov==='Dorsiflexión') ? { ok:true, val: Math.max(0, 90-ia) } : { ok:true, val: Math.max(0, ia-90) };
+      return (mov==='Dorsiflexión') ? _gonioTecho(grupo, mov, Math.max(0, 90-ia)) : _gonioTecho(grupo, mov, Math.max(0, ia-90));
     }
     if(grupo==='Codo'){                                                    // flexión, déficit de extensión E hiperextensión (el fisio elige el mov)
       if(!(v(P.S)&&v(P.E)&&v(P.W))) return { ok:false, val:null };
       if(deg(P.S,P.E,P.W)) return { ok:false, val:null };
-      return { ok:true, val: 180 - _ang2D(lm[P.S], lm[P.E], lm[P.W]) };    // hombro–codo–muñeca; magnitud respecto a la recta
+      return _gonioTecho(grupo, mov, 180 - _ang2D(lm[P.S], lm[P.E], lm[P.W]));    // hombro–codo–muñeca; magnitud respecto a la recta (+ techo fisiológico)
     }
     if(grupo==='Muñeca'){
       if(!(v(P.E)&&v(P.W)&&v(P.Ix))) return { ok:false, val:null };
       if(deg(P.E,P.W,P.Ix)) return { ok:false, val:null };
-      return { ok:true, val: Math.max(0, 180 - _ang2D(lm[P.E], lm[P.W], lm[P.Ix])) };  // antebrazo–muñeca–mano; el fisio elige flex/ext
+      return _gonioTecho(grupo, mov, Math.max(0, 180 - _ang2D(lm[P.E], lm[P.W], lm[P.Ix])));  // antebrazo–muñeca–mano; el fisio elige flex/ext (+ techo fisiológico)
     }
     return { ok:false, val:null };
   }
@@ -2702,17 +2730,25 @@
               fuente:(BIO.modo==='estatico'?(BIO._estaticoFuente||'estatico'):'camara'),
               tSeg:tSegCap,
               lmUsados:_gonioLmUsados(lmCap, g.sel.grupo, g.sel.lado) } };
-    // Si viene de foto/video, guarda la IMAGEN ANOTADA de esta captura (copia del canvas actual) + el ORIGINAL sin anotar (P1-8).
-    if(BIO.modo==='estatico' && BIO._estaticoImg){
-      try{
-        var src=BIO._estaticoImg, cc=document.createElement('canvas'); cc.width=src.width; cc.height=src.height;
-        cc.getContext('2d').drawImage(src,0,0);
-        var origCv=null;   // P1-8: conserva también el cuadro ORIGINAL sin anotar (BIO._estaticoBase)
-        if(BIO._estaticoBase){ try{ var ob=BIO._estaticoBase; origCv=document.createElement('canvas'); origCv.width=ob.width; origCv.height=ob.height; origCv.getContext('2d').drawImage(ob,0,0); }catch(_o){ origCv=null; } }
-        if(!g.imgs) g.imgs={};
-        g.imgs[key] = { canvas:cc, orig:origCv, grupo:g.sel.grupo, mov:g.sel.mov, lado:g.sel.lado, grado:g.medidas[key].grado, etq:g.sel.grupo+' '+g.sel.mov+' '+(g.sel.lado==='izq'?'Izq':'Der') };
-      }catch(_e){}
-    }
+    // Guarda la IMAGEN ANOTADA de esta captura + el ORIGINAL sin anotar, para TODA fuente (antes/después + auditoría).
+    //  · Foto/Video (estatico): usa el cuadro estático analizado (BIO._estaticoImg / BIO._estaticoBase).
+    //  · Cámara EN VIVO ('camara'): copia el cuadro COMPUESTO de BIO.canvas (video+esqueleto+arco, lo que ve el
+    //    terapeuta) + el cuadro ORIGINAL del video. Antes la cámara en vivo NO guardaba foto (solo el número) — pedido de Carlos.
+    try{
+      var _annot=null, _orig=null;
+      if(BIO.modo==='estatico' && BIO._estaticoImg){
+        var src=BIO._estaticoImg; _annot=document.createElement('canvas'); _annot.width=src.width; _annot.height=src.height;
+        _annot.getContext('2d').drawImage(src,0,0);
+        if(BIO._estaticoBase){ try{ var ob=BIO._estaticoBase; _orig=document.createElement('canvas'); _orig.width=ob.width; _orig.height=ob.height; _orig.getContext('2d').drawImage(ob,0,0); }catch(_o){ _orig=null; } }
+      } else if(BIO.modo==='camara' && BIO.canvas && BIO.canvas.width){
+        _annot=document.createElement('canvas'); _annot.width=BIO.canvas.width; _annot.height=BIO.canvas.height;
+        _annot.getContext('2d').drawImage(BIO.canvas,0,0);
+        try{ var _sv=BIO.srcEl||BIO.video; if(_sv && (_sv.videoWidth||_sv.naturalWidth)) _orig=_canvasDeImagen(_sv); }catch(_o){ _orig=null; }
+      }
+      if(_annot){ if(!g.imgs) g.imgs={};
+        g.imgs[key] = { canvas:_annot, orig:_orig, grupo:g.sel.grupo, mov:g.sel.mov, lado:g.sel.lado, grado:g.medidas[key].grado, etq:g.sel.grupo+' '+g.sel.mov+' '+(g.sel.lado==='izq'?'Izq':'Der') };
+      }
+    }catch(_e){}
     toast('Capturado: '+g.sel.grupo+' '+g.sel.mov+' '+(g.sel.lado==='izq'?'Izq':'Der'),'success');
     if(BIO.modo==='estatico'){ pintarGonioCtrl(); _recalcEstatico(); }   // conserva la foto para medir otra
     else { g.peak=null; g.run=0; pintarGonioCtrl(); }
@@ -3402,7 +3438,7 @@
   window.BIO_comparar = BIO_comparar;
   window.BIO_cmpSel = BIO_cmpSel;
   window.BIO_cmpCerrar = BIO_cmpCerrar;
-  window.__BIO_GONIO = { calcularGonio:calcularGonio, nuevoAccGonio:nuevoAccGonio, GONIO_CAT:GONIO_CAT, _gonioTexto:_gonioTexto, _gonioAlerta:_gonioAlerta, _gonioFmtGrado:_gonioFmtGrado, _gonioFueraRango:_gonioFueraRango };  // hook de pruebas
+  window.__BIO_GONIO = { calcularGonio:calcularGonio, nuevoAccGonio:nuevoAccGonio, GONIO_CAT:GONIO_CAT, _gonioTexto:_gonioTexto, _gonioAlerta:_gonioAlerta, _gonioFmtGrado:_gonioFmtGrado, _gonioFueraRango:_gonioFueraRango, _gonioTecho:_gonioTecho, GONIO_TECHO:GONIO_TECHO };  // hook de pruebas
   // Hook de PRUEBAS (geometría pura, sin DOM/MediaPipe) — lo usa pruebas/geometria.test.js.
   window.__BIO_TEST = {
     setAspect:_setAspect, ang2D:_ang2D, seg2D:_seg2D,
