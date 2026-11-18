@@ -1471,9 +1471,22 @@
         var t = v.currentTime || 0;
         // Mismo watchdog que en vivo: libera un send() colgado para no congelar el muestreo del video.
         if(BIO.sending && BIO._sendAt && (Date.now()-BIO._sendAt)>2500){ BIO.sending=false; if(BIO._genQ && BIO._genQ.length) BIO._genQ.shift(); }
+        // iOS: si el video no arrancó (currentTime pegado en 0), reintenta reproducir dentro del loop
+        // (muteado+playsinline suele autoplay, pero algunos iOS exigen reintentos). Throttle 700ms.
+        if(t < 0.05 && (Date.now()-arranque) > 1000 && (Date.now()-(BIO._lastPlayTry||0)) > 700){ BIO._lastPlayTry=Date.now(); intentarPlay(); }
         if(!BIO.sending && BIO.pose && v.videoWidth>0 && (t - lastSample) >= minGap){
           lastSample = t; BIO.sending = true; BIO._sendAt = Date.now(); BIO.framesTotales++;
-          _genSend(v).then(function(){ BIO.sending=false; }).catch(function(){ BIO.sending=false; });
+          // 🔑 iOS/HEVC (.MOV del iPhone): mandar el <video> DIRECTO a MediaPipe da cuadros NEGROS (iOS no
+          // texturiza el video) → 0 válidos aunque el video sea perfecto. Se dibuja el cuadro a un CANVAS 2D
+          // (drawImage de <video> a 2D SÍ funciona en iOS) y se manda el CANVAS. Android/PC: equivalente.
+          var _fsrc = v;
+          try{
+            var _vc = BIO._vidSampleCv || (BIO._vidSampleCv = document.createElement('canvas'));
+            if(_vc.width!==v.videoWidth || _vc.height!==v.videoHeight){ _vc.width=v.videoWidth; _vc.height=v.videoHeight; }
+            (BIO._vidSampleCtx || (BIO._vidSampleCtx=_vc.getContext('2d'))).drawImage(v,0,0,_vc.width,_vc.height);
+            _fsrc = _vc;
+          }catch(_df){ _fsrc = v; }
+          _genSend(_fsrc).then(function(){ BIO.sending=false; }).catch(function(){ BIO.sending=false; });
         }
         var pct = Math.min(99, Math.round((t/dur)*100));
         fill.style.width = pct+'%';
@@ -1554,7 +1567,7 @@
       '<h3>Resumen de la medición</h3>'
       + '<div style="color:#9BA3B5;font-size:13px;margin-bottom:10px">'+fuenteTxt+' · '+meta.duracionSeg+' s · '+(meta.calidad.framesValidos||0)+' cuadros válidos · convención clínica (0° neutro)<br>ROM = <b style="color:#C9D2E8">media de los picos</b> de cada repetición · máx = mejor intento · ± = consistencia entre reps<br><span style="color:#E8C96A">Margen 2D honesto:</span> abducción/codo/cuello ±5°, flexión/extensión de hombro ±10° (de frente van fuera de plano → para finura, de PERFIL). Diferencias entre sesiones &lt; ~8° pueden ser ruido. Margen estimado, no validado contra goniómetro físico.</div>'
       + '<table class="bio-tabla-res"><thead><tr><th>Movimiento</th><th>Izquierda</th><th>Derecha</th></tr></thead><tbody>'+filas+'</tbody></table>'
-      + (hayDato ? '' : '<div style="color:#E8C96A;font-size:13px;margin-top:10px">⚠️ No se detectó tronco + brazos con suficiente visibilidad. Repite con hombros, codos y caderas en cuadro y buena luz.</div>')
+      + (hayDato ? '' : ('<div style="color:#E8C96A;font-size:13px;margin-top:10px">⚠️ No se detectó tronco + brazos con suficiente visibilidad'+((meta.calidad.framesTotales!=null)?(' ('+meta.calidad.framesTotales+' cuadros leídos'+((meta.calidad.framesTotales||0)===0?'; el video no se reprodujo — tócalo para reproducir y reintenta':'')+')'):'')+'. Repite con hombros, codos y caderas en cuadro y buena luz.</div>'))
       + ((hayDato && (meta.calidad.framesValidos||0)<20) ? '<div style="color:#E8C96A;font-size:12px;margin-top:8px">⚠️ Pocos cuadros válidos ('+(meta.calidad.framesValidos||0)+'). La medición puede ser inestable: repite con el paciente más cerca, buena luz y movimientos algo más lentos.</div>' : '')
       + '<div class="bio-acciones">'
       +   '<button class="bio-b-sec" id="bio-res-repetir">🔄 Repetir</button>'
