@@ -72,7 +72,7 @@
   //    cuadros (p.ej. el canvas HEVC/iOS), gateo de tiempo (VFR), o caps/techos que cambien el resultado —
   //    NO solo en "correcciones". Si el cálculo cambia y el sello no, la procedencia de los datos clínicos
   //    miente (una sesión diría "mismo algoritmo" que otra medida con código distinto).
-  var BIO_ALGO_VER = 'bio-2d-2026-11-18';   // 2026-11-18: refleja el código REALMENTE desplegado (-18x). Desde 'bio-2d-2026-11-14b' el cálculo cambió en -18a (#581): candado de techo del goniómetro (grado sobre el techo anatómico → ok:false; antes registraba un número) + decodificación HEVC por canvas en iOS (cambia los cuadros que ve MediaPipe → los ángulos). El sello 14b quedó desfasado y se corrige aquí (metadata pura, no cambia ningún cálculo).
+  var BIO_ALGO_VER = 'bio-2d-2026-11-19';   // 2026-11-19: + goniómetro de FOTO robusto a orientación (decúbito/cuerpo parcial: prueba rotaciones → mide articulaciones que antes daban "sin cuerpo"). Cambia QUÉ fotos se miden → se sube el sello por la regla de arriba. (Histórico: -18 añadió techo del goniómetro + decode HEVC iOS; 14b = Hallazgo D tiempo/slow-mo.)
   // CORRECCIÓN DE ASPECTO (H1): las coords de MediaPipe vienen normalizadas 0–1 por ANCHO (x) y por
   // ALTO (y) de forma INDEPENDIENTE. En un cuadro NO cuadrado (p.ej. 9:16 vertical del celular) eso
   // deforma los ángulos de segmentos oblicuos hasta ~20°. Reescalando x por (ancho/alto) se recupera
@@ -2638,6 +2638,59 @@
     var mx=document.getElementById('bg-max'); if(mx) mx.textContent = r.ok ? Math.round(r.val) : '—';
     BIO._estaticoImg = r.ok ? cv : null;
   }
+  // ── DECÚBITO / CUERPO PARCIAL: pose robusta a la ORIENTACIÓN ──────────────────────
+  // El detector (BlazePose) está entrenado con personas VERTICALES y no engancha a un paciente
+  // ACOSTADO (prono / lateral / supino) ni cuando el torso/cabeza quedan fuera de cuadro → devuelve
+  // "sin cuerpo". Pero para un ángulo de RODILLA solo hacen falta cadera-rodilla-tobillo, no la
+  // cabeza ni el cuerpo completo. Solución (validada 2026-11-19): probar la foto en 0°/90°/-90°/180°;
+  // el detector engancha cuando el cuerpo queda "vertical", y el ÁNGULO es el mismo (invariante a la
+  // rotación, con la corrección de aspecto H1 recalculada para el cuadro ganador en _recalcEstatico).
+  // Se usa la orientación que más ARTICULACIONES deja visibles. Pedido de Carlos: medir en decúbito
+  // sin cuerpo completo. (La foto puede quedar mostrada girada: es la orientación que el detector vio.)
+  var _GONIO_LM_IDX = [11,12,13,14,15,16,23,24,25,26,27,28]; // hombros, codos, muñecas, caderas, rodillas, tobillos
+  function _scoreVisGonio(lm){
+    if(!lm) return -1;
+    var n=0, s=0;
+    for(var k=0;k<_GONIO_LM_IDX.length;k++){ var p=lm[_GONIO_LM_IDX[k]]; if(!p) continue; var v=(p.visibility==null?1:p.visibility); if(v>=VIS_MIN) n++; s+=v; }
+    return n*1000 + s;   // prioriza nº de articulaciones visibles; desempata por visibilidad total
+  }
+  function _contarVisGonio(lm){ var n=0; if(!lm) return 0; for(var k=0;k<_GONIO_LM_IDX.length;k++){ var p=lm[_GONIO_LM_IDX[k]]; if(p && (p.visibility==null || p.visibility>=VIS_MIN)) n++; } return n; }
+  // Dibuja un <img>/canvas rotado (0/90/-90/180) a un canvas; en 90° intercambia ancho/alto.
+  function _rotarImgACanvas(img, rot){
+    var w=img.naturalWidth||img.width||0, h=img.naturalHeight||img.height||0;
+    var c=document.createElement('canvas'), x;
+    if(rot===90||rot===-90){ c.width=h; c.height=w; } else { c.width=w; c.height=h; }
+    x=c.getContext('2d');
+    if(rot===90){ x.translate(c.width,0); x.rotate(Math.PI/2); }
+    else if(rot===-90){ x.translate(0,c.height); x.rotate(-Math.PI/2); }
+    else if(rot===180){ x.translate(c.width,c.height); x.rotate(Math.PI); }
+    try{ x.drawImage(img,0,0,w,h); }catch(e){}
+    return c;
+  }
+  // Corre pose sobre un canvas/img ESTÁTICO (serializado, igual que la foto normal). Devuelve landmarks o null.
+  async function _poseSobreEstatico(src){
+    BIO.modo='foto'; BIO._fotoRes=null;
+    try{ if(BIO.pose && BIO.pose.reset) BIO.pose.reset(); }catch(_){}
+    for(var i=0;i<2;i++){ try{ await BIO.pose.send({ image: src }); }catch(_s){} if(BIO._fotoRes && BIO._fotoRes.poseLandmarks) break; }
+    var r=BIO._fotoRes; BIO._fotoRes=null;
+    return (r && r.poseLandmarks) ? r.poseLandmarks : null;
+  }
+  // Detecta pose probando rotaciones; devuelve {lm, base} con la orientación que más articulaciones ve.
+  async function _detectarPoseRot(img){
+    var cv0=_canvasDeImagen(img);
+    var lm0=await _poseSobreEstatico(cv0);
+    if(lm0 && _contarVisGonio(lm0)>=8) return { lm:lm0, base:cv0 };   // cuerpo vertical/completo: sin rotar (idéntico a antes)
+    var best = lm0 ? { lm:lm0, base:cv0, sc:_scoreVisGonio(lm0) } : null;
+    var rots=[90,-90,180];
+    for(var i=0;i<rots.length;i++){
+      var cv=_rotarImgACanvas(img, rots[i]);
+      var lm=await _poseSobreEstatico(cv);
+      if(!lm) continue;
+      var sc=_scoreVisGonio(lm);
+      if(!best || sc>best.sc){ best={ lm:lm, base:cv, sc:sc }; }
+    }
+    return best ? { lm:best.lm, base:best.base } : null;
+  }
   // MODO C: subir una FOTO (ideal camilla / decúbito prono) → pose en imagen estática → ángulo + foto anotada.
   async function procesarFoto(file){
     if(!file || !file.type || file.type.indexOf('image')!==0){ toast('Selecciona una imagen (JPG/PNG)','error'); return; }
@@ -2659,17 +2712,14 @@
         setTimeout(function(){ if(img.naturalWidth>0) res(); else rej(new Error('Imagen no compatible (prueba JPG o PNG)')); }, 9000);
       });
     }catch(e){ try{URL.revokeObjectURL(url);}catch(_){ } toast('⚠️ '+e.message,'error'); mostrarVista('bio-vista-inicio'); pintarGonioInicio(); return; }
-    if(txt) txt.textContent='Detectando postura…'; if(fill) fill.style.width='70%';
-    try{ if(BIO.pose && BIO.pose.reset) BIO.pose.reset(); }catch(_e){}
-    BIO.modo='foto'; BIO._fotoRes=null;
-    for(var i=0;i<2;i++){ try{ await BIO.pose.send({ image: img }); }catch(_s){} if(BIO._fotoRes && BIO._fotoRes.poseLandmarks) break; }
-    var res=BIO._fotoRes; BIO._fotoRes=null;
-    var lm = res && res.poseLandmarks;
-    var base=_canvasDeImagen(img);
+    if(txt) txt.textContent='Detectando postura (prueba orientaciones)…'; if(fill) fill.style.width='70%';
+    // DECÚBITO/CUERPO PARCIAL: prueba 0°/90°/-90°/180° y se queda con la que más articulaciones ve.
+    // Solo necesita la articulación en cuadro (cadera-rodilla-tobillo), NO el cuerpo completo.
+    var det = await _detectarPoseRot(img);
     try{URL.revokeObjectURL(url);}catch(_r){}
-    if(!lm){ toast('No se detectó el cuerpo en la foto. Que se vea de PERFIL, la zona completa en cuadro y con buena luz.','warning'); mostrarVista('bio-vista-inicio'); pintarGonioInicio(); return; }
+    if(!det){ toast('No se detectó el cuerpo en la foto. Que la articulación (p.ej. cadera-rodilla-tobillo) se vea de PERFIL, completa en cuadro y con buena luz.','warning'); mostrarVista('bio-vista-inicio'); pintarGonioInicio(); return; }
     if(fill) fill.style.width='100%';
-    _mostrarGonioEstatico(base, _copiaLm(lm), 'foto');
+    _mostrarGonioEstatico(det.base, _copiaLm(det.lm), 'foto');
   }
   // Sube las imágenes anotadas (foto / cuadro-pico) a Storage. Devuelve [{key,etq,grado,url,fbPath,...}] o [] si falla.
   async function _subirImagenesGonio(p, g, btn){
@@ -3491,6 +3541,7 @@
     calcularGonio:calcularGonio, cmpExtraer:_cmpExtraer, cmpTablaHTML:_cmpTablaHTML,
     cadenciaDudosa:_cadenciaDudosa, gonioFmtGrado:_gonioFmtGrado, gonioAlerta:_gonioAlerta,
     gonioFueraRango:_gonioFueraRango, romConfiable:_romConfiable,
+    scoreVisGonio:_scoreVisGonio, contarVisGonio:_contarVisGonio,
     GONIO_CAT:GONIO_CAT, ALGO_VER:BIO_ALGO_VER
   };
 
