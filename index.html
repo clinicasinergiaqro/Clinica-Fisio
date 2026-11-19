@@ -1371,7 +1371,7 @@ body.modo-oscuro .topbar{background:#141824}
 <body>
 <div id="sync-indicator" class="sync-indicator ok" style="display:none"></div>
 <div id="app-version-chip" title="Versión de la app en este equipo — toca para buscar actualización" onclick="try{_tapVersionChip()}catch(e){}"></div>
-<script>/* VERSIÓN VISIBLE: refleja el index.html realmente cargado en ESTE equipo (se bumpea junto con sw.js). Así un iPad con versión vieja se ve de un vistazo. */window.APP_VERSION='v1-2026-11-18d';(function(){try{var c=document.getElementById('app-version-chip');if(c)c.textContent=window.APP_VERSION;}catch(e){}})();</script>
+<script>/* VERSIÓN VISIBLE: refleja el index.html realmente cargado en ESTE equipo (se bumpea junto con sw.js). Así un iPad con versión vieja se ve de un vistazo. */window.APP_VERSION='v1-2026-11-19a';(function(){try{var c=document.getElementById('app-version-chip');if(c)c.textContent=window.APP_VERSION;}catch(e){}})();</script>
 <div class="toast" id="toast" aria-live="polite" aria-atomic="true"></div>
 
 <!-- LOGIN -->
@@ -5800,6 +5800,20 @@ function _pantallaDePasoParaAutoReload(){
     return scr==='' || scr==='screen-login' || scr==='screen-agenda';
   }catch(e){ return false; }
 }
+// [AUTO-UPDATE · CONVERGENCIA 2026-11-19] Además de las pantallas de paso, la actualización DIFERIDA se
+// aplica sola cuando el equipo lleva un rato SIN que nadie lo toque (pausa real). Así un equipo que quedó
+// abierto dentro del expediente/medidor —como el caso de la marcha sellada con sello viejo— ya NO se queda
+// pegado en código viejo: se refresca en la primera pausa, sin que nadie tenga que volver a la agenda ni
+// tocar el banner. Reusa window._ultimaActividad (se reinicia con cada toque/tecla/click del auto-logout),
+// así que TOCAR la pantalla reinicia el contador → jamás recarga a media navegación. Las guardas de datos
+// NO cambian: esto solo se evalúa JUNTO a esSeguroRecargar() + colas vacías en aplicarActualizacionSiSegura,
+// por lo que nunca recarga con nota a medio escribir, campo de texto enfocado, operación clínica en vuelo
+// ni colas con pendientes. Es "siempre actualizada" sin reintroducir la recarga a media nota (pedido Carlos).
+var _UPDATE_INACTIVO_MS = 150000; // 2.5 min sin tocar la pantalla = pausa segura para refrescar a la última
+function _inactivoParaAutoUpdate(){
+  try{ return (Date.now() - (window._ultimaActividad || Date.now())) >= _UPDATE_INACTIVO_MS; }
+  catch(e){ return false; }
+}
 // WATCHDOG anti-atoro: la bandera _dirty ("cambios sin guardar") a veces se queda en true y ya no se
 // limpia (p.ej. un guardado que falló) → "guarda tu nota primero" para SIEMPRE y no se puede Forzar
 // actualización. Si NO hay una pantalla de edición abierta NI un campo de texto enfocado, no hay nada
@@ -5943,11 +5957,12 @@ function aplicarActualizacionSiSegura(){
   // —el flag en-vuelo ya cubre eso— sino por prudencia: si algo aún no cruzó, se espera al drenado.
   // El botón "Actualizar ahora" (abajo) NO aplica este extra: el usuario puede forzar (colas durables).
   var _colasVacias = (typeof _totalPendientesSync!=='function') || (_totalPendientesSync()===0);
-  if(esSeguroRecargar() && _colasVacias && _pantallaDePasoParaAutoReload()){
+  if(esSeguroRecargar() && _colasVacias && (_pantallaDePasoParaAutoReload() || _inactivoParaAutoUpdate())){
     // [FIX-AUTOUPDATE p3] la recarga automática pasa por el freno anti-bucle (misma firma → banner).
     // [FIX-AUTOUPDATE p1] las guardas clínicas de arriba quedan EXACTAMENTE iguales: jamás se llega
     // aquí con nota a medio escribir, operación en vuelo, foco en textarea o colas con pendientes.
-    // [NO-INTERRUMPIR] + solo en pantalla de paso (agenda/login) → nunca a mitad de navegar.
+    // [NO-INTERRUMPIR] pantalla de paso (agenda/login) O equipo inactivo ≥2.5 min (pausa real) → nunca a
+    // mitad de navegar (tocar reinicia _ultimaActividad) ni con datos en riesgo (esSeguroRecargar+colas).
     _recargarPorUpdate();
   } else {
     mostrarBannerActualizacion();
