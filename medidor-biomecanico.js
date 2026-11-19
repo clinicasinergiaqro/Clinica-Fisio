@@ -72,7 +72,7 @@
   //    cuadros (p.ej. el canvas HEVC/iOS), gateo de tiempo (VFR), o caps/techos que cambien el resultado —
   //    NO solo en "correcciones". Si el cálculo cambia y el sello no, la procedencia de los datos clínicos
   //    miente (una sesión diría "mismo algoritmo" que otra medida con código distinto).
-  var BIO_ALGO_VER = 'bio-2d-2026-11-19';   // 2026-11-19: + goniómetro de FOTO robusto a orientación (decúbito/cuerpo parcial: prueba rotaciones → mide articulaciones que antes daban "sin cuerpo"). Cambia QUÉ fotos se miden → se sube el sello por la regla de arriba. (Histórico: -18 añadió techo del goniómetro + decode HEVC iOS; 14b = Hallazgo D tiempo/slow-mo.)
+  var BIO_ALGO_VER = 'bio-2d-2026-11-19';   // 2026-11-19: goniómetro de FOTO y VIDEO robusto a orientación (decúbito/cuerpo parcial: prueba rotaciones → mide articulaciones que antes daban "sin cuerpo"). Cambia QUÉ se mide → se sube el sello por la regla de arriba. (Histórico: -18 añadió techo del goniómetro + decode HEVC iOS; 14b = Hallazgo D tiempo/slow-mo.)
   // CORRECCIÓN DE ASPECTO (H1): las coords de MediaPipe vienen normalizadas 0–1 por ANCHO (x) y por
   // ALTO (y) de forma INDEPENDIENTE. En un cuadro NO cuadrado (p.ej. 9:16 vertical del celular) eso
   // deforma los ángulos de segmentos oblicuos hasta ~20°. Reescalando x por (ancho/alto) se recupera
@@ -791,7 +791,7 @@
     var _gi = (BIO._genQ && BIO._genQ.length) ? BIO._genQ.shift() : (BIO.gen||0);
     if(_gi !== (BIO.gen||0)){ BIO.framesDescartados=(BIO.framesDescartados||0)+1; return; }
     // Fija el aspecto real de la fuente (ancho/alto) para que los ángulos 2D no se deformen en vertical (H1).
-    if(BIO.srcEl && BIO.srcEl.videoWidth){ _setAspect(BIO.srcEl.videoWidth, BIO.srcEl.videoHeight); }
+    if(BIO.srcEl && BIO.srcEl.videoWidth){ if(BIO._gonioRot===90||BIO._gonioRot===-90) _setAspect(BIO.srcEl.videoHeight, BIO.srcEl.videoWidth); else _setAspect(BIO.srcEl.videoWidth, BIO.srcEl.videoHeight); }
     var lm = res && res.poseLandmarks;
     var world = res && res.poseWorldLandmarks;
     if(BIO.tipoMedicion==='marcha'){
@@ -821,7 +821,7 @@
       // Al mejorar el pico guardamos los landmarks de ESE cuadro (trazabilidad: qué puntos produjeron el grado).
       if(mejoroG && lm){ try{ BIO._peakGonioLm=_copiaLm(lm); BIO._peakGonioAR=_ANG_AR; }catch(_g){} }
       // Al analizar un VIDEO, además guardamos la IMAGEN del cuadro-pico para anotarla.
-      if(BIO.modo==='video' && mejoroG && lm && BIO.srcEl){ try{ BIO._peakFrameCanvas=_canvasDeImagen(BIO.srcEl); BIO._peakFrameLm=_copiaLm(lm); BIO._peakTSeg=(BIO.srcEl.currentTime||0); }catch(_e){} }
+      if(BIO.modo==='video' && mejoroG && lm && BIO.srcEl){ try{ BIO._peakFrameCanvas=_canvasDeImagen(BIO._gonioRot ? (BIO._vidFrameSent||BIO.srcEl) : BIO.srcEl); BIO._peakFrameLm=_copiaLm(lm); BIO._peakTSeg=(BIO.srcEl.currentTime||0); }catch(_e){} }
       if(BIO.canvas && BIO.srcEl){ dibujar(lm, null); dibujarGonioVivo(lm, rg); }
       return;
     }
@@ -1124,7 +1124,7 @@
     _bumpGen(); BIO.framesDescartados=0;   // nueva generación: cualquier cuadro en vuelo de la medición anterior se descartará
     BIO.modo=null; BIO.recording=false; BIO.procesandoVideo=false; BIO.cancelVideo=false; BIO.finalizando=false;
     BIO.acc=null; BIO.accS=null; BIO.accM=null; BIO.accG=null; BIO.framesTotales=0; BIO.srcEl=null; BIO.sending=false;
-    BIO._estaticoBase=null; BIO._estaticoLm=null; BIO._estaticoImg=null; BIO._estaticoFuente=null; BIO._peakFrameCanvas=null; BIO._peakFrameLm=null; BIO._peakTSeg=null; BIO._fotoRes=null;
+    BIO._estaticoBase=null; BIO._estaticoLm=null; BIO._estaticoImg=null; BIO._estaticoFuente=null; BIO._peakFrameCanvas=null; BIO._peakFrameLm=null; BIO._peakTSeg=null; BIO._fotoRes=null; BIO._gonioRot=0; BIO._vidFrameSent=null;
     BIO.facing='environment';           // cada medición arranca con la cámara TRASERA
     detenerGrabadorVideo(); BIO.pendingVideo=null; BIO.videoCola=[];
     detenerLoopCamara(); pararCronometro();
@@ -1452,7 +1452,7 @@
 
     if(BIO.tipoMedicion==='sent'){ BIO.accS=nuevoAccSent(); }
     else if(BIO.tipoMedicion==='marcha'){ BIO.accM=nuevoAccMarcha(); }
-    else if(BIO.tipoMedicion==='gonio'){ if(!BIO.accG) BIO.accG=nuevoAccGonio(); _gonioSelDefault(BIO.accG); BIO.accG.peak=null; BIO.accG.run=0; BIO._peakFrameCanvas=null; BIO._peakFrameLm=null; BIO._peakTSeg=null; }
+    else if(BIO.tipoMedicion==='gonio'){ if(!BIO.accG) BIO.accG=nuevoAccGonio(); _gonioSelDefault(BIO.accG); BIO.accG.peak=null; BIO.accG.run=0; BIO._peakFrameCanvas=null; BIO._peakFrameLm=null; BIO._peakTSeg=null; BIO._gonioRot=0; }
     else { BIO.acc = nuevoAcumulador(); }
     BIO.framesTotales=0; BIO.framesDescartados=0;   // O4: reinicia descartes al empezar el análisis de video
     BIO.procesandoVideo=true; BIO.cancelVideo=false;
@@ -1461,7 +1461,7 @@
     // con await pose.send) se colgaba en el 2º cuadro en Safari. Aquí reproducimos el video
     // muteado y enviamos cuadros a MediaPipe SIN await (fire-and-forget con guarda BIO.sending,
     // igual que el modo cámara que sí funciona). Progreso = currentTime / duración.
-    await new Promise(function(resolve){
+    function _muestrear(){ return new Promise(function(resolve){
       var minGap = 1/FPS_VIDEO, lastSample = -1, rafId = 0, terminado = false, arranque = Date.now();
       function terminar(){
         if(terminado) return; terminado = true;
@@ -1498,7 +1498,9 @@
             if(_vc.width!==v.videoWidth || _vc.height!==v.videoHeight){ _vc.width=v.videoWidth; _vc.height=v.videoHeight; }
             (BIO._vidSampleCtx || (BIO._vidSampleCtx=_vc.getContext('2d'))).drawImage(v,0,0,_vc.width,_vc.height);
             _fsrc = _vc;
+            if(BIO._gonioRot===90||BIO._gonioRot===-90||BIO._gonioRot===180){ _fsrc = _rotarImgACanvas(_vc, BIO._gonioRot); }  // DECÚBITO: cuadro rotado para que el detector enganche
           }catch(_df){ _fsrc = v; }
+          BIO._vidFrameSent = _fsrc;
           _genSend(_fsrc).then(function(){ BIO.sending=false; }).catch(function(){ BIO.sending=false; });
         }
         var pct = Math.min(99, Math.round((t/dur)*100));
@@ -1513,7 +1515,24 @@
       v.onclick = intentarPlay;                 // iOS: tocar el video reintenta la reproducción
       intentarPlay();
       tick();
-    });
+    }); }
+    await _muestrear();
+    // DECÚBITO (solo goniómetro por video): si NO detectó la articulación en la orientación normal,
+    // reintenta rotando los cuadros 90°/-90°/180° (igual que la foto). El cuerpo acostado queda
+    // "vertical" para el detector; el ángulo es invariante a la rotación. Solo corre si la 1ª pasada
+    // (rot 0, IDÉNTICA a antes) no encontró pico → cero efecto en video normal y en los demás modos.
+    if(BIO.tipoMedicion==='gonio' && !BIO.cancelVideo && !(BIO.accG && BIO.accG.peak!=null && BIO._peakFrameCanvas)){
+      var _rotsVid=[90,-90,180];
+      for(var _rvi=0; _rvi<_rotsVid.length && !BIO.cancelVideo; _rvi++){
+        BIO._gonioRot=_rotsVid[_rvi]; _bumpGen(); BIO.sending=false;
+        if(BIO.accG){ BIO.accG.peak=null; BIO.accG.run=0; } BIO._peakFrameCanvas=null; BIO._peakFrameLm=null; BIO._peakTSeg=null; BIO.framesTotales=0;
+        if(txt) txt.textContent='Probando otra orientación…'; if(fill) fill.style.width='0%';
+        try{ v.currentTime=0; }catch(_){}
+        await _muestrear();
+        if(BIO.accG && BIO.accG.peak!=null && BIO._peakFrameCanvas) break;
+      }
+      BIO._gonioRot=0;
+    }
     BIO.procesandoVideo=false;
     URL.revokeObjectURL(url);
     limpiarVideoSrc(v);
