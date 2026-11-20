@@ -887,7 +887,11 @@ function FST_buildSesionPayload(sesion, modo) {
     evaI: (sesion.evaI !== undefined && sesion.evaI !== null) ? sesion.evaI : null,
     evaF: (sesion.evaF !== undefined && sesion.evaF !== null) ? sesion.evaF : null,
     modalidades: Array.isArray(sesion.modalidades) ? sesion.modalidades : [],
-    modalidad: sesion.modalidad || '',
+    // 'modalidad' (lente trauma/derma) NO se escribe a Firestore a propósito: sesionCreateOK/sesionUpdateOK
+    // (config/firestore.rules) NO lo whitelistean y Firestore rebotaba TODA nota con permission-denied
+    // (caso Zara 2026-11-11 "no se guardan las notas"). La etiqueta vive local en p.soap/la nota, que es
+    // de donde el swap trauma/derma ya filtra. Para persistirla en FS algún día: primero agregar 'modalidad'
+    // al hasOnly de AMBAS funciones en firestore.rules Y que Carlos la publique; solo entonces re-agregar aquí.
     // FIX SOAP-MEDIA (A): adjuntos de la nota — SOLO referencias (url/fbPath), NUNCA base64 al doc.
     // Mismo criterio de strip que el chunking a Sheets (data:null). Condicional: sin adjuntos no se escribe.
     ...(Array.isArray(sesion.media) && sesion.media.length ? {
@@ -932,7 +936,7 @@ function FST_buildSesionPayload(sesion, modo) {
       })), true)
     } : {}),
     ...(sesion.modalidadesDetalle && typeof sesion.modalidadesDetalle === 'object' && Object.keys(sesion.modalidadesDetalle).length ? { modalidadesDetalle: sesion.modalidadesDetalle } : {}),
-    completa: !!sesion.completa, modoNota: sesion.modoNota || '', modalidad: sesion.modalidad || '',
+    completa: !!sesion.completa, modoNota: sesion.modoNota || '',
     importado: false, formatoOriginal: 'soap', revisionPendiente: false,
     origen: 'app_live',
     updatedAt: firebase.firestore.FieldValue.serverTimestamp()
@@ -1367,7 +1371,7 @@ body.modo-oscuro .topbar{background:#141824}
 <body>
 <div id="sync-indicator" class="sync-indicator ok" style="display:none"></div>
 <div id="app-version-chip" title="Versión de la app en este equipo — toca para buscar actualización" onclick="try{_tapVersionChip()}catch(e){}"></div>
-<script>/* VERSIÓN VISIBLE: refleja el index.html realmente cargado en ESTE equipo (se bumpea junto con sw.js). Así un iPad con versión vieja se ve de un vistazo. */window.APP_VERSION='v1-2026-11-20a';(function(){try{var c=document.getElementById('app-version-chip');if(c)c.textContent=window.APP_VERSION;}catch(e){}})();</script>
+<script>/* VERSIÓN VISIBLE: refleja el index.html realmente cargado en ESTE equipo (se bumpea junto con sw.js). Así un iPad con versión vieja se ve de un vistazo. */window.APP_VERSION='v1-2026-11-20b';(function(){try{var c=document.getElementById('app-version-chip');if(c)c.textContent=window.APP_VERSION;}catch(e){}})();</script>
 <div class="toast" id="toast" aria-live="polite" aria-atomic="true"></div>
 
 <!-- LOGIN -->
@@ -1596,6 +1600,21 @@ body.modo-oscuro .topbar{background:#141824}
 .bib-art .ph{display:block;background:linear-gradient(90deg,rgba(21,50,91,.08),rgba(21,50,91,0));border-left:4px solid var(--navy);border-radius:0 8px 8px 0;padding:9px 12px;margin:22px 0 9px;color:var(--navy);font-weight:800;font-size:14.5px;text-align:left}
 .bib-art .ph strong{color:var(--navy)}
 .bib-art li.L-phase{list-style:none;margin:18px 0 6px -10px;padding:8px 12px;background:rgba(21,50,91,.08);border-left:4px solid var(--navy);border-radius:0 8px 8px 0;font-weight:700;color:var(--navy);text-align:left}
+/* MOLDE semana-a-semana: nota de apoyo + tarjetas YA PUEDE (verde) / TODAVÍA NO (roja) */
+.bib-art p.bib-apoyo{margin:9px 0 8px;padding:8px 13px;background:#EEF3F8;border:1px solid #D6E1EE;border-left:4px solid var(--navy);border-radius:0 8px 8px 0;font-size:13px;line-height:1.55;color:var(--gray-800)}
+.bib-art p.bib-apoyo strong{color:var(--navy)}
+.bib-art blockquote.bib-yapuede,.bib-art blockquote.bib-todavia{border-radius:12px;padding:9px 15px 11px;margin:9px 0}
+.bib-art blockquote.bib-yapuede{background:#EAF7EF;border:1px solid #BFE4CE;border-left:5px solid #1F8A4C}
+.bib-art blockquote.bib-todavia{background:#FCEBE9;border:1px solid #F3CFC9;border-left:5px solid #C0392B}
+.bib-art blockquote.bib-yapuede .yp-h strong{color:#1A6B40;font-size:11.5px;letter-spacing:.06em;text-transform:uppercase}
+.bib-art blockquote.bib-todavia .tn-h strong{color:#B42318;font-size:11.5px;letter-spacing:.06em;text-transform:uppercase}
+.bib-art blockquote.bib-yapuede p,.bib-art blockquote.bib-todavia p{margin:0}
+.bib-art blockquote.bib-yapuede ul,.bib-art blockquote.bib-todavia ul{margin:5px 0 0;padding-left:19px}
+.bib-art blockquote.bib-yapuede li,.bib-art blockquote.bib-todavia li{margin:4px 0;font-size:13px;line-height:1.5;text-align:left;color:var(--gray-800)}
+.bib-art blockquote.bib-yapuede li::marker{color:#1F8A4C}
+.bib-art blockquote.bib-todavia li::marker{color:#C0392B}
+.bib-art blockquote.bib-yapuede strong{color:#1A6B40}
+.bib-art blockquote.bib-todavia strong{color:var(--navy)}
 /* Callouts: qué sí / qué no / precaución / criterio / meta */
 .bib-art li.L-si,.bib-art li.L-no,.bib-art li.L-prec,.bib-art li.L-goal,.bib-art li.L-meta{list-style:none;position:relative;margin:6px 0 6px -10px;padding:6px 11px 6px 31px;border-radius:8px;border-left:3px solid;text-align:left}
 .bib-art li.L-si{background:#EAF7EF;border-color:#1F8A4C}
@@ -4438,6 +4457,21 @@ function calcularEdadDesdeFechaNacimiento(fechaNac){
   return edad >= 0 ? edad : null;
 }
 
+// Edad a MOSTRAR: recalcula desde la fecha de nacimiento si existe (canónico `fechaNacimiento`,
+// legado `fechaNac`); si no, deja la edad guardada. Los MIGRADOS traen el `age` CONGELADO de la
+// migración y nunca se recalculaba (un paciente de 15 salía de 12); esto lo corrige en lista e
+// hidratación. NO toca el guardado — es solo para mostrar.
+function _edadMostrada(fechaNac, ageGuardada){
+  try{
+    if(fechaNac){
+      var ff = (typeof _formatFechaNac==='function') ? _formatFechaNac(fechaNac) : fechaNac;
+      var e = calcularEdadDesdeFechaNacimiento(ff);
+      if(e!==null) return e;
+    }
+  }catch(_){}
+  return (ageGuardada==null?'':ageGuardada);
+}
+
 function formatearFechaNac(raw){
   // Convierte DDMMYYYY → DD/MM/YYYY, o valida DD/MM/YYYY
   const s = String(raw||'').replace(/\D/g,'');
@@ -4618,7 +4652,51 @@ document.addEventListener('change', function(e){
     const obs=document.getElementById(obsId);
     if(obs){ obs.focus(); obs.style.borderColor='var(--navy)'; }
   }
+  // Medicamento por condición (ALTA): al marcar/desmarcar una condición, re-pinta los campos de medicamento
+  if(cls==='sc-condicion' && typeof _renderMedPorCond==='function'){ try{ _renderMedPorCond(); }catch(_){} }
 });
+// Auto-crecer un textarea para que SIEMPRE se vea todo el texto (pedido de Carlos: el motivo de consulta
+// se "desaparecía" al escribir porque el textarea tenía altura fija y hacía scroll interno). Crece con el
+// contenido; nunca encoge por debajo de su min-height. Solo UI, no toca ningún dato.
+function _autoGrowTA(el){ try{ if(!el) return; el.style.height='auto'; el.style.height=Math.max(120, el.scrollHeight+2)+'px'; }catch(e){} }
+// Medicamento por CONDICIÓN (ALTA): por cada condición médica marcada (Diabetes, Hipertensión, …) muestra un
+// campo para el medicamento de ESA condición; lo demás va en "Otros medicamentos". Es una AYUDA DE CAPTURA:
+// el valor final se COMBINA en el MISMO campo antecedentes.medicamentos (string) → CERO cambio de datos/backend.
+window._medCondVals = window._medCondVals || {};
+function _renderMedPorCond(){
+  try{
+    var cont=document.getElementById('n-med-cond'); if(!cont) return;
+    window._medCondVals = window._medCondVals || {};
+    // conservar lo ya tecleado antes de re-pintar
+    cont.querySelectorAll('input[data-cond]').forEach(function(i){ window._medCondVals[i.getAttribute('data-cond')]=i.value; });
+    var conds=Array.prototype.slice.call(document.querySelectorAll('.sc-condicion:checked')).map(function(c){return c.value;})
+      .filter(function(v){ return v && v!=='Ninguna referida' && v!=='Otro'; });
+    if(!conds.length){ cont.style.display='none'; cont.innerHTML=''; return; }
+    cont.style.display='';
+    cont.innerHTML='<div style="font-size:12px;color:var(--gray-500);margin:2px 0 6px">💊 ¿Qué medicamento toma para cada condición? (opcional — así sabemos qué es para qué)</div>'+
+      conds.map(function(c){
+        var val=(window._medCondVals[c]||'');
+        var ce=escapeHTML(c).replace(/"/g,'&quot;');
+        return '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">'+
+          '<span style="flex:0 0 40%;font-size:13px;font-weight:600;color:var(--navy)">'+escapeHTML(c)+'</span>'+
+          '<input class="form-input" data-cond="'+ce+'" data-label="'+ce+'" type="text" placeholder="Medicamento y dosis" value="'+escapeHTML(val).replace(/"/g,'&quot;')+'" style="flex:1;font-size:14px;padding:10px"></div>';
+      }).join('');
+  }catch(e){}
+}
+// Combina los medicamentos por condición + "otros" en el string único que se guarda (antecedentes.medicamentos).
+function _medAltaCombinar(){
+  try{
+    var parts=[];
+    var cont=document.getElementById('n-med-cond');
+    if(cont){ cont.querySelectorAll('input[data-label]').forEach(function(inp){
+      var val=(inp.value||'').trim(); if(val) parts.push(inp.getAttribute('data-label')+': '+val);
+    }); }
+    var otros=((document.getElementById('n-medicamentos')||{}).value||'').trim();
+    var hayOtros = otros && !/^ningun[oa]s?$/i.test(otros);
+    if(parts.length){ if(hayOtros) parts.push('Otros: '+otros); return parts.join(' · '); }
+    return otros||'Ninguno';
+  }catch(e){ return ((document.getElementById('n-medicamentos')||{}).value||'').trim()||'Ninguno'; }
+}
 // Post-saneado: recalcular age si hay fechaNacimiento válida
 function sanearYRecalcularEdad(p){
   const s = sanearPaciente(p);
@@ -5722,6 +5800,20 @@ function _pantallaDePasoParaAutoReload(){
     return scr==='' || scr==='screen-login' || scr==='screen-agenda';
   }catch(e){ return false; }
 }
+// [AUTO-UPDATE · CONVERGENCIA 2026-11-19] Además de las pantallas de paso, la actualización DIFERIDA se
+// aplica sola cuando el equipo lleva un rato SIN que nadie lo toque (pausa real). Así un equipo que quedó
+// abierto dentro del expediente/medidor —como el caso de la marcha sellada con sello viejo— ya NO se queda
+// pegado en código viejo: se refresca en la primera pausa, sin que nadie tenga que volver a la agenda ni
+// tocar el banner. Reusa window._ultimaActividad (se reinicia con cada toque/tecla/click del auto-logout),
+// así que TOCAR la pantalla reinicia el contador → jamás recarga a media navegación. Las guardas de datos
+// NO cambian: esto solo se evalúa JUNTO a esSeguroRecargar() + colas vacías en aplicarActualizacionSiSegura,
+// por lo que nunca recarga con nota a medio escribir, campo de texto enfocado, operación clínica en vuelo
+// ni colas con pendientes. Es "siempre actualizada" sin reintroducir la recarga a media nota (pedido Carlos).
+var _UPDATE_INACTIVO_MS = 150000; // 2.5 min sin tocar la pantalla = pausa segura para refrescar a la última
+function _inactivoParaAutoUpdate(){
+  try{ return (Date.now() - (window._ultimaActividad || Date.now())) >= _UPDATE_INACTIVO_MS; }
+  catch(e){ return false; }
+}
 // WATCHDOG anti-atoro: la bandera _dirty ("cambios sin guardar") a veces se queda en true y ya no se
 // limpia (p.ej. un guardado que falló) → "guarda tu nota primero" para SIEMPRE y no se puede Forzar
 // actualización. Si NO hay una pantalla de edición abierta NI un campo de texto enfocado, no hay nada
@@ -5865,11 +5957,12 @@ function aplicarActualizacionSiSegura(){
   // —el flag en-vuelo ya cubre eso— sino por prudencia: si algo aún no cruzó, se espera al drenado.
   // El botón "Actualizar ahora" (abajo) NO aplica este extra: el usuario puede forzar (colas durables).
   var _colasVacias = (typeof _totalPendientesSync!=='function') || (_totalPendientesSync()===0);
-  if(esSeguroRecargar() && _colasVacias && _pantallaDePasoParaAutoReload()){
+  if(esSeguroRecargar() && _colasVacias && (_pantallaDePasoParaAutoReload() || _inactivoParaAutoUpdate())){
     // [FIX-AUTOUPDATE p3] la recarga automática pasa por el freno anti-bucle (misma firma → banner).
     // [FIX-AUTOUPDATE p1] las guardas clínicas de arriba quedan EXACTAMENTE iguales: jamás se llega
     // aquí con nota a medio escribir, operación en vuelo, foco en textarea o colas con pendientes.
-    // [NO-INTERRUMPIR] + solo en pantalla de paso (agenda/login) → nunca a mitad de navegar.
+    // [NO-INTERRUMPIR] pantalla de paso (agenda/login) O equipo inactivo ≥2.5 min (pausa real) → nunca a
+    // mitad de navegar (tocar reinicia _ultimaActividad) ni con datos en riesgo (esSeguroRecargar+colas).
     _recargarPorUpdate();
   } else {
     mostrarBannerActualizacion();
@@ -6140,6 +6233,20 @@ function renderAgenda(){
           +'<div style="flex:1;min-width:0"><div style="font-size:15px;font-weight:800;color:#117A3D;letter-spacing:-.01em">Equipos al día ('+_sa.total+')</div>'
           +'<div style="font-size:12.5px;color:#117A3D;margin-top:1px;font-weight:600">🟢 Todos sincronizados y en la última versión — toca para ver el tablero →</div></div>'
           +'<svg width="18" height="18" fill="none" stroke="#117A3D" stroke-width="2.5" viewBox="0 0 24 24" style="flex-shrink:0"><polyline points="9 18 15 12 9 6"/></svg></div>';
+      }
+    }
+  }catch(_){}
+  // REVISIÓN DIARIA DE CONTRAINDICACIONES (supervisor): banner si hay activos con enfermedad/implante
+  // detectado en el expediente que aún no tiene su alerta. Toca → modal con la lista para revisar y confirmar.
+  try{
+    if(typeof esSupervisorUI==='function' && esSupervisorUI()){
+      var _cl=_contraCountActivos();
+      if(_cl && _cl.length){
+        html+='<div onclick="try{_contraModalRevisar();}catch(_){}" style="margin-bottom:12px;padding:14px 16px;border-radius:16px;background:linear-gradient(135deg,#FFF4E5,#FFE8CC);border:1.5px solid #F5C77E;cursor:pointer;display:flex;align-items:center;gap:13px;box-shadow:0 2px 10px rgba(120,80,20,.12)">'
+          +'<div style="font-size:28px;line-height:1">⚠️</div>'
+          +'<div style="flex:1;min-width:0"><div style="font-size:15px;font-weight:800;color:#8A5A00;letter-spacing:-.01em">Revisar contraindicaciones ('+_cl.length+')</div>'
+          +'<div style="font-size:12.5px;color:#8A5A00;margin-top:1px;font-weight:600">Pacientes con una enfermedad/implante detectado sin alerta marcada — toca para revisar y confirmar →</div></div>'
+          +'<svg width="18" height="18" fill="none" stroke="#8A5A00" stroke-width="2.5" viewBox="0 0 24 24" style="flex-shrink:0"><polyline points="9 18 15 12 9 6"/></svg></div>';
       }
     }
   }catch(_){}
@@ -11997,6 +12104,9 @@ function renderExpediente(tab='historia'){
   // Alerta de seguridad clínica — visible en TODOS los tabs del expediente (incluida SOAP/notas).
   // Caja rica y específica (implantes, condiciones, contraindicaciones, banderas, alergias); roja si es grave.
   html+=_soapSeguridadHTML(p);
+  // Revisión diaria de contraindicaciones: propone marcar enfermedades/implantes detectados en el expediente
+  // (del propio paciente) que aún no tienen alerta. Se confirma con 1 toque. Vacío si no hay nada por revisar.
+  html+='<div id="contra-exp-wrap">'+_contraBannerExpediente(p)+'</div>';
 
   if(tab==='historia'){
     if(hasContra) html+=`<div class="contraindication-box">⚠️ ${escapeHTML(p.contraindicaciones)}</div>`;
@@ -12287,7 +12397,7 @@ function renderExpediente(tab='historia'){
   if(tab==='estudios'){
     const fotos=p.fotos||[], docs=p.docs||[];
     html+=`<input type="file" id="inp-foto" accept="image/*" capture="environment" style="display:none" onchange="handleMedia(event,'foto','${p.id}')">
-    <input type="file" id="inp-galeria" accept="image/*" style="display:none" onchange="handleMedia(event,'galeria','${p.id}')">
+    <input type="file" id="inp-galeria" accept="image/*" multiple style="display:none" onchange="handleMedia(event,'galeria','${p.id}')">
     <input type="file" id="inp-doc" accept="*/*" multiple style="display:none" onchange="handleMedia(event,'doc','${p.id}')">
     <div style="background:var(--blue-light);border-radius:10px;padding:10px 12px;margin-bottom:12px;font-size:11px;color:var(--navy);display:flex;gap:8px;align-items:flex-start">
       <span style="font-size:14px">ℹ️</span>
@@ -12810,22 +12920,16 @@ async function FST_cargarIndicePacientes() {
       snap.forEach(doc => {
         const d = doc.data() || {};
         if (d.eliminado === true) { _elimIdx.add(doc.id); return; }   // [BORRADO] fuera de la lista + al set
-        // [FIX EDAD MIGRADOS] El age guardado en el doc migrado está congelado (de la migración, hace 2-3 años);
-        // la edad REAL se recalcula desde fechaNacimiento. El doc usa el campo `fechaNacimiento` (lo escribe el
-        // barrido / claudeFsMerge), no `fechaNac`. _formatFechaNac normaliza ISO/8-dígitos → DD/MM/YYYY.
-        var _fnacIdx = d.fechaNacimiento || d.fechaNac || '';
-        var _ageIdx  = (_fnacIdx && typeof calcularEdadDesdeFechaNacimiento === 'function')
-          ? calcularEdadDesdeFechaNacimiento(_formatFechaNac(_fnacIdx)) : null;
         pacientes.push({
           id              : doc.id,
           fstPid          : doc.id,
           name            : d.name            || '',
-          age             : (_ageIdx != null ? _ageIdx : (d.age || '')),   // [FIX EDAD MIGRADOS] edad recalculada; fallback al age viejo solo si no hay DOB
+          age             : _edadMostrada(d.fechaNacimiento || d.fechaNac, d.age),   // recalcula desde FN (migrados traían age congelada de la migración)
           terapeuta       : d.terapeuta       || d.terapeutaActual || '',
           terapeutaSeguimiento: d.terapeutaSeguimiento || '',   // FASE 3b: tarjeta completa desde el índice
           date            : d.date            || '',
-          fechaNac        : _formatFechaNac(_fnacIdx) || d.fechaNac || '',
-          fechaNacimiento : _fnacIdx || undefined,   // [FIX EDAD MIGRADOS] conservar DOB en la entrada → hidratación y recálculo posterior
+          fechaNac        : d.fechaNac        || '',
+          fechaNacimiento : d.fechaNacimiento || d.fechaNac || '',
           creadoPor       : d.creadoPor       || '',
           nombreNormalizado: d.nombreNormalizado || FST_normalizarBusqueda(d.name || ''),
           dx              : d.dx              || d.diagnostico     || '',
@@ -13026,15 +13130,15 @@ async function FST_hidratarCamposClinicos(p, id) {
     const d = snap.data() || {};
     if (!_fstDocVivo(d)) return;   // [BORRADO] no hidratar (ni abrir) un paciente tombstoneado
 
-    // [FIX EDAD MIGRADOS] La fecha de nacimiento manda sobre el age viejo congelado (consistente con
-    // sanearYRecalcularEdad de los activos). Si el doc trae fechaNacimiento, se recalcula; si no, se
-    // conserva el comportamiento anterior (copiar el age guardado solo cuando el local está vacío).
-    if (d.fechaNacimiento && !p.fechaNacimiento) p.fechaNacimiento = d.fechaNacimiento;
-    var _fnacHid = p.fechaNacimiento || d.fechaNacimiento;
-    var _ageHid  = (_fnacHid && typeof calcularEdadDesdeFechaNacimiento === 'function')
-      ? calcularEdadDesdeFechaNacimiento(_formatFechaNac(_fnacHid)) : null;
-    if (_ageHid != null)                       p.age = _ageHid;
-    else if (d.age != null && p.age == null)   p.age = d.age;
+    if (d.age != null && p.age == null)   p.age = d.age;
+    // EDAD desde la fecha de nacimiento: el índice trae el `age` CONGELADO de la migración y no se
+    // recalculaba → un migrado de 15 salía de 12. El doc sí tiene la fecha; recalcular aquí deja el
+    // expediente y "Editar datos" con la edad correcta. Solo memoria/mostrar, no toca el guardado.
+    if (d.fechaNacimiento) {
+      p.fechaNacimiento = d.fechaNacimiento;
+      var _edHid = _edadMostrada(d.fechaNacimiento, p.age);
+      if (_edHid !== '' && _edHid != null) p.age = _edHid;
+    }
     if (d.alergias)                       p.alergias = d.alergias;
     if (d.motivoConsulta)                 p.motivoConsulta = d.motivoConsulta;
     if (d.antecedentes && typeof d.antecedentes === 'object' && !Array.isArray(d.antecedentes))
@@ -13952,6 +14056,149 @@ function _soapSeguridadHTML(p){
     +'<div style="font-size:11px;color:#8A6D1A;margin-top:7px;font-weight:600">Verifica antes de aplicar agentes físicos (tecar, US, ondas, electro, termo, láser) o ejercicio de carga.</div>'
     +'</div>';
 }
+// ══════════════════════════════════════════════════════════════════════════════
+// REVISIÓN DIARIA DE CONTRAINDICACIONES (2026-11-11) — "propone y confirma".
+// Detecta enfermedades/implantes de riesgo en el texto del expediente (dx + antecedentes
+// patológicos/cirugías/medicamentos + motivo) que NO están reflejados en seguridadClinica,
+// FILTRANDO antecedentes familiares, y los PROPONE para confirmar con 1 toque → se escriben a
+// seguridadClinica (de donde _soapSeguridadHTML ya saca la alerta). NUNCA auto-escribe.
+// Corre al abrir el expediente (todos los días, en el acto) y en un banner del supervisor.
+function _contraNorm(s){ try{ return String(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,''); }catch(_){ return String(s||'').toLowerCase(); } }
+// Términos de antecedente FAMILIAR (sin 'mama' a propósito: "cáncer de mama" es del paciente).
+var _CONTRA_FAM=/(pap[ao]|abuel|herman|\bt[ií]os?\b|\bt[ií]as?\b|prim[oa]|familiar|hereditar|heredofamil|espos[oa]|\bhij[oa]s?\b|\bpadres?\b|\bmadre\b|abuelit|niet[oa]|sobrin|bisabuel|por parte|parte de)/;
+var _CONTRA_DEFS=[
+  {cat:'MARCAPASO', rx:/marcapas|desfibrilador|\bdai\b|cardiodesfibril|resincronizador/, tipo:'impl', val:'Implante electrónico', ancla:/marcapas|desfibrilador|\bdai\b|implante electr/, nota:'Marcapaso/DAI: NO electroterapia/tecar/diatermia/US/ondas cerca del dispositivo.'},
+  {cat:'ANTICOAG', rx:/anticoagul|warfarin|acenocumar|sintrom|xarelto|rivaroxaban|apixaban|eliquis|dabigatran|pradaxa|clopidogrel|heparin/, tipo:'cond', val:'Anticoagulantes', ancla:/anticoagul|sintrom|xarelto|warfarin|eliquis|heparin|clopidogrel|acenocumar/, nota:'Anticoagulación: precaución con punción seca/MEP y masaje profundo (riesgo de hematoma).'},
+  {cat:'METAL', rx:/osteosintesis|\bplacas?\b|tornillo|\bclavos?\b|protesis|artrodesis|fijador|material de osteo|endoprotesis/, tipo:'impl', valFn:function(b){ return /protesis|endoprotesis|artrodesis/.test(b)?'Prótesis metálica':'Material de osteosíntesis'; }, ancla:/osteosintesis|protesis|\bplaca|tornillo|\bclavo|\bmetal|implante|artrodesis/, nota:'Osteosíntesis/implante metálico: NO radiofrecuencia/diatermia/tecar térmica/US térmico sobre el material.'},
+  {cat:'CANCER', rx:/\bcancer|oncolog|carcinoma|linfoma|leucemia|metastas|mastectom|melanoma|\btumor|quimioterap|radioterap|tamoxifen|letrozol/, tipo:'cond', val:'Antecedente de cáncer', ancla:/cancer|oncolog|tumor|melanoma|linfoma|leucemia|metastas|mastectom/, nota:'Antecedente oncológico: NO termoterapia/tecar/US/ondas sobre la zona sin aval; confirmar estado.'},
+  {cat:'EMBARAZO', rx:/\bembaraz|gestant|semanas de gestac/, tipo:'cond', val:'Embarazo', ancla:/embaraz|gestant/, nota:'Embarazo: NO tecar/diatermia/US/electro/ondas sobre tronco/abdomen/zona lumbopélvica.'},
+  {cat:'TROMBO', rx:/trombos|\btvp\b|\btep\b|tromboembol|embolia pulmon/, tipo:'cond', val:'Alteración vascular', ancla:/trombos|\btvp\b|\btep\b|vascular|tromboembol/, nota:'Antecedente trombótico (TVP/TEP): NO masaje/compresión/termo en la zona; valorar.'},
+  {cat:'DIABETES', rx:/\bdiabet|\bdm2\b|dm tipo|insulinodepend/, tipo:'cond', val:'Diabetes', ancla:/diabet/, nota:'Diabetes: precaución con termo/crioterapia por alteración de sensibilidad; vigilar piel.'},
+  {cat:'EPILEPSIA', rx:/epileps|convulsi/, tipo:'cond', val:'Epilepsia', ancla:/epileps|convulsi/, nota:'Epilepsia: precaución con electroestimulación; valorar.'}
+];
+function _contraBlob(p){
+  // OJO: antecedentes.patologicos es el campo "Antecedentes HEREDOFAMILIARES" (familia), NO del paciente
+  //  → se EXCLUYE a propósito. Lo del propio paciente vive en dx + cirugías + medicamentos + motivo
+  //  (+ seguridadClinica.condicionesObs, que no se re-escanea porque ya está marcado).
+  var parts=[]; var dx=p&&p.dx;
+  if(dx&&typeof dx==='object') parts.push(Object.keys(dx).map(function(k){return dx[k];}).join(' ')); else parts.push(String(dx||''));
+  var a=(p&&p.antecedentes)||{};
+  if(a&&typeof a==='object') ['cirugias','medicamentos'].forEach(function(k){ parts.push(String(a[k]||'')); });
+  var m=p&&p.motivo;
+  if(m&&typeof m==='object') parts.push(Object.keys(m).map(function(k){return m[k];}).join(' ')); else parts.push(String(m||''));
+  return _contraNorm(parts.join(' || '));
+}
+function _contraSegText(p){
+  var sc=(p&&p.seguridadClinica)||{}; var t='';
+  try{ t=JSON.stringify(sc); }catch(_){}
+  t+=' '+((p&&p.contraindicaciones)||'')+' '+((p&&p.planTto&&p.planTto.contraindicaciones)||'');
+  return _contraNorm(t);
+}
+function _contraDescSet(){ try{ return JSON.parse(localStorage.getItem('sinergia_contra_desc')||'{}')||{}; }catch(_){ return {}; } }
+function _contraDescartado(pid,cat){ var m=_contraDescSet(); return !!(m[pid]&&m[pid][cat]); }
+// Propuestas para un paciente: riesgo del PROPIO paciente, sin reflejar en seguridadClinica y sin descartar.
+function _contraDetect(p){
+  if(!p||p._activoEliminado||p.eliminado) return [];
+  var blob=_contraBlob(p); if(!blob.replace(/[^a-z]/g,'')) return [];
+  var seg=_contraSegText(p); var out=[];
+  _CONTRA_DEFS.forEach(function(d){
+    if(_contraDescartado(p.id,d.cat)) return;
+    if(d.ancla.test(seg)) return;                         // ya está en Seguridad clínica
+    var re=new RegExp(d.rx.source,'g'), mm, hits=[], algunoPropio=false;
+    while((mm=re.exec(blob))){ var i=mm.index; var frag=blob.slice(Math.max(0,i-45), i+45); var fam=_CONTRA_FAM.test(frag); hits.push(frag); if(!fam) algunoPropio=true; }
+    if(!hits.length) return;
+    if(!algunoPropio) return;                              // todos los hits son de familiar → no aplica
+    var val=d.val||(d.valFn?d.valFn(blob):'');
+    out.push({cat:d.cat, tipo:d.tipo, val:val, nota:d.nota, frag:(hits.find(function(f){return !_CONTRA_FAM.test(f);})||hits[0]).trim()});
+  });
+  return out;
+}
+// Escribe la contraindicación confirmada en seguridadClinica (merge, preserva lo existente) + guarda verificado.
+async function _contraConfirmar(pid,cat){
+  var p=(currentPatient&&currentPatient.id===pid)?currentPatient:(Array.isArray(patientsDB)?patientsDB.find(function(x){return x&&x.id===pid;}):null);
+  if(!p){ showToast('No se encontró el paciente.','warning'); return; }
+  var prop=_contraDetect(p).find(function(x){return x.cat===cat;}); if(!prop){ return; }
+  if(!p.seguridadClinica||typeof p.seguridadClinica!=='object'||Array.isArray(p.seguridadClinica)) p.seguridadClinica={};
+  var sc=p.seguridadClinica;
+  if(!Array.isArray(sc.implantes)) sc.implantes=[];
+  if(!Array.isArray(sc.condiciones)) sc.condiciones=[];
+  if(!Array.isArray(sc.banderasRojas)) sc.banderasRojas=[];
+  var arr=(prop.tipo==='impl')?sc.implantes:sc.condiciones;
+  if(arr.indexOf(prop.val)<0) arr.push(prop.val);
+  var campoObs=(prop.tipo==='impl')?'implantesDetalle':'condicionesObs';
+  var obs=String(sc[campoObs]||'').trim();
+  if(_segNegDefault(obs)) obs='';
+  if(obs.toLowerCase().indexOf(prop.nota.toLowerCase().slice(0,24))<0) obs=obs?(obs+' · '+prop.nota):prop.nota;
+  sc[campoObs]=obs;
+  try{ sc.tienePrecaucion = calcularTienePrecaucion(sc) || !!sc.tienePrecaucion || true; }catch(_){ sc.tienePrecaucion=true; }
+  var ahora=new Date(); var fh=ahora.toLocaleDateString('es-MX')+' '+ahora.toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'});
+  var quien=(typeof currentUser!=='undefined'&&currentUser&&currentUser.name)?currentUser.name:'';
+  p.fechaActualizacion=fh; p.ultimoUsuario=quien;
+  if(!Array.isArray(p.historialCambios)) p.historialCambios=[];
+  p.historialCambios.push({usuario:quien,seccion:'seguridadClinica',fecha:fh,accion:'Marcó contraindicación detectada',antes:'',despues:prop.val+' — '+prop.nota});
+  try{ var idx=patientsDB.findIndex(function(x){return x&&x.id===p.id;}); if(idx>=0) patientsDB[idx]=p; }catch(_){}
+  var res=null;
+  try{ res=await saveDB('pts',[p],{camposHist:['seguridadClinica','historialCambios','fechaActualizacion','ultimoUsuario']}); }catch(e){ res={ok:false,error:(e&&e.message)||String(e)}; }
+  if(res&&res.ok) showToast('✅ Contraindicación marcada en Seguridad clínica','success');
+  else if(res&&res.pendiente) showToast('📴 Sin conexión — quedó en este equipo y se sincronizará.','warning');
+  else showToast('⚠️ No se pudo confirmar el guardado. Reintenta con conexión.','warning');
+  _contraRefrescar(pid);
+}
+function _contraDescartar(pid,cat){
+  var m=_contraDescSet(); if(!m[pid]) m[pid]={}; m[pid][cat]=1;
+  try{ localStorage.setItem('sinergia_contra_desc', JSON.stringify(m)); }catch(_){}
+  _contraRefrescar(pid);
+}
+function _contraRefrescar(pid){
+  try{ var w=document.getElementById('contra-exp-wrap'); if(w&&currentPatient&&currentPatient.id===pid){ renderExpediente(currentTab||'historia'); return; } }catch(_){}
+  try{ window._contraCountCache=null; if(document.getElementById('contra-modal-wrap')) _contraModalRevisar(); }catch(_){}
+  try{ if(document.getElementById('screen-agenda')&&document.getElementById('screen-agenda').classList.contains('active')) renderAgenda(); }catch(_){}
+}
+// Banner dentro del expediente (todas las pestañas). Se ve al abrir cualquier paciente.
+function _contraBannerExpediente(p){
+  var props=_contraDetect(p); if(!props.length) return '';
+  var filas=props.map(function(x){
+    return '<div style="background:#fff;border:1px solid #F0D9A8;border-radius:10px;padding:8px 10px;margin-top:7px">'
+      +'<div style="font-size:12.5px;color:#7A4E00;font-weight:700">'+escapeHTML(x.nota)+'</div>'
+      +'<div style="font-size:11px;color:#8a7a55;margin-top:2px">Detectado en el expediente: “…'+escapeHTML(x.frag)+'…”</div>'
+      +'<div style="display:flex;gap:7px;margin-top:7px">'
+      +'<button data-pid="'+escapeAttr_(p.id)+'" data-cat="'+x.cat+'" onclick="_contraConfirmar(this.dataset.pid,this.dataset.cat)" style="background:#117A3D;border:none;color:#fff;border-radius:14px;padding:6px 13px;font-size:12px;font-weight:700;cursor:pointer">✓ Confirmar y marcar</button>'
+      +'<button data-pid="'+escapeAttr_(p.id)+'" data-cat="'+x.cat+'" onclick="_contraDescartar(this.dataset.pid,this.dataset.cat)" style="background:#F3F4F6;border:1px solid #D1D5DB;color:#555;border-radius:14px;padding:6px 13px;font-size:12px;font-weight:600;cursor:pointer">✕ No aplica</button>'
+      +'</div></div>';
+  }).join('');
+  return '<div style="margin:0 14px 12px;background:#FFF7E6;border:1.5px solid #E0B000;border-left:6px solid #E0B000;border-radius:12px;padding:11px 14px">'
+    +'<div style="font-size:12px;font-weight:800;color:#8A5A00;text-transform:uppercase;letter-spacing:.4px">⚠️ POSIBLES CONTRAINDICACIONES SIN MARCAR ('+props.length+')</div>'
+    +'<div style="font-size:11px;color:#8a7a55;margin-top:3px">La app detectó estas condiciones en el expediente que aún no tienen su alerta. Confirma las que apliquen (o descártalas si son de un familiar).</div>'
+    +filas+'</div>';
+}
+// Conteo para el banner del supervisor (activos con propuestas). Cacheado.
+function _contraCountActivos(){
+  if(window._contraCountCache && (Date.now()-window._contraCountCache.ts<60000)) return window._contraCountCache.list;
+  var list=[];
+  try{ (Array.isArray(patientsDB)?patientsDB:[]).forEach(function(p){ if(!p||String(p.id||'').indexOf('mig_pac_')===0) return; var pr=_contraDetect(p); if(pr.length) list.push({id:p.id,name:p.name,ter:p.terapeuta||p.terapeutaSeguimiento||'',n:pr.length}); }); }catch(_){}
+  window._contraCountCache={ts:Date.now(),list:list};
+  return list;
+}
+// Modal del supervisor: lista de activos con contraindicaciones por revisar (abrir expediente para confirmar).
+function _contraModalRevisar(){
+  var list=_contraCountActivos();
+  var cuerpo=list.length? list.sort(function(a,b){return b.n-a.n;}).map(function(x){
+    return '<div style="display:flex;align-items:center;gap:10px;padding:9px 4px;border-bottom:1px solid #eef1f5">'
+      +'<div style="flex:1;min-width:0"><div style="font-weight:700;color:#14233d;font-size:13.5px">'+escapeHTML(x.name||'(sin nombre)')+'</div>'
+      +'<div style="font-size:11px;color:#8a7a55">'+x.n+' posible'+(x.n!==1?'s':'')+(x.ter?(' · '+escapeHTML(x.ter)):'')+'</div></div>'
+      +'<button data-pid="'+escapeAttr_(x.id)+'" onclick="_contraAbrirDesdeModal(this.dataset.pid)" style="background:var(--gold);border:none;color:var(--navy-dark);border-radius:14px;padding:6px 13px;font-size:12px;font-weight:700;cursor:pointer">Revisar →</button></div>';
+  }).join('') : '<div style="padding:24px 8px;text-align:center;color:#117A3D;font-weight:700">✅ Nada por revisar — todo al día.</div>';
+  var ov=document.getElementById('contra-modal-wrap');
+  if(!ov){ ov=document.createElement('div'); ov.id='contra-modal-wrap'; document.body.appendChild(ov); }
+  ov.innerHTML='<div onclick="if(event.target===this)_contraCerrarModal()" style="position:fixed;inset:0;background:rgba(10,20,40,.5);z-index:9999;display:flex;align-items:flex-end;justify-content:center">'
+    +'<div style="background:#fff;width:100%;max-width:560px;max-height:85vh;overflow:auto;border-radius:18px 18px 0 0;padding:16px 16px 26px">'
+    +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px"><div style="font-size:16px;font-weight:800;color:#1B3A6B">⚠️ Revisar contraindicaciones ('+list.length+')</div>'
+    +'<button onclick="_contraCerrarModal()" style="background:transparent;border:none;font-size:22px;color:#999;cursor:pointer;line-height:1">×</button></div>'
+    +'<div style="font-size:11.5px;color:#5b6572;margin-bottom:8px">Pacientes activos con una enfermedad/implante detectado en su expediente que aún no tiene su alerta. Abre cada uno y confirma (o descarta) desde la caja amarilla.</div>'
+    +cuerpo+'</div></div>';
+}
+function _contraCerrarModal(){ var ov=document.getElementById('contra-modal-wrap'); if(ov) ov.remove(); }
+function _contraAbrirDesdeModal(pid){ _contraCerrarModal(); try{ FST_abrirPacienteDesdeLista(pid); }catch(_){ try{ openExpediente(pid); }catch(__){} } }
 // LIVE (2026-09-30): caja de seguridad que se actualiza MIENTRAS se llena la historia (form content-nuevo).
 // Lee los checkboxes/campos del formulario y reusa _soapSeguridadHTML con un objeto armado al vuelo, para
 // que "🛑 CUIDADO / seguridad clínica" aparezca al momento (no solo después de guardar).
@@ -14477,8 +14724,9 @@ function renderSOAPForm(){
       <button class="media-btn" onclick="(currentPatient||{}).id&&agregarEstudioArchivo(currentPatient.id,'receta')"><span class="media-icon">💊</span>Receta<span class="media-sub">foto / archivo</span></button>
       <button class="media-btn" onclick="(currentPatient||{}).id&&agregarEstudioArchivo(currentPatient.id,'imagen')"><span class="media-icon">🩻</span>Estudio<span class="media-sub">rayos X / RM</span></button>
       <button class="media-btn" onclick="(currentPatient||{}).id&&agregarEstudioArchivo(currentPatient.id,'interpretacion')"><span class="media-icon">📝</span>Interpret.<span class="media-sub">reporte</span></button>
+      <button class="media-btn" onclick="(currentPatient||{}).id&&window.abrirMedidorBiomecanico&&window.abrirMedidorBiomecanico('gonio')"><span class="media-icon">📐</span>Ángulo<span class="media-sub">foto / video</span></button>
     </div>
-    <div style="font-size:10px;color:var(--gray-400);margin:2px 2px 0;line-height:1.3">Las 3 primeras quedan en ESTA nota; Link / Receta / Estudio / Interpret. se guardan en el expediente del paciente.</div>
+    <div style="font-size:10px;color:var(--gray-400);margin:2px 2px 0;line-height:1.3">Las 3 primeras quedan en ESTA nota; Link / Receta / Estudio / Interpret. se guardan en el expediente del paciente. Ángulo abre el goniómetro (foto / video / cámara) y escribe el ROM de la Valoración.</div>
     <div id="soap-media-preview" class="media-grid" style="margin-top:8px"></div>
   </div>
 
@@ -15475,71 +15723,75 @@ function _selEstudioValTipo(el){
   window._altaEstudioTipo={ tipo:el.dataset.tipo||'imagen', clinico:el.dataset.clinico||'' };
 }
 async function _capturarEstudioVal(ev){
-  var file=ev&&ev.target&&ev.target.files&&ev.target.files[0]; if(ev&&ev.target) ev.target.value='';
-  if(!file) return;
-  if(file.size>15*1024*1024){ showToast('⚠️ '+(file.name||'archivo')+' supera 15MB — omitido','error'); return; }
+  // MULTI: acepta VARIOS archivos de una vez (input tiene `multiple`). Sube el lote conservando
+  // TODA la red de seguridad por archivo (reintento 3x + fallback IndexedDB + guard de cambio de
+  // formulario + contador en-vuelo). La interpretación escrita se aplica SOLO al primer archivo.
+  var files=(ev&&ev.target&&ev.target.files)?Array.from(ev.target.files):[]; if(ev&&ev.target) ev.target.value='';
+  if(!files.length) return;
   var sel=window._altaEstudioTipo||{tipo:'imagen',clinico:''};
   if(!window._altaPid) window._altaPid=(typeof generarIdSeguro_==='function'?generarIdSeguro_('p'):('p'+Date.now()));
   var interpEl=document.getElementById('n-estudio-val-interp');
   var interp=(interpEl&&interpEl.value?String(interpEl.value).trim():'');
   var _pidEst=window._altaPid;   // identidad del alta al iniciar (la subida es async)
-  var ts=Date.now();
-  var desc=(sel.clinico?sel.clinico+' · ':'')+String(file.name||'estudio').replace(/\.[^.]+$/,'');
-  function _baseItem(){
-    var it={ id:'est_'+ts+'_'+Math.random().toString(36).slice(2,6), tipo:sel.tipo||'imagen', tipoClinico:sel.clinico||'',
-      type:file.type||'', descripcion:desc, name:(file.name||'estudio'),
-      fechaEstudio:(typeof _isoMasDias==='function'?_isoMasDias(0):''), fechaAgregado:new Date().toLocaleDateString('es-MX'),
-      agregadoPor:(currentUser&&currentUser.name)||'' };
-    if(interp){ it.resumenManual={ texto:interp.slice(0,600), autor:(currentUser&&currentUser.name)||'', fecha:new Date().toISOString() }; }
-    return it;
-  }
   // [ESTUDIO-ALTA-NO-SE-PIERDE] Contador de subidas en vuelo: guardarNuevoPaciente NO deja crear el
   // expediente mientras haya una subida en curso (evita la carrera que dejaba el estudio fuera).
   window._altaEstudiosEnVuelo=(window._altaEstudiosEnVuelo||0)+1;
-  showToast('☁️ Subiendo…','');
+  var _ok=0, _fall=0, _multi=files.length>1;
   try{
-    var safeName=String(file.name||'estudio').replace(/[^\w.\-]+/g,'_');
-    var fbPath='clinica/sinergia/'+_pidEst+'/estudios/'+ts+'_'+safeName;
-    // [REINTENTO] mala señal: hasta 3 intentos con espera creciente antes de rendirse (igual que la
-    // foto de valoración _capturarMediaAntes). Antes: 1 intento y si fallaba se PERDÍA el estudio.
-    var url=null, _try=0;
-    while(_try<3 && !url){
-      _try++;
+    for(var _fi=0; _fi<files.length; _fi++){
+      var file=files[_fi];
+      if(!file) continue;
+      if(file.size>15*1024*1024){ _fall++; showToast('⚠️ '+(file.name||'archivo')+' supera 15MB — omitido','error'); continue; }
+      var ts=Date.now()+_fi;
+      var desc=(sel.clinico?sel.clinico+' · ':'')+String(file.name||'estudio').replace(/\.[^.]+$/,'');
+      var _thisInterp=(_fi===0)?interp:'';   // la interpretación escrita va solo al 1er estudio
+      var item={ id:'est_'+ts+'_'+Math.random().toString(36).slice(2,6), tipo:sel.tipo||'imagen', tipoClinico:sel.clinico||'',
+        type:file.type||'', descripcion:desc, name:(file.name||'estudio'),
+        fechaEstudio:(typeof _isoMasDias==='function'?_isoMasDias(0):''), fechaAgregado:new Date().toLocaleDateString('es-MX'),
+        agregadoPor:(currentUser&&currentUser.name)||'' };
+      if(_thisInterp){ item.resumenManual={ texto:_thisInterp.slice(0,600), autor:(currentUser&&currentUser.name)||'', fecha:new Date().toISOString() }; }
+      showToast(_multi?('☁️ Subiendo '+(_fi+1)+' de '+files.length+'…'):'☁️ Subiendo…','');
       try{
-        var ref=fbStorage.ref(fbPath);
-        url=await new Promise(function(resolve,reject){
-          var task=ref.put(file,{ contentType:file.type||'application/octet-stream' });
-          task.on('state_changed', null, function(err){ reject(err); }, async function(){ try{ resolve(await task.snapshot.ref.getDownloadURL()); }catch(e){ reject(e); } });
-        });
-      }catch(e){ console.warn('[estudio-val] intento '+_try, e&&e.message); if(_try<3){ showToast('Reintentando ('+_try+'/3)…',''); await new Promise(function(r){ setTimeout(r,_try*1500); }); } }
-    }
-    // FUGA ENTRE BORRADORES (auditoría): si se abrió otro Nuevo/Editar durante la subida, _altaPid ya
-    // cambió y _altaEstudios se vació → descartar para no meter el estudio de un alta en otra.
-    if(window._altaPid!==_pidEst){ showToast('Cambiaste de formulario — el estudio no se adjuntó','warning'); return; }
-    if(!Array.isArray(window._altaEstudios)) window._altaEstudios=[];
-    var item=_baseItem();
-    if(url){
-      item.url=url; item.fbPath=fbPath;
-      window._altaEstudios.push(item);
-    } else {
-      // [FALLBACK-IDB] La subida falló tras 3 intentos (mala señal). NO perder el estudio: binario a
-      // IndexedDB + mediaId + pendienteSubida. Se re-sube solo al reconectar o abrir Estudios
-      // (_reSubirFotosLocales procesa estudiosDocs). MISMA red de seguridad que la foto de valoración
-      // y la pestaña Estudios — antes esta ruta era la ÚNICA sin respaldo.
-      try{
-        var _data=await readFile(file);
-        var _mid='estv_'+_pidEst+'_'+ts+'_'+Math.random().toString(36).slice(2,7);
-        await idbSet(_mid,_data);
-        item.mediaId=_mid; item.pendienteSubida=true;
-        window._altaEstudios.push(item);
-        showToast('📴 Estudio guardado en el equipo — se subirá solo al reconectar','warning');
-      }catch(_e){ showToast('No se pudo guardar el estudio: '+((_e&&_e.message)||'error'),'error'); return; }
+        var safeName=String(file.name||'estudio').replace(/[^\w.\-]+/g,'_');
+        var fbPath='clinica/sinergia/'+_pidEst+'/estudios/'+ts+'_'+safeName;
+        // [REINTENTO] mala señal: hasta 3 intentos con espera creciente antes de rendirse.
+        var url=null, _try=0;
+        while(_try<3 && !url){
+          _try++;
+          try{
+            var ref=fbStorage.ref(fbPath);
+            url=await new Promise(function(resolve,reject){
+              var task=ref.put(file,{ contentType:file.type||'application/octet-stream' });
+              task.on('state_changed', null, function(err){ reject(err); }, async function(){ try{ resolve(await task.snapshot.ref.getDownloadURL()); }catch(e){ reject(e); } });
+            });
+          }catch(e){ console.warn('[estudio-val] intento '+_try, e&&e.message); if(_try<3){ showToast('Reintentando ('+_try+'/3)…',''); await new Promise(function(r){ setTimeout(r,_try*1500); }); } }
+        }
+        // FUGA ENTRE BORRADORES: si se abrió otro Nuevo/Editar durante la subida, _altaPid ya cambió
+        // y _altaEstudios se vació → descartar para no meter el estudio de un alta en otra.
+        if(window._altaPid!==_pidEst){ showToast('Cambiaste de formulario — se detuvo la carga','warning'); break; }
+        if(!Array.isArray(window._altaEstudios)) window._altaEstudios=[];
+        if(url){
+          item.url=url; item.fbPath=fbPath;
+          window._altaEstudios.push(item); _ok++;
+        } else {
+          // [FALLBACK-IDB] subida falló tras 3 intentos: binario a IndexedDB + pendienteSubida.
+          try{
+            var _data=await readFile(file);
+            var _mid='estv_'+_pidEst+'_'+ts+'_'+Math.random().toString(36).slice(2,7);
+            await idbSet(_mid,_data);
+            item.mediaId=_mid; item.pendienteSubida=true;
+            window._altaEstudios.push(item); _ok++;
+            showToast('📴 '+(file.name||'estudio')+' guardado en el equipo — se subirá al reconectar','warning');
+          }catch(_e){ _fall++; showToast('No se pudo guardar '+(file.name||'estudio')+': '+((_e&&_e.message)||'error'),'error'); }
+        }
+      }catch(e){ _fall++; console.warn('[estudio-val]', e&&e.message); }
     }
     if(interpEl) interpEl.value='';
     _renderEstudiosVal(); marcarDirty();
     try{ if(typeof guardarBorradorNuevo==='function') guardarBorradorNuevo(); }catch(_){}
-    if(url) showToast('✅ Estudio agregado','success');
-  }catch(e){ console.warn('[estudio-val]', e&&e.message); showToast('No se pudo agregar: '+((e&&e.message)||'error'),'error'); }
+    if(_ok) showToast('✅ '+_ok+' estudio(s) agregado(s)'+(_fall?(' · '+_fall+' con error'):''),'success');
+    else if(_fall) showToast('❌ No se agregó ningún estudio ('+_fall+' con error)','error');
+  }catch(e){ console.warn('[estudio-val lote]', e&&e.message); showToast('No se pudo agregar: '+((e&&e.message)||'error'),'error'); }
   finally{ window._altaEstudiosEnVuelo=Math.max(0,(window._altaEstudiosEnVuelo||1)-1); }
 }
 function _renderEstudiosVal(){
@@ -17405,17 +17657,46 @@ function _fusionarBiomecanica(local, remoto){
   });
   return order.map(function(x){ return (typeof x==='string')?byId[x]:x; });
 }
+var _bmSaveDeferPend = {};   // N3: pendientes de guardado diferido POR id de paciente — fuera del objeto paciente (no se serializa a local/Sheet/FS)
 async function _syncBiomecanicaFS(p){
   try{
     if(!p || !p.id || !Array.isArray(p.biomecanica)) return {ok:false};
     var ok = (typeof FST_init==='function') ? await FST_init() : false;
     if(!ok || !window._fstDb) return {ok:false, pendiente:true};          // offline → queda local, se sube luego
     var ref = window._fstDb.collection('pacientes').doc(p.id);
-    var dsnap = await _conTimeout(ref.get(), 8000);
-    var bmR = ((dsnap && dsnap.data()) || {}).biomecanica;
-    var fusion = _fusionarBiomecanica(p.biomecanica, Array.isArray(bmR)?bmR:[]);
-    p.biomecanica = fusion;                                               // local refleja la unión (trae lo de otros equipos)
-    await _conTimeout(ref.set(_sinUndefined({ biomecanica: fusion }), { merge:true }), 8000);
+    var fusionFinal = null;
+    var _idsAntes={}; p.biomecanica.forEach(function(s){ if(s&&s.id) _idsAntes[s.id]=1; });   // P2-14: para detectar sesiones nuevas que trae la fusión
+    // TRANSACCIÓN ATÓMICA (H3): lee→fusiona→escribe en una sola operación. El get+set no transaccional de
+    // antes tenía una carrera read-modify-write: dos equipos guardando a la vez leían el mismo remoto y el
+    // segundo pisaba la medición del primero. La transacción reintenta sola ante contención → no se pierde ninguna.
+    await _conTimeout(window._fstDb.runTransaction(function(tx){
+      return tx.get(ref).then(function(snap){
+        var bmR = (snap && snap.exists && snap.data()) ? snap.data().biomecanica : null;
+        fusionFinal = _fusionarBiomecanica(p.biomecanica, Array.isArray(bmR)?bmR:[]);
+        tx.set(ref, _sinUndefined({ biomecanica: fusionFinal }), { merge:true });
+      });
+    }), 10000);
+    if(fusionFinal){
+      // P1-10: la transacción confirmó → estas sesiones YA están en la nube. Marca su estado de sync SOLO
+      // tras el éxito (nunca si la tx falló). Campo nuevo; sesiones viejas sin el campo se dejan sin marcar.
+      var _nowISO=(new Date()).toISOString();
+      fusionFinal.forEach(function(s){ if(s && !s.eliminado && s._estadoSync!=='sincronizada'){ s._estadoSync='sincronizada'; s._estadoSyncFecha=_nowISO; } });
+      p.biomecanica = fusionFinal;                                        // local refleja la unión (trae lo de otros equipos)
+      // P2-14: si la fusión trajo sesiones NUEVAS de otros equipos, persístelas en local con un saveDB DIFERIDO
+      // (si no, viven solo en memoria hasta el próximo guardado). Debounce por paciente; saveDB no re-dispara este sync.
+      var _hayNuevas = fusionFinal.some(function(s){ return s && s.id && !_idsAntes[s.id]; });
+      if(_hayNuevas){
+        if(typeof saveDB==='function' && !_bmSaveDeferPend[p.id]){
+          _bmSaveDeferPend[p.id]=true;
+          setTimeout(function(){ delete _bmSaveDeferPend[p.id]; try{ saveDB('pts',[p]); }catch(_e){} }, 1500);
+        }
+        // CROSS-DEVICE (fix 2026-11-14): el pull trajo sesiones de OTRO equipo. La pestaña 🦴 ya se había
+        // pintado "Sin mediciones" cuando se disparó este sync (p.biomecanica estaba vacío) → REPINTAR para
+        // que aparezcan. Solo si seguimos en el MISMO paciente con el expediente abierto. _hayNuevas evita
+        // el bucle: en el re-render, p.biomecanica ya trae las sesiones → la fusión no reporta novedades.
+        try{ if(typeof currentPatient!=='undefined' && currentPatient && currentPatient.id===p.id && document.getElementById('content-expediente') && typeof renderExpediente==='function'){ renderExpediente((typeof currentTab!=='undefined' && currentTab) || 'biomecanica'); } }catch(_e){}
+      }
+    }
     return {ok:true};
   }catch(e){
     if(e && (e.code==='permission-denied' || /permission|insufficient/i.test(String((e&&e.message)||'')))){
@@ -20160,6 +20441,7 @@ function showNuevoPaciente(){
   limpiarDirty();
   window._nuevoModoDerma=false;   // alta MSK normal
   window._nuevoEditPid=null;   // modo CREAR
+  window._medCondVals={};   // medicamento-por-condición: arranca limpio en cada alta nueva
   screenStack.push('screen-nuevo');showScreen('screen-nuevo',false);renderNuevoPaciente();
 }
 // Alta DERMATOFUNCIONAL: mismo formulario (ficha + historia básica), pero abre el apartado 🧴 ya
@@ -20170,6 +20452,7 @@ function showNuevoPacienteDerma(){
   limpiarDirty();
   window._nuevoModoDerma=true;
   window._nuevoEditPid=null;
+  window._medCondVals={};   // medicamento-por-condición: arranca limpio
   screenStack.push('screen-nuevo');showScreen('screen-nuevo',false);renderNuevoPaciente();
 }
 // EDITAR VALORACIÓN reusando el MISMO formulario de nuevo paciente, en modo edición.
@@ -20292,7 +20575,7 @@ function renderNuevoPaciente(){
     </div>
     <div class="form-group">
       <div class="form-field"><div class="form-label">Cirugías previas</div><input class="form-input" id="n-cirugias" type="text" placeholder="Ej: Apendicectomía 2018"><div class="chip-row"><button type="button" class="chip-oneshot" onclick="setCampoRapido('n-cirugias','Ninguna')">Sin cirugías previas relevantes</button></div></div>
-      <div class="form-field"><div class="form-label">Medicamentos actuales</div><input class="form-input" id="n-medicamentos" type="text" placeholder="Ej: Enalapril 10mg"><div class="chip-row"><button type="button" class="chip-oneshot" onclick="setCampoRapido('n-medicamentos','Ninguno')">No toma medicamentos</button></div></div>
+      <div class="form-field"><div class="form-label">Medicamentos actuales</div><div id="n-med-cond" style="display:none;margin-bottom:6px"></div><input class="form-input" id="n-medicamentos" type="text" placeholder="Otros medicamentos (o todos, si no los separas)"><div class="chip-row"><button type="button" class="chip-oneshot" onclick="setCampoRapido('n-medicamentos','Ninguno')">No toma medicamentos</button></div></div>
       <div class="form-field"><div class="form-label">🚫 Alergias <span class="req">*</span></div><input class="form-input" id="n-alergias" type="text" placeholder="Ej: Penicilina, AINES, látex. O escribir 'Ninguna'"><div class="chip-row"><button type="button" class="chip-oneshot" onclick="setCampoRapido('n-alergias','Ninguna')">Sin alergias conocidas</button></div></div>
       <div class="form-field"><div class="form-label" id="n-depo-label">Antecedentes deportivos</div><input class="form-input" id="n-deportivos" type="text" placeholder="Ej: Crossfit, natación..."><div class="chip-row"><button type="button" class="chip-quick" onclick="setCampoRapido('n-deportivos','No practica actividad deportiva')">No practica</button></div></div>
       <div class="form-field"><div class="form-label">Deporte y frecuencia</div><input class="form-input" id="n-deporte-freq" type="text" placeholder="Ej: Crossfit 4x semana"><div class="chip-row"><button type="button" class="chip-quick" onclick="setCampoRapido('n-deporte-freq','No aplica')">No aplica</button></div></div>
@@ -20350,7 +20633,7 @@ function renderNuevoPaciente(){
         <div class="form-label">¿Qué le pasa? Cuéntelo como lo dice el paciente <span class="req">*</span></div>
         <!-- Título del episodio (motivoConsulta): oculto; se genera solo (zona + desde) o de la 1ª línea del relato -->
         <input type="hidden" id="n-motivoconsulta">
-        <textarea class="form-input" id="n-padecimiento" autocapitalize="sentences" style="min-height:120px" placeholder="Escríbelo como lo cuenta el paciente…"></textarea>
+        <textarea class="form-input" id="n-padecimiento" autocapitalize="sentences" oninput="_autoGrowTA(this)" style="min-height:120px;overflow:hidden" placeholder="Escríbelo como lo cuenta el paciente…"></textarea>
         <div id="n-motivo-guia" style="background:#F0F5FB;border:1px solid #DCE8F5;border-radius:10px;padding:10px 12px;font-size:12px;color:var(--navy-light);margin:7px 14px 0;line-height:1.7">
           <b style="color:var(--navy)">Guíate con esto 👇</b><br>
           • ¿Cuál es la molestia principal y dónde la siente?<br>
@@ -20690,7 +20973,7 @@ function renderNuevoPaciente(){
         </div>
         <div style="font-size:12.5px;font-weight:700;color:#00584E;margin-bottom:7px">2. Interpretación <span style="font-weight:400;color:var(--gray-400);font-size:11px">(opcional)</span></div>
         <input type="text" id="n-estudio-val-interp" placeholder="Ej: Rotura parcial de menisco interno, reporta Dr. Pérez" style="width:100%;box-sizing:border-box;border:1.5px solid #B7D8D2;border-radius:10px;padding:11px 12px;font-size:14px;font-family:inherit;color:var(--gray-800);background:#fff;outline:none">
-        <input type="file" id="n-estudio-val-capture" accept="image/*,application/pdf" style="display:none" onchange="_capturarEstudioVal(event)">
+        <input type="file" id="n-estudio-val-capture" accept="image/*,application/pdf" multiple style="display:none" onchange="_capturarEstudioVal(event)">
         <div id="n-estudios-val-wrap" style="margin-top:10px"></div>
         <div style="font-size:12.5px;font-weight:700;color:#00584E;margin:14px 0 7px">3. Captura el documento</div>
         <button type="button" onclick="var i=document.getElementById('n-estudio-val-capture');if(i)i.click()" style="width:100%;background:#00695C;color:#fff;border:none;border-radius:12px;padding:14px;font-size:15px;font-weight:800;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px">📷 Escanear / foto / PDF de estudio</button>
@@ -20881,7 +21164,7 @@ function _prefillNuevoDesdePaciente(p){
   // Alergias es OBLIGATORIO: NO limpiar 'Ninguna'/'No' (blanquearlo bloquearía el guardado).
   S('n-alergias', (p.alergias!=null&&String(p.alergias).trim())?p.alergias:'');
   // Motivo (relato + estructurado)
-  S('n-padecimiento', hc.relato||m.padecimiento||'');
+  S('n-padecimiento', hc.relato||m.padecimiento||''); try{ _autoGrowTA(document.getElementById('n-padecimiento')); }catch(_){}
   S('n-motivoconsulta', p.motivoConsulta||'');
   S('n-dxmedico', (m.dxMedico&&m.dxMedico!=='No cuenta con diagnóstico médico referido')?m.dxMedico:( (p.dx&&p.dx!=='No cuenta con diagnóstico médico referido')?p.dx:'' ));
   S('n-mecanismo',_clean(m.mecanismo)); S('n-evolucion',_clean(m.evolucion));
@@ -20913,6 +21196,7 @@ function _prefillNuevoDesdePaciente(p){
   // Seguridad clínica
   setChecks('sc-implante', sc.implantes||[]); setChecks('sc-condicion', sc.condiciones||[]); setChecks('sc-bandera', sc.banderasRojas||[]);
   S('sc-implantes-detalle', sc.implantesDetalle||''); S('sc-condiciones-obs', sc.condicionesObs||''); S('sc-banderas-detalle', sc.banderasDetalle||'');
+  try{ window._medCondVals={}; _renderMedPorCond(); }catch(_){}   // medicamento por condición: pinta las filas según las condiciones del paciente
   try{ _actualizarAlertaSegVivo(); }catch(_){}   // LIVE: mostrar la caja al abrir en edición si ya trae seguridad
   // Consentimientos (solo reflejar; no se re-piden en edición)
   var _ck=function(id,on){ var el=document.getElementById(id); if(el) el.checked=!!on; };
@@ -21386,7 +21670,7 @@ async function guardarNuevoPaciente(){
     contraindicaciones:v('n-contra','Ninguna'),
     alergias,
     antecedentes:{patologicos:v('n-patologicos','Ninguno'),deportivos:v('n-deportivos','Ninguno'),
-      deporteFrecuencia:v('n-deporte-freq','No aplica'),cirugias:v('n-cirugias','Ninguna'),medicamentos:v('n-medicamentos','Ninguno')},
+      deporteFrecuencia:v('n-deporte-freq','No aplica'),cirugias:v('n-cirugias','Ninguna'),medicamentos:_medAltaCombinar()},
     motivo:{dxMedico:dxmedicoFinal, padecimiento, mecanismo:v('n-mecanismo','No especificado'),
       evolucion:v('n-evolucion','No especificado'),estudios:v('n-estudios','Pendiente'),hallazgos:'',
       // RED DE SEGURIDAD: espejo de la estructura del motivo DENTRO de motivo (que nunca se pierde en
@@ -22926,6 +23210,7 @@ function aplicarBorradorNuevo(data){
     if(data._nEvaVal!=null){ _nEvaVal=data._nEvaVal; var _r=document.getElementById('n-eva-row'); if(_r) _r.innerHTML=_nEvaBtnsHTML(); }
     if(data._implantes) setChecks('sc-implante',data._implantes);
     if(data._condiciones) setChecks('sc-condicion',data._condiciones);
+    try{ _renderMedPorCond&&_renderMedPorCond(); _autoGrowTA(document.getElementById('n-padecimiento')); }catch(_){}
     if(data._banderas) setChecks('sc-bandera',data._banderas);
     // FIX (auditoría): restaurar el motivo estructurado (_HC) y re-marcar sus chips (zona/lado/irrad).
     if(data._HC&&typeof data._HC==='object'){ window._HC=Object.assign({},data._HC); if(typeof _hcInit==='function') _hcInit(); if(typeof _hcRemarcarChips==='function') _hcRemarcarChips(); }
@@ -27917,7 +28202,7 @@ function _bibAbrirArea(li,ai){
     tocHtml='<details class="bib-toc" open><summary>📑 Índice · '+toc.length+' secciones</summary><ul>'+items+'</ul></details>';
   }
   var eyebrow=_bibEsc((lib.emoji?lib.emoji+' ':'')+lib.titulo);
-  var soap=(lib.id!=='derma')?'<div class="bib-soap">💬 <b>Cómo registrarlo en el SOAP:</b> <b>S</b> síntomas y EVA, qué agrava/alivia · <b>O</b> ROM, fuerza y las pruebas de la fase · <b>A</b> fase actual + criterios cumplidos (¿va en tiempo o desfasado?) · <b>P</b> ejercicios/carga de la fase + agentes coadyuvantes y educación.</div>':'';
+  var soap=(lib.id!=='derma'&&lib.id!=='medidor')?'<div class="bib-soap">💬 <b>Cómo registrarlo en el SOAP:</b> <b>S</b> síntomas y EVA, qué agrava/alivia · <b>O</b> ROM, fuerza y las pruebas de la fase · <b>A</b> fase actual + criterios cumplidos (¿va en tiempo o desfasado?) · <b>P</b> ejercicios/carga de la fase + agentes coadyuvantes y educación.</div>':'';
   c.innerHTML='<div class="bib-wrap">'
     +'<div class="bib-toprow"><button class="bib-back2" onclick="_bibBack()">‹ Todos los protocolos</button>'
     +'<button class="bib-pdfbtn" onclick="_bibPDF()">📄 PDF</button></div>'
@@ -28731,7 +29016,7 @@ async function resetImportacion_(){
         <button onclick="capturarFotoScanner2()" id="scan2-btn-captura" style="flex:2;min-width:150px;background:var(--navy);color:white;border:none;border-radius:18px;padding:11px;font-weight:800;cursor:pointer">📸 Capturar</button>
         <button onclick="document.getElementById('scan2-file').click()" style="flex:1;min-width:130px;background:white;border:1.5px solid var(--gray-200);color:var(--gray-600);border-radius:18px;padding:11px;font-weight:700;cursor:pointer">🖼️ Elegir imagen</button>
       </div>
-      <input type="file" id="scan2-file" accept="image/*" style="display:none" onchange="scanner2ArchivoElegido(event)">
+      <input type="file" id="scan2-file" accept="image/*" multiple style="display:none" onchange="scanner2ArchivoElegido(event)">
     </div>
     <div id="scan2-editor" style="display:none">
       <div id="scan2-aviso-calidad" style="display:none;background:var(--red-light);color:var(--red);border-radius:8px;padding:8px 10px;font-size:12px;font-weight:700;margin-bottom:8px"></div>
@@ -28779,7 +29064,8 @@ const scannerState = {
   filtro:'color-suave', autoDetectado:false, ajusteManual:false,
   dragIdx:-1, calidad:[], isSaving:false,
   lastDetectedCorners:null, liveDetectionActive:false,
-  procesadaCanvas:null, paginaActualAgregada:false, _rafId:null, _lastFrameTs:0, _prevPuntos:null, _estableCount:0
+  procesadaCanvas:null, paginaActualAgregada:false, _rafId:null, _lastFrameTs:0, _prevPuntos:null, _estableCount:0,
+  cola:[]
 };
 let _cvReadyPromise = null;
 function ensureOpenCVReady(){
@@ -28829,6 +29115,7 @@ function resetScannerStateForNewScan(){
   scannerState.calidad=[]; scannerState.isSaving=false; scannerState.lastDetectedCorners=null;
   scannerState.liveDetectionActive=false; scannerState.procesadaCanvas=null; scannerState.paginaActualAgregada=false;
   scannerState._prevPuntos=null; scannerState._estableCount=0; scannerState.warpBase=null;
+  scannerState.cola=[];
 }
 function resetScannerUIForNewScan(){
   resetScannerCanvas(); resetScannerFileInput();
@@ -29042,8 +29329,17 @@ function capturarFotoScanner2(){
   img.src=cv2.toDataURL('image/jpeg',0.92);
 }
 function scanner2ArchivoElegido(ev){
-  const f=ev.target.files&&ev.target.files[0]; if(!f) return; ev.target.value='';
-  if(!f.type.startsWith('image')){ showToast('Selecciona una imagen','error'); return; }
+  // MULTI: se pueden elegir VARIAS imágenes de la galería de una vez. La 1ª entra al editor
+  // (ajuste de esquinas/filtro/rotar); las demás quedan en cola y se encadenan al tocar
+  // "Agregar página" → todas caen en el MISMO PDF. (La cámara sigue de una por página.)
+  const files=Array.from((ev.target&&ev.target.files)||[]).filter(f=>f.type&&f.type.startsWith('image'));
+  if(ev.target) ev.target.value='';
+  if(!files.length){ showToast('Selecciona una imagen','error'); return; }
+  scannerState.cola=files.slice(1);
+  _scanProcesarArchivoEscaner(files[0]);
+  if(scannerState.cola.length) showToast('Lote de '+files.length+' imágenes — ajusta cada una y toca "Agregar página"','');
+}
+function _scanProcesarArchivoEscaner(f){
   const reader=new FileReader();
   reader.onload=()=>{ const img=new Image(); img.onload=()=>{ detenerCamaraScanner2(); procesarCapturaScanner2(img, null, true); }; img.onerror=()=>showToast('Imagen inválida','error'); img.src=reader.result; };
   reader.readAsDataURL(f);
@@ -29586,6 +29882,14 @@ function agregarPaginaScanner2(){
   if(!agregarPaginaActualScanner2()){ showToast('No hay página para agregar','warning'); return; }
   showToast('Página '+scannerState.pages.length+' agregada','success');
   scannerState.procesadaCanvas=null; scannerState.warpBase=null; scannerState.paginaActualAgregada=false;
+  // Si hay imágenes en cola (lote de galería), encadenar la siguiente al editor en vez de la cámara.
+  if(scannerState.cola && scannerState.cola.length){
+    const nextF=scannerState.cola.shift();
+    showToast('Siguiente del lote — quedan '+scannerState.cola.length,'');
+    _scanProcesarArchivoEscaner(nextF);
+    actualizarContadorPaginasScanner();
+    return;
+  }
   document.getElementById('scan2-editor').style.display='none';
   document.getElementById('scan2-captura').style.display='block';
   abrirCamaraScanner2(); actualizarContadorPaginasScanner();
@@ -29608,6 +29912,11 @@ function cerrarScanner2(){ resetScannerAfterCancel(); document.getElementById('s
 
 async function guardarPDFScannerMultipagina(){
   if(scannerState.isSaving) return;
+  // Si quedan imágenes del lote de galería sin agregar, avisar antes de finalizar (no perderlas en silencio).
+  if(scannerState.cola && scannerState.cola.length){
+    if(!confirm('Quedan '+scannerState.cola.length+' imágen(es) del lote sin agregar. ¿Finalizar el PDF de todos modos?')) return;
+    scannerState.cola=[];
+  }
   if(scannerState.procesadaCanvas && !scannerState.paginaActualAgregada){ agregarPaginaActualScanner2(); }
   if(scannerState.pages.length===0){ showToast('Agrega al menos una página','warning'); return; }
   const p=currentPatient; if(!p){ showToast('Sin paciente','error'); return; }

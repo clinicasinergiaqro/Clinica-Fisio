@@ -1,0 +1,176 @@
+[
+  {
+    "id": "bm_DEMO_1731600000000",
+    "tipo": "goniometria",
+    "fuente": "camara",
+    "fecha": "2026-11-14",
+    "horaCreacion": "10:15",
+    "fechaHoraISO": "2026-11-14T16:15:00.000Z",
+    "terapeuta": "DEMO",
+    "convencion": "clinica",
+    "plano": "sagital",
+    "medidas": [
+      {
+        "key": "rod_flex", "grupo": "Rodilla", "mov": "Flexión", "lado": "der",
+        "grado": 132, "ref": "0°", "lim": 140, "defic": false, "hiperext": false, "normTxt": "Flexión 0–140°",
+        "traza": {
+          "algoVersion": "bio-2d-2026-11-14a", "aspect": 0.5625, "fuente": "camara", "tSeg": null,
+          "lmUsados": { "a": {"i":24,"x":0.512,"y":0.503,"v":0.98}, "vtx": {"i":26,"x":0.515,"y":0.712,"v":0.97}, "b": {"i":28,"x":0.402,"y":0.861,"v":0.95} }
+        }
+      }
+    ],
+    "hallazgos": [],
+    "cita": "AAOS; Norkin & White",
+    "calidad": { "nMedidas": 1, "algoVersion": "bio-2d-2026-11-14a", "framesDescartados": 2, "captura": { "w": 1080, "h": 1920, "fps": 30, "facing": "environment" } },
+    "imagenes": [],
+    "video": null,
+    "reportePdf": null,
+    "eliminado": false,
+    "_estadoSync": "sincronizada",
+    "_estadoSyncFecha": "2026-11-14T16:15:03.000Z"
+  },
+  {
+    "id": "bm_DEMO_1731600600000",
+    "tipo": "goniometria",
+    "fuente": "foto",
+    "fecha": "2026-11-14",
+    "horaCreacion": "10:25",
+    "fechaHoraISO": "2026-11-14T16:25:00.000Z",
+    "terapeuta": "DEMO",
+    "convencion": "clinica",
+    "plano": "sagital",
+    "medidas": [
+      {
+        "key": "rod_flex", "grupo": "Rodilla", "mov": "Flexión", "lado": "der",
+        "grado": 128, "ref": "0°", "lim": 140, "defic": false, "hiperext": false, "normTxt": "Flexión 0–140°",
+        "traza": {
+          "algoVersion": "bio-2d-2026-11-14a", "aspect": 0.5625, "fuente": "foto", "tSeg": null,
+          "lmUsados": { "a": {"i":24,"x":0.498,"y":0.511,"v":0.96}, "vtx": {"i":26,"x":0.502,"y":0.705,"v":0.95}, "b": {"i":28,"x":0.401,"y":0.853,"v":0.93} }
+        }
+      }
+    ],
+    "hallazgos": [],
+    "cita": "AAOS; Norkin & White",
+    "calidad": { "nMedidas": 1, "algoVersion": "bio-2d-2026-11-14a" },
+    "imagenes": [
+      {
+        "key": "rod_flex_der", "grupo": "Rodilla", "mov": "Flexión", "lado": "der", "grado": 128, "etq": "Rodilla Flexión Der",
+        "url": "https://firebasestorage.googleapis.com/v0/b/clinicasinergia-ec2cf.appspot.com/o/clinica%2Fsinergia%2FDEMO%2Fbiomecanica%2Fgonio_rod_flex_der_1731600600000_0.jpg",
+        "fbPath": "clinica/sinergia/DEMO/biomecanica/gonio_rod_flex_der_1731600600000_0.jpg",
+        "urlOrig": "https://firebasestorage.googleapis.com/v0/b/clinicasinergia-ec2cf.appspot.com/o/clinica%2Fsinergia%2FDEMO%2Fbiomecanica%2Fgonio_rod_flex_der_1731600600000_0_orig.jpg",
+        "fbPathOrig": "clinica/sinergia/DEMO/biomecanica/gonio_rod_flex_der_1731600600000_0_orig.jpg",
+        "mime": "image/jpeg"
+      }
+    ],
+    "video": null,
+    "reportePdf": null,
+    "eliminado": false,
+    "_estadoSync": "sincronizada",
+    "_estadoSyncFecha": "2026-11-14T16:25:04.000Z"
+  },
+  {
+    "id": "bm_DEMO_1731601200000",
+    "tipo": "goniometria",
+    "fuente": "video",
+    "fecha": "2026-11-14",
+    "horaCreacion": "10:35",
+    "fechaHoraISO": "2026-11-14T16:35:00.000Z",
+    "terapeuta": "DEMO",
+    "convencion": "clinica",
+    "plano": "sagital",
+    "medidas": [
+      {
+        "key": "cod_flex", "grupo": "Codo", "mov": "Flexión", "lado": "izq",
+        "grado": 141, "ref": "0°", "lim": 145, "defic": false, "hiperext": false, "normTxt": "Flexión 0–145°",
+        "traza": {
+          "algoVersion": "bio-2d-2026-11-14a", "aspect": 0.5625, "fuente": "video", "tSeg": 7.3,
+          "lmUsados": { "a": {"i":11,"x":0.471,"y":0.302,"v":0.97}, "vtx": {"i":13,"x":0.388,"y":0.455,"v":0.96}, "b": {"i":15,"x":0.401,"y":0.598,"v":0.90} }
+        }
+      }
+    ],
+    "hallazgos": [],
+    "cita": "AAOS; Norkin & White",
+    "calidad": { "nMedidas": 1, "algoVersion": "bio-2d-2026-11-14a" },
+    "imagenes": [
+      {
+        "key": "cod_flex_izq", "grupo": "Codo", "mov": "Flexión", "lado": "izq", "grado": 141, "etq": "Codo Flexión Izq",
+        "url": "https://firebasestorage.googleapis.com/v0/b/clinicasinergia-ec2cf.appspot.com/o/clinica%2Fsinergia%2FDEMO%2Fbiomecanica%2Fgonio_cod_flex_izq_1731601200000_0.jpg",
+        "fbPath": "clinica/sinergia/DEMO/biomecanica/gonio_cod_flex_izq_1731601200000_0.jpg",
+        "urlOrig": "https://firebasestorage.googleapis.com/v0/b/clinicasinergia-ec2cf.appspot.com/o/clinica%2Fsinergia%2FDEMO%2Fbiomecanica%2Fgonio_cod_flex_izq_1731601200000_0_orig.jpg",
+        "fbPathOrig": "clinica/sinergia/DEMO/biomecanica/gonio_cod_flex_izq_1731601200000_0_orig.jpg",
+        "mime": "image/jpeg"
+      }
+    ],
+    "video": null,
+    "reportePdf": null,
+    "eliminado": false,
+    "_estadoSync": "sincronizada",
+    "_estadoSyncFecha": "2026-11-14T16:35:05.000Z"
+  },
+  {
+    "id": "bm_DEMO_1731601800000",
+    "tipo": "marcha",
+    "fuente": "camara",
+    "fecha": "2026-11-14",
+    "horaCreacion": "10:45",
+    "fechaHoraISO": "2026-11-14T16:45:00.000Z",
+    "terapeuta": "DEMO",
+    "convencion": "clinica",
+    "duracionSeg": 20,
+    "nCiclos": 6,
+    "cadencia": 108,
+    "velocidad": 1.1,
+    "temporal": { "izq": { "nCiclos": 6, "stancePct": 61, "swingPct": 39 }, "der": { "nCiclos": 6, "stancePct": 62, "swingPct": 38 } },
+    "espacial": { "pasoM": 0.62 },
+    "sagital": { "rodPicoIzq": 57, "rodPicoDer": 58, "caderaRomIzq": 40, "caderaRomDer": 41 },
+    "simetria": { "rodPeak": 94, "hipROM": 91, "stancePct": 96 },
+    "medidas": [
+      { "key": "stance_izq", "valor": 61, "unidad": "%", "confiable": true },
+      { "key": "stance_der", "valor": 62, "unidad": "%", "confiable": true },
+      { "key": "rod_pico_izq", "valor": 57, "unidad": "", "confiable": true },
+      { "key": "rod_pico_der", "valor": 58, "unidad": "", "confiable": true },
+      { "key": "cadera_rom_izq", "valor": 40, "unidad": "", "confiable": true },
+      { "key": "cadera_rom_der", "valor": 41, "unidad": "", "confiable": true }
+    ],
+    "calibracion": { "estaturaCm": 170 },
+    "calidad": { "framesValidos": 210, "frames": 240, "visPct": 88, "orientPerfilOK": true, "tiempoDudoso": false, "fpsMuestreo": 12, "framesTotales": 240, "algoVersion": "bio-2d-2026-11-14a", "framesDescartados": 1 },
+    "reportePdf": null,
+    "video": null,
+    "eliminado": false,
+    "_estadoSync": "sincronizada",
+    "_estadoSyncFecha": "2026-11-14T16:45:06.000Z"
+  },
+  {
+    "id": "bm_DEMO_1731602400000",
+    "tipo": "marcha",
+    "fuente": "video",
+    "fecha": "2026-11-14",
+    "horaCreacion": "10:55",
+    "fechaHoraISO": "2026-11-14T16:55:00.000Z",
+    "terapeuta": "DEMO",
+    "convencion": "clinica",
+    "duracionSeg": 12,
+    "nCiclos": 4,
+    "cadencia": 34,
+    "velocidad": null,
+    "temporal": { "izq": { "nCiclos": 4, "stancePct": 70 }, "der": { "nCiclos": 4, "stancePct": 71 } },
+    "espacial": { "pasoM": null },
+    "sagital": { "rodPicoIzq": 55, "rodPicoDer": 56, "caderaRomIzq": 38, "caderaRomDer": 39 },
+    "simetria": { "rodPeak": 95, "hipROM": 92, "stancePct": null },
+    "medidas": [
+      { "key": "stance_izq", "valor": 70, "unidad": "%", "confiable": false },
+      { "key": "stance_der", "valor": 71, "unidad": "%", "confiable": false },
+      { "key": "rod_pico_izq", "valor": 55, "unidad": "", "confiable": true },
+      { "key": "rod_pico_der", "valor": 56, "unidad": "", "confiable": true },
+      { "key": "cadera_rom_izq", "valor": 38, "unidad": "", "confiable": true },
+      { "key": "cadera_rom_der", "valor": 39, "unidad": "", "confiable": true }
+    ],
+    "calibracion": { "estaturaCm": 165 },
+    "calidad": { "framesValidos": 300, "frames": 320, "visPct": 82, "orientPerfilOK": true, "tiempoDudoso": true, "tiempoDudosoMsg": "El ritmo calculado (34 pasos/min) es atípico. Si el video es en cámara lenta o acelerada, los tiempos (cadencia, fase de apoyo, doble apoyo, longitud de paso y velocidad) NO son fiables; el ángulo de rodilla/cadera sí.", "fpsMuestreo": 12, "framesTotales": 320, "algoVersion": "bio-2d-2026-11-14a" },
+    "reportePdf": null,
+    "video": { "url": "https://firebasestorage.googleapis.com/v0/b/clinicasinergia-ec2cf.appspot.com/o/clinica%2Fsinergia%2FDEMO%2Fbiomecanica%2Fmarcha_1731602400000.mp4", "fbPath": "clinica/sinergia/DEMO/biomecanica/marcha_1731602400000.mp4", "mime": "video/mp4", "tamanoBytes": 1234567, "fuente": "video" },
+    "eliminado": false,
+    "_estadoSync": "local",
+    "_estadoSyncFecha": null
+  }
+]
