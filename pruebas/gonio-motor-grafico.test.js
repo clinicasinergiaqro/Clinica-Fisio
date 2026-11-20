@@ -183,7 +183,7 @@ console.log('\n== _renderAnotada: anotada con barra de procedencia + original in
   chk(out && out.orig.width===800 && out.orig.height===600, 'R3', 'original con las dimensiones EXACTAS del cuadro (sin anotar)');
   var rec=out && out.annot._rec;
   chk(rec && rec.calls.text.some(function(t){ return /Codo · Flexión · Der/.test(t.t) && /57°/.test(t.t); }), 'R4', 'la barra lleva movimiento · lado · valor');
-  chk(rec && rec.calls.text.some(function(t){ return /✋/.test(t.t); }), 'R5', 'revisión manual marcada (✋) en la barra');
+  chk(rec && rec.calls.text.some(function(t){ return /ajuste manual/.test(t.t); }), 'R5', 'revisión manual marcada ("ajuste manual") en la barra');
 })();
 
 console.log('\nMotor gráfico V3: '+pass+' OK, '+fail+' fallidas.');
