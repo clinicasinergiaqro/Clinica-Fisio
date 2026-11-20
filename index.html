@@ -1367,7 +1367,7 @@ body.modo-oscuro .topbar{background:#141824}
 <body>
 <div id="sync-indicator" class="sync-indicator ok" style="display:none"></div>
 <div id="app-version-chip" title="Versión de la app en este equipo — toca para buscar actualización" onclick="try{_tapVersionChip()}catch(e){}"></div>
-<script>/* VERSIÓN VISIBLE: refleja el index.html realmente cargado en ESTE equipo (se bumpea junto con sw.js). Así un iPad con versión vieja se ve de un vistazo. */window.APP_VERSION='v1-2026-11-11b';(function(){try{var c=document.getElementById('app-version-chip');if(c)c.textContent=window.APP_VERSION;}catch(e){}})();</script>
+<script>/* VERSIÓN VISIBLE: refleja el index.html realmente cargado en ESTE equipo (se bumpea junto con sw.js). Así un iPad con versión vieja se ve de un vistazo. */window.APP_VERSION='v1-2026-11-20a';(function(){try{var c=document.getElementById('app-version-chip');if(c)c.textContent=window.APP_VERSION;}catch(e){}})();</script>
 <div class="toast" id="toast" aria-live="polite" aria-atomic="true"></div>
 
 <!-- LOGIN -->
@@ -5899,6 +5899,7 @@ if ('serviceWorker' in navigator) {
       if (document.visibilityState === 'visible'){
         try{ navigator.serviceWorker.getRegistration().then(r=>{ if(r) r.update(); }).catch(()=>{}); }catch(e){}
         revisarCambioDeCaches();
+        try{ _sondearVersionNuevaPorRed(); }catch(e){}   // [CIERRE BORDE iPAD] resume principal de iOS
         aplicarActualizacionSiSegura();
       }
     });
@@ -5912,11 +5913,31 @@ if ('serviceWorker' in navigator) {
     // agresiva — pageshow(persisted) y focus cubren esos huecos y PROVOCAN reg.update() (el paso
     // que en standalone nunca corría). Throttle 60s: alternar apps no genera ráfagas de update().
     // Offline: reg.update() falla silencioso y el gancho 'online' (arriba) reintenta al volver la red.
+    // [CIERRE BORDE iPAD] Sonda DIRECTA por red del sw.js, INDEPENDIENTE de reg.update(). En iOS
+    // standalone con suspensión agresiva, WebKit a veces sirve el sw.js del caché viejo pese a
+    // updateViaCache:'none' → updatefound/controllerchange nunca disparan, _swUpdatePendiente queda
+    // false y la app "no se actualiza" hasta reinstalar. _altaVersionVieja() hace fetch('./sw.js',
+    // no-store + cache-buster) y compara su versión con APP_VERSION (throttle 3 min, offline-safe).
+    // Si confirma una MÁS NUEVA por red, marca el pendiente y delega en la ruta SEGURA existente
+    // (nunca a mitad de nota/navegación/con colas: aplica en pantalla de paso o difiere al banner).
+    function _sondearVersionNuevaPorRed(){
+      try{
+        if(_swRecargando || _swUpdatePendiente) return;          // ya detectado por la vía normal
+        if(typeof _altaVersionVieja!=='function') return;
+        _altaVersionVieja().then(function(vieja){
+          if(vieja && !_swRecargando && !_swUpdatePendiente){
+            _swUpdatePendiente = true;
+            try{ aplicarActualizacionSiSegura(); }catch(_){}
+          }
+        }).catch(function(){});
+      }catch(_){}
+    }
     var _swUpdPingTs = 0;
     function _swPingUpdate(){
       var t = Date.now(); if(t - _swUpdPingTs < 60000) return; _swUpdPingTs = t;
       try{ navigator.serviceWorker.getRegistration().then(r => { if(r) r.update(); }).catch(()=>{}); }catch(e){}
       try{ revisarCambioDeCaches(); }catch(e){}
+      try{ _sondearVersionNuevaPorRed(); }catch(e){}   // [CIERRE BORDE iPAD] sonda directa en cada resume
       try{ aplicarActualizacionSiSegura(); }catch(e){}
     }
     window.addEventListener('pageshow', function(ev){ if(ev && ev.persisted) _swPingUpdate(); });
@@ -5924,7 +5945,7 @@ if ('serviceWorker' in navigator) {
     // Tic lento: [FIX-AUTOUPDATE p4] revisa estado y aplica si es seguro. Si quedó una
     // actualización pendiente y el usuario ya terminó (guardó / dejó de escribir), se aplica
     // sola sin que tenga que hacer nada.
-    setInterval(function(){ if(document.visibilityState==='hidden') return; revisarCambioDeCaches(); aplicarActualizacionSiSegura(); }, 30000);   // RENDIMIENTO: 15s→30s y sin trabajo en 2º plano
+    setInterval(function(){ if(document.visibilityState==='hidden') return; revisarCambioDeCaches(); _sondearVersionNuevaPorRed(); aplicarActualizacionSiSegura(); }, 30000);   // RENDIMIENTO: 15s→30s y sin trabajo en 2º plano. [CIERRE BORDE iPAD] + sonda directa (throttle 3min interno) para el iPad que queda abierto y nunca re-fetcha sw.js
   });
   function _registrarSW(){
     // updateViaCache:'none' — CLAVE para iOS: obliga a traer sw.js SIEMPRE de la red al revisar
@@ -12789,15 +12810,22 @@ async function FST_cargarIndicePacientes() {
       snap.forEach(doc => {
         const d = doc.data() || {};
         if (d.eliminado === true) { _elimIdx.add(doc.id); return; }   // [BORRADO] fuera de la lista + al set
+        // [FIX EDAD MIGRADOS] El age guardado en el doc migrado está congelado (de la migración, hace 2-3 años);
+        // la edad REAL se recalcula desde fechaNacimiento. El doc usa el campo `fechaNacimiento` (lo escribe el
+        // barrido / claudeFsMerge), no `fechaNac`. _formatFechaNac normaliza ISO/8-dígitos → DD/MM/YYYY.
+        var _fnacIdx = d.fechaNacimiento || d.fechaNac || '';
+        var _ageIdx  = (_fnacIdx && typeof calcularEdadDesdeFechaNacimiento === 'function')
+          ? calcularEdadDesdeFechaNacimiento(_formatFechaNac(_fnacIdx)) : null;
         pacientes.push({
           id              : doc.id,
           fstPid          : doc.id,
           name            : d.name            || '',
-          age             : d.age             || '',
+          age             : (_ageIdx != null ? _ageIdx : (d.age || '')),   // [FIX EDAD MIGRADOS] edad recalculada; fallback al age viejo solo si no hay DOB
           terapeuta       : d.terapeuta       || d.terapeutaActual || '',
           terapeutaSeguimiento: d.terapeutaSeguimiento || '',   // FASE 3b: tarjeta completa desde el índice
           date            : d.date            || '',
-          fechaNac        : d.fechaNac        || '',
+          fechaNac        : _formatFechaNac(_fnacIdx) || d.fechaNac || '',
+          fechaNacimiento : _fnacIdx || undefined,   // [FIX EDAD MIGRADOS] conservar DOB en la entrada → hidratación y recálculo posterior
           creadoPor       : d.creadoPor       || '',
           nombreNormalizado: d.nombreNormalizado || FST_normalizarBusqueda(d.name || ''),
           dx              : d.dx              || d.diagnostico     || '',
@@ -12998,7 +13026,15 @@ async function FST_hidratarCamposClinicos(p, id) {
     const d = snap.data() || {};
     if (!_fstDocVivo(d)) return;   // [BORRADO] no hidratar (ni abrir) un paciente tombstoneado
 
-    if (d.age != null && p.age == null)   p.age = d.age;
+    // [FIX EDAD MIGRADOS] La fecha de nacimiento manda sobre el age viejo congelado (consistente con
+    // sanearYRecalcularEdad de los activos). Si el doc trae fechaNacimiento, se recalcula; si no, se
+    // conserva el comportamiento anterior (copiar el age guardado solo cuando el local está vacío).
+    if (d.fechaNacimiento && !p.fechaNacimiento) p.fechaNacimiento = d.fechaNacimiento;
+    var _fnacHid = p.fechaNacimiento || d.fechaNacimiento;
+    var _ageHid  = (_fnacHid && typeof calcularEdadDesdeFechaNacimiento === 'function')
+      ? calcularEdadDesdeFechaNacimiento(_formatFechaNac(_fnacHid)) : null;
+    if (_ageHid != null)                       p.age = _ageHid;
+    else if (d.age != null && p.age == null)   p.age = d.age;
     if (d.alergias)                       p.alergias = d.alergias;
     if (d.motivoConsulta)                 p.motivoConsulta = d.motivoConsulta;
     if (d.antecedentes && typeof d.antecedentes === 'object' && !Array.isArray(d.antecedentes))
