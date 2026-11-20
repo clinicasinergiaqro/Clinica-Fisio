@@ -72,7 +72,7 @@
   //    cuadros (p.ej. el canvas HEVC/iOS), gateo de tiempo (VFR), o caps/techos que cambien el resultado —
   //    NO solo en "correcciones". Si el cálculo cambia y el sello no, la procedencia de los datos clínicos
   //    miente (una sesión diría "mismo algoritmo" que otra medida con código distinto).
-  var BIO_ALGO_VER = 'bio-2d-2026-11-19';   // 2026-11-19: goniómetro de FOTO y VIDEO robusto a orientación (decúbito/cuerpo parcial: prueba rotaciones → mide articulaciones que antes daban "sin cuerpo"). Cambia QUÉ se mide → se sube el sello por la regla de arriba. (Histórico: -18 añadió techo del goniómetro + decode HEVC iOS; 14b = Hallazgo D tiempo/slow-mo.)
+  var BIO_ALGO_VER = 'bio-2d-2026-11-20';   // 2026-11-20: MUÑECA contra el 3.er METACARPIANO (detector de MANO lm0→lm9, bajo demanda) en vez de la punta del índice de Pose, que colapsa con el puño y daba ángulos inventados; fallback al índice SOLO con mano abierta (gate de largo mínimo) y "no medible" honesto. Cambia el EJE de medición → sube el sello. (Histórico: -19 foto/video robustos a orientación; -18 techo + decode HEVC iOS; 14b Hallazgo D tiempo/slow-mo.)
   // CORRECCIÓN DE ASPECTO (H1): las coords de MediaPipe vienen normalizadas 0–1 por ANCHO (x) y por
   // ALTO (y) de forma INDEPENDIENTE. En un cuadro NO cuadrado (p.ej. 9:16 vertical del celular) eso
   // deforma los ángulos de segmentos oblicuos hasta ~20°. Reescalando x por (ancho/alto) se recupera
@@ -136,6 +136,64 @@
       document.head.appendChild(s);
     });
     return BIO._readyPromise;
+  }
+
+  // ── Carga de MediaPipe HANDS bajo demanda — SOLO para el goniómetro de MUÑECA ─────────────
+  // AUDITORÍA 2026-11-20: el eje clínico de la mano para medir muñeca es el 3.er METACARPIANO
+  // (muñeca → nudillo del dedo medio). Pose solo da la PUNTA del índice (19/20), que con la mano
+  // cerrada / dedos curvos cae junto a la palma → el vector casi desaparece y el ángulo sale
+  // inventado. Hands da lm0 (muñeca) y lm9 (nudillo medio), ESTABLES aunque el puño esté cerrado.
+  // NO va al SHELL del SW (no rompe el offline del resto): se baja del CDN la 1.ª vez que se mide
+  // muñeca y el SW lo cachea en runtime (igual que html2canvas). Si no carga → fallback endurecido.
+  var MP_HANDS_BASE = 'https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4';
+  function ensureHandsReady(){
+    if(BIO.hands) return Promise.resolve(true);
+    if(BIO._handsPromise) return BIO._handsPromise;
+    BIO._handsPromise = new Promise(function(resolve){
+      var timeout = setTimeout(function(){ resolve(false); }, 30000);
+      function crearHands(){
+        try{
+          if(typeof Hands === 'undefined'){ clearTimeout(timeout); resolve(false); return; }
+          var h = new Hands({ locateFile:function(f){ return MP_HANDS_BASE + '/' + f; } });
+          h.setOptions({ maxNumHands:2, modelComplexity:1, minDetectionConfidence:0.4, minTrackingConfidence:0.4 });
+          h.onResults(onResultsHands);
+          BIO.hands = h; clearTimeout(timeout); resolve(true);
+        }catch(e){ clearTimeout(timeout); console.warn('[BIO] Hands init falló:', e && e.message); resolve(false); }
+      }
+      if(typeof Hands !== 'undefined'){ crearHands(); return; }
+      var s = document.createElement('script');
+      s.src = MP_HANDS_BASE + '/hands.js'; s.async = true; s.crossOrigin = 'anonymous';
+      s.onload = crearHands;
+      s.onerror = function(){ clearTimeout(timeout); console.warn('[BIO] No se pudo cargar hands.js (la muñeca exigirá mano abierta)'); resolve(false); };
+      document.head.appendChild(s);
+    });
+    return BIO._handsPromise;
+  }
+  function _munecaActiva(){ return BIO.tipoMedicion==='gonio' && !!(BIO.accG && BIO.accG.sel && BIO.accG.sel.grupo==='Muñeca'); }
+  // Dispara la carga de Hands en 2º plano si el goniómetro activo es Muñeca (nunca bloquea; si falla, queda el fallback).
+  function _ensureHandsSiMuneca(){
+    if(_munecaActiva() && !BIO.hands && !BIO._handsFallo){
+      ensureHandsReady().then(function(ok){ if(!ok) BIO._handsFallo = true; });
+    }
+  }
+  function onResultsHands(res){
+    var hs = res && res.multiHandLandmarks;
+    BIO._handsLm = (hs && hs.length) ? hs : null;
+    BIO._handsLmTs = Date.now();
+  }
+  // Manos vigentes para el CÁLCULO de muñeca: en estático las congeladas con ESE cuadro (foto / pico de
+  // video); en vivo/video las frescas (<1.2 s, mismo flujo de cuadros). [] = "se buscó y no hay mano".
+  function _handsActuales(){
+    if(BIO._handsLmTest) return BIO._handsLmTest;                                   // hook de pruebas
+    if(BIO.modo==='estatico') return (BIO._estaticoHandsLm!==undefined) ? BIO._estaticoHandsLm : null;
+    if(BIO._handsLm && (Date.now() - (BIO._handsLmTs||0)) < 1200) return BIO._handsLm;
+    return null;
+  }
+  // Copia defensiva de landmarks de manos (para congelar el cuadro-pico, igual que _copiaLm con la pose).
+  function _copiaManosLm(hs){
+    if(!hs) return null;
+    try{ return hs.map(function(h){ return (h||[]).map(function(p){ return p ? { x:p.x, y:p.y, z:p.z } : p; }); }); }
+    catch(_c){ return null; }
   }
 
   // ── Matemática de ángulos ──────────────────────────────────────────────────
@@ -773,10 +831,20 @@
   // resuelto): si un send colgado que el watchdog ya "soltó" (shift) resuelve TARDE (<2.5 s), su callback
   // consume el gen del send fresco y un cuadro algo viejo de la MISMA medición se acepta (y el fresco cae al
   // fallback). Es intra-medición y acotado a 2.5 s; NO mezcla mediciones de generaciones distintas.
-  function _bumpGen(){ BIO.gen = (BIO.gen||0) + 1; }
+  function _bumpGen(){ BIO.gen = (BIO.gen||0) + 1; BIO._handsLm = null; }   // manos frescas: no cruzar fuente/selección
   function _genSend(img){
     (BIO._genQ || (BIO._genQ=[])).push(BIO.gen||0);
     if(BIO._genQ.length > 32) BIO._genQ.shift();   // candado: un send() colgado que nunca devolvió no crece la cola sin fin
+    // MUÑECA: el MISMO cuadro va también a Hands (eje del 3.er metacarpiano), fire-and-forget con su propio
+    // candado — se auto-regula (solo bombea cuando Hands quedó libre) y nunca bloquea ni retrasa a Pose.
+    if(_munecaActiva() && BIO.hands){
+      if(BIO._handsSending && BIO._handsSendAt && (Date.now()-BIO._handsSendAt)>2500) BIO._handsSending=false;  // watchdog
+      if(!BIO._handsSending){
+        BIO._handsSending=true; BIO._handsSendAt=Date.now();
+        try{ BIO.hands.send({ image: img }).then(function(){ BIO._handsSending=false; }).catch(function(){ BIO._handsSending=false; }); }
+        catch(_h){ BIO._handsSending=false; }
+      }
+    }
     return BIO.pose.send({ image: img });
   }
 
@@ -818,10 +886,11 @@
       var sg=BIO.accG&&BIO.accG.sel;
       var rg = (lm && sg) ? calcularGonio(lm, sg.grupo, sg.mov, sg.lado) : {ok:false,val:null};
       var mejoroG = procesarGonioFrame(rg);
-      // Al mejorar el pico guardamos los landmarks de ESE cuadro (trazabilidad: qué puntos produjeron el grado).
-      if(mejoroG && lm){ try{ BIO._peakGonioLm=_copiaLm(lm); BIO._peakGonioAR=_ANG_AR; }catch(_g){} }
-      // Al analizar un VIDEO, además guardamos la IMAGEN del cuadro-pico para anotarla.
-      if(BIO.modo==='video' && mejoroG && lm && BIO.srcEl){ try{ BIO._peakFrameCanvas=_canvasDeImagen(BIO._gonioRot ? (BIO._vidFrameSent||BIO.srcEl) : BIO.srcEl); BIO._peakFrameLm=_copiaLm(lm); BIO._peakTSeg=(BIO.srcEl.currentTime||0); }catch(_e){} }
+      // Al mejorar el pico guardamos los landmarks de ESE cuadro (trazabilidad: qué puntos produjeron el grado)
+      // + el RESULTADO (rg.mano/rg.eje: en muñeca trae el eje metacarpiano real con el que salió el número).
+      if(mejoroG && lm){ try{ BIO._peakGonioLm=_copiaLm(lm); BIO._peakGonioAR=_ANG_AR; BIO._peakGonioR=rg; }catch(_g){} }
+      // Al analizar un VIDEO, además guardamos la IMAGEN del cuadro-pico para anotarla (+ las manos de ese momento).
+      if(BIO.modo==='video' && mejoroG && lm && BIO.srcEl){ try{ BIO._peakFrameCanvas=_canvasDeImagen(BIO._gonioRot ? (BIO._vidFrameSent||BIO.srcEl) : BIO.srcEl); BIO._peakFrameLm=_copiaLm(lm); BIO._peakTSeg=(BIO.srcEl.currentTime||0); BIO._peakHandsLm=_copiaManosLm(_handsActuales()); }catch(_e){} }
       if(BIO.canvas && BIO.srcEl){ dibujar(lm, null); dibujarGonioVivo(lm, rg); }
       return;
     }
@@ -1125,6 +1194,7 @@
     BIO.modo=null; BIO.recording=false; BIO.procesandoVideo=false; BIO.cancelVideo=false; BIO.finalizando=false;
     BIO.acc=null; BIO.accS=null; BIO.accM=null; BIO.accG=null; BIO.framesTotales=0; BIO.srcEl=null; BIO.sending=false;
     BIO._estaticoBase=null; BIO._estaticoLm=null; BIO._estaticoImg=null; BIO._estaticoFuente=null; BIO._peakFrameCanvas=null; BIO._peakFrameLm=null; BIO._peakTSeg=null; BIO._fotoRes=null; BIO._gonioRot=0; BIO._vidFrameSent=null;
+    BIO._handsLm=null; BIO._handsSending=false; BIO._estaticoHandsLm=undefined; BIO._estaticoHandsNext=undefined; BIO._estaticoHandsRun=false; BIO._peakHandsLm=null; BIO._peakGonioR=null; BIO._estaticoR=null;   // estado de HANDS (muñeca); el modelo cargado se conserva para reuso
     BIO.facing='environment';           // cada medición arranca con la cámara TRASERA
     detenerGrabadorVideo(); BIO.pendingVideo=null; BIO.videoCola=[];
     detenerLoopCamara(); pararCronometro();
@@ -1150,7 +1220,7 @@
 
   // ── MODO A: cámara en vivo ─────────────────────────────────────────────────
   async function iniciarCamara(){
-    BIO.modo='camara'; _bumpGen();
+    BIO.modo='camara'; _bumpGen(); _ensureHandsSiMuneca();
     BIO.facing = BIO.facing || 'environment';   // TRASERA por defecto (se apunta al paciente)
     mostrarVista('bio-vista-camara');
     // Reset del botón de grabar y cronómetro (evita estado viejo al volver a grabar).
@@ -1415,7 +1485,7 @@
   // ── MODO B: analizar video subido ──────────────────────────────────────────
   async function procesarVideo(file){
     if(!file.type || file.type.indexOf('video')!==0){ toast('Selecciona un archivo de video','error'); return; }
-    BIO.modo='video'; _bumpGen();
+    BIO.modo='video'; _bumpGen(); _ensureHandsSiMuneca();
     // Guardar el archivo elegido para subirlo al expediente al guardar (antes/después visual).
     var _ext=(String(file.name||'').split('.').pop()||'').toLowerCase().replace(/[^a-z0-9]/g,'') || (file.type.indexOf('mp4')>=0?'mp4':(file.type.indexOf('quicktime')>=0?'mov':'webm'));
     BIO.pendingVideo = { file:file, mime:file.type||'video/mp4', ext:_ext };
@@ -1452,7 +1522,7 @@
 
     if(BIO.tipoMedicion==='sent'){ BIO.accS=nuevoAccSent(); }
     else if(BIO.tipoMedicion==='marcha'){ BIO.accM=nuevoAccMarcha(); }
-    else if(BIO.tipoMedicion==='gonio'){ if(!BIO.accG) BIO.accG=nuevoAccGonio(); _gonioSelDefault(BIO.accG); BIO.accG.peak=null; BIO.accG.run=0; BIO._peakFrameCanvas=null; BIO._peakFrameLm=null; BIO._peakTSeg=null; BIO._gonioRot=0; }
+    else if(BIO.tipoMedicion==='gonio'){ if(!BIO.accG) BIO.accG=nuevoAccGonio(); _gonioSelDefault(BIO.accG); BIO.accG.peak=null; BIO.accG.run=0; BIO._peakFrameCanvas=null; BIO._peakFrameLm=null; BIO._peakTSeg=null; BIO._gonioRot=0; BIO._peakHandsLm=null; BIO._peakGonioR=null; _ensureHandsSiMuneca(); }
     else { BIO.acc = nuevoAcumulador(); }
     BIO.framesTotales=0; BIO.framesDescartados=0;   // O4: reinicia descartes al empezar el análisis de video
     BIO.procesandoVideo=true; BIO.cancelVideo=false;
@@ -1525,7 +1595,7 @@
       var _rotsVid=[90,-90,180];
       for(var _rvi=0; _rvi<_rotsVid.length && !BIO.cancelVideo; _rvi++){
         BIO._gonioRot=_rotsVid[_rvi]; _bumpGen(); BIO.sending=false;
-        if(BIO.accG){ BIO.accG.peak=null; BIO.accG.run=0; } BIO._peakFrameCanvas=null; BIO._peakFrameLm=null; BIO._peakTSeg=null; BIO.framesTotales=0;
+        if(BIO.accG){ BIO.accG.peak=null; BIO.accG.run=0; } BIO._peakFrameCanvas=null; BIO._peakFrameLm=null; BIO._peakTSeg=null; BIO._peakHandsLm=null; BIO._peakGonioR=null; BIO.framesTotales=0;
         if(txt) txt.textContent='Probando otra orientación…'; if(fill) fill.style.width='0%';
         try{ v.currentTime=0; }catch(_){}
         await _muestrear();
@@ -1554,6 +1624,7 @@
     } else if(BIO.tipoMedicion==='gonio'){
       var gg=BIO.accG;
       if(gg && gg.peak!=null && BIO._peakFrameCanvas){
+        BIO._estaticoHandsNext = (BIO._peakHandsLm!=null) ? BIO._peakHandsLm : undefined;   // manos del cuadro-pico, congeladas con él
         _mostrarGonioEstatico(BIO._peakFrameCanvas, BIO._peakFrameLm, 'video');
       } else {
         toast('No se detectó la articulación con claridad en el video. Grábalo de PERFIL, con la zona y buena luz en cuadro, o usa una foto.','warning');
@@ -2370,8 +2441,9 @@
     { key:'tob_pf',   grupo:'Tobillo', mov:'Plantiflexión', pos:'Supino',        agg:'max', ref:50,  lim:40,  normTxt:'0–50°',
       guia:'Cámara al COSTADO del pie. Apunta la punta del pie hacia abajo.' },
     // ── Miembro superior (plano sagital, cámara al COSTADO del brazo) ──
-    // Codo es fiable en 2D (hombro-codo-muñeca, todos landmarks sólidos). Muñeca es una ESTIMACIÓN
-    // (depende de ver bien la mano/índice). El fisio elige el movimiento y lo hace solo → la app mide la magnitud.
+    // Codo es fiable en 2D (hombro-codo-muñeca, todos landmarks sólidos). MUÑECA se mide contra el eje del
+    // 3.er METACARPIANO (muñeca→nudillo medio, detector de MANO bajo demanda — auditoría 2026-11-20); sin ese
+    // detector cae al índice de Pose SOLO con la mano abierta; con puño/mano tapada → "no medible" honesto.
     { key:'cod_flex', grupo:'Codo',    mov:'Flexión',       pos:'Sentado/De pie', agg:'max', ref:145, lim:130, normTxt:'0–145°',
       guia:'Cámara al COSTADO del brazo. Brazo pegado al cuerpo; dobla el codo llevando la mano al hombro.' },
     { key:'cod_ext',  grupo:'Codo',    mov:'Extensión',     pos:'Sentado/De pie', agg:'min', ref:0,   lim:5, defic:true, normTxt:'0° (déficit ≤5°)',
@@ -2379,9 +2451,9 @@
     { key:'cod_hext', grupo:'Codo',    mov:'Hiperextensión', pos:'Sentado/De pie', agg:'max', ref:5,  lim:10, hiperext:true, normTxt:'≤5–10° (laxitud si más)',
       guia:'Cámara al COSTADO del brazo. Codo en su máxima extensión; si rebasa la línea recta es hiperextensión. La app mide la MAGNITUD respecto a la recta; tú confirmas la dirección.' },
     { key:'mun_flex', grupo:'Muñeca',  mov:'Flexión',       pos:'Sentado',        agg:'max', ref:80,  lim:60,  normTxt:'0–80°',
-      guia:'Antebrazo apoyado, MANO LIBRE y visible, cámara al COSTADO. Dobla la muñeca llevando la palma hacia el antebrazo.' },
+      guia:'Antebrazo apoyado, MANO LIBRE y VISIBLE a la cámara, cámara al COSTADO. Dobla la muñeca llevando la palma hacia el antebrazo (la app mide al NUDILLO medio, no a los dedos).' },
     { key:'mun_ext',  grupo:'Muñeca',  mov:'Extensión',     pos:'Sentado',        agg:'max', ref:70,  lim:50,  normTxt:'0–70°',
-      guia:'Antebrazo apoyado, MANO LIBRE y visible, cámara al COSTADO. Lleva el dorso de la mano hacia arriba/atrás.' }
+      guia:'Antebrazo apoyado, MANO LIBRE y VISIBLE a la cámara, cámara al COSTADO. Lleva el dorso de la mano hacia arriba/atrás (se mide al NUDILLO medio).' }
   ];
   var GONIO_CITA = 'AAOS; Norkin & White, Measurement of Joint Motion.';
   var GONIO_JOINTS = ['Cadera','Rodilla','Tobillo','Codo','Muñeca'];
@@ -2406,6 +2478,33 @@
     return (lado==='izq')
       ? { S:11, H:23, K:25, A:27, F:31, E:13, W:15, Ix:19 }
       : { S:12, H:24, K:26, A:28, F:32, E:14, W:16, Ix:20 };
+  }
+  // ── Eje de la MANO para medir MUÑECA (auditoría 2026-11-20) ───────────────────────────────
+  // Clínicamente la muñeca se mide antebrazo vs 3.er METACARPIANO (muñeca→nudillo del dedo medio),
+  // NO vs la punta del índice: la punta se mueve con cada postura del dedo y con el puño cerrado cae
+  // junto a la palma → el vector casi desaparece y el ángulo sale inventado.
+  //  1º Hands lm0→lm9 (estable con puño cerrado). Se elige la mano cuya muñeca (lm0) quede pegada a la
+  //     muñeca de Pose del lado medido — ≤ max(0.05, 45% del antebrazo) en espacio con aspecto — para no
+  //     agarrar la mano contraria ni una detección suelta.
+  //  2º Fallback SIN Hands (offline / no cargó): índice de Pose SOLO con la mano ABIERTA — segmento
+  //     muñeca→índice ≥ max(0.045, 30% del antebrazo) y visible. Si no se cumple → null y el llamador
+  //     devuelve {ok:false, motivo:'mano'} ("abre la mano"), NUNCA un número falso.
+  function _munecaEje(lm, P, hs){
+    var W=lm[P.W], E=lm[P.E];
+    if(!_finP(W) || !_finP(E)) return null;
+    var fore=_seg2D(E, W);
+    if(hs && hs.length){
+      var best=null, bd=Infinity;
+      for(var i=0;i<hs.length;i++){
+        var h=hs[i]; if(!h || !_finP(h[0]) || !_finP(h[9])) continue;
+        var d=_seg2D(h[0], W);
+        if(d<bd){ bd=d; best=h; }
+      }
+      if(best && bd <= Math.max(0.05, fore*0.45)) return { eje:'metacarpiano-hands', B:best[0], C:best[9] };
+    }
+    var Ix=lm[P.Ix];
+    if(_vis(lm,P.Ix) && _finP(Ix) && _seg2D(W, Ix) >= Math.max(0.045, fore*0.30)) return { eje:'indice-pose', B:W, C:Ix };
+    return null;
   }
   // Ángulo del movimiento seleccionado, en convención clínica (0° neutro), desde landmarks 2D de imagen.
   function calcularGonio(lm, grupo, mov, lado){
@@ -2437,9 +2536,16 @@
       return _gonioTecho(grupo, mov, 180 - _ang2D(lm[P.S], lm[P.E], lm[P.W]));    // hombro–codo–muñeca; magnitud respecto a la recta (+ techo fisiológico)
     }
     if(grupo==='Muñeca'){
-      if(!(v(P.E)&&v(P.W)&&v(P.Ix))) return { ok:false, val:null };
-      if(deg(P.E,P.W,P.Ix)) return { ok:false, val:null };
-      return _gonioTecho(grupo, mov, Math.max(0, 180 - _ang2D(lm[P.E], lm[P.W], lm[P.Ix])));  // antebrazo–muñeca–mano; el fisio elige flex/ext (+ techo fisiológico)
+      if(!(v(P.E)&&v(P.W))) return { ok:false, val:null };
+      var ejeM=_munecaEje(lm, P, _handsActuales());                      // 3.er metacarpiano (Hands) o índice con mano abierta
+      if(!ejeM) return { ok:false, val:null, motivo:'mano' };            // puño/mano no visible → "abre la mano", no un número falso
+      if(!_medible3(lm[P.E], ejeM.B, ejeM.C)) return { ok:false, val:null, motivo:'mano' };
+      var rM=_gonioTecho(grupo, mov, Math.max(0, 180 - _ang2D(lm[P.E], ejeM.B, ejeM.C)));  // antebrazo–muñeca–metacarpiano (+ techo fisiológico)
+      if(rM.ok){
+        rM.eje=ejeM.eje; rM.mano={ B:{x:ejeM.B.x,y:ejeM.B.y}, C:{x:ejeM.C.x,y:ejeM.C.y} };  // los puntos REALES del número (dibujo+traza)
+        if(_seg2D(lm[P.E], ejeM.B) < 0.09 || _seg2D(ejeM.B, ejeM.C) < 0.05) rM.cortoImg=true;  // fuera de plano probable → baja confianza
+      }
+      return rM;
     }
     return { ok:false, val:null };
   }
@@ -2477,6 +2583,17 @@
   function procesarGonioFrame(r){
     var g=BIO.accG; if(!g || !g.sel) return false;
     var ok = !!(r && r.ok);
+    // Hint honesto de MUÑECA (vivo): mano no medible → pedir mano abierta/visible, nunca inventar número.
+    g.manoMiss = (r && !ok && r.motivo==='mano') ? ((g.manoMiss||0)+1) : 0;
+    var hintV=document.getElementById('bg-hint');
+    if(hintV){ var mV='';
+      if(g.sel.grupo==='Muñeca'){
+        if(!BIO.hands && !BIO._handsFallo) mV='⏳ Cargando el detector de MANO (solo la 1.ª vez)…';
+        else if(g.manoMiss>=6) mV='🖐 No se ve bien la mano: ábrela con la palma visible, cámara al costado';
+        else if(ok && r.cortoImg) mV='⚠️ Antebrazo/mano muy cortos en imagen: acércate o pon la cámara al costado';
+      }
+      hintV.textContent=mV;
+    }
     g.run = ok ? (g.run+1) : 0;
     var valido = ok && g.run>=3;                        // 3 cuadros seguidos válidos
     var eLive = _emaVivo('g_live', ok, ok?r.val:null);  // anti-parpadeo solo para mostrar
@@ -2498,20 +2615,32 @@
     return { vtx:P.A, ea:P.K, eb:P.F };   // Tobillo
   }
   // Los 3 landmarks (redondeados) que produjeron el grado, para trazabilidad de la captura.
-  function _gonioLmUsados(lm, grupo, lado){
+  // Muñeca con eje metacarpiano: vtx/b son los puntos de HANDS realmente usados (+ qué eje midió).
+  function _gonioLmUsados(lm, grupo, lado, r){
     if(!lm) return null;
     var P=_gonioPts(lado), vx=_gonioVtx(grupo,P);
     function pt(i){ var q=lm[i]; if(!q) return null;
       return { i:i, x:Math.round(q.x*1e4)/1e4, y:Math.round(q.y*1e4)/1e4,
                v:(q.visibility!=null?Math.round(q.visibility*100)/100:null) }; }
+    function ptXY(q){ return q ? { x:Math.round(q.x*1e4)/1e4, y:Math.round(q.y*1e4)/1e4 } : null; }
+    if(grupo==='Muñeca' && r && r.mano){ return { a:pt(vx.ea), vtx:ptXY(r.mano.B), b:ptXY(r.mano.C), eje:(r.eje||null) }; }
     return { a:pt(vx.ea), vtx:pt(vx.vtx), b:pt(vx.eb) };
   }
   // Traza brazos + arco + valor sobre CUALQUIER contexto (canvas vivo, o foto / cuadro-pico estático).
-  function _trazarGonio(ctx, w, h, lm, grupo, lado, val){
+  // `r` (opcional) = resultado de calcularGonio: en MUÑECA trae r.mano (muñeca→nudillo de Hands) y las
+  // líneas se dibujan sobre ESOS puntos → el dibujo sale de los MISMOS puntos que el número (auditoría 11-20).
+  function _trazarGonio(ctx, w, h, lm, grupo, lado, val, r){
     if(!ctx || !w || !h || !lm) return;
-    var P=_gonioPts(lado), j=_gonioVtx(grupo, P), vtx=j.vtx, ea=j.ea, eb=j.eb;
-    if(!(_vis(lm,vtx)&&_vis(lm,ea)&&_vis(lm,eb))) return;
-    var V=lm[vtx], A=lm[ea], B=lm[eb], vx=V.x*w, vy=V.y*h;
+    var P=_gonioPts(lado), j=_gonioVtx(grupo, P);
+    var V, A, B;
+    if(grupo==='Muñeca' && r && r.mano && _finP(r.mano.B) && _finP(r.mano.C)){
+      if(!_vis(lm,j.ea)) return;
+      V=r.mano.B; A=lm[j.ea]; B=r.mano.C;          // vértice = muñeca (Hands); brazos = antebrazo + 3.er metacarpiano
+    } else {
+      if(!(_vis(lm,j.vtx)&&_vis(lm,j.ea)&&_vis(lm,j.eb))) return;
+      V=lm[j.vtx]; A=lm[j.ea]; B=lm[j.eb];
+    }
+    var vx=V.x*w, vy=V.y*h;
     ctx.lineCap='round';
     ctx.strokeStyle='rgba(61,220,151,.95)'; ctx.lineWidth=Math.max(3, Math.round(w*0.009));
     ctx.beginPath(); ctx.moveTo(vx,vy); ctx.lineTo(A.x*w, A.y*h); ctx.stroke();
@@ -2519,7 +2648,7 @@
     var a1=Math.atan2(A.y*h-vy, A.x*w-vx), a2=Math.atan2(B.y*h-vy, B.x*w-vx);
     var rad=Math.max(24, Math.min(w,h)*0.10);
     ctx.beginPath(); ctx.arc(vx, vy, rad, a1, a2, false); ctx.strokeStyle='#E8C96A'; ctx.lineWidth=Math.max(2, Math.round(w*0.006)); ctx.stroke();
-    [ea,eb,vtx].forEach(function(ix){ var p=lm[ix]; ctx.fillStyle='#C9A84C'; ctx.beginPath(); ctx.arc(p.x*w,p.y*h, Math.max(4,Math.round(w*0.009)),0,Math.PI*2); ctx.fill(); });
+    [A,B,V].forEach(function(p){ ctx.fillStyle='#C9A84C'; ctx.beginPath(); ctx.arc(p.x*w,p.y*h, Math.max(4,Math.round(w*0.009)),0,Math.PI*2); ctx.fill(); });
     if(val!=null){
       var txt=Math.round(val)+'°';
       ctx.font='bold '+Math.max(18, Math.round(w*0.05))+'px -apple-system,Arial'; ctx.textAlign='center'; ctx.textBaseline='middle';
@@ -2541,7 +2670,7 @@
   // Dibuja los brazos del goniómetro + arco + valor sobre la articulación medida (vista EN VIVO).
   function dibujarGonioVivo(lm, r){
     var g=BIO.accG; if(!lm || !BIO.ctx || !BIO.canvas || !g || !g.sel) return;
-    _trazarGonio(BIO.ctx, BIO.canvas.width, BIO.canvas.height, lm, g.sel.grupo, g.sel.lado, (r && r.ok) ? r.val : null);
+    _trazarGonio(BIO.ctx, BIO.canvas.width, BIO.canvas.height, lm, g.sel.grupo, g.sel.lado, (r && r.ok) ? r.val : null, r);
   }
   // Panel flotante con el número en vivo (grande) + el máximo.
   function pintarPanelGonio(){
@@ -2553,6 +2682,7 @@
       + '<div class="gl-num"><span id="bg-live">—</span><span class="gl-deg">°</span></div>'
       + '<div class="gl-lbl" id="bg-lbl">'+(s?(esc(s.grupo)+' · '+esc(s.mov)+' · '+(s.lado==='izq'?'Izq':'Der')):'—')+'</div>'
       + '<div class="gl-max">máx <b id="bg-max">—</b>° · normal '+(s?esc(s.normTxt):'—')+'</div>'
+      + '<div id="bg-hint" style="font-size:12px;line-height:1.3;color:#E8C96A;margin-top:4px;min-height:14px"></div>'
       + '</div>';
   }
   // Chips de selección articulación/movimiento/lado (compartido entre inicio, cámara y estático).
@@ -2628,6 +2758,10 @@
   function _mostrarGonioEstatico(baseCanvas, lm, fuente){
     detenerCamaraStream(); detenerLoopCamara();
     BIO.modo='estatico'; BIO._estaticoBase=baseCanvas; BIO._estaticoLm=lm; BIO._estaticoFuente=fuente;
+    // Manos CONGELADAS con este cuadro (foto: pase explícito; video: las del cuadro-pico). undefined =
+    // aún no se buscó la mano en esta imagen → _recalcEstatico la busca bajo demanda si eligen Muñeca.
+    BIO._estaticoHandsLm = (BIO._estaticoHandsNext!==undefined) ? BIO._estaticoHandsNext : undefined;
+    BIO._estaticoHandsNext = undefined; BIO._estaticoHandsRun = false;
     mostrarVista('bio-vista-camara');
     var cv=document.getElementById('bio-canvas'); if(!cv) return;
     BIO.canvas=cv; BIO.ctx=cv.getContext('2d'); BIO.srcEl=null;
@@ -2650,11 +2784,23 @@
     if(cv.width!==BIO._estaticoBase.width || cv.height!==BIO._estaticoBase.height){ cv.width=BIO._estaticoBase.width; cv.height=BIO._estaticoBase.height; }
     ctx.clearRect(0,0,cv.width,cv.height);
     try{ ctx.drawImage(BIO._estaticoBase,0,0); }catch(e){}
+    // MUÑECA sobre cuadro estático: si aún no se buscó la mano en ESTA imagen, se corre Hands en 2º plano
+    // y se repinta al terminar (mientras tanto el fallback de índice-abierto puede dar un número provisional).
+    if(g.sel.grupo==='Muñeca' && BIO._estaticoHandsLm===undefined && !BIO._handsFallo) _asegurarHandsEstatico();
     var r = BIO._estaticoLm ? calcularGonio(BIO._estaticoLm, g.sel.grupo, g.sel.mov, g.sel.lado) : { ok:false, val:null };
-    if(r.ok){ _trazarGonio(ctx, cv.width, cv.height, BIO._estaticoLm, g.sel.grupo, g.sel.lado, r.val); g.peak=r.val; }
+    BIO._estaticoR = r;   // para la traza de la captura (en muñeca trae r.mano/r.eje reales)
+    if(r.ok){ _trazarGonio(ctx, cv.width, cv.height, BIO._estaticoLm, g.sel.grupo, g.sel.lado, r.val, r); g.peak=r.val; }
     else { g.peak=null; }
     var live=document.getElementById('bg-live'); if(live) live.textContent = r.ok ? Math.round(r.val) : '—';
     var mx=document.getElementById('bg-max'); if(mx) mx.textContent = r.ok ? Math.round(r.val) : '—';
+    var hintE=document.getElementById('bg-hint');
+    if(hintE){ var mE='';
+      if(g.sel.grupo==='Muñeca'){
+        if(!r.ok && r.motivo==='mano') mE = BIO._estaticoHandsRun ? '⏳ Buscando la mano en la imagen…' : '🖐 No se ve bien la mano: palma visible hacia la cámara (abre la mano o sube otra toma)';
+        else if(r.ok && r.cortoImg) mE='⚠️ Antebrazo/mano muy cortos en imagen (posible fuera de plano): medición menos fiable';
+      }
+      hintE.textContent=mE;
+    }
     BIO._estaticoImg = r.ok ? cv : null;
   }
   // ── DECÚBITO / CUERPO PARCIAL: pose robusta a la ORIENTACIÓN ──────────────────────
@@ -2685,6 +2831,29 @@
     else if(rot===180){ x.translate(c.width,c.height); x.rotate(Math.PI); }
     try{ x.drawImage(img,0,0,w,h); }catch(e){}
     return c;
+  }
+  // Corre HANDS sobre un canvas/img ESTÁTICO (serializado) y devuelve multiHandLandmarks o null.
+  async function _handsSobreEstatico(src){
+    var ok = await ensureHandsReady();
+    if(!ok || !BIO.hands){ BIO._handsFallo=true; return null; }
+    try{ if(BIO.hands.reset) BIO.hands.reset(); }catch(_r){}
+    BIO._handsLm=null;
+    for(var i=0;i<2;i++){ try{ await BIO.hands.send({ image: src }); }catch(_s){} if(BIO._handsLm && BIO._handsLm.length) break; }
+    return BIO._handsLm || null;
+  }
+  // Lazy: el fisio eligió MUÑECA sobre una foto/cuadro ya analizado SIN pase de manos → se corre una vez
+  // sobre la MISMA imagen (BIO._estaticoBase, ya rotada si aplica) y se repinta. [] = se buscó y no hay.
+  function _asegurarHandsEstatico(){
+    if(BIO.modo!=='estatico' || !BIO._estaticoBase || BIO._estaticoHandsRun) return;
+    if(BIO._estaticoHandsLm!==undefined) return;
+    BIO._estaticoHandsRun=true;
+    var base=BIO._estaticoBase;
+    _handsSobreEstatico(base).then(function(hs){
+      BIO._estaticoHandsRun=false;
+      if(BIO.modo!=='estatico' || BIO._estaticoBase!==base) return;   // cambió la fuente mientras corría
+      BIO._estaticoHandsLm = _copiaManosLm(hs) || [];
+      _recalcEstatico();
+    }).catch(function(){ BIO._estaticoHandsRun=false; BIO._estaticoHandsLm=[]; });
   }
   // Corre pose sobre un canvas/img ESTÁTICO (serializado, igual que la foto normal). Devuelve landmarks o null.
   async function _poseSobreEstatico(src){
@@ -2737,6 +2906,13 @@
     var det = await _detectarPoseRot(img);
     try{URL.revokeObjectURL(url);}catch(_r){}
     if(!det){ toast('No se detectó el cuerpo en la foto. Que la articulación (p.ej. cadera-rodilla-tobillo) se vea de PERFIL, completa en cuadro y con buena luz.','warning'); mostrarVista('bio-vista-inicio'); pintarGonioInicio(); return; }
+    // MUÑECA: corre HANDS sobre el MISMO cuadro elegido (det.base, ya rotado si hizo falta) → el eje del
+    // 3.er metacarpiano queda en las MISMAS coordenadas que la pose. Si falla, el fallback endurecido decide.
+    BIO._estaticoHandsNext=undefined;
+    if(BIO.accG && BIO.accG.sel && BIO.accG.sel.grupo==='Muñeca'){
+      if(txt) txt.textContent='Detectando la mano (eje del 3.er metacarpiano)…';
+      try{ BIO._estaticoHandsNext = _copiaManosLm(await _handsSobreEstatico(det.base)) || []; }catch(_h){ BIO._estaticoHandsNext=[]; }
+    }
     if(fill) fill.style.width='100%';
     _mostrarGonioEstatico(det.base, _copiaLm(det.lm), 'foto');
   }
@@ -2780,6 +2956,7 @@
     else if(kind==='mov'){ g.sel.mov=val; }
     else if(kind==='lado'){ g.sel.lado=val; }
     _gonioSelDefault(g);
+    _ensureHandsSiMuneca();   // eligieron Muñeca → baja el detector de MANO en 2º plano (eje metacarpiano)
     if(BIO.modo==='estatico'){
       if(BIO._estaticoFuente==='foto'){ pintarGonioCtrl(); _recalcEstatico(); return; }   // misma foto: recalcula el nuevo movimiento
       // VIDEO: el cuadro-pico está atado al movimiento ANALIZADO (no vale para otro movimiento). Si conservamos
@@ -2836,6 +3013,8 @@
     // para poder re-verificar la medición después. Cuadro estático → BIO._estaticoLm; vivo → pico BIO._peakGonioLm.
     var lmCap = (BIO.modo==='estatico') ? BIO._estaticoLm : BIO._peakGonioLm;
     var arCap = (BIO.modo==='estatico') ? (_ANG_AR||1) : (BIO._peakGonioAR||_ANG_AR||1);
+    // Resultado del cuadro que produjo el grado: en MUÑECA trae el eje real usado (metacarpiano-hands / índice-pose).
+    var rCap = (BIO.modo==='estatico') ? (BIO._estaticoR||null) : (BIO._peakGonioR||null);
     // Marca de tiempo del cuadro-pico (solo video): deja trazable a qué segundo del clip salió el grado.
     var tSegCap = (BIO.modo==='estatico' && BIO._estaticoFuente==='video' && BIO._peakTSeg!=null) ? Math.round(BIO._peakTSeg*10)/10 : null;
     g.medidas[key] = { key:g.sel.key, grupo:g.sel.grupo, mov:g.sel.mov, lado:g.sel.lado,
@@ -2843,7 +3022,11 @@
       traza:{ algoVersion:BIO_ALGO_VER, aspect:Math.round(arCap*1e4)/1e4,
               fuente:(BIO.modo==='estatico'?(BIO._estaticoFuente||'estatico'):'camara'),
               tSeg:tSegCap,
-              lmUsados:_gonioLmUsados(lmCap, g.sel.grupo, g.sel.lado) } };
+              lmUsados:_gonioLmUsados(lmCap, g.sel.grupo, g.sel.lado, rCap) } };
+    if(g.sel.grupo==='Muñeca' && rCap){
+      if(rCap.eje) g.medidas[key].eje = rCap.eje;                 // con qué eje se midió (metacarpiano-hands | indice-pose)
+      if(rCap.cortoImg) g.medidas[key].traza.cortoImg = true;     // brazo/mano muy cortos en imagen → menos fiable
+    }
     // Guarda la IMAGEN ANOTADA de esta captura + el ORIGINAL sin anotar, para TODA fuente (antes/después + auditoría).
     //  · Foto/Video (estatico): usa el cuadro estático analizado (BIO._estaticoImg / BIO._estaticoBase).
     //  · Cámara EN VIVO ('camara'): copia el cuadro COMPUESTO de BIO.canvas (video+esqueleto+arco, lo que ve el
@@ -3557,6 +3740,7 @@
   // Hook de PRUEBAS (geometría pura, sin DOM/MediaPipe) — lo usa pruebas/geometria.test.js.
   window.__BIO_TEST = {
     setAspect:_setAspect, ang2D:_ang2D, seg2D:_seg2D,
+    munecaEje:_munecaEje, setHandsLm:function(a){ BIO._handsLmTest = a || null; },
     calcularGonio:calcularGonio, cmpExtraer:_cmpExtraer, cmpTablaHTML:_cmpTablaHTML,
     cadenciaDudosa:_cadenciaDudosa, gonioFmtGrado:_gonioFmtGrado, gonioAlerta:_gonioAlerta,
     gonioFueraRango:_gonioFueraRango, romConfiable:_romConfiable,
