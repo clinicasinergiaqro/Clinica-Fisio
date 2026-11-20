@@ -133,11 +133,12 @@ function mcpA(aGrados, largo){ var l=(largo==null?0.12:largo); return { x:0.6+l*
   T.setAspect(1,1); T.setHandsLm(null);
 })();
 
-// ── M7) El techo fisiológico sigue aplicando (mun_flex ≤ 100°) ───────────────
+// ── M7) El techo fisiológico sigue aplicando (mun_flex ≤ 100°) — contrato V3: el valor se
+// CONSERVA con bandera `fueraTecho` (confirmable por el fisio), ya no se descarta como inmedible.
 (function(){
-  T.setAspect(1,1); T.setHandsLm([ mano(HW, mcpA(130)) ]);   // "flexión" de 140° → imposible
+  T.setAspect(1,1); T.setHandsLm([ mano(HW, mcpA(130)) ]);   // "flexión" de 140° → por encima del techo
   var r = T.calcularGonio(lmBase(), 'Muñeca', 'Flexión', 'der');
-  ok(r && r.ok===false && r.val===null, 'M7 un grado por encima del techo sigue siendo NO medible con el eje nuevo');
+  ok(r && r.ok===true && r.fueraTecho===true && r.val>100, 'M7 un grado sobre el techo queda MARCADO fueraTecho (valor conservado, requiere confirmación; ya no se borra)');
   T.setHandsLm(null);
 })();
 
