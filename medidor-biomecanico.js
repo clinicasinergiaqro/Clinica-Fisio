@@ -4141,7 +4141,10 @@
     else { g.peak=null; g.run=0; pintarGonioCtrl(); }
   }
   // Borra una medición Y su evidencia (V3.1: la imagen anotada no puede sobrevivir a su medida).
-  function BIO_gonioBorrar(key){ var g=BIO.accG; if(g&&g.medidas[key]){ delete g.medidas[key]; if(g.imgs&&g.imgs[key]) delete g.imgs[key]; pintarGonioCtrl(); } }
+  // (V3.2) tras borrar, en ESTÁTICO se re-calcula la lectura del cuadro: pintarGonioCtrl → _gonioSelDefault
+  // resetea el peak en cada repintado (pre-existente V3/V3.1) y sin este recalc no se podía RE-capturar la
+  // misma articulación hasta cambiar la selección (cazado por la evidencia del flujo captura→eliminación).
+  function BIO_gonioBorrar(key){ var g=BIO.accG; if(g&&g.medidas[key]){ delete g.medidas[key]; if(g.imgs&&g.imgs[key]) delete g.imgs[key]; pintarGonioCtrl(); if(BIO.modo==='estatico') _recalcEstatico(); } }
   function BIO_gonioFinish(){
     var g=BIO.accG; if(!g || !Object.keys(g.medidas).length){ toast('Captura al menos un ángulo antes de terminar','warning'); return; }
     mostrarResumenGonio();
