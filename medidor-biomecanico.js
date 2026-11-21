@@ -72,7 +72,7 @@
   //    cuadros (p.ej. el canvas HEVC/iOS), gateo de tiempo (VFR), o caps/techos que cambien el resultado —
   //    NO solo en "correcciones". Si el cálculo cambia y el sello no, la procedencia de los datos clínicos
   //    miente (una sesión diría "mismo algoritmo" que otra medida con código distinto).
-  var BIO_ALGO_VER = 'bio-2d-2026-11-20c';   // -20c (V3.1): IDENTIDAD DE CUADRO — cada cuadro de goniómetro se congela a un raster INMUTABLE de pool ANTES de enviarse y el resultado se empareja por contexto {gen, frameId, mediaTime}; Hands en LOCKSTEP por frameId (fin de la ventana de 1200 ms: mano de un cuadro jamás se mezcla con pose de otro); "cuadro actual" y pico son snapshots de ESE cuadro exacto; captura TRANSACCIONAL (evidencia antes que medida; sin imagen = explícito y confirmado) con valCrudo a precisión original, capturadoEn, metodo, resExport y frameId en traza; hiperextensión exige confirmación visual. Las FÓRMULAS del ángulo no cambian. (-20b V3 motor gráfico/techo/tupla/manual; -20 muñeca 3.er metacarpiano; -19 foto/video robustos a orientación; -18 techo+HEVC iOS.)
+  var BIO_ALGO_VER = 'bio-2d-2026-11-21';   // -21 (V3.2): IDENTIDAD DE CALLBACKS — el emparejado resultado↔cuadro deja de depender de colas FIFO globales: Hands con UN job en vuelo por instancia (el .then/.catch libera SOLO su job; watchdog = job PERDIDO drenado por conteo o por epoch de instancia retirada) y Pose del goniómetro emparejada por el contexto de SU envío + deuda AMBIGUA (descarta sin adivinar) / DECLARADA (drenaje FIFO tras watchdog); techo DURO del pool de rasters; adquiridoEnUTC en traza. Las FÓRMULAS del ángulo no cambian. (-20c (V3.1): IDENTIDAD DE CUADRO — cada cuadro de goniómetro se congela a un raster INMUTABLE de pool ANTES de enviarse y el resultado se empareja por contexto {gen, frameId, mediaTime}; Hands en LOCKSTEP por frameId (fin de la ventana de 1200 ms: mano de un cuadro jamás se mezcla con pose de otro); "cuadro actual" y pico son snapshots de ESE cuadro exacto; captura TRANSACCIONAL (evidencia antes que medida; sin imagen = explícito y confirmado) con valCrudo a precisión original, capturadoEn, metodo, resExport y frameId en traza; hiperextensión exige confirmación visual. Las FÓRMULAS del ángulo no cambian. (-20b V3 motor gráfico/techo/tupla/manual; -20 muñeca 3.er metacarpiano; -19 foto/video robustos a orientación; -18 techo+HEVC iOS.)
   // CORRECCIÓN DE ASPECTO (H1): las coords de MediaPipe vienen normalizadas 0–1 por ANCHO (x) y por
   // ALTO (y) de forma INDEPENDIENTE. En un cuadro NO cuadrado (p.ej. 9:16 vertical del celular) eso
   // deforma los ángulos de segmentos oblicuos hasta ~20°. Reescalando x por (ancho/alto) se recupera
@@ -156,7 +156,11 @@
           if(typeof Hands === 'undefined'){ clearTimeout(timeout); resolve(false); return; }
           var h = new Hands({ locateFile:function(f){ return MP_HANDS_BASE + '/' + f; } });
           h.setOptions({ maxNumHands:2, modelComplexity:1, minDetectionConfidence:0.4, minTrackingConfidence:0.4 });
-          h.onResults(onResultsHands);
+          // (V3.2 P0) el callback queda ATADO por closure al epoch de ESTA instancia: si la instancia
+          // se retira (watchdog → _handsRetirarInstancia), sus callbacks llegan con un epoch viejo y se
+          // descartan ENTEROS — una instancia retirada jamás publica resultados en el estado de la nueva.
+          var _epochInst = (BIO._handsEpoch||0);
+          h.onResults(function(r){ onResultsHands(r, _epochInst); });
           BIO.hands = h; clearTimeout(timeout); resolve(true);
         }catch(e){ clearTimeout(timeout); console.warn('[BIO] Hands init falló:', e && e.message); resolve(false); }
       }
@@ -176,14 +180,50 @@
       ensureHandsReady().then(function(ok){ if(!ok) BIO._handsFallo = true; });
     }
   }
-  // (V3.1 P0) Las manos se emparejan por FRAME: cada envío a Hands encola su frameId (_handsQ, FIFO,
-  // un solo envío en vuelo por el candado _handsSending) y el resultado queda sellado con ESE id.
-  // Si el cuadro en proceso tenía manos pendientes (lockstep de muñeca), el resultado de Hands dispara
-  // el procesamiento diferido del cuadro (_frResolverPend). Ya NO existe la ventana de 1200 ms: una
-  // mano de otro cuadro JAMÁS se fusiona con la pose de éste.
-  function onResultsHands(res){
+  // (V3.2 P0) RETIRO de la instancia Hands tras un watchdog: si el constructor está disponible, la
+  // instancia colgada se cierra y se crea OTRA cuyo callback va atado a su propio epoch (closure en
+  // crearHands) → cualquier callback tardío de la retirada cae por epoch, llegue cuando llegue y en el
+  // orden que llegue. Si el constructor no está (aún no cargó / entorno de pruebas), se CONSERVA la
+  // instancia y el callback tardío se drena por conteo (_handsStale) — mismo invariante, menor garantía,
+  // acotado a la instancia única. Mientras recrea, la muñeca cae al fallback honesto (hint "cargando").
+  function _handsRetirarInstancia(){
+    try{
+      if(typeof Hands === 'undefined') return;           // sin constructor: drenaje por _handsStale
+      var vieja = BIO.hands;
+      BIO.hands = null; BIO._handsPromise = null;
+      BIO._handsEpoch = (BIO._handsEpoch||0) + 1;        // los callbacks de la vieja caen por epoch…
+      BIO._handsStale = 0;                               // …así que el conteo de huérfanos se limpia
+      try{ if(vieja && typeof vieja.close==='function') vieja.close(); }catch(_c){}
+      ensureHandsReady().then(function(ok){ if(!ok) BIO._handsFallo = true; });
+    }catch(_r){}
+  }
+  // (V3.2 P0-03) Un WATCHDOG (≥2.5 s sin respuesta) convierte la deuda AMBIGUA de Pose en pérdida
+  // DECLARADA: los próximos N callbacks se drenan en orden (expectativa FIFO de la instancia única,
+  // explícita y documentada) y el flujo siguiente empareja limpio — es lo que permite que el primer
+  // cuadro tras recuperarse de un cuelgue SÍ se mida. Si un "perdido" en realidad nunca llega, el
+  // drenaje consume un callback bueno y ESE cuadro se pierde (costo acotado a 1 cuadro, auto-sanable);
+  // jamás una asociación cruzada. Sin watchdog (cambio de generación a secas) NO hay declaración:
+  // la deuda queda AMBIGUA y onResults descarta sin emparejar (ver rama gonio).
+  function _poseDeclararPerdidos(){
+    BIO._poseStale = (BIO._poseStale||0) + (BIO._poseAmb||0);
+    BIO._poseAmb = 0;
+  }
+  // (V3.2 P0-01) IDENTIDAD POR JOB + INSTANCIA, no por cola FIFO global. La API de Hands no ecoa ids,
+  // así que el único emparejado seguro es: UNA inferencia en vuelo por instancia (BIO._handsJob) y el
+  // callback sella el frameId de ESE job. Reglas de llegada, en orden:
+  //  1) epoch de otra instancia (retirada por watchdog) → se descarta ENTERO: jamás publica.
+  //  2) _handsStale>0 → callbacks de jobs declarados PERDIDOS (watchdog en la MISMA instancia, cuando
+  //     no se pudo retirar): se DRENAN sin tocar estado — un callback viejo jamás consume el id de un
+  //     job nuevo (el bug V3.1: _handsQ.shift() le daba el frameId fresco al huérfano).
+  //  3) resto → pertenece al job vigente: sella su frameId y resuelve el cuadro diferido (lockstep).
+  // Sigue sin existir la ventana de 1200 ms: una mano de otro cuadro JAMÁS se fusiona con la pose de éste.
+  function onResultsHands(res, epoch){
+    if(epoch!=null && epoch!==(BIO._handsEpoch||0)) return;            // instancia retirada: nunca publica
+    if((BIO._handsStale||0)>0){ BIO._handsStale--; return; }           // huérfano declarado: se drena
     var hs = res && res.multiHandLandmarks;
-    var fid = (BIO._handsQ && BIO._handsQ.length) ? BIO._handsQ.shift() : null;
+    var job = BIO._handsJob;
+    if(job) job.resuelto = true;                                       // su callback SÍ llegó (el watchdog ya no lo cuenta)
+    var fid = job ? job.frameId : null;
     BIO._handsLm = (hs && hs.length) ? hs : null;
     BIO._handsLmTs = Date.now();
     BIO._handsResFrameId = fid;
@@ -846,10 +886,15 @@
     // (accG.peak + su snapshot) NO se toca aquí: ya es evidencia completa de SU cuadro y lo limpian los
     // cambios de selección/fuente (resetGonio/BIO_gonioSel), no un hipo del watchdog.
     try{
-      if(BIO._frQ && BIO._frQ.length){ for(var _bi=0;_bi<BIO._frQ.length;_bi++){ _frSoltar(BIO._frQ[_bi].fr); } BIO._frQ.length=0; }
-      if(BIO._frPend){ _frSoltar(BIO._frPend.fr); BIO._frPend=null; }
+      if(BIO._frQ && BIO._frQ.length){
+        // (V3.2 P0-03) cada contexto barrido tiene un callback de Pose EN VUELO que ya no es atribuible
+        // con certeza (la API no ecoa ids): pasa a deuda AMBIGUA — los próximos callbacks se descartan
+        // SIN emparejar (y sacrifican al posible dueño vivo), llegue cada uno en el orden que llegue.
+        BIO._poseAmb = (BIO._poseAmb||0) + BIO._frQ.length;
+        for(var _bi=0;_bi<BIO._frQ.length;_bi++){ _frSoltar(BIO._frQ[_bi].fr); } BIO._frQ.length=0;
+      }
+      if(BIO._frPend){ _frSoltar(BIO._frPend.fr); BIO._frPend=null; }   // su pose YA llegó: no es deuda
       if(BIO._frRet){ _frSoltar(BIO._frRet.fr); BIO._frRet=null; }
-      if(BIO._handsQ) BIO._handsQ.length=0;
       BIO._frProcHands=null;
     }catch(_bg){}
   }
@@ -864,7 +909,12 @@
     // Pool agotado = contextos muertos de una generación anterior → recupera el más viejo inválido.
     var q=BIO._frQ||[];
     for(var j=0;j<q.length;j++){ if(q[j].gen!==(BIO.gen||0)){ var d=q.splice(j,1)[0]; d.fr.busy=true; return d.fr; } }
-    var f2={ cv:document.createElement('canvas'), busy:true }; pool.push(f2); return f2;   // último recurso (no debería pasar)
+    // (V3.2) TECHO DURO: con los 4 rasters ocupados y nada recuperable, el CUADRO se descarta de forma
+    // controlada (null → _gonioSendFrame lo salta SIN enviar). Saltar un cuadro de stream no pierde
+    // ninguna MEDICIÓN (el siguiente tick trae otro); crecer el pool sin tope sí arriesgaba memoria en
+    // iOS (hallazgo auditoría V3.1). Contador de diagnóstico: BIO._frPoolAgotado.
+    BIO._frPoolAgotado = (BIO._frPoolAgotado||0) + 1;
+    return null;
   }
   function _frSoltar(fr){ if(fr) fr.busy=false; }
   // Resultado de Hands para un frameId: si el cuadro con ese id está DIFERIDO esperando su mano
@@ -896,13 +946,23 @@
     var mandarHands = _munecaActiva() && !!BIO.hands;
     if(mandarHands && BIO._handsSending){
       if(BIO._handsSendAt && (Date.now()-BIO._handsSendAt)>2500){
-        // Hands colgado: invalida TODO lo en vuelo (generación nueva) en vez de arriesgar un emparejado
-        // corrido; la medición en curso (pico ya materializado) no se pierde.
-        BIO._handsSending=false; _bumpGen();
+        // (V3.2) Hands colgado: el JOB se declara PERDIDO. Su callback, si algún día llega, cae por
+        // epoch (instancia retirada) o se drena por conteo (_handsStale, misma instancia) — JAMÁS
+        // consume el id de un job nuevo. El lock lo libera SOLO este watchdog (dueño del cierre); la
+        // promesa del job vencido no desbloquea al sucesor (guard por job en su .then/.catch). La
+        // pérdida de POSE de la generación barrida queda DECLARADA (drenaje FIFO) para que el primer
+        // cuadro tras la recuperación sí se mida.
+        var _jv=BIO._handsJob;
+        if(_jv && !_jv.resuelto){ _jv.perdido=true; BIO._handsStale=(BIO._handsStale||0)+1; }
+        BIO._handsJob=null; BIO._handsSending=false;
+        _handsRetirarInstancia();
+        _bumpGen(); _poseDeclararPerdidos();
       }
       return Promise.resolve();   // Hands aún procesando el cuadro anterior → este cuadro se salta completo
     }
-    var fr=_frTomar(), cv=fr.cv;
+    var fr=_frTomar();
+    if(!fr) return Promise.resolve();   // (V3.2) pool al techo duro: cuadro saltado de forma controlada
+    var cv=fr.cv;
     // Tope 1600 px por lado (igual que las capturas V3): los landmarks son normalizados (idénticos) y el
     // pool queda acotado en memoria aun con cámara/video de alta resolución (presupuesto de píxeles iOS).
     var capL=1600, maxDim=Math.max(w,h), escF=(maxDim>capL)?capL/maxDim:1;
@@ -919,33 +979,41 @@
       x.setTransform(1,0,0,1,0,0);
     }catch(_d){ _frSoltar(fr); return Promise.resolve(); }
     var ctxF={ fr:fr, gen:(BIO.gen||0), frameId:(++BIO._frSeq||(BIO._frSeq=1)), t:(mediaT!=null?mediaT:null),
-               w:dw, h:dh, rot:rot, handsSent:false, handsLm:undefined, handsListo:false };
+               adq:Date.now(), w:dw, h:dh, rot:rot, handsSent:false, handsLm:undefined, handsListo:false };
     if(mandarHands){
       ctxF.handsSent=true;
-      BIO._handsSending=true; BIO._handsSendAt=Date.now();
-      (BIO._handsQ || (BIO._handsQ=[])).push(ctxF.frameId);
-      var _hfid=ctxF.frameId;
+      // (V3.2 P0-02) UNA inferencia en vuelo por instancia, con identidad de JOB: el .then/.catch de
+      // ESTE send libera exclusivamente el job que lo creó. La resolución tardía de un job vencido
+      // (que el watchdog ya cerró) encuentra _handsJob apuntando a OTRO job y no toca el lock del
+      // sucesor ni dispara un tercer envío concurrente.
+      var _hjob={ frameId:ctxF.frameId, gen:ctxF.gen, epoch:(BIO._handsEpoch||0), perdido:false, resuelto:false };
+      BIO._handsJob=_hjob; BIO._handsSending=true; BIO._handsSendAt=Date.now();
       try{
-        BIO.hands.send({ image: cv }).then(function(){ BIO._handsSending=false; })
-          .catch(function(){
-            BIO._handsSending=false;
-            // El callback no va a llegar: saca el id de la cola y resuelve el cuadro como "sin mano buscada".
-            try{ var qi=(BIO._handsQ||[]).indexOf(_hfid); if(qi>=0) BIO._handsQ.splice(qi,1); }catch(_q){}
-            _frResolverPend(_hfid, []);
-          });
+        BIO.hands.send({ image: cv }).then(function(){
+          if(ctxF._huerfano){ _frSoltar(fr); ctxF._huerfano=false; }
+          if(BIO._handsJob===_hjob){ BIO._handsJob=null; BIO._handsSending=false; }
+        }).catch(function(){
+          if(ctxF._huerfano){ _frSoltar(fr); ctxF._huerfano=false; }
+          if(BIO._handsJob===_hjob){
+            BIO._handsJob=null; BIO._handsSending=false;
+            _frResolverPend(_hjob.frameId, []);   // el callback no llegará: cuadro "sin mano buscada"
+          } else if(_hjob.perdido && (BIO._handsStale||0)>0){
+            BIO._handsStale--;                    // contado como huérfano, pero su callback jamás vendrá
+          }
+        });
       }catch(_h){
-        BIO._handsSending=false; ctxF.handsSent=false;
-        try{ var qe=(BIO._handsQ||[]).indexOf(_hfid); if(qe>=0) BIO._handsQ.splice(qe,1); }catch(_q2){}
+        BIO._handsSending=false; BIO._handsJob=null; ctxF.handsSent=false;
       }
     }
-    (BIO._genQ || (BIO._genQ=[])).push(ctxF.gen);
-    if(BIO._genQ.length > 32) BIO._genQ.shift();
+    // (V3.2) el goniómetro ya NO empuja a la cola global de generaciones (_genQ): su emparejado es por
+    // el contexto de SU envío (_frQ) + contadores de deuda — ver la rama gonio de onResults.
     (BIO._frQ || (BIO._frQ=[])).push(ctxF);
     try{ return BIO.pose.send({ image: cv }); }
     catch(_s){
-      // send tronó síncrono: deshaz las colas de ESTE envío y libera el raster.
-      try{ BIO._genQ.pop(); var fi=BIO._frQ.indexOf(ctxF); if(fi>=0) BIO._frQ.splice(fi,1); }catch(_u){}
-      _frSoltar(fr);
+      // send de Pose tronó síncrono: deshaz la cola de ESTE envío. El raster vuelve al pool solo si
+      // Hands no lo está leyendo; si iba en vuelo a Hands, lo libera SU promesa al terminar (_huerfano).
+      try{ var fi=BIO._frQ.indexOf(ctxF); if(fi>=0) BIO._frQ.splice(fi,1); }catch(_u){}
+      if(ctxF.handsSent){ ctxF._huerfano=true; } else { _frSoltar(fr); }
       return Promise.resolve();
     }
   }
@@ -960,15 +1028,50 @@
     // MODO FOTO: una sola imagen estática → solo guardamos el resultado y salimos (lo procesa procesarFoto).
     // La foto está serializada con pose.reset() y se consume por BIO._fotoRes → NO pasa por la cola de generación.
     if(BIO.modo==='foto'){ BIO._fotoRes = res; return; }
-    // IDENTIDAD DE GENERACIÓN (P1-6): saca el gen más viejo encolado por su send(); si NO es la generación
-    // vigente, el cuadro quedó en vuelo de una medición anterior (cambió fuente/selección, o el watchdog
-    // liberó un send colgado) → se DESCARTA para no contaminar el acumulador nuevo. Sustituye a _dropStale.
+    // (V3.2 P0-03) DEUDA del goniómetro PRIMERO, sea cual sea el tipo vigente — así un callback de un
+    // cuadro barrido no contamina NINGÚN acumulador (ni el gonio nuevo, ni marcha/sentadilla si se
+    // cambió de tipo con envíos en vuelo):
+    //  · _poseStale = pérdidas DECLARADAS por watchdog → se drenan en orden (FIFO declarado) y el
+    //    flujo siguiente empareja limpio.
+    //  · _poseAmb = cambio de generación con callbacks en vuelo y SIN watchdog → el orden de entrega
+    //    no es verificable (la API no ecoa ids): este callback es AMBIGUO → se descarta Y se sacrifica
+    //    el contexto vivo más viejo (su callback real pudo ser éste u otro: JAMÁS se adivina). Costo:
+    //    ~1-2 cuadros tras un cambio de selección con send en vuelo; a cambio, un resultado viejo
+    //    NUNCA se une a un raster nuevo, llegue en el orden que llegue.
+    if((BIO._poseStale||0)>0){
+      BIO._poseStale--; BIO.framesDescartados=(BIO.framesDescartados||0)+1;
+      return;
+    }
+    if((BIO._poseAmb||0)>0){
+      BIO._poseAmb--; BIO.framesDescartados=(BIO.framesDescartados||0)+1;
+      if(BIO.tipoMedicion==='gonio' && BIO._frQ && BIO._frQ.length){ _frSoltar(BIO._frQ.shift().fr); }
+      return;
+    }
+    if(BIO.tipoMedicion==='gonio'){
+      // (V3.2 P0) El goniómetro NO usa la cola global de generaciones: el emparejado es por el contexto
+      // congelado de SU envío (cabeza de _frQ, generación vigente). Sin deuda pendiente (arriba), la
+      // paridad 1:1 con la instancia única es sólida; un resultado SIN contexto vigente es huérfano y
+      // se DESCARTA — jamás se reasigna al primer id fresco de una cola.
+      var fcG=(BIO._frQ && BIO._frQ.length && BIO._frQ[0].gen===(BIO.gen||0)) ? BIO._frQ.shift() : null;
+      if(!fcG){
+        if(BIO._frQ && BIO._frQ.length && BIO._frQ[0].gen!==(BIO.gen||0)){ _frSoltar(BIO._frQ.shift().fr); }
+        BIO.framesDescartados=(BIO.framesDescartados||0)+1;
+        return;
+      }
+      var lmG = res && res.poseLandmarks;
+      if(fcG.handsSent && !fcG.handsListo){
+        fcG.poseLm = lmG; BIO._frPend = fcG;
+        return;   // lo completa _frResolverPend cuando llegue la mano de este mismo cuadro (lockstep)
+      }
+      _gonioProcesarCuadro(fcG, lmG);
+      return;
+    }
+    // IDENTIDAD DE GENERACIÓN (P1-6, modos NO goniómetro): saca el gen más viejo encolado por su send();
+    // si NO es la generación vigente, el cuadro quedó en vuelo de una medición anterior (cambió
+    // fuente/selección, o el watchdog liberó un send colgado) → se DESCARTA. Sustituye a _dropStale.
     var _gi = (BIO._genQ && BIO._genQ.length) ? BIO._genQ.shift() : (BIO.gen||0);
     if(_gi !== (BIO.gen||0)){
       BIO.framesDescartados=(BIO.framesDescartados||0)+1;
-      // (V3.1) si el descartado era un cuadro de goniómetro, su contexto va al frente de _frQ con el
-      // MISMO gen viejo → se saca y su raster vuelve al pool (un resultado tardío jamás se guarda).
-      if(BIO._frQ && BIO._frQ.length && BIO._frQ[0].gen===_gi){ _frSoltar(BIO._frQ.shift().fr); }
       return;
     }
     // Fija el aspecto real de la fuente (ancho/alto) para que los ángulos 2D no se deformen en vertical (H1).
@@ -995,19 +1098,6 @@
       if(BIO.modo==='camara'){ actualizarPanelSent(f); actualizarGateSent(lm, f); }
       return;
     }
-    if(BIO.tipoMedicion==='gonio'){
-      // (V3.1 P0) IDENTIDAD DE CUADRO: el resultado se empareja con el contexto de SU envío (FIFO, misma
-      // generación) — raster congelado + frameId + mediaTime. Si el cuadro mandó también Hands (muñeca) y
-      // la mano de ESTE frameId aún no llega, el procesamiento se DIFIERE hasta su callback (lockstep):
-      // pose de un cuadro jamás se mezcla con mano de otro.
-      var fc=(BIO._frQ && BIO._frQ.length && BIO._frQ[0].gen===(BIO.gen||0)) ? BIO._frQ.shift() : null;
-      if(fc && fc.handsSent && !fc.handsListo){
-        fc.poseLm = lm; BIO._frPend = fc;
-        return;   // lo completa _frResolverPend cuando llegue la mano de este mismo cuadro
-      }
-      _gonioProcesarCuadro(fc, lm);
-      return;
-    }
     var ang = (lm && world) ? calcularAngulos(world, lm) : null;
     if(ang && (BIO.recording || BIO.procesandoVideo)) acumular(BIO.acc, ang);
     if(BIO.canvas && BIO.srcEl) dibujar(lm, ang);
@@ -1032,7 +1122,7 @@
     if(fc && lm){
       try{
         if(BIO._frRet && BIO._frRet.fr!==fc.fr) _frSoltar(BIO._frRet.fr);
-        BIO._frRet={ fr:fc.fr, frameId:fc.frameId, t:fc.t, w:fc.w, h:fc.h, gen:fc.gen,
+        BIO._frRet={ fr:fc.fr, frameId:fc.frameId, t:fc.t, adq:fc.adq, w:fc.w, h:fc.h, gen:fc.gen,
                      lm:_copiaLm(lm), r:rg, ar:_ANG_AR,
                      hands:(fc.handsSent?_copiaManosLm(fc.handsLm||[]):null) };
         // compat: _liveLm/_liveR/_liveAR apuntan a la MISMA tupla (lectores existentes del panel/captura)
@@ -1050,13 +1140,14 @@
         BIO._peakTSeg=(fc.t!=null?fc.t:0);
         BIO._peakHandsLm=(fc.handsSent?_copiaManosLm(fc.handsLm||[]):null);
         BIO._peakFrameId=fc.frameId;
+        BIO._peakAdq=fc.adq;      // (V3.2) UTC de adquisición del raster del pico (trazabilidad)
         BIO._peakRot=fc.rot||0;   // orientación ganadora (decúbito): fijar otros cuadros usa la MISMA
         // (V3.1 P2) candidatos de MEJOR RANGO para la línea de tiempo del video (t de media + frameId auténticos)
         (BIO._vidCands||(BIO._vidCands=[])).push({ t:(fc.t!=null?Math.round(fc.t*100)/100:null), val:Math.round(rg.val*10)/10, frameId:fc.frameId });
         if(BIO._vidCands.length>12) BIO._vidCands.shift();
       } else if(BIO.modo==='camara'){
         BIO._livePeakCv=_copiarFrameA(BIO._livePeakCv, fc.fr.cv, 1600);
-        BIO._livePeakFrameId=fc.frameId; BIO._livePeakT=fc.t;
+        BIO._livePeakFrameId=fc.frameId; BIO._livePeakT=fc.t; BIO._livePeakAdq=fc.adq;
         BIO._livePeakHands=(fc.handsSent?_copiaManosLm(fc.handsLm||[]):null);
       }
     }catch(_e){} }
@@ -1078,6 +1169,17 @@
     var cap = 720, escala = vw>cap ? cap/vw : 1;
     var w = Math.round(vw*escala), h = Math.round(vh*escala);
     if(cv.width!==w || cv.height!==h){ cv.width=w; cv.height=h; }
+    // (V3.2 P1) marca el visor como VERTICAL cuando el contenido lo es (el CSS de escritorio ciñe el
+    // wrap al aspecto del contenido para no dejar franjas negras laterales). Solo presentación.
+    try{
+      var _wv=cv.parentElement;
+      if(_wv && _wv.classList && _wv._bioArv!==(vw+'x'+vh)){
+        _wv._bioArv=(vw+'x'+vh);
+        var _esV=(vh>vw);
+        _wv.classList.toggle('bio-vert', _esV);
+        if(_esV) _wv.style.setProperty('--bio-arv', String(Math.round((vw/vh)*1e4)/1e4));
+      }
+    }catch(_bv){}
     try{ ctx.drawImage(src, 0, 0, w, h); }catch(e){ return; }
     if(!lm) return;
     // conexiones — en GONIÓMETRO el esqueleto se atenúa (sirve para encuadrar, pero el instrumento V3
@@ -1245,6 +1347,9 @@
       '@media (min-width:1024px){',
       ' #bio-vista-camara.gonio-v31{display:grid!important;grid-template-columns:minmax(0,1fr) minmax(300px,340px);grid-template-rows:auto auto auto minmax(0,1fr) auto;overflow:hidden}',
       ' .gonio-v31 .bio-canvas-wrap{grid-column:1;grid-row:1/5;height:auto;min-height:0}',
+      // (V3.2 P1) contenido VERTICAL en visor ancho: el wrap se ciñe al aspecto del contenido y se centra
+      // (menos franjas negras laterales). Solo CSS de presentación: export, puntos y análisis intactos.
+      ' .gonio-v31 .bio-canvas-wrap.bio-vert{width:auto;aspect-ratio:var(--bio-arv,0.5625);max-width:100%;justify-self:center}',
       ' .gonio-v31 .bio-gtools{grid-column:1;grid-row:5;justify-content:center}',
       ' .gonio-v31 .bio-panel-dock{grid-column:2;grid-row:1;border-left:1px solid rgba(255,255,255,.1);border-top:none}',
       ' .gonio-v31 .bio-estado{grid-column:2;grid-row:2;border-left:1px solid rgba(255,255,255,.1)}',
@@ -1395,7 +1500,13 @@
     if(bS) bS.classList.toggle('on', BIO.tipoMedicion==='sent');
     if(bM) bM.classList.toggle('on', BIO.tipoMedicion==='marcha');
     if(bG) bG.classList.toggle('on', BIO.tipoMedicion==='gonio');
-    var ic=document.getElementById('bio-ini-icono'); if(ic) ic.textContent = BIO.tipoMedicion==='sent' ? '🏋️' : (BIO.tipoMedicion==='marcha' ? '🚶' : (BIO.tipoMedicion==='gonio' ? '📐' : '🦴'));
+    var ic=document.getElementById('bio-ini-icono');
+    if(ic){
+      ic.textContent = BIO.tipoMedicion==='sent' ? '🏋️' : (BIO.tipoMedicion==='marcha' ? '🚶' : (BIO.tipoMedicion==='gonio' ? '📐' : '🦴'));
+      // (V3.2 P1) en el INSTRUMENTO (goniómetro) no hay emoji decorativo gigante: a 320 px la vista
+      // inicial consumía demasiada altura (hallazgo auditoría V3.1 #1).
+      ic.style.display = (BIO.tipoMedicion==='gonio') ? 'none' : '';
+    }
     // estatura: sentadilla y marcha la usan (calibración a cm); ROM no.
     var ew=document.getElementById('bio-est-wrap'); if(ew) ew.style.display = (BIO.tipoMedicion==='sent'||BIO.tipoMedicion==='marcha') ? 'block' : 'none';
     var de=document.getElementById('bio-ini-desc');
@@ -1407,7 +1518,15 @@
           ? 'GONIÓMETRO (plano sagital): cadera, rodilla, tobillo, codo y muñeca por lado. Mídelo EN VIVO, subiendo una FOTO (ideal en camilla / decúbito prono) o subiendo un VIDEO. Elige articulación, movimiento y lado; el ángulo se escribe en el ROM de la Valoración.'
           : 'Mide los rangos articulares de codo y hombro. Elige cómo capturar el movimiento.'));
     var tt=document.querySelector('#bio-overlay .bio-top b');
-    if(tt) tt.textContent = BIO.tipoMedicion==='sent' ? '🏋️ Sentadilla — análisis frontal' : (BIO.tipoMedicion==='marcha' ? '🚶 Marcha — análisis sagital' : (BIO.tipoMedicion==='gonio' ? '📐 Goniómetro — cámara · foto · video' : '🦴 Medición biomecánica — ROM'));
+    if(tt){
+      if(BIO.tipoMedicion==='gonio'){
+        // (V3.2 P1) 320 px: título corto en UNA línea + las fuentes en una 2.ª línea pequeña, sin emoji
+        // decorativo (hallazgo auditoría V3.1 #1 — el título largo se partía en dos líneas grandes).
+        tt.innerHTML='Goniómetro<span style="display:block;font-size:11.5px;font-weight:600;color:rgba(255,255,255,.72);letter-spacing:.3px;margin-top:1px">Cámara · foto · video — plano sagital 2D</span>';
+      } else {
+        tt.textContent = BIO.tipoMedicion==='sent' ? '🏋️ Sentadilla — análisis frontal' : (BIO.tipoMedicion==='marcha' ? '🚶 Marcha — análisis sagital' : '🦴 Medición biomecánica — ROM');
+      }
+    }
     // Goniómetro: selector de articulación/movimiento/lado + botón de foto + tira de capturas (foto/video usan el mismo acumulador).
     var esG=(BIO.tipoMedicion==='gonio');
     var gSel=document.getElementById('bio-gonio-sel'); if(gSel) gSel.style.display=esG?'block':'none';
@@ -1426,8 +1545,15 @@
     BIO._estaticoBase=null; BIO._estaticoLm=null; BIO._estaticoImg=null; BIO._estaticoFuente=null; BIO._peakFrameCanvas=null; BIO._peakFrameLm=null; BIO._peakTSeg=null; BIO._fotoRes=null; BIO._gonioRot=0; BIO._vidFrameSent=null;
     BIO._fotoHD=null; BIO._liveLm=null; BIO._liveR=null; BIO._liveAR=null; BIO._livePeakCv=null; BIO._ed=null; BIO._gxHyst=null; _zoomReset();   // V3: HD de foto, tupla viva, ajuste manual, histéresis y zoom
     // V3.1: identidad de cuadro — pool de rasters, colas de contexto/manos, tupla retenida y sellos de pico
-    BIO._frPool=[]; BIO._frQ=[]; BIO._handsQ=[]; BIO._frPend=null; BIO._frRet=null; BIO._frProcHands=null;
+    BIO._frPool=[]; BIO._frQ=[]; BIO._frPend=null; BIO._frRet=null; BIO._frProcHands=null;
+    // (V3.2) jobs y deuda de callbacks: la DEUDA sobrevive al reset — un send en vuelo del estado
+    // anterior sigue debiendo su callback y, si el medidor se re-abre de inmediato, ese callback
+    // tardío NO debe emparejar cuadros nuevos (el _bumpGen de arriba ya convirtió los contextos en
+    // vuelo en deuda ambigua). El job de Hands en vuelo pasa a deuda; el lock se re-arma limpio.
+    if(BIO._handsJob && !BIO._handsJob.resuelto){ BIO._handsStale=(BIO._handsStale||0)+1; }
+    BIO._handsJob=null; BIO._frPoolAgotado=0;
     BIO._livePeakFrameId=null; BIO._livePeakT=null; BIO._livePeakHands=null; BIO._peakFrameId=null;
+    BIO._livePeakAdq=null; BIO._peakAdq=null; BIO._estaticoAdq=null;   // (V3.2) UTC de adquisición
     BIO._vidCands=[]; BIO._vidDur=null; BIO._peakRot=0; BIO._estaticoTipoCuadro=null; BIO._estaticoTipoCuadroNext=null; BIO._vidFijando=false;
     BIO._handsLm=null; BIO._handsSending=false; BIO._estaticoHandsLm=undefined; BIO._estaticoHandsNext=undefined; BIO._estaticoHandsRun=false; BIO._peakHandsLm=null; BIO._peakGonioR=null; BIO._estaticoR=null;   // estado de HANDS (muñeca); el modelo cargado se conserva para reuso
     BIO.facing='environment';           // cada medición arranca con la cámara TRASERA
@@ -1535,9 +1661,10 @@
       if(BIO.sending){
         if(BIO._sendAt && (Date.now()-BIO._sendAt)>2500){
           BIO.sending=false; BIO._sendStuck=(BIO._sendStuck||0)+1;
-          // (V3.1) en goniómetro un send colgado invalida la GENERACIÓN completa (los contextos en vuelo
-          // se barren y un callback tardío se descarta) → jamás un emparejado corrido cuadro↔resultado.
-          if(BIO.tipoMedicion==='gonio'){ _bumpGen(); }
+          // (V3.2) en goniómetro un send colgado invalida la GENERACIÓN completa y la pérdida queda
+          // DECLARADA (los callbacks en deuda se drenan FIFO) → jamás un emparejado corrido, y el
+          // primer cuadro tras recuperarse sí se mide.
+          if(BIO.tipoMedicion==='gonio'){ _bumpGen(); _poseDeclararPerdidos(); }
           else if(BIO._genQ && BIO._genQ.length) BIO._genQ.shift();
         }
         return;
@@ -1772,7 +1899,7 @@
 
     if(BIO.tipoMedicion==='sent'){ BIO.accS=nuevoAccSent(); }
     else if(BIO.tipoMedicion==='marcha'){ BIO.accM=nuevoAccMarcha(); }
-    else if(BIO.tipoMedicion==='gonio'){ if(!BIO.accG) BIO.accG=nuevoAccGonio(); _gonioSelDefault(BIO.accG); BIO.accG.peak=null; BIO.accG.run=0; BIO._peakFrameCanvas=null; BIO._peakFrameLm=null; BIO._peakTSeg=null; BIO._gonioRot=0; BIO._peakHandsLm=null; BIO._peakGonioR=null; BIO._vidDur=dur; BIO._vidCands=[]; BIO._peakRot=0; BIO._peakFrameId=null; _ensureHandsSiMuneca(); }
+    else if(BIO.tipoMedicion==='gonio'){ if(!BIO.accG) BIO.accG=nuevoAccGonio(); _gonioSelDefault(BIO.accG); BIO.accG.peak=null; BIO.accG.run=0; BIO._peakFrameCanvas=null; BIO._peakFrameLm=null; BIO._peakTSeg=null; BIO._gonioRot=0; BIO._peakHandsLm=null; BIO._peakGonioR=null; BIO._vidDur=dur; BIO._vidCands=[]; BIO._peakRot=0; BIO._peakFrameId=null; BIO._peakAdq=null; _ensureHandsSiMuneca(); }
     else { BIO.acc = nuevoAcumulador(); }
     BIO.framesTotales=0; BIO.framesDescartados=0;   // O4: reinicia descartes al empezar el análisis de video
     BIO.procesandoVideo=true; BIO.cancelVideo=false;
@@ -1806,7 +1933,7 @@
         // (V3.1) en goniómetro invalida la generación completa (contextos barridos, tardío descartado).
         if(BIO.sending && BIO._sendAt && (Date.now()-BIO._sendAt)>2500){
           BIO.sending=false;
-          if(BIO.tipoMedicion==='gonio'){ _bumpGen(); }
+          if(BIO.tipoMedicion==='gonio'){ _bumpGen(); _poseDeclararPerdidos(); }   // (V3.2) pérdida declarada
           else if(BIO._genQ && BIO._genQ.length) BIO._genQ.shift();
         }
         // iOS: si el video no arrancó (currentTime pegado en 0), reintenta reproducir dentro del loop
@@ -1856,7 +1983,7 @@
       var _rotsVid=[90,-90,180];
       for(var _rvi=0; _rvi<_rotsVid.length && !BIO.cancelVideo; _rvi++){
         BIO._gonioRot=_rotsVid[_rvi]; _bumpGen(); BIO.sending=false;
-        if(BIO.accG){ BIO.accG.peak=null; BIO.accG.run=0; } BIO._peakFrameCanvas=null; BIO._peakFrameLm=null; BIO._peakTSeg=null; BIO._peakHandsLm=null; BIO._peakGonioR=null; BIO._peakFrameId=null; BIO._vidCands=[]; BIO.framesTotales=0;
+        if(BIO.accG){ BIO.accG.peak=null; BIO.accG.run=0; } BIO._peakFrameCanvas=null; BIO._peakFrameLm=null; BIO._peakTSeg=null; BIO._peakHandsLm=null; BIO._peakGonioR=null; BIO._peakFrameId=null; BIO._peakAdq=null; BIO._vidCands=[]; BIO.framesTotales=0;
         if(txt) txt.textContent='Probando otra orientación…'; if(fill) fill.style.width='0%';
         try{ v.currentTime=0; }catch(_){}
         await _muestrear();
@@ -3176,15 +3303,18 @@
     var rotMax=(s && s.agg==='min') ? 'Mejor (mínimo)' : 'Mejor rango';
     panel.innerHTML =
       '<div class="bio-gonio-live">'
-      + '<div class="gl-eyebrow">'+(esEstP?'Lectura del cuadro':'Lectura en vivo · suavizada')+'</div>'
+      + '<div class="gl-eyebrow">'+(esEstP?'Lectura del cuadro analizado':'Lectura en vivo (suavizada)')+'</div>'
       + '<div class="gl-head">'
       +   '<div class="gl-num" aria-live="polite"><span id="bg-live">—</span><span class="gl-deg">°</span></div>'
       +   '<div><div class="gl-lbl" id="bg-lbl">'+(s?(esc(s.grupo)+' · '+esc(s.mov)+' · '+(s.lado==='izq'?'Izquierdo':'Derecho')):'—')+'</div>'
       +     '<div class="gl-metodo">Estimación fotogoniométrica 2D · dirección por confirmar</div></div>'
       + '</div>'
       + '<div class="gl-sub">'
-      +   (esEstP ? '' : '<span>Cuadro <b id="bg-cuadro">—</b>°</span><span>'+rotMax+' <b id="bg-max">—</b>°</span>')
-      +   '<span>Normal '+(s?esc(s.normTxt):'—')+'</span>'
+      // (V3.2 P1) lecturas auto-descritas: "Cuadro" = valor CRUDO del último cuadro (el del arco);
+      // "Mejor rango" = mayor/mejor valor SOSTENIDO de la toma; la referencia es de ADULTO y ORIENTATIVA
+      // (no diagnóstico automático — en pediatría los rangos difieren). Hallazgos auditoría V3.1 #3/#4.
+      +   (esEstP ? '' : '<span title="Valor crudo del último cuadro procesado — el mismo número que dibuja el arco">Cuadro <b id="bg-cuadro">—</b>°</span><span title="'+((s && s.agg==='min')?'El menor valor sostenido de la toma (déficit): su mejor lectura':'El mayor rango sostenido alcanzado en esta toma')+'">'+rotMax+' <b id="bg-max">—</b>°</span>')
+      +   '<span title="Rango de referencia de ADULTO — orientativo, no es diagnóstico (en pediatría difiere)">Ref. adulto '+(s?esc(s.normTxt):'—')+' <i style="font-style:normal;opacity:.7">(orientativa)</i></span>'
       +   (esEstP ? '<span style="display:none">'+rotMax+' <b id="bg-max">—</b>°</span>' : '')
       + '</div>'
       + '<div id="bg-hint" style="font-size:12px;line-height:1.3;color:#E8C96A;margin-top:4px;min-height:14px"></div>'
@@ -3299,6 +3429,9 @@
     // (V3.1 P2) qué cuadro es éste: 'pico' (del análisis) o 'fijado' (elegido a mano en la línea de tiempo)
     BIO._estaticoTipoCuadro=(BIO._estaticoTipoCuadroNext!=null)?BIO._estaticoTipoCuadroNext:((fuente==='video')?'pico':null);
     BIO._estaticoTipoCuadroNext=null;
+    // (V3.2) UTC de ADQUISICIÓN del raster analizado: video-pico hereda el del cuadro congelado del
+    // análisis; foto / cuadro fijado = momento de decodificación (el archivo no trae hora confiable).
+    BIO._estaticoAdq=(fuente==='video' && BIO._peakAdq!=null) ? BIO._peakAdq : Date.now();
     BIO._ed=null; BIO._gxHyst=null; _zoomReset();   // V3: fuente nueva → ajuste manual, histéresis y zoom desde cero
     // Manos CONGELADAS con este cuadro (foto: pase explícito; video: las del cuadro-pico). undefined =
     // aún no se buscó la mano en esta imagen → _recalcEstatico la busca bajo demanda si eligen Muñeca.
@@ -3329,6 +3462,17 @@
     var cv=BIO.canvas, ctx=BIO.ctx;
     _setAspect(BIO._estaticoBase.width, BIO._estaticoBase.height);   // aspecto del cuadro estático (H1)
     if(cv.width!==BIO._estaticoBase.width || cv.height!==BIO._estaticoBase.height){ cv.width=BIO._estaticoBase.width; cv.height=BIO._estaticoBase.height; }
+    // (V3.2 P1) marca el visor VERTICAL también en estático (igual que dibujar): el CSS de escritorio
+    // ciñe el wrap al aspecto del contenido — menos franjas negras laterales; solo presentación.
+    try{
+      var _wvE=cv.parentElement, _vwE=BIO._estaticoBase.width, _vhE=BIO._estaticoBase.height;
+      if(_wvE && _wvE.classList && _wvE._bioArv!==(_vwE+'x'+_vhE)){
+        _wvE._bioArv=(_vwE+'x'+_vhE);
+        var _esVE=(_vhE>_vwE);
+        _wvE.classList.toggle('bio-vert', _esVE);
+        if(_esVE) _wvE.style.setProperty('--bio-arv', String(Math.round((_vwE/_vhE)*1e4)/1e4));
+      }
+    }catch(_bvE){}
     ctx.clearRect(0,0,cv.width,cv.height);
     try{ ctx.drawImage(BIO._estaticoBase,0,0); }catch(e){}
     // MUÑECA sobre cuadro estático: si aún no se buscó la mano en ESTA imagen, se corre Hands en 2º plano
@@ -3773,6 +3917,7 @@
       var lm=await _poseSobreEstatico(base);
       BIO._peakTSeg=Math.round(tReal*100)/100;                    // el estático pasa a SER este cuadro
       BIO._peakFrameId=(++BIO._frSeq||(BIO._frSeq=1));
+      BIO._peakAdq=Date.now();                                    // (V3.2) adquisición = decodificación de ESTE cuadro
       BIO._estaticoTipoCuadroNext='fijado';
       BIO._estaticoHandsNext=undefined;                           // muñeca: Hands se re-corre sobre ESTE cuadro
       _mostrarGonioEstatico(base, lm, 'video');
@@ -3882,6 +4027,7 @@
     if(esEst){
       if(g.peak==null){ toast('No se detecta esa articulación en la imagen; cambia de movimiento/lado, usa Ajustar puntos o sube otra','warning'); return; }
       tup={ base:BIO._estaticoBase, lm:BIO._estaticoLm, r:(BIO._estaticoR||null), val:g.peak, ar:(_ANG_AR||1),
+            adq:(BIO._estaticoAdq!=null?BIO._estaticoAdq:null),
             fuente:(BIO._estaticoFuente||'estatico'),
             tSeg:(BIO._estaticoFuente==='video' && BIO._peakTSeg!=null) ? Math.round(BIO._peakTSeg*10)/10 : null,
             frameId:(BIO._estaticoFuente==='video' && BIO._peakFrameId!=null) ? BIO._peakFrameId : null,
@@ -3897,12 +4043,13 @@
       if(!(ret && ret.r && ret.r.ok && ret.lm)){ toast('No hay una lectura válida en este cuadro: acomoda la articulación de PERFIL y a cuadro','warning'); return; }
       var cvA=null; try{ cvA=_copiarFrameA(null, ret.fr.cv, 1600); }catch(_c){}
       tup={ base:cvA, lm:ret.lm, r:ret.r, val:ret.r.val, ar:(ret.ar||_ANG_AR||1), fuente:'camara', tSeg:null,
-            cual:'actual', frameId:ret.frameId };
+            cual:'actual', frameId:ret.frameId, adq:(ret.adq!=null?ret.adq:null) };
     } else {
       if(g.peak==null){ toast('Mueve la articulación hasta el tope para medir (o captura el cuadro actual)','warning'); return; }
       tup={ base:(BIO._livePeakCv||null), lm:BIO._peakGonioLm, r:(BIO._peakGonioR||null), val:g.peak,
             ar:(BIO._peakGonioAR||_ANG_AR||1), fuente:'camara', tSeg:null, cual:'pico',
-            frameId:(BIO._livePeakFrameId!=null?BIO._livePeakFrameId:null) };
+            frameId:(BIO._livePeakFrameId!=null?BIO._livePeakFrameId:null),
+            adq:(BIO._livePeakAdq!=null?BIO._livePeakAdq:null) };
     }
     // ── Confirmaciones de integridad (V3/V3.1): nunca auto-guardar lo sospechoso, nunca borrar lo real ──
     var rT=tup.r||{}, eSel=_gonioEntry(g.sel.grupo, g.sel.mov);
@@ -3951,9 +4098,12 @@
               frameId:(tup.frameId!=null?tup.frameId:null),
               seleccion:{ grupo:g.sel.grupo, mov:g.sel.mov, lado:g.sel.lado },
               // valCrudo = PRECISIÓN ORIGINAL del cálculo (1e-6, solo limpia polvo de flotante);
-              // "grado" (0.1°) es el valor de PRESENTACIÓN. capturadoEn = fecha/hora de adquisición.
+              // "grado" (0.1°) es el valor de PRESENTACIÓN. capturadoEn = momento de pulsar Capturar;
+              // adquiridoEnUTC (V3.2) = momento de ADQUISICIÓN/decodificación del raster medido (en
+              // cámara/video puede diferir del Capturar: el pico se congeló antes). tSeg = tiempo de media.
               valCrudo:Math.round(tup.val*1e6)/1e6,
               capturadoEn:fechaHoy()+' '+horaAhora(),
+              adquiridoEnUTC:(tup.adq!=null ? new Date(tup.adq).toISOString() : null),
               metodo:metodo,
               dims:(tup.base && tup.base.width)?{ w:tup.base.width, h:tup.base.height }:null,
               resExport:(rend && rend.dims)?{ w:rend.dims.w, h:rend.dims.h }:null,
@@ -4045,9 +4195,9 @@
     cont.innerHTML =
       '<h3>Resumen — Goniometría de cámara</h3>'
       + '<div style="color:#9BA3B5;font-size:13px;margin-bottom:10px">📷 Cámara · plano sagital · '+arr.length+' medida'+(arr.length===1?'':'s')+'</div>'
-      + '<table class="bio-tabla-res"><thead><tr><th>Articulación / movimiento</th><th style="text-align:center">Der</th><th style="text-align:center">Izq</th><th style="text-align:center">Normal</th></tr></thead><tbody>'+filas+'</tbody></table>'
+      + '<table class="bio-tabla-res"><thead><tr><th>Articulación / movimiento</th><th style="text-align:center">Der</th><th style="text-align:center">Izq</th><th style="text-align:center">Ref. adulto</th></tr></thead><tbody>'+filas+'</tbody></table>'
       + '<div style="margin-top:12px;background:rgba(255,255,255,.05);border-radius:10px;padding:10px 12px;font-size:13px;color:#cfd6e4">'+esc(interp)+'</div>'
-      + '<div style="font-size:11px;color:#9BA3B5;margin-top:8px;font-style:italic">Referencia: '+esc(GONIO_CITA)+' · Medición 2D (cribado), ±5° en plano; margen estimado, no validado contra goniómetro físico.</div>'
+      + '<div style="font-size:11px;color:#9BA3B5;margin-top:8px;font-style:italic">Referencia: '+esc(GONIO_CITA)+' · Rangos de referencia de ADULTO, orientativos (no diagnóstico; en pediatría difieren) · Medición 2D (cribado), ±5° en plano; margen estimado, no validado contra goniómetro físico.</div>'
       + '<div style="color:#9BA3B5;font-size:12px;margin-top:10px">Se escribirá en el campo <b>ROM</b> de la Valoración y quedará en Biomecánica.</div>'
       + '<div class="bio-acciones" style="padding-top:14px">'
       +   '<button class="bio-b-sec" onclick="BIO_gonioVolver()">← Seguir midiendo</button>'
