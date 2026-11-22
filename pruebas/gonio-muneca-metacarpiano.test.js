@@ -3,12 +3,14 @@
  * Qué demuestra:
  *   - Con la mano CERRADA (puño), la punta del índice de Pose colapsa junto a la
  *     palma y la fórmula vieja producía un número INVENTADO con ok:true; ahora,
- *     sin detector de mano, eso es {ok:false, motivo:'mano'} (gate endurecido).
+ *     sin detector de mano, eso es un RECHAZO TERMINAL (contrato V4).
  *   - Con Hands (lm0 muñeca → lm9 nudillo medio) el eje se mantiene aunque el
  *     puño esté cerrado → el ángulo sale bien.
  *   - Una mano detectada LEJOS de la muñeca de Pose (mano contraria / detección
- *     suelta) NO se usa.
- *   - El fallback de índice SOLO acepta mano abierta (segmento largo y visible).
+ *     suelta) NO se usa → HAND_NOT_ASSOCIATED, sin fallback.
+ *   - ACTUALIZADO V4 P0-PROVENANCIA (22-nov-2026): el fallback de índice quedó
+ *     BLOQUEADO; sin Hands válida la muñeca exige corrección manual (✋) o nueva
+ *     toma (HANDS_NOT_AVAILABLE / HAND_NOT_ASSOCIATED / MCP5_NO_DISPONIBLE).
  *   - La corrección de aspecto (H1), el techo fisiológico y la marca de
  *     "brazo corto en imagen" (cortoImg) siguen aplicando sobre el eje nuevo.
  * Correr:  node pruebas/gonio-muneca-metacarpiano.test.js   (sale !=0 si falla)
@@ -85,7 +87,9 @@ function mcpA(aGrados, largo){ var l=(largo==null?0.12:largo); return { x:0.6+l*
   ok(viejo > 10, 'M2a (demostración del bug) la fórmula vieja daba un número con el puño: ' + viejo.toFixed(1) + '°');
   var r = T.calcularGonio(lm, 'Muñeca', 'Flexión', 'der');
   ok(r && r.ok===false && r.val===null, 'M2b ahora el puño sin detector de mano es {ok:false}');
-  ok(r && r.motivo==='mano', 'M2c con motivo "mano" (→ hint: abre la mano)');
+  // ACTUALIZADO al contrato V4: sin Hands el rechazo es TERMINAL (HANDS_NOT_AVAILABLE) y se reporta
+  // como 'correspondencia' (revisión manual ✋ / nueva toma), ya no como motivo 'mano' con fallback posible.
+  ok(r && r.motivo==='correspondencia' && r.gate && r.gate.reason==='HANDS_NOT_AVAILABLE', 'M2c con rechazo terminal HANDS_NOT_AVAILABLE (contrato V4: revisión manual, no índice)');
 })();
 
 // ── M3) PUÑO CON Hands → el eje 0→9 se mantiene y mide bien ──────────────────
@@ -106,18 +110,23 @@ function mcpA(aGrados, largo){ var l=(largo==null?0.12:largo); return { x:0.6+l*
   T.setHandsLm([ mano(lejos, { x:0.95, y:0.9, z:0 }) ]);
   var lm = lmBase({ 20:L(0.62,0.515) });               // y el índice está en puño → tampoco hay fallback
   var r = T.calcularGonio(lm, 'Muñeca', 'Flexión', 'der');
-  ok(r && r.ok===false && r.motivo==='mano', 'M4 mano lejana (contraria/suelta) no se agarra → no medible');
+  // ACTUALIZADO al contrato V4: hay un detector Hands activo pero ninguna mano compatible con este
+  // brazo → rechazo TERMINAL HAND_NOT_ASSOCIATED (nunca degradar al índice en silencio).
+  ok(r && r.ok===false && r.motivo==='correspondencia' && r.gate && r.gate.reason==='HAND_NOT_ASSOCIATED', 'M4 mano lejana (contraria/suelta) no se agarra → rechazo terminal HAND_NOT_ASSOCIATED');
   T.setHandsLm(null);
 })();
 
-// ── M5) Fallback de ÍNDICE solo con mano ABIERTA (sin Hands) ─────────────────
+// ── M5) Sin Hands NO hay eje metacarpiano: el fallback de índice quedó BLOQUEADO (contrato V4) ──
+// ANTES (V3.x): con la mano abierta y sin Hands, el índice de Pose sustituía al metacarpiano y se
+// emitía un número (eje 'indice-pose'). V4 P0-PROVENANCIA lo bloquea por seguridad: el índice de
+// Pose NO es un eje metacarpiano certificado → sin Hands se exige corrección manual (✋) o nueva toma.
 (function(){
   T.setAspect(1,1); T.setHandsLm(null);
   var lm = lmBase({ 20:L(0.6+0.12*Math.cos(rad(50)), 0.5+0.12*Math.sin(rad(50))) });   // índice extendido a 50°
   var r = T.calcularGonio(lm, 'Muñeca', 'Flexión', 'der');
-  ok(r && r.ok===true, 'M5a mano abierta sin Hands: el fallback de índice sigue midiendo');
-  near(r && r.val, 50, 0.8, 'M5b con el ángulo correcto');
-  ok(r && r.eje==='indice-pose', 'M5c y queda trazado que midió el ÍNDICE (menos fiable)');
+  ok(r && r.ok===false && r.val===null, 'M5a mano abierta sin Hands: SIN número automático (el fallback de índice quedó bloqueado)');
+  ok(r && r.motivo==='correspondencia' && r.gate && r.gate.reason==='HANDS_NOT_AVAILABLE', 'M5b el rechazo queda trazado como HANDS_NOT_AVAILABLE (terminal)');
+  ok(r && r.eje===undefined, 'M5c y NO se reporta ningún eje medido (antes: indice-pose)');
 })();
 
 // ── M6) Corrección de aspecto (H1) sobre el eje nuevo ────────────────────────
@@ -158,10 +167,12 @@ function mcpA(aGrados, largo){ var l=(largo==null?0.12:largo); return { x:0.6+l*
   var lm = lmBase({ 20:L(0.6+0.12*Math.cos(rad(50)), 0.5+0.12*Math.sin(rad(50))) });
   var conManos = T.munecaEje(lm, PDer, [ mano(HW, mcpA(50)) ]);
   ok(conManos && conManos.eje==='metacarpiano-hands', 'M9a con Hands gana el metacarpiano aunque el índice esté abierto');
+  // M9b/M9c — ACTUALIZADO al contrato V4: sin Hands, _munecaEje devuelve un RECHAZO terminal
+  // (HANDS_NOT_AVAILABLE) en vez del índice (mano abierta) o null (puño). Nunca eje 'indice-pose'.
   var sinManos = T.munecaEje(lm, PDer, null);
-  ok(sinManos && sinManos.eje==='indice-pose', 'M9b sin Hands y mano abierta → índice');
+  ok(sinManos && sinManos.rechazo==='HANDS_NOT_AVAILABLE' && !sinManos.eje, 'M9b sin Hands y mano abierta → rechazo terminal (sin eje de índice)');
   var puno = T.munecaEje(lmBase({ 20:L(0.62,0.515) }), PDer, null);
-  ok(puno===null, 'M9c sin Hands y puño → null (no medible)');
+  ok(puno && puno.rechazo==='HANDS_NOT_AVAILABLE' && !puno.eje, 'M9c sin Hands y puño → rechazo terminal (no medible, razón trazada)');
 })();
 
 // ── M10) Visibilidad del codo/muñeca de Pose sigue siendo requisito ──────────

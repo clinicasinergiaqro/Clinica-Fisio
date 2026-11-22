@@ -45,7 +45,10 @@ var ctx = {
   setInterval: function(){ return 0; }, clearInterval: noop,
   requestAnimationFrame: noop, cancelAnimationFrame: noop,
   Image: function(){}, URL: { createObjectURL:function(){return '';}, revokeObjectURL:noop },
-  fetch: function(){ return Promise.reject(new Error('sin red')); }
+  fetch: function(){ return Promise.reject(new Error('sin red')); },
+  // V4 P0-PROVENANCIA: _confirmar es fail-closed (sin función confirm() NO se asume aprobación del
+  // profesional). Esta suite SIMULA que el fisioterapeuta confirma, para poder probar la traza.
+  confirm: function(){ return true; }
 };
 vm.createContext(ctx);
 vm.runInContext(src, ctx, { filename: path.basename(modPath) });

@@ -10,8 +10,8 @@
  *   C) Integración calcularGonio/Muñeca: mano a 20% del antebrazo (el caso
  *      REAL de la foto 3 del caso auditado) → {ok:false, motivo:'correspondencia'}
  *      (sin número automático); a 4% → ok con qc.matchRatio; a 11% → ok con
- *      ALARMA de revisión; con índice abierto el descarte del gate queda
- *      trazado (gateDescartado) y el fallback sigue exigiendo confirmación.
+ *      ALARMA de revisión; con índice abierto el rechazo del gate es TERMINAL
+ *      (contrato V4 P0-PROVENANCIA: sin fallback automático al índice).
  *   D) Protocolos NO intercambiables: 5.º MCP (lateral clásico) usa lm17 y
  *      NUNCA degrada al índice; 3.er MCP queda etiquetado proxy-3mcp.
  *   E) Construcción eje-contra-eje: el vértice es la muñeca de POSE (centro
@@ -108,11 +108,14 @@ var W0={ x:0.6, y:0.5, z:0 };   // muñeca de Pose en la base
   var r20 = T.calcularGonio(lmBase({ 20:L(0.62,0.515) }), 'Muñeca', 'Flexión', 'der');
   ok(r20 && r20.ok===false && r20.motivo==='correspondencia', 'C1 mano a 20% del antebrazo → SIN número automático (motivo correspondencia)');
   ok(r20 && r20.gate && r20.gate.reason==='WRIST_MISMATCH' && Math.abs(r20.gate.ratio-0.20)<=0.02, 'C2 el rechazo queda trazado con la razón y la proporción');
-  // C3: la misma mano con el ÍNDICE ABIERTO → degrada al índice (pose pura) y DEJA TRAZA del descarte
+  // C3/C4 — ACTUALIZADO al contrato V4 (P0-PROVENANCIA, 22-nov-2026): un rechazo del gate de
+  // correspondencia es TERMINAL. Antes, con el índice abierto, el motor degradaba al índice de Pose
+  // (eje 'indice-pose') dejando solo una traza del descarte; ese fallback automático quedó BLOQUEADO
+  // por seguridad: sin mano verificada no se emite número (corrección manual ✋ o nueva toma).
   var lmAbierto = lmBase({ 20:L(0.6+0.12*Math.cos(rad(50)), 0.5+0.12*Math.sin(rad(50))) });
   var rIx = T.calcularGonio(lmAbierto, 'Muñeca', 'Flexión', 'der');
-  ok(rIx && rIx.ok===true && rIx.eje==='indice-pose', 'C3 con índice abierto el fallback (pose pura) sigue midiendo');
-  ok(rIx && rIx.gateDescartado && rIx.gateDescartado.rechazo==='WRIST_MISMATCH', 'C4 y queda trazado que la mano de Hands se descartó por el gate');
+  ok(rIx && rIx.ok===false && rIx.val===null && rIx.motivo==='correspondencia', 'C3 con índice abierto YA NO hay fallback automático: sin número (contrato V4)');
+  ok(rIx && rIx.gate && rIx.gate.reason==='WRIST_MISMATCH' && rIx.gate.ratio!=null, 'C4 y el rechazo del gate queda trazado como razón TERMINAL (WRIST_MISMATCH + proporción)');
   // C5: mano a 4% → medible, con la proporción registrada y sin alarma
   var cerca={ x:0.6+0.3*0.04, y:0.5, z:0 };
   T.setHandsLm([ mano(cerca, mcpDesde(cerca,50)) ]);
