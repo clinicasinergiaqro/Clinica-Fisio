@@ -72,7 +72,7 @@
   //    cuadros (p.ej. el canvas HEVC/iOS), gateo de tiempo (VFR), o caps/techos que cambien el resultado —
   //    NO solo en "correcciones". Si el cálculo cambia y el sello no, la procedencia de los datos clínicos
   //    miente (una sesión diría "mismo algoritmo" que otra medida con código distinto).
-  var BIO_ALGO_VER = 'bio-2d-2026-11-21';   // -21 (V3.2): IDENTIDAD DE CALLBACKS — el emparejado resultado↔cuadro deja de depender de colas FIFO globales: Hands con UN job en vuelo por instancia (el .then/.catch libera SOLO su job; watchdog = job PERDIDO drenado por conteo o por epoch de instancia retirada) y Pose del goniómetro emparejada por el contexto de SU envío + deuda AMBIGUA (descarta sin adivinar) / DECLARADA (drenaje FIFO tras watchdog); techo DURO del pool de rasters; adquiridoEnUTC en traza. Las FÓRMULAS del ángulo no cambian. (-20c (V3.1): IDENTIDAD DE CUADRO — cada cuadro de goniómetro se congela a un raster INMUTABLE de pool ANTES de enviarse y el resultado se empareja por contexto {gen, frameId, mediaTime}; Hands en LOCKSTEP por frameId (fin de la ventana de 1200 ms: mano de un cuadro jamás se mezcla con pose de otro); "cuadro actual" y pico son snapshots de ESE cuadro exacto; captura TRANSACCIONAL (evidencia antes que medida; sin imagen = explícito y confirmado) con valCrudo a precisión original, capturadoEn, metodo, resExport y frameId en traza; hiperextensión exige confirmación visual. Las FÓRMULAS del ángulo no cambian. (-20b V3 motor gráfico/techo/tupla/manual; -20 muñeca 3.er metacarpiano; -19 foto/video robustos a orientación; -18 techo+HEVC iOS.)
+  var BIO_ALGO_VER = 'bio-2d-2026-11-22';   // -22 (P0 ANATÓMICO): VALIDEZ DE LANDMARKS DE MUÑECA — gate de correspondencia Pose↔Hands (la muñeca de Hands debe caer a ≤12% del antebrazo de la muñeca de Pose, medido en las 6 fotos reales: buenas ~5%, malas 13–20%; antes se aceptaba hasta 45% en silencio → 3 de 4 medidas de muñeca pasaban sin revisión); brazo FIJO del goniómetro = eje longitudinal del antebrazo (codo→muñeca de Pose, UN solo modelo), vértice = muñeca de Pose (centro articular del detector) y brazo móvil = DIRECCIÓN del metacarpiano de Hands trasladada al vértice (ya no la polilínea codo→H0→H9 que mezclaba la POSICIÓN de dos modelos en el vértice; en las fotos reales el cambio de valor es ≤1.6°); protocolos NO intercambiables: (B) proxy computacional 3.er MCP (auto) vs (A) lateral clásico 5.º MCP (requiere revisión del fisio); foto estática sin "tope confirmado" → "posición mostrada", sin semáforo de corte; estadoAnatomico por medida; panel de diagnóstico anatómico sin ángulos + export de coordenadas. (-21 (V3.2): IDENTIDAD DE CALLBACKS — el emparejado resultado↔cuadro deja de depender de colas FIFO globales: Hands con UN job en vuelo por instancia (el .then/.catch libera SOLO su job; watchdog = job PERDIDO drenado por conteo o por epoch de instancia retirada) y Pose del goniómetro emparejada por el contexto de SU envío + deuda AMBIGUA (descarta sin adivinar) / DECLARADA (drenaje FIFO tras watchdog); techo DURO del pool de rasters; adquiridoEnUTC en traza. Las FÓRMULAS del ángulo no cambian. (-20c (V3.1): IDENTIDAD DE CUADRO — cada cuadro de goniómetro se congela a un raster INMUTABLE de pool ANTES de enviarse y el resultado se empareja por contexto {gen, frameId, mediaTime}; Hands en LOCKSTEP por frameId (fin de la ventana de 1200 ms: mano de un cuadro jamás se mezcla con pose de otro); "cuadro actual" y pico son snapshots de ESE cuadro exacto; captura TRANSACCIONAL (evidencia antes que medida; sin imagen = explícito y confirmado) con valCrudo a precisión original, capturadoEn, metodo, resExport y frameId en traza; hiperextensión exige confirmación visual. Las FÓRMULAS del ángulo no cambian. (-20b V3 motor gráfico/techo/tupla/manual; -20 muñeca 3.er metacarpiano; -19 foto/video robustos a orientación; -18 techo+HEVC iOS.)
   // CORRECCIÓN DE ASPECTO (H1): las coords de MediaPipe vienen normalizadas 0–1 por ANCHO (x) y por
   // ALTO (y) de forma INDEPENDIENTE. En un cuadro NO cuadrado (p.ej. 9:16 vertical del celular) eso
   // deforma los ángulos de segmentos oblicuos hasta ~20°. Reescalando x por (ancho/alto) se recupera
@@ -225,6 +225,9 @@
     if(job) job.resuelto = true;                                       // su callback SÍ llegó (el watchdog ya no lo cuenta)
     var fid = job ? job.frameId : null;
     BIO._handsLm = (hs && hs.length) ? hs : null;
+    // (P0 2026-11-22) PROVENANCE: handedness/score del detector, mismo orden que multiHandLandmarks
+    // (antes se descartaba → la traza no podía decir la confianza de la mano usada).
+    try{ BIO._handsMeta = (res && res.multiHandedness) ? JSON.parse(JSON.stringify(res.multiHandedness)) : null; }catch(_m){ BIO._handsMeta=null; }
     BIO._handsLmTs = Date.now();
     BIO._handsResFrameId = fid;
     _frResolverPend(fid, (hs && hs.length) ? hs : []);
@@ -1556,6 +1559,8 @@
     BIO._livePeakAdq=null; BIO._peakAdq=null; BIO._estaticoAdq=null;   // (V3.2) UTC de adquisición
     BIO._vidCands=[]; BIO._vidDur=null; BIO._peakRot=0; BIO._estaticoTipoCuadro=null; BIO._estaticoTipoCuadroNext=null; BIO._vidFijando=false;
     BIO._handsLm=null; BIO._handsSending=false; BIO._estaticoHandsLm=undefined; BIO._estaticoHandsNext=undefined; BIO._estaticoHandsRun=false; BIO._peakHandsLm=null; BIO._peakGonioR=null; BIO._estaticoR=null;   // estado de HANDS (muñeca); el modelo cargado se conserva para reuso
+    BIO._handsMeta=null; BIO._estaticoHandsMeta=null; BIO._estaticoHandsMetaNext=undefined;   // (P0) provenance de handedness
+    BIO._munProto='3mcp'; BIO._extOk=false; BIO._anatOn=false;   // (P0) protocolo de muñeca, tope de rango y panel anatómico
     BIO.facing='environment';           // cada medición arranca con la cámara TRASERA
     detenerGrabadorVideo(); BIO.pendingVideo=null; BIO.videoCola=[];
     detenerLoopCamara(); pararCronometro();
@@ -2856,6 +2861,46 @@
     cad_flex:150, cad_ext:50, rod_flex:160, rod_ext:30, rod_hext:40,
     tob_df:45, tob_pf:80, cod_flex:160, cod_ext:30, cod_hext:40, mun_flex:100, mun_ext:95
   };
+  // ═══ GATES DE VALIDEZ ANATÓMICA (P0 corrección anatómica, 2026-11-22) ═══════════════════════════
+  // Un punto DETECTADO no es un landmark anatómico CONFIRMADO. Estos gates no "arreglan" el número:
+  // cuando la evidencia no alcanza, el resultado es NO MEDIBLE / requiere revisión manual del fisio.
+  // Umbrales PROVISIONALES sujetos a calibración clínica (medidos sobre las 6 fotos reales del caso
+  // auditado: correspondencias buenas ~0.05 del antebrazo, malas 0.13–0.20; el 0.45 viejo queda SOLO
+  // como radio de ASOCIACIÓN "qué mano pertenece a este brazo", nunca como validez anatómica).
+  var GONIO_MATCH_MAX = 0.12;      // > esto → la muñeca de Hands NO corresponde a la de Pose → sin número
+  var GONIO_MATCH_WARN = 0.10;     // alarma de revisión a partir de aquí (parámetro conservador de la orden)
+  var GONIO_FOREARM_MIN_PX = 20;   // antebrazo proyectado más corto que esto (px) → eje no evaluable
+  // Gate de correspondencia muñeca Pose↔Hands. `fore`/`mismatch` en CUALQUIER unidad consistente (la
+  // razón es adimensional); `forePx` opcional = antebrazo en píxeles del cuadro (si se conoce).
+  function _gateMunecaMatch(fore, mismatch, forePx){
+    if(!(fore>0) || !isFinite(fore) || mismatch==null || !isFinite(mismatch)) return { valid:false, reason:'AXIS_NOT_TESTABLE', ratio:null };
+    if(forePx!=null && forePx < GONIO_FOREARM_MIN_PX) return { valid:false, reason:'FOREARM_TOO_SHORT', ratio:null };
+    var ratio=mismatch/fore;
+    if(ratio <= GONIO_MATCH_MAX) return { valid:true, ratio:Math.round(ratio*1e4)/1e4, warn:(ratio >= GONIO_MATCH_WARN) };
+    return { valid:false, reason:'WRIST_MISMATCH', ratio:Math.round(ratio*1e4)/1e4 };
+  }
+  // Calidad del EJE del segmento fijo (semántica de la auditoría): error perpendicular de cada muestra
+  // de línea media respecto a la recta shaftA→shaftB, normalizado por el semiancho local del miembro;
+  // válido solo si TODAS las muestras quedan a ≤0.3 semianchos. Requiere silueta/segmentación para
+  // obtener muestras reales → hoy se usa en pruebas y en auditoría offline (en vivo: NOT RUN, el panel
+  // de anatomía da el recorte al 100% para el chequeo visual del fisio).
+  function _axisQuality(shaftA, shaftB, midlineSamples, halfWidths){
+    if(!shaftA || !shaftB || !midlineSamples || !halfWidths) return { valid:false, reason:'AXIS_NOT_TESTABLE' };
+    var vx=shaftB.x-shaftA.x, vy=shaftB.y-shaftA.y;
+    var denom=Math.hypot(vx,vy);
+    if(denom<20 || midlineSamples.length!==halfWidths.length || !midlineSamples.length) return { valid:false, reason:'AXIS_NOT_TESTABLE' };
+    var errors=midlineSamples.map(function(p,i){ return Math.abs((p.x-shaftA.x)*vy-(p.y-shaftA.y)*vx)/denom/halfWidths[i]; });
+    return { valid:errors.every(function(e){ return e<=0.3; }), errors:errors };
+  }
+  // Alto en píxeles del cuadro que se está midiendo (en el espacio norm-con-aspecto, distancia × alto = px).
+  function _frameHGonio(){
+    try{
+      if(BIO._frameHTest!=null) return BIO._frameHTest;
+      if(BIO.modo==='estatico' && BIO._estaticoBase && BIO._estaticoBase.height) return BIO._estaticoBase.height;
+      if(BIO.srcEl && BIO.srcEl.videoHeight) return BIO.srcEl.videoHeight;
+    }catch(_e){}
+    return null;
+  }
   // (V3 P0-4, 2ª revisión) El techo ya NO descarta el valor como "no medible": un techo duro perdía
   // PATOLOGÍA REAL (una contractura severa de codo con déficit ~90° > techo 30° se volvía inmedible).
   // Ahora el valor SE CONSERVA con bandera `fueraTecho` → el pico automático EN VIVO lo sigue ignorando
@@ -2891,18 +2936,51 @@
     var W=lm[P.W], E=lm[P.E];
     if(!_finP(W) || !_finP(E)) return null;
     var fore=_seg2D(E, W);
+    var proto = (BIO._munProto==='5mcp') ? '5mcp' : '3mcp';   // (A) lateral clásico 5.º MCP | (B) proxy 3.er MCP
+    var di = (proto==='5mcp') ? 17 : 9;                        // landmark distal de Hands según protocolo
+    var gateFallo=null;
     if(hs && hs.length){
-      var best=null, bd=Infinity;
+      var best=null, bd=Infinity, bi=-1;
       for(var i=0;i<hs.length;i++){
-        var h=hs[i]; if(!h || !_finP(h[0]) || !_finP(h[9])) continue;
+        var h=hs[i]; if(!h || !_finP(h[0]) || !_finP(h[di])) continue;
         var d=_seg2D(h[0], W);
-        if(d<bd){ bd=d; best=h; }
+        if(d<bd){ bd=d; best=h; bi=i; }
       }
-      if(best && bd <= Math.max(0.05, fore*0.45)) return { eje:'metacarpiano-hands', B:best[0], C:best[9], dPoseHands:Math.round(bd*1e4)/1e4, antebrazoLen:Math.round(fore*1e4)/1e4 };
+      if(best && bd <= Math.max(0.05, fore*0.45)){            // ASOCIACIÓN: esta mano pertenece a este brazo…
+        // …pero asociación ≠ anatomía: GATE de correspondencia (P0 2026-11-22). La muñeca de Hands debe
+        // COINCIDIR con la de Pose (≤12% del antebrazo); si no, alguno de los dos modelos está mal ubicado
+        // → sin número automático (revisión manual con ✋), nunca un grado de landmarks no verificados.
+        var fH=_frameHGonio();
+        var gate=_gateMunecaMatch(fore, bd, (fH!=null)? fore*fH : null);
+        if(gate.valid){
+          // EJE-CONTRA-EJE (criterio de la auditoría): brazo FIJO = eje longitudinal del antebrazo
+          // (codo→muñeca de Pose, un solo modelo), VÉRTICE = muñeca de Pose (centro articular del
+          // detector) y brazo móvil = DIRECCIÓN del metacarpiano de Hands (lm0→lmDistal) TRASLADADA al
+          // vértice. Ya no se usa la POSICIÓN de lm0 de Hands como vértice (quedaba sobre el carpo,
+          // desplazada del centro articular, mezclando posiciones de dos modelos en el vértice).
+          var C2={ x: W.x + (best[di].x - best[0].x), y: W.y + (best[di].y - best[0].y) };
+          return { eje:(proto==='5mcp'?'metacarpiano5-hands':'metacarpiano-hands'), B:W, C:C2,
+                   manoCruda:{ H0:{x:best[0].x,y:best[0].y}, H9:(_finP(best[9])?{x:best[9].x,y:best[9].y}:null),
+                               H17:(_finP(best[17])?{x:best[17].x,y:best[17].y}:null) },
+                   manoIdx:bi, gate:gate,
+                   dPoseHands:Math.round(bd*1e4)/1e4, antebrazoLen:Math.round(fore*1e4)/1e4 };
+        }
+        gateFallo={ rechazo:gate.reason, ratio:gate.ratio,
+                    dPoseHands:Math.round(bd*1e4)/1e4, antebrazoLen:Math.round(fore*1e4)/1e4 };
+      } else if(best===null && proto==='5mcp'){
+        gateFallo={ rechazo:'MCP5_NO_VISIBLE', ratio:null };   // hay manos pero sin lm17 confiable
+      }
     }
+    // Protocolo A (5.º MCP, lateral clásico): NO degrada al índice (sería una TERCERA convención en
+    // silencio). Sin mano válida → se reporta el fallo y el fisio revisa/ajusta.
+    if(proto==='5mcp') return gateFallo || null;
     var Ix=lm[P.Ix];
-    if(_vis(lm,P.Ix) && _finP(Ix) && _seg2D(W, Ix) >= Math.max(0.045, fore*0.30)) return { eje:'indice-pose', B:W, C:Ix };
-    return null;
+    if(_vis(lm,P.Ix) && _finP(Ix) && _seg2D(W, Ix) >= Math.max(0.045, fore*0.30)){
+      var rIx={ eje:'indice-pose', B:W, C:Ix };
+      if(gateFallo) rIx.gateDescartado=gateFallo;   // trazabilidad: la mano de Hands se descartó por el gate
+      return rIx;
+    }
+    return gateFallo || null;
   }
   // Ángulo del movimiento seleccionado, en convención clínica (0° neutro), desde landmarks 2D de imagen.
   function calcularGonio(lm, grupo, mov, lado){
@@ -2935,12 +3013,24 @@
     }
     if(grupo==='Muñeca'){
       if(!(v(P.E)&&v(P.W))) return { ok:false, val:null };
-      var ejeM=_munecaEje(lm, P, _handsActuales());                      // 3.er metacarpiano (Hands) o índice con mano abierta
+      var ejeM=_munecaEje(lm, P, _handsActuales());                      // metacarpiano (Hands, gate) o índice con mano abierta
+      if(ejeM && ejeM.rechazo){                                          // GATE P0: la mano detectada NO corresponde a esta muñeca
+        return { ok:false, val:null, motivo:'correspondencia',
+                 gate:{ reason:ejeM.rechazo, ratio:ejeM.ratio, dPoseHands:ejeM.dPoseHands, antebrazoLen:ejeM.antebrazoLen } };
+      }
       if(!ejeM) return { ok:false, val:null, motivo:'mano' };            // puño/mano no visible → "abre la mano", no un número falso
       if(!_medible3(lm[P.E], ejeM.B, ejeM.C)) return { ok:false, val:null, motivo:'mano' };
-      var rM=_gonioTecho(grupo, mov, Math.max(0, 180 - _ang2D(lm[P.E], ejeM.B, ejeM.C)));  // antebrazo–muñeca–metacarpiano (+ techo fisiológico)
+      var rM=_gonioTecho(grupo, mov, Math.max(0, 180 - _ang2D(lm[P.E], ejeM.B, ejeM.C)));  // antebrazo (codo→muñeca) vs eje de la mano trasladado al vértice (+ techo fisiológico)
       if(rM.ok){
         rM.eje=ejeM.eje; rM.mano={ B:{x:ejeM.B.x,y:ejeM.B.y}, C:{x:ejeM.C.x,y:ejeM.C.y} };  // los puntos REALES del número (dibujo+traza)
+        rM.protocolo = (ejeM.eje==='metacarpiano5-hands') ? 'lateral-5mcp' : (ejeM.eje==='metacarpiano-hands' ? 'proxy-3mcp' : 'indice-pose');
+        if(ejeM.manoCruda) rM.manoCruda=ejeM.manoCruda;            // lm0/lm9/lm17 CRUDOS de Hands (panel anatómico + traza)
+        if(ejeM.manoIdx!=null){                                    // confianza (handedness score) de la mano usada, si el detector la dio
+          try{ var _hm=(BIO.modo==='estatico')?BIO._estaticoHandsMeta:BIO._handsMeta;
+               var _he=_hm&&_hm[ejeM.manoIdx]; if(_he&&_he.score!=null) rM.handsScore=Math.round(_he.score*100)/100; }catch(_hs){}
+        }
+        if(ejeM.gate) rM.qc={ matchRatio:ejeM.gate.ratio, matchAlarma:!!ejeM.gate.warn };   // correspondencia Pose↔Hands aprobada (con o sin alarma)
+        if(ejeM.gateDescartado) rM.gateDescartado=ejeM.gateDescartado;
         if(ejeM.dPoseHands!=null) rM.dPoseHands=ejeM.dPoseHands;   // distancia muñeca Pose↔Hands (diagnóstico de asignación de mano; unidad: norm-con-aspecto)
         if(ejeM.antebrazoLen!=null) rM.antebrazoLen=ejeM.antebrazoLen;   // largo del antebrazo en la misma unidad (para exportar la proporción)
         if(_seg2D(lm[P.E], ejeM.B) < 0.09 || _seg2D(ejeM.B, ejeM.C) < 0.05) rM.cortoImg=true;  // fuera de plano probable → baja confianza
@@ -2977,12 +3067,17 @@
     if(m.hiperext){ return (m.grado<=1) ? '0° (neutro)' : ('+'+Math.round(m.grado)+'° hiperext'); }
     if(m.defic){ return (m.grado<=1) ? '0° (completa)' : ('déficit '+Math.round(m.grado)+'°'+(_gonioSuperaTecho(m)?' (supera techo)':'')); }
     if(_gonioSuperaTecho(m)) return Math.round(m.grado)+'° (supera techo)';   // V3: por encima del techo manda sobre "(revisar)"
-    return Math.round(m.grado)+'°'+(_gonioFueraRango(m)?' (revisar)':'');
+    return Math.round(m.grado)+'°'+(_gonioFueraRango(m)?' (revisar)':'')+(_gonioSinExtremo(m)?' (posición mostrada)':'');
   }
+  // (P0 2026-11-22) Foto/cuadro estático SIN confirmación de tope: el número describe la POSICIÓN QUE SE
+  // VE, no el rango máximo del paciente → no se compara contra cortes clínicos. Medidas viejas (sin el
+  // campo) y tomas dinámicas ('pico-dinamico') conservan el comportamiento de siempre.
+  function _gonioSinExtremo(m){ return !!(m && m.traza && m.traza.extremoRango==='sin confirmar'); }
   function _gonioAlerta(m){
     if(!m || m.grado==null) return false;
     if(_gonioSuperaTecho(m)) return true;             // V3: por encima del techo fisiológico → alerta siempre
     if(_gonioFueraRango(m)) return true;              // (h) fuera de rango (posible escorzo) → alerta
+    if(_gonioSinExtremo(m)) return false;             // (P0) posición mostrada ≠ rango máximo → sin semáforo de corte
     if(m.hiperext) return m.grado>m.lim;              // hiperextensión: alerta si rebasa el umbral
     return m.defic ? (m.grado>m.lim) : (m.grado<m.lim);
   }
@@ -3000,8 +3095,10 @@
       if(ok && r.fueraTecho) mV='⚠️ '+Math.round(r.val)+'° supera el techo típico ('+r.techo+'°): posible escorzo o punto mal detectado. Si es real, captúralo con "Cuadro actual" y confírmalo.';
       else if(g.sel.grupo==='Muñeca'){
         if(!BIO.hands && !BIO._handsFallo) mV='Cargando el detector de mano (solo la primera vez)…';
+        else if(r && !ok && r.motivo==='correspondencia') mV='⚠️ La mano detectada no corresponde a esa muñeca'+(r.gate&&r.gate.ratio!=null?' (separación '+Math.round(r.gate.ratio*100)+'% del antebrazo, límite 12%)':'')+': acomoda la mano a cuadro o revisa con ✋ Ajustar puntos';
         else if(g.manoMiss>=6) mV='No se ve bien la mano: ábrela con la palma visible, cámara al costado';
         else if(ok && r.cortoImg) mV='⚠️ Antebrazo/mano muy cortos en imagen: acércate o pon la cámara al costado';
+        else if(ok && r.qc && r.qc.matchAlarma) mV='⚠️ Correspondencia muñeca↔mano al límite ('+Math.round(r.qc.matchRatio*100)+'% del antebrazo): revisa los puntos antes de capturar';
       }
       hintV.textContent=mV;
     }
@@ -3038,7 +3135,12 @@
       return { i:i, x:Math.round(q.x*1e4)/1e4, y:Math.round(q.y*1e4)/1e4,
                v:(q.visibility!=null?Math.round(q.visibility*100)/100:null) }; }
     function ptXY(q){ return q ? { x:Math.round(q.x*1e4)/1e4, y:Math.round(q.y*1e4)/1e4 } : null; }
-    if(grupo==='Muñeca' && r && r.mano){ return { a:pt(vx.ea), vtx:ptXY(r.mano.B), b:ptXY(r.mano.C), eje:(r.eje||null) }; }
+    if(grupo==='Muñeca' && r && r.mano){
+      // vtx = muñeca de POSE (centro articular del detector, P0 2026-11-22); manoCruda = lm0/9/17 de
+      // Hands SIN trasladar (lo que el detector vio de verdad), para auditar la correspondencia.
+      return { a:pt(vx.ea), vtx:(pt(vx.vtx)||ptXY(r.mano.B)), b:ptXY(r.mano.C), eje:(r.eje||null),
+               manoCruda:(r.manoCruda?JSON.parse(JSON.stringify(r.manoCruda)):null) };
+    }
     return { a:pt(vx.ea), vtx:pt(vx.vtx), b:pt(vx.eb) };
   }
   // ═══ MOTOR GEOMÉTRICO/GRÁFICO V3 (motor V2 de la 2ª revisión + dirección de arte V3) ═══════════
@@ -3307,7 +3409,13 @@
       + '<div class="gl-head">'
       +   '<div class="gl-num" aria-live="polite"><span id="bg-live">—</span><span class="gl-deg">°</span></div>'
       +   '<div><div class="gl-lbl" id="bg-lbl">'+(s?(esc(s.grupo)+' · '+esc(s.mov)+' · '+(s.lado==='izq'?'Izquierdo':'Derecho')):'—')+'</div>'
-      +     '<div class="gl-metodo">Estimación fotogoniométrica 2D · dirección por confirmar</div></div>'
+      +     '<div class="gl-metodo">'
+      +       ((s && s.grupo==='Muñeca')
+                ? (BIO._munProto==='5mcp'
+                    ? 'Lateral clásico · eje 5.º metacarpiano (requiere revisión del fisio)'
+                    : 'Proxy computacional · eje 3.er metacarpiano (no equivale a goniometría manual)')
+                : 'Estimación fotogoniométrica 2D')
+      +       ' · dirección por confirmar</div></div>'
       + '</div>'
       + '<div class="gl-sub">'
       // (V3.2 P1) lecturas auto-descritas: "Cuadro" = valor CRUDO del último cuadro (el del arco);
@@ -3363,7 +3471,25 @@
     var editando=(BIO._ed&&BIO._ed.on);
     box.innerHTML =
       _gonioSelectorHTML(g)
+      // (P0 2026-11-22) MUÑECA: protocolos NO intercambiables — (B) proxy computacional del 3.er
+      // metacarpiano (automático, el que mide el detector de mano) vs (A) lateral clásico del 5.º
+      // metacarpiano (convención de goniometría manual; SIEMPRE requiere revisión del fisio al capturar).
+      + (sel.grupo==='Muñeca'
+          ? '<div class="bio-gfield"><span class="bio-glab">Protocolo</span>'
+            + '<div class="bio-seg" role="group" aria-label="Protocolo de muñeca">'
+            +   '<button type="button" class="bio-seg-b'+(BIO._munProto!=='5mcp'?' on':'')+'" aria-pressed="'+(BIO._munProto!=='5mcp')+'" onclick="BIO_gonioProto(\'3mcp\')" title="Proxy computacional: eje muñeca→3.er nudillo del detector de mano">3.er MCP · proxy</button>'
+            +   '<button type="button" class="bio-seg-b'+(BIO._munProto==='5mcp'?' on':'')+'" aria-pressed="'+(BIO._munProto==='5mcp')+'" onclick="BIO_gonioProto(\'5mcp\')" title="Convención lateral clásica (5.º metacarpiano): requiere revisión del fisioterapeuta">5.º MCP · clásico</button>'
+            + '</div></div>'
+          : '')
       + '<div class="bio-gdiv"></div>'
+      // (P0) Foto/cuadro estático: sin "tope confirmado" la medida se guarda como POSICIÓN MOSTRADA
+      // (sin semáforo de corte) y queda "requiere revisión". El fisio lo confirma solo si de verdad
+      // llevó la articulación a su tope al tomar la foto.
+      + (esEstC
+          ? '<label style="display:flex;align-items:center;gap:8px;font-size:12.5px;color:#cfd6e4;margin:0 0 8px;cursor:pointer">'
+            + '<input type="checkbox" id="bio-ext-ok" '+(BIO._extOk?'checked':'')+' onchange="BIO_gonioExtremo(this.checked)" style="width:17px;height:17px;accent-color:#E7BB57">'
+            + '<span>Tope de movimiento <b>confirmado</b> por el fisioterapeuta <span style="color:#9BA3B5">(sin marcar = "posición mostrada", no rango máximo)</span></span></label>'
+          : '')
       + (esEstC
           ? '<div class="bio-gbtns" id="bio-ed-row">'
             + '<button class="bio-ged-btn" id="bio-ed-btn" onclick="BIO_gonioAjustar()" aria-label="Ajustar puntos anatómicos">'+(editando?'Ajustando puntos…':((BIO._ed&&BIO._ed.ok)?'Puntos ajustados ✓':'Ajustar puntos anatómicos'))+'</button>'
@@ -3400,7 +3526,10 @@
           '<button class="bio-gtool" onclick="BIO_gonioZoomReset()" aria-label="Vista completa">Vista completa</button>'
           + '<button class="bio-gtool" id="bio-gtool-foco" aria-pressed="'+(BIO._zoomFoco?'true':'false')+'" onclick="BIO_gonioEnfocar()" aria-label="Enfocar la articulación medida">Enfocar articulación</button>'
           + '<button class="bio-gtool zx" onclick="BIO_gonioZoomMenos()" aria-label="Alejar">−</button>'
-          + '<button class="bio-gtool zx" onclick="BIO_gonioZoomMas()" aria-label="Acercar">+</button>';
+          + '<button class="bio-gtool zx" onclick="BIO_gonioZoomMas()" aria-label="Acercar">+</button>'
+          // (P0 2026-11-22) Panel de DIAGNÓSTICO ANATÓMICO: puntos crudos por fuente, SIN ángulos.
+          + '<button class="bio-gtool" id="bio-gtool-anat" aria-pressed="'+(BIO._anatOn?'true':'false')+'" onclick="BIO_gonioPanelAnat()" aria-label="Panel de diagnóstico anatómico (puntos crudos, sin ángulos)"'+(BIO._anatOn?' style="background:#E7BB57;border-color:#E7BB57;color:#122C43"':'')+'>Anatomía</button>'
+          + (BIO._anatOn ? '<button class="bio-gtool" onclick="BIO_gonioExportTraza()" aria-label="Exportar coordenadas (JSON)">Exportar JSON</button>' : '');
         tb.classList.add('on');
       } else { tb.classList.remove('on'); tb.innerHTML=''; }
     }
@@ -3436,7 +3565,9 @@
     // Manos CONGELADAS con este cuadro (foto: pase explícito; video: las del cuadro-pico). undefined =
     // aún no se buscó la mano en esta imagen → _recalcEstatico la busca bajo demanda si eligen Muñeca.
     BIO._estaticoHandsLm = (BIO._estaticoHandsNext!==undefined) ? BIO._estaticoHandsNext : undefined;
-    BIO._estaticoHandsNext = undefined; BIO._estaticoHandsRun = false;
+    BIO._estaticoHandsMeta = (BIO._estaticoHandsNext!==undefined) ? (BIO._estaticoHandsMetaNext||null) : null;
+    BIO._estaticoHandsNext = undefined; BIO._estaticoHandsMetaNext = undefined; BIO._estaticoHandsRun = false;
+    BIO._extOk=false; BIO._anatOn=false;   // (P0) fuente nueva → tope de rango SIN confirmar y panel anatómico apagado
     mostrarVista('bio-vista-camara');
     try{ var _vc31e=document.getElementById('bio-vista-camara'); if(_vc31e) _vc31e.classList.add('gonio-v31'); }catch(_g31e){}   // V3.1: layout de instrumento
     var cv=document.getElementById('bio-canvas'); if(!cv) return;
@@ -3486,22 +3617,30 @@
       ed.r = _gonioValorDesdePx(ed.pts, g.sel.grupo, g.sel.mov);
       rMostrar = ed.r; valMostrar = ed.r.ok ? ed.r.val : null;
     }
-    if(valMostrar!=null){
+    if(BIO._anatOn){
+      // (P0 2026-11-22) PANEL ANATÓMICO: puntos crudos por fuente, SIN ángulos (el arco y el número se
+      // apagan a propósito mientras se revisa la anatomía). El peak sigue computándose para la captura.
+      _dibujarPanelAnat(ctx, cv);
+      g.peak = valMostrar;
+    } else if(valMostrar!=null){
       _trazarGonio(ctx, cv.width, cv.height, BIO._estaticoLm, g.sel.grupo, g.sel.lado, valMostrar, r,
                    usandoManual ? { manual:ed.pts } : undefined);
       g.peak = valMostrar;
     } else { g.peak=null; if(usandoManual && ed.on) _edDibujarSolo(ctx, cv, ed); }
     if(usandoManual && ed.on) _edDibujarHandles(ctx, cv, ed);
-    var live=document.getElementById('bg-live'); if(live) live.textContent = (valMostrar!=null) ? Math.round(valMostrar) : '—';
-    var mx=document.getElementById('bg-max'); if(mx) mx.textContent = (valMostrar!=null) ? Math.round(valMostrar) : '—';
+    var live=document.getElementById('bg-live'); if(live) live.textContent = (BIO._anatOn || valMostrar==null) ? '—' : Math.round(valMostrar);
+    var mx=document.getElementById('bg-max'); if(mx) mx.textContent = (BIO._anatOn || valMostrar==null) ? '—' : Math.round(valMostrar);
     var hintE=document.getElementById('bg-hint');
     if(hintE){ var mE='';
-      if(usandoManual && ed.on) mE='Ajuste manual: arrastra los puntos (proximal · vértice · distal) y toca "Usar estos puntos"';
+      if(BIO._anatOn) mE='Panel de ANATOMÍA activo (sin ángulos): verifica que cada punto caiga en su referencia; corrige con ✋ Ajustar puntos. Toca "Anatomía" para volver a la medición.';
+      else if(usandoManual && ed.on) mE='Ajuste manual: arrastra los puntos (proximal · vértice · distal) y toca "Usar estos puntos"';
       else if(usandoManual && ed.ok) mE='Puntos ajustados por el terapeuta — el valor sale de esos puntos';
       else if(rMostrar && rMostrar.ok && rMostrar.fueraTecho) mE='⚠️ '+Math.round(valMostrar)+'° supera el techo típico ('+rMostrar.techo+'°): posible escorzo o punto mal detectado. Capturar pedirá confirmación.';
       else if(g.sel.grupo==='Muñeca'){
-        if(!r.ok && r.motivo==='mano') mE = BIO._estaticoHandsRun ? 'Buscando la mano en la imagen…' : 'No se ve bien la mano: palma visible hacia la cámara (abre la mano, sube otra toma o usa Ajustar puntos)';
+        if(!r.ok && r.motivo==='correspondencia') mE='⚠️ La mano detectada NO corresponde a esa muñeca'+(r.gate&&r.gate.ratio!=null?' (separación '+Math.round(r.gate.ratio*100)+'% del antebrazo, límite 12%)':'')+' → sin número automático. Revisa en el panel Anatomía y ajusta con ✋ Ajustar puntos, o sube otra toma.';
+        else if(!r.ok && r.motivo==='mano') mE = BIO._estaticoHandsRun ? 'Buscando la mano en la imagen…' : 'No se ve bien la mano: palma visible hacia la cámara (abre la mano, sube otra toma o usa Ajustar puntos)';
         else if(r.ok && r.cortoImg) mE='⚠️ Antebrazo/mano muy cortos en imagen (posible fuera de plano): medición menos fiable';
+        else if(r.ok && r.qc && r.qc.matchAlarma) mE='⚠️ Correspondencia muñeca↔mano al límite ('+Math.round(r.qc.matchRatio*100)+'% del antebrazo): revisa los puntos (panel Anatomía / ✋) antes de capturar';
       }
       hintE.textContent=mE;
     }
@@ -3534,6 +3673,154 @@
       ctx.fillStyle='#fff'; ctx.fillText(t[1], p.x, ty);
     });
     ctx.restore();
+  }
+  // ── (P0 2026-11-22) PROTOCOLO DE MUÑECA · TOPE DE RANGO · PANEL ANATÓMICO · EXPORT ──────────────
+  function BIO_gonioProto(v){
+    var nv=(v==='5mcp')?'5mcp':'3mcp';
+    if(BIO._munProto===nv) return;
+    BIO._munProto=nv;
+    _bumpGen();   // cambió la convención del eje distal: cuadros en vuelo de la anterior no valen
+    if(BIO.modo==='estatico'){ pintarGonioCtrl(); _recalcEstatico(); }
+    else if(BIO.modo==='camara'){ pintarGonioCtrl(); }
+    else pintarGonioInicio();
+  }
+  function BIO_gonioExtremo(on){
+    BIO._extOk=!!on;
+    var est=document.getElementById('bio-estado');
+    if(est) est.textContent = BIO._extOk
+      ? 'Tope confirmado por el fisioterapeuta: la medida se comparará contra la referencia.'
+      : 'Sin tope confirmado: se guardará como "posición mostrada" (sin semáforo de corte) y quedará para revisión.';
+  }
+  // Panel de DIAGNÓSTICO ANATÓMICO (orden §2): muestra los puntos CRUDOS de cada detector con nombre,
+  // índice, fuente y confianza, las líneas de eje y el centro articular — SIN NINGÚN ÁNGULO. Sirve para
+  // verificar a ojo (con zoom/Enfocar) que los puntos caen en la anatomía ANTES de fiarse del número.
+  function BIO_gonioPanelAnat(){
+    if(BIO.modo!=='estatico'){ toast('El panel de anatomía funciona sobre una foto o cuadro analizado','info'); return; }
+    BIO._anatOn=!BIO._anatOn;
+    pintarGonioCtrl(); _recalcEstatico();
+  }
+  function _dibujarPanelAnat(ctx, cv){
+    var g=BIO.accG; if(!g || !g.sel || !BIO._estaticoLm) return;
+    var lm=BIO._estaticoLm, w=cv.width, h=cv.height, k=_gxK(ctx, w);
+    var P=_gonioPts(g.sel.lado);
+    var r=BIO._estaticoR||null;
+    function X(p){ return p.x*w; } function Y(p){ return p.y*h; }
+    ctx.save();
+    ctx.lineWidth=2.2*k; ctx.font='700 '+Math.round(12*k)+'px Inter, system-ui, Arial, sans-serif';
+    function rotulo(x,y,txt,color,dy){
+      var tw=ctx.measureText(txt).width+8*k;
+      var bx=x+7*k; if(bx+tw > w-4*k) bx=Math.max(4*k, w-4*k-tw);   // nunca cortar el texto en el borde
+      var by=y-18*k+(dy||0); if(by<2*k) by=y+10*k; if(by+16*k>h-2*k) by=h-18*k;
+      ctx.fillStyle='rgba(13,22,38,.82)'; ctx.fillRect(bx, by, tw, 16*k);
+      ctx.fillStyle=color; ctx.fillText(txt, bx+4*k, by+12*k);
+    }
+    function punto(x,y,rad,color,borde){
+      ctx.beginPath(); ctx.arc(x,y,rad,0,Math.PI*2); ctx.fillStyle=color; ctx.fill();
+      ctx.strokeStyle=borde; ctx.lineWidth=1.6*k; ctx.stroke();
+    }
+    // Eje del ANTEBRAZO (codo→muñeca de Pose) y brazo (hombro→codo): cian.
+    var nomP={}; nomP[P.S]='hombro'; nomP[P.E]='codo'; nomP[P.W]='muñeca'; nomP[P.Ix]='índice';
+    var segs=[[P.S,P.E],[P.E,P.W]];
+    ctx.strokeStyle='rgba(0,229,255,.85)'; ctx.lineWidth=2.4*k;
+    segs.forEach(function(sg){ var a=lm[sg[0]], b=lm[sg[1]]; if(!a||!b) return;
+      ctx.beginPath(); ctx.moveTo(X(a),Y(a)); ctx.lineTo(X(b),Y(b)); ctx.stroke(); });
+    var dyP={}; dyP[P.S]=0; dyP[P.E]=0; dyP[P.W]=-34*k; dyP[P.Ix]=-16*k;   // escalonado: la muñeca/índice no se encimen
+    [P.S,P.E,P.W,P.Ix].forEach(function(i){
+      var p=lm[i]; if(!p) return;
+      punto(X(p),Y(p),5*k,'#00E5FF','#06303B');
+      var vis=(p.visibility!=null)?(' '+Math.round(p.visibility*100)+'%'):'';
+      rotulo(X(p),Y(p),'Pose '+i+' · '+(nomP[i]||'')+vis+' · detector','#00E5FF', dyP[i]||0);
+    });
+    // CENTRO ARTICULAR del detector (muñeca de Pose): anillo.
+    var Wp=lm[P.W];
+    if(Wp){ ctx.beginPath(); ctx.arc(X(Wp),Y(Wp),11*k,0,Math.PI*2); ctx.strokeStyle='rgba(0,229,255,.7)'; ctx.setLineDash([4*k,3*k]); ctx.stroke(); ctx.setLineDash([]); }
+    // MANOS (Hands): todas las detectadas; 0/9/17 grandes con nombre y score, resto chico; eje 0→9 y 0→17.
+    var manos=(BIO._estaticoHandsLm&&BIO._estaticoHandsLm.length)?BIO._estaticoHandsLm:[];
+    manos.forEach(function(hd,hi){
+      if(!hd) return;
+      var meta=(BIO._estaticoHandsMeta&&BIO._estaticoHandsMeta[hi])||null;
+      var sc=(meta&&meta.score!=null)?(' · conf '+Math.round(meta.score*100)+'%'):'';
+      var dyH={ 0:24*k, 9:42*k, 17:60*k };   // escalonado para que los 3 rótulos de la mano no se encimen
+      hd.forEach(function(q,qi){ if(!q) return;
+        if(qi===0||qi===9||qi===17){
+          punto(X(q),Y(q),5*k,'#FFB300','#4A2F00');
+          rotulo(X(q),Y(q),'Hands '+hi+':'+qi+' · '+(qi===0?'muñeca':(qi===9?'3.er MCP':'5.º MCP'))+sc+' · detector','#FFB300', dyH[qi]);
+        } else { ctx.beginPath(); ctx.arc(X(q),Y(q),2*k,0,Math.PI*2); ctx.fillStyle='rgba(255,179,0,.5)'; ctx.fill(); }
+      });
+      var h0=hd[0];
+      [[9,false],[17,true]].forEach(function(dd){ var q=hd[dd[0]]; if(!h0||!q) return;
+        ctx.strokeStyle='rgba(255,179,0,.85)'; ctx.lineWidth=2*k;
+        if(dd[1]) ctx.setLineDash([5*k,4*k]);
+        ctx.beginPath(); ctx.moveTo(X(h0),Y(h0)); ctx.lineTo(X(q),Y(q)); ctx.stroke(); ctx.setLineDash([]);
+      });
+    });
+    // Puntos AJUSTADOS por el fisio (si los hay): dorado — único estado "confirmado por humano".
+    var ed=BIO._ed;
+    if(ed && (ed.ok||ed.on) && ed.pts){
+      ctx.strokeStyle='rgba(231,187,87,.95)'; ctx.lineWidth=2.6*k;
+      ctx.beginPath(); ctx.moveTo(ed.pts.A.x, ed.pts.A.y); ctx.lineTo(ed.pts.V.x, ed.pts.V.y); ctx.lineTo(ed.pts.C.x, ed.pts.C.y); ctx.stroke();
+      [['A','prox'],['V','vértice'],['C','distal']].forEach(function(t){ var p=ed.pts[t[0]]; if(!p) return;
+        punto(p.x,p.y,5.5*k,'#E7BB57','#4A2F00'); rotulo(p.x,p.y,'✋ '+t[1]+' · confirmado por fisio','#E7BB57'); });
+    }
+    // Leyenda + lectura del gate (nunca un ángulo).
+    var lineas=['DIAGNÓSTICO ANATÓMICO · sin ángulos','cian = Pose (detector) · ámbar = Hands (detector) · dorado = ✋ confirmado por fisio'];
+    if(g.sel.grupo==='Muñeca'){
+      if(r && r.dPoseHands!=null && r.antebrazoLen){
+        var ratio=r.dPoseHands/r.antebrazoLen;
+        lineas.push('Correspondencia muñeca Pose↔Hands: '+Math.round(ratio*100)+'% del antebrazo (límite 12%) '+(ratio<=GONIO_MATCH_MAX?'✓':'✗ requiere revisión'));
+      } else if(r && r.gate && r.gate.ratio!=null){
+        lineas.push('Correspondencia muñeca Pose↔Hands: '+Math.round(r.gate.ratio*100)+'% del antebrazo (límite 12%) ✗ requiere revisión');
+      }
+      lineas.push('Protocolo: '+(BIO._munProto==='5mcp'?'lateral clásico (5.º MCP, revisión del fisio)':'proxy computacional (3.er MCP)'));
+    }
+    ctx.font='700 '+Math.round(12*k)+'px Inter, system-ui, Arial, sans-serif';
+    // Leyenda con AJUSTE DE LÍNEA al ancho del cuadro (nunca texto cortado en el borde).
+    var maxW=w-32*k, lin2=[];
+    lineas.forEach(function(t){
+      if(ctx.measureText(t).width<=maxW){ lin2.push(t); return; }
+      var palabras=t.split(' '), cur='';
+      palabras.forEach(function(pal){
+        var prueba=cur?(cur+' '+pal):pal;
+        if(ctx.measureText(prueba).width<=maxW){ cur=prueba; }
+        else { if(cur) lin2.push(cur); cur=pal; }
+      });
+      if(cur) lin2.push(cur);
+    });
+    var lw=0; lin2.forEach(function(t){ lw=Math.max(lw, ctx.measureText(t).width); });
+    ctx.fillStyle='rgba(13,22,38,.85)'; ctx.fillRect(8*k, 8*k, Math.min(lw+16*k, w-16*k), (lin2.length*16+10)*k);
+    lin2.forEach(function(t,i){ ctx.fillStyle=(i===0)?'#FFFFFF':'#cfd6e4'; ctx.fillText(t, 16*k, (24+16*i)*k); });
+    ctx.restore();
+  }
+  // Exporta el registro COMPLETO de coordenadas del cuadro estático (orden maestra): pose 33, manos,
+  // resultado con gates, selección y dims — como archivo JSON descargable (nada se manda a ningún lado).
+  function BIO_gonioExportTraza(){
+    if(BIO.modo!=='estatico' || !BIO._estaticoBase){ toast('Exportar funciona sobre una foto o cuadro analizado','info'); return; }
+    var g=BIO.accG||{};
+    var bw=BIO._estaticoBase.width, bh=BIO._estaticoBase.height;
+    function rnd(v,n){ return (v==null)?null:Math.round(v*Math.pow(10,n))/Math.pow(10,n); }
+    var reg={
+      motor:BIO_ALGO_VER, exportadoEn:new Date().toISOString(),
+      seleccion:(g.sel?{grupo:g.sel.grupo,mov:g.sel.mov,lado:g.sel.lado}:null),
+      protocoloMuneca:(BIO._munProto==='5mcp'?'lateral-5mcp':'proxy-3mcp'),
+      cuadro:{ w:bw, h:bh, fuente:BIO._estaticoFuente||null, rot:(BIO._fotoHD&&BIO._fotoHD.rot)||0,
+               adquiridoEnUTC:(BIO._estaticoAdq!=null?new Date(BIO._estaticoAdq).toISOString():null) },
+      pose33:(BIO._estaticoLm||[]).map(function(p,i){ return p?{ i:i, x:rnd(p.x,5), y:rnd(p.y,5), z:rnd(p.z,5),
+        visibility:rnd(p.visibility,4), px:{x:rnd(p.x*bw,1), y:rnd(p.y*bh,1)} }:null; }),
+      manos:(BIO._estaticoHandsLm||[]).map(function(hd,hi){ return { mano:hi,
+        meta:(BIO._estaticoHandsMeta&&BIO._estaticoHandsMeta[hi])||null,
+        pts:(hd||[]).map(function(q,qi){ return q?{ i:qi, x:rnd(q.x,5), y:rnd(q.y,5),
+          px:{x:rnd(q.x*bw,1), y:rnd(q.y*bh,1)} }:null; }) }; }),
+      resultado:(BIO._estaticoR?JSON.parse(JSON.stringify(BIO._estaticoR)):null),
+      ajusteManual:(BIO._ed&&BIO._ed.ok)?JSON.parse(JSON.stringify(BIO._ed.pts)):null
+    };
+    try{
+      var blob=new Blob([JSON.stringify(reg,null,1)],{type:'application/json'});
+      var a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+      a.download='gonio_traza_'+((g.sel&&g.sel.key)||'cuadro')+'_'+Date.now()+'.json';
+      document.body.appendChild(a); a.click();
+      setTimeout(function(){ try{ URL.revokeObjectURL(a.href); a.remove(); }catch(_e){} }, 1200);
+      toast('Traza exportada (JSON con coordenadas y confianza)','success');
+    }catch(_e){ toast('No se pudo exportar la traza','error'); }
   }
   function BIO_gonioAjustar(){
     var g=BIO.accG; if(BIO.modo!=='estatico' || !g || !g.sel || !BIO.canvas){ return; }
@@ -3747,8 +4034,9 @@
       BIO._estaticoHandsRun=false;
       if(BIO.modo!=='estatico' || BIO._estaticoBase!==base) return;   // cambió la fuente mientras corría
       BIO._estaticoHandsLm = _copiaManosLm(hs) || [];
+      BIO._estaticoHandsMeta = BIO._handsMeta || null;                // (P0) confianza/handedness congeladas con ese cuadro
       _recalcEstatico();
-    }).catch(function(){ BIO._estaticoHandsRun=false; BIO._estaticoHandsLm=[]; });
+    }).catch(function(){ BIO._estaticoHandsRun=false; BIO._estaticoHandsLm=[]; BIO._estaticoHandsMeta=null; });
   }
   // Corre pose sobre un canvas/img ESTÁTICO (serializado, igual que la foto normal). Devuelve landmarks o null.
   async function _poseSobreEstatico(src){
@@ -3807,10 +4095,10 @@
     BIO._fotoHD = { img: img, rot: (det.rot||0) };
     // MUÑECA: corre HANDS sobre el MISMO cuadro elegido (det.base, ya rotado si hizo falta) → el eje del
     // 3.er metacarpiano queda en las MISMAS coordenadas que la pose. Si falla, el fallback endurecido decide.
-    BIO._estaticoHandsNext=undefined;
+    BIO._estaticoHandsNext=undefined; BIO._estaticoHandsMetaNext=undefined;
     if(BIO.accG && BIO.accG.sel && BIO.accG.sel.grupo==='Muñeca'){
-      if(txt) txt.textContent='Detectando la mano (eje del 3.er metacarpiano)…';
-      try{ BIO._estaticoHandsNext = _copiaManosLm(await _handsSobreEstatico(det.base)) || []; }catch(_h){ BIO._estaticoHandsNext=[]; }
+      if(txt) txt.textContent='Detectando la mano (eje metacarpiano)…';
+      try{ BIO._estaticoHandsNext = _copiaManosLm(await _handsSobreEstatico(det.base)) || []; BIO._estaticoHandsMetaNext = BIO._handsMeta || null; }catch(_h){ BIO._estaticoHandsNext=[]; BIO._estaticoHandsMetaNext=null; }
     }
     if(fill) fill.style.width='100%';
     _mostrarGonioEstatico(det.base, _copiaLm(det.lm), 'foto');
@@ -4002,7 +4290,10 @@
     ctx.fillStyle='#E7BB57'; ctx.fillRect(0,h,w,Math.max(2,Math.round(barH*0.055)));
     ctx.textBaseline='middle'; ctx.textAlign='left'; ctx.fillStyle='#FFFFFF';
     ctx.font='700 '+Math.round(barH*0.4)+'px Inter, system-ui, -apple-system, Arial, sans-serif';
-    ctx.fillText(tup.grupo+' · '+tup.mov+' · '+(tup.lado==='izq'?'Izquierdo':'Derecho')+' — '+Math.round(tup.val)+'°'+(tup.revision==='manual'?' · ajuste manual':''), Math.round(barH*0.4), h+barH/2);
+    ctx.fillText(tup.grupo+' · '+tup.mov+' · '+(tup.lado==='izq'?'Izquierdo':'Derecho')+' — '+Math.round(tup.val)+'°'
+      +(tup.revision==='manual'?' · ajuste manual':'')
+      +(tup.protocolo==='proxy-3mcp'?' · proxy 3.er MCP':(tup.protocolo==='lateral-5mcp'?' · lateral 5.º MCP (revisado)':(tup.protocolo==='indice-pose'?' · índice (estimación)':'')))
+      +(tup.sinExtremo?' · posición mostrada':''), Math.round(barH*0.4), h+barH/2);
     ctx.textAlign='right'; ctx.fillStyle='rgba(255,255,255,.75)';
     ctx.font='600 '+Math.round(barH*0.28)+'px Inter, system-ui, Arial, sans-serif';
     ctx.fillText('Goniometría 2D · '+fechaHoy(), w-Math.round(barH*0.4), h+barH/2);
@@ -4061,18 +4352,39 @@
     if(g.sel.grupo==='Muñeca' && rT.eje==='indice-pose' && !tup.manualR){
       if(!_confirmar('🖐 La muñeca se midió contra el ÍNDICE (no se pudo usar el detector de mano / 3.er metacarpiano).\nEs una ESTIMACIÓN de menor confianza: exige mano ABIERTA y palma visible.\n\n¿Confirmas que la mano está abierta y el valor es coherente?')) return;
     }
+    // (P0 2026-11-22) Protocolo A (lateral clásico, 5.º metacarpiano): NO es automático — exige la
+    // revisión del fisioterapeuta de los puntos (criterio de la auditoría: protocolos no intercambiables).
+    if(g.sel.grupo==='Muñeca' && rT.eje==='metacarpiano5-hands' && !tup.manualR){
+      if(!_confirmar('Protocolo LATERAL CLÁSICO (eje del 5.º metacarpiano): requiere revisión del fisioterapeuta.\n\n¿Revisaste que el centro de la muñeca y el eje del 5.º metacarpiano están bien ubicados (panel Anatomía / ✋ Ajustar puntos)?')) return;
+    }
+    // (P0) Alarma de correspondencia muñeca↔mano (0.10–0.12 del antebrazo): medible, pero se confirma.
+    if(g.sel.grupo==='Muñeca' && rT.qc && rT.qc.matchAlarma && !tup.manualR){
+      if(!_confirmar('⚠️ La muñeca del detector de MANO quedó al límite de correspondencia con la muñeca de POSE ('+Math.round(rT.qc.matchRatio*100)+'% del antebrazo; límite 12%).\n\n¿Revisaste en el panel Anatomía que los puntos caen donde deben?')) return;
+    }
     // (V3.1) HIPEREXTENSIÓN: la cámara 2D mide la MAGNITUD de la desviación; el SENTIDO anatómico no es
     // inferible del signo de pantalla → exige confirmación visual del fisioterapeuta antes de persistir.
     if(eSel && eSel.hiperext){
       if(!_confirmar('La cámara 2D mide la MAGNITUD de la desviación respecto a la recta ('+Math.round(tup.val)+'°); la DIRECCIÓN (hiperextensión) no puede firmarla.\n\n¿Confirmas VISUALMENTE que la articulación está en HIPEREXTENSIÓN (no en flexión residual)?')) return;
     }
     var e=eSel, key=_gonioSelKey(g);
-    var rev = tup.manualR ? 'manual' : ((fueraT || (g.sel.grupo==='Muñeca' && rT.eje==='indice-pose') || (eSel&&eSel.hiperext)) ? 'confirmada' : 'auto');
+    var rev = tup.manualR ? 'manual' : ((fueraT || (g.sel.grupo==='Muñeca' && (rT.eje==='indice-pose' || rT.eje==='metacarpiano5-hands' || (rT.qc&&rT.qc.matchAlarma))) || (eSel&&eSel.hiperext)) ? 'confirmada' : 'auto');
+    // (P0 2026-11-22) Estado de la REVISIÓN ANATÓMICA de esta medida (no es validación clínica):
+    //  'revisada-fisio' = puntos ajustados a mano; 'confirmada-fisio' = el fisio confirmó un caso dudoso;
+    //  'requiere-revision' = quedó pendiente de revisión humana (posición mostrada sin tope confirmado /
+    //  calidad baja); 'validada-auto' = gates en verde Y tope dinámico. Nunca "normal/anormal" automático.
+    var esEstCap = esEst && (tup.fuente!=='camara');
+    var extremoRango = esEstCap ? (BIO._extOk ? 'confirmado-fisio' : 'sin confirmar') : 'pico-dinamico';
+    var estadoAnat = (rev==='manual') ? 'revisada-fisio'
+                   : (rev==='confirmada') ? 'confirmada-fisio'
+                   : (esEstCap && !BIO._extOk) ? 'requiere-revision'
+                   : (rT.cortoImg) ? 'requiere-revision'
+                   : 'validada-auto';
     // ── TRANSACCIÓN (V3.1): primero la EVIDENCIA, luego la medida — nunca un "éxito" a medias ──
     var rend=null;
     try{
       rend=_renderAnotada({ base:tup.base, lm:tup.lm, r:tup.r, val:tup.val, grupo:g.sel.grupo, mov:g.sel.mov,
-                            lado:g.sel.lado, manualPts:tup.manualPts, hd:tup.hd, revision:rev });
+                            lado:g.sel.lado, manualPts:tup.manualPts, hd:tup.hd, revision:rev,
+                            protocolo:(rT.protocolo||null), sinExtremo:(extremoRango==='sin confirmar') });
     }catch(_e){ rend=null; }
     var sinImagen=false;
     if(!rend || !rend.annot){
@@ -4090,8 +4402,9 @@
       }
     }catch(_pp){}
     // Método de origen de la cifra (trazabilidad): ajuste manual / pose+mano (muñeca metacarpiana) / pose 2D.
-    var metodo = tup.manualR ? 'ajuste-manual' : (rT.eje==='metacarpiano-hands' ? 'pose+hands-2d' : 'pose-2d');
+    var metodo = tup.manualR ? 'ajuste-manual' : ((rT.eje==='metacarpiano-hands'||rT.eje==='metacarpiano5-hands') ? 'pose+hands-2d' : 'pose-2d');
     g.medidas[key] = { key:g.sel.key, grupo:g.sel.grupo, mov:g.sel.mov, lado:g.sel.lado,
+      estadoAnatomico:estadoAnat,
       grado:Math.round(tup.val*10)/10, ref:e.ref, lim:e.lim, defic:!!e.defic, hiperext:!!e.hiperext, normTxt:e.normTxt,
       traza:{ algoVersion:BIO_ALGO_VER, aspect:Math.round(tup.ar*1e4)/1e4,
               fuente:tup.fuente, tSeg:tup.tSeg, cuadro:(tup.cual||null),
@@ -4108,6 +4421,14 @@
               dims:(tup.base && tup.base.width)?{ w:tup.base.width, h:tup.base.height }:null,
               resExport:(rend && rend.dims)?{ w:rend.dims.w, h:rend.dims.h }:null,
               pxPts:pxPts, revision:rev, dirAnatomica:'porConfirmar',
+              // (P0 2026-11-22) revisión anatómica: protocolo de muñeca (no intercambiables), tope de
+              // rango (foto estática sin confirmar = "posición mostrada"), gate de correspondencia
+              // Pose↔Hands y si los landmarks fueron confirmados por un humano (solo el ajuste ✋ lo es).
+              protocolo:(rT.protocolo||null), extremoRango:extremoRango,
+              qc:{ matchRatio:(rT.qc?rT.qc.matchRatio:null), matchAlarma:!!(rT.qc&&rT.qc.matchAlarma),
+                   gateDescartado:(rT.gateDescartado?rT.gateDescartado.rechazo:null),
+                   handsScore:(rT.handsScore!=null?rT.handsScore:null) },
+              anatomiaConfirmada:(rev==='manual'),
               lmUsados:_gonioLmUsados(tup.lm, g.sel.grupo, g.sel.lado, tup.r) } };
     if(fueraT) g.medidas[key].traza.fueraTecho=true;
     if(sinImagen) g.medidas[key].traza.sinImagen=true;
@@ -4184,7 +4505,11 @@
     var by={}; arr.forEach(function(m){ (by[m.key]=by[m.key]||{})[m.lado]=m; });
     function celda(m){ if(!m) return '<span style="color:#9BA3B5">—</span>';
       var col=_gonioAlerta(m)?'#E8C96A':'#3DDC97';
-      return '<b style="color:'+col+'">'+_gonioFmtGrado(m)+'</b>'; }
+      // (P0) estado de la revisión anatómica por medida: nunca un número sin su estatus.
+      var est = (m.estadoAnatomico==='revisada-fisio') ? ' <sup style="color:#3DDC97">✋fisio</sup>'
+              : (m.estadoAnatomico==='confirmada-fisio') ? ' <sup style="color:#E8C96A">✋conf</sup>'
+              : (m.estadoAnatomico==='requiere-revision') ? ' <sup style="color:#E8C96A">⚠rev</sup>' : '';
+      return '<b style="color:'+col+'">'+_gonioFmtGrado(m)+'</b>'+est; }
     var filas=GONIO_CAT.map(function(e){
       var d=by[e.key]||{};
       if(!d.der && !d.izq) return '';
@@ -4200,7 +4525,9 @@
       + '<div style="color:#9BA3B5;font-size:13px;margin-bottom:10px">📷 Cámara · plano sagital · '+arr.length+' medida'+(arr.length===1?'':'s')+'</div>'
       + '<table class="bio-tabla-res"><thead><tr><th>Articulación / movimiento</th><th style="text-align:center">Der</th><th style="text-align:center">Izq</th><th style="text-align:center">Ref. adulto</th></tr></thead><tbody>'+filas+'</tbody></table>'
       + '<div style="margin-top:12px;background:rgba(255,255,255,.05);border-radius:10px;padding:10px 12px;font-size:13px;color:#cfd6e4">'+esc(interp)+'</div>'
-      + '<div style="font-size:11px;color:#9BA3B5;margin-top:8px;font-style:italic">Referencia: '+esc(GONIO_CITA)+' · Rangos de referencia de ADULTO, orientativos (no diagnóstico; en pediatría difieren) · Medición 2D (cribado), ±5° en plano; margen estimado, no validado contra goniómetro físico.</div>'
+      + '<div style="font-size:11px;color:#9BA3B5;margin-top:8px;font-style:italic">Referencia: '+esc(GONIO_CITA)+' · Rangos de referencia de ADULTO, orientativos (no diagnóstico; en pediatría difieren) · Medición 2D (cribado), ±5° en plano; margen estimado, no validado contra goniómetro físico.'
+      +   ' · Muñeca: proxy computacional (3.er MCP) o lateral clásico (5.º MCP, revisado) — NO intercambiables.'
+      +   ' · <b style="color:#E8C96A">⚠rev = medición NO VALIDADA, requiere revisión manual del fisioterapeuta</b> (posición mostrada sin tope confirmado o calidad limitada); ✋ = puntos revisados/confirmados por el fisio.</div>'
       + '<div style="color:#9BA3B5;font-size:12px;margin-top:10px">Se escribirá en el campo <b>ROM</b> de la Valoración y quedará en Biomecánica.</div>'
       + '<div class="bio-acciones" style="padding-top:14px">'
       +   '<button class="bio-b-sec" onclick="BIO_gonioVolver()">← Seguir midiendo</button>'
@@ -4241,11 +4568,18 @@
     // reemplaza solo una línea previa de "Goniometría (" para no acumular en re-mediciones).
     try{
       if(!p.valoracion || typeof p.valoracion!=='object') p.valoracion={};
-      var linea='Goniometría cámara 2D ('+sesion.fecha+', cribado ±5–10°, no validado contra goniómetro físico): '+_gonioTexto(arr);
+      // (P0 2026-11-22) La línea de ROM declara el protocolo de muñeca (proxy ≠ goniometría manual) y
+      // si quedaron medidas pendientes de revisión — nunca un grado "limpio" de algo no revisado.
+      var protos={}; arr.forEach(function(m){ var pr=m.traza&&m.traza.protocolo; if(pr&&m.grupo==='Muñeca') protos[pr]=1; });
+      var protoTxt = protos['lateral-5mcp'] ? (protos['proxy-3mcp'] ? '; muñeca: proxy 3.er MCP y lateral 5.º MCP' : '; muñeca: lateral clásico 5.º MCP revisado')
+                   : (protos['proxy-3mcp'] ? '; muñeca: proxy computacional 3.er MCP' : (protos['indice-pose'] ? '; muñeca: estimación por índice' : ''));
+      var nRev=arr.filter(function(m){ return m.estadoAnatomico==='requiere-revision'; }).length;
+      var linea='Goniometría cámara 2D ('+sesion.fecha+', cribado ±5–10°, no validado contra goniómetro físico'+protoTxt+(nRev?('; '+nRev+' medida'+(nRev===1?'':'s')+' SIN validar, requiere'+(nRev===1?'':'n')+' revisión'):'')+'): '+_gonioTexto(arr);
       var prev=String(p.valoracion.rom||'').split('\n').filter(function(l){ var t=l.trim(); return t && t.indexOf('Goniometría')!==0; });
       prev.push(linea);
       p.valoracion.rom = prev.join('\n');
     }catch(e){}
+    try{ sesion.calidad.requierenRevision = arr.filter(function(m){ return m.estadoAnatomico==='requiere-revision'; }).length; }catch(_q){}
     await _persistirSesion(p, sesion, btn, 'Goniometría sagital (cámara)');
   }
 
@@ -4253,7 +4587,9 @@
     var by={}; (s.medidas||[]).forEach(function(m){ (by[m.key]=by[m.key]||{})[m.lado]=m; });
     function cel(m){ if(!m||m.grado==null) return '<span style="color:var(--gray-400)">—</span>';
       var al=_gonioAlerta(m), col=al?'#B45309':'var(--green)';
-      return '<b style="color:'+col+'">'+_gonioFmtGrado(m)+'</b>'+(al?' ⚠️':''); }
+      var est=(m.estadoAnatomico==='requiere-revision') ? ' <span style="font-size:10px;color:#B45309">(requiere revisión)</span>'
+            : (m.estadoAnatomico==='revisada-fisio'||m.estadoAnatomico==='confirmada-fisio') ? ' <span style="font-size:10px;color:var(--gray-400)">✋</span>' : '';
+      return '<b style="color:'+col+'">'+_gonioFmtGrado(m)+'</b>'+(al?' ⚠️':'')+est; }
     function fila(e){ var d=by[e.key]||{}; if(!d.der&&!d.izq) return '';
       return '<div class="field-row"><div class="field-label">'+esc(e.grupo)+' · '+esc(e.mov)+'</div><div class="field-value" style="display:flex;gap:14px;flex-wrap:wrap">'
         + '<span><b style="color:var(--gray-400);font-weight:600">Der</b> '+cel(d.der)+'</span>'
@@ -4319,6 +4655,21 @@
       y+=18;
       if(y>720){ doc.addPage(); y=60; }
     });
+    // (P0 2026-11-22) Estado de revisión anatómica: el PDF nunca presenta como validado lo no revisado.
+    var _nRevPdf=(s.medidas||[]).filter(function(m){ return m.estadoAnatomico==='requiere-revision'; }).length;
+    var _protosPdf={}; (s.medidas||[]).forEach(function(m){ var pr=m.traza&&m.traza.protocolo; if(pr&&m.grupo==='Muñeca') _protosPdf[pr]=1; });
+    if(_nRevPdf || _protosPdf['proxy-3mcp'] || _protosPdf['lateral-5mcp'] || _protosPdf['indice-pose']){
+      y+=2; doc.setFontSize(9);
+      if(_nRevPdf){ doc.setTextColor(AMBAR[0],AMBAR[1],AMBAR[2]); doc.setFont('helvetica','bold');
+        doc.splitTextToSize('MEDICIÓN NO VALIDADA / REQUIERE REVISIÓN MANUAL: '+_nRevPdf+' medida'+(_nRevPdf===1?'':'s')+' ("posición mostrada" sin tope confirmado por el fisioterapeuta, o calidad limitada). No usar como rango máximo del paciente sin revisión.', W-2*M).forEach(function(ln){ doc.text(ln, M, y); y+=12; });
+        doc.setFont('helvetica','normal'); }
+      doc.setTextColor(GRIS[0],GRIS[1],GRIS[2]);
+      if(_protosPdf['proxy-3mcp'] || _protosPdf['lateral-5mcp'] || _protosPdf['indice-pose']){
+        doc.splitTextToSize('Muñeca — convención del eje distal: '+(_protosPdf['proxy-3mcp']?'proxy computacional (3.er metacarpiano, detector de mano); ':'')+(_protosPdf['lateral-5mcp']?'lateral clásico (5.º metacarpiano, revisado por el fisioterapeuta); ':'')+(_protosPdf['indice-pose']?'estimación por índice (menor confianza); ':'')+'las convenciones NO son intercambiables ni equivalen a goniometría manual sin validación.', W-2*M).forEach(function(ln){ doc.text(ln, M, y); y+=12; });
+      }
+      doc.setFontSize(11); doc.setTextColor(INK[0],INK[1],INK[2]);
+      if(y>700){ doc.addPage(); y=60; }
+    }
     y+=10; doc.setDrawColor(210,216,228); doc.line(M,y,W-M,y); y+=20;
     doc.setFont('helvetica','bold'); doc.setTextColor(NAVY[0],NAVY[1],NAVY[2]); doc.setFontSize(12); doc.text('Interpretación', M, y); y+=16;
     doc.setFont('helvetica','normal'); doc.setTextColor(INK[0],INK[1],INK[2]); doc.setFontSize(11);
@@ -4870,6 +5221,10 @@
   window.BIO_gonioZoomMas = BIO_gonioZoomMas;                   // V3.1: barra de herramientas del visor
   window.BIO_gonioZoomMenos = BIO_gonioZoomMenos;
   window.BIO_gonioEnfocar = BIO_gonioEnfocar;                   // V3.1: recorte virtual no destructivo A/V/C
+  window.BIO_gonioProto = BIO_gonioProto;                       // P0 2026-11-22: protocolo de muñeca (proxy 3MCP | lateral 5MCP)
+  window.BIO_gonioExtremo = BIO_gonioExtremo;                   // P0: tope de movimiento confirmado por el fisio
+  window.BIO_gonioPanelAnat = BIO_gonioPanelAnat;               // P0: panel de diagnóstico anatómico (sin ángulos)
+  window.BIO_gonioExportTraza = BIO_gonioExportTraza;           // P0: export JSON de coordenadas/confianza
   window.BIO_gonioFijarCuadro = BIO_gonioFijarCuadro;           // V3.1 P2: fijar un cuadro del video (re-analiza Pose+Hands)
   window.BIO_gonioCuadroPaso = BIO_gonioCuadroPaso;             // V3.1 P2: cuadro anterior/siguiente (~1/FPS, seek declarado aprox.)
   window.BIO_gonioBorrar = BIO_gonioBorrar;
@@ -4893,6 +5248,10 @@
     setAspect:_setAspect, ang2D:_ang2D, seg2D:_seg2D,
     munecaEje:_munecaEje, setHandsLm:function(a){ BIO._handsLmTest = a || null; },
     calcularGonio:calcularGonio, cmpExtraer:_cmpExtraer, cmpTablaHTML:_cmpTablaHTML,
+    gateMunecaMatch:_gateMunecaMatch, axisQuality:_axisQuality,            // P0 2026-11-22: gates anatómicos
+    setMunProto:function(v){ BIO._munProto=v; }, setFrameH:function(h){ BIO._frameHTest=h; },
+    setExtOk:function(b){ BIO._extOk=!!b; }, sinExtremo:_gonioSinExtremo,
+    setHandsMeta:function(m){ BIO._handsMeta=m||null; },
     cadenciaDudosa:_cadenciaDudosa, gonioFmtGrado:_gonioFmtGrado, gonioAlerta:_gonioAlerta,
     gonioFueraRango:_gonioFueraRango, romConfiable:_romConfiable,
     scoreVisGonio:_scoreVisGonio, contarVisGonio:_contarVisGonio,
