@@ -1,0 +1,54 @@
+{
+  "version": "sinergia-fotogonio-4.0.0",
+  "exportedAt": "2026-11-22T20:47:53.501Z",
+  "measurements": [
+    {
+      "engine": "sinergia-fotogonio-4.0.0",
+      "createdAt": "2026-11-22T20:47:52.518Z",
+      "source": "photo",
+      "frameId": "1795380471734-1",
+      "mediaTime": null,
+      "image": {
+        "width": 960,
+        "height": 1280
+      },
+      "selection": {
+        "movement": "elbow-flexion",
+        "side": "derecho",
+        "protocol": "2d-ejes-manuales"
+      },
+      "calculation": {
+        "degreeRaw": 129.33938868236336,
+        "degreeDisplay": 129.3,
+        "formula": "atan2(abs(cross),dot)",
+        "pointsPx": {
+          "A": {
+            "x": 355.36322699652777,
+            "y": 457.11357964409723
+          },
+          "B": {
+            "x": 483.12961154513886,
+            "y": 639.3855794270834
+          },
+          "C": {
+            "x": 526.8191867404514,
+            "y": 483.23838975694446
+          }
+        },
+        "warnings": [
+          "POSITION_ONLY_MAX_NOT_CONFIRMED"
+        ],
+        "quality": "review"
+      },
+      "evidence": {
+        "maxConfirmed": false,
+        "directionConfirmed": false,
+        "manualReviewed": true,
+        "therapistConfirmation": true,
+        "detectorOriginal": null
+      },
+      "status": "FOTOGONIOMETRIA_2D_REVISADA_NO_VALIDADA_CON_GONIOMETRO",
+      "clinicalStatement": "Posición fotografiada; no demuestra rango máximo"
+    }
+  ]
+}

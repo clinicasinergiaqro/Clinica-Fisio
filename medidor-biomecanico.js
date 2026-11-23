@@ -5288,16 +5288,62 @@
   try{ if(typeof window!=='undefined' && typeof window.addEventListener==='function'){
     window.addEventListener('sinergia:medicion-revisada', function(ev){ try{ _v4Recibir(ev.detail); }catch(e){ console.warn('[BIO-V4]', e&&e.message); } });
   } }catch(_v4L){}
+  // Contrato de la medición entrante: volver a calcular desde A-B-C en el HOST.
+  // El ángulo y el estado de revisión no deben depender únicamente de los campos
+  // declarados por un iframe. No sustituye la revisión anatómica humana.
+  function _v4ComprobarRegistro(rec){
+    if(!rec || !rec.selection || !_V4_MOV[rec.selection.movement] || !rec.image ||
+       !rec.calculation || !rec.calculation.pointsPx || !rec.evidence ||
+       rec.evidence.manualReviewed!==true || rec.evidence.therapistConfirmation!==true)
+      return {ok:false,reason:'REGISTRO_INCOMPLETO_O_NO_REVISADO'};
+    var w=Number(rec.image.width), h=Number(rec.image.height);
+    if(!(w>0 && h>0 && Number.isFinite(w) && Number.isFinite(h))) return {ok:false,reason:'DIMENSIONES_INVALIDAS'};
+    var p=rec.calculation.pointsPx, ks=['A','B','C'];
+    for(var i=0;i<3;i++){
+      var q=p[ks[i]];
+      if(!q || !Number.isFinite(q.x) || !Number.isFinite(q.y) || q.x<0 || q.x>w || q.y<0 || q.y>h)
+        return {ok:false,reason:'PUNTO_FUERA_DE_IMAGEN'};
+    }
+    var ax=p.B.x-p.A.x, ay=p.B.y-p.A.y, bx=p.C.x-p.B.x, by=p.C.y-p.B.y;
+    if(Math.hypot(ax,ay)<1e-7 || Math.hypot(bx,by)<1e-7) return {ok:false,reason:'SEGMENTO_DEGENERADO'};
+    var calculated=Math.abs(Math.atan2(ax*by-ay*bx,ax*bx+ay*by))*180/Math.PI;
+    var raw=Number(rec.calculation.degreeRaw), shown=Number(rec.calculation.degreeDisplay);
+    if(!Number.isFinite(raw) || !Number.isFinite(shown) || Math.abs(raw-calculated)>0.02 ||
+       Math.abs(shown-Math.round(calculated*10)/10)>0.051)
+      return {ok:false,reason:'ANGULO_NO_COINCIDE_CON_EJES'};
+    if(!['derecho','izquierdo','der','izq'].includes(rec.selection.side))return {ok:false,reason:'LATERALIDAD_INVALIDA'};
+    if(!rec.selection.protocol || typeof rec.selection.protocol!=='string')return {ok:false,reason:'PROTOCOLO_AUSENTE'};
+    if(rec.selection.movement==='elbow-hyperextension' && rec.evidence.directionConfirmed!==true)
+      return {ok:false,reason:'HIPEREXTENSION_NO_CONFIRMADA'};
+    return {ok:true,angulo:calculated};
+  }
+  // Mantiene las mediciones de OTROS movimientos y lados al actualizar valoracion.rom.
+  // El expediente completo continúa preservándose en p.biomecanica[]; en ROM se
+  // reemplaza únicamente el último valor del MISMO movimiento y lado.
+  function _v4ActualizarROM(romPrevio, claveMovimiento, lado, linea){
+    var prefijo='Goniometría revisada V4 ['+claveMovimiento+':'+lado+']';
+    var prev=String(romPrevio||'').split('\n').filter(function(l){
+      var t=l.trim(); return t && t.indexOf(prefijo)!==0;
+    });
+    prev.push(prefijo+' '+linea);
+    return prev.join('\n');
+  }
   function _v4Recibir(rec){
-    if(!rec || !rec.calculation || !rec.selection || rec.calculation.degreeDisplay==null){ toast('Medición V4 no reconocida','error'); return; }
-    if(!_V4_MOV[rec.selection.movement]){ toast('Movimiento V4 sin equivalente en el catálogo: '+String(rec.selection.movement),'warning'); return; }
+    var check=_v4ComprobarRegistro(rec);
+    if(!check.ok){toast('Medición V4 rechazada: '+check.reason,'error');return;}
+    // Congelar el destino clínico ANTES de encolar. Una nueva selección de
+    // paciente nunca puede redirigir esta medición a otro expediente.
+    var p=(typeof currentPatient!=='undefined')?currentPatient:null;
+    if(!p || p.id==null){toast('Abre primero el expediente del paciente','error');return;}
+    var sellado=Object.assign({},rec,{_v4PacienteId:String(p.id),_v4PacienteNombre:String(p.name||p.id)});
     if(!BIO._v4Cola) BIO._v4Cola=[];
-    BIO._v4Cola.push(rec);
+    BIO._v4Cola.push(sellado);
     if(!document.getElementById('bio-v4-conf')) _v4MostrarConfirmacion();
   }
   function _v4MostrarConfirmacion(){
     var rec=BIO._v4Cola && BIO._v4Cola[0]; if(!rec) return;
     var p=(typeof currentPatient!=='undefined')?currentPatient:null;
+    var pacienteCoincide=!!(p && rec._v4PacienteId && String(p.id)===rec._v4PacienteId);
     var key=_V4_MOV[rec.selection.movement];
     var e=null; for(var i=0;i<GONIO_CAT.length;i++){ if(GONIO_CAT[i].key===key){ e=GONIO_CAT[i]; break; } }
     var lado=(rec.selection.side==='izquierdo'||rec.selection.side==='izq')?'izq':'der';
@@ -5306,6 +5352,7 @@
     var fueraT=!!(tch && tch.fueraTecho);
     var maxOk=!!(rec.evidence && rec.evidence.maxConfirmed);
     var avisos=[];
+    if(!pacienteCoincide) avisos.push('El expediente activo cambió desde que se capturó esta medición. Regresa al paciente original o descarta.');
     if(!maxOk) avisos.push('Posición mostrada en la foto — NO demuestra el tope de movimiento.');
     if(fueraT) avisos.push(Math.round(val)+'° supera el techo típico ('+tch.techo+'°): revisa que los puntos estén bien colocados; guardar pedirá confirmación.');
     if(e && e.hiperext && !(rec.evidence && rec.evidence.directionConfirmed)) avisos.push('Hiperextensión SIN confirmación visual de dirección en V4 — no se puede guardar.');
@@ -5330,7 +5377,7 @@
       + ((BIO._v4Cola.length>1)?('<div style="font:600 11px system-ui;color:#5a6b7c;margin-top:8px">'+(BIO._v4Cola.length-1)+' medición(es) más en espera de revisión.</div>'):'')
       + '</div>';
     document.body.appendChild(host);
-    var noGuardable = !p || !e || (e.hiperext && !(rec.evidence && rec.evidence.directionConfirmed));
+    var noGuardable = !pacienteCoincide || !e || (e.hiperext && !(rec.evidence && rec.evidence.directionConfirmed));
     var bS=document.getElementById('bio-v4-save'); if(bS){ if(noGuardable){ bS.disabled=true; bS.style.opacity='.45'; bS.style.cursor='not-allowed'; } else { bS.onclick=function(){ _v4Guardar(); }; } }
     var bD=document.getElementById('bio-v4-desc'); if(bD) bD.onclick=function(){ _v4CerrarConf(true); };
   }
@@ -5368,6 +5415,11 @@
     var rec=BIO._v4Cola && BIO._v4Cola[0]; if(!rec) return;
     var p=(typeof currentPatient!=='undefined')?currentPatient:null;
     if(!p){ toast('Sin paciente activo','error'); return; }
+    if(!rec._v4PacienteId || String(p.id)!==rec._v4PacienteId){
+      toast('Paciente cambiado: la medición V4 NO se guardó en un expediente distinto','error');return;
+    }
+    var verificacion=_v4ComprobarRegistro(rec);
+    if(!verificacion.ok){toast('Medición alterada o inválida: '+verificacion.reason,'error');return;}
     var key=_V4_MOV[rec.selection.movement];
     var e=null; for(var i=0;i<GONIO_CAT.length;i++){ if(GONIO_CAT[i].key===key){ e=GONIO_CAT[i]; break; } }
     if(!e){ toast('Movimiento V4 sin equivalente','error'); return; }
@@ -5425,9 +5477,7 @@
     try{
       if(!p.valoracion || typeof p.valoracion!=='object') p.valoracion={};
       var linea='Goniometría revisada V4 ('+sesion.fecha+', puntos colocados por el fisioterapeuta, cribado 2D, no validado contra goniómetro físico'+(maxOk?'':'; posición mostrada, tope sin confirmar')+'): '+_gonioTexto([med]);
-      var prev=String(p.valoracion.rom||'').split('\n').filter(function(l){ var t=l.trim(); return t && t.indexOf('Goniometría')!==0; });
-      prev.push(linea);
-      p.valoracion.rom=prev.join('\n');
+      p.valoracion.rom=_v4ActualizarROM(p.valoracion.rom, key, lado, linea);
     }catch(_rl){}
     var okSave=await _v4Persistir(p, sesion);
     if(est) est.textContent = okSave ? '✅ Guardada en el expediente ('+(imgs.length?'con imagen de evidencia':'SIN imagen, registrado')+')' : '⚠️ Guardada LOCAL; se sincronizará al reconectar';
