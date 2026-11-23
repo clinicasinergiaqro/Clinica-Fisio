@@ -1371,7 +1371,7 @@ body.modo-oscuro .topbar{background:#141824}
 <body>
 <div id="sync-indicator" class="sync-indicator ok" style="display:none"></div>
 <div id="app-version-chip" title="Versión de la app en este equipo — toca para buscar actualización" onclick="try{_tapVersionChip()}catch(e){}"></div>
-<script>/* VERSIÓN VISIBLE: refleja el index.html realmente cargado en ESTE equipo (se bumpea junto con sw.js). Así un iPad con versión vieja se ve de un vistazo. */window.APP_VERSION='v1-2026-11-23a';(function(){try{var c=document.getElementById('app-version-chip');if(c)c.textContent=window.APP_VERSION;}catch(e){}})();</script>
+<script>/* VERSIÓN VISIBLE: refleja el index.html realmente cargado en ESTE equipo (se bumpea junto con sw.js). Así un iPad con versión vieja se ve de un vistazo. */window.APP_VERSION='v1-2026-11-23b';(function(){try{var c=document.getElementById('app-version-chip');if(c)c.textContent=window.APP_VERSION;}catch(e){}})();</script>
 <div class="toast" id="toast" aria-live="polite" aria-atomic="true"></div>
 
 <!-- LOGIN -->
@@ -14113,11 +14113,11 @@ function _contraSegText(p){
 function _contraDescSet(){ try{ return JSON.parse(localStorage.getItem('sinergia_contra_desc')||'{}')||{}; }catch(_){ return {}; } }
 function _contraDescartado(pid,cat){ var m=_contraDescSet(); return !!(m[pid]&&m[pid][cat]); }
 // Propuestas para un paciente: riesgo del PROPIO paciente, sin reflejar en seguridadClinica y sin descartar.
-function _contraDetect(p){
+function _contraDetect(p, _lite){
   if(!p||p._activoEliminado||p.eliminado) return [];
   var blob=_contraBlob(p); if(!blob.replace(/[^a-z]/g,'')) return [];
   var seg=_contraSegText(p); var out=[];
-  var fuentesLeg=_contraFuentesLegibles(p);
+  var fuentesLeg=_lite?null:_contraFuentesLegibles(p);   // _lite: solo contar, no armar el texto completo del expediente
   _CONTRA_DEFS.forEach(function(d){
     if(_contraDescartado(p.id,d.cat)) return;
     if(d.ancla.test(seg)) return;                         // ya está en Seguridad clínica
@@ -14127,8 +14127,8 @@ function _contraDetect(p){
     if(!algunoPropio) return;                              // todos los hits son de familiar → no aplica
     var val=d.val||(d.valFn?d.valFn(blob):'');
     // Campos del expediente (COMPLETOS, legibles) donde cae la coincidencia → se muestran enteros en la tarjeta.
-    var mrx=new RegExp(d.rx.source);
-    var fsel=fuentesLeg.filter(function(f){ return mrx.test(f.tn); });
+    var fsel=[];
+    if(fuentesLeg){ var mrx=new RegExp(d.rx.source); fsel=fuentesLeg.filter(function(f){ return mrx.test(f.tn); }); }
     out.push({cat:d.cat, tipo:d.tipo, val:val, nota:d.nota, frag:(hits.find(function(f){return !_CONTRA_FAM.test(f);})||hits[0]).trim(), fuentes:fsel});
   });
   return out;
@@ -14207,10 +14207,14 @@ function _contraBannerExpediente(p){
 }
 // Conteo para el banner del supervisor (activos con propuestas). Cacheado.
 function _contraCountActivos(){
-  if(window._contraCountCache && (Date.now()-window._contraCountCache.ts<60000)) return window._contraCountCache.list;
+  var pdb=Array.isArray(patientsDB)?patientsDB:[];
+  // NO servir ni guardar el caché con la base VACÍA: en el arranque (y tras una actualización que recarga)
+  // patientsDB está un instante vacío antes de que loadFromCloud/el respaldo IDB la llenen; si cacheáramos
+  // ese "0" por 60s, el banner "Revisar contraindicaciones (N)" NO aparecería aunque sí haya pacientes.
+  if(pdb.length && window._contraCountCache && (Date.now()-window._contraCountCache.ts<60000)) return window._contraCountCache.list;
   var list=[];
-  try{ (Array.isArray(patientsDB)?patientsDB:[]).forEach(function(p){ if(!p||String(p.id||'').indexOf('mig_pac_')===0) return; var pr=_contraDetect(p); if(pr.length) list.push({id:p.id,name:p.name,ter:p.terapeuta||p.terapeutaSeguimiento||'',n:pr.length}); }); }catch(_){}
-  window._contraCountCache={ts:Date.now(),list:list};
+  try{ pdb.forEach(function(p){ if(!p||String(p.id||'').indexOf('mig_pac_')===0) return; var pr=_contraDetect(p,true); if(pr.length) list.push({id:p.id,name:p.name,ter:p.terapeuta||p.terapeutaSeguimiento||'',n:pr.length}); }); }catch(_){}
+  if(pdb.length) window._contraCountCache={ts:Date.now(),list:list};
   return list;
 }
 // Modal del supervisor: lista de activos con contraindicaciones por revisar (abrir expediente para confirmar).
