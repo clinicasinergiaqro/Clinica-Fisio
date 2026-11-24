@@ -4585,6 +4585,16 @@
     if(ks.length===1) return ks[0];
     return 'mixta';
   }
+  // ROM de cámara: sustituir SOLO el resumen de cámara, nunca líneas V4 u otras
+  // anotaciones del expediente. Maneja también el prefijo antiguo "Goniometría (".
+  function _gonioActualizarROM(romPrevio, linea){
+    var prev=String(romPrevio||'').split('\n').filter(function(l){
+      var t=l.trim();
+      return t && !/^Goniometría(?: cámara 2D)? \(/.test(t);
+    });
+    prev.push(linea);
+    return prev.join('\n');
+  }
   async function guardarSesionGonio(){
     var p=(typeof currentPatient!=='undefined')?currentPatient:null; if(!p){ toast('Sin paciente activo','error'); return; }
     var g=BIO.accG, arr=_gonioMedidasArr(g);
@@ -4610,9 +4620,7 @@
                    : (protos['proxy-3mcp'] ? '; muñeca: proxy computacional 3.er MCP' : (protos['indice-pose'] ? '; muñeca: estimación por índice' : ''));
       var nRev=arr.filter(function(m){ return m.estadoAnatomico==='requiere-revision'; }).length;
       var linea='Goniometría cámara 2D ('+sesion.fecha+', cribado ±5–10°, no validado contra goniómetro físico'+protoTxt+(nRev?('; '+nRev+' medida'+(nRev===1?'':'s')+' SIN validar, requiere'+(nRev===1?'':'n')+' revisión'):'')+'): '+_gonioTexto(arr);
-      var prev=String(p.valoracion.rom||'').split('\n').filter(function(l){ var t=l.trim(); return t && t.indexOf('Goniometría')!==0; });
-      prev.push(linea);
-      p.valoracion.rom = prev.join('\n');
+      p.valoracion.rom = _gonioActualizarROM(p.valoracion.rom, linea);
     }catch(e){}
     try{ sesion.calidad.requierenRevision = arr.filter(function(m){ return m.estadoAnatomico==='requiere-revision'; }).length; }catch(_q){}
     await _persistirSesion(p, sesion, btn, 'Goniometría sagital (cámara)');
