@@ -6,7 +6,7 @@
 <!-- SEGURIDAD: el token del paciente viaja en ?ejercicios= (query string). Sin esto, cada carga de una
      imagen/video de Storage mandaría el Referer con la URL completa (token incluido) a terceros. -->
 <meta name="referrer" content="no-referrer">
-<meta name="theme-color" content="#122950">
+<meta name="theme-color" content="#112F66">
 <title>Mi rutina de ejercicios · Clínica Sinergia</title>
 <!-- [MIGRACIÓN HOSTING] Redirige el sitio viejo (GitHub Pages) al nuevo (Firebase Hosting). Solo en
      *.github.io; en .web.app/.firebaseapp.com es no-op. Conserva ?ejercicios= (links de pacientes). -->
@@ -26,8 +26,8 @@
      Diseño editorial clínico, sin dependencias ni cambio de reglas clínicas. */
   *{box-sizing:border-box;margin:0;padding:0}
   :root{
-    --navy:#102B5C;--navy2:#112750;--brand:#263C98;
-    --gold:#C9A554;--gold-soft:#F7F0E2;
+    --navy:#112F66;--navy2:#112F66;--brand:#263C98;
+    --gold:#D6B36B;--gold-soft:#F7F0E2;
     --ink:#17243B;--gray:#637086;--gray2:#8490A1;
     --bg:#F3F5F8;--card:#FFFFFF;--line:#E5E9F0;
     --soft:#F7F9FC;--focus:#2252AC;
@@ -79,7 +79,7 @@
   .dose-pill{background:#fff;color:var(--navy2);padding:8px 10px;font-size:13px;line-height:1.3;font-weight:750;border:1px solid #E4EAF2;border-radius:8px;font-variant-numeric:tabular-nums}
   .ind{padding:4px 1px 12px;margin-bottom:12px;border-bottom:1px solid var(--line)}
   .ind .l,.prec .l{font-size:11px;font-weight:800;letter-spacing:.2px;color:var(--navy2);margin-bottom:5px}
-  .ind .t,.prec .t{font-size:14px;line-height:1.55;color:#34435B}
+  .ind .t,.prec .t{font-size:14px;line-height:1.55;color:#34435B;white-space:pre-line}
   .prec{padding:12px 13px;background:#FFF9EB;border-left:3px solid #D4AC57;border-radius:9px;margin-bottom:0}
   .prec .l{color:#9B6B19}
   .prec .t{color:#72572B}
@@ -126,6 +126,22 @@
 
   function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
   function hoyFmt(){ var d=new Date(); return String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0')+'/'+d.getFullYear(); }
+  // ¿El nombre capturado es un archivo/identificador técnico (no un nombre clínico)?
+  // Cubre: cámara (IMG_5869, VID_8091.mp4), UUIDs, tiras largas de dígitos (81681412526__D439…),
+  // extensiones de archivo, fechas ("Ejercicio 19/11/2026") y textos casi sin letras.
+  // CONSERVADOR: cualquier nombre con palabras reales SIEMPRE se muestra tal cual.
+  function _esNombreTecnico(s){
+    var t=String(s||'').trim();
+    if(!t) return true;
+    if(/^(IMG|VID|MOV|DSC|PXL|GOPR|DJI|MVI|WA|WP)[-_ ]?\d+/i.test(t)) return true;
+    if(/\.(mp4|mov|m4v|3gp|avi|webm|mkv|jpe?g|png|heic|heif|gif|webp)$/i.test(t)) return true;
+    if(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i.test(t)) return true;
+    if(/^\d{6,}/.test(t)) return true;
+    if(/^ejercicio[\s\d/.:-]*$/i.test(t)) return true;
+    if(/^\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4}$/.test(t)) return true;
+    if((t.match(/[a-záéíóúüñ]/gi)||[]).length<3) return true;
+    return false;
+  }
   // Reproductor BAJO DEMANDA: inyecta el <video> real SOLO cuando la paciente toca la tarjeta, para no
   // descargar NINGÚN video al cargar la página (ver [NO-SE-CARGAN]). Global porque el onclick es inline.
   window._playVid=function(el){
@@ -134,11 +150,15 @@
       var v=document.createElement('video');
       v.src=src; v.controls=true; v.autoplay=true; v.preload='auto';
       v.setAttribute('playsinline',''); v.setAttribute('webkit-playsinline','');
+      v.onerror=function(){ try{ el.innerHTML='<div class="nomedia">⚠️ No se pudo cargar el video.<br>Revisa tu conexión e intenta de nuevo.</div>'; }catch(_e2){} };
       el.classList.remove('vidph'); el.removeAttribute('onclick'); el.removeAttribute('role'); el.removeAttribute('tabindex');
       el.innerHTML=''; el.appendChild(v);
       try{ v.play(); }catch(_){}
     }catch(_){}
   };
+
+  // Estado claro si una imagen no carga (sin romper la tarjeta).
+  window._imgErr=function(img){ try{ img.parentNode.innerHTML='<div class="nomedia">⚠️ No se pudo cargar la imagen</div>'; }catch(_){} };
 
   function estado(){ return { spin:function(msg){ app.innerHTML='<div class="state"><div class="spin"></div><div class="d" style="margin-top:16px">'+esc(msg||'Cargando…')+'</div></div>'; },
     error:function(sinRed){ app.innerHTML='<div class="state"><div class="em">'+(sinRed?'📶':'🔒')+'</div><div class="t">'+(sinRed?'Sin conexión':'Rutina no disponible')+'</div><div class="d">'+(sinRed?'No pudimos cargar tu rutina. Revisa tu internet o tus datos y vuelve a intentar. Si estás en datos móviles, prueba en un lugar con mejor señal.':'Este programa ya no está activo o el link es incorrecto. Contacta a tu terapeuta.')+'</div>'+(sinRed?'<button class="btn" onclick="location.reload()">🔄 Reintentar</button>':'')+'</div>'; },
@@ -155,16 +175,21 @@
       if(!src) media='<div class="media"><div class="nomedia">Video no disponible sin conexión</div></div>';
       // Video BAJO DEMANDA: no cargar el archivo hasta el toque. Sin poster remoto/precarga.
       else if(isVid) media='<div class="media vidph" role="button" tabindex="0" aria-label="Reproducir video del ejercicio" onclick="_playVid(this)" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();_playVid(this)}" data-src="'+esc(src)+'"><span class="media-kicker">VIDEO DEL EJERCICIO</span><div class="playwrap"><div class="playbtn" aria-hidden="true">▶</div><div class="playtxt">Toca para reproducir</div></div></div>';
-      else if(isImg) media='<div class="media"><img src="'+esc(src)+'" loading="lazy" alt="Imagen del ejercicio"></div>';
+      else if(isImg) media='<div class="media"><img src="'+esc(src)+'" loading="lazy" alt="Imagen del ejercicio" onerror="_imgErr(this)"></div>';
       else media='<div class="media"><div class="nomedia">📎 '+esc(m.label||'Archivo')+'</div></div>';
     }
     var dosisTxt=ej.dosis||[ej.series,ej.repeticiones,ej.tiempo,ej.frecuencia,ej.duracion].filter(Boolean).join(' · ');
     var partes=dosisTxt?String(dosisTxt).split(/\s*[·•]\s*/).filter(Boolean):[];
     var dosisHTML=partes.map(function(p){return '<span class="dose-pill">'+esc(p)+'</span>';}).join('');
-    // Solo oculta nombres técnicos de cámara (IMG_####), no modifica el dato original.
-    var nombreRaw=(ej.nombre||ej.name||'Ejercicio').trim();
-    var nombreVisible=/^(IMG|VID|MOV|DSC|PXL)[-_ ]?\d+(\.[a-z0-9]+)?$/i.test(nombreRaw)?'Ejercicio guiado':nombreRaw;
-    return '<article class="card"><div class="chdr"><div class="cnum"><span class="cindex">'+String(num).padStart(2,'0')+'</span> EJERCICIO</div><div class="cnom">'+esc(nombreVisible)+'</div>'
+    // NUMERACIÓN AUTOMÁTICA: el título del paciente es "Ejercicio N". El nombre capturado solo
+    // se muestra si es un nombre clínico real (no archivo de cámara/UUID/fecha). SOLO presentación:
+    // el dato original del expediente nunca se modifica y el fisio no tiene que capturar nada.
+    var nombreRaw=String(ej.nombre||ej.name||'').trim();
+    var nombreClinico=_esNombreTecnico(nombreRaw)?'':nombreRaw;
+    var titulo = nombreClinico
+      ? '<div class="cnum"><span class="cindex">'+String(num).padStart(2,'0')+'</span> EJERCICIO</div><div class="cnom">'+esc(nombreClinico)+'</div>'
+      : '<div class="cnom">Ejercicio '+num+'</div>';
+    return '<article class="card"><div class="chdr">'+titulo
       +((ej.terapeuta||ej.fecha)?'<div class="cmeta">'+esc([ej.terapeuta,ej.fecha].filter(Boolean).join(' · '))+'</div>':'')+'</div>'
       +'<div class="cbody">'+media
       +(dosisTxt?'<div class="dosis"><div class="dlbl">Dosificación</div><div class="dose-pills">'+dosisHTML+'</div></div>':'')
