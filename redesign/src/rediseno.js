@@ -150,69 +150,154 @@
     if(document.body.classList.contains('rd-desk')||document.body.classList.contains('rd-tablet')) d.open=true;
   }
 
-  /* --------------------------------- TARJETA BIOMECÁNICA (propuesta) ------
-     Lee p.biomecanica real; estados Actual/Histórica/Pendiente; NO calcula
-     diferencias de pendientes; conserva fecha de las históricas; reusa el
-     motor existente (abrirMedidorBiomecanico/BIO_comparar). Es PROPUESTA
-     visual: no escribe datos, no toca algoritmos. */
-  function bioSesiones(p){ try{ return (p&&Array.isArray(p.biomecanica))?p.biomecanica.slice():[]; }catch(_){ return []; } }
-  function bioMejorMedida(ses){
-    // extrae una medida (grado + etiqueta) de una sesión gonio, si la trae
-    try{
-      if(!ses||!Array.isArray(ses.medidas)) return null;
-      var m=ses.medidas.find(function(x){return x && (x.grado!=null) && x.ok!==false;});
-      if(!m) return null;
-      return {etq:(m.etq||m.articulacion||m.mov||'Medición'), grado:m.grado, fecha:ses.fecha||ses.date||'', pend:(m.ok===false||m.validado===false)};
-    }catch(_){ return null; }
+  /* ===================================================================== *
+   * V1.1 · ROM / BIOMECÁNICA  (integración funcional, motor intacto)      *
+   *   · medir en vivo / foto / video → abrirMedidorBiomecanico (real)     *
+   *   · Importar histórica = SELECCIONAR una medición existente (no abrir *
+   *     el medidor) → la trae a la nota (FIX del bug reportado)           *
+   *   · comparar SOLO compatibles: mismo movimiento+lado+método+unidad,   *
+   *     mismo episodio; excluye eliminadas y pendientes de validar        *
+   *   · recuperar media anotada (miniaturas) · reporte (BIO_pdf real)     *
+   *   · NO toca ni duplica algoritmos; no pierde el borrador del SOAP     *
+   * ===================================================================== */
+  function bioSesiones(p){ try{ return (p&&Array.isArray(p.biomecanica))?p.biomecanica.filter(function(s){return s && s.eliminado!==true;}):[]; }catch(_){ return []; } }
+  function bioPend(m){ return (m.ok===false)||(m.validado===false)||(m.validada===false)||(m.pendiente===true)||(m.porValidar===true); }
+  function bioEp(p){ try{ return (p&&(p.motivoActualIndex!=null))?p.motivoActualIndex:0; }catch(_){ return 0; } }
+  function bioFlat(p, incluirPend){
+    var out=[], ep=bioEp(p);
+    bioSesiones(p).forEach(function(s){
+      (Array.isArray(s.medidas)?s.medidas:[]).forEach(function(m){
+        if(m==null || m.grado==null) return;
+        var pend=bioPend(m);
+        if(pend && !incluirPend) return;                       // fuera de comparaciones clínicas
+        out.push({ sesId:s.id, tipo:s.tipo||s.tipoMedicion||'', fecha:s.fecha||s.date||'',
+          ep:(s.motivoIndex!=null?s.motivoIndex:ep),
+          clave:m.clave||m.key||'', etq:m.etq||((m.grupo||'')+(m.mov?(' · '+m.mov):''))||'Medición',
+          grupo:m.grupo||'', mov:m.mov||'', lado:m.lado||'', unidad:m.fuente||m.unidad||'cámara 2D',
+          grado:m.grado, ref:(m.ref!=null?m.ref:null), pend:pend,
+          imagen:(Array.isArray(s.imagenes)&&s.imagenes[0]&&s.imagenes[0].url)||'',
+          video:(s.video&&s.video.url)||'' });
+      });
+    });
+    return out;
   }
-  function buildBioCard(full){
-    var O=full.querySelector('.rd-o'); if(!O) return;
-    var grp=O.querySelector('.form-group'); if(!grp) return;
-    if(grp.querySelector('.rd-bio')) return;
+  // Compatibilidad clínica: mismo movimiento (clave/etq) + lado + método/unidad + episodio
+  function bioCompat(m){ return (m.ep)+'||'+(m.clave||m.etq||'')+'||'+(m.lado||'')+'||'+(m.unidad||''); }
+  function bioFecha(f){ return fzParse(f); }
+
+  function bioWrite(texto){
+    try{
+      if(typeof window.setCampoAppend==='function'){ window.setCampoAppend('f-orom', texto); return true; }
+      var t=el('f-orom'); if(t){ t.value=(t.value?t.value.replace(/\s*$/,'')+' · ':'')+texto; t.dispatchEvent(new Event('input',{bubbles:true})); return true; }
+    }catch(_){}
+    return false;
+  }
+  // FIX "Importar histórica": abre un SELECTOR de mediciones existentes (no el medidor)
+  function bioImportPicker(){
     var p=cur(); if(!p) return;
-    var ses=bioSesiones(p).filter(function(s){return s && s.tipo==='gonio';});  // ROM/goniómetro
-    var medidas=ses.map(bioMejorMedida).filter(Boolean);
-    var actual=medidas.length?medidas[medidas.length-1]:null;
-    // COMPARABILIDAD: la "inicial" debe ser del MISMO movimiento que la actual
-    // (mismo etiquetado). Nunca se compara flexión con cadencia, etc.
-    var inicial=null;
+    var old=el('rd-bio-pick'); if(old) old.remove();
+    var items=bioFlat(p, true).sort(function(a,b){return bioFecha(b.fecha)-bioFecha(a.fecha);});
+    var ov=document.createElement('div'); ov.id='rd-bio-pick'; ov.className='rd-modal';
+    var lista = items.length ? items.map(function(m){
+      var dis=m.pend;
+      return '<button type="button" class="rd-pick-item'+(dis?' dis':'')+'" '+(dis?'disabled':'data-import="1"')+' data-txt="'+H(m.etq+' '+Math.round(m.grado)+'° '+(m.lado||'')+' ('+m.fecha+')')+'">'
+        +(m.imagen?'<img src="'+H(m.imagen)+'" alt="">':'<span class="noimg">📐</span>')
+        +'<span class="rd-pick-main"><b>'+H(m.etq)+(m.lado?(' · '+H(m.lado)):'')+'</b>'
+        +'<small>'+Math.round(m.grado)+'° · '+H(m.unidad)+' · '+H(m.fecha)+(dis?' · ⏳ pendiente de validar':'')+'</small></span>'
+        +(dis?'<span class="rd-pick-cta off">no válida</span>':'<span class="rd-pick-cta">Importar ⬇️</span>')+'</button>';
+    }).join('') : '<div class="rd-pick-empty">No hay mediciones previas guardadas en este expediente.</div>';
+    ov.innerHTML='<div class="rd-modal-box"><div class="rd-modal-top"><b>⬇️ Importar medición existente</b><button class="rd-modal-x" aria-label="cerrar">×</button></div>'
+      +'<div class="rd-modal-sub">Selecciona una medición ya guardada para traerla a esta nota (O · ROM). Las pendientes de validar no se pueden importar para comparación.</div>'
+      +'<div class="rd-pick-list">'+lista+'</div></div>';
+    document.body.appendChild(ov);
+    function close(){ ov.remove(); }
+    ov.querySelector('.rd-modal-x').onclick=close;
+    ov.addEventListener('click', function(ev){ if(ev.target===ov) close(); var b=ev.target.closest('[data-import]'); if(b){ bioWrite('[histórica] '+b.getAttribute('data-txt')); close(); } });
+  }
+  function bioReportar(){
+    try{ if(typeof window.BIO_pdf==='function'){ BIO_pdf(); return; } }catch(_){}
+    try{ if(typeof window.BIO_construirPDF==='function'){ BIO_construirPDF(); return; } }catch(_){}
+    try{ if(typeof window.abrirMedidorBiomecanico==='function'){ abrirMedidorBiomecanico('gonio'); } }catch(_){}
+  }
+  function buildBioCard(grp){
+    if(!grp) return;
+    if(grp.querySelector(':scope > .rd-bio, :scope .rd-bio')) return;
+    var p=cur(); if(!p) return;
+    var todas=bioFlat(p,false);                   // excluye eliminadas y pendientes
+    var pend=bioFlat(p,true).filter(function(m){return m.pend;});
+    // Para el titular/comparación usamos ROM/goniómetro (no métricas de marcha/sentadilla);
+    // el selector de importar sí ofrece TODAS las mediciones.
+    var rom=todas.filter(function(m){return m.tipo==='gonio'||m.tipo==='rom'||(m.grupo&&m.mov);});
+    var validas=rom.length?rom:todas;
+    // la "actual" = la más reciente VÁLIDA; su histórico compatible
+    validas.sort(function(a,b){return bioFecha(a.fecha)-bioFecha(b.fecha);});
+    var actual=validas.length?validas[validas.length-1]:null, inicial=null, delta=null;
     if(actual){
-      for(var i=0;i<medidas.length-1;i++){
-        if(medidas[i] && medidas[i].etq===actual.etq){ inicial=medidas[i]; break; }
-      }
-    }
-    // delta SOLO si: mismo movimiento, ambos numéricos y NINGUNO pendiente de validar
-    var delta=null;
-    if(actual && inicial && actual.etq===inicial.etq
-       && typeof actual.grado==='number' && typeof inicial.grado==='number'
-       && !actual.pend && !inicial.pend){
-      delta=(actual.grado-inicial.grado);
+      var compat=validas.filter(function(m){return bioCompat(m)===bioCompat(actual);});
+      if(compat.length>=2){ inicial=compat[0]; if(typeof actual.grado==='number'&&typeof inicial.grado==='number') delta=actual.grado-inicial.grado; }
     }
     var hayMed=(typeof window.abrirMedidorBiomecanico==='function');
     var hayCmp=(typeof window.BIO_comparar==='function');
-    function val(lbl,v,sub,cls){ return '<div class="rd-bio-v '+(cls||'')+'"><div class="rd-bio-n">'+H(v)+'</div><div class="rd-bio-l">'+H(lbl)+(sub?('<br><span>'+H(sub)+'</span>'):'')+'</div></div>'; }
+    var hayPdf=(typeof window.BIO_pdf==='function')||(typeof window.BIO_construirPDF==='function');
+    function vcell(lbl,v,sub,cls){ return '<div class="rd-bio-v '+(cls||'')+'"><div class="rd-bio-n">'+H(v)+'</div><div class="rd-bio-l">'+H(lbl)+(sub?('<br><span>'+H(sub)+'</span>'):'')+'</div></div>'; }
     var cuerpo;
     if(actual){
-      cuerpo='<div class="rd-bio-row">'
-        + (inicial?val('Inicial', inicial.grado+'°', inicial.fecha, 'hist'):'')
-        + val('Actual', actual.grado+'°'+(actual.pend?' ⏳':''), actual.pend?'pendiente de validar':(actual.fecha||'sesión actual'), actual.pend?'pend':'now')
-        + (delta!=null?val('Cambio', (delta>=0?'+':'')+delta+'°', 'comparable', 'delta'):(actual.pend?val('Cambio','—','no se calcula en pendientes','off'):''))
+      cuerpo='<div class="rd-bio-sub">'+H(actual.etq)+(actual.lado?(' · '+H(actual.lado)):'')+' · '+H(actual.unidad)+'</div>'
+        +'<div class="rd-bio-row">'
+        + (inicial?vcell('Inicial', Math.round(inicial.grado)+'°', inicial.fecha, 'hist'):'')
+        + vcell('Actual', Math.round(actual.grado)+'°', (actual.fecha||'sesión actual'), 'now')
+        + (delta!=null?vcell('Cambio', (delta>=0?'+':'')+Math.round(delta)+'°', 'mismo mov./lado', 'delta'):vcell('Cambio','—','1 sola medición','off'))
         + '</div>'
-        + '<div class="rd-bio-note">'+H(actual.etq)+' · cámara 2D · estimación no validada frente a goniómetro físico. Confirmar posición, activa/pasiva, lado y evidencia.</div>';
+        + (actual.imagen?('<div class="rd-bio-media"><img src="'+H(actual.imagen)+'" alt="medición anotada"><span>Imagen anotada guardada</span></div>'):'')
+        + '<div class="rd-bio-note">cámara 2D · estimación no validada frente a goniómetro físico. Compara solo mismo episodio, articulación, movimiento, lado y método.</div>';
     } else {
-      cuerpo='<div class="rd-bio-note">Sin mediciones en este motivo. Mide con la cámara o importa una medición previa.</div>';
+      cuerpo='<div class="rd-bio-note">Sin mediciones válidas en este motivo. Mide con la cámara, sube foto/video o importa una previa.</div>';
     }
+    if(pend.length) cuerpo+='<div class="rd-bio-pend">⏳ '+pend.length+' medición(es) pendiente(s) de validar — fuera de las comparaciones clínicas.</div>';
     var card=document.createElement('div'); card.className='rd-bio';
-    card.innerHTML='<div class="rd-bio-head">📐 Mediciones biomecánicas <span class="rd-bio-tag">propuesta</span></div>'
+    card.innerHTML='<div class="rd-bio-head">📐 Mediciones biomecánicas <span class="rd-bio-tag">ROM</span></div>'
       + cuerpo
       + '<div class="rd-bio-btns">'
-      + (hayMed?'<button type="button" onclick="try{abrirMedidorBiomecanico(\'gonio\')}catch(e){}">📐 Medir ROM</button>':'')
-      + (hayMed?'<button type="button" onclick="try{abrirMedidorBiomecanico(\'gonio\')}catch(e){}">⬇️ Importar histórica</button>':'')
-      + (hayCmp?'<button type="button" onclick="try{BIO_comparar()}catch(e){}">⚖️ Comparar</button>':'')
+      + (hayMed?'<button type="button" data-bio="vivo">📷 Medir (cámara / foto / video)</button>':'')
+      + '<button type="button" data-bio="import">⬇️ Importar histórica</button>'
+      + (hayCmp?'<button type="button" data-bio="comparar">⚖️ Comparar</button>':'')
+      + (hayPdf?'<button type="button" data-bio="reporte">📄 Reporte</button>':'')
       + '</div>'
       + '<div class="rd-bio-legend"><span class="now">● Actual</span><span class="hist">● Histórica</span><span class="pend">● Pendiente</span> · la pendiente no alimenta diferencias ni IA</div>';
     grp.appendChild(card);
+    card.addEventListener('click', function(ev){
+      var b=ev.target.closest('[data-bio]'); if(!b) return;
+      var a=b.getAttribute('data-bio');
+      if(a==='vivo'){ rdSnapDraft(); try{ abrirMedidorBiomecanico('gonio'); }catch(_){} }
+      else if(a==='import'){ bioImportPicker(); }
+      else if(a==='comparar'){ rdSnapDraft(); try{ BIO_comparar(); }catch(_){} }
+      else if(a==='reporte'){ rdSnapDraft(); bioReportar(); }
+    });
   }
+
+  /* --- GUARDA DE BORRADOR DEL SOAP (no perder la nota al abrir/cerrar el
+     goniómetro ni en un re-render). Mantiene un borrador vivo por campo y lo
+     restaura si la nota se vuelve a pintar vacía. No interfiere al EDITAR. --- */
+  var SOAP_DRAFT_FIELDS=['f-sdolor','f-scambios','f-sactfisica','f-orom','f-ofuerza','f-ohallazgos',
+    'f-aevolucion','f-arespuesta','f-aanalisis','f-pindicaciones','f-pcontra','f-ptratamiento','f-objetivo-sesion'];
+  function rdSnapDraft(){
+    try{
+      if(editId()) return;                 // al editar, la app ya trae los valores
+      var m={}, any=false;
+      SOAP_DRAFT_FIELDS.forEach(function(id){ var e=el(id); if(e){ m[id]=e.value; if(String(e.value||'').trim()) any=true; } });
+      if(any) window._rdSoapDraft={ts:Date.now(), pid:(cur()&&cur().id)||'', map:m};
+    }catch(_){}
+  }
+  function rdRestoreDraft(){
+    try{
+      var d=window._rdSoapDraft; if(!d) return;
+      if(Date.now()-d.ts>15*60*1000){ window._rdSoapDraft=null; return; }
+      if(editId()) return;
+      if(cur() && d.pid && cur().id!==d.pid) return;     // otro paciente → no restaurar
+      Object.keys(d.map).forEach(function(id){ var e=el(id); if(e && !String(e.value||'').trim() && String(d.map[id]||'').trim()){ e.value=d.map[id]; try{e.dispatchEvent(new Event('input',{bubbles:true}));}catch(_){} } });
+    }catch(_){}
+  }
+  function rdClearDraft(){ window._rdSoapDraft=null; }
 
   /* ===================================================================== *
    * V1.1 · FUERZA MUSCULAR  (escala comparativa 0–10, 10 = lado sano)     *
@@ -416,6 +501,7 @@
         var b=realSaveBtn();
         if(b){ b.click(); }      // usa el botón REAL → conserva su verificación/estado
         else { try{ if(typeof guardarSOAP==='function') guardarSOAP(); }catch(_){} }
+        setTimeout(function(){ try{ rdClearDraft(); }catch(_){} }, 60);  // nota guardada → limpiar borrador
       };
       bar.querySelector('.rd-bar-top').onclick=function(){ var sf=el('soap-full'); if(sf) rdScrollTo(sf); };
       var vv=window.visualViewport;
@@ -464,10 +550,15 @@
       full.insertBefore(r2,map.a); r2.appendChild(map.a); r2.appendChild(map.p);
     }
     buildSoapCtx(container);            // panel de contexto (colapsado en móvil)
-    try{ buildBioCard(full); }catch(_){}
+    try{ var og=map.o&&map.o.querySelector('.form-group'); if(og) buildBioCard(og); }catch(_){}
     try{ if(map.o) buildFuerzaPanel(map.o, cur(), {writeField:'f-ofuerza'}); }catch(_){}
     try{ buildSoapQuickNav(full, map); }catch(_){}   // al final → queda como 1er hijo (arriba de todo)
     try{ buildSoapSaveBar(map); }catch(_){}
+    // guarda de borrador: mantener vivo + restaurar si el re-render dejó la nota vacía
+    try{
+      if(!full._rdDraftHooked){ full._rdDraftHooked=true; var _t; full.addEventListener('input',function(){ clearTimeout(_t); _t=setTimeout(rdSnapDraft,400); }); }
+      rdRestoreDraft();
+    }catch(_){}
   }
 
   /* --------------------------------------------------- OBSERVADORES ------ */
@@ -476,6 +567,7 @@
     // Solo en la pestaña Valoración: panel de Fuerza 0–10 (comparativa/evolución).
     if(!/valoraci/.test(tabActivo())) return;
     if(c.querySelector(':scope > .rd-fz')){ try{ buildFuerzaPanel(c, cur(), {}); }catch(_){} return; }
+    try{ buildBioCard(c); }catch(_){}                 // ROM/biomecánica también en Valoración
     try{ buildFuerzaPanel(c, cur(), {}); }catch(_){}
   }
   function runFor(id){
