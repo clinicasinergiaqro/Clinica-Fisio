@@ -5,6 +5,14 @@
 - NO fragmentar en varias partes/bloques. El usuario trabaja en iPad y no puede copiar por pedazos.
 - Si un cambio toca varios puntos del archivo, mostrarlo igualmente como un único bloque continuo.
 - **REGLA DE ORO (Carlos, enfático 2026-11-05): cuando pida el código de un archivo, ENTREGAR EL ARCHIVO COMPLETO, NUNCA fragmentos ni "pega esto al final" ni un snippet suelto. ES TODO O NADA.** Si el archivo es grande y retipearlo en el chat arriesga corromperlo (ej. `config/Codigo.gs`, 2800+ líneas de backend en producción), editar el archivo real del repo y entregarlo COMPLETO por `SendUserFile` (son los bytes reales, cero riesgo de typo) — eso ES el archivo completo, no una parte. Nunca mandar un pedazo para que él lo inserte.
+- **🔴🔴🔴 REGLA ABSOLUTA REFORZADA (Carlos, MOLESTO 2026-11-26) — CÓDIGO COMPLETO, NUNCA POR PEDAZOS 🔴🔴🔴**
+  - CÓDIGO COMPLETO. CÓDIGO COMPLETO. CÓDIGO COMPLETO. CÓDIGO COMPLETO. CÓDIGO COMPLETO.
+  - NUNCA MANDAR CÓDIGO POR PARTES. NUNCA MANDAR CÓDIGO POR PARTES. NUNCA MANDAR CÓDIGO POR PARTES.
+  - NO "Buscar y Reemplazar". NO "pega esto al final". NO snippets. NO fragmentos. NO pedacitos. NADA POR PARTES.
+  - SIEMPRE el ARCHIVO COMPLETO, listo para DESCARGAR + COPIAR TODO + PEGAR reemplazando todo. Por `SendUserFile`.
+  - Si NO va a ser el archivo COMPLETO → NO mandar nada. "Si no, no me mandes nada" (Carlos textual).
+  - Cuando el `config/Codigo.gs` EN VIVO va adelante del repo: Carlos lo pega → se reconstruye en disco por tramos (cat >> heredoc), se parcha con reemplazo EXACTO (python replace + assert de nº de ocurrencias), se valida (`node --check` sobre copia .js + grep de funciones clave), y se entrega el archivo ENTERO por `SendUserFile`. El usuario recibe UN archivo, aunque internamente se arme por tramos.
+  - ESTO ES REGLA PERMANENTE E INNEGOCIABLE. Releer antes de entregar cualquier código.
 
 ## Instrucciones / pruebas / prompts para copiar
 - SIEMPRE en UN SOLO bloque de código de texto plano corrido, de principio a fin, en una sola caja copiable.
