@@ -21,12 +21,16 @@ var raw = JSON.parse(fs.readFileSync(inPath, 'utf8'));
 var corte = (raw._meta && raw._meta.fecha_corte_default) || '2026-11-26';
 var casos = raw.casos || raw;
 
-// Cuenta metas "asumidas" (texto de supuesto: 50% / 90% / Daniels 5/5 / simetría) en los objetivos.
+// Cuenta metas ASUMIDAS SIN JUSTIFICAR (supuesto fijo: 50% / 90% / Daniels 5/5 / simetría) en los
+// objetivos. En V2.2.1 una meta que lleva `justificacion_meta` es una PROPUESTA editable justificada por
+// datos (p.ej. simetría SOLO con lado sano confirmado) → NO cuenta como supuesto. Solo cuenta un supuesto
+// fijo sin justificación (como los de V2.1).
 function metasAsumidas(res) {
   var n = 0;
   (res.objetivos || []).forEach(function (o) {
     var m = o.meta_propuesta;
     if (!m) return;
+    if (o.justificacion_meta) return; // propuesta justificada y editable: no es un supuesto
     var v = JSON.stringify(m).toLowerCase();
     if (/≥90|90%|daniels 5\/5|5\/5|simetr|~50%|reducci[oó]n ~50/.test(v)) n++;
   });
@@ -92,7 +96,7 @@ fs.writeFileSync(outPath, JSON.stringify({ _agregado: agg, comparacion: filas },
 var md = ['# Comparación V2.1 → V2.2 (insumos anonimizados)', '',
   '- Casos: ' + agg.n,
   '- Sin fecha_corte: V2.1 = ' + agg.v21_sin_fecha_corte + ' → V2.2 = ' + agg.v22_sin_fecha_corte,
-  '- Metas asumidas (50%/90%/Daniels/simetría): V2.1 = ' + agg.v21_metas_asumidas + ' → V2.2 = ' + agg.v22_metas_asumidas,
+  '- Metas asumidas SIN justificar (50%/90%/Daniels/simetría sin dato): V2.1 = ' + agg.v21_metas_asumidas + ' → V2.2.1 = ' + agg.v22_metas_asumidas + ' (las propuestas justificadas y editables NO cuentan)',
   '- ROM cualitativo reportado como grados: V2.1 = ' + agg.v21_rom_falso_grados + ' → V2.2 = ' + agg.v22_rom_falso_grados,
   '- Planes distintos (variedad por patología): V2.1 = ' + agg.v21_planes_distintos + ' → V2.2 = ' + agg.v22_planes_distintos,
   '- Casos con cambio de seguridad: ' + (agg.casos_con_cambio_seguridad.join(', ') || '—'),

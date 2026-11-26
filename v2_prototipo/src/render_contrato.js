@@ -6,7 +6,7 @@
  */
 (function (root) {
   'use strict';
-  var VERSION = '2.2.0-proto';
+  var VERSION = '2.2.1-proto';
 
   function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
 
@@ -67,11 +67,22 @@
     H.push('<div class="cribado ' + (c.seguridad.cribado_documentado ? 'ok' : 'no') + '">Cribado de banderas rojas: ' + (c.seguridad.cribado_documentado ? 'documentado' : 'NO documentado') + '</div>');
     H.push('</section>');
 
-    // Episodio / nuevo motivo (punto 5)
-    if (c.episodio_analisis && c.episodio_analisis.sospecha) {
-      H.push('<section class="sec warn"><h3>Posible nuevo motivo de consulta</h3><p>' + esc(c.episodio_analisis.accion || '') +
-        '</p><div class="muted">Región del motivo valorado: ' + esc((c.episodio_analisis.region_valoracion || []).join(', ') || '—') +
-        ' · región en la nota SOAP reciente: ' + esc((c.episodio_analisis.region_soap_reciente || []).join(', ') || '—') + '</div></section>');
+    // Episodio / motivo de consulta (punto 5): estructura REAL (solo lectura) + OBSERVACIÓN informativa.
+    // La IA NO inicia un nuevo motivo; la decisión es del fisioterapeuta.
+    if (c.episodio_analisis) {
+      var ea = c.episodio_analisis, est = ea.estructura || {};
+      var sh = function (v) { return (v === 0 || (v != null && v !== '')) ? esc(v) : '—'; };
+      H.push('<section class="sec' + (ea.posible_nuevo_motivo ? ' warn' : '') + '"><h3>Episodio / motivo de consulta</h3>');
+      H.push('<div class="muted">Estructura (solo lectura): episodio ' + sh(est.numEpisodio) + ' · motivoActualIndex ' + sh(est.motivoActualIndex) +
+        ' · sesión del episodio ' + sh(est.numSesionEpisodioActual) + ' · motivos anteriores ' + sh(est.motivosAnteriores_n) + '</div>');
+      H.push('<div class="muted">' + esc(ea.alcance || '') + '</div>');
+      if (ea.posible_nuevo_motivo) {
+        H.push('<p>⚠ ' + esc(ea.observacion || '') + '</p>' +
+          '<div class="muted">Región del motivo valorado: ' + esc((ea.region_valoracion || []).join(', ') || '—') +
+          ' · región en la nota SOAP reciente: ' + esc((ea.region_soap_reciente || []).join(', ') || '—') +
+          ' · decide: ' + esc(ea.decide || 'fisioterapeuta') + ' · la IA no inicia el motivo</div>');
+      }
+      H.push('</section>');
     }
 
     // Diagnóstico funcional
@@ -105,7 +116,7 @@
       H.push('<table class="obj"><thead><tr><th>Fase</th><th>Alteración</th><th>Indicador</th><th>Línea base</th><th>Meta</th><th>Método</th><th>Criterio de alta</th></tr></thead><tbody>');
       c.objetivos.forEach(function (o) {
         H.push('<tr><td>' + esc(o.fase) + '</td><td>' + esc(o.alteracion || '') + '<div class="muted">' + esc(o.actividad || '') + '</div>' + evids(o.evidencias) + '</td>' +
-          '<td>' + esc(o.indicador || '') + '</td><td>' + lineaBase(o.linea_base) + '</td><td>' + metaProp(o.meta_propuesta, o.meta_nota) + '</td>' +
+          '<td>' + esc(o.indicador || '') + '</td><td>' + lineaBase(o.linea_base) + '</td><td>' + metaProp(o.meta_propuesta, o.meta_nota) + (o.justificacion_meta ? '<div class="muted">· ' + esc(o.justificacion_meta) + '</div>' : '') + '</td>' +
           '<td>' + esc(o.metodo || '—') + '<div class="muted">reeval: ' + esc(o.reevaluacion || '—') + '</div></td>' +
           '<td>' + esc(o.criterio_cumplimiento || '—') + '</td></tr>');
       });
@@ -141,11 +152,23 @@
     }
     H.push('</section>');
 
-    // Mediciones
-    if (c.mediciones && c.mediciones.length) {
+    // Mediciones biomecánicas (contrato p.biomecanica[].medidas[]): estado actual/histórica/pendiente/eliminada.
+    var bm = c.mediciones_biomecanica;
+    if (bm && bm.conteo && bm.conteo.total) {
+      H.push('<section class="sec"><h3>Mediciones biomecánicas</h3>');
+      H.push('<div class="muted">total ' + bm.conteo.total + ' · actuales ' + bm.conteo.actuales + ' · históricas ' + bm.conteo.historicas +
+        ' · pendientes ' + bm.conteo.pendientes + ' · eliminadas ' + bm.conteo.eliminadas + (bm.conteo.sin_id ? ' · sin id ' + bm.conteo.sin_id : '') + '</div>');
+      H.push('<table class="med"><thead><tr><th>estado</th><th>articulación</th><th>mov</th><th>lado</th><th>valor</th><th>método</th><th>fecha</th></tr></thead><tbody>');
+      ['actuales', 'historicas', 'pendientes', 'eliminadas'].forEach(function (grp) {
+        (bm[grp] || []).forEach(function (m) {
+          H.push('<tr class="bm-' + esc(m.estado) + '"><td>' + esc(m.estado) + '</td><td>' + esc(m.articulacion || '—') + '</td><td>' + esc(m.movimiento || '—') + '</td><td>' + esc(m.lado || '—') + '</td><td>' + esc(m.valor != null ? m.valor : '—') + (m.unidad ? ' ' + esc(m.unidad) : '') + '</td><td>' + esc(m.metodo || '—') + '</td><td>' + esc(m.fecha || '—') + '</td></tr>');
+        });
+      });
+      H.push('</tbody></table></section>');
+    } else if (c.mediciones && c.mediciones.length) {
       H.push('<section class="sec"><h3>Mediciones</h3><table class="med"><thead><tr><th>id</th><th>articulación</th><th>mov</th><th>lado</th><th>valor</th><th>método</th><th>fecha</th></tr></thead><tbody>');
       c.mediciones.forEach(function (m) {
-        H.push('<tr><td>' + esc(m.id) + '</td><td>' + esc(m.articulacion || '—') + '</td><td>' + esc(m.movimiento || '—') + '</td><td>' + esc(m.lado || '—') + '</td><td>' + esc(m.valor != null ? m.valor : '—') + (m.unidad ? ' ' + esc(m.unidad) : '') + '</td><td>' + esc(m.metodo || '—') + '</td><td>' + esc(m.fecha || '—') + '</td></tr>' + (m.tarea ? '<tr class="med-tarea"><td colspan="7">⚠ ' + esc(m.tarea) + '</td></tr>' : ''));
+        H.push('<tr><td>' + esc(m.id) + '</td><td>' + esc(m.articulacion || '—') + '</td><td>' + esc(m.movimiento || '—') + '</td><td>' + esc(m.lado || '—') + '</td><td>' + esc(m.valor != null ? m.valor : '—') + (m.unidad ? ' ' + esc(m.unidad) : '') + '</td><td>' + esc(m.metodo || '—') + '</td><td>' + esc(m.fecha || '—') + '</td></tr>');
       });
       H.push('</tbody></table></section>');
     }

@@ -9,7 +9,7 @@
  */
 (function (root) {
   'use strict';
-  var VERSION = '2.2.0-proto';
+  var VERSION = '2.2.1-proto';
 
   var norm = function (s) {
     return String(s == null ? '' : s).normalize('NFKD').replace(/[̀-ͯ]/g, '').toLowerCase();
@@ -56,6 +56,19 @@
     return { present: present, affirmed: affirmed, negatedOnly: present && !affirmed, evidencia: ev, evidencia_negada: negEv };
   }
 
+  // ¿co-ocurren un término de A y uno de B en la MISMA cláusula (entre . ; o salto)? Sirve para exigir
+  // que un contexto neural esté JUNTO a una "debilidad/pérdida de fuerza" antes de llamarla déficit neuro.
+  function _coOcurreClausula(rawText, termsA, termsB) {
+    var txt = norm(rawText);
+    var clausulas = txt.split(/[.;\n]/);
+    for (var i = 0; i < clausulas.length; i++) {
+      var c = clausulas[i];
+      if (!termsA.some(function (t) { return c.indexOf(norm(t)) !== -1; })) continue;
+      if (termsB.some(function (t) { return c.indexOf(norm(t)) !== -1; })) return true;
+    }
+    return false;
+  }
+
   // Lateralidad de un texto (derecho / izquierdo / bilateral / null)
   function ladoDe(rawText) {
     var t = norm(rawText);
@@ -77,7 +90,11 @@
     cadera: ['cadera', 'coxofemoral', 'labrum de cadera'], rodilla: ['rodilla', 'menisc', 'rotul', 'patelo', 'cruzado'], tobillo_pie: ['tobillo', 'pie', 'aquiles', 'calcaneo', 'fascitis plantar']
   };
   function regionDe(txt) {
-    txt = norm(txt); var found = [];
+    txt = norm(txt);
+    // "pie fijo" / "de pie" / "a pie" / "en pie" NO son la región anatómica tobillo/pie: son postura o
+    // mecanismo (p.ej. "giro con pie fijo"). Se neutralizan para no generar un falso conflicto de región.
+    txt = txt.replace(/\bpie\s+fij\w*/g, ' ').replace(/\b(de|a|en)\s+pie\b/g, ' ');
+    var found = [];
     Object.keys(REGIONES).forEach(function (r) { if (REGIONES[r].some(function (k) { return txt.indexOf(k) !== -1; })) found.push(r); });
     return found;
   }
@@ -151,7 +168,21 @@
     //      (OCT-06: tenía denervación activa documentada por ENMG y V2.1 no lo marcaba → se recupera aquí.)
     //  (c) SOSPECHA DE COMPRESIÓN MEDULAR / radiculopatía confirmada → derivación/emergencia según bandera.
     var sintomaNeuroReferido = flag(['parestesia', 'hormigueo', 'adormecimiento', 'se me duerme', 'se duerme', 'entumecimiento', 'entumecido', 'sensacion de corriente'], personal, 'sintoma_neuro_referido');
-    var deficitNeuroObjetivo = flag(['pie caido', 'perdida de fuerza', 'debilidad', 'paralisis', 'paresia', 'plejia', 'arreflexia', 'hiporreflexia', 'atrofia', 'hipotrofia', 'amiotrofia', 'denervacion', 'denervado', 'enmg', ' emg', 'electromiografia', 'axonotmesis', 'degeneracion axonal', 'neurotmesis', 'reinervacion'], personal, 'deficit_neuro_objetivo');
+    // Marcadores NEUROLÓGICOS DUROS (signo objetivo / electrofisiológico): pie caído, arreflexia, atrofia,
+    // denervación/ENMG, axonotmesis… Son hallazgos objetivos poco ambiguos → cuentan por sí solos.
+    var deficitNeuroDuro = flag(['pie caido', 'arreflexia', 'hiporreflexia', 'atrofia', 'hipotrofia', 'amiotrofia', 'denervacion', 'denervado', 'enmg', ' emg', 'electromiografia', 'axonotmesis', 'degeneracion axonal', 'neurotmesis', 'reinervacion'], personal, 'deficit_neuro_objetivo');
+    // AMBIGUOS: "debilidad / pérdida de fuerza / parálisis / paresia / plejia". Una DISMINUCIÓN de fuerza
+    // NO es, por sí sola, un déficit neurológico (puede ser dolor, desuso, inhibición; "parálisis facial"
+    // antigua es un cuadro craneal/resuelto ajeno al motivo MSK). Solo cuentan como déficit neuro
+    // OBJETIVADO si un CONTEXTO NEURAL (nervio/raíz/dermatoma/miotoma/nivel medular de miembro) aparece en
+    // la MISMA CLÁUSULA. (Requisito Sinergia: NO confundir disminución de fuerza con déficit neurológico.)
+    var ambiguosNeuro = ['debilidad', 'perdida de fuerza', 'perdida de la fuerza', 'disminucion de fuerza', 'disminucion de la fuerza', 'paralisis', 'paresia', 'plejia'];
+    var neuralCtx = ['nervio', 'raiz nerviosa', 'radicul', 'dermatoma', 'miotoma', 'l2', 'l3', 'l4', 'l5', 's1', 'c5', 'c6', 'c7', 'c8', 'peroneo', 'ciatic', 'cubital', 'nervio radial', 'nervio mediano', 'femoral', 'neuropat', 'nervioso'];
+    var debilidadTerm = termState(personal, ambiguosNeuro);
+    var debilidadNeural = debilidadTerm.affirmed && _coOcurreClausula(personal, ambiguosNeuro, neuralCtx);
+    var debilidadSinContextoNeuro = debilidadTerm.affirmed && !debilidadNeural && !deficitNeuroDuro.affirmed; // disminución de fuerza NO neurológica
+    var deficitNeuroObjetivo = { affirmed: deficitNeuroDuro.affirmed || debilidadNeural, evidencia: deficitNeuroDuro.evidencia || (debilidadNeural ? debilidadTerm.evidencia : null) };
+    if (deficitNeuroObjetivo.affirmed && !ev['deficit_neuro_objetivo']) ev['deficit_neuro_objetivo'] = { campo: 'deficit_neuro_objetivo', fragmento: deficitNeuroObjetivo.evidencia };
     var radiculopatiaConfirmada = flag(['radiculopatia confirmada', 'radiculopatia por enmg', 'radiculopatia electromiografica', 'compromiso radicular objetivado', 'dano axonal'], personal, 'radiculopatia_confirmada');
     var deficitProgresivo = flag(['progresiv', 'empeora', 'avanza', 'en aumento', 'cada vez mas'], relato + ' ' + soap.todo, 'deficit_progresivo');
     var mielopatia = flag(['mielopat', 'hoffmann', 'babinski', 'clonus', 'marcha espastica', 'hiperreflexia', 'signo de lhermitte'], personal, 'mielopatia');
@@ -193,17 +224,16 @@
     var regionDxArr = regionDe(dxMed);
     var regionMec = regionDe(mecanismoTxt);
     var regionPat = regionDe(rec.patologia || '');
-    // Conflicto de región ROBUSTO: compara TODAS las fuentes no vacías {zona, dx, mecanismo, patología}.
-    // Hay conflicto si DOS fuentes con región no comparten NINGUNA región entre sí (OCT-84: zona vs dx/patología).
-    var _setsReg = [regionZona, regionDxArr, regionMec, regionPat].filter(function (a) { return a.length; });
+    // Conflicto de región CONSERVADOR: compara SOLO los dos campos que la clínica captura de forma
+    // independiente: la ZONA codificada y el DX médico referido. NO entran el MECANISMO (narrativo, menciona
+    // regiones incidentalmente: "giro con pie fijo") NI la PATOLOGÍA (que en datos reales se DERIVA de un
+    // clasificador y fabricaría conflictos, p.ej. un dx "cervical y lumbar" con zona lumbar). Un dx con
+    // varias regiones NO entra en conflicto si comparte alguna con la zona. (Ambos se siguen reportando.)
     var regionConflicto = false;
-    for (var _i = 0; _i < _setsReg.length && !regionConflicto; _i++) {
-      for (var _j = _i + 1; _j < _setsReg.length; _j++) {
-        var comparten = _setsReg[_i].some(function (r) { return _setsReg[_j].indexOf(r) !== -1; });
-        if (!comparten) { regionConflicto = true; break; }
-      }
+    if (regionZona.length && regionDxArr.length) {
+      regionConflicto = !regionZona.some(function (r) { return regionDxArr.indexOf(r) !== -1; });
     }
-    if (regionConflicto && !ev['region_conflicto']) ev['region_conflicto'] = { campo: 'zona/dx/mecanismo/patologia', fragmento: 'zona:[' + regionZona.join(',') + '] dx:[' + regionDxArr.join(',') + '] mec:[' + regionMec.join(',') + '] pat:[' + regionPat.join(',') + ']' };
+    if (regionConflicto && !ev['region_conflicto']) ev['region_conflicto'] = { campo: 'zona/dx', fragmento: 'zona:[' + regionZona.join(',') + '] dx:[' + regionDxArr.join(',') + ']' + (regionMec.length ? ' (mec:[' + regionMec.join(',') + '] y pat:[' + regionPat.join(',') + '] NO entran al conflicto)' : '') };
 
     // --- Cirugía ligamentaria/meniscal PREVIA con LATERALIDAD (ipsilateral requiere mismo lado) ---
     var cxLigTerms = ['lca', 'ligamento cruzado', 'cruzado anterior', 'plastia de ligamento', 'reconstruccion de ligament', 'menisc', 'ligamentoplastia'];
@@ -267,12 +297,31 @@
     // --- ROM / Fuerza: ¿numérico (medible) o texto cualitativo? ---
     // El generador NO debe etiquetar texto cualitativo ("limitado", "disminuida") como medición en grados.
     var romRaw = String(o.rom || '');
-    var fuerzaRaw = String(o.fuerza || '');
     var romEsNumerico = lleno(romRaw) && /\d+\s*(°|grados?|grd|º)/i.test(romRaw);
     var romTextoCualitativo = lleno(romRaw) && !romEsNumerico;
-    // Fuerza numérica = escala Daniels DOCUMENTADA (x/5, 3/5, 4/5…), no "disminuida"/"conservada".
-    var fuerzaEsNumerica = lleno(fuerzaRaw) && /\b[0-5]\s*\/\s*5\b|\bdaniels?\s*[0-5]\b|\bgrado\s*[0-5]\b/i.test(fuerzaRaw);
+    // --- FUERZA: escala CLÍNICA COMPARATIVA de Sinergia 0–10 (lado sano/referencia válida = 10/10;
+    //     6/10 ≈ 60% ESTIMADO de la fuerza de referencia). NO se sustituye por Daniels/MRC ni se
+    //     convierte entre escalas: un valor /5 (legado) se conserva etiquetado, nunca se pasa a /10.
+    //     Se identifica grupo muscular, lateralidad y referencia; no se asume el contralateral sano.
+    var fuerzaRaw = String(o.fuerza || '');
+    var mFuerzaComp = fuerzaRaw.match(/\b(10|\d)(?:\.\d)?\s*\/\s*10\b/);           // X/10 (Sinergia, canónica)
+    var mFuerzaDaniels = fuerzaRaw.match(/\b([0-5])\s*\/\s*5\b|\bdaniels?\s*([0-5])\b|\bgrado\s*([0-5])\b/i); // legado /5 (NO convertir)
+    var fuerzaEscala = mFuerzaComp ? 'comparativa_0_10' : (mFuerzaDaniels ? 'daniels_0_5' : null);
+    var fuerzaValor = mFuerzaComp ? parseFloat(mFuerzaComp[1]) : (mFuerzaDaniels ? parseFloat(mFuerzaDaniels[1] || mFuerzaDaniels[2] || mFuerzaDaniels[3]) : null);
+    var fuerzaRef = mFuerzaComp ? 10 : (mFuerzaDaniels ? 5 : null);
+    // % estimado SOLO para la escala comparativa 0–10 (es su DEFINICIÓN, no una conversión de escala).
+    var fuerzaPctEstimado = (fuerzaEscala === 'comparativa_0_10' && fuerzaValor != null) ? Math.round(fuerzaValor * 10) : null;
+    var fuerzaEsNumerica = lleno(fuerzaRaw) && !!fuerzaEscala;
     var fuerzaTextoCualitativo = lleno(fuerzaRaw) && !fuerzaEsNumerica;
+    var fuerzaLado = ladoDe(fuerzaRaw);
+    // Grupo muscular nombrado junto a la fuerza (lista MSK frecuente); null si no se nombra.
+    var _gruposMusc = ['cuadriceps', 'isquiotibial', 'gluteo', 'gastrocnemio', 'soleo', 'tibial anterior', 'peroneo', 'aductor', 'abductor', 'psoas', 'iliopsoas', 'manguito rotador', 'supraespinoso', 'infraespinoso', 'deltoides', 'biceps', 'triceps', 'trapecio', 'dorsal ancho', 'pectoral', 'flexores', 'extensores', 'prension', 'grip', 'core', 'abdominal', 'paravertebral', 'erector'];
+    var fuerzaGrupo = null;
+    for (var _g = 0; _g < _gruposMusc.length; _g++) { if (norm(fuerzaRaw).indexOf(_gruposMusc[_g]) !== -1) { fuerzaGrupo = _gruposMusc[_g]; break; } }
+    // Referencia/contralateral: ¿se MENCIONA? ¿se AFIRMA SANA? Nunca se asume sano el contralateral.
+    var fuerzaRefMencionada = termState(fuerzaRaw, ['lado sano', 'contralateral', 'lado opuesto', 'lado contrario', 'comparado con', 'vs lado', 'referencia']).affirmed;
+    var fuerzaRefSanaConfirmada = termState(fuerzaRaw, ['lado sano 10', 'sano 10/10', 'lado sano', 'contralateral sano', 'contralateral normal', 'contralateral sin alteracion', 'opuesto normal', 'opuesto sano', 'referencia 10/10', 'referencia sana']).affirmed
+      && !termState(fuerzaRaw, ['contralateral tambien', 'ambos lados', 'bilateral', 'opuesto afectado', 'contralateral afectado', 'contralateral debil']).affirmed;
     // Datos insuficientes para afirmar seguridad: examen objetivo vacío Y sin cribado documentado,
     // o ≥2 campos clínicos núcleo por confirmar. Ausencia de dato ≠ ausencia de riesgo.
     var examenVacio = !lleno(romRaw) && !lleno(fuerzaRaw) && !lleno(pruebasTxt);
@@ -306,6 +355,9 @@
       restriccionDocumentada: restriccionDocumentada,
       romEsNumerico: romEsNumerico, romTextoCualitativo: romTextoCualitativo, romRaw: romRaw,
       fuerzaEsNumerica: fuerzaEsNumerica, fuerzaTextoCualitativo: fuerzaTextoCualitativo, fuerzaRaw: fuerzaRaw,
+      fuerzaEscala: fuerzaEscala, fuerzaValor: fuerzaValor, fuerzaRef: fuerzaRef, fuerzaPctEstimado: fuerzaPctEstimado,
+      fuerzaGrupo: fuerzaGrupo, fuerzaLado: fuerzaLado, fuerzaRefMencionada: fuerzaRefMencionada, fuerzaRefSanaConfirmada: fuerzaRefSanaConfirmada,
+      debilidadSinContextoNeuro: debilidadSinContextoNeuro,
       datosInsuficientes: datosInsuficientes,
       // evidencias (campo + fragmento literal) por hecho afirmado/negado
       evidencias: ev

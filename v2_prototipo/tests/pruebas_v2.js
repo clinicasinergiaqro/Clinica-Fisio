@@ -156,11 +156,13 @@ check('OBJ-02', 'deportivos con actividad real SÍ produce "retorno a <actividad
     return largo && largo.actividad.indexOf('correr 10k') !== -1;
   })());
 
-check('OBJ-03', 'V2.2: meta de dolor NO se asume (null + nota); línea base EVA numérica = medida',
+check('OBJ-03', 'V2.2.1: meta de dolor = PROPUESTA justificada y editable desde la EVA (no supuesto fijo ni dolor cero); línea base EVA numérica = medida',
   (function () {
     var c = GEN.generar({ patologia: 'Lumbalgia', orig: { padecimiento: 'dolor lumbar al estar sentado 2 horas desde hace 1 mes', zona: 'lumbar', eva: '8' } });
     var dolor = c.objetivos.filter(function (o) { return o.alteracion === 'dolor'; })[0];
-    return dolor && dolor.linea_base.tipo === 'medido' && dolor.linea_base.valor === 8 && dolor.meta_propuesta === null && !!dolor.meta_nota;
+    return dolor && dolor.fase === 'corto' && dolor.linea_base.tipo === 'medido' && dolor.linea_base.valor === 8
+      && dolor.meta_propuesta && dolor.meta_propuesta.tipo === 'propuesta_editable' && /\d\/10/.test(dolor.meta_propuesta.valor)
+      && !!dolor.justificacion_meta && !!dolor.meta_nota;
   })());
 
 check('OBJ-04', 'ROM no medido → línea base pendiente (no inventa valor) y meta null',
@@ -254,8 +256,54 @@ check('V22-ROM-NUM', 'ROM numérico ("90 grados") = medido; ROM texto ("limitado
 check('V22-ROM-OBJ', 'Objetivo de ROM con texto cualitativo NO se etiqueta "medido" ni se reporta en grados',
   (function () { var c = GEN.generar({ patologia: 'Hombro', orig: { padecimiento: 'dolor de hombro al elevar desde hace 1 mes', zona: 'hombro', rom: 'movilidad limitada', eva: '5' } }); var rom = c.objetivos.filter(function (o) { return o.indicador.indexOf('ROM') !== -1; })[0]; return rom && rom.linea_base.tipo === 'texto_cualitativo' && rom.linea_base.unidad === 'texto' && rom.meta_propuesta === null; })());
 
-check('V22-FUERZA-SUP', 'Objetivo de fuerza NO asume "≥90% simetría" ni "Daniels 5/5" (meta null + nota)',
-  (function () { var c = GEN.generar({ patologia: 'Rodilla', orig: { padecimiento: 'dolor de rodilla al correr desde hace 1 mes', zona: 'rodilla', fuerza: '4/5 cuádriceps', eva: '4' } }); var fz = c.objetivos.filter(function (o) { return /fuerza/.test(o.alteracion); })[0]; return fz && fz.meta_propuesta === null && !!fz.meta_nota && fz.linea_base.tipo === 'medido'; })());
+check('V22-FUERZA-SUP', 'Fuerza legada /5 (Daniels): NO se convierte a 0–10, meta null + nota de recaptura',
+  (function () { var c = GEN.generar({ patologia: 'Rodilla', orig: { padecimiento: 'dolor de rodilla al correr desde hace 1 mes', zona: 'rodilla', fuerza: '4/5 cuádriceps', eva: '4' } }); var fz = c.objetivos.filter(function (o) { return /fuerza/.test(o.alteracion); })[0]; return fz && fz.meta_propuesta === null && !!fz.meta_nota && fz.linea_base.tipo === 'medido' && fz.linea_base.escala === 'daniels_0_5' && fz.linea_base.valor === '4/5' && !/\/10/.test(JSON.stringify(fz.linea_base)); })());
+
+// --- Requisito Sinergia V2.2.1: FUERZA en escala 0–10 comparativa (sano=10; 6/10≈60%); NO Daniels/MRC ni conversión ---
+check('V221-FUERZA-010-REF', 'Fuerza 6/10 con lado sano CONFIRMADO 10/10 → meta de simetría PROPUESTA y JUSTIFICADA + grupo/lado/%',
+  (function () { var c = GEN.generar({ patologia: 'Lesion ligamentaria', orig: { padecimiento: 'inestabilidad de rodilla derecha tras lesión ligamentaria hace 1 mes', zona: 'rodilla', lado: 'derecho', fuerza: 'cuádriceps 6/10 lado derecho (lado sano 10/10)', eva: '4' } }); var fz = c.objetivos.filter(function (o) { return /fuerza/.test(o.alteracion); })[0]; return fz && fz.linea_base.escala === 'comparativa_0_10' && fz.linea_base.pct_estimado === 60 && fz.linea_base.grupo_muscular === 'cuadriceps' && fz.linea_base.referencia_confirmada_sana === true && fz.meta_propuesta && fz.meta_propuesta.tipo === 'propuesta_editable' && /simetr/i.test(fz.meta_propuesta.valor) && !!fz.justificacion_meta; })());
+
+check('V221-FUERZA-010-NOREF', 'Fuerza 6/10 SIN referencia sana confirmada → NO se propone simetría (no se asume contralateral sano)',
+  (function () { var c = GEN.generar({ patologia: 'Rodilla', orig: { padecimiento: 'debilidad de cuádriceps derecho tras dolor de rodilla hace 1 mes', zona: 'rodilla', lado: 'derecho', fuerza: 'cuádriceps 6/10', eva: '4' } }); var fz = c.objetivos.filter(function (o) { return /fuerza/.test(o.alteracion); })[0]; return fz && fz.linea_base.escala === 'comparativa_0_10' && fz.linea_base.referencia_confirmada_sana === false && fz.meta_propuesta === null && /referencia|lado sano|contralateral/i.test(fz.justificacion_meta || ''); })());
+
+check('V221-NEURO-NO-FUERZA', 'Disminución de fuerza por dolor (sin contexto neural) NO es déficit neurológico ni deriva',
+  (function () { var c = GEN.generar({ patologia: 'Rodilla', orig: { padecimiento: 'debilidad de cuádriceps por dolor de rodilla al subir escaleras hace 1 mes', zona: 'rodilla', eva: '5' } }); return c.hechos_clave.deficitNeuroObjetivo === false && c.hechos_clave.deficitNeuroDerivacion !== true && c.seguridad.bloquea_plan === false; })());
+
+check('V221-NEURO-SI', 'Déficit neurológico DURO (pie caído/arreflexia) sí es objetivado y deriva',
+  (function () { var c = GEN.generar({ patologia: 'Lumbalgia', orig: { padecimiento: 'lumbalgia con pie caído y arreflexia aquílea derecha desde hace 2 semanas', zona: 'lumbar', eva: '6' } }); return c.hechos_clave.deficitNeuroObjetivo === true; })());
+
+check('V221-REGION-PIE', '"giro con pie fijo" en el mecanismo NO crea falso conflicto de región (no bloquea el plan)',
+  (function () { var c = GEN.generar({ patologia: 'Lesion ligamentaria', orig: { padecimiento: 'dolor de rodilla derecha tras pivote hace 3 semanas', zona: 'rodilla', lado: 'derecho', mecanismo: 'giro con pie fijo (pivote)', dxMedico: 'Esguince LCA grado II', eva: '5' } }); return c.hechos_clave.regionConflicto === false && c.seguridad.estado !== 'bloqueo_por_dato_inconsistente'; })());
+
+check('V221-REGION-X2', 'Conflicto de región GENUINO (zona vs dx de otra región) SÍ bloquea (X2)',
+  (function () { var c = GEN.generar({ patologia: 'Rodilla', orig: { zona: 'rodilla', padecimiento: 'dolor referido hace 1 mes', dxMedico: 'tendinopatía del manguito rotador del hombro', eva: '5' } }); return c.hechos_clave.regionConflicto === true && c.seguridad.estado === 'bloqueo_por_dato_inconsistente' && c.seguridad.alertas.some(function (a) { return a.regla === 'X2'; }); })());
+
+check('V221-REGION-MULTI', 'Dx con varias regiones que INCLUYE la zona NO es conflicto (dx "cervical y lumbar" + zona lumbar)',
+  (function () { var c = GEN.generar({ patologia: 'Lumbalgia', orig: { zona: 'lumbar', padecimiento: 'dolor de espalda baja hace 1 mes', dxMedico: 'esguince cervical grado 2 y esguince lumbar grado 1', eva: '5' } }); return c.hechos_clave.regionConflicto === false; })());
+
+check('V221-NEURO-FACIAL', 'Parálisis facial antigua (otra cláusula, sin contexto neural de miembro) NO es déficit neuro objetivado',
+  (function () { var c = GEN.generar({ patologia: 'Cervicalgia', orig: { zona: 'cervical', padecimiento: 'tuvo una parálisis facial hace años, ya resuelta. Ahora acude por dolor de cuello al girar hace 2 semanas', eva: '5' } }); return c.hechos_clave.deficitNeuroObjetivo === false; })());
+
+// --- Requisito Sinergia V2.2.1: BIOMECÁNICA p.biomecanica[].medidas[] (actual/histórica/pendiente/eliminada) ---
+check('V221-BIO-SESIONES', 'Consume sesiones→medidas y clasifica actual/histórica/pendiente/eliminada; vinculadas excluye eliminadas',
+  (function () {
+    var c = GEN.generar({ orig: { padecimiento: 'control de ROM tras cirugía de rodilla izquierda, seguimiento', zona: 'rodilla', lado: 'izquierdo', eva: '2' }, biomecanica: [
+      { id: 's1', fecha: '2026-10-01', medidas: [{ id: 'm1', articulacion: 'rodilla', movimiento: 'flexion', lado: 'izquierdo', valor: 95 }, { id: 'm2', articulacion: 'rodilla', movimiento: 'extension', lado: 'izquierdo', valor: null }] },
+      { id: 's2', fecha: '2026-11-01', medidas: [{ id: 'm3', articulacion: 'rodilla', movimiento: 'flexion', lado: 'izquierdo', valor: 120 }] },
+      { id: 's0', fecha: '2026-09-01', eliminado: true, medidas: [{ id: 'mx', articulacion: 'rodilla', movimiento: 'flexion', lado: 'izquierdo', valor: 80 }] }
+    ] });
+    var b = c.mediciones_biomecanica;
+    return b.conteo.actuales === 1 && b.conteo.historicas === 1 && b.conteo.pendientes === 1 && b.conteo.eliminadas === 1 && b.actuales[0].valor === 120 && c.mediciones_vinculadas_n === 3;
+  })());
+
+check('V221-EPIS-NO-INICIA', 'Episodio: consume estructura real y la IA NO inicia un nuevo motivo (decide el fisioterapeuta)',
+  (function () {
+    var c = GEN.generar({ episodio: { numEpisodio: 2, motivoActualIndex: 1, numSesionEpisodioActual: 3, motivosAnteriores: [{}] }, patologia: 'Rodilla', orig: { zona: 'rodilla', padecimiento: 'gonalgia por sobreuso al correr hace meses' }, soap: [{ fecha: '2026-09-01', s: 'dolor de rodilla' }, { fecha: '2026-11-20', s: 'ahora acude por dolor de hombro derecho' }] }, { fecha_corte_default: '2026-11-26' });
+    var ea = c.episodio_analisis;
+    return ea.estructura.numEpisodio === 2 && ea.estructura.motivoActualIndex === 1 && ea.estructura.numSesionEpisodioActual === 3 && ea.estructura.motivosAnteriores_n === 1
+      && ea.inicia_automaticamente === false && ea.decide === 'fisioterapeuta' && ea.posible_nuevo_motivo === true
+      && c.valoracion_pendiente.some(function (p) { return /no lo inicia|lo decide el fisioterapeuta/i.test(p); });
+  })());
 
 // --- Punto 4: PLANES individualizados por patología (ya no idénticos) ---
 check('V22-PLAN-PAT', 'El plan referencia un protocolo de la biblioteca ESPECÍFICO por patología (Tendinopatía ≠ Lumbalgia)',
@@ -269,7 +317,7 @@ check('V22-PLAN-RESTR', 'El plan incorpora restricción real (metal → no térm
   (function () { var c = GEN.generar({ patologia: 'Fractura', orig: { padecimiento: 'dolor posterior a fractura de tibia con placa desde hace 2 meses', zona: 'tobillo_pie', eva: '5' }, seguridadClinica: { implantes: 'material de osteosíntesis, placa y tornillos en tibia' } }); return c.plan && c.plan.restricciones.some(function (r) { return /osteos[ií]ntesis|material/i.test(r); }); })());
 
 // --- Punto 5: SOAP / nuevo motivo ---
-check('V22-EPISODIO', 'Nuevo motivo: SOAP reciente de OTRA región → sospecha de episodio distinto (iniciar desde sesión 1)',
+check('V22-EPISODIO', 'Nuevo motivo: SOAP reciente de OTRA región → OBSERVACIÓN de posible episodio distinto (la IA no lo inicia)',
   (function () { var c = GEN.generar({ patologia: 'Rodilla', orig: { zona: 'rodilla', padecimiento: 'gonalgia por sobreuso al correr hace meses' }, soap: [{ fecha: '2026-09-01', s: 'dolor de rodilla' }, { fecha: '2026-11-20', s: 'ahora acude por dolor de hombro derecho tras cargar peso' }] }, { fecha_corte_default: '2026-11-26' }); return c.episodio_analisis.sospecha === true && c.episodio_analisis.region_valoracion.indexOf('rodilla') !== -1 && c.episodio_analisis.region_soap_reciente.indexOf('hombro') !== -1; })());
 
 check('V22-EPISODIO-NEG', 'Mismo motivo en evolución NO marca episodio nuevo',

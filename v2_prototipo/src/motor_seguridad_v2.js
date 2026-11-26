@@ -14,8 +14,8 @@
 (function (root) {
   'use strict';
 
-  var VERSION = '2.2.0-proto';
-  var CATALOGO_VERSION = '2026-11-26.b';
+  var VERSION = '2.2.1-proto';
+  var CATALOGO_VERSION = '2026-11-26.c';
 
   var norm = function (s) { return String(s == null ? '' : s).normalize('NFKD').replace(/[̀-ͯ]/g, '').toLowerCase(); };
   var any = function (txt, kws) { txt = norm(txt); return kws.some(function (k) { return txt.indexOf(norm(k)) !== -1; }); };

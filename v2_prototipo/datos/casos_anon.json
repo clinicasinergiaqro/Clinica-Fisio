@@ -1,116 +1,551 @@
 {
   "_meta": {
-    "descripcion": "Insumos clínicos ANONIMIZADOS y SINTÉTICOS (sin PHI) para regenerar el contrato V2.2 y comparar con V2.1. Cubren los casos de la auditoría (OCT-*) y un espectro de patologías. NO son pacientes reales: el repo es público. El set real de 85 se regenera con el mismo pipeline (v2_prototipo/tools/regenerar.js) apuntando al export anonimizado del backend (requiere el token CLAUDE que Carlos comparte; el scratchpad que lo guardaba se borró al reiniciar el worker).",
+    "descripcion": "Insumos clínicos ANONIMIZADOS y SINTÉTICOS (sin PHI) para regenerar el contrato V2.2 y comparar con V2.1. Cubren los casos de la auditoría (OCT-*) y un espectro de patologías. NO son pacientes reales: el repo es público.  Casos SINT-FZ10*/BIOSES/EPIS2 añadidos en V2.2.1 (fuerza 0–10 comparativa, biomecánica sesiones→medidas, estructura de episodio). El set real de 85 se regenera con el mismo pipeline sobre el export anonimizado del backend (fuera de git por PHI).",
     "fecha_corte_default": "2026-11-26",
-    "version_objetivo": "2.2.0-proto"
+    "version_objetivo": "2.2.1-proto"
   },
   "casos": [
     {
-      "codigo": "OCT-06", "patologia": "Radiculopatia", "edad": 48,
-      "orig": { "zona": "lumbar", "lado": "derecho", "padecimiento": "dolor lumbar irradiado a pierna derecha desde hace 4 meses, con pie caído", "mecanismo": "insidioso, sin trauma", "eva": "7", "dxMedico": "radiculopatía L5 derecha con denervación activa documentada por ENMG", "rom": "limitado por dolor", "fuerza": "4/5 dorsiflexores", "pruebas": "SLR positivo a 40°" },
-      "antecedentes": {}, "seguridadClinica": {}
+      "codigo": "OCT-06",
+      "patologia": "Radiculopatia",
+      "edad": 48,
+      "orig": {
+        "zona": "lumbar",
+        "lado": "derecho",
+        "padecimiento": "dolor lumbar irradiado a pierna derecha desde hace 4 meses, con pie caído",
+        "mecanismo": "insidioso, sin trauma",
+        "eva": "7",
+        "dxMedico": "radiculopatía L5 derecha con denervación activa documentada por ENMG",
+        "rom": "limitado por dolor",
+        "fuerza": "4/5 dorsiflexores",
+        "pruebas": "SLR positivo a 40°"
+      },
+      "antecedentes": {},
+      "seguridadClinica": {}
     },
     {
-      "codigo": "OCT-11", "patologia": "Cervicalgia", "edad": 52,
-      "orig": { "zona": "cervical", "padecimiento": "cervicalgia con hormigueo referido en mano derecha, sin pérdida de fuerza", "mecanismo": "postural", "eva": "5", "rom": "rotación limitada", "fuerza": "conservada", "pruebas": "Spurling dudoso" },
-      "antecedentes": {}, "seguridadClinica": {}
+      "codigo": "OCT-11",
+      "patologia": "Cervicalgia",
+      "edad": 52,
+      "orig": {
+        "zona": "cervical",
+        "padecimiento": "cervicalgia con hormigueo referido en mano derecha, sin pérdida de fuerza",
+        "mecanismo": "postural",
+        "eva": "5",
+        "rom": "rotación limitada",
+        "fuerza": "conservada",
+        "pruebas": "Spurling dudoso"
+      },
+      "antecedentes": {},
+      "seguridadClinica": {}
     },
     {
-      "codigo": "OCT-19", "patologia": "Cervicalgia", "edad": 60,
-      "orig": { "zona": "cervical", "padecimiento": "cervicobraquialgia con debilidad y atrofia progresiva de mano, marcha inestable; signo de Hoffmann positivo", "mecanismo": "insidioso", "eva": "6", "rom": "limitado", "fuerza": "3/5 intrínsecos de mano", "pruebas": "Hoffmann positivo bilateral" },
-      "antecedentes": {}, "seguridadClinica": {}
+      "codigo": "OCT-19",
+      "patologia": "Cervicalgia",
+      "edad": 60,
+      "orig": {
+        "zona": "cervical",
+        "padecimiento": "cervicobraquialgia con debilidad y atrofia progresiva de mano, marcha inestable; signo de Hoffmann positivo",
+        "mecanismo": "insidioso",
+        "eva": "6",
+        "rom": "limitado",
+        "fuerza": "3/5 intrínsecos de mano",
+        "pruebas": "Hoffmann positivo bilateral"
+      },
+      "antecedentes": {},
+      "seguridadClinica": {}
     },
     {
-      "codigo": "OCT-22", "patologia": "Post-quirurgico", "edad": 67,
-      "orig": { "zona": "rodilla", "lado": "derecho", "padecimiento": "posterior a artroplastia de rodilla derecha reciente, refiere hinchazón y dolor en la pantorrilla derecha", "inflamacion": "hinchazón y aumento de volumen en pantorrilla derecha", "mecanismo": "post-operatorio con inmovilización y reposo prolongado", "eva": "6" },
-      "antecedentes": {}, "seguridadClinica": { "implantes": "prótesis total de rodilla derecha" }
+      "codigo": "OCT-22",
+      "patologia": "Post-quirurgico",
+      "edad": 67,
+      "orig": {
+        "zona": "rodilla",
+        "lado": "derecho",
+        "padecimiento": "posterior a artroplastia de rodilla derecha reciente, refiere hinchazón y dolor en la pantorrilla derecha",
+        "inflamacion": "hinchazón y aumento de volumen en pantorrilla derecha",
+        "mecanismo": "post-operatorio con inmovilización y reposo prolongado",
+        "eva": "6"
+      },
+      "antecedentes": {},
+      "seguridadClinica": {
+        "implantes": "prótesis total de rodilla derecha"
+      }
     },
     {
-      "codigo": "OCT-72", "patologia": "Rodilla", "edad": 30,
-      "orig": { "zona": "rodilla", "lado": "izquierda", "padecimiento": "gonalgia anterior al correr y bajar escaleras desde hace 2 meses", "mecanismo": "sobreuso por aumento de volumen de carrera", "eva": "5", "dxMedico": "condromalacia rotuliana, operado por Dr. Martín Alfredo Romo García de Bustamante en 2024", "rom": "flexión 130°", "fuerza": "4/5 cuádriceps", "pruebas": "dolor femoropatelar a la compresión" },
-      "antecedentes": {}, "seguridadClinica": {}
+      "codigo": "OCT-72",
+      "patologia": "Rodilla",
+      "edad": 30,
+      "orig": {
+        "zona": "rodilla",
+        "lado": "izquierda",
+        "padecimiento": "gonalgia anterior al correr y bajar escaleras desde hace 2 meses",
+        "mecanismo": "sobreuso por aumento de volumen de carrera",
+        "eva": "5",
+        "dxMedico": "condromalacia rotuliana, operado por Dr. Martín Alfredo Romo García de Bustamante en 2024",
+        "rom": "flexión 130°",
+        "fuerza": "4/5 cuádriceps",
+        "pruebas": "dolor femoropatelar a la compresión"
+      },
+      "antecedentes": {},
+      "seguridadClinica": {}
     },
     {
-      "codigo": "OCT-84", "patologia": "Hombro", "edad": 58,
-      "orig": { "zona": "hombro derecho", "padecimiento": "dolor de hombro derecho al elevar el brazo desde hace 3 meses", "mecanismo": "sobreuso", "eva": "6", "dxMedico": "síndrome subacromial", "rom": "abducción activa 100°", "fuerza": "4/5 supraespinoso", "pruebas": "Jobe positivo; Hawkins positivo" },
-      "antecedentes": {}, "seguridadClinica": { "condiciones": "antecedente de cáncer de mama, en tratamiento activo y a la vez referido en remisión hace 6 años (dato contradictorio)" }
+      "codigo": "OCT-84",
+      "patologia": "Hombro",
+      "edad": 58,
+      "orig": {
+        "zona": "hombro derecho",
+        "padecimiento": "dolor de hombro derecho al elevar el brazo desde hace 3 meses",
+        "mecanismo": "sobreuso",
+        "eva": "6",
+        "dxMedico": "síndrome subacromial",
+        "rom": "abducción activa 100°",
+        "fuerza": "4/5 supraespinoso",
+        "pruebas": "Jobe positivo; Hawkins positivo"
+      },
+      "antecedentes": {},
+      "seguridadClinica": {
+        "condiciones": "antecedente de cáncer de mama, en tratamiento activo y a la vez referido en remisión hace 6 años (dato contradictorio)"
+      }
     },
     {
-      "codigo": "SINT-TEND", "patologia": "Tendinopatia", "edad": 35,
-      "orig": { "zona": "rodilla", "lado": "derecho", "padecimiento": "dolor en tendón rotuliano al saltar y aterrizar desde hace 3 meses, rigidez matutina", "mecanismo": "sobreuso deportivo (voleibol)", "eva": "4", "rom": "flexión 140°", "fuerza": "4/5 cuádriceps", "pruebas": "dolor a sentadilla unipodal; cribado de banderas rojas negativo", "deportivos": "voleibol recreativo", "limitaciones": "no puede saltar ni entrenar" },
-      "antecedentes": {}, "seguridadClinica": {}
+      "codigo": "SINT-TEND",
+      "patologia": "Tendinopatia",
+      "edad": 35,
+      "orig": {
+        "zona": "rodilla",
+        "lado": "derecho",
+        "padecimiento": "dolor en tendón rotuliano al saltar y aterrizar desde hace 3 meses, rigidez matutina",
+        "mecanismo": "sobreuso deportivo (voleibol)",
+        "eva": "4",
+        "rom": "flexión 140°",
+        "fuerza": "4/5 cuádriceps",
+        "pruebas": "dolor a sentadilla unipodal; cribado de banderas rojas negativo",
+        "deportivos": "voleibol recreativo",
+        "limitaciones": "no puede saltar ni entrenar"
+      },
+      "antecedentes": {},
+      "seguridadClinica": {}
     },
     {
-      "codigo": "SINT-LCA", "patologia": "Lesion ligamentaria", "edad": 24,
-      "orig": { "zona": "rodilla", "lado": "izquierda", "padecimiento": "inestabilidad de rodilla izquierda tras reconstrucción de LCA, en fase de fuerza", "mecanismo": "post-reconstrucción de LCA (injerto HTG)", "eva": "2", "rom": "extensión 0°, flexión 135°", "fuerza": "disminuida en cuádriceps", "pruebas": "Lachman firme; cribado de banderas rojas negativo", "deportivos": "fútbol", "limitaciones": "no puede correr ni pivotar" },
-      "antecedentes": { "cirugias": "reconstrucción de LCA rodilla izquierda hace 4 meses" }, "seguridadClinica": {}
+      "codigo": "SINT-LCA",
+      "patologia": "Lesion ligamentaria",
+      "edad": 24,
+      "orig": {
+        "zona": "rodilla",
+        "lado": "izquierda",
+        "padecimiento": "inestabilidad de rodilla izquierda tras reconstrucción de LCA, en fase de fuerza",
+        "mecanismo": "post-reconstrucción de LCA (injerto HTG)",
+        "eva": "2",
+        "rom": "extensión 0°, flexión 135°",
+        "fuerza": "disminuida en cuádriceps",
+        "pruebas": "Lachman firme; cribado de banderas rojas negativo",
+        "deportivos": "fútbol",
+        "limitaciones": "no puede correr ni pivotar"
+      },
+      "antecedentes": {
+        "cirugias": "reconstrucción de LCA rodilla izquierda hace 4 meses"
+      },
+      "seguridadClinica": {}
     },
     {
-      "codigo": "SINT-MEN", "patologia": "Lesion meniscal", "edad": 41,
-      "orig": { "zona": "rodilla", "lado": "derecho", "padecimiento": "dolor en interlínea medial tras reparación meniscal, respetando restricción de flexión", "mecanismo": "post-reparación meniscal", "eva": "3", "rom": "flexión limitada a 90° por indicación", "fuerza": "4/5", "pruebas": "McMurray no realizado por fase; cribado de banderas rojas negativo", "limitaciones": "no puede flexionar más de 90° ni cargar completo" },
-      "antecedentes": { "cirugias": "reparación meniscal rodilla derecha hace 5 semanas" }, "seguridadClinica": {}
+      "codigo": "SINT-MEN",
+      "patologia": "Lesion meniscal",
+      "edad": 41,
+      "orig": {
+        "zona": "rodilla",
+        "lado": "derecho",
+        "padecimiento": "dolor en interlínea medial tras reparación meniscal, respetando restricción de flexión",
+        "mecanismo": "post-reparación meniscal",
+        "eva": "3",
+        "rom": "flexión limitada a 90° por indicación",
+        "fuerza": "4/5",
+        "pruebas": "McMurray no realizado por fase; cribado de banderas rojas negativo",
+        "limitaciones": "no puede flexionar más de 90° ni cargar completo"
+      },
+      "antecedentes": {
+        "cirugias": "reparación meniscal rodilla derecha hace 5 semanas"
+      },
+      "seguridadClinica": {}
     },
     {
-      "codigo": "SINT-LUMB", "patologia": "Lumbalgia", "edad": 44,
-      "orig": { "zona": "lumbar", "padecimiento": "lumbalgia mecánica inespecífica sin irradiación desde hace 3 semanas, mejora con movimiento", "mecanismo": "esfuerzo al levantar carga", "eva": "4", "rom": "flexión lumbar moderadamente limitada", "fuerza": "conservada", "pruebas": "SLR negativo; cribado de banderas rojas negativo", "limitaciones": "molestia al estar sentado mucho tiempo" },
-      "antecedentes": {}, "seguridadClinica": {}
+      "codigo": "SINT-LUMB",
+      "patologia": "Lumbalgia",
+      "edad": 44,
+      "orig": {
+        "zona": "lumbar",
+        "padecimiento": "lumbalgia mecánica inespecífica sin irradiación desde hace 3 semanas, mejora con movimiento",
+        "mecanismo": "esfuerzo al levantar carga",
+        "eva": "4",
+        "rom": "flexión lumbar moderadamente limitada",
+        "fuerza": "conservada",
+        "pruebas": "SLR negativo; cribado de banderas rojas negativo",
+        "limitaciones": "molestia al estar sentado mucho tiempo"
+      },
+      "antecedentes": {},
+      "seguridadClinica": {}
     },
     {
-      "codigo": "SINT-CERV", "patologia": "Cervicalgia", "edad": 38,
-      "orig": { "zona": "cervical", "padecimiento": "cervicalgia mecánica por postura de trabajo, gradual", "mecanismo": "postural, trabajo de oficina", "eva": "3", "rom": "rotación cervical 60° bilateral", "fuerza": "conservada", "pruebas": "cribado de banderas rojas negativo; sin signos de mielopatía" },
-      "antecedentes": {}, "seguridadClinica": {}
+      "codigo": "SINT-CERV",
+      "patologia": "Cervicalgia",
+      "edad": 38,
+      "orig": {
+        "zona": "cervical",
+        "padecimiento": "cervicalgia mecánica por postura de trabajo, gradual",
+        "mecanismo": "postural, trabajo de oficina",
+        "eva": "3",
+        "rom": "rotación cervical 60° bilateral",
+        "fuerza": "conservada",
+        "pruebas": "cribado de banderas rojas negativo; sin signos de mielopatía"
+      },
+      "antecedentes": {},
+      "seguridadClinica": {}
     },
     {
-      "codigo": "SINT-HOMB", "patologia": "Hombro", "edad": 50,
-      "orig": { "zona": "hombro", "lado": "izquierdo", "padecimiento": "dolor de hombro izquierdo al peinarse y alcanzar objetos altos desde hace 6 semanas", "mecanismo": "insidioso", "eva": "5", "rom": "abducción activa 110°", "fuerza": "4/5 manguito", "pruebas": "Neer positivo; cribado de banderas rojas negativo", "limitaciones": "no puede levantar el brazo por encima del hombro" },
-      "antecedentes": {}, "seguridadClinica": {}
+      "codigo": "SINT-HOMB",
+      "patologia": "Hombro",
+      "edad": 50,
+      "orig": {
+        "zona": "hombro",
+        "lado": "izquierdo",
+        "padecimiento": "dolor de hombro izquierdo al peinarse y alcanzar objetos altos desde hace 6 semanas",
+        "mecanismo": "insidioso",
+        "eva": "5",
+        "rom": "abducción activa 110°",
+        "fuerza": "4/5 manguito",
+        "pruebas": "Neer positivo; cribado de banderas rojas negativo",
+        "limitaciones": "no puede levantar el brazo por encima del hombro"
+      },
+      "antecedentes": {},
+      "seguridadClinica": {}
     },
     {
-      "codigo": "SINT-TOB", "patologia": "Tobillo/pie", "edad": 29,
-      "orig": { "zona": "tobillo_pie", "lado": "derecho", "padecimiento": "esguince lateral de tobillo derecho grado II hace 2 semanas, en fase de carga progresiva", "mecanismo": "inversión jugando básquetbol", "eva": "3", "rom": "dorsiflexión limitada (WBLT reducido)", "fuerza": "4/5 peroneos", "pruebas": "cajón anterior leve; cribado de banderas rojas negativo", "deportivos": "básquetbol", "limitaciones": "no puede correr ni saltar" },
-      "antecedentes": {}, "seguridadClinica": {}
+      "codigo": "SINT-TOB",
+      "patologia": "Tobillo/pie",
+      "edad": 29,
+      "orig": {
+        "zona": "tobillo_pie",
+        "lado": "derecho",
+        "padecimiento": "esguince lateral de tobillo derecho grado II hace 2 semanas, en fase de carga progresiva",
+        "mecanismo": "inversión jugando básquetbol",
+        "eva": "3",
+        "rom": "dorsiflexión limitada (WBLT reducido)",
+        "fuerza": "4/5 peroneos",
+        "pruebas": "cajón anterior leve; cribado de banderas rojas negativo",
+        "deportivos": "básquetbol",
+        "limitaciones": "no puede correr ni saltar"
+      },
+      "antecedentes": {},
+      "seguridadClinica": {}
     },
     {
-      "codigo": "SINT-CAD", "patologia": "Cadera", "edad": 33,
-      "orig": { "zona": "cadera", "lado": "derecho", "padecimiento": "dolor inguinal derecho al flexionar la cadera y sentadilla profunda desde hace 4 meses", "mecanismo": "pinzamiento femoroacetabular", "eva": "5", "rom": "rotación interna de cadera limitada", "fuerza": "4/5 glúteo medio", "pruebas": "FADIR positivo; cribado de banderas rojas negativo", "limitaciones": "no puede hacer sentadilla profunda" },
-      "antecedentes": {}, "seguridadClinica": {}
+      "codigo": "SINT-CAD",
+      "patologia": "Cadera",
+      "edad": 33,
+      "orig": {
+        "zona": "cadera",
+        "lado": "derecho",
+        "padecimiento": "dolor inguinal derecho al flexionar la cadera y sentadilla profunda desde hace 4 meses",
+        "mecanismo": "pinzamiento femoroacetabular",
+        "eva": "5",
+        "rom": "rotación interna de cadera limitada",
+        "fuerza": "4/5 glúteo medio",
+        "pruebas": "FADIR positivo; cribado de banderas rojas negativo",
+        "limitaciones": "no puede hacer sentadilla profunda"
+      },
+      "antecedentes": {},
+      "seguridadClinica": {}
     },
     {
-      "codigo": "SINT-FRAC", "patologia": "Fractura", "edad": 55,
-      "orig": { "zona": "tobillo_pie", "lado": "izquierdo", "padecimiento": "dolor y rigidez tras fractura de tobillo izquierdo osteosintetizada, con carga autorizada", "mecanismo": "caída, fractura bimaleolar con placa y tornillos", "eva": "5", "rom": "dorsiflexión muy limitada", "fuerza": "disminuida", "pruebas": "cribado de banderas rojas negativo", "limitaciones": "cojea, no puede caminar distancias largas" },
-      "antecedentes": { "cirugias": "osteosíntesis de tobillo izquierdo con placa y tornillos hace 10 semanas" }, "seguridadClinica": { "implantes": "material de osteosíntesis: placa y tornillos en tobillo izquierdo" }
+      "codigo": "SINT-FRAC",
+      "patologia": "Fractura",
+      "edad": 55,
+      "orig": {
+        "zona": "tobillo_pie",
+        "lado": "izquierdo",
+        "padecimiento": "dolor y rigidez tras fractura de tobillo izquierdo osteosintetizada, con carga autorizada",
+        "mecanismo": "caída, fractura bimaleolar con placa y tornillos",
+        "eva": "5",
+        "rom": "dorsiflexión muy limitada",
+        "fuerza": "disminuida",
+        "pruebas": "cribado de banderas rojas negativo",
+        "limitaciones": "cojea, no puede caminar distancias largas"
+      },
+      "antecedentes": {
+        "cirugias": "osteosíntesis de tobillo izquierdo con placa y tornillos hace 10 semanas"
+      },
+      "seguridadClinica": {
+        "implantes": "material de osteosíntesis: placa y tornillos en tobillo izquierdo"
+      }
     },
     {
-      "codigo": "SINT-MARCA", "patologia": "Hombro", "edad": 72,
-      "orig": { "zona": "hombro", "lado": "derecho", "padecimiento": "dolor de hombro derecho al elevar desde hace 2 meses", "mecanismo": "insidioso", "eva": "4", "rom": "abducción 120°", "fuerza": "4/5", "pruebas": "Hawkins positivo; cribado de banderas rojas negativo" },
-      "antecedentes": {}, "seguridadClinica": { "implantes": "marcapaso definitivo" }
+      "codigo": "SINT-MARCA",
+      "patologia": "Hombro",
+      "edad": 72,
+      "orig": {
+        "zona": "hombro",
+        "lado": "derecho",
+        "padecimiento": "dolor de hombro derecho al elevar desde hace 2 meses",
+        "mecanismo": "insidioso",
+        "eva": "4",
+        "rom": "abducción 120°",
+        "fuerza": "4/5",
+        "pruebas": "Hawkins positivo; cribado de banderas rojas negativo"
+      },
+      "antecedentes": {},
+      "seguridadClinica": {
+        "implantes": "marcapaso definitivo"
+      }
     },
     {
-      "codigo": "SINT-EPIS", "patologia": "Rodilla", "edad": 40,
-      "orig": { "zona": "rodilla", "lado": "derecho", "padecimiento": "gonalgia derecha por sobreuso al correr, en seguimiento", "mecanismo": "sobreuso", "eva": "3", "rom": "flexión 140°", "fuerza": "4/5", "pruebas": "cribado de banderas rojas negativo", "deportivos": "correr" },
-      "antecedentes": {}, "seguridadClinica": {},
+      "codigo": "SINT-EPIS",
+      "patologia": "Rodilla",
+      "edad": 40,
+      "orig": {
+        "zona": "rodilla",
+        "lado": "derecho",
+        "padecimiento": "gonalgia derecha por sobreuso al correr, en seguimiento",
+        "mecanismo": "sobreuso",
+        "eva": "3",
+        "rom": "flexión 140°",
+        "fuerza": "4/5",
+        "pruebas": "cribado de banderas rojas negativo",
+        "deportivos": "correr"
+      },
+      "antecedentes": {},
+      "seguridadClinica": {},
       "soap": [
-        { "fecha": "2026-09-10", "s": "dolor de rodilla al correr", "o": "flexión completa", "a": "tendinopatía rotuliana en mejoría", "p": "continuar carga" },
-        { "fecha": "2026-11-18", "s": "ahora acude por dolor de hombro derecho tras cargar una caja pesada", "o": "dolor a la abducción de hombro derecho", "a": "posible lesión de manguito, hombro derecho", "p": "valorar hombro" }
+        {
+          "fecha": "2026-09-10",
+          "s": "dolor de rodilla al correr",
+          "o": "flexión completa",
+          "a": "tendinopatía rotuliana en mejoría",
+          "p": "continuar carga"
+        },
+        {
+          "fecha": "2026-11-18",
+          "s": "ahora acude por dolor de hombro derecho tras cargar una caja pesada",
+          "o": "dolor a la abducción de hombro derecho",
+          "a": "posible lesión de manguito, hombro derecho",
+          "p": "valorar hombro"
+        }
       ]
     },
     {
-      "codigo": "SINT-LADO", "patologia": "Rodilla", "edad": 46,
-      "orig": { "zona": "rodilla", "lado": "derecho", "dxMedico": "gonartrosis de rodilla izquierda", "padecimiento": "dolor de rodilla al subir escaleras desde hace 3 meses", "mecanismo": "degenerativo", "eva": "5", "rom": "flexión 120°", "fuerza": "4/5", "pruebas": "cribado de banderas rojas negativo" },
-      "antecedentes": {}, "seguridadClinica": {}
+      "codigo": "SINT-LADO",
+      "patologia": "Rodilla",
+      "edad": 46,
+      "orig": {
+        "zona": "rodilla",
+        "lado": "derecho",
+        "dxMedico": "gonartrosis de rodilla izquierda",
+        "padecimiento": "dolor de rodilla al subir escaleras desde hace 3 meses",
+        "mecanismo": "degenerativo",
+        "eva": "5",
+        "rom": "flexión 120°",
+        "fuerza": "4/5",
+        "pruebas": "cribado de banderas rojas negativo"
+      },
+      "antecedentes": {},
+      "seguridadClinica": {}
     },
     {
-      "codigo": "SINT-MIN", "patologia": "Tendinopatia", "edad": 39,
-      "orig": { "zona": "codo", "lado": "derecho", "padecimiento": "dolor en epicóndilo lateral al cargar peso desde hace 6 semanas", "eva": "4" },
-      "antecedentes": {}, "seguridadClinica": {}
+      "codigo": "SINT-MIN",
+      "patologia": "Tendinopatia",
+      "edad": 39,
+      "orig": {
+        "zona": "codo",
+        "lado": "derecho",
+        "padecimiento": "dolor en epicóndilo lateral al cargar peso desde hace 6 semanas",
+        "eva": "4"
+      },
+      "antecedentes": {},
+      "seguridadClinica": {}
     },
     {
-      "codigo": "SINT-BIO", "patologia": "Rodilla", "edad": 27,
-      "orig": { "zona": "rodilla", "lado": "derecho", "padecimiento": "limitación de flexión de rodilla derecha tras inmovilización, en recuperación de ROM", "mecanismo": "post-inmovilización por esguince", "eva": "2", "fuerza": "4/5 cuádriceps", "pruebas": "cribado de banderas rojas negativo", "limitaciones": "no logra flexión completa para subir escaleras" },
-      "antecedentes": {}, "seguridadClinica": {},
+      "codigo": "SINT-BIO",
+      "patologia": "Rodilla",
+      "edad": 27,
+      "orig": {
+        "zona": "rodilla",
+        "lado": "derecho",
+        "padecimiento": "limitación de flexión de rodilla derecha tras inmovilización, en recuperación de ROM",
+        "mecanismo": "post-inmovilización por esguince",
+        "eva": "2",
+        "fuerza": "4/5 cuádriceps",
+        "pruebas": "cribado de banderas rojas negativo",
+        "limitaciones": "no logra flexión completa para subir escaleras"
+      },
+      "antecedentes": {},
+      "seguridadClinica": {},
       "biomecanica": [
-        { "id": "bio_sint_001", "fecha": "2026-11-20", "articulacion": "rodilla", "movimiento": "flexion", "lado": "derecho", "tipo": "activa", "posicion": "sedente", "metodo": "goniometro_camara", "unidad": "grados", "valor": 105, "calidad": "buena", "autor": "fisio" },
-        { "id": "bio_sint_002", "fecha": "2026-11-20", "articulacion": "rodilla", "movimiento": "extension", "lado": "derecho", "tipo": "activa", "posicion": "sedente", "metodo": "goniometro_camara", "unidad": "grados", "valor": 0, "calidad": "buena", "autor": "fisio" }
+        {
+          "id": "bio_sint_001",
+          "fecha": "2026-11-20",
+          "articulacion": "rodilla",
+          "movimiento": "flexion",
+          "lado": "derecho",
+          "tipo": "activa",
+          "posicion": "sedente",
+          "metodo": "goniometro_camara",
+          "unidad": "grados",
+          "valor": 105,
+          "calidad": "buena",
+          "autor": "fisio"
+        },
+        {
+          "id": "bio_sint_002",
+          "fecha": "2026-11-20",
+          "articulacion": "rodilla",
+          "movimiento": "extension",
+          "lado": "derecho",
+          "tipo": "activa",
+          "posicion": "sedente",
+          "metodo": "goniometro_camara",
+          "unidad": "grados",
+          "valor": 0,
+          "calidad": "buena",
+          "autor": "fisio"
+        }
+      ]
+    },
+    {
+      "codigo": "SINT-FZ10",
+      "patologia": "Lesion ligamentaria",
+      "edad": 26,
+      "orig": {
+        "zona": "rodilla",
+        "lado": "derecho",
+        "padecimiento": "Inestabilidad y debilidad de rodilla derecha tras lesion de ligamento hace 5 semanas, le cuesta subir escaleras",
+        "mecanismo": "giro con pie fijo en la cancha",
+        "eva": "4",
+        "dxMedico": "Insuficiencia de LCA",
+        "rom": "flexion 0-120 grados",
+        "fuerza": "Fuerza de cuadriceps 6/10 del lado derecho (lado sano 10/10)",
+        "pruebas": "Lachman positivo",
+        "limitaciones": "no puede correr"
+      },
+      "antecedentes": {
+        "deportivos": "correr"
+      },
+      "seguridadClinica": {}
+    },
+    {
+      "codigo": "SINT-FZ10NR",
+      "patologia": "Rodilla",
+      "edad": 40,
+      "orig": {
+        "zona": "rodilla",
+        "lado": "izquierdo",
+        "padecimiento": "Dolor y debilidad de rodilla izquierda al ponerse de pie, desde hace 1 mes",
+        "eva": "5",
+        "fuerza": "Fuerza de cuadriceps 6/10",
+        "rom": "flexion 0-110 grados"
+      },
+      "antecedentes": {},
+      "seguridadClinica": {}
+    },
+    {
+      "codigo": "SINT-BIOSES",
+      "patologia": "Rodilla",
+      "edad": 33,
+      "orig": {
+        "zona": "rodilla",
+        "lado": "izquierdo",
+        "padecimiento": "Seguimiento de ROM tras cirugia de rodilla izquierda, mejorando, con goniometria de camara",
+        "eva": "2"
+      },
+      "antecedentes": {
+        "cirugias": "artroscopia de rodilla izquierda"
+      },
+      "seguridadClinica": {},
+      "biomecanica": [
+        {
+          "id": "ses-a",
+          "fecha": "2026-10-01",
+          "medidas": [
+            {
+              "id": "ma1",
+              "articulacion": "rodilla",
+              "movimiento": "flexion",
+              "lado": "izquierdo",
+              "valor": 95,
+              "metodo": "goniometro de camara",
+              "autor": "fisio"
+            },
+            {
+              "id": "ma2",
+              "articulacion": "rodilla",
+              "movimiento": "extension",
+              "lado": "izquierdo",
+              "valor": null
+            }
+          ]
+        },
+        {
+          "id": "ses-b",
+          "fecha": "2026-11-01",
+          "medidas": [
+            {
+              "id": "mb1",
+              "articulacion": "rodilla",
+              "movimiento": "flexion",
+              "lado": "izquierdo",
+              "valor": 120,
+              "metodo": "goniometro de camara"
+            }
+          ]
+        },
+        {
+          "id": "ses-x",
+          "fecha": "2026-09-01",
+          "eliminado": true,
+          "medidas": [
+            {
+              "id": "mx1",
+              "articulacion": "rodilla",
+              "movimiento": "flexion",
+              "lado": "izquierdo",
+              "valor": 80
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "codigo": "SINT-EPIS2",
+      "patologia": "Hombro",
+      "edad": 52,
+      "episodio": {
+        "numEpisodio": 2,
+        "motivoActualIndex": 1,
+        "motivoIndex": 1,
+        "numSesionEpisodioActual": 3,
+        "motivosAnteriores": [
+          {
+            "dx": "lumbalgia"
+          }
+        ]
+      },
+      "orig": {
+        "zona": "hombro",
+        "lado": "derecho",
+        "padecimiento": "Dolor de hombro derecho al elevar el brazo desde hace 3 semanas; el paciente ya habia venido antes por lumbalgia",
+        "eva": "6",
+        "rom": "abduccion 0-90 grados",
+        "fuerza": "Fuerza de abductores 7/10 lado derecho (lado sano 10/10)"
+      },
+      "antecedentes": {},
+      "seguridadClinica": {},
+      "soap": [
+        {
+          "fecha": "2026-11-10",
+          "s": "dolor de hombro al peinarse",
+          "o": "abduccion dolorosa",
+          "a": "probable tendinopatia de manguito",
+          "p": "ejercicio escapular"
+        }
       ]
     }
   ]
