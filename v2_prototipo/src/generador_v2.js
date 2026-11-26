@@ -62,18 +62,19 @@
     if (!relatoCorto) return { texto: 'Anamnesis insuficiente para un diagnóstico funcional. Primera acción: RECAPTURAR la historia (zona, lado, EVA, mecanismo y limitación funcional).', estado: 'provisional', evidencias: [] };
     var reg = lleno(o.zona) ? String(o.zona).replace('_', '/') : 'región por precisar';
     var lado = (h.lado) ? (' ' + h.lado) : '';
-    var contexto = (lleno(o.dxMedico) && norm(o.dxMedico).indexOf('no cuenta') === -1) ? ('dx médico referido: ' + o.dxMedico)
-      : (lleno(o.dxMedicoMotivo) ? ('dx referido: ' + o.dxMedicoMotivo) : 'sin diagnóstico médico referido');
+    var conDx = (lleno(o.dxMedico) && norm(o.dxMedico).indexOf('no cuenta') === -1) ? ('dx médico referido: ' + o.dxMedico)
+      : (lleno(o.dxMedicoMotivo) ? ('dx referido: ' + o.dxMedicoMotivo) : null);
+    var contexto = conDx ? ('en contexto de ' + conDx) : 'sin diagnóstico médico referido';
     var sintomas = [], evid = [];
     if (lleno(o.eva)) { sintomas.push('EVA ' + o.eva + (/^\d+$/.test(String(o.eva).trim()) ? '/10' : '')); evid.push({ campo: 'valoracion.eva', fragmento: String(o.eva) }); }
     if (h.inflamacionPresente) { sintomas.push('inflamación referida'); if (h.evidencias.inflamacion) evid.push(h.evidencias.inflamacion); }
     if (h.dolorNocturno) { sintomas.push('dolor nocturno/en reposo'); if (h.evidencias.dolor_nocturno) evid.push(h.evidencias.dolor_nocturno); }
     if (h.deficitNeuro) { sintomas.push('síntomas neurales referidos'); if (h.evidencias.deficit_neuro) evid.push(h.evidencias.deficit_neuro); }
-    var crono = lleno(o.desdeCuando) ? (' Evolución: ' + o.desdeCuando + '.') : '';
+    var crono = (lleno(o.desdeCuando) && /[a-z0-9]/i.test(String(o.desdeCuando))) ? (' Evolución: ' + String(o.desdeCuando).trim() + '.') : '';
     var faltan = [];
     ['rom', 'fuerza', 'pruebas'].forEach(function (k) { if (!lleno(o[k])) faltan.push(k === 'rom' ? 'ROM' : (k === 'fuerza' ? 'fuerza' : 'pruebas especiales')); });
     var pend = faltan.length ? (' Exploración objetiva pendiente (' + faltan.join(', ') + '): diagnóstico PROVISIONAL.') : '';
-    var txt = 'Disfunción de ' + reg + lado + ' en contexto de ' + contexto +
+    var txt = 'Disfunción de ' + reg + lado + ' ' + contexto +
       (sintomas.length ? ', caracterizada por ' + sintomas.join(', ') : ', con síntomas por precisar') + '.' + crono + pend;
     return { texto: txt, estado: 'provisional', evidencias: evid };
   }
