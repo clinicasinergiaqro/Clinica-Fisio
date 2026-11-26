@@ -1,7 +1,7 @@
-/* SINERGIA · Pruebas EJECUTABLES V2.1 (unitarias + integración) · Node, sin dependencias.
+/* SINERGIA · Pruebas EJECUTABLES V2.2 (unitarias + integración) · Node, sin dependencias.
  * Correr:  node v2_prototipo/tests/pruebas_v2.js
- * Reproduce CADA error señalado por la auditoría y verifica su corrección. Exit code 1 si falla alguna.
- * Cada caso declara: id, lo que reproduce (bug de auditoría), y el aserto. Datos SINTÉTICOS (sin PHI).
+ * Reproduce CADA error señalado por la auditoría (V2.1) y por la 2ª revisión (V2.2) y verifica su
+ * corrección. Exit code 1 si falla alguna. Datos SINTÉTICOS (sin PHI).
  */
 'use strict';
 var EX = require('../src/extractor_v2.js');
@@ -156,31 +156,32 @@ check('OBJ-02', 'deportivos con actividad real SÍ produce "retorno a <actividad
     return largo && largo.actividad.indexOf('correr 10k') !== -1;
   })());
 
-check('OBJ-03', 'meta_propuesta de dolor es PROPUESTA editable (no dato medido) y línea base es medida',
+check('OBJ-03', 'V2.2: meta de dolor NO se asume (null + nota); línea base EVA numérica = medida',
   (function () {
     var c = GEN.generar({ patologia: 'Lumbalgia', orig: { padecimiento: 'dolor lumbar al estar sentado 2 horas desde hace 1 mes', zona: 'lumbar', eva: '8' } });
     var dolor = c.objetivos.filter(function (o) { return o.alteracion === 'dolor'; })[0];
-    return dolor && dolor.linea_base.tipo === 'medido' && dolor.linea_base.valor === 8 && dolor.meta_propuesta.tipo === 'propuesta_editable';
+    return dolor && dolor.linea_base.tipo === 'medido' && dolor.linea_base.valor === 8 && dolor.meta_propuesta === null && !!dolor.meta_nota;
   })());
 
-check('OBJ-04', 'ROM no medido → línea base pendiente (no inventa valor)',
+check('OBJ-04', 'ROM no medido → línea base pendiente (no inventa valor) y meta null',
   (function () {
     var c = GEN.generar({ patologia: 'Rodilla', orig: { padecimiento: 'dolor de rodilla al subir escaleras desde hace 1 mes', zona: 'rodilla', eva: '4' } });
     var rom = c.objetivos.filter(function (o) { return o.indicador.indexOf('ROM') !== -1; })[0];
-    return rom && rom.linea_base.tipo === 'pendiente' && rom.linea_base.valor === null;
+    return rom && rom.linea_base.tipo === 'pendiente' && rom.linea_base.valor === null && rom.meta_propuesta === null;
   })());
 
-// ---------- MEDICIONES: id no nulo ----------
-check('MED-01', 'Medición estructurada conserva su id real',
+// ---------- MEDICIONES: vinculadas (id real) vs texto (no cuentan) ----------
+check('MED-01', 'Medición estructurada conserva su id real y cuenta como vinculada',
   (function () {
     var c = GEN.generar({ orig: { padecimiento: 'dolor de rodilla al flexionar desde hace 2 meses', zona: 'rodilla' }, biomecanica: [{ id: 'bio_123', fecha: '2026-11-01', articulacion: 'rodilla', movimiento: 'flexion', lado: 'derecho', tipo: 'activa', valor: 110, unidad: 'grados', autor: 'fisio' }] });
-    return c.mediciones[0] && c.mediciones[0].id === 'bio_123' && c.mediciones[0].articulacion === 'rodilla';
+    return c.mediciones[0] && c.mediciones[0].id === 'bio_123' && c.mediciones[0].articulacion === 'rodilla' && c.mediciones_vinculadas_n === 1;
   })());
 
-check('MED-02', 'ROM solo en texto → id sentinel "sin_id_estructurado" (NO null) + tarea',
+check('MED-02', 'V2.2: ROM solo en texto NO cuenta como medición vinculada (va a mediciones_sin_vincular)',
   (function () {
     var c = GEN.generar({ orig: { padecimiento: 'dolor de hombro al abducir desde hace 1 mes', zona: 'hombro', rom: 'abducción 90° limitada' } });
-    return c.mediciones[0] && c.mediciones[0].id === 'sin_id_estructurado' && !!c.mediciones[0].tarea;
+    return c.mediciones.length === 0 && c.mediciones_vinculadas_n === 0
+      && c.mediciones_sin_vincular.some(function (m) { return m.origen === 'valoracion.rom' && !!m.tarea; });
   })());
 
 // ---------- PLAN BLOQUEADO CUANDO HAY ALERTA ----------
@@ -202,19 +203,98 @@ check('PHI-02', 'scrubPHI respeta texto clínico sin nombres',
   GEN._scrubPHI('dolor lumbar que no cede, EVA 7') === 'dolor lumbar que no cede, EVA 7');
 
 // ---------- INTEGRACIÓN: caso limpio no debe disparar nada ----------
-check('INT-01', 'Caso simple sin banderas → sin_alerta_detectada + plan editable',
+check('INT-01', 'Caso COMPLETO sin banderas (con exploración + cribado) → sin_alerta_detectada + plan editable',
   (function () {
-    var c = GEN.generar({ patologia: 'Tendinopatia', orig: { padecimiento: 'dolor en codo al cargar peso, gradual, desde hace 6 semanas, mejora con reposo', zona: 'codo', lado: 'derecho', eva: '4' } });
+    var c = GEN.generar({ patologia: 'Tendinopatia', orig: { padecimiento: 'dolor en codo al cargar peso, gradual, desde hace 6 semanas, mejora con reposo', zona: 'codo', lado: 'derecho', eva: '4', mecanismo: 'sobreuso por trabajo manual repetitivo', rom: 'extensión de codo 0°, flexión 140°', fuerza: '4/5 extensores de muñeca', pruebas: 'Cozen positivo; cribado de banderas rojas negativo' } });
     return c.seguridad.estado === 'sin_alerta_detectada_con_datos_disponibles' && c.plan && c.plan.estado === 'propuesta_editable';
   })());
 
+check('INT-02', 'Caso MÍNIMO sin exploración → V2.2 surge "datos insuficientes" (NO "sin alerta")',
+  (function () {
+    var c = GEN.generar({ patologia: 'Tendinopatia', orig: { padecimiento: 'dolor en codo al cargar peso desde hace 6 semanas', zona: 'codo', lado: 'derecho', eva: '4' } });
+    return c.seguridad.estado === 'precaucion_especifica' && c.seguridad.alertas.some(function (a) { return a.regla === 'V2'; }) && !c.seguridad.bloquea_plan;
+  })());
+
+// ========================================================================
+// ============  V2.2 · 2ª revisión independiente (ChatGPT)  ==============
+// ========================================================================
+
+// --- Punto 1: SEGURIDAD ---
+check('V22-TVP-CONS', 'OCT-22: TVP por CONSTELACIÓN (hinchazón pierna + factor de riesgo, sin la palabra "trombosis") → D3 y BLOQUEA',
+  (function () { var s = evalS({ orig: { inflamacion: 'hinchazón de pantorrilla derecha', padecimiento: 'posterior a cirugía de rodilla reciente con inmovilización y reposo prolongado' } }); return tieneRegla(s, 'D3') && s.bloquea_plan && s.estado === 'derivacion_prioritaria'; })());
+
+check('V22-TVP-AGENTE', 'TVP sospecha: evaluarAgente sobre el miembro = contraindicado (D3)',
+  (function () { var h = facts({ orig: { inflamacion: 'hinchazón de pierna izquierda', padecimiento: 'reposo prolongado por yeso' } }); var r = MS.evaluarAgente(h, 'ultrasonido', 'pierna'); return r.estado === 'contraindicado' && r.reglas.indexOf('D3') !== -1; })());
+
+check('V22-NEU-OBJ', 'OCT-06: denervación activa por ENMG = déficit OBJETIVADO → D2 deriva',
+  (function () { var r = { orig: { dxMedico: 'radiculopatía L5 derecha con denervación activa documentada por ENMG' } }; var f = facts(r); var s = evalS(r); return f.deficitNeuroObjetivo && s.estado === 'derivacion_prioritaria' && tieneRegla(s, 'D2'); })());
+
+check('V22-NEU-REF', 'Solo hormigueo (síntoma REFERIDO) sin déficit objetivo NO deriva (precaución)',
+  (function () { var f = facts({ orig: { padecimiento: 'refiere hormigueo ocasional en la mano, sin pérdida de fuerza' } }); return f.sintomaNeuroReferido && !f.deficitNeuroObjetivo && !f.deficitNeuroDerivacion; })());
+
+check('V22-NEU-PROG', 'Síntoma referido PROGRESIVO sí deriva (D2)',
+  (function () { var r = { orig: { zona: 'cervical', padecimiento: 'hormigueo en brazo que empeora y avanza cada vez más' } }; return facts(r).deficitNeuroDerivacion && tieneRegla(evalS(r), 'D2'); })());
+
+check('V22-ONCO-DUDOSO', 'OCT-84: estado oncológico contradictorio (activo + remisión) → V1 verificar, NO se asume inactivo, NO bloquea',
+  (function () { var r = { seguridadClinica: { condiciones: 'cáncer de mama activo, en remisión hace 5 años' }, orig: { zona: 'hombro' } }; var f = facts(r); var s = evalS(r); return f.oncoEstadoDudoso && !f.oncoActivo && tieneRegla(s, 'V1') && !s.bloquea_plan; })());
+
+check('V22-REG-MEC', 'OCT-84: conflicto de región detectado por patología/mecanismo vs zona',
+  facts({ orig: { zona: 'hombro derecho', dxMedico: 'lumbalgia crónica' } }).regionConflicto === true);
+
+check('V22-DATOS', 'Ausencia de datos ≠ ausencia de riesgo: examen vacío sin cribado → V2 (datos insuficientes)',
+  (function () { var r = { orig: { padecimiento: 'dolor' } }; return facts(r).datosInsuficientes && tieneRegla(evalS(r), 'V2'); })());
+
+check('V22-X3-NOBLOCK', 'Punto 1: regla PENDIENTE (X3) NO bloquea el plan; aparece en pendientes_bloqueo',
+  (function () { var s = evalS({ orig: { zona: 'rodilla derecha', dxMedico: 'gonalgia derecha' }, antecedentes: { cirugias: 'plastia de ligamento cruzado anterior rodilla derecha hace 2 años' } }); return tieneRegla(s, 'X3') && s.bloquea_plan === false && s.pendientes_bloqueo.indexOf('X3') !== -1; })());
+
+// --- Punto 3: OBJETIVOS sin supuestos ---
+check('V22-ROM-NUM', 'ROM numérico ("90 grados") = medido; ROM texto ("limitado") = cualitativo (NO grados)',
+  (function () { var a = facts({ orig: { rom: 'flexión 90 grados' } }); var b = facts({ orig: { rom: 'limitado y doloroso' } }); return a.romEsNumerico && !b.romEsNumerico && b.romTextoCualitativo; })());
+
+check('V22-ROM-OBJ', 'Objetivo de ROM con texto cualitativo NO se etiqueta "medido" ni se reporta en grados',
+  (function () { var c = GEN.generar({ patologia: 'Hombro', orig: { padecimiento: 'dolor de hombro al elevar desde hace 1 mes', zona: 'hombro', rom: 'movilidad limitada', eva: '5' } }); var rom = c.objetivos.filter(function (o) { return o.indicador.indexOf('ROM') !== -1; })[0]; return rom && rom.linea_base.tipo === 'texto_cualitativo' && rom.linea_base.unidad === 'texto' && rom.meta_propuesta === null; })());
+
+check('V22-FUERZA-SUP', 'Objetivo de fuerza NO asume "≥90% simetría" ni "Daniels 5/5" (meta null + nota)',
+  (function () { var c = GEN.generar({ patologia: 'Rodilla', orig: { padecimiento: 'dolor de rodilla al correr desde hace 1 mes', zona: 'rodilla', fuerza: '4/5 cuádriceps', eva: '4' } }); var fz = c.objetivos.filter(function (o) { return /fuerza/.test(o.alteracion); })[0]; return fz && fz.meta_propuesta === null && !!fz.meta_nota && fz.linea_base.tipo === 'medido'; })());
+
+// --- Punto 4: PLANES individualizados por patología (ya no idénticos) ---
+check('V22-PLAN-PAT', 'El plan referencia un protocolo de la biblioteca ESPECÍFICO por patología (Tendinopatía ≠ Lumbalgia)',
+  (function () {
+    var t = GEN.generar({ patologia: 'Tendinopatia', orig: { padecimiento: 'dolor en tendón rotuliano al saltar desde hace 2 meses', zona: 'rodilla', eva: '4' } });
+    var l = GEN.generar({ patologia: 'Lumbalgia', orig: { padecimiento: 'dolor lumbar mecánico desde hace 3 semanas', zona: 'lumbar', eva: '4' } });
+    return t.plan.protocolo_referencia !== l.plan.protocolo_referencia && /HSR|Tendinopat/.test(t.plan.protocolo_referencia) && !!t.plan.fuente_biblioteca && /dosificaci/i.test(t.plan.nota);
+  })());
+
+check('V22-PLAN-RESTR', 'El plan incorpora restricción real (metal → no térmico sobre material) sin inventar dosis',
+  (function () { var c = GEN.generar({ patologia: 'Fractura', orig: { padecimiento: 'dolor posterior a fractura de tibia con placa desde hace 2 meses', zona: 'tobillo_pie', eva: '5' }, seguridadClinica: { implantes: 'material de osteosíntesis, placa y tornillos en tibia' } }); return c.plan && c.plan.restricciones.some(function (r) { return /osteos[ií]ntesis|material/i.test(r); }); })());
+
+// --- Punto 5: SOAP / nuevo motivo ---
+check('V22-EPISODIO', 'Nuevo motivo: SOAP reciente de OTRA región → sospecha de episodio distinto (iniciar desde sesión 1)',
+  (function () { var c = GEN.generar({ patologia: 'Rodilla', orig: { zona: 'rodilla', padecimiento: 'gonalgia por sobreuso al correr hace meses' }, soap: [{ fecha: '2026-09-01', s: 'dolor de rodilla' }, { fecha: '2026-11-20', s: 'ahora acude por dolor de hombro derecho tras cargar peso' }] }, { fecha_corte_default: '2026-11-26' }); return c.episodio_analisis.sospecha === true && c.episodio_analisis.region_valoracion.indexOf('rodilla') !== -1 && c.episodio_analisis.region_soap_reciente.indexOf('hombro') !== -1; })());
+
+check('V22-EPISODIO-NEG', 'Mismo motivo en evolución NO marca episodio nuevo',
+  (function () { var c = GEN.generar({ patologia: 'Rodilla', orig: { zona: 'rodilla', padecimiento: 'gonalgia derecha al correr' }, soap: [{ fecha: '2026-09-01', s: 'dolor de rodilla' }, { fecha: '2026-11-20', s: 'rodilla con menos dolor, mejor flexión' }] }, { fecha_corte_default: '2026-11-26' }); return c.episodio_analisis.sospecha === false; })());
+
+// --- Punto 7: trazabilidad / anonimización ---
+check('V22-FECHA-CORTE', 'Todo resultado trae fecha_corte (de la última nota SOAP o del default de la corrida)',
+  (function () {
+    var conSoap = GEN.generar({ orig: { padecimiento: 'dolor de codo al cargar desde hace 1 mes', zona: 'codo' }, soap: [{ fecha: '2026-10-10', s: 'x' }, { fecha: '2026-11-15', s: 'y' }] }, { fecha_corte_default: '2026-11-26' });
+    var sinSoap = GEN.generar({ orig: { padecimiento: 'dolor de codo al cargar desde hace 1 mes', zona: 'codo' } }, { fecha_corte_default: '2026-11-26' });
+    return conSoap.fecha_corte === '2026-11-15' && sinSoap.fecha_corte === '2026-11-26';
+  })());
+
+check('V22-PHI-PART', 'OCT-72: nombre de médico con partículas ("García de Bustamante") se elimina entero',
+  (function () { var c = GEN.generar({ patologia: 'Rodilla', orig: { padecimiento: 'dolor de rodilla al correr desde hace 1 mes', zona: 'rodilla', dxMedico: 'Condromalacia, operado por Dr. Martín Alfredo Romo García de Bustamante' } }); var b = JSON.stringify(c); return b.indexOf('García de Bustamante') === -1 && b.indexOf('Bustamante') === -1 && b.indexOf('[médico]') !== -1; })());
+
+check('V22-PHI-NOFALSO', 'scrubPHI NO se come palabras comunes (médico tratante / en reposo / referido sin nombre)',
+  (function () { return GEN._scrubPHI('el médico tratante indicó reposo; dolor en reposo nocturno; sin diagnóstico médico referido') === 'el médico tratante indicó reposo; dolor en reposo nocturno; sin diagnóstico médico referido'; })());
+
 // Pendientes declarados honestamente (no implementados aún en este incremento)
-pendiente('UX-EDIT', 'Interfaz editable (editar dx/objetivos/metas, validar/rechazar) — pendiente incremento UI');
-pendiente('BIO-BTN', 'Botones funcionales de medición en prototipo sintético — pendiente incremento UI');
-pendiente('PDF-JSON', 'Regenerar los 85 JSON con este código y el PDF SOLO desde ese JSON — pendiente incremento de integración');
+pendiente('UX-EDIT', 'Interfaz editable (editar dx/objetivos/metas, validar/rechazar) — la define el rediseño visual (otra ventana)');
+pendiente('BIO-BTN', 'Botones de medición: los implementa el rediseño visual; esta rama define/consume el CONTRATO de datos de medición');
 
 // ---------- RESUMEN ----------
-console.log('\n================ RESUMEN PRUEBAS V2.1 ================');
+console.log('\n================ RESUMEN PRUEBAS V2.2 ================');
 RES.forEach(function (r) { console.log('  [' + r.estado + '] ' + r.id + ' · ' + r.nota); });
 console.log('-----------------------------------------------------');
 console.log('  PASA: ' + paso + '   FALLA: ' + fallo + '   PENDIENTE(declarado): ' + pend);

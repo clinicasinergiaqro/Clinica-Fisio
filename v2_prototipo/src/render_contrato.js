@@ -1,12 +1,12 @@
-/* SINERGIA · Render del contrato V2.1 (prototipo) · ÚNICA fuente de verdad para interfaz y reportes.
- * version 2.1.0-proto · 2026-11-26. Convierte el JSON que produce generador_v2 en HTML.
+/* SINERGIA · Render del contrato V2.2 (prototipo) · ÚNICA fuente de verdad para interfaz y reportes.
+ * version 2.2.0-proto · 2026-11-26. Convierte el JSON que produce generador_v2 en HTML.
  * Lo usan TANTO el PDF como el prototipo visual (no hay prosa "mejorada" aparte).
  * Colores institucionales (navy/oro) PROVISIONALES: no cerrar diseño hasta revisar la interfaz real.
  * Node + navegador.
  */
 (function (root) {
   'use strict';
-  var VERSION = '2.1.0-proto';
+  var VERSION = '2.2.0-proto';
 
   function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
 
@@ -22,10 +22,12 @@
   function lineaBase(lb) {
     if (!lb) return '<span class="muted">—</span>';
     if (lb.tipo === 'pendiente' || lb.valor == null) return '<span class="pend">pendiente de medir</span>' + (lb.nota ? ' <span class="muted">(' + esc(lb.nota) + ')</span>' : '');
+    if (lb.tipo === 'texto_cualitativo') return '“' + esc(lb.valor) + '” <span class="tag tag-pend">cualitativo (no es medición)</span>' + (lb.nota ? ' <span class="muted">(' + esc(lb.nota) + ')</span>' : '');
     return '<b>' + esc(lb.valor) + '</b>' + (lb.unidad ? ' ' + esc(lb.unidad) : '') + ' <span class="tag tag-med">' + esc(lb.tipo || 'medido') + '</span>' + (lb.fuente ? ' <span class="muted">· ' + esc(lb.fuente) + '</span>' : '');
   }
-  function metaProp(m) {
-    if (!m) return '<span class="muted">—</span>';
+  // Meta: en V2.2 NO se asume (muchas son null + nota). Si null, se muestra la nota de por qué.
+  function metaProp(m, nota) {
+    if (!m) return '<span class="pend">a definir con el fisioterapeuta</span>' + (nota ? ' <span class="muted">(' + esc(nota) + ')</span>' : '');
     return esc(m.valor) + (m.unidad ? ' ' + esc(m.unidad) : '') + ' <span class="tag tag-prop">propuesta editable</span>' + (m.nota ? ' <span class="muted">(' + esc(m.nota) + ')</span>' : '');
   }
   function evids(ev) {
@@ -59,8 +61,18 @@
       });
       H.push('</ul>');
     }
+    if (c.seguridad.pendientes_bloqueo && c.seguridad.pendientes_bloqueo.length) {
+      H.push('<p class="seg-pend">⚠ Regla(s) PENDIENTE(S) de validación (' + esc(c.seguridad.pendientes_bloqueo.join(', ')) + '): NO bloquean el plan automáticamente, pero el fisioterapeuta debe revisarlas.</p>');
+    }
     H.push('<div class="cribado ' + (c.seguridad.cribado_documentado ? 'ok' : 'no') + '">Cribado de banderas rojas: ' + (c.seguridad.cribado_documentado ? 'documentado' : 'NO documentado') + '</div>');
     H.push('</section>');
+
+    // Episodio / nuevo motivo (punto 5)
+    if (c.episodio_analisis && c.episodio_analisis.sospecha) {
+      H.push('<section class="sec warn"><h3>Posible nuevo motivo de consulta</h3><p>' + esc(c.episodio_analisis.accion || '') +
+        '</p><div class="muted">Región del motivo valorado: ' + esc((c.episodio_analisis.region_valoracion || []).join(', ') || '—') +
+        ' · región en la nota SOAP reciente: ' + esc((c.episodio_analisis.region_soap_reciente || []).join(', ') || '—') + '</div></section>');
+    }
 
     // Diagnóstico funcional
     H.push('<section class="sec"><h3>Diagnóstico funcional <span class="tag">' + esc(c.diagnostico_funcional.estado) + '</span></h3>');
@@ -93,7 +105,7 @@
       H.push('<table class="obj"><thead><tr><th>Fase</th><th>Alteración</th><th>Indicador</th><th>Línea base</th><th>Meta</th><th>Método</th><th>Criterio de alta</th></tr></thead><tbody>');
       c.objetivos.forEach(function (o) {
         H.push('<tr><td>' + esc(o.fase) + '</td><td>' + esc(o.alteracion || '') + '<div class="muted">' + esc(o.actividad || '') + '</div>' + evids(o.evidencias) + '</td>' +
-          '<td>' + esc(o.indicador || '') + '</td><td>' + lineaBase(o.linea_base) + '</td><td>' + metaProp(o.meta_propuesta) + '</td>' +
+          '<td>' + esc(o.indicador || '') + '</td><td>' + lineaBase(o.linea_base) + '</td><td>' + metaProp(o.meta_propuesta, o.meta_nota) + '</td>' +
           '<td>' + esc(o.metodo || '—') + '<div class="muted">reeval: ' + esc(o.reevaluacion || '—') + '</div></td>' +
           '<td>' + esc(o.criterio_cumplimiento || '—') + '</td></tr>');
       });
@@ -105,7 +117,18 @@
     H.push('<section class="sec"><h3>Plan de tratamiento</h3>');
     if (!c.plan) { H.push('<p class="bloq">Plan BLOQUEADO por la acción de seguridad. Resolver la alerta antes de fijar el plan terapéutico.</p>'); }
     else {
-      H.push('<p class="muted">' + esc(c.plan.estado) + ' · ' + esc(c.plan.nota || '') + '</p><ol class="fases">');
+      if (c.plan.protocolo_referencia) {
+        H.push('<div class="proto"><b>Protocolo de referencia:</b> ' + esc(c.plan.protocolo_referencia) +
+          (c.plan.fuente_biblioteca ? ' <span class="muted">· fuente: ' + esc(c.plan.fuente_biblioteca) + '</span>' : '') +
+          (c.plan.irritabilidad_estimada ? ' <span class="tag">irritabilidad: ' + esc(c.plan.irritabilidad_estimada) + '</span>' : '') +
+          (c.plan.objetivo_prioritario ? '<div class="muted">objetivo prioritario: ' + esc(c.plan.objetivo_prioritario) + '</div>' : '') + '</div>');
+      }
+      if (c.plan.restricciones && c.plan.restricciones.length) {
+        H.push('<ul class="restr">');
+        c.plan.restricciones.forEach(function (r) { H.push('<li>⛔ ' + esc(r) + '</li>'); });
+        H.push('</ul>');
+      }
+      H.push('<ol class="fases">');
       (c.plan.fases || []).forEach(function (f) {
         H.push('<li><b>' + esc(f.nombre) + '</b> — ' + esc(f.objetivo || '') +
           (f.ejemplos ? '<div class="muted">ej.: ' + esc((f.ejemplos || []).join(', ')) + '</div>' : '') +
@@ -113,6 +136,8 @@
           (f.criterio_alta ? '<div class="muted">alta: ' + esc(f.criterio_alta) + '</div>' : '') + '</li>');
       });
       H.push('</ol>');
+      if (c.plan.agentes_coadyuvantes) H.push('<div class="muted"><b>Agentes coadyuvantes:</b> ' + esc(c.plan.agentes_coadyuvantes) + '</div>');
+      H.push('<p class="muted">' + esc(c.plan.estado) + ' · ' + esc(c.plan.nota || '') + '</p>');
     }
     H.push('</section>');
 
@@ -123,6 +148,16 @@
         H.push('<tr><td>' + esc(m.id) + '</td><td>' + esc(m.articulacion || '—') + '</td><td>' + esc(m.movimiento || '—') + '</td><td>' + esc(m.lado || '—') + '</td><td>' + esc(m.valor != null ? m.valor : '—') + (m.unidad ? ' ' + esc(m.unidad) : '') + '</td><td>' + esc(m.metodo || '—') + '</td><td>' + esc(m.fecha || '—') + '</td></tr>' + (m.tarea ? '<tr class="med-tarea"><td colspan="7">⚠ ' + esc(m.tarea) + '</td></tr>' : ''));
       });
       H.push('</tbody></table></section>');
+    }
+
+    // Mediciones SIN vincular (texto, sin id estructurado): NO cuentan como mediciones vinculadas.
+    if (c.mediciones_sin_vincular && c.mediciones_sin_vincular.length) {
+      H.push('<section class="sec"><h3>Datos de medición sin vincular <span class="muted">(no cuentan como mediciones estructuradas)</span></h3><ul class="chk">');
+      c.mediciones_sin_vincular.forEach(function (m) {
+        H.push('<li>• <b>' + esc(m.origen) + '</b>: ' + esc(m.valor_texto != null ? ('“' + m.valor_texto + '”') : (m.n + ' registro(s)')) +
+          ' <span class="tag tag-pend">no estructurado</span> <span class="muted">' + esc(m.tarea || '') + '</span></li>');
+      });
+      H.push('</ul></section>');
     }
 
     // Validación profesional
@@ -155,12 +190,19 @@
     '.muted{color:var(--muted);font-size:12px}.pend{color:#8A5E0C;font-weight:600}',
     '.evid{margin-top:5px}.evid-chip{display:inline-block;font-size:11px;background:#f0f4f9;border:1px solid var(--line);border-radius:6px;padding:1px 7px;margin:2px 3px 0 0;color:#3a4a5e}',
     '.warn{background:#fbf3dd;border-radius:8px;padding:8px 12px}.bloq{background:#f1ecfb;border-left:4px solid #5B3A9B;padding:8px 10px;border-radius:6px;font-weight:600}',
-    'table{width:100%;border-collapse:collapse;font-size:12.5px;margin-top:4px}th,td{border:1px solid var(--line);padding:6px 7px;text-align:left;vertical-align:top}th{background:var(--navy);color:#fff;font-weight:600}',
+    'table{width:100%;border-collapse:collapse;font-size:12px;margin-top:4px;table-layout:fixed}th,td{border:1px solid var(--line);padding:6px 7px;text-align:left;vertical-align:top;overflow-wrap:break-word;word-break:break-word}th{background:var(--navy);color:#fff;font-weight:600}',
     'tbody tr:nth-child(even){background:#fafcff}.med-tarea td{background:#fbf3dd;color:#8A5E0C}',
+    '.obj th:nth-child(1){width:8%}.obj th:nth-child(2){width:22%}.obj th:nth-child(3){width:14%}.obj th:nth-child(4){width:16%}.obj th:nth-child(5){width:16%}.obj th:nth-child(6){width:12%}.obj th:nth-child(7){width:12%}',
+    '.med th:nth-child(1){width:20%}',
     '.chk{list-style:none;padding:0;margin:0}.chk li{padding:2px 0}',
     '.fases{margin:4px 0 0;padding-left:18px}.fases li{margin:4px 0}',
+    '.seg-pend{margin:6px 0 2px;font-size:12.5px;color:#8A5E0C;background:#fbf3dd;border-radius:6px;padding:4px 8px}',
+    '.proto{background:#eef3fb;border-left:4px solid var(--navy);border-radius:6px;padding:6px 10px;margin:2px 0 6px}',
+    '.restr{list-style:none;margin:6px 0;padding:0}.restr li{background:#fcecea;border-left:3px solid #B3261E;border-radius:4px;padding:4px 8px;margin:3px 0;font-size:12.5px}',
     '.caso-foot{border-top:2px solid var(--navy);margin:10px -18px 0;padding:10px 18px 0;display:flex;justify-content:space-between;gap:12px;font-size:12px}',
-    '@media print{body{background:#fff}.caso{break-inside:avoid;box-shadow:none}}'
+    // PDF: NO forzar toda la caja en una página (eso CORTABA las tablas largas). Dejar fluir la caja y
+    // proteger filas/encabezado: la fila no se parte y el <thead> se repite en cada página.
+    '@media print{body{background:#fff}.caso{box-shadow:none}.sec,.caso-head,.caso-foot,tr,li{break-inside:avoid}thead{display:table-header-group}tr{page-break-inside:avoid}}'
   ].join('\n');
 
   // Documento completo (para PDF o vista).
@@ -169,9 +211,9 @@
     var lista = Array.isArray(contratos) ? contratos : [contratos];
     var body = lista.map(function (c) { return renderContrato(c, opts); }).join('\n');
     return '<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">' +
-      '<title>' + esc(opts.titulo || 'SINERGIA · Reporte V2.1 (borrador)') + '</title><style>' + CSS + '</style></head><body>' +
-      '<div class="rep-head"><h1>' + esc(opts.titulo || 'SINERGIA · Diagnóstico funcional asistido (V2.1 · BORRADOR)') + '</h1>' +
-      '<div class="sub">' + esc(opts.subtitulo || ('Generado desde el contrato JSON del generador V2.1 · ' + lista.length + ' caso(s) · requiere validación y firma del fisioterapeuta')) + '</div>' +
+      '<title>' + esc(opts.titulo || 'SINERGIA · Reporte V2.2 (borrador)') + '</title><style>' + CSS + '</style></head><body>' +
+      '<div class="rep-head"><h1>' + esc(opts.titulo || 'SINERGIA · Diagnóstico funcional asistido (V2.2 · BORRADOR)') + '</h1>' +
+      '<div class="sub">' + esc(opts.subtitulo || ('Generado desde el contrato JSON del generador V2.2 · ' + lista.length + ' caso(s) · requiere validación y firma del fisioterapeuta')) + '</div>' +
       '<div class="rule"></div></div><div class="wrap">' + body + '</div></body></html>';
   }
 

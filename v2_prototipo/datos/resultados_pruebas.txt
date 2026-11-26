@@ -1,0 +1,70 @@
+
+================ RESUMEN PRUEBAS V2.2 ================
+  [PASA] NEG-01 · Negación de incontinencia NO debe disparar cauda equina (E1)
+  [PASA] NEG-02 · Cauda equina AFIRMADA sí dispara E1 (emergencia)
+  [PASA] NEG-03 · Negación de cáncer NO debe marcar oncológico
+  [PASA] NEG-04 · Cáncer personal AFIRMADO sí marca oncológico + P2
+  [PASA] NEG-05 · Cáncer SOLO familiar (heredofamiliar) NO cuenta como personal
+  [PASA] NEG-06 · "sin inflamación" NO debe leerse como inflamación presente
+  [PASA] NEG-07 · Inflamación AFIRMADA sí marca inflamacionPresente
+  [PASA] TVP-01 · TVP activa dispara E3 (emergencia) — bug OCT-22 (no se detectaba)
+  [PASA] TVP-02 · Con TVP activa, evaluarAgente sobre el miembro = contraindicado
+  [PASA] CERV-01 · Trauma cervical axial en ADULTO dispara E4 (antes solo pediátrico)
+  [PASA] CERV-02 · Trauma cervical axial PEDIÁTRICO dispara E4
+  [PASA] CERV-03 · Cervicalgia mecánica SIN mecanismo axial NO dispara E4
+  [PASA] CERV-04 · "occipital de cabeza" (anatomía) NO dispara E4 — falso positivo OCT-13
+  [PASA] CERV-05 · Marometa con carga axial cervical + moretón en nuca (pediátrico) SÍ dispara E4 — OCT-79
+  [PASA] CERV-06 · "corte axial" en reporte de imagen NO dispara E4
+  [PASA] LAT-01 · Cirugía LCA CONTRALATERAL NO debe marcarse ipsilateral — bug OCT-02
+  [PASA] LAT-02 · Cirugía LCA IPSILATERAL (mismo lado) sí dispara X3
+  [PASA] LAT-03 · Cirugía ligamentaria sin lado documentado → indefinido (verificar, NO bloquear)
+  [PASA] CONF-01 · Conflicto de LADO dispara X1 (bloqueo)
+  [PASA] CONF-02 · Conflicto de REGIÓN dispara X2 y BLOQUEA — antes se detectaba pero no bloqueaba
+  [PASA] CRIB-01 · McMurray negativo NO cuenta como cribado de banderas rojas
+  [PASA] CRIB-02 · Cribado EXPLÍCITO de banderas rojas sí cuenta
+  [PASA] SOAP-01 · Bandera roja presente SOLO en nota SOAP posterior sí se detecta
+  [PASA] SOAP-02 · fecha_corte excluye notas posteriores
+  [PASA] ONCO-01 · Compresión medular / metástasis vertebral = EMERGENCIA (E2)
+  [PASA] ONCO-02 · Onco + dolor espinal nocturno (sin compresión) = DERIVACIÓN (D1), no emergencia
+  [PASA] ERR-01 · Una excepción de regla se reporta como error_regla, NO como "sin alerta"
+  [PASA] AG-01 · Modalidad desconocida → "verificar", NO "permitido"
+  [PASA] AG-02 · Modalidad no especificada → "verificar"
+  [PASA] AG-03 · Sin contraindicación → "permitido_condicionado" (nunca "permitido" seco)
+  [PASA] AG-04 · Marcapaso + electroterapia → contraindicado
+  [PASA] AG-05 · Metal + térmico sin región → "verificar" (no se asume permitido)
+  [PASA] OBJ-01 · deportivos con texto clínico NO produce "retorno a <diagnóstico>"
+  [PASA] OBJ-02 · deportivos con actividad real SÍ produce "retorno a <actividad>"
+  [PASA] OBJ-03 · V2.2: meta de dolor NO se asume (null + nota); línea base EVA numérica = medida
+  [PASA] OBJ-04 · ROM no medido → línea base pendiente (no inventa valor) y meta null
+  [PASA] MED-01 · Medición estructurada conserva su id real y cuenta como vinculada
+  [PASA] MED-02 · V2.2: ROM solo en texto NO cuenta como medición vinculada (va a mediciones_sin_vincular)
+  [PASA] BLK-01 · Con alerta bloqueante, plan = null y objetivos = solo seguridad (no fijar objetivos/mediciones terapéuticas)
+  [PASA] PHI-01 · Nombre de médico en dx referido NO sale en el contrato (se reemplaza por [médico])
+  [PASA] PHI-02 · scrubPHI respeta texto clínico sin nombres
+  [PASA] INT-01 · Caso COMPLETO sin banderas (con exploración + cribado) → sin_alerta_detectada + plan editable
+  [PASA] INT-02 · Caso MÍNIMO sin exploración → V2.2 surge "datos insuficientes" (NO "sin alerta")
+  [PASA] V22-TVP-CONS · OCT-22: TVP por CONSTELACIÓN (hinchazón pierna + factor de riesgo, sin la palabra "trombosis") → D3 y BLOQUEA
+  [PASA] V22-TVP-AGENTE · TVP sospecha: evaluarAgente sobre el miembro = contraindicado (D3)
+  [PASA] V22-NEU-OBJ · OCT-06: denervación activa por ENMG = déficit OBJETIVADO → D2 deriva
+  [PASA] V22-NEU-REF · Solo hormigueo (síntoma REFERIDO) sin déficit objetivo NO deriva (precaución)
+  [PASA] V22-NEU-PROG · Síntoma referido PROGRESIVO sí deriva (D2)
+  [PASA] V22-ONCO-DUDOSO · OCT-84: estado oncológico contradictorio (activo + remisión) → V1 verificar, NO se asume inactivo, NO bloquea
+  [PASA] V22-REG-MEC · OCT-84: conflicto de región detectado por patología/mecanismo vs zona
+  [PASA] V22-DATOS · Ausencia de datos ≠ ausencia de riesgo: examen vacío sin cribado → V2 (datos insuficientes)
+  [PASA] V22-X3-NOBLOCK · Punto 1: regla PENDIENTE (X3) NO bloquea el plan; aparece en pendientes_bloqueo
+  [PASA] V22-ROM-NUM · ROM numérico ("90 grados") = medido; ROM texto ("limitado") = cualitativo (NO grados)
+  [PASA] V22-ROM-OBJ · Objetivo de ROM con texto cualitativo NO se etiqueta "medido" ni se reporta en grados
+  [PASA] V22-FUERZA-SUP · Objetivo de fuerza NO asume "≥90% simetría" ni "Daniels 5/5" (meta null + nota)
+  [PASA] V22-PLAN-PAT · El plan referencia un protocolo de la biblioteca ESPECÍFICO por patología (Tendinopatía ≠ Lumbalgia)
+  [PASA] V22-PLAN-RESTR · El plan incorpora restricción real (metal → no térmico sobre material) sin inventar dosis
+  [PASA] V22-EPISODIO · Nuevo motivo: SOAP reciente de OTRA región → sospecha de episodio distinto (iniciar desde sesión 1)
+  [PASA] V22-EPISODIO-NEG · Mismo motivo en evolución NO marca episodio nuevo
+  [PASA] V22-FECHA-CORTE · Todo resultado trae fecha_corte (de la última nota SOAP o del default de la corrida)
+  [PASA] V22-PHI-PART · OCT-72: nombre de médico con partículas ("García de Bustamante") se elimina entero
+  [PASA] V22-PHI-NOFALSO · scrubPHI NO se come palabras comunes (médico tratante / en reposo / referido sin nombre)
+  [PENDIENTE] UX-EDIT · Interfaz editable (editar dx/objetivos/metas, validar/rechazar) — la define el rediseño visual (otra ventana)
+  [PENDIENTE] BIO-BTN · Botones de medición: los implementa el rediseño visual; esta rama define/consume el CONTRATO de datos de medición
+-----------------------------------------------------
+  PASA: 62   FALLA: 0   PENDIENTE(declarado): 2
+  motor: 2.2.0-proto  catálogo: 2026-11-26.b  extractor: 2.2.0-proto  generador: 2.2.0-proto
+=====================================================

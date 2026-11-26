@@ -1,0 +1,607 @@
+{
+  "_agregado": {
+    "n": 20,
+    "v21_sin_fecha_corte": 20,
+    "v22_sin_fecha_corte": 0,
+    "v21_metas_asumidas": 43,
+    "v22_metas_asumidas": 0,
+    "v21_rom_falso_grados": 6,
+    "v22_rom_falso_grados": 0,
+    "v21_planes_distintos": 2,
+    "v22_planes_distintos": 11,
+    "casos_con_cambio_seguridad": [
+      "OCT-06",
+      "OCT-11",
+      "OCT-22",
+      "SINT-LCA",
+      "SINT-MEN",
+      "SINT-MIN"
+    ],
+    "casos_episodio_nuevo": [
+      "SINT-EPIS"
+    ]
+  },
+  "comparacion": [
+    {
+      "codigo": "OCT-06",
+      "patologia": "Radiculopatia",
+      "v21": {
+        "fecha_corte": null,
+        "seguridad": "sin_alerta_detectada_con_datos_disponibles",
+        "bloquea": false,
+        "reglas": [],
+        "dx": "Disfunción de lumbar derecho en contexto de dx médico referido: radiculopatía L5 derecha con denervación activa documentada por ENMG, caracterizada por EVA 7/10, síntomas neurales referidos.",
+        "metas_asumidas": 3,
+        "rom_falso_grados": 1,
+        "plan_ref": "genérico (sin protocolo por patología)",
+        "mediciones_n": 1
+      },
+      "v22": {
+        "fecha_corte": "2026-11-26",
+        "seguridad": "derivacion_prioritaria",
+        "bloquea": true,
+        "reglas": [
+          "D2"
+        ],
+        "dx": "Disfunción de lumbar derecho en contexto de dx médico referido: radiculopatía L5 derecha con denervación activa documentada por ENMG; mecanismo: insidioso, sin trauma. Cuadro: EVA 7/10, déficit neurológico OBJETIVADO. Hallazgos objetivos: movilidad descrita como \"limitado por dolor\" (cualitativo, sin goniometría); fuerza 4/5 dorsiflexores; pruebas especiales: SLR positivo a 40°. Exploración objetiva por completar (ROM goniométrico): diagnóstico PROVISIONAL.",
+        "metas_asumidas": 0,
+        "rom_falso_grados": 0,
+        "plan_ref": null,
+        "mediciones_vinculadas_n": 0,
+        "episodio_nuevo": false
+      }
+    },
+    {
+      "codigo": "OCT-11",
+      "patologia": "Cervicalgia",
+      "v21": {
+        "fecha_corte": null,
+        "seguridad": "sin_alerta_detectada_con_datos_disponibles",
+        "bloquea": false,
+        "reglas": [],
+        "dx": "Disfunción de cervical sin diagnóstico médico referido, caracterizada por EVA 5/10, síntomas neurales referidos.",
+        "metas_asumidas": 3,
+        "rom_falso_grados": 1,
+        "plan_ref": "genérico (sin protocolo por patología)",
+        "mediciones_n": 1
+      },
+      "v22": {
+        "fecha_corte": "2026-11-26",
+        "seguridad": "precaucion_especifica",
+        "bloquea": false,
+        "reglas": [
+          "P10"
+        ],
+        "dx": "Disfunción de cervical sin diagnóstico médico referido; mecanismo: postural. Cuadro: EVA 5/10, síntomas neurales referidos (sensitivos, sin déficit objetivado). Hallazgos objetivos: movilidad descrita como \"rotación limitada\" (cualitativo, sin goniometría); fuerza descrita como \"conservada\" (cualitativo, sin escala); pruebas especiales: Spurling dudoso. Exploración objetiva por completar (ROM goniométrico, fuerza con escala): diagnóstico PROVISIONAL.",
+        "metas_asumidas": 0,
+        "rom_falso_grados": 0,
+        "plan_ref": "Cervicalgia — ejercicio + terapia según categoría",
+        "mediciones_vinculadas_n": 0,
+        "episodio_nuevo": false
+      }
+    },
+    {
+      "codigo": "OCT-19",
+      "patologia": "Cervicalgia",
+      "v21": {
+        "fecha_corte": null,
+        "seguridad": "derivacion_prioritaria",
+        "bloquea": true,
+        "reglas": [
+          "D2"
+        ],
+        "dx": "Disfunción de cervical sin diagnóstico médico referido, caracterizada por EVA 6/10.",
+        "metas_asumidas": 0,
+        "rom_falso_grados": 0,
+        "plan_ref": null,
+        "mediciones_n": 1
+      },
+      "v22": {
+        "fecha_corte": "2026-11-26",
+        "seguridad": "derivacion_prioritaria",
+        "bloquea": true,
+        "reglas": [
+          "D2"
+        ],
+        "dx": "Disfunción de cervical sin diagnóstico médico referido; mecanismo: insidioso. Cuadro: EVA 6/10, déficit neurológico OBJETIVADO. Hallazgos objetivos: movilidad descrita como \"limitado\" (cualitativo, sin goniometría); fuerza 3/5 intrínsecos de mano. Exploración objetiva por completar (ROM goniométrico, pruebas especiales): diagnóstico PROVISIONAL.",
+        "metas_asumidas": 0,
+        "rom_falso_grados": 0,
+        "plan_ref": null,
+        "mediciones_vinculadas_n": 0,
+        "episodio_nuevo": false
+      }
+    },
+    {
+      "codigo": "OCT-22",
+      "patologia": "Post-quirurgico",
+      "v21": {
+        "fecha_corte": null,
+        "seguridad": "precaucion_especifica",
+        "bloquea": false,
+        "reglas": [
+          "P3"
+        ],
+        "dx": "Disfunción de rodilla derecho sin diagnóstico médico referido, caracterizada por EVA 6/10, inflamación referida. Exploración objetiva pendiente (ROM, fuerza, pruebas especiales): diagnóstico PROVISIONAL.",
+        "metas_asumidas": 1,
+        "rom_falso_grados": 0,
+        "plan_ref": "genérico (sin protocolo por patología)",
+        "mediciones_n": 0
+      },
+      "v22": {
+        "fecha_corte": "2026-11-26",
+        "seguridad": "derivacion_prioritaria",
+        "bloquea": true,
+        "reglas": [
+          "D3",
+          "P3",
+          "V2"
+        ],
+        "dx": "Disfunción de rodilla derecho sin diagnóstico médico referido; mecanismo: post-operatorio con inmovilización y reposo prolongado. Cuadro: EVA 6/10, inflamación referida. Sin hallazgos objetivos documentados. Exploración objetiva por completar (ROM goniométrico, fuerza con escala, pruebas especiales): diagnóstico PROVISIONAL. Datos clínicos insuficientes: no se afirma seguridad por ausencia de hallazgos.",
+        "metas_asumidas": 0,
+        "rom_falso_grados": 0,
+        "plan_ref": null,
+        "mediciones_vinculadas_n": 0,
+        "episodio_nuevo": false
+      }
+    },
+    {
+      "codigo": "OCT-72",
+      "patologia": "Rodilla",
+      "v21": {
+        "fecha_corte": null,
+        "seguridad": "sin_alerta_detectada_con_datos_disponibles",
+        "bloquea": false,
+        "reglas": [],
+        "dx": "Disfunción de rodilla izquierdo en contexto de dx médico referido: condromalacia rotuliana, operado por [médico] García de Bustamante en 2024, caracterizada por EVA 5/10.",
+        "metas_asumidas": 3,
+        "rom_falso_grados": 0,
+        "plan_ref": "genérico (sin protocolo por patología)",
+        "mediciones_n": 1
+      },
+      "v22": {
+        "fecha_corte": "2026-11-26",
+        "seguridad": "sin_alerta_detectada_con_datos_disponibles",
+        "bloquea": false,
+        "reglas": [],
+        "dx": "Disfunción de rodilla izquierdo en contexto de dx médico referido: condromalacia rotuliana, operado por [médico] en 2024; mecanismo: sobreuso por aumento de volumen de carrera. Cuadro: EVA 5/10. Hallazgos objetivos: ROM flexión 130°; fuerza 4/5 cuádriceps. Exploración objetiva por completar (pruebas especiales): diagnóstico PROVISIONAL.",
+        "metas_asumidas": 0,
+        "rom_falso_grados": 0,
+        "plan_ref": "Sin protocolo específico en la biblioteca para esta patología; usar criterio clínico.",
+        "mediciones_vinculadas_n": 0,
+        "episodio_nuevo": false
+      }
+    },
+    {
+      "codigo": "OCT-84",
+      "patologia": "Hombro",
+      "v21": {
+        "fecha_corte": null,
+        "seguridad": "precaucion_especifica",
+        "bloquea": false,
+        "reglas": [
+          "P2"
+        ],
+        "dx": "Disfunción de hombro derecho derecho en contexto de dx médico referido: síndrome subacromial, caracterizada por EVA 6/10.",
+        "metas_asumidas": 3,
+        "rom_falso_grados": 0,
+        "plan_ref": "genérico (sin protocolo por patología)",
+        "mediciones_n": 1
+      },
+      "v22": {
+        "fecha_corte": "2026-11-26",
+        "seguridad": "precaucion_especifica",
+        "bloquea": false,
+        "reglas": [
+          "P2",
+          "V1"
+        ],
+        "dx": "Disfunción de hombro derecho derecho en contexto de dx médico referido: síndrome subacromial; mecanismo: sobreuso. Cuadro: EVA 6/10. Hallazgos objetivos: ROM abducción activa 100°; fuerza 4/5 supraespinoso; pruebas especiales: Jobe positivo; Hawkins positivo.",
+        "metas_asumidas": 0,
+        "rom_falso_grados": 0,
+        "plan_ref": "Manguito rotador — por tamaño/tipo",
+        "mediciones_vinculadas_n": 0,
+        "episodio_nuevo": false
+      }
+    },
+    {
+      "codigo": "SINT-TEND",
+      "patologia": "Tendinopatia",
+      "v21": {
+        "fecha_corte": null,
+        "seguridad": "sin_alerta_detectada_con_datos_disponibles",
+        "bloquea": false,
+        "reglas": [],
+        "dx": "Disfunción de rodilla derecho sin diagnóstico médico referido, caracterizada por EVA 4/10.",
+        "metas_asumidas": 3,
+        "rom_falso_grados": 0,
+        "plan_ref": "genérico (sin protocolo por patología)",
+        "mediciones_n": 1
+      },
+      "v22": {
+        "fecha_corte": "2026-11-26",
+        "seguridad": "sin_alerta_detectada_con_datos_disponibles",
+        "bloquea": false,
+        "reglas": [],
+        "dx": "Disfunción de rodilla derecho sin diagnóstico médico referido; mecanismo: sobreuso deportivo (voleibol). Cuadro: EVA 4/10. Hallazgos objetivos: ROM flexión 140°; fuerza 4/5 cuádriceps. Limitación funcional: no puede saltar ni entrenar. Exploración objetiva por completar (pruebas especiales): diagnóstico PROVISIONAL.",
+        "metas_asumidas": 0,
+        "rom_falso_grados": 0,
+        "plan_ref": "Tendinopatía — carga progresiva tipo HSR",
+        "mediciones_vinculadas_n": 0,
+        "episodio_nuevo": false
+      }
+    },
+    {
+      "codigo": "SINT-LCA",
+      "patologia": "Lesion ligamentaria",
+      "v21": {
+        "fecha_corte": null,
+        "seguridad": "bloqueo_por_dato_inconsistente",
+        "bloquea": true,
+        "reglas": [
+          "X3"
+        ],
+        "dx": "Disfunción de rodilla izquierdo sin diagnóstico médico referido, caracterizada por EVA 2/10.",
+        "metas_asumidas": 0,
+        "rom_falso_grados": 0,
+        "plan_ref": null,
+        "mediciones_n": 1
+      },
+      "v22": {
+        "fecha_corte": "2026-11-26",
+        "seguridad": "precaucion_especifica",
+        "bloquea": false,
+        "reglas": [
+          "X3"
+        ],
+        "dx": "Disfunción de rodilla izquierdo sin diagnóstico médico referido; mecanismo: post-reconstrucción de LCA (injerto HTG). Cuadro: EVA 2/10. Hallazgos objetivos: ROM extensión 0°, flexión 135°; fuerza descrita como \"disminuida en cuádriceps\" (cualitativo, sin escala); pruebas especiales: Lachman firme; cribado de banderas rojas negativo. Limitación funcional: no puede correr ni pivotar. Exploración objetiva por completar (fuerza con escala): diagnóstico PROVISIONAL.",
+        "metas_asumidas": 0,
+        "rom_falso_grados": 0,
+        "plan_ref": "LCA / ligamentaria — progresión por criterios",
+        "mediciones_vinculadas_n": 0,
+        "episodio_nuevo": false
+      }
+    },
+    {
+      "codigo": "SINT-MEN",
+      "patologia": "Lesion meniscal",
+      "v21": {
+        "fecha_corte": null,
+        "seguridad": "bloqueo_por_dato_inconsistente",
+        "bloquea": true,
+        "reglas": [
+          "X3"
+        ],
+        "dx": "Disfunción de rodilla derecho sin diagnóstico médico referido, caracterizada por EVA 3/10.",
+        "metas_asumidas": 0,
+        "rom_falso_grados": 0,
+        "plan_ref": null,
+        "mediciones_n": 1
+      },
+      "v22": {
+        "fecha_corte": "2026-11-26",
+        "seguridad": "precaucion_especifica",
+        "bloquea": false,
+        "reglas": [
+          "X3"
+        ],
+        "dx": "Disfunción de rodilla derecho sin diagnóstico médico referido; mecanismo: post-reparación meniscal. Cuadro: EVA 3/10. Hallazgos objetivos: ROM flexión limitada a 90° por indicación; fuerza 4/5; pruebas especiales: McMurray no realizado por fase; cribado de banderas rojas negativo. Limitación funcional: no puede flexionar más de 90° ni cargar completo.",
+        "metas_asumidas": 0,
+        "rom_falso_grados": 0,
+        "plan_ref": "Menisco — reparación (lento) vs meniscectomía (rápido)",
+        "mediciones_vinculadas_n": 0,
+        "episodio_nuevo": false
+      }
+    },
+    {
+      "codigo": "SINT-LUMB",
+      "patologia": "Lumbalgia",
+      "v21": {
+        "fecha_corte": null,
+        "seguridad": "sin_alerta_detectada_con_datos_disponibles",
+        "bloquea": false,
+        "reglas": [],
+        "dx": "Disfunción de lumbar sin diagnóstico médico referido, caracterizada por EVA 4/10.",
+        "metas_asumidas": 3,
+        "rom_falso_grados": 1,
+        "plan_ref": "genérico (sin protocolo por patología)",
+        "mediciones_n": 1
+      },
+      "v22": {
+        "fecha_corte": "2026-11-26",
+        "seguridad": "sin_alerta_detectada_con_datos_disponibles",
+        "bloquea": false,
+        "reglas": [],
+        "dx": "Disfunción de lumbar sin diagnóstico médico referido; mecanismo: esfuerzo al levantar carga. Cuadro: EVA 4/10. Hallazgos objetivos: movilidad descrita como \"flexión lumbar moderadamente limitada\" (cualitativo, sin goniometría); fuerza descrita como \"conservada\" (cualitativo, sin escala); pruebas especiales: SLR negativo; cribado de banderas rojas negativo. Limitación funcional: molestia al estar sentado mucho tiempo. Exploración objetiva por completar (ROM goniométrico, fuerza con escala): diagnóstico PROVISIONAL.",
+        "metas_asumidas": 0,
+        "rom_falso_grados": 0,
+        "plan_ref": "Lumbalgia inespecífica — ejercicio graduado, anti-nocebo",
+        "mediciones_vinculadas_n": 0,
+        "episodio_nuevo": false
+      }
+    },
+    {
+      "codigo": "SINT-CERV",
+      "patologia": "Cervicalgia",
+      "v21": {
+        "fecha_corte": null,
+        "seguridad": "sin_alerta_detectada_con_datos_disponibles",
+        "bloquea": false,
+        "reglas": [],
+        "dx": "Disfunción de cervical sin diagnóstico médico referido, caracterizada por EVA 3/10.",
+        "metas_asumidas": 3,
+        "rom_falso_grados": 0,
+        "plan_ref": "genérico (sin protocolo por patología)",
+        "mediciones_n": 1
+      },
+      "v22": {
+        "fecha_corte": "2026-11-26",
+        "seguridad": "sin_alerta_detectada_con_datos_disponibles",
+        "bloquea": false,
+        "reglas": [],
+        "dx": "Disfunción de cervical sin diagnóstico médico referido; mecanismo: postural, trabajo de oficina. Cuadro: EVA 3/10. Hallazgos objetivos: ROM rotación cervical 60° bilateral; fuerza descrita como \"conservada\" (cualitativo, sin escala). Exploración objetiva por completar (fuerza con escala, pruebas especiales): diagnóstico PROVISIONAL.",
+        "metas_asumidas": 0,
+        "rom_falso_grados": 0,
+        "plan_ref": "Cervicalgia — ejercicio + terapia según categoría",
+        "mediciones_vinculadas_n": 0,
+        "episodio_nuevo": false
+      }
+    },
+    {
+      "codigo": "SINT-HOMB",
+      "patologia": "Hombro",
+      "v21": {
+        "fecha_corte": null,
+        "seguridad": "sin_alerta_detectada_con_datos_disponibles",
+        "bloquea": false,
+        "reglas": [],
+        "dx": "Disfunción de hombro izquierdo sin diagnóstico médico referido, caracterizada por EVA 5/10.",
+        "metas_asumidas": 3,
+        "rom_falso_grados": 0,
+        "plan_ref": "genérico (sin protocolo por patología)",
+        "mediciones_n": 1
+      },
+      "v22": {
+        "fecha_corte": "2026-11-26",
+        "seguridad": "sin_alerta_detectada_con_datos_disponibles",
+        "bloquea": false,
+        "reglas": [],
+        "dx": "Disfunción de hombro izquierdo sin diagnóstico médico referido; mecanismo: insidioso. Cuadro: EVA 5/10. Hallazgos objetivos: ROM abducción activa 110°; fuerza 4/5 manguito; pruebas especiales: Neer positivo; cribado de banderas rojas negativo. Limitación funcional: no puede levantar el brazo por encima del hombro.",
+        "metas_asumidas": 0,
+        "rom_falso_grados": 0,
+        "plan_ref": "Manguito rotador — por tamaño/tipo",
+        "mediciones_vinculadas_n": 0,
+        "episodio_nuevo": false
+      }
+    },
+    {
+      "codigo": "SINT-TOB",
+      "patologia": "Tobillo/pie",
+      "v21": {
+        "fecha_corte": null,
+        "seguridad": "sin_alerta_detectada_con_datos_disponibles",
+        "bloquea": false,
+        "reglas": [],
+        "dx": "Disfunción de tobillo/pie derecho sin diagnóstico médico referido, caracterizada por EVA 3/10.",
+        "metas_asumidas": 3,
+        "rom_falso_grados": 1,
+        "plan_ref": "genérico (sin protocolo por patología)",
+        "mediciones_n": 1
+      },
+      "v22": {
+        "fecha_corte": "2026-11-26",
+        "seguridad": "sin_alerta_detectada_con_datos_disponibles",
+        "bloquea": false,
+        "reglas": [],
+        "dx": "Disfunción de tobillo/pie derecho sin diagnóstico médico referido; mecanismo: inversión jugando básquetbol. Cuadro: EVA 3/10. Hallazgos objetivos: movilidad descrita como \"dorsiflexión limitada (WBLT reducido)\" (cualitativo, sin goniometría); fuerza 4/5 peroneos; pruebas especiales: cajón anterior leve; cribado de banderas rojas negativo. Limitación funcional: no puede correr ni saltar. Exploración objetiva por completar (ROM goniométrico): diagnóstico PROVISIONAL.",
+        "metas_asumidas": 0,
+        "rom_falso_grados": 0,
+        "plan_ref": "Esguince lateral / tobillo — carga funcional temprana",
+        "mediciones_vinculadas_n": 0,
+        "episodio_nuevo": false
+      }
+    },
+    {
+      "codigo": "SINT-CAD",
+      "patologia": "Cadera",
+      "v21": {
+        "fecha_corte": null,
+        "seguridad": "sin_alerta_detectada_con_datos_disponibles",
+        "bloquea": false,
+        "reglas": [],
+        "dx": "Disfunción de cadera derecho sin diagnóstico médico referido, caracterizada por EVA 5/10.",
+        "metas_asumidas": 3,
+        "rom_falso_grados": 1,
+        "plan_ref": "genérico (sin protocolo por patología)",
+        "mediciones_n": 1
+      },
+      "v22": {
+        "fecha_corte": "2026-11-26",
+        "seguridad": "sin_alerta_detectada_con_datos_disponibles",
+        "bloquea": false,
+        "reglas": [],
+        "dx": "Disfunción de cadera derecho sin diagnóstico médico referido; mecanismo: pinzamiento femoroacetabular. Cuadro: EVA 5/10. Hallazgos objetivos: movilidad descrita como \"rotación interna de cadera limitada\" (cualitativo, sin goniometría); fuerza 4/5 glúteo medio; pruebas especiales: FADIR positivo; cribado de banderas rojas negativo. Limitación funcional: no puede hacer sentadilla profunda. Exploración objetiva por completar (ROM goniométrico): diagnóstico PROVISIONAL.",
+        "metas_asumidas": 0,
+        "rom_falso_grados": 0,
+        "plan_ref": "Cadera — labrum/FAI o conservador",
+        "mediciones_vinculadas_n": 0,
+        "episodio_nuevo": false
+      }
+    },
+    {
+      "codigo": "SINT-FRAC",
+      "patologia": "Fractura",
+      "v21": {
+        "fecha_corte": null,
+        "seguridad": "precaucion_especifica",
+        "bloquea": false,
+        "reglas": [
+          "P3"
+        ],
+        "dx": "Disfunción de tobillo/pie izquierdo sin diagnóstico médico referido, caracterizada por EVA 5/10.",
+        "metas_asumidas": 3,
+        "rom_falso_grados": 1,
+        "plan_ref": "genérico (sin protocolo por patología)",
+        "mediciones_n": 1
+      },
+      "v22": {
+        "fecha_corte": "2026-11-26",
+        "seguridad": "precaucion_especifica",
+        "bloquea": false,
+        "reglas": [
+          "P3"
+        ],
+        "dx": "Disfunción de tobillo/pie izquierdo sin diagnóstico médico referido; mecanismo: caída, fractura bimaleolar con placa y tornillos. Cuadro: EVA 5/10. Hallazgos objetivos: movilidad descrita como \"dorsiflexión muy limitada\" (cualitativo, sin goniometría); fuerza descrita como \"disminuida\" (cualitativo, sin escala). Limitación funcional: cojea, no puede caminar distancias largas. Exploración objetiva por completar (ROM goniométrico, fuerza con escala, pruebas especiales): diagnóstico PROVISIONAL.",
+        "metas_asumidas": 0,
+        "rom_falso_grados": 0,
+        "plan_ref": "Post-fractura — según consolidación y autorización",
+        "mediciones_vinculadas_n": 0,
+        "episodio_nuevo": false
+      }
+    },
+    {
+      "codigo": "SINT-MARCA",
+      "patologia": "Hombro",
+      "v21": {
+        "fecha_corte": null,
+        "seguridad": "precaucion_especifica",
+        "bloquea": false,
+        "reglas": [
+          "P1"
+        ],
+        "dx": "Disfunción de hombro derecho sin diagnóstico médico referido, caracterizada por EVA 4/10.",
+        "metas_asumidas": 3,
+        "rom_falso_grados": 0,
+        "plan_ref": "genérico (sin protocolo por patología)",
+        "mediciones_n": 1
+      },
+      "v22": {
+        "fecha_corte": "2026-11-26",
+        "seguridad": "precaucion_especifica",
+        "bloquea": false,
+        "reglas": [
+          "P1"
+        ],
+        "dx": "Disfunción de hombro derecho sin diagnóstico médico referido; mecanismo: insidioso. Cuadro: EVA 4/10. Hallazgos objetivos: ROM abducción 120°; fuerza 4/5; pruebas especiales: Hawkins positivo; cribado de banderas rojas negativo.",
+        "metas_asumidas": 0,
+        "rom_falso_grados": 0,
+        "plan_ref": "Manguito rotador — por tamaño/tipo",
+        "mediciones_vinculadas_n": 0,
+        "episodio_nuevo": false
+      }
+    },
+    {
+      "codigo": "SINT-EPIS",
+      "patologia": "Rodilla",
+      "v21": {
+        "fecha_corte": null,
+        "seguridad": "sin_alerta_detectada_con_datos_disponibles",
+        "bloquea": false,
+        "reglas": [],
+        "dx": "Disfunción de rodilla derecho sin diagnóstico médico referido, caracterizada por EVA 3/10.",
+        "metas_asumidas": 3,
+        "rom_falso_grados": 0,
+        "plan_ref": "genérico (sin protocolo por patología)",
+        "mediciones_n": 1
+      },
+      "v22": {
+        "fecha_corte": "2026-11-18",
+        "seguridad": "sin_alerta_detectada_con_datos_disponibles",
+        "bloquea": false,
+        "reglas": [],
+        "dx": "Disfunción de rodilla derecho sin diagnóstico médico referido; mecanismo: sobreuso. Cuadro: EVA 3/10. Hallazgos objetivos: ROM flexión 140°; fuerza 4/5. Exploración objetiva por completar (pruebas especiales): diagnóstico PROVISIONAL.",
+        "metas_asumidas": 0,
+        "rom_falso_grados": 0,
+        "plan_ref": "Sin protocolo específico en la biblioteca para esta patología; usar criterio clínico.",
+        "mediciones_vinculadas_n": 0,
+        "episodio_nuevo": true
+      }
+    },
+    {
+      "codigo": "SINT-LADO",
+      "patologia": "Rodilla",
+      "v21": {
+        "fecha_corte": null,
+        "seguridad": "bloqueo_por_dato_inconsistente",
+        "bloquea": true,
+        "reglas": [
+          "X1"
+        ],
+        "dx": "Disfunción de rodilla derecho en contexto de dx médico referido: gonartrosis de rodilla izquierda, caracterizada por EVA 5/10.",
+        "metas_asumidas": 0,
+        "rom_falso_grados": 0,
+        "plan_ref": null,
+        "mediciones_n": 1
+      },
+      "v22": {
+        "fecha_corte": "2026-11-26",
+        "seguridad": "bloqueo_por_dato_inconsistente",
+        "bloquea": true,
+        "reglas": [
+          "X1"
+        ],
+        "dx": "Disfunción de rodilla derecho en contexto de dx médico referido: gonartrosis de rodilla izquierda; mecanismo: degenerativo. Cuadro: EVA 5/10. Hallazgos objetivos: ROM flexión 120°; fuerza 4/5. Exploración objetiva por completar (pruebas especiales): diagnóstico PROVISIONAL.",
+        "metas_asumidas": 0,
+        "rom_falso_grados": 0,
+        "plan_ref": null,
+        "mediciones_vinculadas_n": 0,
+        "episodio_nuevo": false
+      }
+    },
+    {
+      "codigo": "SINT-MIN",
+      "patologia": "Tendinopatia",
+      "v21": {
+        "fecha_corte": null,
+        "seguridad": "sin_alerta_detectada_con_datos_disponibles",
+        "bloquea": false,
+        "reglas": [],
+        "dx": "Disfunción de codo derecho sin diagnóstico médico referido, caracterizada por EVA 4/10. Exploración objetiva pendiente (ROM, fuerza, pruebas especiales): diagnóstico PROVISIONAL.",
+        "metas_asumidas": 1,
+        "rom_falso_grados": 0,
+        "plan_ref": "genérico (sin protocolo por patología)",
+        "mediciones_n": 0
+      },
+      "v22": {
+        "fecha_corte": "2026-11-26",
+        "seguridad": "precaucion_especifica",
+        "bloquea": false,
+        "reglas": [
+          "V2"
+        ],
+        "dx": "Disfunción de codo derecho sin diagnóstico médico referido. Cuadro: EVA 4/10. Sin hallazgos objetivos documentados. Exploración objetiva por completar (ROM goniométrico, fuerza con escala, pruebas especiales): diagnóstico PROVISIONAL. Datos clínicos insuficientes: no se afirma seguridad por ausencia de hallazgos.",
+        "metas_asumidas": 0,
+        "rom_falso_grados": 0,
+        "plan_ref": "Tendinopatía — carga progresiva tipo HSR",
+        "mediciones_vinculadas_n": 0,
+        "episodio_nuevo": false
+      }
+    },
+    {
+      "codigo": "SINT-BIO",
+      "patologia": "Rodilla",
+      "v21": {
+        "fecha_corte": null,
+        "seguridad": "sin_alerta_detectada_con_datos_disponibles",
+        "bloquea": false,
+        "reglas": [],
+        "dx": "Disfunción de rodilla derecho sin diagnóstico médico referido, caracterizada por EVA 2/10. Exploración objetiva pendiente (ROM): diagnóstico PROVISIONAL.",
+        "metas_asumidas": 2,
+        "rom_falso_grados": 0,
+        "plan_ref": "genérico (sin protocolo por patología)",
+        "mediciones_n": 2
+      },
+      "v22": {
+        "fecha_corte": "2026-11-26",
+        "seguridad": "sin_alerta_detectada_con_datos_disponibles",
+        "bloquea": false,
+        "reglas": [],
+        "dx": "Disfunción de rodilla derecho sin diagnóstico médico referido; mecanismo: post-inmovilización por esguince. Cuadro: EVA 2/10. Hallazgos objetivos: fuerza 4/5 cuádriceps. Limitación funcional: no logra flexión completa para subir escaleras. Exploración objetiva por completar (ROM goniométrico, pruebas especiales): diagnóstico PROVISIONAL.",
+        "metas_asumidas": 0,
+        "rom_falso_grados": 0,
+        "plan_ref": "Sin protocolo específico en la biblioteca para esta patología; usar criterio clínico.",
+        "mediciones_vinculadas_n": 2,
+        "episodio_nuevo": false
+      }
+    }
+  ]
+}

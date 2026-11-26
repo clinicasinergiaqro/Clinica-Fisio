@@ -1,5 +1,5 @@
-/* SINERGIA · Motor de Seguridad Clínica V2.1 (prototipo, determinista, versionado)
- * version 2.1.0-proto · 2026-11-26 · BORRADOR, requiere firma del fisioterapeuta.
+/* SINERGIA · Motor de Seguridad Clínica V2.2 (prototipo, determinista, versionado)
+ * version 2.2.0-proto · 2026-11-26 · BORRADOR, requiere firma del fisioterapeuta.
  * Consume los HECHOS del extractor_v2 (negación/temporalidad/lateralidad ya resueltas).
  * No diagnostica ni autoriza tratamiento por sí solo.
  * Clasificación de reglas: emergencia | derivacion_prioritaria | bloqueo_por_dato_inconsistente
@@ -14,8 +14,8 @@
 (function (root) {
   'use strict';
 
-  var VERSION = '2.1.0-proto';
-  var CATALOGO_VERSION = '2026-11-26.a';
+  var VERSION = '2.2.0-proto';
+  var CATALOGO_VERSION = '2026-11-26.b';
 
   var norm = function (s) { return String(s == null ? '' : s).normalize('NFKD').replace(/[̀-ͯ]/g, '').toLowerCase(); };
   var any = function (txt, kws) { txt = norm(txt); return kws.some(function (k) { return txt.indexOf(norm(k)) !== -1; }); };
@@ -57,9 +57,14 @@
       test: function (h) { return !!(h.oncologico && (h.dolorNocturno || h.deficitNeuro || h.dolorPersistente || h.regionEspinal || h.oncoActivo)); } },
 
     { id: 'D2', clasificacion: CLASES.DERIVACION, estado: 'verificada',
-      fundamento: 'Signos de mielopatía / déficit neurológico progresivo que requieren derivación.',
-      fuente: 'NICE NG127 (cervical) / juicio clínico', accion: 'Valoración neurológica/médica. No manipular ni traccionar la columna sin descartar mielopatía.',
+      fundamento: 'Signos de mielopatía / déficit neurológico OBJETIVADO (motor/reflejo/electrofisiológico: pie caído, pérdida de fuerza, arreflexia, atrofia, denervación/ENMG) o radiculopatía confirmada / progresión → derivación.',
+      fuente: 'NICE NG127 (cervical) / juicio clínico', accion: 'Valoración neurológica/médica. No manipular ni traccionar la columna sin descartar mielopatía. Documentar el déficit objetivo.',
       test: function (h) { return !!h.deficitNeuroDerivacion; } },
+
+    { id: 'D3', clasificacion: CLASES.DERIVACION, estado: 'verificada',
+      fundamento: 'Sospecha de TVP por CONSTELACIÓN clínica (hinchazón unilateral de pierna/pantorrilla + factor de riesgo: inmovilización, post-operatorio reciente, reposo/viaje prolongado), aunque no se haya escrito "trombosis".',
+      fuente: 'NICE NG158 (ETV) — regla de sospecha por hallazgos', accion: 'Descartar TVP antes de tratar (Wells/dímero-D/eco-doppler). NO masaje, NO compresión/termoterapia, NO ejercicio vigoroso del miembro hasta descartar. Derivación médica.',
+      test: function (h) { return !!(h.tvpSospecha && !h.tvp); } },
 
     { id: 'X1', clasificacion: CLASES.BLOQUEO, estado: 'verificada',
       fundamento: 'Conflicto de LADO no resuelto entre el dx referido y el registro.',
@@ -113,7 +118,22 @@
 
     { id: 'P9', clasificacion: CLASES.PRECAUCION, estado: 'pendiente_validacion', agente: true,
       fundamento: 'Embarazo.', fuente: 'Pendiente de validación', accion: 'Contraindicados varios agentes (RF/US sobre abdomen/pelvis, ondas, ciertas corrientes). Verificar modalidad/región.',
-      test: function (h) { return !!h.embarazo; } }
+      test: function (h) { return !!h.embarazo; } },
+
+    { id: 'P10', clasificacion: CLASES.PRECAUCION, estado: 'verificada',
+      fundamento: 'Síntoma neurológico REFERIDO (sensitivo: parestesia/hormigueo/adormecimiento) SIN déficit objetivado ni progresión. Precaución, no derivación.',
+      fuente: 'Juicio clínico / distinción referido vs objetivado', accion: 'Vigilar evolución del síntoma; re-evaluar fuerza/reflejos y DERIVAR si aparece déficit objetivado o progresión. Evitar técnicas agresivas sobre el trayecto nervioso.',
+      test: function (h) { return !!(h.sintomaNeuroReferido && !h.deficitNeuroObjetivo && !h.deficitNeuroDerivacion && !h.mielopatia); } },
+
+    { id: 'V1', clasificacion: CLASES.PRECAUCION, estado: 'verificada', forzar_validacion: true,
+      fundamento: 'Estado oncológico CONTRADICTORIO en el dato (aparecen a la vez señales de "activo" y de "remisión"). No se infiere: debe confirmarse.',
+      fuente: 'Regla de integridad del dato + NICE NG234', accion: 'CONFIRMAR estado oncológico (activo vs remisión) con el servicio tratante antes de progresar o aplicar agentes térmicos/RF/US sobre la región. No asumir inactivo por antigüedad.',
+      test: function (h) { return !!h.oncoEstadoDudoso; } },
+
+    { id: 'V2', clasificacion: CLASES.PRECAUCION, estado: 'verificada', forzar_validacion: true,
+      fundamento: 'Datos clínicos insuficientes (examen objetivo vacío y sin cribado documentado, o múltiples campos núcleo por confirmar). La AUSENCIA de dato NO equivale a ausencia de riesgo.',
+      fuente: 'Regla de integridad del dato', accion: 'Completar exploración y cribado de banderas rojas antes de afirmar seguridad o fijar metas medibles. El plan queda condicionado a esos datos.',
+      test: function (h) { return !!h.datosInsuficientes; } }
   ];
 
   var ORDEN = [CLASES.EMERGENCIA, CLASES.DERIVACION, CLASES.BLOQUEO, CLASES.ERROR, CLASES.PRECAUCION];
@@ -132,18 +152,36 @@
       }
       if (hit) {
         alertas.push({ regla: r.id, clasificacion: r.clasificacion, fundamento: r.fundamento, fuente: r.fuente,
-          estado: r.estado, requiere_validacion: (r.estado === 'pendiente_validacion'), es_agente_fisico: !!r.agente, accion: r.accion });
+          estado: r.estado, requiere_validacion: (r.estado === 'pendiente_validacion') || !!r.forzar_validacion, es_agente_fisico: !!r.agente, accion: r.accion });
       }
     });
 
     var cribado = !!h.cribadoDocumentado;
 
+    // Una regla PENDIENTE de validación (o que fuerza validación) NUNCA bloquea ni eleva el estado a
+    // emergencia/derivación/bloqueo por sí sola: aparece en 'alertas' con su clase real, pero para el
+    // ESTADO del plan cuenta como precaución "requiere validación". Solo las VERIFICADAS (o un error de
+    // regla) determinan el bloqueo. (Corrige X3: antes bloqueaba siendo una regla no validada.)
+    function _cuentaBloqueo(cls) {
+      return alertas.some(function (a) {
+        if (a.clasificacion !== cls) return false;
+        if (cls === CLASES.ERROR) return true;
+        return a.estado === 'verificada' && !a.requiere_validacion;
+      });
+    }
     var estado = CLASES.SIN;
     for (var i = 0; i < ORDEN.length; i++) {
-      if (alertas.some(function (a) { return a.clasificacion === ORDEN[i]; })) { estado = ORDEN[i]; break; }
+      var cls = ORDEN[i];
+      if (cls === CLASES.PRECAUCION) {
+        if (alertas.length) { estado = CLASES.PRECAUCION; break; } // cualquier alerta (incl. pendiente) = al menos precaución
+      } else if (_cuentaBloqueo(cls)) { estado = cls; break; }
     }
     // Bloquea plan terapéutico: emergencia, derivación prioritaria, bloqueo por dato, o error de regla no resuelto.
     var bloquea = (estado === CLASES.EMERGENCIA || estado === CLASES.DERIVACION || estado === CLASES.BLOQUEO || estado === CLASES.ERROR);
+    // Reglas PENDIENTES cuya clase SERÍA bloqueante una vez validadas (transparencia; hoy NO bloquean).
+    var pendientes_bloqueo = alertas.filter(function (a) {
+      return a.requiere_validacion && (a.clasificacion === CLASES.EMERGENCIA || a.clasificacion === CLASES.DERIVACION || a.clasificacion === CLASES.BLOQUEO);
+    }).map(function (a) { return a.regla; });
 
     var nota = '';
     if (estado === CLASES.SIN) {
@@ -152,11 +190,15 @@
     } else if (estado === CLASES.PRECAUCION && !cribado) {
       nota = 'Precauciones detectadas; cribado de banderas rojas NO documentado.';
     }
+    if (pendientes_bloqueo.length) {
+      nota = (nota ? nota + ' ' : '') + 'Hay regla(s) PENDIENTE(S) de validación clínica (' + pendientes_bloqueo.join(', ') + ') que no bloquean el plan automáticamente pero requieren revisión del fisioterapeuta.';
+    }
 
     return {
       version: VERSION, catalogo_version: CATALOGO_VERSION,
       estado: estado, cribado_documentado: cribado, nota: nota,
       alertas: alertas, bloquea_plan: bloquea,
+      pendientes_bloqueo: pendientes_bloqueo,
       reglas_pendientes: alertas.filter(function (a) { return a.requiere_validacion; }).map(function (a) { return a.regla; })
     };
   }
@@ -188,8 +230,9 @@
     var rNorm = norm(region || '');
     var regionConocida = !!rNorm;
 
-    // Emergencia activa sobre el segmento: no aplicar agentes al segmento afectado.
+    // Emergencia/derivación activa sobre el segmento: no aplicar agentes al segmento afectado.
     if (h.tvp) { out.estado = 'contraindicado'; out.motivo = 'TVP activa: no aplicar agentes físicos/termo/compresión sobre el miembro afectado (E3).'; out.reglas.push('E3'); return out; }
+    if (h.tvpSospecha) { out.estado = 'contraindicado'; out.requiere_validacion = true; out.motivo = 'Sospecha de TVP por constelación clínica: NO aplicar agentes/termo/compresión/ejercicio del miembro hasta descartar TVP (D3).'; out.reglas.push('D3'); return out; }
 
     if (h.marcapaso && electromagnetico) { out.estado = 'contraindicado'; out.motivo = 'Implante electrónico: evitar modalidad electromagnética (P1). Verificar distancia al dispositivo.'; out.reglas.push('P1'); return out; }
 
