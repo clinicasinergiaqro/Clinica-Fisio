@@ -455,3 +455,66 @@ body.rd-desk #rd-soap-bar .rd-bar-top{ display:none; }   /* escritorio: no hay t
   color:var(--aviso); background:#fff; border:1px solid var(--gold); border-radius:999px; padding:2px 8px; vertical-align:middle; }
 .rd-nm-ep{ font-size:12px; font-weight:800; color:var(--navy); background:#fff; border:1px solid var(--gold-light); border-radius:8px; padding:4px 9px; flex:0 0 auto; }
 .rd-nm-note{ font-size:11.5px; color:#6B5618; margin-top:7px; line-height:1.5; }
+
+/* ===================== ÍNDICE DE APARTADOS DEL ALTA (V1.1) ============== */
+#rd-alta-nav{ position:sticky; top:0; z-index:18; display:flex; gap:6px; overflow-x:auto; scrollbar-width:none;
+  padding:8px 2px; margin:0 0 10px; background:linear-gradient(180deg,var(--bg) 70%,transparent); }
+#rd-alta-nav::-webkit-scrollbar{ display:none; }
+#rd-alta-nav button{ flex:0 0 auto; display:inline-flex; align-items:center; gap:6px; min-height:40px; padding:7px 13px;
+  border:1.5px solid var(--borde); border-radius:var(--radius-pill); background:var(--surface); color:var(--navy);
+  font-family:inherit; font-weight:650; font-size:12.5px; cursor:pointer; white-space:nowrap; box-shadow:var(--shadow-sm); transition:all .12s; }
+#rd-alta-nav button:hover{ border-color:var(--navy); }
+#rd-alta-nav button span{ font-size:14px; }
+@media (min-width:1100px){ body.rd-desk #rd-alta-nav{ top:0; } }
+
+/* ===================== DX FUNCIONAL · presentación (V1.1) =============== */
+.rd-dx{ margin:12px 0 2px; border:1.5px solid var(--borde); border-radius:var(--radius-sm);
+  background:linear-gradient(180deg,var(--surface),var(--gray-50)); padding:13px; }
+.rd-dx-head{ font-size:13px; font-weight:800; color:var(--navy); display:flex; align-items:center; gap:8px; margin-bottom:9px; flex-wrap:wrap; }
+.rd-dx-src{ font-size:9.5px; font-weight:800; text-transform:uppercase; letter-spacing:.4px; color:var(--secundario); background:var(--gray-100); border-radius:6px; padding:2px 8px; }
+.rd-dx-row{ display:flex; gap:10px; padding:6px 0; border-top:1px solid var(--gray-100); font-size:12.5px; }
+.rd-dx-row:first-of-type{ border-top:none; }
+.rd-dx-row b{ flex:0 0 96px; color:var(--gray-500); font-weight:700; font-size:11px; text-transform:uppercase; letter-spacing:.3px; }
+.rd-dx-row span{ flex:1; color:var(--text); line-height:1.45; }
+.rd-dx-edit{ width:100%; min-height:44px; margin-top:10px; border:1.5px solid var(--navy); border-radius:11px; background:var(--surface);
+  color:var(--navy); font-family:inherit; font-weight:750; font-size:13px; cursor:pointer; transition:all .12s; }
+.rd-dx-edit:hover{ background:var(--navy); color:#fff; }
+
+/* =============================== MODO OSCURO (refinamiento) ============= */
+body.modo-oscuro{
+  --bg:#0E1A2C; --surface:#17243C; --text:#E8EEF7; --secundario:#A7B6CD; --borde:#2C3E5B;
+  --white:#17243C; --navy-light:#3A5C92;
+  --gray-50:#1C2B45; --gray-100:#22324C; --gray-150:#27374F; --gray-200:#2C3E5B;
+  --gray-300:#3A4E6E; --gray-400:#8295B0; --gray-500:#A7B6CD; --gray-600:#C3CFE0; --gray-800:#E8EEF7;
+  --blue-light:#1E3350; --exito-bg:#14352A; --aviso-bg:#352B13; --riesgo-bg:#381E1C;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 6px 20px rgba(0,0,0,.35); --shadow-sm:0 1px 2px rgba(0,0,0,.35); --shadow-lg:0 14px 36px rgba(0,0,0,.5);
+}
+body.modo-oscuro .rd-fz-g, body.modo-oscuro .rd-bio-media, body.modo-oscuro .rd-bio-v, body.modo-oscuro .rd-fz-chip,
+body.modo-oscuro .rd-pick-item, body.modo-oscuro #rd-soap-qnav, body.modo-oscuro #rd-soap-bar,
+body.modo-oscuro .rd-modal-box, body.modo-oscuro .rd-modal-top{ background:var(--surface); }
+body.modo-oscuro #rd-soap-qnav, body.modo-oscuro #rd-soap-bar{ background:rgba(23,36,60,.96); }
+body.modo-oscuro .rd-ctx, body.modo-oscuro .rd-bio, body.modo-oscuro .rd-fz, body.modo-oscuro .rd-dx,
+body.modo-oscuro .section-card, body.modo-oscuro .form-group{ background:linear-gradient(180deg,var(--surface),var(--gray-50)); }
+
+/* ============ DIRECTORIO MAESTRO-DETALLE (escritorio, V1.1) ============= */
+#rd-dir-preview{ display:none; }
+@media (min-width:1100px){
+  body.rd-desk #rd-dir-preview{ position:fixed; top:78px; right:24px; width:300px; max-height:calc(100vh - 104px); overflow:auto;
+    background:var(--surface); border:1px solid var(--borde); border-radius:16px; box-shadow:var(--shadow-lg); padding:16px; z-index:90; }
+  body.rd-desk #content-pacientes{ padding-right:340px; }
+}
+.rd-dp-empty{ color:var(--gray-400); font-size:13px; text-align:center; padding:22px 6px; line-height:1.5; }
+.rd-dp-head{ display:flex; align-items:center; gap:11px; margin-bottom:11px; }
+.rd-dp-av{ width:42px; height:42px; border-radius:11px; background:var(--navy); color:#fff; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:18px; flex:0 0 auto; }
+.rd-dp-name{ font-size:15px; font-weight:800; color:var(--navy); line-height:1.2; }
+.rd-dp-sub{ font-size:11.5px; color:var(--gray-500); margin-top:1px; }
+.rd-dp-dx{ font-size:12.5px; color:var(--text); background:var(--gray-50); border:1px solid var(--borde); border-radius:9px; padding:8px 10px; margin-bottom:10px; line-height:1.4; }
+.rd-dp-row{ display:flex; gap:8px; padding:5px 0; border-top:1px solid var(--gray-100); font-size:12px; }
+.rd-dp-row b{ flex:0 0 68px; color:var(--gray-500); font-weight:700; font-size:10px; text-transform:uppercase; letter-spacing:.3px; }
+.rd-dp-row span{ flex:1; color:var(--text); line-height:1.4; }
+.rd-dp-nota{ margin-top:9px; padding-top:9px; border-top:1px solid var(--gray-100); font-size:11.5px; color:var(--gray-600); display:flex; justify-content:space-between; gap:8px; }
+.rd-dp-nota b{ color:var(--gray-500); font-weight:700; }
+.rd-dp-btns{ display:flex; gap:7px; margin-top:13px; }
+.rd-dp-btns button{ flex:1; min-height:42px; border:none; border-radius:10px; background:var(--navy); color:#fff; font-family:inherit; font-weight:700; font-size:12.5px; cursor:pointer; transition:filter .12s; }
+.rd-dp-btns button:hover{ filter:brightness(1.08); }
+.rd-dp-btns button.sec{ background:var(--surface); color:var(--navy); border:1.5px solid var(--navy); }

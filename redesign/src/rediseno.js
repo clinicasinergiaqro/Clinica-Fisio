@@ -63,6 +63,8 @@
     var u=el('rd-rail-user'); try{ var cu=curUser(); if(u && cu && cu.name) u.textContent=cu.name; }catch(_){}
     // La barra de Guardar fija solo vive en la pantalla SOAP activa
     try{ var cs=el('content-soap'); if(!(cs && cs.offsetParent!==null && el('soap-full'))) hideSoapSaveBar(); }catch(_){}
+    // El panel de vista previa del directorio solo en la pantalla Pacientes
+    try{ var pane=el('rd-dir-preview'); if(pane){ var cp=el('content-pacientes'); var onPac=!!(cp && cp.offsetParent!==null && document.body.classList.contains('rd-desk')); pane.style.display=onPac?'block':'none'; if(!onPac) pane.classList.remove('show'); } }catch(_){}
   }
 
   /* ---------------------------------------------- helpers de lectura ------ */
@@ -594,11 +596,61 @@
   }
 
   /* --------------------------------------------------- OBSERVADORES ------ */
+  /* V1.1 · ÍNDICE DE APARTADOS DEL ALTA (sticky, salta a cada sección) */
+  function altaLabel(tx){
+    tx=(tx||'').trim();
+    var ic=(tx.match(/^(\p{Emoji})/u)||[])[1]||'';
+    var map=[[/identificaci|datos general/i,'Datos'],[/antecedent/i,'Antec.'],[/seguridad|bandera/i,'Seguridad'],
+      [/motivo/i,'Motivo'],[/valoraci/i,'Valoración'],[/diagn|plan/i,'Dx/Plan'],[/privacidad|protecci/i,'Privacidad'],
+      [/dermato|🧴/i,'Derma'],[/estudio/i,'Estudios']];
+    for(var i=0;i<map.length;i++){ if(map[i][0].test(tx)) return {ic:ic||'•', t:map[i][1]}; }
+    var words=tx.replace(/^[\p{Emoji}\s]+/u,'').split(/\s+/); return {ic:ic||'•', t:words[0]||'Sección'};
+  }
+  function enhanceAlta(c){
+    var secs=[].slice.call(c.querySelectorAll(':scope > .form-section')).filter(function(s){
+      var t=s.querySelector(':scope > .form-section-title'); return t && s.offsetParent!==null;
+    });
+    if(secs.length<3){ var o=el('rd-alta-nav'); if(o) o.remove(); return; }
+    var nav=el('rd-alta-nav');
+    if(!nav){ nav=document.createElement('div'); nav.id='rd-alta-nav'; c.insertBefore(nav, c.firstChild); }
+    else if(c.firstChild!==nav){ c.insertBefore(nav, c.firstChild); }
+    nav.innerHTML=secs.map(function(s,i){
+      var l=altaLabel((s.querySelector(':scope > .form-section-title').textContent)||'');
+      s.setAttribute('data-rda', i); s.style.scrollMarginTop='56px';
+      return '<button type="button" data-rda="'+i+'"><span>'+H(l.ic)+'</span>'+H(l.t)+'</button>';
+    }).join('');
+    nav.querySelectorAll('button').forEach(function(b){
+      b.onclick=function(){ var s=c.querySelector('.form-section[data-rda="'+b.getAttribute('data-rda')+'"]'); if(s) s.scrollIntoView({behavior:'smooth',block:'start'}); };
+    });
+  }
+
   function tabActivo(){ try{ var t=document.querySelector('.tabs .tab.active'); return t?(t.textContent||'').trim().toLowerCase():''; }catch(_){ return ''; } }
+  /* V1.1 · DX FUNCIONAL — presentación + edición (NO genera; lee p.dxFuncional) */
+  function buildDxCard(host, p){
+    if(!host || !p) return;
+    if(host.querySelector(':scope > .rd-dx')) return;
+    var dxf=p.dxFuncional||{};
+    var fun=txt(dxf.dxFuncional), cli=txt(dxf.dxClinico)||txt(p.dx), cp=txt(dxf.objetivosCP), lp=txt(dxf.objetivosLP),
+        pr=txt(dxf.pronostico), lim=txt(dxf.limitaciones);
+    if(!(fun||cli||cp||lp||pr||lim)) return;   // nada que presentar
+    function row(lbl,v){ return v?('<div class="rd-dx-row"><b>'+H(lbl)+'</b><span>'+H(v)+'</span></div>'):''; }
+    var card=document.createElement('div'); card.className='rd-dx';
+    card.innerHTML='<div class="rd-dx-head">🔎 Diagnóstico funcional <span class="rd-dx-src">'+(dxf.generadoPor?('generado · '+H(dxf.generadoPor)):'editable')+'</span></div>'
+      + row('Dx clínico', cli) + row('Dx funcional', fun)
+      + row('Objetivos CP', cp) + row('Objetivos LP', lp)
+      + row('Pronóstico', pr) + row('Limitaciones', lim)
+      + '<button type="button" class="rd-dx-edit">✏️ Editar diagnóstico y plan</button>';
+    host.appendChild(card);
+    card.querySelector('.rd-dx-edit').onclick=function(){
+      try{ if(typeof window.editarValoracionComoNuevo==='function'){ editarValoracionComoNuevo(); return; } }catch(_){}
+      try{ if(typeof window.editarDatos==='function'){ editarDatos(); return; } }catch(_){}
+    };
+  }
   function enhanceValoracion(c){
     // Solo en la pestaña Valoración: panel de Fuerza 0–10 (comparativa/evolución).
     if(!/valoraci/.test(tabActivo())) return;
     if(c.querySelector(':scope > .rd-fz')){ try{ buildFuerzaPanel(c, cur(), {}); }catch(_){} return; }
+    try{ buildDxCard(c, cur()); }catch(_){}            // presentación del dx funcional
     try{ buildBioCard(c); }catch(_){}                 // ROM/biomecánica también en Valoración
     try{ buildFuerzaPanel(c, cur(), {}); }catch(_){}
   }
@@ -606,6 +658,7 @@
     var c=el(id); if(!c) return;
     if(id==='content-soap') enhanceSoap(c);
     else if(id==='content-expediente'){ buildExpCtx(c); try{ enhanceValoracion(c); }catch(_){} }
+    else if(id==='content-nuevo'){ try{ enhanceAlta(c); }catch(_){} }
   }
   function observe(id){
     var c=el(id); if(!c) return;
@@ -624,17 +677,55 @@
     fire();
   }
 
+  /* V1.1 · DIRECTORIO MAESTRO-DETALLE (escritorio): panel de vista previa a
+     la derecha que se llena al pasar el cursor por una tarjeta. La tarjeta
+     sigue abriendo el expediente al hacer clic (no se toca la navegación). */
+  function pdb(){ try{ return (typeof patientsDB!=='undefined'&&Array.isArray(patientsDB))?patientsDB:[]; }catch(_){ return []; } }
+  function dirPreviewPatient(pid){
+    var p=pdb().filter(function(x){return x && x.id===pid;})[0]; if(!p) return;
+    var pane=el('rd-dir-preview'); if(!pane) return;
+    var mv={}; try{ mv=(typeof window._motivoVigenteDe==='function')?window._motivoVigenteDe(p):{valoracion:p.valoracion||{},dxFuncional:p.dxFuncional||{}}; }catch(_){ mv={valoracion:p.valoracion||{},dxFuncional:p.dxFuncional||{}}; }
+    var val=mv.valoracion||{}, dxf=mv.dxFuncional||{};
+    var vivas=soapVivas(p), ultima=vivas.length?vivas[vivas.length-1]:null;
+    var dx=txt(dxf.dxFuncional)||txt(dxf.dxClinico)||txt(p.dx)||txt(p.motivoConsulta)||'Sin diagnóstico';
+    function line(l,v){ return v?('<div class="rd-dp-row"><b>'+H(l)+'</b><span>'+H(v)+'</span></div>'):''; }
+    pane.innerHTML='<div class="rd-dp-head"><div class="rd-dp-av">'+H((p.name||'?').slice(0,1).toUpperCase())+'</div>'
+      +'<div><div class="rd-dp-name">'+H(p.name||'—')+'</div><div class="rd-dp-sub">'+H((p.age?(p.age+' años · '):''))+H(p.terapeuta||'')+'</div></div></div>'
+      +'<div class="rd-dp-dx">'+H(dx)+'</div>'
+      + line('EVA', txt(val.eva)) + line('ROM', txt(val.rom)) + line('Fuerza', txt(val.fuerza))
+      + line('Objetivo CP', txt(dxf.objetivosCP))
+      + '<div class="rd-dp-nota"><b>Última nota</b>'+(ultima?('<span>Sesión '+H(ultima.num||ultima.sesion||'')+' · '+H(ultima.fecha||ultima.date||'')+'</span>'):'<span style="color:var(--gray-400)">Sin notas</span>')+'</div>'
+      +'<div class="rd-dp-btns"><button type="button" data-open="'+H(p.id)+'">Abrir expediente</button>'
+      +'<button type="button" data-ses="'+H(p.id)+'" class="sec">➕ Sesión</button></div>';
+    pane.classList.add('show');
+    pane.querySelector('[data-open]').onclick=function(){ try{ openExpediente(p.id); }catch(_){} };
+    var sb=pane.querySelector('[data-ses]'); if(sb) sb.onclick=function(){ try{ if(typeof nuevaSesionRapida==='function') nuevaSesionRapida(p.id); else openExpediente(p.id); }catch(_){} };
+  }
+  function buildDirPreview(){
+    if(el('rd-dir-preview')) return;
+    var pane=document.createElement('aside'); pane.id='rd-dir-preview';
+    pane.innerHTML='<div class="rd-dp-empty">Pasa el cursor por un paciente para ver su resumen</div>';
+    document.body.appendChild(pane);
+    var cp=el('content-pacientes');
+    if(cp && !cp._rdHover){ cp._rdHover=true; cp.addEventListener('mouseover', function(ev){
+      if(!document.body.classList.contains('rd-desk')) return;
+      var card=ev.target.closest('.patient-card'); if(!card) return;
+      var pid=card.getAttribute('data-pid'); if(pid) dirPreviewPatient(pid);
+    }); }
+  }
+
   /* -------------------------------------------------------------- INIT --- */
   function init(){
     try{ applyBP(); }catch(_){}
     try{ buildRail(); syncRail(); }catch(_){}
+    try{ buildDirPreview(); }catch(_){}
     window.addEventListener('resize', function(){ try{applyBP();}catch(_){} }, {passive:true});
     // re-sincroniza el rail cuando cambia la pantalla activa
     try{
       var mo=new MutationObserver(function(){ try{syncRail();}catch(_){} });
       document.querySelectorAll('.screen').forEach(function(s){ mo.observe(s,{attributes:true,attributeFilter:['class']}); });
     }catch(_){}
-    ['content-soap','content-expediente'].forEach(observe);
+    ['content-soap','content-expediente','content-nuevo'].forEach(observe);
   }
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', init);
   else setTimeout(init, 0);
