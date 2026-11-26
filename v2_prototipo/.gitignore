@@ -8,3 +8,6 @@ SINERGIA_V2.2*_codigo.zip
 ocr_*
 recovered_*
 estudios85*
+# artefactos efímeros de smoke-test (no versionar)
+_*.png
+_*.html
