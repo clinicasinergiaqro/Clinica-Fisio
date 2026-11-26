@@ -1,0 +1,12 @@
+SINERGIA · Código del Generador de Diagnóstico Funcional V2 (prototipo determinista)
+-----------------------------------------------------------------------------------
+Archivos:
+  motor_seguridad_v2.js  · motor de seguridad independiente y versionado (reglas + fuentes)
+  generador_v2.js        · extracción + normalización + conflictos + objetivos + contrato
+Correr en Node:
+  const G = require('./generador_v2.js');
+  const contrato = G.generar(registroExpediente);   // SOLO LECTURA, no escribe nada
+SOLO LECTURA · no ejecuta saveDB · no modifica expedientes · no se despliega.
+Las reglas marcadas "pendiente" NO bloquean automáticamente; requieren firma del fisioterapeuta
+y, en agentes físicos, verificación contra el fabricante del equipo.
+Ver SINERGIA_Plan_Implementacion_V2.md y SINERGIA_Motor_Seguridad_V2.md.

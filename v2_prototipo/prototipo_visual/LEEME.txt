@@ -1,0 +1,8 @@
+SINERGIA · Prototipo visual del Generador de Diagnóstico Funcional V2
+--------------------------------------------------------------------
+Abrir index.html en cualquier navegador (doble clic). No requiere internet.
+DATOS 100% SINTÉTICOS — ningún paciente real. Solo para evaluar la experiencia visual.
+3 casos de ejemplo: derivación (plan bloqueado), bloqueo por lado, y caso sin alerta (con plan).
+Apartados: Dx funcional · Hipótesis · Objetivos · Seguridad clínica · Plan terapéutico ·
+Mediciones biomecánicas · Evolución · Validación del fisioterapeuta.
+El diseño definitivo se hará tras la auditoría UX/UI de toda la app.
