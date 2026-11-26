@@ -179,3 +179,39 @@ body{
 
 .field-value{color:var(--v2-ink)}
 .field-label{color:var(--v2-ink2)}
+
+/* ============================================================================
+   MÓDULO 3 · EXPEDIENTE CLÍNICO
+   (hero de identidad elegante · pills pastilla · tabs segmentadas premium ·
+    tarjetas y banners de seguridad refinados — COLOR de seguridad intacto)
+   ============================================================================ */
+.exp-header{
+  background:linear-gradient(135deg,var(--navy-dark) 0%, var(--navy) 66%, var(--navy-light) 100%);
+  border-radius:0 0 22px 22px;                 /* bleed arriba bajo el topbar, curva abajo */
+  padding:18px 18px 20px;
+  box-shadow:0 16px 34px -22px rgba(18,41,80,.6);
+}
+.exp-name{font-size:21px; letter-spacing:-.4px}
+.exp-meta{margin-top:5px; color:rgba(255,255,255,.72)}
+.exp-pills{margin-top:14px; gap:7px}
+.exp-pill{
+  background:rgba(255,255,255,.13); border:1px solid rgba(255,255,255,.16);
+  border-radius:999px; padding:5px 13px; font-weight:700; backdrop-filter:blur(3px);
+}
+.exp-pill.gold{background:linear-gradient(180deg,var(--gold-light),var(--gold)); color:var(--navy-dark); border-color:transparent}
+.exp-pill.red{background:rgba(192,57,43,.32); color:#FFDAD4; border-color:rgba(255,130,120,.3)}
+
+/* tabs → control segmentado premium (misma función/onclick) */
+.tabs{
+  border-radius:14px; padding:5px; gap:2px;
+  border:1px solid var(--v2-border); box-shadow:var(--v2-shadow-card);
+}
+.tab{border-radius:10px; font-size:12.5px; color:var(--v2-ink2); padding:9px 13px}
+.tab.active{
+  background:linear-gradient(180deg,var(--navy-light),var(--navy)); color:#fff;
+  box-shadow:0 5px 14px -7px rgba(18,41,80,.65);
+}
+
+/* tarjetas de sección y banners clínicos */
+.section-card{border-radius:var(--radius); border:1px solid var(--v2-border); box-shadow:var(--v2-shadow-card)}
+.allergy-box, .contraindication-box{border-radius:14px}

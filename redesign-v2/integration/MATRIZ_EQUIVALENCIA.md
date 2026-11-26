@@ -60,6 +60,27 @@ presentación; los `onclick` del markup real quedan intactos.**
 | Chips de estado | `.badge badge-pending/alert/done` ("Sin consentimiento"/"SOAP +7d"/"OK") | **solo** `border-radius` (width-neutral) → sin reflow; color de seguridad intacto | `.badge*` | ✅ nombre "Juan Pérez Demo" en 1 línea como el "antes" |
 | Directorio pacientes | `renderPacientesShell`, `_pacCardHTML`, filtros, buscador, "Nuevo paciente", "Nuevo paciente dermatofuncional", lente rosa derma | chips pill, tarjetas premium | `.chip-quick`, `.patient-card`, `.btn-primary/secondary` | ✅ lente derma rosa intacta |
 
+## MÓDULO 3 · Expediente clínico
+
+Función real: `openExpediente(pid)` / `renderExpediente(tab)` (verificadas). El
+reskin **no** cambia tabs, acciones, datos ni el motor de render.
+
+| Control | Función real (se conserva) | Cambio SOLO presentación | IDs/clases | Verificación |
+|---|---|---|---|---|
+| Hero de identidad | nombre/edad/terapeuta/sesiones + pills (dx, alergia, consentimiento) | **tarjeta navy redondeada** con sombra (antes bloque plano) — mismos datos | `.exp-header/.exp-name/.exp-meta` | ✅ sin pérdida |
+| Pills | dx / alergia / consentimiento (significado intacto) | pastilla con borde; `.gold` y `.red` conservan color | `.exp-pill(.gold/.red)` | ✅ |
+| Pestañas | Historia/Valoración/SOAP/Estudios/Reportes… (mismos `onclick`) | **control segmentado premium**; activa en navy | `.tabs/.tab/.tab.active` | ✅ navegación intacta |
+| Completitud / pendientes | "Expediente 4/7" + Consentimiento/Revaloración/SOAP semanal (cálculos reales) | hereda tarjeta/chip premium | — | ✅ cifras reales |
+| Seguridad clínica | banner `_soapSeguridadHTML` (significado intacto) | radio refinado; **color de alerta sin cambio** | `.contraindication-box/.allergy-box` | ✅ |
+| Motivo activo / historia | `.section-card/.field-*` | tarjeta premium, tinta legible | mismas clases | ✅ |
+| Acciones | Exportar JSON / Editar datos / Pedir apoyo (SOS) / Agregar dermatofuncional | botones refinados (mismos onclick) | `.btn-*`, derma | ✅ |
+
+> **Pendiente documentado (no hecho a ciegas):** "Alergia" aparece 3× (pill +
+> banner de seguridad + caja de alergia). Reducir esa duplicación **sin eliminar
+> datos** requiere un pase de **reorganización con JS** (colapsar la caja de
+> alergia redundante solo cuando el banner ya la muestra). Queda para el pase de
+> de-duplicación con verificación, no para CSS a ciegas.
+
 ---
 
 ## Pendientes de dispositivo físico (⏳, no testeable headless)
