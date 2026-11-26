@@ -521,6 +521,32 @@
   }
   function hideSoapSaveBar(){ var b=el('rd-soap-bar'); if(b) b.classList.remove('show'); }
 
+  /* V1.1 · NUEVO MOTIVO — al activarlo, mostrar de inmediato
+     "Nuevo episodio · Sesión 1 · pendiente de guardar" y recordar que los
+     antecedentes/historia se conservan (no se mezclan lesiones). */
+  function rdMotivoNuevoOn(){
+    try{ if(window._soapNuevoMotivoOn===true) return true; }catch(_){}
+    var box=el('nuevo-motivo-box'); return !!(box && box.style.display!=='none' && box.offsetParent!==null);
+  }
+  function rdNuevoMotivoBanner(){
+    var full=el('soap-full'); if(!full) return;
+    var on=rdMotivoNuevoOn();
+    var ban=el('rd-nm-banner');
+    if(!on){ if(ban) ban.remove(); return; }
+    var p=cur(); var ep=((p&&p.motivoActualIndex)||0)+2;   // el nuevo episodio (1-based)
+    if(!ban){
+      ban=document.createElement('div'); ban.id='rd-nm-banner'; ban.className='rd-nm';
+      var qn=el('rd-soap-qnav');
+      if(qn && qn.nextSibling) full.insertBefore(ban, qn.nextSibling);
+      else full.insertBefore(ban, full.firstChild);
+    }
+    ban.innerHTML='<div class="rd-nm-top"><span class="rd-nm-ic">🆕</span>'
+      +'<div><b>Nuevo episodio · Sesión 1</b>'
+      +'<span class="rd-nm-pend">pendiente de guardar</span></div>'
+      +'<span class="rd-nm-ep">Episodio '+ep+'</span></div>'
+      +'<div class="rd-nm-note">Se conservan los antecedentes y la historia; esta nota inicia un episodio nuevo y la numeración de sesiones arranca en 1. No se mezcla con lesiones anteriores.</div>';
+  }
+
   /* --------------------------------- COMPACTAR + ACENTUAR SOAP ----------- */
   function enhanceSoap(container){
     var full=el('soap-full'); if(!full){ hideSoapSaveBar(); return; }
@@ -558,6 +584,12 @@
     try{
       if(!full._rdDraftHooked){ full._rdDraftHooked=true; var _t; full.addEventListener('input',function(){ clearTimeout(_t); _t=setTimeout(rdSnapDraft,400); }); }
       rdRestoreDraft();
+    }catch(_){}
+    // nuevo motivo: banner inmediato + hook al botón real (el toggle es un cambio de estilo)
+    try{
+      var nmb=el('btn-nuevo-motivo-soap');
+      if(nmb && !nmb._rdHooked){ nmb._rdHooked=true; nmb.addEventListener('click', function(){ setTimeout(rdNuevoMotivoBanner, 40); }); }
+      rdNuevoMotivoBanner();
     }catch(_){}
   }
 
