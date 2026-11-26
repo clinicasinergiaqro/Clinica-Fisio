@@ -215,6 +215,139 @@
   }
 
   /* ===================================================================== *
+   * V1.1 · FUERZA MUSCULAR  (escala comparativa 0–10, 10 = lado sano)     *
+   *   · UI rápida: región → músculo → valor 0–10 → lado → referencia      *
+   *   · escribe la frase en el campo libre REAL (f-ofuerza) sin pisarlo   *
+   *   · guarda registro estructurado aditivo valoracion.fuerzaEval[]      *
+   *   · comparativa (déficit vs 10 / Izq-Der) y evolución compatibles     *
+   *   · NO sustituye Daniels/MRC; conserva texto libre y registros previos*
+   * ===================================================================== */
+  function fzGrupos(){ try{ return window._FZ_MUS||{}; }catch(_){ return {}; } }
+  function fzColor(v){ v=+v; return v<=3?'#A52D25':(v<=6?'#B07A12':(v<=9?'#1B3A6B':'#236646')); }
+  function fzEntries(p){ try{ p.valoracion=p.valoracion||{}; if(!Array.isArray(p.valoracion.fuerzaEval)) p.valoracion.fuerzaEval=[]; return p.valoracion.fuerzaEval; }catch(_){ return []; } }
+  function fzHoy(){ try{ var d=new Date(); return ('0'+d.getDate()).slice(-2)+'/'+('0'+(d.getMonth()+1)).slice(-2)+'/'+d.getFullYear(); }catch(_){ return ''; } }
+  function fzParse(f){ try{ var m=String(f).match(/(\d{1,2})\/(\d{1,2})\/(\d{2,4})/); return m?new Date(+((''+m[3]).length<4?'20'+m[3]:m[3]),+m[2]-1,+m[1]).getTime():0; }catch(_){ return 0; } }
+  var fzSel={reg:'',mus:'',valor:null,lado:'der',ref:'sano'};
+  function fzRefLbl(r){ return r==='esperado'?'normal esperado':'lado sano/control'; }
+  function fzFrase(e){ return e.mus+' '+e.valor+'/10'+(e.valor>=10?' (sano)':'')+(e.lado?(' '+e.lado):'')+' [ref: '+fzRefLbl(e.ref)+']'; }
+
+  // Comparativa + evolución: agrupa por músculo (último valor por lado + histórico)
+  function fzResumen(p){
+    var es=fzEntries(p).filter(function(e){return e && e.eliminado!==true && typeof e.valor==='number';});
+    var byMus={};
+    es.forEach(function(e){
+      var k=e.mus||'—'; byMus[k]=byMus[k]||{mus:k, lados:{}, hist:[]};
+      byMus[k].hist.push(e);
+      var l=e.lado||'der';
+      var prev=byMus[k].lados[l];
+      if(!prev || (fzParse(e.fecha)>=fzParse(prev.fecha))) byMus[k].lados[l]=e; // el más reciente por lado
+    });
+    return Object.keys(byMus).map(function(k){return byMus[k];});
+  }
+  function fzBar(v){
+    v=Math.max(0,Math.min(10,+v));
+    return '<div class="rd-fz-bar"><i style="width:'+(v*10)+'%;background:'+fzColor(v)+'"></i></div>';
+  }
+  function fzCompHTML(g){
+    var der=g.lados.der, izq=g.lados.izq, bil=g.lados.bilateral;
+    var row=function(lado,e){
+      if(!e) return '';
+      var def=Math.round((10-e.valor)*10);
+      return '<div class="rd-fz-cmp"><span class="l">'+H(lado)+'</span>'
+        +'<span class="v" style="color:'+fzColor(e.valor)+'">'+e.valor+'<small>/10</small></span>'
+        +fzBar(e.valor)
+        +'<span class="d">'+(e.valor>=10?'referencia':('déficit '+def+'%'))+'</span></div>';
+    };
+    var asim='';
+    if(der&&izq&&(der.valor!==izq.valor)){
+      var hi=Math.max(der.valor,izq.valor), lo=Math.min(der.valor,izq.valor);
+      var ladoDebil=der.valor<izq.valor?'der':'izq';
+      asim='<div class="rd-fz-asim">Asimetría Izq/Der: '+Math.round((hi-lo)*10)+'% más débil el lado '+ladoDebil+'</div>';
+    }
+    // evolución: mismo músculo+lado, ≥2 fechas
+    var evo='';
+    ['der','izq','bilateral'].forEach(function(l){
+      var hs=g.hist.filter(function(e){return (e.lado||'der')===l;}).sort(function(a,b){return fzParse(a.fecha)-fzParse(b.fecha);});
+      if(hs.length>=2){
+        var first=hs[0], last=hs[hs.length-1], dlt=last.valor-first.valor;
+        evo+='<div class="rd-fz-evo"><b>'+H(l)+'</b> '+hs.map(function(e){return '<span style="color:'+fzColor(e.valor)+'">'+e.valor+'</span>';}).join(' → ')
+          +' <span class="dl '+(dlt>=0?'up':'dn')+'">'+(dlt>=0?'▲ +':'▼ ')+dlt+'</span> <small>'+H(first.fecha)+'→'+H(last.fecha)+'</small></div>';
+      }
+    });
+    return '<div class="rd-fz-g"><div class="rd-fz-gh">'+H(g.mus)+'</div>'+row('Der',der)+row('Izq',izq)+row('Bilat.',bil)+asim+evo+'</div>';
+  }
+
+  function fzRenderResultados(host,p){
+    var box=host.querySelector('.rd-fz-res'); if(!box) return;
+    var gs=fzResumen(p);
+    if(!gs.length){ box.innerHTML='<div class="rd-fz-empty">Aún no hay registros de fuerza en este motivo. Captura arriba.</div>'; return; }
+    box.innerHTML='<div class="rd-fz-res-h">Comparativa y evolución</div>'+gs.map(fzCompHTML).join('');
+  }
+  function fzRenderCapture(host){
+    var regs=Object.keys(fzGrupos());
+    var regHTML=regs.map(function(r){ return '<button type="button" class="rd-fz-chip" data-fz="reg" data-v="'+H(r)+'">'+H(r)+'</button>'; }).join('');
+    var musHTML=(fzSel.reg&&fzGrupos()[fzSel.reg]||[]).map(function(m){ return '<button type="button" class="rd-fz-chip" data-fz="mus" data-v="'+H(m)+'">'+H(m)+'</button>'; }).join('');
+    var valHTML=''; for(var i=0;i<=10;i++){ valHTML+='<button type="button" class="rd-fz-val" data-fz="val" data-v="'+i+'" style="--c:'+fzColor(i)+'">'+i+'</button>'; }
+    var cap=host.querySelector('.rd-fz-cap');
+    cap.innerHTML=
+      '<div class="rd-fz-step"><span>1 · Región</span><div class="rd-fz-row">'+regHTML+'</div></div>'
+      +(fzSel.reg?'<div class="rd-fz-step"><span>2 · Músculo</span><div class="rd-fz-row">'+musHTML+'</div></div>':'')
+      +(fzSel.mus?('<div class="rd-fz-step"><span>3 · Fuerza (0 = sin contracción · 10 = lado sano)</span><div class="rd-fz-vals">'+valHTML+'</div></div>'
+        +'<div class="rd-fz-step2"><div><span>Lado</span><div class="rd-fz-row">'
+          +'<button type="button" class="rd-fz-chip" data-fz="lado" data-v="der">Der</button>'
+          +'<button type="button" class="rd-fz-chip" data-fz="lado" data-v="izq">Izq</button>'
+          +'<button type="button" class="rd-fz-chip" data-fz="lado" data-v="bilateral">Bilat.</button></div></div>'
+        +'<div><span>Referencia = 10</span><div class="rd-fz-row">'
+          +'<button type="button" class="rd-fz-chip" data-fz="ref" data-v="sano">Lado sano/control</button>'
+          +'<button type="button" class="rd-fz-chip" data-fz="ref" data-v="esperado">Normal esperado</button></div></div></div>'
+        +'<div class="rd-fz-prev"></div>'
+        +'<button type="button" class="rd-fz-add" data-fz="add" disabled>➕ Registrar fuerza</button>'):'');
+    // marcar selección
+    function mark(attr,val){ cap.querySelectorAll('[data-fz="'+attr+'"]').forEach(function(b){ b.classList.toggle('on', b.getAttribute('data-v')===String(val)); }); }
+    mark('reg',fzSel.reg); mark('mus',fzSel.mus); if(fzSel.valor!=null) mark('val',fzSel.valor); mark('lado',fzSel.lado); mark('ref',fzSel.ref);
+    var prev=cap.querySelector('.rd-fz-prev'), add=cap.querySelector('.rd-fz-add');
+    if(prev && fzSel.mus && fzSel.valor!=null){
+      prev.style.display='block';
+      prev.innerHTML='Se registra: <b>'+H(fzFrase({mus:fzSel.mus,valor:fzSel.valor,lado:fzSel.lado,ref:fzSel.ref}))+'</b>';
+      if(add) add.disabled=false;
+    } else if(prev){ prev.style.display='none'; if(add) add.disabled=true; }
+  }
+  function buildFuerzaPanel(host, p, opts){
+    opts=opts||{};
+    if(!host || !p) return;
+    if(host.querySelector(':scope > .rd-fz')){ fzRenderResultados(host.querySelector(':scope > .rd-fz'), p); return; }
+    if(!Object.keys(fzGrupos()).length) return;  // taxonomía real no cargada
+    var panel=document.createElement('div'); panel.className='rd-fz';
+    panel.innerHTML='<div class="rd-fz-head">💪 Fuerza muscular <span class="rd-fz-tag">0–10 · 10 = lado sano</span></div>'
+      +'<div class="rd-fz-cap"></div>'
+      +'<div class="rd-fz-res"></div>';
+    host.appendChild(panel);
+    fzRenderCapture(panel);
+    fzRenderResultados(panel, p);
+    panel.addEventListener('click', function(ev){
+      var b=ev.target.closest('[data-fz]'); if(!b) return;
+      var a=b.getAttribute('data-fz'), v=b.getAttribute('data-v');
+      if(a==='reg'){ fzSel.reg=(fzSel.reg===v?'':v); fzSel.mus=''; fzSel.valor=null; fzRenderCapture(panel); }
+      else if(a==='mus'){ fzSel.mus=(fzSel.mus===v?'':v); fzSel.valor=null; fzRenderCapture(panel); }
+      else if(a==='val'){ fzSel.valor=(fzSel.valor===+v?null:+v); fzRenderCapture(panel); }
+      else if(a==='lado'){ fzSel.lado=v; fzRenderCapture(panel); }
+      else if(a==='ref'){ fzSel.ref=v; fzRenderCapture(panel); }
+      else if(a==='add'){
+        if(!fzSel.mus||fzSel.valor==null) return;
+        var e={id:'fz_'+Date.now()+'_'+Math.random().toString(36).slice(2,6), reg:fzSel.reg, mus:fzSel.mus, lado:fzSel.lado, valor:fzSel.valor, ref:fzSel.ref, fecha:fzHoy()};
+        fzEntries(p).push(e);
+        // escribir la frase en el campo libre REAL sin pisar lo escrito
+        try{
+          if(opts.writeField && typeof window.setCampoAppend==='function') window.setCampoAppend(opts.writeField, fzFrase(e));
+          else if(opts.writeField){ var t=el(opts.writeField); if(t){ t.value=(t.value?t.value.replace(/\s*$/,'')+' · ':'')+fzFrase(e); t.dispatchEvent(new Event('input',{bubbles:true})); } }
+        }catch(_){}
+        fzSel.mus=''; fzSel.valor=null;      // listo para el siguiente músculo
+        fzRenderCapture(panel); fzRenderResultados(panel, p);
+      }
+    });
+  }
+
+  /* ===================================================================== *
    * V1.1 · SOAP MOBILE-FIRST                                              *
    *   · compacta identificación / fecha / dictado (encabezado liviano)   *
    *   · barra sticky de navegación rápida S/O/A/P (llega al Subjetivo)    *
@@ -332,15 +465,23 @@
     }
     buildSoapCtx(container);            // panel de contexto (colapsado en móvil)
     try{ buildBioCard(full); }catch(_){}
+    try{ if(map.o) buildFuerzaPanel(map.o, cur(), {writeField:'f-ofuerza'}); }catch(_){}
     try{ buildSoapQuickNav(full, map); }catch(_){}   // al final → queda como 1er hijo (arriba de todo)
     try{ buildSoapSaveBar(map); }catch(_){}
   }
 
   /* --------------------------------------------------- OBSERVADORES ------ */
+  function tabActivo(){ try{ var t=document.querySelector('.tabs .tab.active'); return t?(t.textContent||'').trim().toLowerCase():''; }catch(_){ return ''; } }
+  function enhanceValoracion(c){
+    // Solo en la pestaña Valoración: panel de Fuerza 0–10 (comparativa/evolución).
+    if(!/valoraci/.test(tabActivo())) return;
+    if(c.querySelector(':scope > .rd-fz')){ try{ buildFuerzaPanel(c, cur(), {}); }catch(_){} return; }
+    try{ buildFuerzaPanel(c, cur(), {}); }catch(_){}
+  }
   function runFor(id){
     var c=el(id); if(!c) return;
     if(id==='content-soap') enhanceSoap(c);
-    else if(id==='content-expediente') buildExpCtx(c);
+    else if(id==='content-expediente'){ buildExpCtx(c); try{ enhanceValoracion(c); }catch(_){} }
   }
   function observe(id){
     var c=el(id); if(!c) return;

@@ -361,6 +361,47 @@ body{
 body.rd-desk #rd-soap-bar{ left:var(--rail); }
 body.rd-desk #rd-soap-bar .rd-bar-top{ display:none; }   /* escritorio: no hay teclado que tape; solo Guardar */
 
+/* ===================== FUERZA MUSCULAR 0–10 (V1.1) ===================== */
+.rd-fz{ margin:12px 0 2px; border:1.5px solid var(--borde); border-radius:var(--radius-sm);
+  background:linear-gradient(180deg,#fff,var(--gray-50)); padding:13px 13px 11px; }
+.rd-fz-head{ font-size:13px; font-weight:800; color:var(--navy); display:flex; align-items:center; gap:8px; margin-bottom:10px; flex-wrap:wrap; }
+.rd-fz-tag{ font-size:9.5px; font-weight:800; text-transform:uppercase; letter-spacing:.4px; color:var(--navy); background:var(--blue-light); border-radius:6px; padding:2px 8px; }
+.rd-fz-step{ margin-bottom:9px; }
+.rd-fz-step>span{ display:block; font-size:10.5px; font-weight:700; color:var(--gray-500); text-transform:uppercase; letter-spacing:.4px; margin-bottom:5px; }
+.rd-fz-step2{ display:flex; gap:14px; flex-wrap:wrap; margin-bottom:9px; }
+.rd-fz-step2>div>span{ display:block; font-size:10.5px; font-weight:700; color:var(--gray-500); text-transform:uppercase; letter-spacing:.4px; margin-bottom:5px; }
+.rd-fz-row{ display:flex; gap:6px; flex-wrap:wrap; }
+.rd-fz-chip{ min-height:38px; padding:7px 13px; border-radius:var(--radius-pill); border:1.5px solid var(--borde);
+  background:#fff; color:var(--navy); font-family:inherit; font-weight:650; font-size:12.5px; cursor:pointer; transition:all .12s; }
+.rd-fz-chip:hover{ border-color:var(--navy); }
+.rd-fz-chip.on{ background:var(--navy); color:#fff; border-color:var(--navy); }
+.rd-fz-vals{ display:flex; gap:5px; flex-wrap:wrap; }
+.rd-fz-val{ flex:1 0 auto; min-width:40px; min-height:44px; border-radius:10px; border:1.5px solid var(--borde);
+  background:#fff; color:var(--c,#1B3A6B); font-family:inherit; font-weight:800; font-size:16px; cursor:pointer; transition:all .1s; }
+.rd-fz-val:hover{ border-color:var(--c,var(--navy)); }
+.rd-fz-val.on{ background:var(--c,var(--navy)); color:#fff; border-color:var(--c,var(--navy)); box-shadow:0 3px 10px rgba(18,41,80,.18); }
+.rd-fz-prev{ display:none; margin:8px 0; font-size:12.5px; background:var(--exito-bg); border:1px solid #9FC7B2; color:#1c6b46; border-radius:9px; padding:8px 11px; }
+.rd-fz-add{ width:100%; min-height:46px; margin-top:4px; border:none; border-radius:11px; background:var(--navy); color:#fff;
+  font-family:inherit; font-weight:750; font-size:14px; cursor:pointer; transition:filter .12s; }
+.rd-fz-add:hover{ filter:brightness(1.08); }
+.rd-fz-add:disabled{ background:var(--gray-200); color:var(--gray-500); cursor:default; }
+.rd-fz-res{ margin-top:11px; }
+.rd-fz-res-h{ font-size:10.5px; font-weight:800; text-transform:uppercase; letter-spacing:.5px; color:var(--navy); margin:2px 0 7px; }
+.rd-fz-empty{ font-size:11.5px; color:var(--gray-400); padding:3px 2px; }
+.rd-fz-g{ background:#fff; border:1px solid var(--borde); border-radius:11px; padding:9px 11px; margin-bottom:8px; }
+.rd-fz-gh{ font-size:12.5px; font-weight:800; color:var(--navy); margin-bottom:6px; }
+.rd-fz-cmp{ display:flex; align-items:center; gap:9px; margin:4px 0; font-size:12px; }
+.rd-fz-cmp .l{ width:44px; color:var(--gray-500); font-weight:700; }
+.rd-fz-cmp .v{ width:46px; font-weight:800; font-size:15px; }
+.rd-fz-cmp .v small{ font-size:10px; color:var(--gray-400); font-weight:600; }
+.rd-fz-cmp .d{ font-size:11px; color:var(--gray-500); white-space:nowrap; }
+.rd-fz-bar{ flex:1; height:8px; border-radius:5px; background:var(--gray-150); overflow:hidden; min-width:60px; }
+.rd-fz-bar i{ display:block; height:100%; border-radius:5px; }
+.rd-fz-asim{ font-size:11px; color:var(--aviso); background:var(--aviso-bg); border-radius:8px; padding:5px 9px; margin-top:6px; font-weight:650; }
+.rd-fz-evo{ font-size:11px; color:var(--gray-600); margin-top:6px; padding-top:6px; border-top:1px dashed var(--gray-200); }
+.rd-fz-evo .dl.up{ color:var(--exito); font-weight:800; } .rd-fz-evo .dl.dn{ color:var(--riesgo); font-weight:800; }
+.rd-fz-evo small{ color:var(--gray-400); }
+
 /* Fecha compacta en móvil (es un solo input de fecha) */
 @media (max-width:759px){
   #content-soap .rd-fecha{ margin-bottom:10px; }

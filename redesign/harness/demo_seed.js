@@ -86,6 +86,14 @@
                   ej('Sentadilla a la pared','3×12 · tempo 3-3 · 3×/sem','Baja controlado en 3 s, sube en 3 s. Rodilla alineada con el pie.') ];
   p1.estudiosDocs=[ est('RM rodilla derecha','resonancia','Engrosamiento tendón rotuliano proximal') ];
   p1.biomecanica=[ bioGonio('02/11/2026',{k:'rod_flex',t:'Flexión de rodilla'},100,140), bioGonio('09/11/2026',{k:'rod_flex',t:'Flexión de rodilla'},125,140), bioMarcha('09/11/2026') ];
+  // Fuerza estructurada (escala 0–10, 10 = lado sano) — demo de comparativa y evolución
+  p1.valoracion.fuerzaEval=[
+    {id:'fz_d1', reg:'Rodilla', mus:'Cuádriceps',   lado:'der', valor:5,  ref:'sano', fecha:'02/11/2026'},
+    {id:'fz_d2', reg:'Rodilla', mus:'Cuádriceps',   lado:'der', valor:7,  ref:'sano', fecha:'09/11/2026'},
+    {id:'fz_d3', reg:'Rodilla', mus:'Cuádriceps',   lado:'izq', valor:10, ref:'sano', fecha:'09/11/2026'},
+    {id:'fz_d4', reg:'Rodilla', mus:'Isquiotibiales',lado:'der',valor:9,  ref:'sano', fecha:'09/11/2026'},
+    {id:'fz_d5', reg:'Cadera',  mus:'Glúteo medio', lado:'der', valor:6,  ref:'sano', fecha:'09/11/2026'}
+  ];
   p1.sugerenciaIA='💡 Sugerencia de anamnesis (por ejes):\n• Mecanismo: [sobreuso en carrera — por confirmar]\n• Comportamiento del dolor: agrava al bajar escaleras y correr; alivia con reposo.\n• Limitación funcional: no puede correr >2 km.\n— Texto original: '+p1.motivo.padecimiento;
   P.push(p1);
 
