@@ -28,20 +28,25 @@ Leyenda estado: ✅ verificado en réplica · ⏳ pendiente dispositivo físico.
 | Tarjetas | `.patient-card/.section-card/.soap-card/.card` (contenido intacto) | radio 12→16, sombra en capas | mismas clases | ✅ |
 | Nav inferior | `.bottom-nav/.nav-item` (mismos `onclick`, orden, íconos SVG reales) | borde/sombra/blur, color activo navy | `.bottom-nav` | ✅ 4 ítems, activo correcto |
 
-## MÓDULO 1 · Login / identidad
+## MÓDULO 1 · Login / identidad  (referencia V2: fondo CLARO + logo oficial)
+
+Nombres de función verificados vigentes en `main` (1 def c/u): `doLogin`,
+`togglePassVer`, `recuperarPass`, `entrarModoOffline_`. **Solo se cambia su
+presentación; los `onclick` del markup real quedan intactos.**
 
 | Control | Función real (se conserva) | Cambio SOLO presentación | IDs | Verificación |
 |---|---|---|---|---|
-| Marca | markup `<div class="mark">🫀</div>` | emoji oculto (`font-size:0`) + **emblema oficial** por `background` (incrustado base64, offline-safe). **No** se borra ni reemplaza el nodo | `.login-logo .mark` | ✅ emblema visible, sin JS |
-| Correo | `#login-user` + `doLogin()` | campo premium (radio, foco oro) | `#login-user` | ✅ intacto |
-| Contraseña + ojo | `#login-pass`, `togglePassVer()` en `#btn-ver-pass` | botón ojo a **44×44**, centrado, **sin desbordar**; input deja sitio | `#login-pass`, `#btn-ver-pass` | ✅ corregido overflow |
-| Entrar | `doLogin()` (auth real) | botón oro con degradado/sombra | `.btn-login` | ✅ onclick intacto |
-| Modo offline | `entrarModoOffline_()` | botón coherente discreto | `.btn-secondary` | ✅ onclick intacto |
-| Recuperar contraseña | `recuperarPass()` | — (estilo heredado) | enlace | ✅ onclick intacto |
-| Fondo | `#screen-login` | curvas navy/oro (pseudo-elementos, `pointer-events:none`) | `#screen-login::before/::after` | ✅ no intercepta toques |
-| Chip de versión | `window.APP_VERSION` / `#app-version-chip` | estilo discreto (claro sobre navy, tenue sobre claro) | `#app-version-chip` | ✅ texto real sin cambio |
-| **Barra de estado/notch simulados** | N/A — la app real **no** tiene barra/notch (eran del prototipo) | nada que quitar | — | ✅ no existen en la app real |
+| Fondo | `#screen-login` | **tema CLARO** (#F5F7FA) + **curvas institucionales** navy (banda superior) y acento dorado (pseudo-elementos `pointer-events:none`) | `#screen-login::before/::after` | ✅ no intercepta toques; login scrolleable (`overflow-y:auto`) → teclado no tapa campos |
+| Marca / logo | markup `<div class="mark">🫀</div>` | el emoji se **retira del árbol de accesibilidad** (`textContent=''` por JS) y se pone el **LOGO OFICIAL COMPLETO** como `<img alt="Clínica Sinergia — Fisioterapia y Rehabilitación">`. El `<h1>` de texto redundante se oculta **solo** si el logo se insertó (`.v2-login-ready`) → degradación elegante | `.login-logo .mark`, `.v2-login-logo` | ✅ logo visible + **nombre accesible** correcto (no emoji) |
+| Correo | `#login-user` + `doLogin()` | campo **claro** profesional + **icono lineal** (sobre SVG, decorativo) | `#login-user` | ✅ onclick/placeholder intactos |
+| Contraseña + ojo | `#login-pass`, `togglePassVer()` en `#btn-ver-pass` | campo claro + icono candado; botón ojo **44×44**, tinta, **sin desbordar**; input deja sitio | `#login-pass`, `#btn-ver-pass` | ✅ overflow corregido |
+| Entrar (primario) | `doLogin()` (auth real) | **botón navy con DETALLE dorado** (línea inferior), como la referencia | `.btn-login` | ✅ onclick intacto |
+| Modo offline (secundario) | `entrarModoOffline_()` | **acción secundaria** (contorno navy sobre claro) | `.btn-secondary` | ✅ onclick intacto |
+| Recuperar contraseña | `recuperarPass()` | enlace navy discreto | enlace | ✅ onclick intacto |
+| Chip de versión | `window.APP_VERSION` / `#app-version-chip` | pastilla discreta | `#app-version-chip` | ✅ texto real sin cambio |
+| **Barra de estado/notch simulados** | N/A — la app real **no** los tiene (eran del prototipo) | nada que quitar | — | ✅ no existen en la app real |
 | Credenciales demo | N/A — la app real **no** precarga credenciales | **no se introducen** | — | ✅ login en blanco |
+| Responsive | — | verificado 360/390/430 px: logo+campos+botones caben sin desborde | — | ✅ 360/390/430 |
 
 ## MÓDULO 2 · Agenda / directorio
 
