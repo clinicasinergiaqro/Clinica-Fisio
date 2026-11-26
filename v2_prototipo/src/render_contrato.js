@@ -6,7 +6,7 @@
  */
 (function (root) {
   'use strict';
-  var VERSION = '2.2.2-proto';
+  var VERSION = '2.2.3-proto';
 
   function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
 

@@ -9,7 +9,7 @@
  */
 (function (root) {
   'use strict';
-  var VERSION = '2.2.2-proto';
+  var VERSION = '2.2.3-proto';
 
   var norm = function (s) {
     return String(s == null ? '' : s).normalize('NFKD').replace(/[̀-ͯ]/g, '').toLowerCase();
@@ -86,9 +86,11 @@
   // Clasificador de REGIÓN anatómica (para detectar conflicto zona vs dx médico, como HECHO).
   var REGIONES = {
     cervical: ['cervical', 'cuello'], dorsal: ['dorsal', 'toracic', 'espalda alta'], lumbar: ['lumbar', 'lumbalg', 'espalda baja', 'l4', 'l5', 's1'],
-    hombro: ['hombro', 'manguito', 'supraespinoso', 'glenohumeral'], codo: ['codo', 'epicondil'], muneca_mano: ['muneca', 'mano', 'carpo', 'dedo', 'tunel carpiano'],
-    cadera: ['cadera', 'coxofemoral', 'labrum de cadera'], rodilla: ['rodilla', 'menisc', 'rotul', 'patelo', 'cruzado'], tobillo_pie: ['tobillo', 'pie', 'aquiles', 'calcaneo', 'fascitis plantar']
+    hombro: ['hombro', 'manguito', 'supraespinoso', 'glenohumeral', 'humero proximal'], codo: ['codo', 'epicondil', 'supraintercondilea', 'supracondilea', 'intercondilea', 'olecranon', 'humero distal', 'humeral distal', 'cubito proximal'], muneca_mano: ['muneca', 'mano', 'carpo', 'dedo', 'tunel carpiano', 'escafoides', 'colles'],
+    cadera: ['cadera', 'coxofemoral', 'labrum de cadera'], rodilla: ['rodilla', 'menisc', 'rotul', 'patelo', 'cruzado', 'lca', 'gonartros'], tobillo_pie: ['tobillo', 'pie', 'aquiles', 'calcaneo', 'fascitis plantar', 'peroneo', 'astragal', 'maleolo']
   };
+  var REGION_LABEL = { cervical: 'columna cervical', dorsal: 'columna dorsal', lumbar: 'columna lumbar', hombro: 'hombro', codo: 'codo', muneca_mano: 'muñeca/mano', cadera: 'cadera', rodilla: 'rodilla', tobillo_pie: 'tobillo/pie' };
+  function _regionLabel(k) { return REGION_LABEL[k] || (k ? String(k).replace('_', '/') : 'región por precisar'); }
   function regionDe(txt) {
     txt = norm(txt);
     // "pie fijo" / "de pie" / "a pie" / "en pie" NO son la región anatómica tobillo/pie: son postura o
@@ -139,13 +141,54 @@
     return { valor: valor, reposo: reposo, movimiento: movimiento, nums: nums };
   }
 
+  // SOAP CLÍNICO: extrae hallazgos REALES de cada nota (el campo 'o' suele traer rom/fuerza/hallazgos).
+  // Determina el estado ACTUAL (la nota más reciente con dato) vs el inicial, y conserva el histórico de
+  // fuerza con sus fechas. No presenta un hallazgo antiguo como actual: cada dato lleva su fecha.
+  function _subcampo(oTxt, clave) {
+    var re = new RegExp(clave + "['\"\\s]*[:=]\\s*['\"]?([^}'\"]*?)(?:['\"]?\\s*[,}]|rom|fuerza|hallazgos|$)", 'i');
+    var m = String(oTxt || '').match(re); return m ? m[1].trim() : null;
+  }
+  // El campo SOAP 'o' puede venir como OBJETO {rom,fuerza,hallazgos} o como texto. Normaliza a texto plano.
+  function _oTexto(oVal) {
+    if (oVal && typeof oVal === 'object') return [oVal.rom, oVal.fuerza, oVal.hallazgos, oVal.o, oVal.observaciones].filter(Boolean).map(String).join(' · ');
+    return String(oVal || '');
+  }
+  function _oSub(oVal, clave) {
+    if (oVal && typeof oVal === 'object') return (oVal[clave] != null && lleno(oVal[clave])) ? String(oVal[clave]).trim() : null;
+    var v = _subcampo(oVal, clave); return (v && lleno(v)) ? v : null;
+  }
+  function _soapClinico(rec, fechaCorte) {
+    var soaps = Array.isArray(rec.soap) ? rec.soap.slice() : [];
+    var parse = function (f) { var d = Date.parse(f || ''); return isNaN(d) ? 0 : d; };
+    if (fechaCorte) { var fc = parse(fechaCorte); if (fc) soaps = soaps.filter(function (s) { return parse(s.fecha) <= fc; }); }
+    soaps.sort(function (a, b) { return parse(a.fecha) - parse(b.fecha); });
+    var notas = soaps.map(function (s) {
+      var oVal = s && s.o;
+      var fuerzaSub = _oSub(oVal, 'fuerza');
+      var grupos = _parseFuerzaMulti(fuerzaSub != null ? fuerzaSub : _oTexto(oVal));
+      var romSub = _oSub(oVal, 'rom');
+      var hallSub = _oSub(oVal, 'hallazgos');
+      var texto = [s && s.s, _oTexto(oVal), s && s.a, s && s.p, s && s.texto].filter(Boolean).map(String).join(' · ');
+      var hallLimpio = (hallSub && !/^(sin pruebas?|na|n\/a|pendiente|ninguno|ninguna|sin cambios?|s\/p|sin novedad)\.?$/i.test(hallSub.trim())) ? hallSub : null;
+      return { fecha: (s && s.fecha) || null, grupos: grupos, romTxt: romSub, hallazgos: hallLimpio, region: regionDe(texto) };
+    });
+    function latestWith(pred) { for (var i = notas.length - 1; i >= 0; i--) if (pred(notas[i])) return notas[i]; return null; }
+    return {
+      n: notas.length,
+      fuerzaActual: latestWith(function (x) { return x.grupos && x.grupos.length; }),
+      romActual: latestWith(function (x) { return x.romTxt; }),
+      hallazgosActual: latestWith(function (x) { return x.hallazgos; }),
+      histFuerza: notas.filter(function (x) { return x.grupos && x.grupos.length; }).map(function (x) { return { fecha: x.fecha, grupos: x.grupos }; })
+    };
+  }
+
   // Texto SOAP: separa nota INICIAL (valoración) de la MÁS RECIENTE (evolución) con fecha_corte.
   function _soapTexto(rec, fechaCorte) {
     var soaps = Array.isArray(rec.soap) ? rec.soap.slice() : [];
     var parse = function (f) { var d = Date.parse(f || ''); return isNaN(d) ? 0 : d; };
     if (fechaCorte) { var fc = parse(fechaCorte); if (fc) soaps = soaps.filter(function (s) { return parse(s.fecha) <= fc; }); }
     soaps.sort(function (a, b) { return parse(a.fecha) - parse(b.fecha); });
-    var join = function (s) { return [s && s.s, s && s.o, s && s.a, s && s.p, s && s.texto].filter(Boolean).join(' · '); };
+    var join = function (s) { return [s && s.s, _oTexto(s && s.o), s && s.a, s && s.p, s && s.texto].filter(Boolean).join(' · '); };
     var inicial = soaps.length ? join(soaps[0]) : '';
     var actual = soaps.length ? join(soaps[soaps.length - 1]) : '';
     var todo = soaps.map(join).join(' · ');
@@ -168,9 +211,14 @@
     var relato = String(o.padecimiento || '');
     var dxMed = String((o.dxMedico || '') + ' ' + (o.dxMedicoMotivo || ''));
     var soap = _soapTexto(rec, fechaCorte);
+    var soapClin = _soapClinico(rec, fechaCorte);
 
     // Texto clínico del PACIENTE (personal), incluye evolución SOAP (dentro de fecha_corte).
-    var personal = [segBlob, cirugias, medicamentos, relato, dxMed, soap.todo].join(' · ');
+    // Texto recuperado de DOCUMENTOS adjuntos (dx documentado, cirugías, indicaciones, restricciones) —
+    // así el motor de seguridad cuenta restricciones que no están en los campos estructurados.
+    var dr = rec.docsRecuperados || {};
+    var docsBlob = [].concat((dr.dx_documentado || []).map(function (x) { return x.dx || ''; }), dr.cirugias || [], dr.indicaciones || [], dr.restricciones || []).join(' · ');
+    var personal = [segBlob, cirugias, medicamentos, relato, dxMed, soap.todo, docsBlob].join(' · ');
 
     var ev = {}; // evidencias por hecho
     function flag(terms, texto, campo) {
@@ -275,6 +323,22 @@
     }
     if (regionConflicto && !ev['region_conflicto']) ev['region_conflicto'] = { campo: 'zona/dx', fragmento: 'zona:[' + regionZona.join(',') + '] dx:[' + regionDxArr.join(',') + ']' + (regionMec.length ? ' (mec:[' + regionMec.join(',') + '] y pat:[' + regionPat.join(',') + '] NO entran al conflicto)' : '') };
 
+    // --- RECUPERACIÓN de REGIÓN (zona → dx → padecimiento → SOAP) cuando la zona está vacía o es "otra".
+    //     No resuelve contradicciones por suposición: solo RECUPERA cuando la zona no da información.
+    var regRelato = regionDe(relato);
+    var regSoap = (soapClin.fuerzaActual && soapClin.fuerzaActual.region && soapClin.fuerzaActual.region.length) ? soapClin.fuerzaActual.region : regionDe(soap.todo);
+    var zonaVaga = !lleno(o.zona) || norm(o.zona) === 'otra' || norm(o.zona) === 'otro';
+    var regionRec = null, regionRecFuente = null;
+    if (!zonaVaga) { regionRec = regionZona.length ? regionZona[0] : norm(o.zona); regionRecFuente = 'zona'; }
+    if (!regionRec) {
+      var _cands = [['dxMedico', regionDxArr], ['padecimiento', regRelato], ['soap', regSoap]];
+      for (var _ri = 0; _ri < _cands.length; _ri++) { if (_cands[_ri][1] && _cands[_ri][1].length) { regionRec = _cands[_ri][1][0]; regionRecFuente = _cands[_ri][0]; break; } }
+    }
+    var regionRecLabel = regionRec ? _regionLabel(regionRec) : 'región por precisar';
+    // Lado RECUPERADO (orig.lado → dx → padecimiento). No inventa; null si nada lo documenta.
+    var ladoRecuperado = ladoReg || ladoDx || ladoDe(relato) || null;
+    var ladoRecFuente = ladoReg ? 'valoracion.lado' : (ladoDx ? 'dxMedico' : (ladoDe(relato) ? 'padecimiento' : null));
+
     // --- Cirugía ligamentaria/meniscal PREVIA con LATERALIDAD (ipsilateral requiere mismo lado) ---
     var cxLigTerms = ['lca', 'ligamento cruzado', 'cruzado anterior', 'plastia de ligamento', 'reconstruccion de ligament', 'menisc', 'ligamentoplastia'];
     var cxLig = termState(cirugias + ' ' + dxMed + ' ' + relato, cxLigTerms);
@@ -332,7 +396,7 @@
     // como prueba hecha con resultado negativo, NO como hallazgo positivo ni como cribado de banderas).
     var pruebasEspecialesPresentes = lleno(pruebasTxt) && termState(pruebasTxt, ['mcmurray', 'lachman', 'cajon', 'thessaly', 'apley', 'neer', 'hawkins', 'jobe', 'obrien', 'spurling', 'slr', 'lasegue', 'thomas', 'faber', 'fadir']).present;
 
-    var restriccionDocumentada = termState(segBlob + ' ' + soap.todo, ['contraindic', 'no aplicar', 'no rf', 'no tecar', 'evitar sobre', 'restriccion documentada', 'no diatermia']).affirmed;
+    var restriccionDocumentada = termState(segBlob + ' ' + soap.todo + ' ' + ((rec.docsRecuperados && (rec.docsRecuperados.restricciones || []).join(' ')) || ''), ['contraindic', 'no aplicar', 'no rf', 'no tecar', 'evitar sobre', 'restriccion documentada', 'no diatermia', 'no carga', 'no impacto', 'sin carga']).affirmed;
 
     // --- ROM / Fuerza: ¿numérico (medible) o texto cualitativo? ---
     // El generador NO debe etiquetar texto cualitativo ("limitado", "disminuida") como medición en grados.
@@ -362,8 +426,10 @@
     var evaP = _parseEVA(o.eva);
     // Datos insuficientes para afirmar seguridad: examen objetivo vacío Y sin cribado documentado,
     // o ≥2 campos clínicos núcleo por confirmar. Ausencia de dato ≠ ausencia de riesgo.
-    var examenVacio = !lleno(romRaw) && !lleno(fuerzaRaw) && !lleno(pruebasTxt);
-    var nPorConfirmar = [romRaw, fuerzaRaw, pruebasTxt, String(o.palpacion || ''), relato].filter(function (v) { return !lleno(v); }).length;
+    // El SOAP de seguimiento cuenta como examen DOCUMENTADO (fuerza/ROM reales en notas posteriores).
+    var soapTieneExamen = !!((soapClin.fuerzaActual && soapClin.fuerzaActual.grupos.length) || soapClin.romActual || soapClin.hallazgosActual);
+    var examenVacio = !lleno(romRaw) && !lleno(fuerzaRaw) && !lleno(pruebasTxt) && !soapTieneExamen;
+    var nPorConfirmar = [romRaw, fuerzaRaw, pruebasTxt, String(o.palpacion || ''), relato].filter(function (v) { return !lleno(v); }).length - (soapTieneExamen ? 2 : 0);
     var datosInsuficientes = (examenVacio && !cribadoDocumentado) || nPorConfirmar >= 4;
 
     return {
@@ -382,6 +448,9 @@
       dolorNocturno: dolorNocturno.affirmed, dolorPersistente: dolorPersistente.affirmed,
       regionEspinal: regionEspinal,
       region: zona, regionZona: regionZona, regionDx: regionDxArr, regionMecanismo: regionMec, regionPatologia: regionPat, regionConflicto: regionConflicto,
+      regionRecuperada: regionRec, regionRecuperadaLabel: regionRecLabel, regionRecFuente: regionRecFuente,
+      ladoRecuperado: ladoRecuperado, ladoRecFuente: ladoRecFuente,
+      soapFuerzaActual: soapClin.fuerzaActual, soapRomActual: soapClin.romActual, soapHallazgos: soapClin.hallazgosActual, soapHistFuerza: soapClin.histFuerza, soap_todo: soap.todo,
       lado: ladoReg, ladoDx: ladoDx, ladoConflicto: ladoConflicto,
       ligamentoIpsilateralPrevio: ligamentoIpsilateralPrevio, ligamentoContralateral: ligamentoContralateral, ligamentoLadoIndefinido: ligamentoLadoIndef, ladoCirugia: ladoCx,
       traumaCervicalAxial: traumaCervicalAxial, pediatrico: pediatrico, edad: isNaN(edadNum) ? null : edadNum, lesionCervicalDescartada: false,

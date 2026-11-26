@@ -52,9 +52,20 @@ function ficha(c) {
   var estadoRev = seg.bloquea_plan ? 'Requiere resolver seguridad' : 'Borrador — requiere validación del fisioterapeuta';
   H.push('<div class="head"><div><h2>' + esc(c.episodio || '') + '</h2>' + chips.join(' ') + '</div>' +
     '<div class="rev ' + (seg.bloquea_plan ? 'bloq' : '') + '">' + esc(estadoRev) + '</div></div>');
-  // Dx médico referido
+  // Dx médico: referido (campo) · documentado (recuperado de documentos, fuente+fecha) · radiológico (aparte)
   var dm = c.diagnostico_medico_referido || {};
-  H.push('<div class="row"><div class="lbl">Dx médico referido</div><div class="val">' + (dm.texto ? esc(dm.texto) + ' <span class="mut">(referido, a confirmar)</span>' : '<span class="mut">sin dx médico referido</span>') + '</div></div>');
+  var ddoc = c.diagnostico_medico_documentado || { propuestas: [] };
+  var rad = c.hallazgos_radiologicos || [];
+  var dmHtml = '<div class="row"><div class="lbl">Dx médico</div><div class="val">';
+  dmHtml += '<b>Referido:</b> ' + (dm.texto ? esc(dm.texto) + ' <span class="mut">(referido, a confirmar)</span>' : '<span class="mut">— campo vacío —</span>');
+  if (ddoc.propuestas && ddoc.propuestas.length) {
+    dmHtml += '<br><b>Recuperado de documento:</b> ' + ddoc.propuestas.map(function (p) { return esc(p.dx) + ' <span class="mut">(' + esc(p.fuente || 'doc') + (p.fecha ? ', ' + esc(p.fecha) : '') + ')</span>'; }).join(' · ') + ' <span class="mut">— propuesta para completar; verificar fuente</span>';
+  }
+  if (rad.length) {
+    dmHtml += '<br><b>Hallazgo radiológico (no es dx confirmado):</b> ' + rad.map(function (x) { return esc((x.estudio ? x.estudio + ': ' : '') + (x.impresion || '')) + (x.fecha ? ' <span class="mut">(' + esc(x.fecha) + ')</span>' : ''); }).join(' · ');
+  }
+  dmHtml += '</div></div>';
+  H.push(dmHtml);
   // Dx funcional anterior vs propuesto
   var dxAnt = lleno(ex.dxFuncional) ? ex.dxFuncional : (lleno(ex.dxClinico) ? ex.dxClinico : null);
   H.push('<div class="dx2"><div class="col"><div class="lbl">Dx funcional ANTERIOR (expediente)</div><div class="box ' + (dxAnt ? '' : 'vacio') + '">' + (dxAnt ? esc(dxAnt) : '— vacío / no documentado —') + '</div></div>' +

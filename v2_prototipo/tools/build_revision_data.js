@@ -1,11 +1,10 @@
 #!/usr/bin/env node
-/* SINERGIA · Arma el JSON que consume el PROTOTIPO DE REVISIÓN (aceptar/editar/rechazar).
- * Combina el contrato (resultados) con el dato existente del expediente (dataset.existente) y la
- * metadata de verificación (episodio activo, fecha de corte, nº de notas, hash de la fuente).
- * Escribe un archivo JS `window.DATOS_REVISION = [...]` para abrir el prototipo offline (file://).
+/* SINERGIA · Arma el JSON que consume el PROTOTIPO DE REVISIÓN (aceptar/editar/rechazar POR SECCIÓN).
+ * Secciones independientes: Dx MÉDICO (referido + documentado recuperado + radiológico) · Dx FUNCIONAL ·
+ * Objetivos CP · MP · LP. Cada sección muestra el texto ANTERIOR exacto y el PROPUESTO exacto; todas
+ * inician PENDIENTES (no se acepta nada automáticamente). Incluye la verificación (episodio/fecha/hash).
  *
  * Uso: node tools/build_revision_data.js --in <resultados.json> --data <dataset.json> --out <datos_revision.js>
- * Por defecto escribe el prototipo SINTÉTICO (sin PHI). Para el real-85 se apunta a los archivos del scratchpad.
  */
 'use strict';
 var fs = require('fs'), path = require('path'), crypto = require('crypto');
@@ -20,20 +19,32 @@ var resultados = raw.resultados || raw;
 var dataset = {};
 try { var dj = JSON.parse(fs.readFileSync(dataPath, 'utf8')); (dj.casos || dj).forEach(function (c) { dataset[c.codigo] = c; }); } catch (e) { }
 
-function lleno(v) { var VAC = ['', 'none', 'no evaluado', 'no evaluada', 'pendiente', 'por definir', '-', 'n/a', 'no especificado', 'ninguno', 'ninguna', 'no cuenta con diagnostico medico referido']; return VAC.indexOf(String(v == null ? '' : v).trim().toLowerCase()) === -1 && String(v == null ? '' : v).trim() !== ''; }
+function _norm(v) { return String(v == null ? '' : v).normalize('NFD').replace(/[̀-ͯ]/g, '').trim().toLowerCase(); }
+function lleno(v) { var VAC = ['', 'none', 'no evaluado', 'no evaluada', 'pendiente', 'por definir', 'por precisar', '-', '--', 'n/a', 'na', 'no especificado', 'no refiere', 'sin datos', 'ninguno', 'ninguna', 'no cuenta con diagnostico medico referido', 'no cuenta con diagnostico medico', 'sin diagnostico medico referido']; var n = _norm(v); return VAC.indexOf(n) === -1 && n !== ''; }
 function hash(obj) { return crypto.createHash('sha1').update(JSON.stringify(obj)).digest('hex').slice(0, 10); }
-function objTxt(o) { var m = o.meta_propuesta ? (typeof o.meta_propuesta === 'object' ? o.meta_propuesta.valor : o.meta_propuesta) : null; return { fase: o.fase, alteracion: o.alteracion, actividad: o.actividad, meta: m || null, justificacion: o.justificacion_meta || null }; }
+function objTxt(o) { var m = o.meta_propuesta ? (typeof o.meta_propuesta === 'object' ? o.meta_propuesta.valor : o.meta_propuesta) : null; return o.actividad + (m ? ' — meta: ' + m : '') + (o.justificacion_meta ? ' (' + o.justificacion_meta + ')' : ''); }
 
 var items = resultados.map(function (c) {
   var ds = dataset[c.episodio] || {}; var ex = ds.existente || {}; var sm = ds.soap_meta || {};
+  var dm = c.diagnostico_medico_referido || {};
+  var ddoc = c.diagnostico_medico_documentado || { propuestas: [] };
+  var rad = c.hallazgos_radiologicos || [];
+  var docsx = c.documentos_recuperados || {};
   var dxAnt = lleno(ex.dxFuncional) ? ex.dxFuncional : (lleno(ex.dxClinico) ? ex.dxClinico : '');
-  var objAnt = [];
-  if (lleno(ex.objetivosCP)) objAnt.push({ horizonte: 'CP', texto: ex.objetivosCP });
-  if (lleno(ex.objetivosLP)) objAnt.push({ horizonte: 'LP', texto: ex.objetivosLP });
-  var vacios = { dx: !lleno(dxAnt), obj: objAnt.length === 0 };
+  var porFase = { corto: [], mediano: [], largo: [] };
+  (c.objetivos || []).forEach(function (o) { if (o.fase === 'seguridad') return; (porFase[o.fase] || porFase.largo).push(objTxt(o)); });
+  var vacios = {
+    dx_medico: !lleno(dm.texto),
+    dx_funcional: !lleno(dxAnt),
+    cp: !lleno(ex.objetivosCP),
+    mp: true, // no existe campo de mediano plazo en el expediente → siempre "vacío" (aditivo)
+    lp: !lleno(ex.objetivosLP)
+  };
+  var nVacios = Object.keys(vacios).reduce(function (a, k) { return a + (vacios[k] ? 1 : 0); }, 0);
+  // Propuesta de dx médico a guardar (si el campo está vacío y hay documento): el dx documentado.
+  var dxMedPropuesto = lleno(dm.texto) ? dm.texto : (ddoc.propuestas && ddoc.propuestas.length ? ddoc.propuestas.map(function (p) { return p.dx + ' [' + (p.fuente || 'doc') + (p.fecha ? ' ' + p.fecha : '') + ']'; }).join(' · ') : '');
   return {
     codigo: c.episodio, patologia: ds.patologia || c.patologia || null, edad: (typeof ds.edad === 'number' ? ds.edad : null),
-    // Verificación ANTES de aplicar (el expediente real debe coincidir con esto):
     verificacion: {
       episodio_activo: (c.episodio_analisis && c.episodio_analisis.estructura) ? c.episodio_analisis.estructura.motivoActualIndex : null,
       num_episodio: (c.episodio_analisis && c.episodio_analisis.estructura) ? c.episodio_analisis.estructura.numEpisodio : null,
@@ -41,22 +52,27 @@ var items = resultados.map(function (c) {
       soap_n: c.soap_procesado ? c.soap_procesado.n_notas : 0,
       valoracion_inicial_fecha: sm.valoracion_inicial_fecha || null,
       posible_nuevo_motivo: !!(c.episodio_analisis && c.episodio_analisis.posible_nuevo_motivo),
-      source_hash: hash({ dx: c.diagnostico_funcional.texto, obj: c.objetivos })
+      source_hash: hash({ dxm: dxMedPropuesto, dx: c.diagnostico_funcional.texto, obj: porFase })
     },
-    dx_medico: c.diagnostico_medico_referido ? c.diagnostico_medico_referido.texto : null,
-    dx_anterior: dxAnt, dx_propuesto: c.diagnostico_funcional.texto,
-    obj_anterior: objAnt, obj_nuevos: (c.objetivos || []).map(objTxt),
+    secciones: {
+      dx_medico: { anterior: dm.texto || '', propuesto: dxMedPropuesto, documentado: ddoc.propuestas || [], radiologicos: rad, vacio: vacios.dx_medico },
+      dx_funcional: { anterior: dxAnt, propuesto: c.diagnostico_funcional.texto, vacio: vacios.dx_funcional },
+      cp: { anterior: lleno(ex.objetivosCP) ? ex.objetivosCP : '', propuesto: porFase.corto, campo: 'objetivosCP', vacio: vacios.cp },
+      mp: { anterior: '', propuesto: porFase.mediano, campo: 'objetivosMP (nuevo, aditivo)', vacio: true },
+      lp: { anterior: lleno(ex.objetivosLP) ? ex.objetivosLP : '', propuesto: porFase.largo, campo: 'objetivosLP', vacio: vacios.lp }
+    },
     pendientes: (c.valoracion_pendiente || []).filter(function (p) { return !/POSIBLE NUEVO MOTIVO/.test(p); }),
     precauciones: (c.seguridad.alertas || []).map(function (a) { return { regla: a.regla, clase: a.clasificacion, accion: a.accion, requiere_validacion: !!a.requiere_validacion }; }),
+    restricciones_recuperadas: docsx.restricciones || [],
+    enlaces_no_consultados: docsx.enlaces_no_consultados || [],
     bloquea_plan: !!c.seguridad.bloquea_plan,
-    estado_revision: c.seguridad.bloquea_plan ? 'resolver_seguridad' : 'pendiente_revision',
-    vacios: vacios
+    nVacios: nVacios, vacios: vacios
   };
 });
 
-// Prioriza expedientes con campos vacíos (dx y/o objetivos) al frente.
-items.sort(function (a, b) { return (b.vacios.dx + b.vacios.obj) - (a.vacios.dx + a.vacios.obj); });
+// Prioriza expedientes con más campos vacíos al frente.
+items.sort(function (a, b) { return b.nVacios - a.nVacios; });
 
-var meta = { generado: new Date().toISOString(), version: raw._resumen ? raw._resumen.version_generador : 'V2.2.2', n: items.length, fuente: path.basename(inPath) };
+var meta = { generado: new Date().toISOString(), version: raw._resumen ? raw._resumen.version_generador : 'V2.2.3', n: items.length, fuente: path.basename(inPath) };
 fs.writeFileSync(outPath, 'window.DATOS_REVISION = ' + JSON.stringify({ _meta: meta, items: items }, null, 1) + ';\n');
-console.log('Datos de revisión: ' + outPath + ' (' + items.length + ' pacientes; ' + items.filter(function (i) { return i.vacios.dx || i.vacios.obj; }).length + ' con campos vacíos)');
+console.log('Datos de revisión: ' + outPath + ' (' + items.length + ' pacientes; ' + items.filter(function (i) { return i.nVacios > 0; }).length + ' con campos vacíos)');

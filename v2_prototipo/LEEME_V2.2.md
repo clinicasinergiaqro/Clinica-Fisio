@@ -1,11 +1,42 @@
-# SINERGIA · Generador de diagnóstico funcional — PROTOTIPO V2.2.2
+# SINERGIA · Generador de diagnóstico funcional — PROTOTIPO V2.2.3
 
 **Prototipo aislado.** NO toca `index.html` de producción, NO ejecuta `saveDB`, NO modifica expedientes, NO
-despliega, NO se fusiona todavía con el rediseño visual. Rama independiente. El rediseño visual
-(botones/ventanas) avanza en otra ventana de Claude; esta rama define y consume el **contrato de datos**
-(ver `SINERGIA_Contrato_Clinico_Compartido.md`).
+despliega, NO se fusiona todavía con el rediseño visual. Rama independiente `claude/generador-v2-prototipo`.
+El rediseño visual (botones/ventanas) avanza en otra ventana de Claude; esta rama define y consume el
+**contrato de datos** (ver `SINERGIA_Contrato_Clinico_Compartido.md`).
 
-Módulos: `extractor / motor / generador / render = 2.2.2-proto` · catálogo seguridad `2026-11-26.d`.
+Módulos: `extractor / motor / generador / render = 2.2.3-proto` · catálogo seguridad `2026-11-26.e`.
+Pruebas: `node v2_prototipo/tests/pruebas_v2.js` → **78 PASA · 0 FALLA · 2 PENDIENTE** (declarados).
+
+## Novedades V2.2.3 (cierre definitivo: dx + objetivos de los 85, listos para incorporar)
+
+- **Revisión completa del expediente incl. ESTUDIOS.** OCR/visión de recetas e informes: se recupera el dx
+  médico cuando el campo está vacío pero el documento lo soporta, con **fuente + fecha**. Se separan
+  **dx documentado** (receta/informe que afirma un dx) de **hallazgo radiológico** (impresión de estudio, que
+  **no** constituye por sí solo un dx clínico confirmado). No se inventa. Real-85: **17** pac. con dx
+  recuperado, **9** con hallazgo radiológico; **24** documentos en enlace de portal externo no consultables
+  (lista aparte).
+- **SOAP interpretado de verdad.** El campo `o` es un **objeto** `{rom, fuerza, hallazgos}`: se lee su
+  contenido, se respeta la cronología (valoración inicial vs hallazgos posteriores vs estado actual) y se usa
+  fuerza multi-grupo y ROM reales en el dx (p. ej. flexión de codo 120° del SOAP).
+- **Dx funcional con marco causal.** Post-qx/fractura/LCA/menisco → “**secundaria a** …”. Región recuperada
+  desde zona→dxMedico→padecimiento→SOAP (se eliminó “disfunción de otra”/“región por precisar” donde hay
+  información).
+- **Revisión POR SECCIÓN** (`prototipo_revision/`): dx médico · dx funcional · objetivos CP · MP · LP, cada
+  uno **independiente** y **todo inicia PENDIENTE** (nada se acepta solo). Por apartado: **Conservar /
+  Aceptar / Editar-combinar / Rechazar**; muestra el **texto anterior** y el **texto final a guardar**;
+  registra **revisor + fecha**; un paciente **no** cuenta como aprobado si queda una sección pendiente.
+  Verificación previa (paciente/episodio activo/fecha de corte/hash) y **flujo de aplicación en seco**.
+- **Cifras de la auditoría reconciliadas** (acento-normalizado): dx médico vacío **39** · dx funcional vacío
+  **30** · objetivos CP vacíos **47** · objetivos LP vacíos **56** · planes bloqueados **16** · posible nuevo
+  motivo **5**.
+- **5 pacientes piloto** seleccionados para la primera validación individual (campos vacíos, info suficiente,
+  sin alertas que bloqueen el plan, regiones diversas). Ver `SINERGIA_Dossier_5_Piloto`.
+- **Entregables**: PDF comparativo conciso (1 pág/paciente), JSON anonimizado con propuestas, HTML de revisión
+  por sección, matriz de correcciones de auditorías, inventario de documentos, lista de no consultables, mapa
+  durable R85↔id real (**PHI, fuera de GitHub**), ZIP de código, pruebas.
+
+## Novedades V2.2.2 (base de la etapa)
 
 ## Novedades V2.2.2 (cerrar la 1ª etapa: dx + objetivos de los 85, listos para incorporar)
 
@@ -73,7 +104,7 @@ fuente de verdad: dx, objetivos CP/MP/LP, plan, biomecánica, episodio, segurida
 ## Cómo reproducir
 
 ```
-node v2_prototipo/tests/pruebas_v2.js          # 72 pruebas, exit 0 (2 pendientes declaradas)
+node v2_prototipo/tests/pruebas_v2.js          # 78 PASA / 0 FALLA / 2 PENDIENTE, exit 0
 node v2_prototipo/tools/regenerar.js           # casos_anon.json (24 sintéticos) → datos/resultados_v22.json
 node v2_prototipo/tools/comparar.js            # V2.1 (baseline_v21) vs V2.2.1 → datos/comparacion_v21_v22.{json,md}
 node v2_prototipo/tools/build_html.js          # resultados JSON → datos/reporte_v22.html
@@ -108,5 +139,8 @@ sana confirmada (regla "no asumir contralateral sano" verificada en datos reales
 
 ## Estado
 
-Avance de V2.2.1 completo en la rama aislada. Integración con el rediseño visual **NO** autorizada todavía;
-**no** se fusiona. Pendiente de la validación final de Carlos / 4ª revisión si la hubiera.
+Cierre de V2.2.3 completo en la rama aislada: dx + objetivos de los 85 definitivos, estudios revisados (OCR),
+herramienta de revisión por sección corregida, 5 pilotos seleccionados y entregables listos. **No** se ha
+ejecutado `saveDB`, **no** se ha tocado ningún expediente real, **no** se despliega y **no** se fusiona con el
+rediseño visual. Siguiente paso: validación individual de los 5 pilotos por el fisioterapeuta en la
+herramienta de revisión; la incorporación real a expedientes requiere autorización explícita campo por campo.
