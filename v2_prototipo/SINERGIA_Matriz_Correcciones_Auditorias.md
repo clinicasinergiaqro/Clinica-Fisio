@@ -59,6 +59,20 @@ Cada fila enlaza el hallazgo de auditoría con **qué se cambió**, **dónde** (
 
 ---
 
+## Ronda 4 — Referencia definitiva (corrección puntual, sin reconstrucción)
+
+| # | Hallazgo / pedido | Corrección | Dónde | Prueba |
+|---|----------|-----------|-------|--------|
+| 26 | Faltaban `proposal_hash` y `approved_hash` (solo había `source_hash`) | **Tres hashes**: `source_hash` (estado del expediente — abortar si cambió), `proposal_hash` (propuesta exacta revisada), `approved_hash` (texto aprobado, sellado por apartado) | `build_revision_data.js` (source/proposal) + `prototipo_revision/index.html` (`_h` FNV-1a, approved) | smoke headless |
+| 27 | Revisor no obligatorio | **Revisor obligatorio**: sin nombre no se sella ningún apartado (alerta) | `index.html` `sellar()` | smoke (aceptar sin revisor → no sella) |
+| 28 | La aprobación no se invalidaba al editar después | Si el texto final cambia tras sellar → **approved_hash deja de coincidir** → apartado **INVALIDADO** (banner rojo + re-confirmar); no cuenta como aprobado | `index.html` `secInvalidada`/`secAprobada` | smoke (editar tras sellar → INVALIDADA) |
+| 29 | Un paciente podía contar aprobado con apartados sin sellar | **APROBADO** sólo si: no bloqueado, verificado, revisor, y **cada** apartado sellado y sin cambios | `index.html` `aprobado()` | smoke (conservar 5 + verificar → APROBADO) |
+| 30 | Dx de fractura genérico (prioridad codo R85-641dfb) | El marco causal **enriquece el descriptor anatómico documentado** (“secundaria a fractura **supraintercondílea humeral** postoperada”), tomándolo del dx documentado; se descartan nombres de región como descriptor | `generador_v2.js` (encuadre causal) | 78 PASA; R85-641dfb = texto objetivo |
+
+> Nota de procedencia: los dos archivos que se recibieron como “referencia de ChatGPT” eran en realidad las salidas **propias V2.2.2** (con los defectos “disfunción de otra”/“región por precisar” que V2.2.3 ya corrige). Se procedió con las instrucciones escritas, que son especificación completa. **No** se reconstruyó el generador: sólo las correcciones puntuales de esta ronda.
+
+---
+
 ## Trazabilidad de las cifras de la auditoría (verificadas tras consultar documentos)
 
 | Cifra del encargo | Verificada | Fuente |

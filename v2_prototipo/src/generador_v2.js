@@ -256,7 +256,21 @@
     var causal = null;
     if (/postoperad|postquirurg|post-?op|reconstrucc|reparacion|plastia|artroplast|protesis|osteosintesis/.test(_blob)) causal = 'secundaria a procedimiento quirúrgico';
     if (/aquiles/.test(_blob) && /reparacion|reconstrucc|postoperad|ruptura|rotura/.test(_blob)) causal = 'secundaria a reparación quirúrgica del tendón de Aquiles';
-    if (/fractura/.test(_blob)) causal = 'secundaria a fractura' + (/postoperad|osteosintesis|placa|clavo|tornillo|post-?op/.test(_blob) ? ' postoperada' : '');
+    if (/fractura/.test(_blob)) {
+      // Enriquecer con el descriptor anatómico documentado (p. ej. "supraintercondílea humeral"), si existe.
+      var _post = /postoperad|osteosintesis|placa|clavo|tornillo|post-?op/.test(_blob) ? ' postoperada' : '';
+      var _desc = '';
+      var _dxDocTxt = ((rec.docsRecuperados && rec.docsRecuperados.dx_documentado) || []).map(function (p) { return p.dx || ''; }).join(' ');
+      var _m = ((o.dxMedico || '') + ' ' + _dxDocTxt).match(/fractura\s+([A-Za-zÁÉÍÓÚáéíóúñ]+(?:\s+[A-Za-zÁÉÍÓÚáéíóúñ]+){0,2})/i);
+      if (_m) {
+        var _d = _m[1].replace(/\s+/g, ' ').trim()
+          .replace(/\s*(derech\w*|izquierd\w*|bilateral|expuest\w*|cerrad\w*|grado|tipo|de|del|en|y)\b.*$/i, '').trim();
+        // No usar un nombre de REGIÓN como descriptor (ya está en la región): "fractura tobillo" → "fractura".
+        if (/^(tobillo|rodilla|codo|hombro|muñeca|muneca|cadera|pie|mano|columna|cuello|dedo|clavicula|clavícula|costilla|femur|fémur|tibia|peron|húmero|humero|radio|cubito|cúbito)\b/i.test(_d)) _d = '';
+        if (_d && _d.length <= 40) _desc = ' ' + _d.toLowerCase();
+      }
+      causal = 'secundaria a fractura' + _desc + _post;
+    }
     if (/lca|ligamento cruzado|cruzado anterior/.test(_blob)) causal = 'secundaria a lesión del ligamento cruzado anterior';
     if (/menisc/.test(_blob) && /artroscop|meniscect|sutura|operad|postoperad/.test(_blob)) causal = 'secundaria a cirugía meniscal';
     // Prosa fisioterapéutica.

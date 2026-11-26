@@ -27,6 +27,11 @@ Pruebas: `node v2_prototipo/tests/pruebas_v2.js` → **78 PASA · 0 FALLA · 2 P
   Aceptar / Editar-combinar / Rechazar**; muestra el **texto anterior** y el **texto final a guardar**;
   registra **revisor + fecha**; un paciente **no** cuenta como aprobado si queda una sección pendiente.
   Verificación previa (paciente/episodio activo/fecha de corte/hash) y **flujo de aplicación en seco**.
+- **Integridad por tres hashes** (ronda 4): `source_hash` (estado del expediente — abortar si cambió),
+  `proposal_hash` (propuesta exacta) y `approved_hash` (texto aprobado por apartado). **Revisor obligatorio**;
+  si el texto cambia tras aprobar, la aprobación de ese apartado se **invalida** (banner rojo) y debe
+  re-confirmarse. Dx de fractura enriquecido con el descriptor anatómico documentado (p. ej. “secundaria a
+  fractura **supraintercondílea humeral** postoperada”, R85-641dfb).
 - **Cifras de la auditoría reconciliadas** (acento-normalizado): dx médico vacío **39** · dx funcional vacío
   **30** · objetivos CP vacíos **47** · objetivos LP vacíos **56** · planes bloqueados **16** · posible nuevo
   motivo **5**.

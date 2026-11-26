@@ -31,6 +31,11 @@
   .sec{border:1px solid var(--line);border-radius:9px;margin:8px 0;padding:8px 10px}
   .sec.pend{background:#fffdf7;border-color:#e8d79a}
   .sec.ok{background:#f6fbf8;border-color:#bfe3cd}
+  .sec.warn{background:#fff7ef;border-color:#e6c08a}
+  .sello{font-size:11px;border-radius:6px;padding:4px 8px;margin-top:5px}
+  .sello.ok{background:#e8f6ee;border:1px solid #8ccfa6;color:var(--ok)}
+  .sello.pend{background:#fff3df;border:1px solid #e3c878;color:#7a5c14}
+  .sello.bad{background:#fdeaea;border:1px solid #d99;color:var(--bad);font-weight:600}
   .sec-h{display:flex;justify-content:space-between;align-items:center;gap:8px}
   .sec-h b{color:var(--navy);font-size:13px}
   .badge{font-size:10px;border-radius:6px;padding:1px 7px}
@@ -95,11 +100,14 @@
   function load(){ try{return JSON.parse(localStorage.getItem(LS)||"{}");}catch(e){return {};} }
   function save(){ try{localStorage.setItem(LS,JSON.stringify(ST));}catch(e){} render(); }
   var ST = load();
+  // Hash determinista (FNV-1a 32-bit) para integridad del texto aprobado en el navegador.
+  function _h(str){ str=String(str==null?"":str); var h=0x811c9dc5; for(var i=0;i<str.length;i++){ h^=str.charCodeAt(i); h=(h+((h<<1)+(h<<4)+(h<<7)+(h<<8)+(h<<24)))>>>0; } return ("0000000"+h.toString(16)).slice(-8); }
+  function revisorActual(){ var el=document.getElementById("revisor"); return (el&&el.value||"").trim(); }
   function st(it){
-    var k=it.codigo;
-    if(!ST[k] || ST[k].source_hash!==it.verificacion.source_hash){
-      ST[k]={ source_hash:it.verificacion.source_hash, verificado:false, revisor:null, ts:null, sec:{} };
-      SEC.forEach(function(s){ ST[k].sec[s.k]={modo:"pendiente", texto:null, ts:null}; });
+    var k=it.codigo; var ph=it.verificacion.proposal_hash||null;
+    if(!ST[k] || ST[k].source_hash!==it.verificacion.source_hash || ST[k].proposal_hash!==ph){
+      ST[k]={ source_hash:it.verificacion.source_hash, proposal_hash:ph, verificado:false, revisor:null, ts:null, sec:{} };
+      SEC.forEach(function(s){ ST[k].sec[s.k]={modo:"pendiente", texto:null, ts:null, approved_hash:null, revisor:null}; });
     }
     return ST[k];
   }
@@ -113,6 +121,13 @@
     if(d.modo==="conservar"||d.modo==="rechazar") return sec.anterior||"";
     return null; // pendiente
   }
+  // Hash del texto final de un apartado (modo + texto). Lo que se sella al aprobar.
+  function finalHash(it,s,d){ var t=finalTexto(it,s,d); return t==null?null:_h(d.modo+"|"+t); }
+  // Un apartado queda APROBADO sólo si: decidido, sellado por un revisor, y el texto final NO cambió desde el sello.
+  function secAprobada(it,s){ var d=st(it).sec[s.k]; if(d.modo==="pendiente") return false; if(!d.approved_hash||!d.revisor) return false; return d.approved_hash===finalHash(it,s,d); }
+  function secInvalidada(it,s){ var d=st(it).sec[s.k]; return d.modo!=="pendiente" && d.approved_hash && d.revisor && d.approved_hash!==finalHash(it,s,d); }
+  // Sella la aprobación del apartado (exige revisor). Devuelve false si falta revisor.
+  function sellar(it,s){ var r=revisorActual(); if(!r){ alert("Escribe tu nombre en 'Revisor' antes de aprobar un apartado."); return false; } var d=st(it).sec[s.k]; d.approved_hash=finalHash(it,s,d); d.revisor=r; d.ts=new Date().toISOString(); return true; }
 
   function seccionHTML(it, s){
     var sec=it.secciones[s.k]; var d=st(it).sec[s.k];
@@ -129,25 +144,36 @@
     var editor = d.modo==="editar" ? '<textarea oninput="RV.txt(\''+it.codigo+'\',\''+s.k+'\',this.value)">'+esc(d.texto!=null?d.texto:prop)+'</textarea>'+
       '<div style="margin-top:4px"><button class="sm" onclick="RV.ins(\''+it.codigo+'\',\''+s.k+'\',\'ant\')">+ Insertar anterior</button> <button class="sm" onclick="RV.ins(\''+it.codigo+'\',\''+s.k+'\',\'prop\')">+ Insertar propuesta</button></div>' : '';
     var fin = finalTexto(it,s,d);
-    var finBox = (d.modo!=="pendiente") ? '<div style="margin-top:5px"><div class="lbl">Texto final a guardar '+(d.modo==="conservar"||d.modo==="rechazar"?'(sin cambio — se conserva lo anterior)':'')+'</div><div class="box final">'+(fin?esc(fin):"<span class=\"mut\">(vacío)</span>")+'</div></div>' : '';
-    return '<div class="sec '+(d.modo==="pendiente"?"pend":"ok")+'">'+
-      '<div class="sec-h"><b>'+esc(s.label)+'</b> <span class="mut" style="font-size:10px">→ '+esc(s.campo)+'</span><span class="badge '+bm[0]+'">'+bm[1]+'</span></div>'+
+    var aprob=secAprobada(it,s), inval=secInvalidada(it,s);
+    var sello="";
+    if(d.modo!=="pendiente"){
+      if(aprob) sello='<div class="sello ok">✓ Aprobado por <b>'+esc(d.revisor)+'</b> · '+esc((d.ts||"").slice(0,16).replace("T"," "))+' · approved_hash <span class="mut">'+esc(d.approved_hash)+'</span></div>';
+      else if(inval) sello='<div class="sello bad">⚠ APROBACIÓN INVALIDADA: el texto cambió después de aprobar. Vuelve a confirmar. <button class="sm" onclick="RV.confirmar(\''+it.codigo+'\',\''+s.k+'\')">✓ Re-confirmar apartado</button></div>';
+      else sello='<div class="sello pend">Falta confirmar este apartado con tu nombre. <button class="sm" onclick="RV.confirmar(\''+it.codigo+'\',\''+s.k+'\')">✓ Confirmar apartado</button></div>';
+    }
+    var finBox = (d.modo!=="pendiente") ? '<div style="margin-top:5px"><div class="lbl">Texto final a guardar '+(d.modo==="conservar"||d.modo==="rechazar"?'(sin cambio — se conserva lo anterior)':'')+'</div><div class="box final">'+(fin?esc(fin):"<span class=\"mut\">(vacío)</span>")+'</div>'+sello+'</div>' : '';
+    var secCls=d.modo==="pendiente"?"pend":(aprob?"ok":"warn");
+    return '<div class="sec '+secCls+'">'+
+      '<div class="sec-h"><b>'+esc(s.label)+'</b> <span class="mut" style="font-size:10px">→ '+esc(s.campo)+'</span><span class="badge '+bm[0]+'">'+bm[1]+(aprob?" ✓":(d.modo!=="pendiente"?" ⏳":""))+'</span></div>'+
       '<div class="two"><div><div class="lbl">Texto anterior (expediente)</div><div class="box ant '+(ant?"":"vacio")+'">'+(ant?esc(ant):"— vacío / no documentado —")+'</div>'+docExtra+'</div>'+
       '<div><div class="lbl">Propuesta (V2.2.3)</div><div class="box prop">'+(prop?esc(prop):"<span class=\"mut\">— sin propuesta —</span>")+'</div></div></div>'+
       '<div class="opts">'+opt("conservar",(ant?"Conservar anterior":"Conservar vacío"))+opt("aceptar","✓ Aceptar propuesta")+opt("editar","✎ Editar/combinar")+opt("rechazar","✕ Rechazar")+'</div>'+editor+finBox+'</div>';
   }
 
-  function aprobado(it){ var S=st(it); if(it.bloquea_plan) return false; if(!S.verificado) return false; return SEC.every(function(s){return S.sec[s.k].modo!=="pendiente";}); }
-  function pendientesN(it){ var S=st(it); return SEC.filter(function(s){return S.sec[s.k].modo==="pendiente";}).length; }
+  // APROBADO sólo si: no bloqueado, verificado, revisor, y CADA apartado sellado y sin cambios posteriores.
+  function aprobado(it){ var S=st(it); if(it.bloquea_plan) return false; if(!S.verificado) return false; if(!S.revisor) return false; return SEC.every(function(s){return secAprobada(it,s);}); }
+  function pendientesN(it){ return SEC.filter(function(s){return !secAprobada(it,s);}).length; }
+  function invalidadasN(it){ return SEC.filter(function(s){return secInvalidada(it,s);}).length; }
 
   function card(it){
     var S=st(it); var v=it.verificacion; var ap=aprobado(it);
     var cls=it.bloquea_plan?"bloq":(ap?"done":(it.nVacios>0?"vacio":""));
     var chips='<span class="chip">'+esc(it.patologia||"—")+'</span>'+(it.edad!=null?'<span class="chip">'+it.edad+' años</span>':'')+'<span class="chip oct">corte '+esc(v.fecha_corte||"—")+'</span>'+(it.nVacios>0?'<span class="chip gold">'+it.nVacios+' campos vacíos</span>':'');
     var stateCls=it.bloquea_plan?"bloq":(ap?"done":"rev");
-    var stateTxt=it.bloquea_plan?"Resolver seguridad":(ap?"APROBADO":pendientesN(it)+" sección(es) por revisar");
+    var nInv=invalidadasN(it);
+    var stateTxt=it.bloquea_plan?"Resolver seguridad":(ap?"APROBADO":(nInv?nInv+" invalidada(s) · ":"")+pendientesN(it)+" sección(es) por revisar");
     var verifCls=v.posible_nuevo_motivo?"verif nm":"verif";
-    var verif='<div class="'+verifCls+'"><b>Verificación antes de aplicar</b> · episodio activo (motivoActualIndex): <b>'+esc(v.episodio_activo)+'</b>'+(v.num_episodio!=null?' · nº episodio '+esc(v.num_episodio):'')+' · corte <b>'+esc(v.fecha_corte||"—")+'</b> · '+esc(v.soap_n)+' nota(s) SOAP'+(v.valoracion_inicial_fecha?' · valoración inicial '+esc(v.valoracion_inicial_fecha):'')+' · <span class="mut">hash '+esc(v.source_hash)+'</span>'+(v.posible_nuevo_motivo?'<br>⚠ POSIBLE NUEVO MOTIVO: lo decide el fisioterapeuta; la IA no inicia motivo.':'')+'<br><label style="font-size:12px"><input type="checkbox" '+(S.verificado?"checked":"")+' onclick="RV.verif(\''+it.codigo+'\',this.checked)"> Verifiqué paciente, episodio activo, fecha de corte y que no hay cambios/notas posteriores</label></div>';
+    var verif='<div class="'+verifCls+'"><b>Verificación antes de aplicar</b> · episodio activo (motivoActualIndex): <b>'+esc(v.episodio_activo)+'</b>'+(v.num_episodio!=null?' · nº episodio '+esc(v.num_episodio):'')+' · corte <b>'+esc(v.fecha_corte||"—")+'</b> · '+esc(v.soap_n)+' nota(s) SOAP'+(v.valoracion_inicial_fecha?' · valoración inicial '+esc(v.valoracion_inicial_fecha):'')+' · <span class="mut">source_hash '+esc(v.source_hash)+' · proposal_hash '+esc(v.proposal_hash||"—")+'</span>'+(v.posible_nuevo_motivo?'<br>⚠ POSIBLE NUEVO MOTIVO: lo decide el fisioterapeuta; la IA no inicia motivo.':'')+'<br><label style="font-size:12px"><input type="checkbox" '+(S.verificado?"checked":"")+' onclick="RV.verif(\''+it.codigo+'\',this.checked)"> Verifiqué paciente, episodio activo, fecha de corte y que no hay cambios/notas posteriores</label><div class="mut" style="font-size:10.5px">Si el expediente o la propuesta cambian, o si editas el texto tras aprobar, la aprobación de ese apartado se invalida y debe re-confirmarse.</div></div>';
     var secs=SEC.map(function(s){return seccionHTML(it,s);}).join("");
     var pend=(it.pendientes||[]);
     var restr=(it.restricciones_recuperadas||[]);
@@ -162,21 +188,25 @@
   function precHTML(it){ var al=it.precauciones||[]; if(!al.length) return '<div class="mut">Sin alertas con los datos disponibles.</div>'; var danger=it.bloquea_plan; return '<ul class="prec '+(danger?"danger":"warn")+'">'+al.map(function(a){return "<li><b>"+esc(a.regla)+"</b> · "+esc(a.clase)+(a.requiere_validacion?' <span class="mut">(requiere validación)</span>':"")+"<br>"+esc(a.accion)+"</li>";}).join("")+'</ul>'+(it.bloquea_plan?'<div style="color:var(--bad);font-weight:700;font-size:12px">Plan BLOQUEADO hasta resolver.</div>':""); }
 
   function payload(it){
-    var S=st(it); var campos={}, cambios=[];
+    var S=st(it); var campos={}, cambios=[], sellos={};
     SEC.forEach(function(s){
-      var d=S.sec[s.k]; var sec=it.secciones[s.k];
-      if(d.modo==="aceptar"||d.modo==="editar"){ campos[s.campo.split(" ")[0]] = finalTexto(it,s,d); cambios.push(s.label+": "+(d.modo==="editar"?"editado por el revisor":"aceptar propuesta")); }
-      else if(d.modo==="rechazar"){ cambios.push(s.label+": propuesta RECHAZADA (se conserva lo existente)"); }
-      else if(d.modo==="conservar"){ cambios.push(s.label+": conservar lo existente (sin cambio)"); }
+      var d=S.sec[s.k]; var ap=secAprobada(it,s);
+      // Sólo se escribe lo APROBADO (sellado por revisor y sin cambios posteriores).
+      if((d.modo==="aceptar"||d.modo==="editar") && ap){ campos[s.campo.split(" ")[0]] = finalTexto(it,s,d); cambios.push(s.label+": "+(d.modo==="editar"?"editado por "+d.revisor:"aceptar propuesta ("+d.revisor+")")); sellos[s.k]={revisor:d.revisor,ts:d.ts,approved_hash:d.approved_hash}; }
+      else if(d.modo==="rechazar" && ap){ cambios.push(s.label+": propuesta RECHAZADA (conserva lo existente) ("+d.revisor+")"); sellos[s.k]={revisor:d.revisor,ts:d.ts,approved_hash:d.approved_hash}; }
+      else if(d.modo==="conservar" && ap){ cambios.push(s.label+": conservar lo existente, sin cambio ("+d.revisor+")"); sellos[s.k]={revisor:d.revisor,ts:d.ts,approved_hash:d.approved_hash}; }
+      else if(secInvalidada(it,s)){ cambios.push(s.label+": APROBACIÓN INVALIDADA (texto cambió tras aprobar) — re-confirmar"); }
       else cambios.push(s.label+": PENDIENTE de revisión");
     });
-    return { campos:campos, cambios:cambios };
+    return { campos:campos, cambios:cambios, sellos:sellos };
   }
   function flujo(it){
     var S=st(it); var p=payload(it); var v=it.verificacion; var L=[];
     L.push("// DRY-RUN — NO escribe nada. Rutas existentes, con autorización del usuario.");
-    L.push("Revisor: "+(S.revisor||"(sin nombre)")+" · verificado: "+(S.verificado?"SÍ":"NO")+" · secciones pendientes: "+pendientesN(it));
-    L.push("1) RE-LEER expediente y verificar: episodio activo=="+JSON.stringify(v.episodio_activo)+", fecha_corte=="+JSON.stringify(v.fecha_corte)+", source_hash=="+JSON.stringify(v.source_hash)+", sin notas SOAP posteriores.");
+    L.push("Revisor: "+(S.revisor||"(sin nombre)")+" · verificado: "+(S.verificado?"SÍ":"NO")+" · secciones por aprobar: "+pendientesN(it)+(invalidadasN(it)?" · INVALIDADAS: "+invalidadasN(it):""));
+    L.push("Hashes: source_hash="+JSON.stringify(v.source_hash)+" · proposal_hash="+JSON.stringify(v.proposal_hash||null));
+    L.push("Sellos por apartado (approved_hash): "+JSON.stringify(p.sellos));
+    L.push("1) RE-LEER expediente y verificar: episodio activo=="+JSON.stringify(v.episodio_activo)+", fecha_corte=="+JSON.stringify(v.fecha_corte)+", source_hash=="+JSON.stringify(v.source_hash)+", sin notas SOAP posteriores. Si el source_hash ya no coincide, ABORTAR (el expediente cambió).");
     L.push("2) NO sobrescribir: solo se escriben las secciones ACEPTADAS/EDITADAS; conservar/rechazar NO tocan el expediente. Se conserva todo dato ajeno a los campos aprobados.");
     L.push("3) ACTIVO → saveDB('pts',[p],{camposHist:['dxFuncional','dx','historialCambios','fechaActualizacion','ultimoUsuario']}); MIGRADO → _persistirHistoricoFirestore. objetivosMP es NUEVO y aditivo (no borra CP/LP).");
     L.push("   campos a escribir = "+JSON.stringify(p.campos,null,1));
@@ -187,10 +217,16 @@
   }
 
   window.RV={
-    set:function(c,k,v){ var it=byc(c),S=st(it); S.sec[k].modo=v; S.sec[k].ts=new Date().toISOString(); S.revisor=document.getElementById("revisor").value||S.revisor; save(); },
-    txt:function(c,k,t){ var it=byc(c),S=st(it); S.sec[k].texto=t; try{localStorage.setItem(LS,JSON.stringify(ST));}catch(e){} },
-    ins:function(c,k,w){ var it=byc(c),S=st(it); var sec=it.secciones[k]; var add=w==="ant"?(sec.anterior||""):propTexto(sec,SEC.filter(function(s){return s.k===k;})[0]); S.sec[k].texto=(S.sec[k].texto!=null?S.sec[k].texto:"")+(S.sec[k].texto?"\n":"")+add; save(); },
-    verif:function(c,b){ var it=byc(c),S=st(it); S.verificado=b; S.revisor=document.getElementById("revisor").value||S.revisor; S.ts=new Date().toISOString(); save(); },
+    set:function(c,k,v){ var it=byc(c); var s=SEC.filter(function(x){return x.k===k;})[0]; var d=st(it).sec[k];
+      d.modo=v; st(it).revisor=revisorActual()||st(it).revisor;
+      // Modos de texto FIJO (conservar/aceptar/rechazar) se sellan al elegir, exigiendo revisor.
+      if(v==="editar"){ d.approved_hash=null; d.ts=new Date().toISOString(); }
+      else { if(!sellar(it,s)){ d.approved_hash=null; } }
+      save(); },
+    txt:function(c,k,t){ var it=byc(c); var d=st(it).sec[k]; d.texto=t; /* si ya estaba sellado, el mismatch de hash lo marca INVALIDADO al re-render */ try{localStorage.setItem(LS,JSON.stringify(ST));}catch(e){} },
+    ins:function(c,k,w){ var it=byc(c); var d=st(it).sec[k]; var sec=it.secciones[k]; var add=w==="ant"?(sec.anterior||""):propTexto(sec,SEC.filter(function(s){return s.k===k;})[0]); d.texto=(d.texto!=null?d.texto:"")+(d.texto?"\n":"")+add; save(); },
+    confirmar:function(c,k){ var it=byc(c); var s=SEC.filter(function(x){return x.k===k;})[0]; if(sellar(it,s)) save(); },
+    verif:function(c,b){ var it=byc(c),S=st(it); S.verificado=b; S.revisor=revisorActual()||S.revisor; S.ts=new Date().toISOString(); save(); },
     dry:function(c){ var el=document.getElementById("dry_"+c); el.textContent=flujo(byc(c)); el.style.display=el.style.display==="block"?"none":"block"; }
   };
 
@@ -210,7 +246,7 @@
     var nAp=D.filter(aprobado).length;
     document.getElementById("count").textContent=D.length+" pacientes · "+D.filter(function(i){return i.nVacios>0;}).length+" con vacíos · "+nAp+" aprobados · mostrando "+vis.length;
   }
-  document.getElementById("banner").innerHTML='<b>Cómo usar.</b> Escribe tu nombre (Revisor). Revisa CADA sección (dx médico, dx funcional, objetivos CP/MP/LP) de forma independiente: <b>Conservar</b>, <b>Aceptar</b>, <b>Editar/combinar</b> o <b>Rechazar</b>. Todo inicia en <b>PENDIENTE</b>: nada se acepta solo. Verás el <b>texto anterior</b> y el <b>texto final a guardar</b>. Marca la <b>verificación</b>. Un paciente queda <b>APROBADO</b> solo cuando verificas y ninguna sección queda pendiente. "Preparar aplicación (en seco)" <b>no escribe nada</b>. Datos de prueba ('+esc(META.version||"")+', '+D.length+' pacientes). <b>No se aplica a expedientes reales sin autorización.</b>';
+  document.getElementById("banner").innerHTML='<b>Cómo usar.</b> Escribe tu nombre en <b>Revisor</b> (obligatorio: sin nombre no se aprueba nada). Revisa CADA apartado (dx médico, dx funcional, objetivos CP/MP/LP) por separado: <b>Conservar</b>, <b>Aceptar</b>, <b>Editar/combinar</b> o <b>Rechazar</b>. Todo inicia en <b>PENDIENTE</b>. Al editar, pulsa <b>✓ Confirmar apartado</b> para sellarlo. Si cambias el texto después de aprobar, la aprobación se <b>invalida</b> y hay que re-confirmar. Cada aprobación guarda <b>revisor + fecha + approved_hash</b>; se verifican además <b>source_hash</b> (expediente) y <b>proposal_hash</b> (propuesta). Un paciente queda <b>APROBADO</b> solo si verificaste y TODOS los apartados están sellados y sin cambios. "Preparar aplicación (en seco)" <b>no escribe nada</b>. Datos de prueba ('+esc(META.version||"")+', '+D.length+' pacientes). <b>No se aplica a expedientes reales sin autorización.</b>';
   document.getElementById("filtro").onchange=render;
   var rev=document.getElementById("revisor"); try{rev.value=localStorage.getItem("sinergia_revisor")||"";}catch(e){}
   rev.oninput=function(){ try{localStorage.setItem("sinergia_revisor",rev.value);}catch(e){} };
@@ -229,7 +265,7 @@
   };
   document.getElementById("btnExport").onclick=function(){
     var out={_meta:{generado:new Date().toISOString(),version:META.version||null,nota:"Decisiones de revisión (dry-run). No se aplicó a expedientes reales."},decisiones:[]};
-    D.forEach(function(it){ var S=st(it); var p=payload(it); out.decisiones.push({codigo:it.codigo, revisor:S.revisor, aprobado:aprobado(it), verificado:S.verificado, source_hash:it.verificacion.source_hash, secciones:Object.keys(S.sec).reduce(function(a,k){a[k]={modo:S.sec[k].modo,ts:S.sec[k].ts};return a;},{}), campos:p.campos, cambios:p.cambios}); });
+    D.forEach(function(it){ var S=st(it); var p=payload(it); out.decisiones.push({codigo:it.codigo, revisor:S.revisor, aprobado:aprobado(it), verificado:S.verificado, source_hash:it.verificacion.source_hash, proposal_hash:it.verificacion.proposal_hash||null, secciones:Object.keys(S.sec).reduce(function(a,k){var d=S.sec[k];a[k]={modo:d.modo, revisor:d.revisor, ts:d.ts, approved_hash:d.approved_hash, aprobada:secAprobada(it,SEC.filter(function(x){return x.k===k;})[0]), invalidada:secInvalidada(it,SEC.filter(function(x){return x.k===k;})[0])};return a;},{}), campos:p.campos, cambios:p.cambios}); });
     var txt=JSON.stringify(out,null,1); try{var b=new Blob([txt],{type:"application/json"});var a=document.createElement("a");a.href=URL.createObjectURL(b);a.download="decisiones_revision.json";a.click();}catch(e){alert(txt.slice(0,400));}
   };
   document.getElementById("btnDryAll").onclick=function(){

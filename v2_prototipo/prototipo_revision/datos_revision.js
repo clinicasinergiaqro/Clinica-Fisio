@@ -1,6 +1,6 @@
 window.DATOS_REVISION = {
  "_meta": {
-  "generado": "2026-11-26T23:00:59.165Z",
+  "generado": "2026-11-26T23:36:55.548Z",
   "version": "2.2.3-proto",
   "n": 24,
   "fuente": "resultados_v22.json"
@@ -17,7 +17,8 @@ window.DATOS_REVISION = {
     "soap_n": 0,
     "valoracion_inicial_fecha": null,
     "posible_nuevo_motivo": false,
-    "source_hash": "4256b28496"
+    "source_hash": "69d4259bc4",
+    "proposal_hash": "4256b28496"
    },
    "secciones": {
     "dx_medico": {
@@ -93,7 +94,8 @@ window.DATOS_REVISION = {
     "soap_n": 0,
     "valoracion_inicial_fecha": null,
     "posible_nuevo_motivo": false,
-    "source_hash": "2d4322c372"
+    "source_hash": "69d4259bc4",
+    "proposal_hash": "2d4322c372"
    },
    "secciones": {
     "dx_medico": {
@@ -164,7 +166,8 @@ window.DATOS_REVISION = {
     "soap_n": 0,
     "valoracion_inicial_fecha": null,
     "posible_nuevo_motivo": false,
-    "source_hash": "a14f2845de"
+    "source_hash": "69d4259bc4",
+    "proposal_hash": "a14f2845de"
    },
    "secciones": {
     "dx_medico": {
@@ -249,7 +252,8 @@ window.DATOS_REVISION = {
     "soap_n": 0,
     "valoracion_inicial_fecha": null,
     "posible_nuevo_motivo": false,
-    "source_hash": "672afe3adc"
+    "source_hash": "69d4259bc4",
+    "proposal_hash": "672afe3adc"
    },
    "secciones": {
     "dx_medico": {
@@ -318,7 +322,8 @@ window.DATOS_REVISION = {
     "soap_n": 0,
     "valoracion_inicial_fecha": null,
     "posible_nuevo_motivo": false,
-    "source_hash": "cb0eff57dd"
+    "source_hash": "69d4259bc4",
+    "proposal_hash": "cb0eff57dd"
    },
    "secciones": {
     "dx_medico": {
@@ -394,7 +399,8 @@ window.DATOS_REVISION = {
     "soap_n": 0,
     "valoracion_inicial_fecha": null,
     "posible_nuevo_motivo": false,
-    "source_hash": "9a9266584d"
+    "source_hash": "69d4259bc4",
+    "proposal_hash": "9a9266584d"
    },
    "secciones": {
     "dx_medico": {
@@ -469,7 +475,8 @@ window.DATOS_REVISION = {
     "soap_n": 0,
     "valoracion_inicial_fecha": null,
     "posible_nuevo_motivo": false,
-    "source_hash": "89660c38b7"
+    "source_hash": "69d4259bc4",
+    "proposal_hash": "89660c38b7"
    },
    "secciones": {
     "dx_medico": {
@@ -538,7 +545,8 @@ window.DATOS_REVISION = {
     "soap_n": 0,
     "valoracion_inicial_fecha": null,
     "posible_nuevo_motivo": false,
-    "source_hash": "05b99da3fb"
+    "source_hash": "69d4259bc4",
+    "proposal_hash": "05b99da3fb"
    },
    "secciones": {
     "dx_medico": {
@@ -607,7 +615,8 @@ window.DATOS_REVISION = {
     "soap_n": 0,
     "valoracion_inicial_fecha": null,
     "posible_nuevo_motivo": false,
-    "source_hash": "93c9db75e0"
+    "source_hash": "69d4259bc4",
+    "proposal_hash": "93c9db75e0"
    },
    "secciones": {
     "dx_medico": {
@@ -675,7 +684,8 @@ window.DATOS_REVISION = {
     "soap_n": 0,
     "valoracion_inicial_fecha": null,
     "posible_nuevo_motivo": false,
-    "source_hash": "61cfe76047"
+    "source_hash": "69d4259bc4",
+    "proposal_hash": "61cfe76047"
    },
    "secciones": {
     "dx_medico": {
@@ -744,7 +754,8 @@ window.DATOS_REVISION = {
     "soap_n": 0,
     "valoracion_inicial_fecha": null,
     "posible_nuevo_motivo": false,
-    "source_hash": "4009594bce"
+    "source_hash": "69d4259bc4",
+    "proposal_hash": "4009594bce"
    },
    "secciones": {
     "dx_medico": {
@@ -813,7 +824,8 @@ window.DATOS_REVISION = {
     "soap_n": 0,
     "valoracion_inicial_fecha": null,
     "posible_nuevo_motivo": false,
-    "source_hash": "9497aa2258"
+    "source_hash": "69d4259bc4",
+    "proposal_hash": "9497aa2258"
    },
    "secciones": {
     "dx_medico": {
@@ -891,7 +903,8 @@ window.DATOS_REVISION = {
     "soap_n": 0,
     "valoracion_inicial_fecha": null,
     "posible_nuevo_motivo": false,
-    "source_hash": "f19dd65cff"
+    "source_hash": "69d4259bc4",
+    "proposal_hash": "f19dd65cff"
    },
    "secciones": {
     "dx_medico": {
@@ -966,7 +979,8 @@ window.DATOS_REVISION = {
     "soap_n": 2,
     "valoracion_inicial_fecha": null,
     "posible_nuevo_motivo": true,
-    "source_hash": "c818af9f30"
+    "source_hash": "99974cfc0e",
+    "proposal_hash": "c818af9f30"
    },
    "secciones": {
     "dx_medico": {
@@ -1035,7 +1049,8 @@ window.DATOS_REVISION = {
     "soap_n": 0,
     "valoracion_inicial_fecha": null,
     "posible_nuevo_motivo": false,
-    "source_hash": "beb0866883"
+    "source_hash": "69d4259bc4",
+    "proposal_hash": "beb0866883"
    },
    "secciones": {
     "dx_medico": {
@@ -1111,7 +1126,8 @@ window.DATOS_REVISION = {
     "soap_n": 0,
     "valoracion_inicial_fecha": null,
     "posible_nuevo_motivo": false,
-    "source_hash": "6552d48baa"
+    "source_hash": "69d4259bc4",
+    "proposal_hash": "6552d48baa"
    },
    "secciones": {
     "dx_medico": {
@@ -1180,7 +1196,8 @@ window.DATOS_REVISION = {
     "soap_n": 0,
     "valoracion_inicial_fecha": null,
     "posible_nuevo_motivo": false,
-    "source_hash": "4fe73ac12c"
+    "source_hash": "69d4259bc4",
+    "proposal_hash": "4fe73ac12c"
    },
    "secciones": {
     "dx_medico": {
@@ -1249,7 +1266,8 @@ window.DATOS_REVISION = {
     "soap_n": 0,
     "valoracion_inicial_fecha": null,
     "posible_nuevo_motivo": false,
-    "source_hash": "de900f55a4"
+    "source_hash": "69d4259bc4",
+    "proposal_hash": "de900f55a4"
    },
    "secciones": {
     "dx_medico": {
@@ -1325,7 +1343,8 @@ window.DATOS_REVISION = {
     "soap_n": 1,
     "valoracion_inicial_fecha": null,
     "posible_nuevo_motivo": false,
-    "source_hash": "3602b6164c"
+    "source_hash": "1ba3e0a4a8",
+    "proposal_hash": "3602b6164c"
    },
    "secciones": {
     "dx_medico": {
@@ -1394,7 +1413,8 @@ window.DATOS_REVISION = {
     "soap_n": 0,
     "valoracion_inicial_fecha": null,
     "posible_nuevo_motivo": false,
-    "source_hash": "546188e84a"
+    "source_hash": "69d4259bc4",
+    "proposal_hash": "546188e84a"
    },
    "secciones": {
     "dx_medico": {
@@ -1464,7 +1484,8 @@ window.DATOS_REVISION = {
     "soap_n": 0,
     "valoracion_inicial_fecha": null,
     "posible_nuevo_motivo": false,
-    "source_hash": "839ce0177e"
+    "source_hash": "69d4259bc4",
+    "proposal_hash": "839ce0177e"
    },
    "secciones": {
     "dx_medico": {
@@ -1533,7 +1554,8 @@ window.DATOS_REVISION = {
     "soap_n": 0,
     "valoracion_inicial_fecha": null,
     "posible_nuevo_motivo": false,
-    "source_hash": "02c631ad3a"
+    "source_hash": "69d4259bc4",
+    "proposal_hash": "02c631ad3a"
    },
    "secciones": {
     "dx_medico": {
@@ -1614,7 +1636,8 @@ window.DATOS_REVISION = {
     "soap_n": 0,
     "valoracion_inicial_fecha": null,
     "posible_nuevo_motivo": false,
-    "source_hash": "e803fbc723"
+    "source_hash": "69d4259bc4",
+    "proposal_hash": "e803fbc723"
    },
    "secciones": {
     "dx_medico": {
@@ -1685,7 +1708,8 @@ window.DATOS_REVISION = {
     "soap_n": 0,
     "valoracion_inicial_fecha": null,
     "posible_nuevo_motivo": false,
-    "source_hash": "2f15d5f953"
+    "source_hash": "69d4259bc4",
+    "proposal_hash": "2f15d5f953"
    },
    "secciones": {
     "dx_medico": {

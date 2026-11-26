@@ -52,7 +52,10 @@ var items = resultados.map(function (c) {
       soap_n: c.soap_procesado ? c.soap_procesado.n_notas : 0,
       valoracion_inicial_fecha: sm.valoracion_inicial_fecha || null,
       posible_nuevo_motivo: !!(c.episodio_analisis && c.episodio_analisis.posible_nuevo_motivo),
-      source_hash: hash({ dxm: dxMedPropuesto, dx: c.diagnostico_funcional.texto, obj: porFase })
+      // source_hash = estado del EXPEDIENTE del que se derivó la propuesta (para re-leer y abortar si cambió).
+      source_hash: hash({ ex: ex, soap_n: (c.soap_procesado ? c.soap_procesado.n_notas : 0), corte: c.fecha_corte || null, docs: (c.documentos_recuperados || null) }),
+      // proposal_hash = contenido EXACTO de la propuesta V2.2.3 que se está revisando.
+      proposal_hash: hash({ dxm: dxMedPropuesto, dx: c.diagnostico_funcional.texto, obj: porFase })
     },
     secciones: {
       dx_medico: { anterior: dm.texto || '', propuesto: dxMedPropuesto, documentado: ddoc.propuestas || [], radiologicos: rad, vacio: vacios.dx_medico },
