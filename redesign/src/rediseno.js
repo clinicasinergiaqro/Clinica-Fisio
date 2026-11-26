@@ -61,6 +61,8 @@
       btn.classList.toggle('active', r.match.indexOf(active)>=0);
     });
     var u=el('rd-rail-user'); try{ var cu=curUser(); if(u && cu && cu.name) u.textContent=cu.name; }catch(_){}
+    // La barra de Guardar fija solo vive en la pantalla SOAP activa
+    try{ var cs=el('content-soap'); if(!(cs && cs.offsetParent!==null && el('soap-full'))) hideSoapSaveBar(); }catch(_){}
   }
 
   /* ---------------------------------------------- helpers de lectura ------ */
@@ -212,31 +214,126 @@
     grp.appendChild(card);
   }
 
+  /* ===================================================================== *
+   * V1.1 · SOAP MOBILE-FIRST                                              *
+   *   · compacta identificación / fecha / dictado (encabezado liviano)   *
+   *   · barra sticky de navegación rápida S/O/A/P (llega al Subjetivo)    *
+   *   · barra de Guardar fija que flota sobre el teclado (visualViewport) *
+   *   · conserva TODO: dictado, descarga, nuevo motivo, modalidades,     *
+   *     agentes, media, razonamiento clínico. Solo reubica y acentúa.    *
+   * ===================================================================== */
+  var SOAP_SECS=[
+    {k:'s', ic:'S', t:'Subjetivo', cls:'rd-s', col:'#1565C0'},
+    {k:'o', ic:'O', t:'Objetivo',  cls:'rd-o', col:'#1B5E20'},
+    {k:'a', ic:'A', t:'Análisis',  cls:'rd-a', col:'#E65100'},
+    {k:'p', ic:'P', t:'Plan',      cls:'rd-p', col:'#6A1B9A'}
+  ];
+  function rdScrollTo(elm){
+    if(!elm) return;
+    try{ elm.scrollIntoView({behavior:'smooth', block:'start'}); }catch(_){ try{elm.scrollIntoView();}catch(__){} }
+  }
+  // Barra sticky con las 4 letras — tocar una salta a su sección.
+  function buildSoapQuickNav(full, map){
+    var present=SOAP_SECS.filter(function(x){return map[x.k];});
+    if(present.length<2){ var old=el('rd-soap-qnav'); if(old) old.remove(); return; }
+    var nav=el('rd-soap-qnav');
+    if(!nav){
+      nav=document.createElement('div'); nav.id='rd-soap-qnav';
+      full.insertBefore(nav, full.firstChild);
+    } else if(nav.parentNode!==full || full.firstChild!==nav){
+      full.insertBefore(nav, full.firstChild);
+    }
+    nav.innerHTML=present.map(function(x){
+      return '<button type="button" data-k="'+x.k+'" style="--rdc:'+x.col+'">'
+        +'<b>'+x.ic+'</b><span>'+x.t+'</span></button>';
+    }).join('');
+    // Apilar la barra justo debajo de la alerta de seguridad sticky (sin ocultarla)
+    try{
+      var cs=el('content-soap'), sf=el('soap-full'), top=0;
+      if(cs){ var ch=cs.children; for(var i=0;i<ch.length;i++){ if(ch[i]===sf) break; if(getComputedStyle(ch[i]).position==='sticky') top+=ch[i].getBoundingClientRect().height; } }
+      nav.style.top=top+'px';
+      SOAP_SECS.forEach(function(x){ if(map[x.k]) map[x.k].style.scrollMarginTop=(top+46)+'px'; });
+    }catch(_){}
+    present.forEach(function(x){
+      var b=nav.querySelector('[data-k="'+x.k+'"]');
+      if(b) b.onclick=function(){ rdScrollTo(map[x.k]); setActiveChip(x.k); };
+    });
+    // scroll-spy: resalta la sección visible
+    try{ if(window.__rdSpy) window.__rdSpy.disconnect(); }catch(_){}
+    var io=new IntersectionObserver(function(ents){
+      ents.forEach(function(e){ if(e.isIntersecting){ var k=e.target.getAttribute('data-rdk'); if(k) setActiveChip(k); } });
+    },{rootMargin:'-45% 0px -45% 0px', threshold:0});
+    present.forEach(function(x){ map[x.k].setAttribute('data-rdk',x.k); io.observe(map[x.k]); });
+    window.__rdSpy=io;
+    function setActiveChip(k){ nav.querySelectorAll('button').forEach(function(b){ b.classList.toggle('on', b.getAttribute('data-k')===k); }); }
+    setActiveChip(present[0].k);
+  }
+  // Barra inferior fija: Guardar (dispara el botón REAL) + saltos S/O/A/P.
+  // Flota sobre el teclado con visualViewport para no quedar tapada al escribir.
+  function realSaveBtn(){ return document.querySelector('#content-soap [onclick="guardarSOAP()"], #content-soap [onclick*="guardarSOAP"]'); }
+  function buildSoapSaveBar(map){
+    var sf=el('soap-full'); if(!sf || sf.offsetParent===null){ hideSoapSaveBar(); return; }  // descarga / pantalla oculta
+    var bar=el('rd-soap-bar');
+    if(!bar){
+      bar=document.createElement('div'); bar.id='rd-soap-bar';
+      bar.innerHTML='<button type="button" class="rd-bar-top" title="Ir al inicio de la nota">↑</button>'
+        +'<button type="button" class="rd-bar-save">💾 Guardar nota</button>';
+      document.body.appendChild(bar);
+      bar.querySelector('.rd-bar-save').onclick=function(){
+        var b=realSaveBtn();
+        if(b){ b.click(); }      // usa el botón REAL → conserva su verificación/estado
+        else { try{ if(typeof guardarSOAP==='function') guardarSOAP(); }catch(_){} }
+      };
+      bar.querySelector('.rd-bar-top').onclick=function(){ var sf=el('soap-full'); if(sf) rdScrollTo(sf); };
+      var vv=window.visualViewport;
+      if(vv){ var f=function(){ floatSaveBar(); }; vv.addEventListener('resize',f); vv.addEventListener('scroll',f); }
+    }
+    bar.classList.add('show');
+    floatSaveBar();
+  }
+  function floatSaveBar(){
+    var bar=el('rd-soap-bar'); if(!bar) return;
+    var vv=window.visualViewport;
+    if(vv){
+      var kb=Math.max(0, (window.innerHeight - vv.height - vv.offsetTop));
+      bar.style.bottom = (kb>60 ? kb : 0) + 'px';         // sobre el teclado si está abierto
+      bar.classList.toggle('kb', kb>60);
+    }
+  }
+  function hideSoapSaveBar(){ var b=el('rd-soap-bar'); if(b) b.classList.remove('show'); }
+
   /* --------------------------------- COMPACTAR + ACENTUAR SOAP ----------- */
   function enhanceSoap(container){
-    var full=el('soap-full'); if(!full) return;
-    var secs=full.querySelectorAll(':scope > .form-section');
-    var S=null,O=null,A=null,P=null;
-    secs.forEach(function(sec){
+    var full=el('soap-full'); if(!full){ hideSoapSaveBar(); return; }
+    // 1) Etiquetar las secciones que aún sean hijas directas (solo acierta en el
+    //    1er render; las clases rd-* persisten aunque luego se aniden en filas).
+    full.querySelectorAll(':scope > .form-section').forEach(function(sec){
       var t=sec.querySelector('.form-section-title'); if(!t) return;
       var tx=(t.textContent||'').trim();
       if(/^📋/.test(tx)||/identificaci/i.test(tx)) sec.classList.add('rd-ident');
-      else if(/^S\s*[—\-·]/.test(tx)||/^S\b.*Subjetiv/i.test(tx)){sec.classList.add('rd-s');S=sec;}
-      else if(/^O\s*[—\-·]/.test(tx)){sec.classList.add('rd-o');O=sec;}
-      else if(/^A\s*[—\-·]/.test(tx)){sec.classList.add('rd-a');A=sec;}
-      else if(/^P\s*[—\-·]/.test(tx)){sec.classList.add('rd-p');P=sec;}
+      else if(/^📅/.test(tx)||/fecha de la consulta/i.test(tx)) sec.classList.add('rd-fecha');
+      else if(sec.querySelector('#soap-dictado-btn')) sec.classList.add('rd-dictado');
+      else if(/^S\s*[—\-·]/.test(tx)||/^S\b.*Subjetiv/i.test(tx)) sec.classList.add('rd-s','rd-sec');
+      else if(/^O\s*[—\-·]/.test(tx)) sec.classList.add('rd-o','rd-sec');
+      else if(/^A\s*[—\-·]/.test(tx)) sec.classList.add('rd-a','rd-sec');
+      else if(/^P\s*[—\-·]/.test(tx)) sec.classList.add('rd-p','rd-sec');
     });
-    // Rejilla S|O y A|P (solo si no se armó ya)
-    if(S&&O&&!full.querySelector('.rd-row-so')){
+    // 2) Resolver el mapa por CLASE (robusto a la rejilla que anida S|O / A|P)
+    var map={ s:full.querySelector('.rd-s'), o:full.querySelector('.rd-o'),
+              a:full.querySelector('.rd-a'), p:full.querySelector('.rd-p') };
+    // 3) Rejilla S|O y A|P SOLO si aún son hijas directas y no se armó
+    if(map.s&&map.o&&map.s.parentNode===full&&map.o.parentNode===full&&!full.querySelector('.rd-row-so')){
       var r1=document.createElement('div'); r1.className='rd-row rd-row-so';
-      S.parentNode.insertBefore(r1,S); r1.appendChild(S); r1.appendChild(O);
+      full.insertBefore(r1,map.s); r1.appendChild(map.s); r1.appendChild(map.o);
     }
-    if(A&&P&&!full.querySelector('.rd-row-ap')){
+    if(map.a&&map.p&&map.a.parentNode===full&&map.p.parentNode===full&&!full.querySelector('.rd-row-ap')){
       var r2=document.createElement('div'); r2.className='rd-row rd-row-ap';
-      A.parentNode.insertBefore(r2,A); r2.appendChild(A); r2.appendChild(P);
+      full.insertBefore(r2,map.a); r2.appendChild(map.a); r2.appendChild(map.p);
     }
-    buildSoapCtx(container);
+    buildSoapCtx(container);            // panel de contexto (colapsado en móvil)
     try{ buildBioCard(full); }catch(_){}
+    try{ buildSoapQuickNav(full, map); }catch(_){}   // al final → queda como 1er hijo (arriba de todo)
+    try{ buildSoapSaveBar(map); }catch(_){}
   }
 
   /* --------------------------------------------------- OBSERVADORES ------ */
