@@ -181,7 +181,14 @@
 
     // --- Trauma cervical por carga axial (PEDIÁTRICO y ADULTO: mecanismo de alto riesgo) ---
     var cervical = termState(zona + ' ' + relato + ' ' + dxMed, ['cervical', 'cuello']).affirmed;
-    var mecAxial = termState(relato + ' ' + soap.todo, ['carga axial', 'clavado', 'de cabeza', 'cayo de cabeza', 'golpe en la cabeza', 'axial', 'zambullida', 'accidente automovilistico', 'alcance vehicular', 'volcadura', 'caida de altura']).affirmed;
+    // Mecanismo de alto riesgo cervical. Términos ESPECÍFICOS (no "de cabeza" suelto, que matchea
+    // "occipital de cabeza"; ni "axial" suelto, que matchea "corte axial" de una imagen). Negación-aware.
+    var mecAxial = termState(relato + ' ' + soap.todo, [
+      'carga axial', 'compresion axial', 'trauma cervical', 'clavado de cabeza', 'se clavo de cabeza', 'clavo de cabeza',
+      'cayo de cabeza', 'de cabeza en la', 'de cabeza a la', 'de cabeza al', 'zambullida', 'golpe en la cabeza',
+      'apoyando todo el cuerpo', 'hiperextension cervical', 'accidente automovilistico', 'alcance vehicular', 'latigazo',
+      'volcadura', 'caida de altura'
+    ]).affirmed;
     var traumaCervicalAxial = cervical && mecAxial;
     var edadNum = (typeof rec.edad === 'number') ? rec.edad : parseInt(rec.edad, 10);
     var pediatrico = !isNaN(edadNum) && edadNum < 16;

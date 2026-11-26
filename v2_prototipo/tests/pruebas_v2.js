@@ -61,6 +61,15 @@ check('CERV-02', 'Trauma cervical axial PEDIÁTRICO dispara E4',
 check('CERV-03', 'Cervicalgia mecánica SIN mecanismo axial NO dispara E4',
   !tieneRegla(evalS({ edad: 40, orig: { zona: 'cervical', padecimiento: 'Cervicalgia por postura de trabajo, gradual.' } }), 'E4'));
 
+check('CERV-04', '"occipital de cabeza" (anatomía) NO dispara E4 — falso positivo OCT-13',
+  !tieneRegla(evalS({ edad: 65, orig: { zona: 'cervical', padecimiento: 'Hace 5 años dolor cervical gradual, se irradia a espalda alta y zona occipital de cabeza; miofascitis.' } }), 'E4'));
+
+check('CERV-05', 'Marometa con carga axial cervical + moretón en nuca (pediátrico) SÍ dispara E4 — OCT-79',
+  tieneRegla(evalS({ edad: 7, orig: { zona: 'cuello', padecimiento: 'Haciendo marometas la cabeza giró hacia atrás apoyando todo el cuerpo sobre la cabeza (hiperextensión/carga axial); moretón en la nuca; dolor en aumento.' } }), 'E4'));
+
+check('CERV-06', '"corte axial" en reporte de imagen NO dispara E4',
+  !tieneRegla(evalS({ edad: 50, orig: { zona: 'cervical', dxMedico: 'RM cervical, corte axial muestra protrusión C5-C6', padecimiento: 'dolor cervical crónico gradual sin trauma' } }), 'E4'));
+
 // ---------- LATERALIDAD CIRUGÍA LIGAMENTARIA ----------
 check('LAT-01', 'Cirugía LCA CONTRALATERAL NO debe marcarse ipsilateral — bug OCT-02',
   (function () { var f = facts({ orig: { zona: 'rodilla', lado: 'derecho', padecimiento: 'dolor de rodilla derecha' }, antecedentes: { cirugias: 'Plastia de LCA en rodilla izquierda hace 3 años' } }); return !f.ligamentoIpsilateralPrevio && f.ligamentoContralateral; })());
@@ -180,6 +189,17 @@ check('BLK-01', 'Con alerta bloqueante, plan = null y objetivos = solo seguridad
     var c = GEN.generar({ orig: { zona: 'lumbar', padecimiento: 'lumbalgia con retención urinaria y anestesia en silla de montar', eva: '7' } });
     return c.plan === null && c.objetivos.length === 1 && c.objetivos[0].fase === 'seguridad';
   })());
+
+// ---------- ANONIMIZACIÓN (PHI) ----------
+check('PHI-01', 'Nombre de médico en dx referido NO sale en el contrato (se reemplaza por [médico])',
+  (function () {
+    var c = GEN.generar({ patologia: 'Rodilla', orig: { padecimiento: 'dolor de rodilla al correr desde hace 1 mes', zona: 'rodilla', dxMedico: 'Condromalacia referida por Dr. Mauricio Larrañaga' } });
+    var blob = JSON.stringify(c);
+    return blob.indexOf('Larrañaga') === -1 && blob.indexOf('[médico]') !== -1;
+  })());
+
+check('PHI-02', 'scrubPHI respeta texto clínico sin nombres',
+  GEN._scrubPHI('dolor lumbar que no cede, EVA 7') === 'dolor lumbar que no cede, EVA 7');
 
 // ---------- INTEGRACIÓN: caso limpio no debe disparar nada ----------
 check('INT-01', 'Caso simple sin banderas → sin_alerta_detectada + plan editable',

@@ -15,6 +15,21 @@
   var norm = EX._norm, lleno = EX._lleno;
   var has = function (t, ks) { t = norm(t); return ks.some(function (k) { return t.indexOf(norm(k)) !== -1; }); };
 
+  // --- Anonimización defensiva: ningún nombre de médico (ni "referido/operado por <Nombre>")
+  //     puede salir en el contrato, aunque el input venga mal anonimizado. Se reemplaza por [médico].
+  function scrubPHI(s) {
+    if (typeof s !== 'string' || !s) return s;
+    return s
+      .replace(/\b[Dd][Rr][Aa]?\.?\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+){0,2}/g, '[médico]')
+      .replace(/\b(referid[oa]|envid[oa]|enviad[oa]|operad[oa]|valorad[oa]|atendid[oa])\s+por\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+){0,2}/gi, '$1 por [médico]');
+  }
+  function scrubDeep(x) {
+    if (typeof x === 'string') return scrubPHI(x);
+    if (Array.isArray(x)) return x.map(scrubDeep);
+    if (x && typeof x === 'object') { var o = {}; Object.keys(x).forEach(function (k) { o[k] = scrubDeep(x[k]); }); return o; }
+    return x;
+  }
+
   var ESCALAS = {
     'Cervicalgia': 'NDI (Neck Disability Index)', 'Lumbalgia': 'Oswestry (ODI) / PSFS', 'Dorsalgia': 'escala de dolor y función pertinente a la región',
     'Lesion meniscal': 'IKDC / KOOS', 'Lesion ligamentaria': 'IKDC + hop tests (según fase)', 'Tendinopatia': 'VISA (según región)',
@@ -159,6 +174,10 @@
 
   function generar(rec, opts) {
     opts = opts || {};
+    return scrubDeep(_generar(rec, opts)); // scrub PHI defensivo sobre TODO el contrato de salida
+  }
+
+  function _generar(rec, opts) {
     var h = EX.extraer(rec, opts); // h.regionConflicto ya viene del extractor (alimenta la regla X2)
     var confl = conflictos(rec, h);
     var seguridad = MS.evaluar(h);
@@ -189,7 +208,7 @@
     };
   }
 
-  var API = { version: VERSION, generar: generar, _conflictos: conflictos, _objetivos: objetivos, _actividadValida: actividadValida, ESCALAS: ESCALAS };
+  var API = { version: VERSION, generar: generar, _conflictos: conflictos, _objetivos: objetivos, _actividadValida: actividadValida, _scrubPHI: scrubPHI, ESCALAS: ESCALAS };
   if (typeof module !== 'undefined' && module.exports) module.exports = API;
   else root.GeneradorV2 = API;
 })(typeof window !== 'undefined' ? window : globalThis);
