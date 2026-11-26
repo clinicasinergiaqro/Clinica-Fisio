@@ -2,260 +2,232 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Sinergia · Prototipo Diagnóstico Funcional V2</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SINERGIA · Prototipo clínico V2.1 (editable, datos sintéticos)</title>
+<!-- Motor REAL cargado en el navegador (mismos módulos que las pruebas y el PDF). Orden importa. -->
+<script src="../src/extractor_v2.js"></script>
+<script src="../src/motor_seguridad_v2.js"></script>
+<script src="../src/generador_v2.js"></script>
+<script src="../src/render_contrato.js"></script>
 <style>
-  :root{
-    --navy:#1B3A6B; --navy2:#14213d; --gold:#C8A24B; --ink:#1f2733; --muted:#6b7686;
-    --line:#e3e8f0; --bg:#f4f6fa; --card:#ffffff;
-    --red:#c0392b; --redbg:#fdECEC; --amber:#9a6b00; --amberbg:#fff6e0; --green:#1f7a4d; --greenbg:#eaf6ee; --blue:#2a5fa5; --bluebg:#eef3fb;
-  }
+  :root{--navy:#1B3A6B;--gold:#C8A24B;--ink:#1c2430;--muted:#6b7682;--line:#e3e8ef;--bg:#eef2f7;--card:#fff}
   *{box-sizing:border-box}
-  body{margin:0;font-family:-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--ink);font-size:14px;line-height:1.5}
-  header{background:var(--navy);color:#fff;padding:14px 20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
-  header .logo{width:34px;height:34px;border-radius:9px;background:var(--gold);color:var(--navy2);display:grid;place-items:center;font-weight:800}
-  header h1{font-size:16px;margin:0;font-weight:700}
-  header .tag{font-size:11px;color:#b9c6df;margin-left:auto;border:1px solid #33518a;border-radius:20px;padding:3px 10px}
-  .wrap{max-width:1040px;margin:0 auto;padding:16px}
-  .psel{display:flex;gap:8px;flex-wrap:wrap;margin:4px 0 14px}
-  .pbtn{border:1px solid var(--line);background:#fff;border-radius:22px;padding:7px 14px;cursor:pointer;font-size:13px;color:var(--navy);font-weight:600}
-  .pbtn.active{background:var(--navy);color:#fff;border-color:var(--navy)}
-  .meta{background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px 16px;margin-bottom:12px;display:flex;gap:18px;flex-wrap:wrap;align-items:center}
-  .meta .big{font-size:18px;font-weight:800;color:var(--navy2)}
-  .meta .chip{font-size:12px;color:var(--muted);background:#f1f4f9;border-radius:16px;padding:3px 10px}
-  .banner{border-radius:12px;padding:12px 16px;margin-bottom:14px;border:1px solid}
-  .banner .t{font-weight:800;text-transform:uppercase;font-size:12px;letter-spacing:.4px}
-  .b-emergencia{background:var(--redbg);border-color:#edc4c4;color:var(--red)}
-  .b-derivacion_prioritaria{background:var(--redbg);border-color:#edc4c4;color:var(--red)}
-  .b-bloqueo_por_dato_inconsistente{background:var(--amberbg);border-color:#ebd9a6;color:var(--amber)}
-  .b-precaucion_especifica{background:var(--amberbg);border-color:#ebd9a6;color:var(--amber)}
-  .b-sin_alerta_detectada_con_datos_disponibles{background:var(--greenbg);border-color:#c9e6d4;color:var(--green)}
-  .tabs{display:flex;gap:4px;flex-wrap:wrap;border-bottom:2px solid var(--line);margin-bottom:12px}
-  .tab{padding:8px 13px;cursor:pointer;font-size:13px;font-weight:600;color:var(--muted);border-bottom:2px solid transparent;margin-bottom:-2px;white-space:nowrap}
-  .tab.active{color:var(--navy);border-bottom-color:var(--gold)}
-  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-bottom:12px}
-  .card h3{margin:0 0 6px;font-size:13px;color:var(--navy);text-transform:uppercase;letter-spacing:.3px}
-  .lab{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.3px}
-  .pill{display:inline-block;font-size:11px;border-radius:14px;padding:2px 9px;margin:2px 4px 2px 0;font-weight:600}
-  .pill.prov{background:#eef3fb;color:var(--blue)}
-  .pill.conf{background:var(--greenbg);color:var(--green)}
-  .obj{border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin:8px 0;background:#fcfdff}
-  .obj .fase{font-size:11px;font-weight:800;text-transform:uppercase;color:var(--gold);letter-spacing:.4px}
-  .obj table{width:100%;border-collapse:collapse;margin-top:6px;font-size:12.5px}
-  .obj td{padding:2px 6px;vertical-align:top}
-  .obj td.k{color:var(--muted);width:120px}
-  .nullbase{color:var(--amber);font-weight:700}
-  .alert{border-left:4px solid var(--red);background:var(--redbg);border-radius:8px;padding:9px 12px;margin:8px 0}
-  .alert.prec{border-left-color:var(--amber);background:var(--amberbg)}
-  .alert .r{font-weight:700}
-  .alert .src{font-size:11px;color:var(--muted)}
-  .yes{background:var(--greenbg);border:1px solid #c9e6d4;border-radius:10px;padding:10px 12px}
-  .no{background:var(--redbg);border:1px solid #edc4c4;border-radius:10px;padding:10px 12px}
-  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-  @media(max-width:620px){.grid2{grid-template-columns:1fr}}
-  .meas{display:flex;justify-content:space-between;align-items:center;border:1px solid var(--line);border-radius:9px;padding:8px 12px;margin:6px 0;background:#fff}
-  .meas .v{font-size:18px;font-weight:800;color:var(--navy2)}
-  .btn{background:var(--navy);color:#fff;border:none;border-radius:9px;padding:9px 14px;font-weight:700;cursor:pointer;font-size:13px}
-  .btn.gold{background:var(--gold);color:var(--navy2)}
+  body{margin:0;font:14.5px/1.55 -apple-system,Segoe UI,Roboto,Arial,sans-serif;color:var(--ink);background:var(--bg)}
+  header.top{background:var(--navy);color:#fff;padding:14px 20px}
+  header.top h1{margin:0;font-size:18px}header.top .sub{opacity:.85;font-size:12.5px;margin-top:2px}
+  header.top .rule{height:3px;background:var(--gold);border-radius:2px;margin-top:10px}
+  .bar{max-width:1040px;margin:0 auto;padding:12px 16px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .bar select,.bar button{font:inherit}
+  .wrap{max-width:1040px;margin:0 auto;padding:0 16px 40px}
+  .note{background:#fff7e6;border:1px solid var(--gold);border-radius:8px;padding:8px 12px;font-size:12.5px;margin:0 0 14px}
+  details.sec{background:var(--card);border:1px solid var(--line);border-radius:10px;margin:0 0 12px;overflow:hidden}
+  details.sec>summary{cursor:pointer;padding:11px 14px;font-weight:600;color:var(--navy);list-style:none;display:flex;justify-content:space-between;align-items:center;background:#f8fafc}
+  details.sec>summary::-webkit-details-marker{display:none}
+  details.sec>summary .chev{transition:.15s}details[open].sec>summary .chev{transform:rotate(90deg)}
+  .sec-body{padding:12px 14px;border-top:1px solid var(--line)}
+  .badge{display:inline-block;color:#fff;font-weight:700;font-size:11.5px;padding:3px 10px;border-radius:999px;letter-spacing:.3px}
+  .pill{display:inline-block;font-size:11px;border-radius:999px;padding:1px 8px;margin-left:5px}
+  .pill.ok{background:#e8f3ec;color:#1F6B3B}.pill.pend{background:#fbf3dd;color:#8A5E0C}.pill.prop{background:#eef0fb;color:#3a3f8a}
+  .alert{background:#fff;border:1px solid var(--line);border-left:5px solid #888;border-radius:8px;padding:9px 11px;margin:7px 0}
+  .alert .acc{background:#fff7e6;border-left:3px solid var(--gold);padding:4px 8px;border-radius:4px;margin-top:4px}
+  .muted{color:var(--muted);font-size:12.5px}
+  textarea,input[type=text]{width:100%;font:inherit;border:1px solid var(--line);border-radius:7px;padding:7px 9px;color:var(--ink)}
+  textarea{min-height:56px;resize:vertical}
+  table{width:100%;border-collapse:collapse;font-size:12.5px;margin-top:6px}
+  th,td{border:1px solid var(--line);padding:6px 7px;text-align:left;vertical-align:top}th{background:var(--navy);color:#fff}
+  .btn{border:1px solid var(--navy);background:var(--navy);color:#fff;border-radius:8px;padding:7px 13px;cursor:pointer}
+  .btn.sec{background:#fff;color:var(--navy)}
+  .btn.gold{background:var(--gold);border-color:var(--gold);color:#3a2d00}
   .btn:disabled{opacity:.45;cursor:not-allowed}
-  .btn.ghost{background:#fff;color:var(--navy);border:1px solid var(--navy)}
-  .spark{height:40px}
-  .foot{color:var(--muted);font-size:11px;text-align:center;padding:16px}
-  .blocked{background:var(--redbg);border:1px dashed #d99;border-radius:10px;padding:14px;color:var(--red);font-weight:600}
-  .val{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-  .trace{font-size:11px;color:var(--muted);background:#f7f9fc;border-radius:8px;padding:8px 10px;margin-top:8px}
-  .hidden{display:none}
+  .bio{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+  .evid-chip{display:inline-block;font-size:11px;background:#f0f4f9;border:1px solid var(--line);border-radius:6px;padding:1px 7px;margin:2px 3px 0 0;color:#3a4a5e}
+  .blocked{background:#f1ecfb;border-left:4px solid #5B3A9B;padding:8px 10px;border-radius:6px;font-weight:600}
+  .ok-banner{background:#e8f3ec;border-left:4px solid #1F6B3B;padding:8px 10px;border-radius:6px}
+  .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .obj-card{border:1px solid var(--line);border-radius:8px;padding:9px;margin:7px 0;background:#fcfdff}
+  .lbl{font-size:11.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.3px;margin:6px 0 2px}
+  #toast{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:var(--navy);color:#fff;padding:9px 16px;border-radius:8px;opacity:0;transition:.2s;pointer-events:none}
+  #toast.show{opacity:1}
 </style>
 </head>
 <body>
-<header>
-  <div class="logo">S</div>
-  <h1>Clínica Sinergia · Diagnóstico Funcional V2 <span style="font-weight:400;color:#b9c6df">(prototipo)</span></h1>
-  <span class="tag">DATOS SINTÉTICOS · solo lectura · no es un expediente real</span>
+<header class="top">
+  <h1>SINERGIA · Diagnóstico funcional asistido — Prototipo clínico V2.1</h1>
+  <div class="sub">Pantalla clínica integrada y EDITABLE · motor determinista real en el navegador · datos SINTÉTICOS (sin PHI) · borrador, requiere firma del fisioterapeuta</div>
+  <div class="rule"></div>
 </header>
-<div class="wrap">
-  <div class="psel" id="psel"></div>
-  <div id="app"></div>
-  <div class="foot">Prototipo visual para evaluar la experiencia. El diseño definitivo se hará tras la auditoría UX/UI. Identidad Sinergia (navy/dorado). Ningún dato corresponde a un paciente real.</div>
+
+<div class="bar">
+  <label>Caso sintético:
+    <select id="selCaso"></select>
+  </label>
+  <button class="btn sec" id="btnReset">↺ Descartar ediciones</button>
+  <button class="btn gold" id="btnReporte">📄 Generar reporte (desde el JSON editado)</button>
+  <span class="muted" id="verLine"></span>
 </div>
 
+<div class="wrap">
+  <div class="note"><b>Diseño provisional:</b> colores institucionales, pero el diseño NO está cerrado hasta revisar la interfaz real de Sinergia. Este prototipo demuestra que la interfaz se genera y edita desde el MISMO contrato JSON del generador (única fuente de verdad), con el motor de seguridad corriendo de verdad.</div>
+  <div id="app"></div>
+</div>
+
+<div id="toast"></div>
+
 <script>
-/* ===== Datos SINTÉTICOS (3 casos, cubren estados: derivación, bloqueo por lado, sin alerta) ===== */
-const CASES = [
-  {
-    id:"SINT-A", titulo:"Lumbalgia · 60 años (sintético)", etiqueta:"Deriva",
-    meta:{edad:60, terapeuta:"—", deporte:"caminata", episodio:"actual"},
-    dx:{texto:"Disfunción lumbar en contexto de dolor lumbar nuevo y persistente; limita caminar y las transferencias. Diagnóstico PROVISIONAL: exploración objetiva pendiente.", estado:"provisional"},
-    hipotesis:[{texto:"Hipótesis estructural: dolor mecánico lumbar — a CONFIRMAR tras resolver la seguridad.", pendiente:["examen tras aval médico"]}],
-    seguridad:{estado:"derivacion_prioritaria", bloquea_plan:true, cribado:false,
-      nota:"", alertas:[
-        {regla:"A1", clasificacion:"derivacion_prioritaria", estado:"verificada", fundamento:"Dolor lumbar nuevo/persistente en contexto oncológico (cáncer activo documentado): descartar causa oncológica/metástasis antes de progresar.", fuente:"NICE NG234", accion:"Evaluación médica antes de progresar; no demorar por pruebas de fisioterapia."},
-        {regla:"A1b", clasificacion:"precaucion_especifica", estado:"verificada", fundamento:"Agentes físicos térmicos/RF/US sobre la región: contraindicados salvo aval oncológico documentado.", fuente:"NICE NG234", accion:"Verificar estado activo/remisión; no inferir por antigüedad."}
-      ]},
-    discrepancias:[],
-    pendientes:["Resolver seguridad (derivación médica)","Medir ROM lumbar (goniómetro)","Medir fuerza con método explícito","ODI/PSFS tras autorización"],
-    objetivos:[
-      {fase:"corto", actividad:"control de irritabilidad y educación; medir línea base funcional", indicador:"EVA contextualizada + ODI", linea_base:null, metodo:"escala", reevaluacion:"1–2 sem"},
-      {fase:"mediano", actividad:"recuperar movilidad y tolerancia a transferencias (condicionado a aval médico)", indicador:"ODI/PSFS + ROM", linea_base:null, metodo:"goniómetro + escala", reevaluacion:"por criterios"},
-      {fase:"largo", actividad:"retorno a caminata y AVD sin limitación", indicador:"PSFS", linea_base:null, metodo:"escala funcional", reevaluacion:"por criterios"}
-    ],
-    plan:null, planAccion:"Plan terapéutico BLOQUEADO hasta resolver la seguridad: derivación médica para descartar causa oncológica. Solo documentar y derivar; no ejercicio ni pruebas provocativas.",
-    mediciones:[],
-    evolucion:[],
-    puede:"Movilidad suave indolora y marcha dentro de tolerancia, SIN provocar dolor.",
-    no_puede:"Carga/impacto, agentes térmicos sobre la zona, y progresión antes del aval médico."
-  },
-  {
-    id:"SINT-B", titulo:"Esguince de tobillo · 25 años (sintético)", etiqueta:"Bloqueo por lado",
-    meta:{edad:25, terapeuta:"—", deporte:"fútbol", episodio:"actual"},
-    dx:{texto:"Dolor de tobillo tras traumatismo; lateralidad NO confirmada (dx médico indica derecho, registro indica izquierdo). No es posible cerrar el diagnóstico funcional.", estado:"provisional"},
-    hipotesis:[{texto:"Lesión ligamentaria de tobillo (referida) — a CONFIRMAR; primero resolver el lado.", pendiente:["aclarar lado","exploración de estabilidad"]}],
-    seguridad:{estado:"bloqueo_por_dato_inconsistente", bloquea_plan:true, cribado:false, nota:"",
-      alertas:[{regla:"B10", clasificacion:"bloqueo_por_dato_inconsistente", estado:"verificada", fundamento:"Conflicto de lado/región no resuelto; riesgo de tratar el lado equivocado.", fuente:"Regla de proceso", accion:"Bloquear plan lateralizado y carga hasta reconciliar el lado."}]},
-    discrepancias:[{tipo:"lado", detalle:"Dx médico: derecho · Registro: izquierdo.", accion:"Aclarar lateralidad antes de tratar."}],
-    pendientes:["Aclarar lado (crítico)","FAAM + Weight-Bearing Lunge Test","Palpación ósea / criterios de imagen si aplican"],
-    objetivos:[
-      {fase:"corto", actividad:"aclarar lado y controlar síntomas; medir apoyo tolerado", indicador:"FAAM + WBLT", linea_base:null, metodo:"escala + prueba", reevaluacion:"al reconciliar lado"},
-      {fase:"mediano", actividad:"recuperar movilidad y marcha según lado confirmado", indicador:"WBLT (cm) + FAAM", linea_base:null, metodo:"prueba funcional", reevaluacion:"2–4 sem"},
-      {fase:"largo", actividad:"retorno a fútbol por criterios", indicador:"hop/Y-Balance + FAAM", linea_base:null, metodo:"pruebas funcionales (comparación bilateral con referencia válida)", reevaluacion:"por criterios"}
-    ],
-    plan:null, planAccion:"Plan lateralizado BLOQUEADO hasta confirmar el lado. Primera acción: reconciliar lado con el paciente / dx médico.",
-    mediciones:[],
-    evolucion:[],
-    puede:"Medidas generales no lateralizadas (educación, control del edema si aplica).",
-    no_puede:"Ejercicio/carga dirigido a un lado hasta confirmarlo."
-  },
-  {
-    id:"SINT-C", titulo:"Gonalgia femoropatelar · 32 años (sintético)", etiqueta:"Sin alerta",
-    meta:{edad:32, terapeuta:"—", deporte:"correr", episodio:"actual"},
-    dx:{texto:"Disfunción de rodilla izquierda de patrón mecánico femoropatelar, con dolor anterior al subir escaleras y correr; limita la carrera y la sentadilla. Déficit de control motor por confirmar con medición.", estado:"provisional"},
-    hipotesis:[{texto:"Síndrome de dolor femoropatelar (hipótesis) — a confirmar con pruebas y control de valgo.", pendiente:["sentadilla monopodal / FPPA"]}],
-    seguridad:{estado:"sin_alerta_detectada_con_datos_disponibles", bloquea_plan:false, cribado:true, nota:"Sin alerta detectada con los datos disponibles; cribado de banderas rojas documentado.", alertas:[]},
-    discrepancias:[],
-    pendientes:["Dinamometría de cuádriceps (línea base)","Evaluar control de valgo en sentadilla (módulo biomecánico)"],
-    objetivos:[
-      {fase:"corto", actividad:"reducir irritabilidad y recuperar sentadilla indolora parcial", indicador:"EVA en tarea + ROM activo", linea_base:"EVA 5/10 (actividad)", metodo:"escala + goniómetro", reevaluacion:"2 sem"},
-      {fase:"mediano", actividad:"fuerza de cuádriceps y control de valgo", indicador:"dinamometría + FPPA (sentadilla)", linea_base:null, metodo:"dinamómetro + módulo biomecánico", reevaluacion:"4–6 sem"},
-      {fase:"largo", actividad:"retorno a carrera progresiva por criterios", indicador:"tolerancia de carrera + control de valgo", linea_base:null, metodo:"prueba funcional", reevaluacion:"por criterios"}
-    ],
-    plan:{fases:[
-      {nombre:"Fase 1 · control de síntomas", objetivo:"reducir dolor anterior", ejercicios:"isométricos de cuádriceps 5×45s submáx; movilidad indolora", agentes:"crioterapia si hay irritabilidad (modalidad/región sin restricción documentada)", progresion:"tolerancia sin aumento de dolor"},
-      {nombre:"Fase 2 · fuerza y control", objetivo:"cuádriceps + glúteo medio + control de valgo", ejercicios:"sentadilla a rango tolerado, step-downs, abducción de cadera", agentes:"—", progresion:"dinamometría y FPPA en progreso"},
-      {nombre:"Fase 3 · retorno a carrera", objetivo:"reintroducir carrera", ejercicios:"pliometría ligera, progresión de volumen", agentes:"—", alta:"criterios funcionales + control de valgo"}
-    ], nota:"Dosis editable por el fisioterapeuta; línea base de fuerza pendiente de medir."},
-    planAccion:null,
-    mediciones:[
-      {articulacion:"rodilla", movimiento:"flexión", lado:"izquierdo", tipo:"activa", valor:118, unidad:"°", metodo:"goniómetro de cámara", fecha:"2026-10-14", id:"bio_1014_a1"},
-      {articulacion:"rodilla", movimiento:"extensión", lado:"izquierdo", tipo:"activa", valor:0, unidad:"°", metodo:"goniómetro de cámara", fecha:"2026-10-14", id:"bio_1014_a2"}
-    ],
-    evolucion:[ {f:"02-oct",eva:7},{f:"09-oct",eva:6},{f:"16-oct",eva:5},{f:"23-oct",eva:4} ],
-    puede:"Movilidad indolora, isométricos, bicicleta sin dolor.",
-    no_puede:"Correr y sentadilla profunda cargada hasta recuperar control y fuerza."
-  }
+'use strict';
+// ---- Casos SINTÉTICOS (sin PHI) que ejercitan cada rama del motor ----
+var CASOS = [
+  { codigo:'SINT-01', patologia:'Tendinopatia', edad:42,
+    orig:{ zona:'codo', lado:'derecho', eva:'5', padecimiento:'Dolor en el codo derecho al cargar peso, gradual, desde hace 6 semanas; mejora con reposo. Niega adormecimiento.', desdeCuando:'6 semanas, igual', deportivos:'tenis recreativo', rom:'', fuerza:'', pruebas:'Cozen positivo' },
+    seguridadClinica:{}, antecedentes:{} },
+  { codigo:'SINT-02', patologia:'Post-quirurgico', edad:60,
+    orig:{ zona:'rodilla', lado:'izquierdo', eva:'4', padecimiento:'Dolor de rodilla izquierda al subir escaleras, 2 meses.', deportivos:'caminar', rom:'flexión 100° limitada', fuerza:'cuádriceps 4/5', pruebas:'McMurray negativo' },
+    seguridadClinica:{ implantes:'Material de osteosíntesis en rodilla izquierda (placa)' }, antecedentes:{ cirugias:'Osteosíntesis rodilla izquierda 2024' } },
+  { codigo:'SINT-03', patologia:'Lumbalgia', edad:58,
+    orig:{ zona:'lumbar', lado:'ambos', eva:'7', padecimiento:'Dolor lumbar nocturno que no cede desde hace 1 mes; refiere pérdida de peso.', desdeCuando:'1 mes, peor' },
+    seguridadClinica:{ condiciones:'Antecedente de cáncer de mama activo en tratamiento' }, antecedentes:{} },
+  { codigo:'SINT-04', patologia:'Cervicalgia', edad:9,
+    orig:{ zona:'cuello', lado:'ambos', eva:'6', padecimiento:'Trauma cervical: cayó de cabeza haciendo clavado, carga axial; dolor de cuello y moretón en la nuca, en aumento.' },
+    seguridadClinica:{}, antecedentes:{} },
+  { codigo:'SINT-05', patologia:'Rodilla', edad:35,
+    orig:{ zona:'rodilla', lado:'derecho', dxMedico:'gonalgia izquierda', eva:'5', padecimiento:'Dolor de rodilla al correr desde hace 3 semanas.', deportivos:'correr 10k' },
+    seguridadClinica:{}, antecedentes:{} }
 ];
 
-/* ===== Render ===== */
-const TABS = [
-  ["dx","Dx funcional"],["hip","Hipótesis"],["obj","Objetivos"],["seg","Seguridad clínica"],
-  ["plan","Plan terapéutico"],["med","Mediciones"],["evo","Evolución"],["val","Validación"]
-];
-let cur = 0, tab = "dx";
-const psel = document.getElementById('psel');
-CASES.forEach((c,i)=>{
-  const b=document.createElement('button'); b.className='pbtn'+(i===0?' active':''); b.textContent=c.titulo.split(' · ')[0]+' · '+c.etiqueta;
-  b.onclick=()=>{cur=i; tab="dx"; [...psel.children].forEach(x=>x.classList.remove('active')); b.classList.add('active'); render();};
-  psel.appendChild(b);
-});
-function esc(s){return String(s==null?'':s).replace(/[&<>]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[m]));}
-function spark(data){
-  if(!data||!data.length) return '';
-  const w=220,h=40,max=10,min=0;
-  const pts=data.map((d,i)=>[8+i*(w-16)/(data.length-1), h-4-(d.eva-min)/(max-min)*(h-10)]);
-  const path=pts.map((p,i)=>(i?'L':'M')+p[0].toFixed(0)+' '+p[1].toFixed(0)).join(' ');
-  return '<svg class="spark" width="'+w+'" height="'+h+'"><polyline points="'+pts.map(p=>p.join(',')).join(' ')+'" fill="none" stroke="#1B3A6B" stroke-width="2"/>'+
-    '<circle cx="'+pts[pts.length-1][0]+'" cy="'+pts[pts.length-1][1]+'" r="3" fill="#C8A24B"/></svg>';
+var G = window.GeneradorV2, R = window.RenderContratoV2;
+var app = document.getElementById('app'), sel = document.getElementById('selCaso');
+var contrato = null, idx = 0;
+
+CASOS.forEach(function(c,i){ var o=document.createElement('option'); o.value=i; o.textContent=c.codigo+' · '+c.patologia+' ('+c.edad+'a)'; sel.appendChild(o); });
+
+function toast(m){ var t=document.getElementById('toast'); t.textContent=m; t.classList.add('show'); setTimeout(function(){t.classList.remove('show');},1700); }
+function esc(s){ return R._esc(s); }
+function draftKey(cod){ return 'sinergia_v21_draft_'+cod; }
+
+function cargar(i, usarDraft){
+  idx=i; var rec=CASOS[i];
+  var base=G.generar(rec,{fecha_corte:null});
+  if(usarDraft){ try{ var d=localStorage.getItem(draftKey(rec.codigo)); if(d){ base=JSON.parse(d); toast('Borrador local recuperado'); } }catch(e){} }
+  contrato=base;
+  document.getElementById('verLine').textContent='motor '+contrato.version_motor+' · catálogo '+contrato.catalogo_seguridad;
+  render();
 }
+
+var SEVC={emergencia:'#B3261E',derivacion_prioritaria:'#B55A00',bloqueo_por_dato_inconsistente:'#5B3A9B',error_regla:'#5B3A9B',precaucion_especifica:'#8A5E0C',sin_alerta_detectada_con_datos_disponibles:'#1F6B3B'};
+
+function section(id,titulo,bodyHTML,open){
+  return '<details class="sec" '+(open?'open':'')+'><summary><span>'+titulo+'</span><span class="chev">▸</span></summary><div class="sec-body">'+bodyHTML+'</div></details>';
+}
+
 function render(){
-  const c=CASES[cur];
-  const s=c.seguridad;
-  let html='';
-  // meta
-  html+='<div class="meta"><span class="big">'+esc(c.titulo)+'</span>'+
-    '<span class="chip">'+c.meta.edad+' años</span><span class="chip">deporte: '+esc(c.meta.deporte)+'</span><span class="chip">episodio: '+esc(c.meta.episodio)+'</span></div>';
-  // safety banner
-  const estTxt={emergencia:"🛑 Emergencia — derivar",derivacion_prioritaria:"🔺 Derivación prioritaria",bloqueo_por_dato_inconsistente:"⛔ Bloqueo por dato inconsistente",precaucion_especifica:"⚠️ Precaución específica",sin_alerta_detectada_con_datos_disponibles:"✅ Sin alerta con los datos disponibles"}[s.estado];
-  html+='<div class="banner b-'+s.estado+'"><div class="t">'+estTxt+'</div>'+
-    (s.bloquea_plan?'<div>El plan terapéutico está BLOQUEADO hasta resolver la seguridad.</div>':'')+
-    (s.estado==='sin_alerta_detectada_con_datos_disponibles'?'<div>'+esc(s.nota)+'</div>':'')+'</div>';
-  // tabs
-  html+='<div class="tabs">'+TABS.map(t=>'<div class="tab'+(t[0]===tab?' active':'')+'" data-t="'+t[0]+'">'+t[1]+'</div>').join('')+'</div>';
-  html+='<div id="tabbody"></div>';
-  document.getElementById('app').innerHTML=html;
-  [...document.querySelectorAll('.tab')].forEach(el=>el.onclick=()=>{tab=el.dataset.t; render();});
-  renderTab();
+  var c=contrato, s=c.seguridad, sev=SEVC[s.estado]||'#888';
+  var H='';
+
+  // SEGURIDAD
+  var segB='<div class="badge" style="background:'+sev+'">'+esc(s.estado.replace(/_/g,' ').toUpperCase())+(s.bloquea_plan?' · PLAN BLOQUEADO':'')+'</div>';
+  if(s.nota) segB+='<p class="muted" style="margin:7px 0 0">'+esc(s.nota)+'</p>';
+  (s.alertas||[]).forEach(function(a,i){
+    segB+='<div class="alert" style="border-left-color:'+sev+'"><b>'+esc(a.regla)+'</b> <span class="muted">'+esc(a.clasificacion)+'</span>'+
+      (a.requiere_validacion?'<span class="pill pend">requiere validación</span>':'<span class="pill ok">verificada</span>')+
+      '<div>'+esc(a.fundamento)+'</div><div class="acc"><b>Acción:</b> '+esc(a.accion)+'</div>'+
+      '<div class="row" style="margin-top:6px"><button class="btn sec" data-val="'+i+'">✓ Atender/validar</button> <button class="btn sec" data-rej="'+i+'">✕ Marcar no aplica</button></div></div>';
+  });
+  segB+='<div class="muted" style="margin-top:6px">Cribado de banderas rojas: <b>'+(s.cribado_documentado?'documentado':'NO documentado')+'</b></div>';
+  H+=section('seg','🛡️ Seguridad clínica',segB,true);
+
+  // DIAGNÓSTICO (editable)
+  var dxB='<div class="lbl">Diagnóstico funcional ('+esc(c.diagnostico_funcional.estado)+') — editable</div>'+
+    '<textarea id="edDx">'+esc(c.diagnostico_funcional.texto)+'</textarea>';
+  if(c.diagnostico_funcional.evidencias && c.diagnostico_funcional.evidencias.length){
+    dxB+='<div style="margin-top:5px">'+c.diagnostico_funcional.evidencias.map(function(e){return '<span class="evid-chip">🔎 '+esc(e.campo)+(e.fragmento?': “'+esc(String(e.fragmento).slice(0,70))+'”':'')+'</span>';}).join('')+'</div>';
+  }
+  H+=section('dx','🩺 Diagnóstico funcional',dxB,true);
+
+  // DISCREPANCIAS + PENDIENTE
+  if((c.discrepancias&&c.discrepancias.length)||(c.valoracion_pendiente&&c.valoracion_pendiente.length)){
+    var pb='';
+    if(c.discrepancias.length){ pb+='<div class="lbl">Discrepancias</div><ul>'+c.discrepancias.map(function(d){return '<li><b>'+esc(d.tipo)+':</b> '+esc(d.detalle)+'</li>';}).join('')+'</ul>'; }
+    if(c.valoracion_pendiente.length){ pb+='<div class="lbl">Valoración pendiente</div><ul>'+c.valoracion_pendiente.map(function(p){return '<li>☐ '+esc(p)+'</li>';}).join('')+'</ul>'; }
+    H+=section('pend','📋 Discrepancias y valoración pendiente',pb,false);
+  }
+
+  // OBJETIVOS (editables)
+  var ob='';
+  (c.objetivos||[]).forEach(function(o,i){
+    ob+='<div class="obj-card"><div class="row"><b>'+esc(o.fase)+'</b> <span class="muted">'+esc(o.alteracion||'')+'</span></div>'+
+      '<div class="lbl">Indicador</div><input type="text" data-obj-ind="'+i+'" value="'+esc(o.indicador||'')+'">'+
+      '<div class="lbl">Meta (propuesta editable)</div><input type="text" data-obj-meta="'+i+'" value="'+esc(o.meta_propuesta?(o.meta_propuesta.valor+(o.meta_propuesta.unidad?' '+o.meta_propuesta.unidad:'')):'')+'" placeholder="definir meta">'+
+      '<div class="muted">Línea base: '+(o.linea_base&&o.linea_base.valor!=null?('<b>'+esc(o.linea_base.valor)+'</b> '+esc(o.linea_base.unidad||'')+' <span class="pill ok">'+esc(o.linea_base.tipo||'medido')+'</span>'):'<span class="pill pend">pendiente de medir</span>')+' · método: '+esc(o.metodo||'—')+' · criterio: '+esc(o.criterio_cumplimiento||'—')+'</div></div>';
+  });
+  H+=section('obj','🎯 Objetivos individualizados',ob,true);
+
+  // PLAN
+  var pl = c.plan ? ('<div class="ok-banner">Plan '+esc(c.plan.estado)+'</div>'+(c.plan.fases||[]).map(function(f,i){return '<div class="obj-card"><b>'+esc(f.nombre)+'</b><div class="lbl">Objetivo de fase (editable)</div><input type="text" data-plan="'+i+'" value="'+esc(f.objetivo||'')+'"></div>';}).join(''))
+    : '<div class="blocked">Plan BLOQUEADO por la acción de seguridad. Resolver la alerta antes de fijar el plan terapéutico.</div>';
+  H+=section('plan','🧭 Plan de tratamiento',pl,!c.plan?true:false);
+
+  // BIOMECÁNICA + MEDICIONES
+  var med='<table><thead><tr><th>id</th><th>articulación</th><th>mov</th><th>lado</th><th>valor</th><th>método</th></tr></thead><tbody>';
+  (c.mediciones||[]).forEach(function(m){ med+='<tr><td>'+esc(m.id)+'</td><td>'+esc(m.articulacion||'—')+'</td><td>'+esc(m.movimiento||'—')+'</td><td>'+esc(m.lado||'—')+'</td><td>'+esc(m.valor!=null?m.valor:'—')+' '+esc(m.unidad||'')+'</td><td>'+esc(m.metodo||'—')+'</td></tr>'; });
+  if(!c.mediciones.length) med+='<tr><td colspan="6" class="muted">Sin mediciones estructuradas.</td></tr>';
+  med+='</tbody></table>';
+  var bloq=c.seguridad.bloquea_plan;
+  med+='<div class="bio">'+
+    '<button class="btn" data-bio="medir" '+(bloq?'disabled title="bloqueado: alerta de seguridad activa"':'')+'>📐 Medir ROM</button>'+
+    '<button class="btn sec" data-bio="importar">⬇️ Importar medición</button>'+
+    '<button class="btn sec" data-bio="validar">✓ Validar medición</button>'+
+    '<button class="btn sec" data-bio="comparar">⚖️ Comparar</button>'+
+    '<button class="btn sec" data-bio="soap" '+(bloq?'disabled':'')+'>📝 Incorporar al SOAP (O)</button>'+
+    '</div>'+
+    (bloq?'<div class="muted" style="margin-top:6px">⚠ Mediciones provocativas deshabilitadas: hay una alerta de seguridad que bloquea el plan. Resolver primero.</div>':'');
+  H+=section('bio','📐 Biomecánica y mediciones',med,false);
+
+  // VALIDACIÓN
+  var vb='<div class="row"><button class="btn" id="btnGuardar">💾 Guardar borrador (local)</button>'+
+    '<button class="btn gold" id="btnValidar">✍️ Validar y firmar (fisioterapeuta)</button>'+
+    '<button class="btn sec" id="btnRechazar">✕ Rechazar</button></div>'+
+    '<div class="muted" style="margin-top:7px">Estado: <b>'+esc(c.validacion_profesional.estado)+'</b>'+(c.validacion_profesional.autor?(' · '+esc(c.validacion_profesional.autor)):'')+'. El borrador se guarda SOLO en este navegador (prototipo). No escribe expedientes.</div>';
+  H+=section('val','✅ Validación profesional',vb,true);
+
+  app.innerHTML=H;
+  wire();
 }
-function renderTab(){
-  const c=CASES[cur]; const s=c.seguridad; let h='';
-  if(tab==='dx'){
-    h+='<div class="card"><h3>Diagnóstico funcional</h3><span class="pill '+(c.dx.estado==='provisional'?'prov':'conf')+'">'+c.dx.estado+'</span><p>'+esc(c.dx.texto)+'</p></div>';
-  }
-  if(tab==='hip'){
-    h+='<div class="card"><h3>Hipótesis clínicas (a confirmar)</h3>'+(c.hipotesis.length?c.hipotesis.map(x=>'<p>'+esc(x.texto)+'</p><div class="lab">pendiente: '+esc((x.pendiente||[]).join('; '))+'</div>').join(''):'<p class="lab">Sin hipótesis estructural con los datos.</p>')+'</div>';
-  }
-  if(tab==='obj'){
-    h+='<div class="card"><h3>Objetivos (corto · mediano · largo)</h3>'+c.objetivos.map(o=>
-      '<div class="obj"><div class="fase">'+esc(o.fase)+'</div><div>'+esc(o.actividad)+'</div>'+
-      '<table><tr><td class="k">Indicador</td><td>'+esc(o.indicador)+'</td></tr>'+
-      '<tr><td class="k">Línea base</td><td>'+(o.linea_base?esc(o.linea_base):'<span class="nullbase">— medir primero</span>')+'</td></tr>'+
-      '<tr><td class="k">Método</td><td>'+esc(o.metodo)+'</td></tr>'+
-      '<tr><td class="k">Reevaluación</td><td>'+esc(o.reevaluacion)+'</td></tr></table></div>').join('')+
-      '<div class="lab">Metas numéricas y plazos son propuestas editables, no datos medidos. Sin dolor cero ni ≥90% impuestos.</div></div>';
-  }
-  if(tab==='seg'){
-    h+='<div class="card"><h3>Seguridad clínica</h3>';
-    if(!s.alertas.length) h+='<p>'+esc(s.nota||'Sin alerta detectada con los datos disponibles.')+'</p>';
-    s.alertas.forEach(a=>{ h+='<div class="alert'+(a.clasificacion==='precaucion_especifica'?' prec':'')+'"><div class="r">['+a.regla+' · '+a.estado+'] '+a.clasificacion+'</div><div>'+esc(a.fundamento)+'</div><div class="lab">Acción: '+esc(a.accion)+'</div><div class="src">Fuente: '+esc(a.fuente)+'</div></div>';});
-    if(c.discrepancias.length){ h+='<h3 style="margin-top:10px">Discrepancias</h3>'; c.discrepancias.forEach(d=>h+='<div class="alert prec"><div class="r">'+esc(d.tipo)+'</div><div>'+esc(d.detalle)+'</div><div class="lab">Acción: '+esc(d.accion)+'</div></div>');}
-    if(c.pendientes.length){ h+='<h3 style="margin-top:10px">Valoración pendiente</h3><ul>'+c.pendientes.map(p=>'<li>'+esc(p)+'</li>').join('')+'</ul>';}
-    h+='<div class="lab">Regla de agentes físicos: no se prohíben todos por metal/cáncer; se respeta la restricción documentada y se valida modalidad/región/equipo.</div></div>';
-  }
-  if(tab==='plan'){
-    if(s.bloquea_plan||!c.plan){ h+='<div class="card"><h3>Plan terapéutico</h3><div class="blocked">⛔ Plan BLOQUEADO. '+esc(c.planAccion||'Resolver la alerta de seguridad antes de proponer tratamiento.')+'</div></div>'; }
-    else { h+='<div class="card"><h3>Plan por fases (propuesta editable)</h3>'+c.plan.fases.map(f=>
-      '<div class="obj"><div class="fase">'+esc(f.nombre)+'</div><div><b>Objetivo:</b> '+esc(f.objetivo)+'</div>'+
-      (f.ejercicios?'<div><b>Ejercicio/dosis:</b> '+esc(f.ejercicios)+'</div>':'')+
-      (f.agentes&&f.agentes!=='—'?'<div><b>Agentes físicos:</b> '+esc(f.agentes)+'</div>':'')+
-      (f.progresion?'<div><b>Progresión:</b> '+esc(f.progresion)+'</div>':'')+
-      (f.alta?'<div><b>Alta:</b> '+esc(f.alta)+'</div>':'')+'</div>').join('')+'<div class="lab">'+esc(c.plan.nota||'')+'</div></div>';
-      h+='<div class="grid2"><div class="yes"><b>✅ Ya puede</b><div>'+esc(c.puede)+'</div></div><div class="no"><b>🚫 Todavía no</b><div>'+esc(c.no_puede)+'</div></div></div>';
-    }
-  }
-  if(tab==='med'){
-    h+='<div class="card"><h3>Mediciones biomecánicas</h3>';
-    h+='<div class="val"><button class="btn gold" onclick="alert(\'(Prototipo) Abriría el goniómetro de cámara del módulo 🦴 y guardaría la medición por id.\')">📐 Medir ROM</button>'+
-       '<button class="btn ghost" onclick="alert(\'(Prototipo) Importaría una medición existente de valoración/SOAP por id, conservando fecha/lado/método.\')">⬇️ Importar medición</button></div>';
-    if(c.mediciones.length){ c.mediciones.forEach(m=>h+='<div class="meas"><div><b>'+esc(m.articulacion)+' · '+esc(m.movimiento)+'</b> ('+esc(m.lado)+', '+esc(m.tipo)+')<div class="lab">'+esc(m.metodo)+' · '+esc(m.fecha)+' · id '+esc(m.id)+'</div></div><div class="v">'+m.valor+esc(m.unidad)+'</div></div>'); }
-    else h+='<p class="lab">Sin mediciones registradas. Usa "Medir ROM" para crear la línea base (el 79% de expedientes no tiene ROM capturado).</p>';
-    h+='<div class="trace">Trazabilidad: cada medición conserva id, valor, unidad, lado, movimiento, activa/pasiva, método, fecha y evidencia (imagen anotada). No se transcriben a mano ni se comparan mediciones incompatibles.</div></div>';
-  }
-  if(tab==='evo'){
-    h+='<div class="card"><h3>Evolución</h3>'+(c.evolucion.length?
-      '<div class="lab">EVA en el tiempo</div>'+spark(c.evolucion)+'<div class="lab">'+c.evolucion.map(d=>esc(d.f)+': '+d.eva).join(' · ')+'</div><div class="trace">El comparador antes/después del módulo biomecánico documenta la evolución objetiva de ROM/gesto entre sesiones.</div>'
-      :'<p class="lab">Aún sin serie de evolución (requiere reevaluaciones registradas).</p>')+'</div>';
-  }
-  if(tab==='val'){
-    const bloq=s.bloquea_plan;
-    h+='<div class="card"><h3>Validación del fisioterapeuta</h3>'+
-      '<div class="val"><span class="pill prov">borrador</span>'+
-      '<button class="btn ghost" onclick="alert(\'(Prototipo) Guardaría un borrador editable.\')">💾 Guardar borrador</button>'+
-      '<button class="btn" '+(bloq?'disabled title="No se puede aprobar un plan bloqueado por una alerta de seguridad"':'onclick="alert(\'(Prototipo) Registraría autor, fecha, versión, fuentes y cambios.\')"')+'>✓ Aprobar</button>'+
-      '</div>'+
-      (bloq?'<div class="alert"><div class="r">Aprobación bloqueada</div><div>Hay una alerta de seguridad sin resolver; el plan no puede aprobarse hasta atenderla.</div></div>':'')+
-      '<div class="trace">Se registra autor, fecha, versión, fuentes y cambios. Si cambia un dato crítico (lado, estado de seguridad, medición base) se INVALIDA la aprobación y se re-evalúa.</div></div>';
-  }
-  document.getElementById('tabbody').innerHTML=h;
+
+function recolectarEdiciones(){
+  var c=contrato;
+  var dx=document.getElementById('edDx'); if(dx) c.diagnostico_funcional.texto=dx.value;
+  document.querySelectorAll('[data-obj-ind]').forEach(function(el){ var i=+el.getAttribute('data-obj-ind'); if(c.objetivos[i]) c.objetivos[i].indicador=el.value; });
+  document.querySelectorAll('[data-obj-meta]').forEach(function(el){ var i=+el.getAttribute('data-obj-meta'); if(c.objetivos[i]){ if(el.value.trim()){ c.objetivos[i].meta_propuesta={valor:el.value.trim(),tipo:'propuesta_editable',editada_por_usuario:true}; } } });
+  document.querySelectorAll('[data-plan]').forEach(function(el){ var i=+el.getAttribute('data-plan'); if(c.plan&&c.plan.fases[i]) c.plan.fases[i].objetivo=el.value; });
 }
-render();
+
+function wire(){
+  document.querySelectorAll('[data-val]').forEach(function(b){ b.onclick=function(){ toast('Alerta '+contrato.seguridad.alertas[+b.getAttribute('data-val')].regla+' marcada como atendida (prototipo)'); }; });
+  document.querySelectorAll('[data-rej]').forEach(function(b){ b.onclick=function(){ toast('Alerta marcada “no aplica” — requiere justificación del fisioterapeuta (prototipo)'); }; });
+  document.querySelectorAll('[data-bio]').forEach(function(b){ b.onclick=function(){ bio(b.getAttribute('data-bio')); }; });
+  document.getElementById('btnGuardar').onclick=function(){ recolectarEdiciones(); try{ localStorage.setItem(draftKey(CASOS[idx].codigo),JSON.stringify(contrato)); toast('Borrador guardado localmente'); }catch(e){ toast('No se pudo guardar (almacenamiento)'); } };
+  document.getElementById('btnValidar').onclick=function(){ recolectarEdiciones(); if(contrato.seguridad.bloquea_plan){ toast('No se puede firmar: hay una alerta de seguridad activa'); return; } contrato.validacion_profesional.estado='validado'; contrato.validacion_profesional.autor='Fisioterapeuta (demo)'; contrato.validacion_profesional.fecha=new Date().toISOString().slice(0,10); toast('Validado y firmado (demo)'); render(); };
+  document.getElementById('btnRechazar').onclick=function(){ contrato.validacion_profesional.estado='rechazado'; toast('Marcado como rechazado'); render(); };
+}
+
+function bio(accion){
+  var c=contrato;
+  if(accion==='medir'){
+    if(c.seguridad.bloquea_plan){ toast('Bloqueado: alerta de seguridad activa'); return; }
+    var v=80+Math.floor(Math.random()*60);
+    c.mediciones.push({ id:'bio_'+Date.now(), paciente:c.episodio, fecha:new Date().toISOString().slice(0,10), articulacion:(CASOS[idx].orig.zona||'articulación'), movimiento:'flexión', lado:(CASOS[idx].orig.lado||null), tipo:'activa', posicion:'sedente', metodo:'goniometría de cámara (demo)', unidad:'grados', valor:v, calidad:'aceptable', autor:'demo', evidencia:{campo:'medicion_demo'} });
+    toast('Medición ROM '+v+'° agregada (sintética)'); render();
+  } else if(accion==='importar'){ toast('Importar: enlaza una medición existente por id (demo)'); }
+  else if(accion==='validar'){ toast('Medición validada por el fisioterapeuta (demo)'); }
+  else if(accion==='comparar'){ var n=(c.mediciones||[]).length; toast(n>=2?('Comparando últimas 2 mediciones (demo)'):'Se necesitan ≥2 mediciones para comparar'); }
+  else if(accion==='soap'){ if(c.seguridad.bloquea_plan){ toast('Bloqueado por alerta'); return; } toast('Mediciones incorporadas al apartado O del SOAP (demo)'); }
+}
+
+document.getElementById('selCaso').onchange=function(){ cargar(+this.value,true); };
+document.getElementById('btnReset').onclick=function(){ try{ localStorage.removeItem(draftKey(CASOS[idx].codigo)); }catch(e){} cargar(idx,false); toast('Ediciones descartadas'); };
+document.getElementById('btnReporte').onclick=function(){ recolectarEdiciones(); var html=R.renderDoc([contrato],{titulo:'SINERGIA · Reporte V2.1 (editado) — '+contrato.episodio}); var w=window.open('','_blank'); if(w){ w.document.write(html); w.document.close(); } else { toast('Permite ventanas emergentes para ver el reporte'); } };
+
+cargar(0,true);
 </script>
 </body>
 </html>
