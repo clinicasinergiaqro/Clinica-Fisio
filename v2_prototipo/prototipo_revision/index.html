@@ -1,0 +1,307 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SINERGIA · Revisión de diagnósticos y objetivos (prototipo)</title>
+<style>
+  :root{--navy:#1B3A6B;--gold:#C8A24B;--ink:#13203a;--mut:#6a7690;--line:#d8deea;--bg:#f4f6fa;--ok:#1F8A4C;--warn:#8a5e0c;--bad:#b00020;}
+  *{box-sizing:border-box}
+  body{font:14px/1.5 -apple-system,Segoe UI,Roboto,Arial,sans-serif;color:var(--ink);background:var(--bg);margin:0}
+  header{background:var(--navy);color:#fff;padding:12px 18px;position:sticky;top:0;z-index:5}
+  header h1{font-size:16px;margin:0 0 2px;letter-spacing:.3px}
+  header .sub{font-size:11px;opacity:.85}
+  .bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:10px 18px;background:#fff;border-bottom:1px solid var(--line);position:sticky;top:48px;z-index:4}
+  .bar .sp{flex:1}
+  button{font:inherit;cursor:pointer;border:1px solid var(--line);background:#fff;border-radius:7px;padding:5px 10px}
+  button.primary{background:var(--navy);color:#fff;border-color:var(--navy)}
+  button.gold{background:var(--gold);color:#3a2d06;border-color:var(--gold)}
+  button.sm{padding:3px 8px;font-size:12px}
+  select{font:inherit;padding:4px 8px;border:1px solid var(--line);border-radius:7px}
+  .wrap{max-width:1040px;margin:0 auto;padding:16px}
+  .card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin:0 0 16px;box-shadow:0 1px 2px rgba(20,32,58,.04)}
+  .card.vacio{border-left:5px solid var(--gold)}
+  .card.bloq{border-left:5px solid var(--bad)}
+  .chead{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;border-bottom:2px solid var(--navy);padding-bottom:6px;margin-bottom:8px}
+  .chead h2{font-size:17px;color:var(--navy);margin:0 0 3px;letter-spacing:.4px}
+  .chip{display:inline-block;background:#eef2f8;border-radius:10px;padding:1px 8px;font-size:11px;margin-right:4px}
+  .chip.gold{background:#f6efdd;color:#7a5c14}.chip.oct{background:#e7f0ff;color:var(--navy)}
+  .state{font-size:11px;border-radius:7px;padding:4px 8px;text-align:center;max-width:180px}
+  .state.rev{background:#fff7e6;border:1px solid #e3c878}.state.bloq{background:#fdeaea;border:1px solid #d99;color:var(--bad)}
+  .state.done{background:#e8f6ee;border:1px solid #8ccfa6;color:var(--ok)}
+  .verif{background:#f7f9fc;border:1px dashed var(--line);border-radius:8px;padding:7px 10px;font-size:12px;margin:6px 0}
+  .verif b{color:var(--navy)} .verif .mut{color:var(--mut)}
+  .verif.nm{background:#fff7e6;border-color:#e3c878}
+  .lbl{font-size:10px;text-transform:uppercase;letter-spacing:.6px;color:var(--mut);font-weight:700;margin:8px 0 3px}
+  .two{display:flex;gap:12px}.two>div{flex:1;min-width:0}
+  .box{border:1px solid var(--line);border-radius:8px;padding:7px 9px;background:#fbfcfe;font-size:13px;white-space:pre-wrap}
+  .box.ant.vacio{color:var(--bad);background:#fff6f6;border-color:#ecc;font-style:italic}
+  .box.prop{border-color:var(--navy);background:#f7faff}
+  .opts{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0}
+  .opts label{display:inline-flex;align-items:center;gap:4px;font-size:12px;border:1px solid var(--line);border-radius:7px;padding:3px 8px;cursor:pointer;background:#fff}
+  .opts label.on{border-color:var(--navy);background:#eef3fb;font-weight:600}
+  textarea{width:100%;min-height:70px;font:inherit;border:1px solid var(--line);border-radius:8px;padding:7px;margin-top:4px}
+  table.obj{width:100%;border-collapse:collapse;margin-top:4px}
+  table.obj td{border-bottom:1px solid #eef1f6;padding:4px;vertical-align:top;font-size:12px}
+  td.f{white-space:nowrap;color:var(--navy);font-weight:600;width:62px}
+  .mut{color:var(--mut)}
+  ul.chk,ul.prec{margin:3px 0;padding-left:18px;font-size:12px}
+  ul.prec.danger li b{color:var(--bad)}ul.prec.warn li b{color:var(--warn)}
+  .cfoot{display:flex;flex-wrap:wrap;gap:8px;align-items:center;border-top:1px solid var(--line);margin-top:10px;padding-top:8px}
+  .drybox{background:#0d1c33;color:#d7e3f5;font:12px/1.5 ui-monospace,Menlo,Consolas,monospace;border-radius:8px;padding:10px;margin-top:8px;white-space:pre-wrap;display:none}
+  .banner{background:#fff;border:1px solid var(--line);border-left:5px solid var(--navy);border-radius:10px;padding:10px 14px;margin:0 0 14px;font-size:12.5px}
+  .count{font-size:12px;color:var(--mut)}
+  dialog{border:none;border-radius:12px;max-width:760px;width:94%;padding:0}
+  dialog .dh{background:var(--navy);color:#fff;padding:10px 16px;font-weight:600}
+  dialog .db{padding:14px 16px;max-height:70vh;overflow:auto}
+  .req{color:var(--bad)}
+</style>
+</head>
+<body>
+<header>
+  <h1>SINERGIA · Revisión de diagnósticos funcionales y objetivos</h1>
+  <div class="sub">PROTOTIPO · datos de prueba · <b>no modifica expedientes reales</b> · aceptar / editar / rechazar por paciente · validación profesional obligatoria</div>
+</header>
+<div class="bar">
+  <label>Filtro: <select id="filtro">
+    <option value="todos">Todos</option>
+    <option value="vacios" selected>Con campos vacíos (prioridad)</option>
+    <option value="bloq">Con seguridad a resolver</option>
+    <option value="pendientes">Sin decidir</option>
+  </select></label>
+  <span class="count" id="count"></span>
+  <span class="sp"></span>
+  <button class="sm" id="btnFlujo">Ver flujo de aplicación</button>
+  <button class="sm" id="btnReset">Reiniciar decisiones</button>
+  <button class="primary sm" id="btnExport">Exportar decisiones (JSON)</button>
+  <button class="gold sm" id="btnDryAll">Simular guardado de aprobados (en seco)</button>
+</div>
+<div class="wrap">
+  <div class="banner" id="banner"></div>
+  <div id="lista"></div>
+</div>
+
+<dialog id="modal"><div class="dh" id="modalTitle">—</div><div class="db" id="modalBody"></div><div style="padding:10px 16px;text-align:right"><button onclick="document.getElementById('modal').close()">Cerrar</button></div></dialog>
+
+<script src="datos_revision.js"></script>
+<script>
+(function(){
+  "use strict";
+  var DATA = (window.DATOS_REVISION && window.DATOS_REVISION.items) || [];
+  var META = (window.DATOS_REVISION && window.DATOS_REVISION._meta) || {};
+  var LSKEY = "sinergia_revision_decisiones_v1";
+  var FASES = {corto:"Corto plazo", mediano:"Mediano plazo", largo:"Largo plazo", seguridad:"Seguridad"};
+
+  // ---- persistencia local (per-revisor; nunca toca expedientes) ----
+  function loadDec(){ try{ return JSON.parse(localStorage.getItem(LSKEY)||"{}"); }catch(e){ return {}; } }
+  function saveDec(d){ try{ localStorage.setItem(LSKEY, JSON.stringify(d)); }catch(e){} }
+  var DEC = loadDec();
+  function decOf(it){
+    var k = it.codigo;
+    if(!DEC[k] || DEC[k].source_hash !== it.verificacion.source_hash){
+      // Si la fuente cambió (nueva corrida), se reinicia la decisión de ese paciente (evita aplicar algo viejo).
+      DEC[k] = { source_hash: it.verificacion.source_hash, verificado:false,
+        dx:{ modo: it.vacios.dx ? "aceptar" : "conservar", texto:null },
+        obj: {}, nota:"" };
+    }
+    return DEC[k];
+  }
+  function setDec(){ saveDec(DEC); render(); }
+
+  function esc(s){ return String(s==null?"":s).replace(/[&<>]/g,function(m){return ({"&":"&amp;","<":"&lt;",">":"&gt;"})[m];}); }
+
+  function objRows(it, d){
+    return it.obj_nuevos.map(function(o,i){
+      var cur = d.obj[i] || (d.obj[i] = { modo: "aceptar", texto:null });
+      var meta = o.meta ? ('<b>'+esc(o.meta)+'</b>') : '<span class="mut">— (a definir con el paciente)</span>';
+      function opt(v,txt){ return '<label class="'+(cur.modo===v?'on':'')+'"><input type="radio" name="o_'+it.codigo+'_'+i+'" '+(cur.modo===v?'checked':'')+' onclick="RV.obj(\''+it.codigo+'\','+i+',\''+v+'\')">'+txt+'</label>'; }
+      var editor = cur.modo==="editar" ? '<textarea oninput="RV.objTxt(\''+it.codigo+'\','+i+',this.value)">'+esc(cur.texto!=null?cur.texto:(o.actividad+(o.meta?(" — meta: "+o.meta):"")))+'</textarea>' : '';
+      return '<tr><td class="f">'+esc(FASES[o.fase]||o.fase)+'</td>'+
+        '<td>'+esc(o.alteracion)+'<div class="mut">'+esc(o.actividad)+'</div>'+
+        (o.justificacion?'<div class="mut">'+esc(o.justificacion)+'</div>':'')+
+        '<div class="opts">'+opt("aceptar","✓ Aceptar")+opt("editar","✎ Editar")+opt("rechazar","✕ Rechazar")+'</div>'+editor+'</td>'+
+        '<td>'+meta+'</td></tr>';
+    }).join("");
+  }
+
+  function precHTML(it){
+    if(!it.precauciones.length) return '<div class="mut">Sin alertas con los datos disponibles.</div>';
+    var danger = it.bloquea_plan;
+    return '<ul class="prec '+(danger?'danger':'warn')+'">'+it.precauciones.map(function(a){
+      return '<li><b>'+esc(a.regla)+'</b> · '+esc(a.clase)+(a.requiere_validacion?' <span class="mut">(requiere validación)</span>':'')+'<br>'+esc(a.accion)+'</li>';
+    }).join("")+'</ul>'+(it.bloquea_plan?'<div style="color:var(--bad);font-weight:700;font-size:12px">Plan BLOQUEADO hasta resolver seguridad.</div>':'');
+  }
+
+  function card(it){
+    var d = decOf(it);
+    var vac = (it.vacios.dx||it.vacios.obj);
+    var cls = it.bloquea_plan ? "bloq" : (vac ? "vacio" : "");
+    var done = estadoDecidido(it,d);
+    var v = it.verificacion;
+    var chips = '<span class="chip">'+esc(it.patologia||"—")+'</span>'+(it.edad!=null?'<span class="chip">'+it.edad+' años</span>':'')+
+      '<span class="chip oct">corte '+esc(v.fecha_corte||"—")+'</span>'+(vac?'<span class="chip gold">campos vacíos</span>':'');
+    var stateCls = it.bloquea_plan?"bloq":(done?"done":"rev");
+    var stateTxt = it.bloquea_plan?"Resolver seguridad":(done?"Decidido":"Pendiente de revisión");
+    var verifCls = v.posible_nuevo_motivo ? "verif nm":"verif";
+    var verif = '<div class="'+verifCls+'"><b>Verificación antes de aplicar</b> · '+
+      'episodio activo (motivoActualIndex): <b>'+esc(v.episodio_activo)+'</b>'+(v.num_episodio!=null?' · nº episodio '+esc(v.num_episodio):'')+
+      ' · fecha de corte <b>'+esc(v.fecha_corte||"—")+'</b> · '+esc(v.soap_n)+' nota(s) SOAP'+
+      (v.valoracion_inicial_fecha?' · valoración inicial '+esc(v.valoracion_inicial_fecha):'')+
+      ' · <span class="mut">hash fuente '+esc(v.source_hash)+'</span>'+
+      (v.posible_nuevo_motivo?'<br>⚠ POSIBLE NUEVO MOTIVO: lo decide el fisioterapeuta; la IA no inicia motivo. Verificar que la propuesta corresponde al motivo activo.':'')+
+      '<br><label style="font-size:12px"><input type="checkbox" '+(d.verificado?"checked":"")+' onclick="RV.verif(\''+it.codigo+'\',this.checked)"> Verifiqué paciente, episodio activo, fecha de corte y que no hay cambios/notas posteriores</label></div>';
+
+    // DX
+    function dxOpt(val,txt,dis){ return '<label class="'+(d.dx.modo===val?"on":"")+(dis?" ":"")+'"><input type="radio" name="dx_'+it.codigo+'" '+(d.dx.modo===val?"checked":"")+' onclick="RV.dx(\''+it.codigo+'\',\''+val+'\')">'+txt+'</label>'; }
+    var dxEditor = d.dx.modo==="editar" ? '<textarea oninput="RV.dxTxt(\''+it.codigo+'\',this.value)">'+esc(d.dx.texto!=null?d.dx.texto:it.dx_propuesto)+'</textarea>' : '';
+    var dxBlock = '<div class="lbl">Diagnóstico funcional</div>'+
+      '<div class="two"><div><div class="mut" style="font-size:11px">Anterior (expediente)</div><div class="box ant '+(it.vacios.dx?"vacio":"")+'">'+(it.dx_anterior?esc(it.dx_anterior):"— vacío / no documentado —")+'</div></div>'+
+      '<div><div class="mut" style="font-size:11px">Propuesto (V2.2.2)</div><div class="box prop">'+esc(it.dx_propuesto)+'</div></div></div>'+
+      '<div class="opts">'+dxOpt("conservar", it.vacios.dx?"Conservar vacío":"Conservar anterior")+dxOpt("aceptar","✓ Aceptar propuesta")+dxOpt("editar","✎ Editar")+dxOpt("rechazar","✕ Rechazar")+'</div>'+dxEditor;
+
+    var objBlock = '<div class="lbl">Objetivos — anteriores vs nuevos (CP / MP / LP)</div>'+
+      '<div class="two"><div style="flex:0 0 32%"><div class="mut" style="font-size:11px">Anteriores</div>'+
+      (it.obj_anterior.length? it.obj_anterior.map(function(o){return '<div class="box" style="margin-bottom:4px"><b>'+esc(o.horizonte)+':</b> '+esc(o.texto)+'</div>';}).join(""):'<div class="box ant vacio">— vacío —</div>')+'</div>'+
+      '<div><table class="obj"><tbody>'+objRows(it,d)+'</tbody></table></div></div>';
+
+    var dmBlock = '<div class="lbl">Dx médico referido</div><div class="box">'+(it.dx_medico?esc(it.dx_medico)+' <span class="mut">(referido, a confirmar)</span>':'<span class="mut">sin dx médico referido</span>')+'</div>';
+
+    var pendBlock = '<div class="two" style="margin-top:8px"><div><div class="lbl">Hallazgos pendientes relevantes</div>'+(it.pendientes.length?'<ul class="chk">'+it.pendientes.slice(0,6).map(function(p){return '<li>'+esc(p)+'</li>';}).join("")+'</ul>':'<div class="mut">—</div>')+'</div>'+
+      '<div><div class="lbl">Precauciones clínicas</div>'+precHTML(it)+'</div></div>';
+
+    return '<div class="card '+cls+'" id="card_'+it.codigo+'">'+
+      '<div class="chead"><div><h2>'+esc(it.codigo)+'</h2>'+chips+'</div><div class="state '+stateCls+'">'+stateTxt+'</div></div>'+
+      dmBlock + verif + dxBlock + objBlock + pendBlock +
+      '<div class="cfoot"><button class="sm" onclick="RV.dry(\''+it.codigo+'\')">Preparar aplicación (en seco)</button>'+
+      '<span class="mut" style="font-size:11.5px">La aplicación real requiere tu autorización; este botón solo muestra el payload y las verificaciones, no escribe.</span></div>'+
+      '<div class="drybox" id="dry_'+it.codigo+'"></div>'+
+      '</div>';
+  }
+
+  function estadoDecidido(it,d){
+    if(it.bloquea_plan) return false;
+    // "decidido" = verificado + dx con modo != pendiente + cada objetivo con modo elegido
+    if(!d.verificado) return false;
+    return true;
+  }
+
+  // ---- construcción del payload EN SECO (lo que se escribiría por las rutas existentes) ----
+  function construirPayload(it,d){
+    var campos = {}, cambios = [];
+    // DX funcional
+    if(d.dx.modo==="aceptar"){ campos["dxFuncional.dxFuncional"] = it.dx_propuesto; cambios.push("dxFuncional: aceptar propuesta"); }
+    else if(d.dx.modo==="editar"){ campos["dxFuncional.dxFuncional"] = (d.dx.texto!=null?d.dx.texto:it.dx_propuesto); cambios.push("dxFuncional: editado por el fisioterapeuta"); }
+    else if(d.dx.modo==="rechazar"){ cambios.push("dxFuncional: propuesta RECHAZADA (se conserva lo existente)"); }
+    else { cambios.push("dxFuncional: conservar lo existente (sin cambio)"); }
+    // Objetivos → CP/MP/LP (CP/LP a campos históricos; MP a campo nuevo aditivo objetivosMP)
+    var porFase = {corto:[], mediano:[], largo:[]};
+    it.obj_nuevos.forEach(function(o,i){
+      var dec = d.obj[i]||{modo:"aceptar"};
+      if(o.fase==="seguridad") return;
+      if(dec.modo==="rechazar") return;
+      var txt = dec.modo==="editar" && dec.texto!=null ? dec.texto : (o.actividad + (o.meta?(" — meta: "+o.meta):""));
+      (porFase[o.fase]||porFase.largo).push(txt);
+    });
+    if(porFase.corto.length){ campos["dxFuncional.objetivosCP"] = porFase.corto.join(" · "); }
+    if(porFase.largo.length){ campos["dxFuncional.objetivosLP"] = porFase.largo.join(" · "); }
+    if(porFase.mediano.length){ campos["dxFuncional.objetivosMP"] = porFase.mediano.join(" · "); } // CAMPO NUEVO (aditivo; conserva CP/LP)
+    if(porFase.corto.length||porFase.mediano.length||porFase.largo.length) cambios.push("objetivos: CP/MP/LP actualizados (solo los aceptados/editados)");
+    return { campos: campos, cambios: cambios };
+  }
+
+  function flujoAplicacion(it,d){
+    var p = construirPayload(it,d);
+    var v = it.verificacion;
+    var L = [];
+    L.push("// DRY-RUN — NO escribe nada. Flujo por las RUTAS EXISTENTES (con autorización del usuario).");
+    L.push("1) RE-LEER expediente real y VERIFICAR antes de aplicar:");
+    L.push("   - paciente = "+it.codigo+" (id real resuelto por el mapeo privado)");
+    L.push("   - episodio activo (motivoActualIndex) == "+JSON.stringify(v.episodio_activo)+"  // si cambió → NO aplicar, re-generar");
+    L.push("   - fecha_corte == "+JSON.stringify(v.fecha_corte)+" y SIN notas SOAP posteriores  // si hay nuevas → re-generar");
+    L.push("   - source_hash == "+JSON.stringify(v.source_hash)+"  // la propuesta no cambió desde la revisión");
+    L.push("   - revisor verificó: "+(d.verificado?"SÍ":"NO ⟵ falta marcar la casilla de verificación"));
+    L.push("2) NO sobrescribir: solo se escriben los campos ACEPTADOS/EDITADOS; lo rechazado/conservado NO toca el expediente.");
+    L.push("3) Escritura (misma maquinaria que 'Editar datos'):");
+    L.push("   ACTIVO  → saveDB('pts',[p],{camposHist:['dxFuncional','historialCambios','fechaActualizacion','ultimoUsuario']})");
+    L.push("   MIGRADO → _persistirHistoricoFirestore(p, camposHist)  // activo=migrado");
+    L.push("   campos a escribir = "+JSON.stringify(p.campos, null, 1));
+    L.push("4) Registro de cambios (historialCambios): "+JSON.stringify({quien:"<fisio>", cuando:"<ISO>", accion:"revisión IA aplicada", cambios:p.cambios}));
+    L.push("5) Verificación de guardado: exigir res.ok && res.guardados!==0 → ✅; res.pendiente → 📴 encolado; si no confirma → ⚠️ honesto (no dar por guardado).");
+    L.push("");
+    L.push("ESTADO: "+(d.verificado ? (Object.keys(p.campos).length? "listo para aplicar (pendiente de autorización)" : "sin cambios que aplicar") : "BLOQUEADO: falta verificación del revisor"));
+    return L.join("\n");
+  }
+
+  // ---- API global para los onclick inline ----
+  window.RV = {
+    dx:function(c,v){ var it=byCod(c); var d=decOf(it); d.dx.modo=v; setDec(); },
+    dxTxt:function(c,t){ var it=byCod(c); var d=decOf(it); d.dx.texto=t; saveDec(DEC); },
+    obj:function(c,i,v){ var it=byCod(c); var d=decOf(it); (d.obj[i]=d.obj[i]||{}).modo=v; setDec(); },
+    objTxt:function(c,i,t){ var it=byCod(c); var d=decOf(it); (d.obj[i]=d.obj[i]||{}).texto=t; saveDec(DEC); },
+    verif:function(c,b){ var it=byCod(c); var d=decOf(it); d.verificado=b; setDec(); },
+    dry:function(c){ var it=byCod(c); var d=decOf(it); var el=document.getElementById("dry_"+c); el.textContent=flujoAplicacion(it,d); el.style.display = el.style.display==="block"?"none":"block"; }
+  };
+  function byCod(c){ return DATA.filter(function(x){return x.codigo===c;})[0]; }
+
+  function visibles(){
+    var f = document.getElementById("filtro").value;
+    return DATA.filter(function(it){
+      if(f==="vacios") return it.vacios.dx||it.vacios.obj;
+      if(f==="bloq") return it.bloquea_plan;
+      if(f==="pendientes"){ var d=decOf(it); return !estadoDecidido(it,d); }
+      return true;
+    });
+  }
+  function render(){
+    var vis = visibles();
+    document.getElementById("lista").innerHTML = vis.map(card).join("") || '<div class="mut">Sin pacientes en este filtro.</div>';
+    var nVac = DATA.filter(function(i){return i.vacios.dx||i.vacios.obj;}).length;
+    var nDec = DATA.filter(function(i){return estadoDecidido(i,decOf(i));}).length;
+    document.getElementById("count").textContent = DATA.length+" pacientes · "+nVac+" con campos vacíos · "+nDec+" decididos · mostrando "+vis.length;
+  }
+
+  document.getElementById("banner").innerHTML =
+    '<b>Cómo usar.</b> Revisa cada paciente (prioridad: los de campos vacíos). Para el diagnóstico y para cada objetivo elige <b>Aceptar</b>, <b>Editar</b> o <b>Rechazar</b>; '+
+    'si ya hay texto del fisioterapeuta, por defecto se <b>conserva</b> y la propuesta queda como alternativa. Marca la <b>verificación</b> (paciente, episodio activo, fecha de corte, sin cambios posteriores) antes de aplicar. '+
+    '"Preparar aplicación (en seco)" muestra el payload por las rutas existentes y el registro de cambios — <b>no escribe nada</b>. '+
+    'Datos de prueba ('+esc(META.version||"")+', '+DATA.length+' pacientes). <b>No se aplica a expedientes reales sin autorización.</b>';
+
+  document.getElementById("filtro").onchange = render;
+  document.getElementById("btnReset").onclick = function(){ if(confirm("¿Reiniciar todas las decisiones de este dispositivo?")){ DEC={}; saveDec(DEC); render(); } };
+  document.getElementById("btnFlujo").onclick = function(){
+    document.getElementById("modalTitle").textContent = "Flujo de aplicación selectiva (rutas existentes, con revisión profesional)";
+    document.getElementById("modalBody").innerHTML =
+      '<ol style="font-size:13px;line-height:1.6">'+
+      '<li>Revisión humana por paciente: aceptar / editar / rechazar dx y cada objetivo. La IA nunca sobrescribe sola.</li>'+
+      '<li>Prioridad a expedientes con campos vacíos; si ya hay dx/objetivo del fisio, se conserva y la propuesta es alternativa.</li>'+
+      '<li>Verificación previa: re-leer el expediente y confirmar paciente, <b>episodio activo</b> (motivoActualIndex/numEpisodio), <b>fecha de corte</b> y que no haya notas SOAP posteriores (si las hay, se re-genera). Comparar <b>source_hash</b>.</li>'+
+      '<li>Escritura por la MISMA maquinaria que "Editar datos": ACTIVO → <code>saveDB(\'pts\',[p],{camposHist:[...]})</code>; MIGRADO → Firestore directo. Solo los campos aceptados/editados.</li>'+
+      '<li>Objetivos: <b>CP → objetivosCP</b>, <b>LP → objetivosLP</b> (campos históricos, se conservan), <b>MP → objetivosMP</b> (campo NUEVO aditivo; no borra CP/LP).</li>'+
+      '<li>Registro de cambios en <code>historialCambios</code> (quién, cuándo, campos, antes/después).</li>'+
+      '<li>Verificación de guardado: <code>res.ok && res.guardados!==0</code> → ✅; <code>res.pendiente</code> → 📴 encolado; si no confirma → ⚠️ honesto (no se da por guardado).</li>'+
+      '<li>Hasta aquí todo es EN SECO con datos de prueba. La aplicación a expedientes reales queda pendiente de tu autorización explícita.</li>'+
+      '</ol>';
+    document.getElementById("modal").showModal();
+  };
+  document.getElementById("btnExport").onclick = function(){
+    var out = { _meta:{generado:new Date().toISOString(), fuente:META.fuente||null, version:META.version||null, nota:"Decisiones de revisión (dry-run). No se aplicó a expedientes reales."}, decisiones: [] };
+    DATA.forEach(function(it){ var d=decOf(it); var p=construirPayload(it,d); out.decisiones.push({ codigo:it.codigo, verificado:d.verificado, source_hash:it.verificacion.source_hash, dx_modo:d.dx.modo, campos:p.campos, cambios:p.cambios }); });
+    descargar("decisiones_revision.json", JSON.stringify(out,null,1));
+  };
+  document.getElementById("btnDryAll").onclick = function(){
+    var aprobados = DATA.filter(function(it){ var d=decOf(it); return d.verificado && Object.keys(construirPayload(it,d).campos).length; });
+    var L = ["// SIMULACIÓN EN SECO — "+aprobados.length+" paciente(s) aprobado(s) y verificado(s). NO se escribió nada.",""];
+    aprobados.forEach(function(it){ L.push("### "+it.codigo); L.push(flujoAplicacion(it,decOf(it))); L.push(""); });
+    if(!aprobados.length) L.push("No hay pacientes verificados con cambios. Marca la verificación y acepta/edita al menos un campo.");
+    document.getElementById("modalTitle").textContent = "Simulación de guardado (en seco)";
+    document.getElementById("modalBody").innerHTML = '<pre style="white-space:pre-wrap;font:12px/1.5 ui-monospace,Menlo,Consolas,monospace">'+esc(L.join("\n"))+'</pre>';
+    document.getElementById("modal").showModal();
+  };
+  function descargar(nombre,txt){ try{ var b=new Blob([txt],{type:"application/json"}); var a=document.createElement("a"); a.href=URL.createObjectURL(b); a.download=nombre; a.click(); setTimeout(function(){URL.revokeObjectURL(a.href);},2000); }catch(e){ alert("No se pudo descargar; copia manual:\n\n"+txt.slice(0,500)+"…"); } }
+
+  if(!DATA.length){ document.getElementById("lista").innerHTML='<div class="banner">No hay datos. Genera <code>datos_revision.js</code> con <code>tools/build_revision_data.js</code>.</div>'; }
+  else render();
+})();
+</script>
+</body>
+</html>

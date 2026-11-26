@@ -1,4 +1,4 @@
-# SINERGIA · Contrato clínico compartido (V2.2.1)
+# SINERGIA · Contrato clínico compartido (V2.2.2)
 
 **Propósito.** Documento puente entre las dos ventanas de Claude: esta rama (lógica/contrato de datos,
 `v2_prototipo/`) y la ventana del **rediseño visual** (botones/pantallas). Define la estructura de
@@ -6,7 +6,13 @@
 **seguridad** que ambas deben respetar para no divergir. Es solo-lectura sobre el expediente: NO ejecuta
 `saveDB`, NO modifica expedientes, NO despliega, NO se fusiona todavía con el rediseño visual.
 
-Versión de los módulos: `extractor 2.2.1-proto · motor 2.2.1-proto · generador 2.2.1-proto · render 2.2.1-proto`.
+> **Reconciliación V2.2.2 (ver §10 al final):** diagnóstico MÉDICO referido separado del funcional; fuerza
+> 0–10 **multi-grupo**; EVA **reposo/movimiento**; objetivos SOLO de alteraciones reales (las tareas de
+> medición van a pendientes); objetivos **CP/MP/LP** con **MP como campo NUEVO aditivo** que NO toca los
+> campos históricos `objetivosCP`/`objetivosLP`; flujo de **incorporación con revisión** (aceptar/editar/
+> rechazar). Nada de Daniels/MRC/dinamómetro en las propuestas.
+
+Versión de los módulos: `extractor 2.2.2-proto · motor 2.2.2-proto · generador 2.2.2-proto · render 2.2.2-proto`.
 Pipeline: `extractor_v2` (hechos) → `motor_seguridad_v2` (reglas) → `generador_v2` (contrato JSON, única
 fuente de verdad) → `render_contrato` (HTML/PDF). La prosa se DERIVA de los hechos; no se redacta aparte.
 
@@ -209,3 +215,67 @@ contraindicado por metal).
 - **Ventana del rediseño visual:** botones/pantallas de captura (incl. el botón de medición biomecánica) y
   la presentación. Consume este contrato; **no** duplica ni modifica los algoritmos de medición ni la
   lógica del generador. La integración/fusión se hará cuando ambas partes estén validadas.
+
+---
+
+## 10. Reconciliación V2.2.2 (etapa de incorporación de dx/objetivos)
+
+Cambios de esta etapa, para que la otra ventana consuma el mismo contrato sin divergir.
+
+### 10.1 Diagnóstico MÉDICO referido separado del funcional
+Nuevo campo `diagnostico_medico_referido { texto|null, estado:'referido'|'ausente', nota, evidencias }`.
+El `diagnostico_funcional` ya **no** repite el dx médico (vive en su propio bloque). Bloques distintos:
+**dx médico referido · dx funcional · hipótesis · seguridad · pendientes de valoración**.
+
+### 10.2 Fuerza 0–10 — multi-grupo y sin instrumentos
+`h.fuerzaGrupos = [{ grupo, lado, escala:'comparativa_0_10'|'daniels_0_5', valor, ref, pct_estimado }]` con
+**TODOS** los grupos documentados; `fuerzaMultiGrupo` indica >1 grupo. La línea base de fuerza del objetivo
+usa `linea_base.grupos` (array). **No** se usa Daniels/MRC ni dinamómetro en ninguna propuesta/pendiente;
+un valor `/5` histórico se conserva etiquetado y nunca se convierte. La escala 0–10 (sano = 10) es la única
+del protocolo y la referencia (10/10) solo se propone como meta si está **confirmada sana**.
+
+### 10.3 EVA reposo/movimiento
+`h.eva` (representativo), `h.evaReposo`, `h.evaMovimiento`. El dx lo redacta como "EVA X/10 al movimiento y
+Y/10 en reposo". La meta de dolor se ancla al **dolor de movimiento** (el peor), editable, sin imponer dolor cero.
+
+### 10.4 Objetivos = solo alteraciones REALES
+Un objetivo de tratamiento se crea solo si la alteración está documentada (dolor presente; ROM con déficit;
+fuerza con déficit). Las tareas de **medir** ROM/fuerza/pruebas **no** son objetivos: van a
+`valoracion_pendiente`. Horizontes: `corto` (dolor), `mediano` (ROM, fuerza), `largo` (retorno funcional).
+
+### 10.5 Mapeo a campos del expediente — **MP sin perder CP/LP** (antes de tocar el esquema)
+El expediente ya tiene `dxFuncional.objetivosCP` y `dxFuncional.objetivosLP` (no hay campo de mediano plazo).
+Para no perder esos campos históricos al introducir el mediano plazo, el mapeo de aplicación es **ADITIVO**:
+
+| Horizonte (contrato) | Campo del expediente | Acción |
+|---|---|---|
+| corto plazo  | `dxFuncional.objetivosCP` | se escribe (campo EXISTENTE) |
+| largo plazo  | `dxFuncional.objetivosLP` | se escribe (campo EXISTENTE) |
+| **mediano plazo** | **`dxFuncional.objetivosMP`** | **CAMPO NUEVO, aditivo** — no existe hoy; **no toca CP/LP** |
+| dx funcional | `dxFuncional.dxFuncional` | se escribe (campo EXISTENTE) |
+
+**Plan de preservación (obligatorio antes de cambiar el esquema):** `objetivosMP` se agrega como campo
+NUEVO; la migración es sólo aditiva (los expedientes sin `objetivosMP` lo tienen `undefined`, que se trata
+como vacío). **No se renombra ni se borra** `objetivosCP`/`objetivosLP`. Si la otra ventana prefiere un
+objeto estructurado `dxFuncional.objetivos = { CP, MP, LP }`, debe **mantener en espejo** `objetivosCP`/
+`objetivosLP` como copias de lectura para compatibilidad hacia atrás hasta que todo el código lea el objeto.
+Cualquiera de las dos vías conserva CP/LP; se acuerda la elección ANTES de modificar el esquema.
+
+### 10.6 Flujo de INCORPORACIÓN (revisión profesional, sin sobrescritura)
+Prototipo en `v2_prototipo/prototipo_revision/` (datos de prueba). Reglas que ambas ventanas respetan:
+1. **Prioridad** a expedientes con campos vacíos.
+2. Si ya hay dx/objetivo escrito por el fisio, **se conserva** y la propuesta se muestra como **alternativa**
+   (nunca se auto-sobrescribe).
+3. Aceptar / editar / rechazar **por campo** (dx y cada objetivo).
+4. **Verificación previa** a aplicar: paciente, **episodio activo** (`motivoActualIndex`/`numEpisodio`),
+   **fecha de corte** y **sin notas SOAP posteriores**; se compara un `source_hash` de la propuesta.
+5. Escritura por las **rutas existentes**: ACTIVO → `saveDB('pts',[p],{camposHist:['dxFuncional',…]})`;
+   MIGRADO → Firestore directo. Solo los campos aceptados/editados.
+6. **Registro de cambios** en `historialCambios` y **verificación de guardado** (`res.ok && res.guardados!==0`
+   → ✅; `res.pendiente` → 📴; si no confirma → ⚠️ honesto).
+7. Hasta aquí todo es **EN SECO** con datos de prueba; **no se aplica a expedientes reales sin autorización**.
+
+### 10.7 Identificadores anónimos estables (trazabilidad)
+El real-85 usa `codigo = R85-<hash estable del id real>` (reproducible entre corridas). El mapeo
+`R85-xxxxxx → id real` vive SOLO en el scratchpad (nunca en git). Cohorte = pacientes con actividad SOAP en
+**octubre 2026**. Se distingue la **valoración inicial** de los **hallazgos posteriores del SOAP**.

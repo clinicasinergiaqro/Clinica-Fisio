@@ -6,7 +6,7 @@
  */
 (function (root) {
   'use strict';
-  var VERSION = '2.2.1-proto';
+  var VERSION = '2.2.2-proto';
 
   function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
 
@@ -85,7 +85,13 @@
       H.push('</section>');
     }
 
-    // Diagnóstico funcional
+    // Diagnóstico MÉDICO referido (bloque separado del funcional)
+    if (c.diagnostico_medico_referido) {
+      var dm = c.diagnostico_medico_referido;
+      H.push('<section class="sec"><h3>Diagnóstico médico referido <span class="tag">' + esc(dm.estado) + '</span></h3>');
+      H.push('<p>' + (dm.texto ? esc(dm.texto) : '<span class="muted">—</span>') + '</p><div class="muted">' + esc(dm.nota || '') + '</div></section>');
+    }
+    // Diagnóstico FUNCIONAL (fisioterapéutico)
     H.push('<section class="sec"><h3>Diagnóstico funcional <span class="tag">' + esc(c.diagnostico_funcional.estado) + '</span></h3>');
     H.push('<p>' + esc(c.diagnostico_funcional.texto) + '</p>' + evids(c.diagnostico_funcional.evidencias) + '</section>');
 

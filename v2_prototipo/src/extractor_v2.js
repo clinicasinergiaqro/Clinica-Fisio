@@ -9,7 +9,7 @@
  */
 (function (root) {
   'use strict';
-  var VERSION = '2.2.1-proto';
+  var VERSION = '2.2.2-proto';
 
   var norm = function (s) {
     return String(s == null ? '' : s).normalize('NFKD').replace(/[̀-ͯ]/g, '').toLowerCase();
@@ -97,6 +97,46 @@
     var found = [];
     Object.keys(REGIONES).forEach(function (r) { if (REGIONES[r].some(function (k) { return txt.indexOf(k) !== -1; })) found.push(r); });
     return found;
+  }
+
+  // Grupos musculares frecuentes en MSK (para fuerza por grupo). Nivel módulo (lo usa el parser multi).
+  var GRUPOS_MUSC = ['cuadriceps', 'isquiotibial', 'gluteo', 'gastrocnemio', 'soleo', 'tibial anterior', 'peroneo', 'aductor', 'abductor', 'psoas', 'iliopsoas', 'manguito rotador', 'supraespinoso', 'infraespinoso', 'deltoides', 'biceps', 'triceps', 'trapecio', 'dorsal ancho', 'pectoral', 'flexores', 'extensores', 'prension', 'grip', 'core', 'abdominal', 'paravertebral', 'erector'];
+
+  // Parser de FUERZA con MÚLTIPLES grupos: devuelve un objeto por cada valor X/10 (o /5 legado) hallado,
+  // asociándole el grupo muscular y la lateralidad más cercanos a la izquierda (misma frase). NO convierte
+  // escalas: /10 = comparativa Sinergia (pct = valor*10), /5 = Daniels legado (sin pct). Conserva TODOS.
+  function _parseFuerzaMulti(raw) {
+    var n = norm(raw); var out = [];
+    var re = /(10|\d(?:\.\d)?)\s*\/\s*(10|5)\b/g, m;   // (10|\d…) para que "10/10" no se lea como "0/10"
+    while ((m = re.exec(n))) {
+      var idx = m.index, valor = parseFloat(m[1]), ref = parseInt(m[2], 10);
+      if (valor > ref) continue; // valor fuera de escala → ignora (p.ej. "15/10" sería error)
+      var start = Math.max(0, idx - 48);
+      var win = n.slice(start, idx + m[0].length);
+      var grupo = null, gpos = -1;
+      GRUPOS_MUSC.forEach(function (g) { var p = win.lastIndexOf(g); if (p !== -1 && p > gpos) { gpos = p; grupo = g; } });
+      out.push({ grupo: grupo, lado: ladoDe(win), escala: ref === 10 ? 'comparativa_0_10' : 'daniels_0_5', valor: valor, ref: ref, pct_estimado: ref === 10 ? Math.round(valor * 10) : null });
+    }
+    return out;
+  }
+
+  // Parser de EVA robusto: distingue reposo vs movimiento/actividad y da un valor representativo (el de
+  // movimiento si existe, si no el máximo numérico 0–10). Conserva el texto crudo.
+  function _parseEVA(raw) {
+    var n = norm(String(raw || ''));
+    if (!n.trim()) return { valor: null, reposo: null, movimiento: null, nums: [] };
+    // Quita el denominador de escala "/10" para no contaminar los números ("7/10" → "7", "4-6/10" → "4-6").
+    var nc = n.replace(/\s*\/\s*10\b/g, '');
+    var inR = function (v) { return (v != null && !isNaN(v) && v >= 0 && v <= 10) ? v : null; };
+    var pick = function (re) { var mm = nc.match(re); if (!mm) return null; return inR(parseFloat(mm[1] != null ? mm[1] : mm[2])); };
+    var reposo = pick(/(\d(?:\.\d)?)\s*(?:en|de|al)?\s*reposo/) || pick(/reposo[^0-9]{0,12}(\d(?:\.\d)?)/);
+    var movimiento = pick(/(\d(?:\.\d)?)\s*(?:en|de|al|con)?\s*(?:movimiento|actividad|esfuerzo|mover|cargar|carga|marcha)/) || pick(/(?:movimiento|actividad|esfuerzo|al mover|a la carga)[^0-9]{0,14}(\d(?:\.\d)?)/);
+    // Rango "4-6" o "4 a 6" → toma el valor ALTO (peor dolor).
+    var rng = nc.match(/\b(\d(?:\.\d)?)\s*(?:-|a)\s*(\d(?:\.\d)?)\b/);
+    var rangoAlto = rng ? Math.max(inR(parseFloat(rng[1])) || 0, inR(parseFloat(rng[2])) || 0) : null;
+    var nums = (nc.match(/\b(10|\d(?:\.\d)?)\b/g) || []).map(Number).filter(function (x) { return x >= 0 && x <= 10; });
+    var valor = (movimiento != null) ? movimiento : (rangoAlto != null ? rangoAlto : (nums.length ? Math.max.apply(null, nums) : null));
+    return { valor: valor, reposo: reposo, movimiento: movimiento, nums: nums };
   }
 
   // Texto SOAP: separa nota INICIAL (valoración) de la MÁS RECIENTE (evolución) con fecha_corte.
@@ -300,28 +340,26 @@
     var romEsNumerico = lleno(romRaw) && /\d+\s*(°|grados?|grd|º)/i.test(romRaw);
     var romTextoCualitativo = lleno(romRaw) && !romEsNumerico;
     // --- FUERZA: escala CLÍNICA COMPARATIVA de Sinergia 0–10 (lado sano/referencia válida = 10/10;
-    //     6/10 ≈ 60% ESTIMADO de la fuerza de referencia). NO se sustituye por Daniels/MRC ni se
-    //     convierte entre escalas: un valor /5 (legado) se conserva etiquetado, nunca se pasa a /10.
-    //     Se identifica grupo muscular, lateralidad y referencia; no se asume el contralateral sano.
+    //     6/10 ≈ 60% ESTIMADO). NO se usa Daniels/MRC ni dinamómetro; un valor /5 (legado) se CONSERVA
+    //     etiquetado, nunca se convierte. Soporta MÚLTIPLES grupos musculares (cada uno con valor+lado+%).
     var fuerzaRaw = String(o.fuerza || '');
-    var mFuerzaComp = fuerzaRaw.match(/\b(10|\d)(?:\.\d)?\s*\/\s*10\b/);           // X/10 (Sinergia, canónica)
-    var mFuerzaDaniels = fuerzaRaw.match(/\b([0-5])\s*\/\s*5\b|\bdaniels?\s*([0-5])\b|\bgrado\s*([0-5])\b/i); // legado /5 (NO convertir)
-    var fuerzaEscala = mFuerzaComp ? 'comparativa_0_10' : (mFuerzaDaniels ? 'daniels_0_5' : null);
-    var fuerzaValor = mFuerzaComp ? parseFloat(mFuerzaComp[1]) : (mFuerzaDaniels ? parseFloat(mFuerzaDaniels[1] || mFuerzaDaniels[2] || mFuerzaDaniels[3]) : null);
-    var fuerzaRef = mFuerzaComp ? 10 : (mFuerzaDaniels ? 5 : null);
-    // % estimado SOLO para la escala comparativa 0–10 (es su DEFINICIÓN, no una conversión de escala).
-    var fuerzaPctEstimado = (fuerzaEscala === 'comparativa_0_10' && fuerzaValor != null) ? Math.round(fuerzaValor * 10) : null;
+    var fuerzaGrupos = _parseFuerzaMulti(fuerzaRaw);   // [{grupo,lado,escala,valor,ref,pct_estimado}] — TODOS
+    var _fuPrim = fuerzaGrupos[0] || null;
+    var fuerzaEscala = _fuPrim ? _fuPrim.escala : null;
+    var fuerzaValor = _fuPrim ? _fuPrim.valor : null;
+    var fuerzaRef = _fuPrim ? _fuPrim.ref : null;
+    var fuerzaPctEstimado = _fuPrim ? _fuPrim.pct_estimado : null;
     var fuerzaEsNumerica = lleno(fuerzaRaw) && !!fuerzaEscala;
     var fuerzaTextoCualitativo = lleno(fuerzaRaw) && !fuerzaEsNumerica;
-    var fuerzaLado = ladoDe(fuerzaRaw);
-    // Grupo muscular nombrado junto a la fuerza (lista MSK frecuente); null si no se nombra.
-    var _gruposMusc = ['cuadriceps', 'isquiotibial', 'gluteo', 'gastrocnemio', 'soleo', 'tibial anterior', 'peroneo', 'aductor', 'abductor', 'psoas', 'iliopsoas', 'manguito rotador', 'supraespinoso', 'infraespinoso', 'deltoides', 'biceps', 'triceps', 'trapecio', 'dorsal ancho', 'pectoral', 'flexores', 'extensores', 'prension', 'grip', 'core', 'abdominal', 'paravertebral', 'erector'];
-    var fuerzaGrupo = null;
-    for (var _g = 0; _g < _gruposMusc.length; _g++) { if (norm(fuerzaRaw).indexOf(_gruposMusc[_g]) !== -1) { fuerzaGrupo = _gruposMusc[_g]; break; } }
+    var fuerzaLado = (_fuPrim && _fuPrim.lado) || ladoDe(fuerzaRaw);
+    var fuerzaGrupo = _fuPrim ? _fuPrim.grupo : (function () { var t = norm(fuerzaRaw); for (var i = 0; i < GRUPOS_MUSC.length; i++) if (t.indexOf(GRUPOS_MUSC[i]) !== -1) return GRUPOS_MUSC[i]; return null; })();
+    var fuerzaMultiGrupo = fuerzaGrupos.filter(function (x) { return x.grupo; }).length > 1;
     // Referencia/contralateral: ¿se MENCIONA? ¿se AFIRMA SANA? Nunca se asume sano el contralateral.
     var fuerzaRefMencionada = termState(fuerzaRaw, ['lado sano', 'contralateral', 'lado opuesto', 'lado contrario', 'comparado con', 'vs lado', 'referencia']).affirmed;
     var fuerzaRefSanaConfirmada = termState(fuerzaRaw, ['lado sano 10', 'sano 10/10', 'lado sano', 'contralateral sano', 'contralateral normal', 'contralateral sin alteracion', 'opuesto normal', 'opuesto sano', 'referencia 10/10', 'referencia sana']).affirmed
       && !termState(fuerzaRaw, ['contralateral tambien', 'ambos lados', 'bilateral', 'opuesto afectado', 'contralateral afectado', 'contralateral debil']).affirmed;
+    // --- EVA robusta: distingue reposo vs movimiento/actividad; valor representativo (movimiento o máx) ---
+    var evaP = _parseEVA(o.eva);
     // Datos insuficientes para afirmar seguridad: examen objetivo vacío Y sin cribado documentado,
     // o ≥2 campos clínicos núcleo por confirmar. Ausencia de dato ≠ ausencia de riesgo.
     var examenVacio = !lleno(romRaw) && !lleno(fuerzaRaw) && !lleno(pruebasTxt);
@@ -357,6 +395,8 @@
       fuerzaEsNumerica: fuerzaEsNumerica, fuerzaTextoCualitativo: fuerzaTextoCualitativo, fuerzaRaw: fuerzaRaw,
       fuerzaEscala: fuerzaEscala, fuerzaValor: fuerzaValor, fuerzaRef: fuerzaRef, fuerzaPctEstimado: fuerzaPctEstimado,
       fuerzaGrupo: fuerzaGrupo, fuerzaLado: fuerzaLado, fuerzaRefMencionada: fuerzaRefMencionada, fuerzaRefSanaConfirmada: fuerzaRefSanaConfirmada,
+      fuerzaGrupos: fuerzaGrupos, fuerzaMultiGrupo: fuerzaMultiGrupo,
+      eva: evaP.valor, evaReposo: evaP.reposo, evaMovimiento: evaP.movimiento, evaRaw: String(o.eva || ''),
       debilidadSinContextoNeuro: debilidadSinContextoNeuro,
       datosInsuficientes: datosInsuficientes,
       // evidencias (campo + fragmento literal) por hecho afirmado/negado

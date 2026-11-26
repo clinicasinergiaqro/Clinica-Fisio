@@ -165,11 +165,12 @@ check('OBJ-03', 'V2.2.1: meta de dolor = PROPUESTA justificada y editable desde 
       && !!dolor.justificacion_meta && !!dolor.meta_nota;
   })());
 
-check('OBJ-04', 'ROM no medido → línea base pendiente (no inventa valor) y meta null',
+check('OBJ-04', 'ROM NO documentado → NO es objetivo de tratamiento; "medir ROM" va a valoración pendiente',
   (function () {
     var c = GEN.generar({ patologia: 'Rodilla', orig: { padecimiento: 'dolor de rodilla al subir escaleras desde hace 1 mes', zona: 'rodilla', eva: '4' } });
-    var rom = c.objetivos.filter(function (o) { return o.indicador.indexOf('ROM') !== -1; })[0];
-    return rom && rom.linea_base.tipo === 'pendiente' && rom.linea_base.valor === null && rom.meta_propuesta === null;
+    var romObj = c.objetivos.filter(function (o) { return (o.indicador || '').indexOf('ROM') !== -1; });
+    var enPend = c.valoracion_pendiente.some(function (p) { return /ROM goniom/i.test(p); });
+    return romObj.length === 0 && enPend;
   })());
 
 // ---------- MEDICIONES: vinculadas (id real) vs texto (no cuentan) ----------
@@ -261,7 +262,7 @@ check('V22-FUERZA-SUP', 'Fuerza legada /5 (Daniels): NO se convierte a 0–10, m
 
 // --- Requisito Sinergia V2.2.1: FUERZA en escala 0–10 comparativa (sano=10; 6/10≈60%); NO Daniels/MRC ni conversión ---
 check('V221-FUERZA-010-REF', 'Fuerza 6/10 con lado sano CONFIRMADO 10/10 → meta de simetría PROPUESTA y JUSTIFICADA + grupo/lado/%',
-  (function () { var c = GEN.generar({ patologia: 'Lesion ligamentaria', orig: { padecimiento: 'inestabilidad de rodilla derecha tras lesión ligamentaria hace 1 mes', zona: 'rodilla', lado: 'derecho', fuerza: 'cuádriceps 6/10 lado derecho (lado sano 10/10)', eva: '4' } }); var fz = c.objetivos.filter(function (o) { return /fuerza/.test(o.alteracion); })[0]; return fz && fz.linea_base.escala === 'comparativa_0_10' && fz.linea_base.pct_estimado === 60 && fz.linea_base.grupo_muscular === 'cuadriceps' && fz.linea_base.referencia_confirmada_sana === true && fz.meta_propuesta && fz.meta_propuesta.tipo === 'propuesta_editable' && /simetr/i.test(fz.meta_propuesta.valor) && !!fz.justificacion_meta; })());
+  (function () { var c = GEN.generar({ patologia: 'Lesion ligamentaria', orig: { padecimiento: 'inestabilidad de rodilla derecha tras lesión ligamentaria hace 1 mes', zona: 'rodilla', lado: 'derecho', fuerza: 'cuádriceps 6/10 lado derecho (lado sano 10/10)', eva: '4' } }); var fz = c.objetivos.filter(function (o) { return /fuerza/.test(o.alteracion); })[0]; var g0 = fz && fz.linea_base.grupos && fz.linea_base.grupos[0]; return fz && fz.linea_base.escala === 'comparativa_0_10' && g0 && g0.pct_estimado === 60 && g0.grupo === 'cuadriceps' && fz.linea_base.referencia_confirmada_sana === true && fz.meta_propuesta && fz.meta_propuesta.tipo === 'propuesta_editable' && /simetr/i.test(fz.meta_propuesta.valor) && !!fz.justificacion_meta; })());
 
 check('V221-FUERZA-010-NOREF', 'Fuerza 6/10 SIN referencia sana confirmada → NO se propone simetría (no se asume contralateral sano)',
   (function () { var c = GEN.generar({ patologia: 'Rodilla', orig: { padecimiento: 'debilidad de cuádriceps derecho tras dolor de rodilla hace 1 mes', zona: 'rodilla', lado: 'derecho', fuerza: 'cuádriceps 6/10', eva: '4' } }); var fz = c.objetivos.filter(function (o) { return /fuerza/.test(o.alteracion); })[0]; return fz && fz.linea_base.escala === 'comparativa_0_10' && fz.linea_base.referencia_confirmada_sana === false && fz.meta_propuesta === null && /referencia|lado sano|contralateral/i.test(fz.justificacion_meta || ''); })());
@@ -336,6 +337,33 @@ check('V22-PHI-PART', 'OCT-72: nombre de médico con partículas ("García de Bu
 
 check('V22-PHI-NOFALSO', 'scrubPHI NO se come palabras comunes (médico tratante / en reposo / referido sin nombre)',
   (function () { return GEN._scrubPHI('el médico tratante indicó reposo; dolor en reposo nocturno; sin diagnóstico médico referido') === 'el médico tratante indicó reposo; dolor en reposo nocturno; sin diagnóstico médico referido'; })());
+
+// --- V2.2.2: dx médico separado del funcional ---
+check('V222-DXMED-SEP', 'El diagnóstico MÉDICO referido va en su propio bloque (no dentro del funcional)',
+  (function () { var c = GEN.generar({ patologia: 'Hombro', orig: { zona: 'hombro', lado: 'derecho', padecimiento: 'dolor de hombro derecho al elevar el brazo hace 1 mes', dxMedico: 'síndrome subacromial', eva: '5' } }); return c.diagnostico_medico_referido && c.diagnostico_medico_referido.estado === 'referido' && /subacromial/i.test(c.diagnostico_medico_referido.texto) && c.diagnostico_funcional.texto.indexOf('en contexto de') === -1; })());
+
+check('V222-DXMED-AUSENTE', 'Sin dx médico → bloque médico "ausente" y el funcional igual se redacta',
+  (function () { var c = GEN.generar({ patologia: 'Lumbalgia', orig: { zona: 'lumbar', padecimiento: 'dolor lumbar mecánico al cargar peso hace 3 semanas', eva: '5' } }); return c.diagnostico_medico_referido.estado === 'ausente' && c.diagnostico_medico_referido.texto === null && c.diagnostico_funcional.texto.length > 20; })());
+
+// --- V2.2.2: objetivos = solo alteraciones reales; no "medir X" como objetivo ---
+check('V222-OBJ-NO-TAREA', 'Fuerza NORMAL documentada NO genera objetivo de fuerza; ROM normal tampoco',
+  (function () { var c = GEN.generar({ patologia: 'Rodilla', orig: { zona: 'rodilla', padecimiento: 'dolor de rodilla al correr hace 1 mes', eva: '4', fuerza: 'fuerza conservada 10/10', rom: 'ROM completo' } }); var fz = c.objetivos.filter(function (o) { return /fuerza/.test(o.alteracion); }); var rom = c.objetivos.filter(function (o) { return /movilidad/.test(o.alteracion); }); return fz.length === 0 && rom.length === 0; })());
+
+check('V222-OBJ-MULTIGRUPO', 'Objetivo de fuerza lista MÚLTIPLES grupos con déficit (cuádriceps+glúteo), excluye el 10/10',
+  (function () { var c = GEN.generar({ patologia: 'Rodilla', orig: { zona: 'rodilla', lado: 'derecho', padecimiento: 'debilidad de rodilla derecha tras dolor hace 1 mes', eva: '4', fuerza: 'cuádriceps 6/10 derecho, glúteo medio 7/10 derecho, gastrocnemio 10/10' } }); var fz = c.objetivos.filter(function (o) { return /fuerza/.test(o.alteracion); })[0]; return fz && fz.linea_base.grupos.length === 2 && /cuadriceps/.test(fz.alteracion) && /gluteo/.test(fz.alteracion); })());
+
+check('V222-EVA-REPOSO-MOV', 'EVA reposo/movimiento: la meta se ancla al dolor de MOVIMIENTO y la línea base guarda ambos',
+  (function () { var c = GEN.generar({ patologia: 'Tendinopatia', orig: { zona: 'rodilla', padecimiento: 'dolor en tendón rotuliano al saltar hace 2 meses', eva: '7 al movimiento, 2 en reposo' } }); var d = c.objetivos.filter(function (o) { return o.alteracion === 'dolor'; })[0]; return d && d.linea_base.movimiento === 7 && d.linea_base.reposo === 2 && /≤ 4\/10/.test(d.meta_propuesta.valor); })());
+
+check('V222-NO-DANIELS', 'Ningún TEXTO de recomendación (objetivos/plan) recomienda Daniels/MRC ni dinamómetro (la etiqueta de dato histórico no cuenta)',
+  (function () {
+    var c = GEN.generar({ patologia: 'Rodilla', orig: { zona: 'rodilla', padecimiento: 'debilidad de rodilla al subir escaleras hace 1 mes', eva: '4', fuerza: 'cuádriceps 6/10' } });
+    var textos = [];
+    (c.objetivos || []).forEach(function (o) { textos.push(o.actividad, o.metodo, o.indicador, o.meta_nota, o.justificacion_meta, o.meta_propuesta && o.meta_propuesta.valor, o.linea_base && o.linea_base.nota); });
+    if (c.plan) { textos.push(c.plan.nota, c.plan.agentes_coadyuvantes, c.plan.protocolo_referencia); (c.plan.fases || []).forEach(function (f) { textos.push(f.nombre, f.objetivo, f.criterio_progresion); }); }
+    var blob = textos.filter(Boolean).join(' · ').toLowerCase();
+    return blob.indexOf('daniels') === -1 && blob.indexOf('dinamom') === -1 && blob.indexOf('mrc') === -1;
+  })());
 
 // Pendientes declarados honestamente (no implementados aún en este incremento)
 pendiente('UX-EDIT', 'Interfaz editable (editar dx/objetivos/metas, validar/rechazar) — la define el rediseño visual (otra ventana)');

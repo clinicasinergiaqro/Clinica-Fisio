@@ -10,7 +10,7 @@
   'use strict';
   var EX = (typeof require !== 'undefined') ? require('./extractor_v2.js') : root.ExtractorV2;
   var MS = (typeof require !== 'undefined') ? require('./motor_seguridad_v2.js') : root.MotorSeguridadV2;
-  var VERSION = '2.2.1-proto';
+  var VERSION = '2.2.2-proto';
 
   var norm = EX._norm, lleno = EX._lleno;
   var has = function (t, ks) { t = norm(t); return ks.some(function (k) { return t.indexOf(norm(k)) !== -1; }); };
@@ -46,8 +46,8 @@
   var ESCALAS = {
     'Cervicalgia': 'NDI (Neck Disability Index)', 'Lumbalgia': 'Oswestry (ODI) / PSFS', 'Dorsalgia': 'escala de dolor y función pertinente a la región',
     'Lesion meniscal': 'IKDC / KOOS', 'Lesion ligamentaria': 'IKDC + hop tests (según fase)', 'Tendinopatia': 'VISA (según región)',
-    'Hombro': 'SPADI o QuickDASH', 'Miembro superior': 'PRWE + dinamometría de prensión', 'Tobillo/pie': 'FAAM + Weight-Bearing Lunge Test',
-    'Rodilla': 'IKDC + dinamometría + tolerancia a sentadilla', 'Fractura': 'escala funcional de la región + goniometría',
+    'Hombro': 'SPADI o QuickDASH', 'Miembro superior': 'PRWE + prensión (fuerza comparativa 0–10)', 'Tobillo/pie': 'FAAM + Weight-Bearing Lunge Test',
+    'Rodilla': 'IKDC + fuerza comparativa 0–10 + tolerancia a sentadilla', 'Fractura': 'escala funcional de la región + goniometría',
     'Post-quirurgico': 'escala funcional de la región + ROM autorizado', 'Radiculopatia': 'examen neurológico dirigido + escala regional',
     'Cadera': 'HOOS', 'Otro': 'escala funcional pertinente'
   };
@@ -143,9 +143,33 @@
     return { lista: out, regionConflicto: h.regionConflicto };
   }
 
-  // Diagnóstico funcional NATURAL y CONCISO, individualizado: aprovecha relato + mecanismo + dx médico
-  // + síntomas (dolor / neural referido vs objetivado, sin mezclar) + hallazgos objetivos (ROM / FUERZA
-  // en escala 0–10 comparativa de Sinergia) + limitación + antecedentes pertinentes + evolución SOAP.
+  // Diagnóstico MÉDICO referido (SEPARADO del funcional): lo que dijo el médico, a confirmar. No es el dx fisio.
+  function dxMedicoReferido(rec) {
+    var o = rec.orig || {};
+    var dm = (lleno(o.dxMedico) && norm(o.dxMedico).indexOf('no cuenta') === -1) ? String(o.dxMedico).trim()
+      : (lleno(o.dxMedicoMotivo) && norm(o.dxMedicoMotivo).indexOf('no cuenta') === -1 ? String(o.dxMedicoMotivo).trim() : null);
+    if (!dm) return { texto: null, estado: 'ausente', nota: 'Sin diagnóstico médico referido en el expediente.', evidencias: [] };
+    return { texto: dm, estado: 'referido', nota: 'Diagnóstico MÉDICO referido (no es el diagnóstico fisioterapéutico); a confirmar con exploración/imagen pertinente.', evidencias: [{ campo: 'motivo.dxMedico', fragmento: dm }] };
+  }
+
+  // Frase de fuerza (0–10 comparativa de Sinergia) con TODOS los grupos documentados (multi-grupo).
+  function _fraseFuerza(h) {
+    if (h.fuerzaEscala === 'comparativa_0_10' && h.fuerzaGrupos && h.fuerzaGrupos.length) {
+      // Si la referencia sana está confirmada, el valor 10/10 es la REFERENCIA (va en el sufijo), no un hallazgo.
+      var gs = h.fuerzaGrupos.filter(function (g) { return !(h.fuerzaRefSanaConfirmada && g.valor === g.ref); });
+      if (!gs.length) gs = h.fuerzaGrupos;
+      var partes = gs.map(function (g) { return (g.grupo ? g.grupo + ' ' : '') + g.valor + '/10' + (g.lado ? ' (' + g.lado + ')' : ''); });
+      return 'fuerza ' + partes.join(', ') + ' — escala comparativa Sinergia 0–10 (sano = 10)' +
+        (h.fuerzaRefSanaConfirmada ? '; referencia lado sano confirmada 10/10' : (h.fuerzaRefMencionada ? '; referencia por confirmar' : ''));
+    }
+    if (h.fuerzaEscala === 'daniels_0_5') return 'fuerza ' + String(h.fuerzaRaw).trim() + ' (escala /5 legada; se conserva, no se convierte)';
+    if (h.fuerzaTextoCualitativo) return 'fuerza ' + String(h.fuerzaRaw).trim() + ' (cualitativa, sin escala 0–10)';
+    return null;
+  }
+
+  // Diagnóstico FUNCIONAL: prosa fisioterapéutica, concisa e individualizada. Lidera la disfunción y su
+  // impacto FUNCIONAL; integra dolor (EVA reposo/movimiento), hallazgos (ROM, FUERZA 0–10 multi-grupo),
+  // mecanismo, antecedentes pertinentes y evolución SOAP. NO repite el dx médico (vive en su propio bloque).
   function dxFuncional(rec, h) {
     var o = rec.orig || {};
     var relatoCorto = lleno(o.padecimiento) && String(o.padecimiento).trim().length >= 15;
@@ -153,63 +177,61 @@
     var reg = lleno(o.zona) ? String(o.zona).replace('_', '/') : 'región por precisar';
     var lado = (h.lado) ? (' ' + h.lado) : '';
     var evid = [];
-    var conDx = (lleno(o.dxMedico) && norm(o.dxMedico).indexOf('no cuenta') === -1) ? String(o.dxMedico).trim()
-      : (lleno(o.dxMedicoMotivo) ? String(o.dxMedicoMotivo).trim() : null);
-    if (conDx) evid.push({ campo: 'motivo.dxMedico', fragmento: conDx });
     var mec = lleno(o.mecanismo) ? String(o.mecanismo).trim() : null;
     if (mec) evid.push({ campo: 'motivo.mecanismo', fragmento: mec });
-    // --- Síntomas (dolor; neural REFERIDO vs OBJETIVADO: no se mezclan; la disminución de fuerza NO es neuro) ---
-    var sintomas = [];
-    if (lleno(o.eva)) { sintomas.push('dolor EVA ' + String(o.eva).trim() + (/^\d+$/.test(String(o.eva).trim()) ? '/10' : '')); evid.push({ campo: 'valoracion.eva', fragmento: String(o.eva) }); }
-    if (h.dolorNocturno) { sintomas.push('de predominio nocturno/en reposo'); if (h.evidencias.dolor_nocturno) evid.push(h.evidencias.dolor_nocturno); }
-    else if (h.dolorPersistente) { sintomas.push('persistente'); if (h.evidencias.dolor_persistente) evid.push(h.evidencias.dolor_persistente); }
-    if (h.inflamacionPresente) { sintomas.push('con inflamación'); if (h.evidencias.inflamacion) evid.push(h.evidencias.inflamacion); }
-    if (h.deficitNeuroObjetivo) { sintomas.push('con déficit neurológico OBJETIVADO'); if (h.evidencias.deficit_neuro_objetivo) evid.push(h.evidencias.deficit_neuro_objetivo); }
-    else if (h.sintomaNeuroReferido) { sintomas.push('con síntomas neurales referidos (sensitivos, sin déficit objetivado)'); if (h.evidencias.sintoma_neuro_referido) evid.push(h.evidencias.sintoma_neuro_referido); }
-    // --- Hallazgos objetivos: ROM goniométrico; FUERZA en escala 0–10 comparativa de Sinergia (sano=10) ---
+    var demo = (typeof rec.edad === 'number' && rec.edad > 0) ? ('Paciente de ' + rec.edad + ' años') : 'Paciente';
+    // Dolor con EVA reposo/movimiento.
+    var dolorTxt = null;
+    if (h.eva != null) {
+      if (h.evaReposo != null && h.evaMovimiento != null) dolorTxt = 'dolor EVA ' + h.evaMovimiento + '/10 al movimiento y ' + h.evaReposo + '/10 en reposo';
+      else if (h.evaReposo != null) dolorTxt = 'dolor EVA ' + h.evaReposo + '/10 en reposo';
+      else if (h.evaMovimiento != null) dolorTxt = 'dolor EVA ' + h.evaMovimiento + '/10 al movimiento';
+      else dolorTxt = 'dolor EVA ' + h.eva + '/10';
+      evid.push({ campo: 'valoracion.eva', fragmento: h.evaRaw || String(h.eva) });
+    } else if (lleno(o.eva)) { dolorTxt = 'dolor ' + String(o.eva).trim(); evid.push({ campo: 'valoracion.eva', fragmento: String(o.eva) }); }
+    if (h.dolorNocturno) dolorTxt = (dolorTxt || 'dolor') + ' de predominio nocturno/en reposo';
+    else if (h.dolorPersistente) dolorTxt = (dolorTxt || 'dolor') + ' persistente';
+    // Neural (referido vs objetivado).
+    var neuro = null;
+    if (h.deficitNeuroObjetivo) { neuro = 'déficit neurológico OBJETIVADO'; if (h.evidencias.deficit_neuro_objetivo) evid.push(h.evidencias.deficit_neuro_objetivo); }
+    else if (h.sintomaNeuroReferido) { neuro = 'síntomas neurales referidos (sensitivos, sin déficit objetivado)'; if (h.evidencias.sintoma_neuro_referido) evid.push(h.evidencias.sintoma_neuro_referido); }
+    // Hallazgos objetivos.
     var hallaz = [];
     if (h.romEsNumerico) { hallaz.push('ROM ' + String(o.rom).trim()); evid.push({ campo: 'valoracion.rom', fragmento: String(o.rom) }); }
-    else if (h.romTextoCualitativo) { hallaz.push('movilidad "' + String(o.rom).trim() + '" (cualitativa, sin goniometría)'); evid.push({ campo: 'valoracion.rom', fragmento: String(o.rom) }); }
-    if (h.fuerzaEsNumerica) {
-      var fTxt;
-      if (h.fuerzaEscala === 'comparativa_0_10') {
-        fTxt = 'fuerza ' + (h.fuerzaGrupo ? h.fuerzaGrupo + ' ' : '') + h.fuerzaValor + '/10 (escala comparativa Sinergia' +
-          (h.fuerzaPctEstimado != null ? ', ≈' + h.fuerzaPctEstimado + '% de la referencia' : '') +
-          (h.fuerzaRefSanaConfirmada ? '; lado sano confirmado 10/10' : (h.fuerzaRefMencionada ? '; referencia por confirmar' : '')) + ')';
-      } else { fTxt = 'fuerza ' + String(o.fuerza).trim() + ' (escala /5 documentada; no se convierte a 0–10)'; }
-      hallaz.push(fTxt); evid.push({ campo: 'valoracion.fuerza', fragmento: String(o.fuerza) });
-    } else if (h.fuerzaTextoCualitativo) {
-      hallaz.push('fuerza "' + String(o.fuerza).trim() + '" (cualitativa, sin escala 0–10)'); evid.push({ campo: 'valoracion.fuerza', fragmento: String(o.fuerza) });
-    }
-    if (h.debilidadSinContextoNeuro) hallaz.push('(la disminución de fuerza referida no muestra contexto neurológico: se interpreta como déficit de fuerza, no neural)');
-    if (lleno(o.palpacion)) { hallaz.push('palpación: ' + String(o.palpacion).trim()); evid.push({ campo: 'valoracion.palpacion', fragmento: String(o.palpacion) }); }
-    if (h.pruebasEspecialesPresentes) { hallaz.push('pruebas especiales: ' + String(o.pruebas).trim()); evid.push({ campo: 'valoracion.pruebas', fragmento: String(o.pruebas) }); }
+    else if (h.romTextoCualitativo) { hallaz.push('movilidad ' + String(o.rom).trim() + ' (cualitativa)'); evid.push({ campo: 'valoracion.rom', fragmento: String(o.rom) }); }
+    var ff = _fraseFuerza(h); if (ff) { hallaz.push(ff); evid.push({ campo: 'valoracion.fuerza', fragmento: String(o.fuerza) }); }
+    if (h.inflamacionPresente) { hallaz.push('inflamación'); if (h.evidencias.inflamacion) evid.push(h.evidencias.inflamacion); }
+    if (lleno(o.palpacion)) { hallaz.push('palpación ' + String(o.palpacion).trim()); evid.push({ campo: 'valoracion.palpacion', fragmento: String(o.palpacion) }); }
+    if (h.pruebasEspecialesPresentes) { hallaz.push('pruebas especiales (' + String(o.pruebas).trim() + ')'); evid.push({ campo: 'valoracion.pruebas', fragmento: String(o.pruebas) }); }
     var limit = lleno(o.limitaciones) ? String(o.limitaciones).trim() : null;
     if (limit) evid.push({ campo: 'dxFuncional.limitaciones', fragmento: limit });
-    // Antecedentes PERSONALES pertinentes (breve) — para individualizar, no diagnóstico familiar.
     var antPert = [];
     if (h.metal) antPert.push('material de osteosíntesis/prótesis');
     if (h.oncologico) antPert.push('antecedente oncológico (verificar estado)');
     if (h.diabetesPersonal) antPert.push('diabetes');
     if (h.anticoagulacion) antPert.push('anticoagulación');
     if (h.embarazo) antPert.push('embarazo');
-    // Evolución: desde cuándo + tendencia por nº de notas SOAP.
     var crono = (lleno(o.desdeCuando) && /[a-z0-9]/i.test(String(o.desdeCuando))) ? String(o.desdeCuando).trim() : null;
-    var trend = (h.soap_n >= 2) ? ('en seguimiento, ' + h.soap_n + ' notas SOAP') : null;
-    // Prosa natural y concisa (frases cortas, voz clínica).
-    var frase1 = ('Disfunción de ' + reg + lado + (conDx ? ' en contexto de ' + conDx : '') + (mec ? ' por ' + mec : '')).trim() + '.';
-    var frase2 = sintomas.length ? ('Cursa con ' + sintomas.join(', ') + '.') : '';
-    var frase3 = hallaz.length ? ('A la exploración: ' + hallaz.join('; ') + '.') : 'Sin hallazgos objetivos documentados.';
-    var frase4 = limit ? ('Limita: ' + limit + '.') : '';
+    var trend = (h.soap_n >= 2) ? ('en seguimiento (' + h.soap_n + ' notas SOAP)') : null;
+    // Prosa fisioterapéutica.
+    var cuadro = [];
+    if (dolorTxt) cuadro.push(dolorTxt);
+    if (neuro) cuadro.push(neuro);
+    var frase1 = demo + ' con disfunción de ' + reg + lado + '.';
+    var frase2 = cuadro.length ? ('Cuadro: ' + cuadro.join('; ') + '.') : '';
+    var fraseLim = limit ? ('Limitación funcional: ' + limit + '.') : '';
+    var frase3 = hallaz.length ? ('A la exploración: ' + hallaz.join('; ') + '.') : 'Exploración objetiva no documentada.';
+    if (h.debilidadSinContextoNeuro) frase3 += ' La disminución de fuerza no muestra contexto neurológico (déficit de fuerza, no neural).';
+    var frase4 = mec ? ('Mecanismo: ' + mec + '.') : '';
     var frase5 = antPert.length ? ('Antecedentes a considerar: ' + antPert.join(', ') + '.') : '';
     var frase6 = (crono || trend) ? ('Evolución: ' + [crono, trend].filter(Boolean).join('; ') + '.') : '';
     var faltan = [];
     if (!h.romEsNumerico) faltan.push('ROM goniométrico');
     if (!h.fuerzaEsNumerica) faltan.push('fuerza en escala 0–10');
     if (!h.pruebasEspecialesPresentes) faltan.push('pruebas especiales');
-    var pend = faltan.length ? (' Exploración objetiva por completar (' + faltan.join(', ') + '): diagnóstico PROVISIONAL.') : '';
+    var pend = faltan.length ? (' Exploración por completar (' + faltan.join(', ') + '): diagnóstico PROVISIONAL.') : '';
     if (h.datosInsuficientes) pend += ' Datos clínicos insuficientes: no se afirma seguridad por ausencia de hallazgos.';
-    var txt = [frase1, frase2, frase3, frase4, frase5, frase6].filter(Boolean).join(' ') + pend;
+    var txt = [frase1, frase2, fraseLim, frase3, frase4, frase5, frase6].filter(Boolean).join(' ') + pend;
     return { texto: txt, estado: 'provisional', evidencias: evid };
   }
 
@@ -221,11 +243,11 @@
     return out;
   }
 
-  // Objetivos INDIVIDUALIZADOS por horizonte (CORTO / MEDIANO / LARGO plazo), uno por alteración
-  // detectada, cada uno con indicador / línea base / unidad / método / criterio. Las METAS se PROPONEN
-  // editables y JUSTIFICADAS cuando hay datos suficientes (EVA inicial; fuerza con referencia sana
-  // CONFIRMADA); donde faltaría un supuesto (p.ej. simetría sin lado sano confirmado), la meta queda
-  // null con la razón. La fuerza usa la escala 0–10 comparativa de Sinergia (NO Daniels/MRC, no conversión).
+  // Objetivos TERAPÉUTICOS individualizados por horizonte (CP / MP / LP), SOLO para alteraciones REALMENTE
+  // documentadas. Las tareas de "medir X" NO se vuelven objetivos de tratamiento: van a valoracion_pendiente.
+  // Metas PROPUESTAS, editables y JUSTIFICADAS cuando hay datos suficientes (EVA inicial; fuerza con
+  // referencia sana CONFIRMADA); sin imponer dolor cero, simetría universal ni tiempos rígidos. Fuerza en
+  // escala 0–10 comparativa de Sinergia (multi-grupo); NUNCA Daniels/MRC ni dinamómetro en las propuestas.
   function objetivos(rec, h, seguridad) {
     var o = rec.orig || {}; var pat = rec.patologia || 'Otro'; var escala = ESCALAS[pat] || ESCALAS['Otro'];
     var objs = [];
@@ -233,79 +255,72 @@
       objs.push({ fase: 'seguridad', alteracion: 'alerta de seguridad activa', actividad: 'resolver la acción de seguridad antes de fijar objetivos terapéuticos', indicador: 'acción de seguridad del motor', linea_base: null, meta_propuesta: null, unidad: null, metodo: null, reevaluacion: 'inmediata', criterio_cumplimiento: 'alerta resuelta / derivación realizada', evidencias: (seguridad.alertas[0] ? [{ campo: 'motor_seguridad', fragmento: seguridad.alertas[0].regla + ': ' + seguridad.alertas[0].accion }] : []) });
       return objs; // con plan bloqueado, no se fijan objetivos terapéuticos
     }
-    // ===== CORTO PLAZO: dolor / control de síntomas =====
-    if (lleno(o.eva)) {
-      var evaNum = parseFloat(String(o.eva).replace(/[^\d.]/g, ''));
+    // ===== CORTO PLAZO: dolor (solo si HAY dolor documentado; si no, es tarea de valoración, no objetivo) =====
+    var dolorPresente = (h.eva != null) || h.dolorNocturno || h.dolorPersistente || has(o.padecimiento, ['dolor', 'duele', 'molestia', 'adolorid']);
+    if (dolorPresente) {
+      var evaBase = (h.evaMovimiento != null) ? h.evaMovimiento : h.eva; // el peor dolor (movimiento) ancla la meta
       var metaEva = null, justEva = null;
-      if (!isNaN(evaNum)) {
-        // Propuesta EDITABLE justificada por la línea base y la irritabilidad (no es una regla fija ni "dolor cero").
-        var objetivoEva = (evaNum >= 7) ? Math.max(4, Math.round(evaNum - 3)) : (evaNum >= 4 ? Math.max(2, evaNum - 2) : Math.max(0, evaNum - 1));
+      if (evaBase != null) {
+        var objetivoEva = (evaBase >= 7) ? Math.max(4, Math.round(evaBase - 3)) : (evaBase >= 4 ? Math.max(2, evaBase - 2) : Math.max(0, evaBase - 1));
         metaEva = { valor: '≤ ' + objetivoEva + '/10', tipo: 'propuesta_editable' };
-        justEva = 'Propuesta a partir de la EVA inicial ' + evaNum + '/10 (descenso clínicamente relevante escalonado por irritabilidad). Editable por el fisioterapeuta.';
+        justEva = 'Propuesta a partir de la EVA ' + evaBase + '/10' + (h.evaMovimiento != null ? ' (al movimiento)' : '') + ': descenso clínicamente relevante, escalonado por irritabilidad. Editable; no impone dolor cero.';
       }
       objs.push({ fase: 'corto', alteracion: 'dolor', actividad: 'reducir el dolor y la irritabilidad',
-        indicador: 'EVA', linea_base: { valor: isNaN(evaNum) ? String(o.eva) : evaNum, unidad: '/10', fuente: 'valoracion.eva', tipo: isNaN(evaNum) ? 'texto' : 'medido' },
+        indicador: 'EVA', linea_base: { valor: (h.eva != null ? h.eva : (lleno(o.eva) ? String(o.eva) : null)), unidad: '/10', reposo: h.evaReposo, movimiento: h.evaMovimiento, fuente: 'valoracion.eva', tipo: (h.eva != null ? 'medido' : (lleno(o.eva) ? 'texto' : 'pendiente')) },
         meta_propuesta: metaEva, justificacion_meta: justEva,
-        meta_nota: 'Meta editable; no es una reducción fija obligatoria ni "dolor cero". Reevaluar por irritabilidad y objetivo del paciente.',
-        unidad: '/10', metodo: 'EVA contextualizada', reevaluacion: '1–2 semanas', criterio_cumplimiento: 'EVA en la meta acordada, sostenida', evidencias: [{ campo: 'valoracion.eva', fragmento: String(o.eva) }] });
-    } else {
-      objs.push({ fase: 'corto', alteracion: 'control de síntomas', actividad: 'controlar síntomas y educar al paciente; capturar EVA de línea base',
-        indicador: 'EVA', linea_base: { valor: null, tipo: 'pendiente', fuente: 'valoracion.eva', nota: 'EVA no documentada: capturar línea base' },
-        meta_propuesta: null, unidad: '/10', metodo: 'EVA contextualizada', reevaluacion: '1–2 semanas', criterio_cumplimiento: 'síntomas controlados y EVA capturada', evidencias: [] });
+        meta_nota: 'Meta editable; no es una reducción fija ni "dolor cero". Reevaluar por irritabilidad y objetivo del paciente.',
+        unidad: '/10', metodo: 'EVA contextualizada (reposo/movimiento)', reevaluacion: '1–2 semanas', criterio_cumplimiento: 'EVA en la meta acordada, sostenida', evidencias: [{ campo: 'valoracion.eva', fragmento: h.evaRaw || String(o.eva) }] });
     }
-    // ===== MEDIANO PLAZO: movilidad (ROM) =====
-    if (h.romEsNumerico) {
-      objs.push({ fase: 'mediano', alteracion: 'déficit de movilidad', actividad: 'recuperar ROM funcional de la zona',
-        indicador: 'ROM (goniometría)', linea_base: { valor: String(o.rom).trim(), unidad: 'grados', fuente: 'valoracion.rom', tipo: 'medido' },
-        meta_propuesta: null, meta_nota: 'Definir ROM meta con el fisio según articulación, objetivo y ROM del lado sano/funcional (no se asume simetría automática; proponer meta al documentar la referencia).',
+    // ===== MEDIANO PLAZO: movilidad — SOLO si hay DÉFICIT de ROM documentado (medido o descrito como limitado) =====
+    var romNormal = h.romTextoCualitativo && has(o.rom, ['normal', 'complet', 'conservad', 'sin limitacion', 'sin restriccion', 'integra']);
+    var romDeficit = h.romEsNumerico || (h.romTextoCualitativo && !romNormal);
+    if (romDeficit) {
+      objs.push({ fase: 'mediano', alteracion: 'déficit de movilidad', actividad: 'optimizar y recuperar el ROM funcional de la zona',
+        indicador: 'ROM (goniometría)',
+        linea_base: h.romEsNumerico
+          ? { valor: String(o.rom).trim(), unidad: 'grados', fuente: 'valoracion.rom', tipo: 'medido' }
+          : { valor: String(o.rom).trim(), unidad: 'texto', fuente: 'valoracion.rom', tipo: 'texto_cualitativo', nota: 'descripción cualitativa; capturar goniometría para línea base medible' },
+        meta_propuesta: null, meta_nota: 'Definir ROM meta con el fisio según articulación, objetivo y ROM del lado sano/funcional (no se asume simetría automática).',
         unidad: 'grados', metodo: 'goniometría', reevaluacion: '3–6 semanas', criterio_cumplimiento: 'ROM en la meta acordada sin dolor', evidencias: [{ campo: 'valoracion.rom', fragmento: String(o.rom) }] });
-    } else if (h.romTextoCualitativo) {
-      objs.push({ fase: 'mediano', alteracion: 'movilidad (descrita en texto, sin goniometría)', actividad: 'medir ROM (grados) y luego recuperarlo',
-        indicador: 'ROM (goniometría)', linea_base: { valor: String(o.rom).trim(), unidad: 'texto', fuente: 'valoracion.rom', tipo: 'texto_cualitativo', nota: 'descripción cualitativa: NO es una medición en grados; capturar goniometría para línea base' },
-        meta_propuesta: null, unidad: 'grados', metodo: 'goniometría', reevaluacion: 'tras medir', criterio_cumplimiento: null, evidencias: [{ campo: 'valoracion.rom', fragmento: String(o.rom) }] });
-    } else {
-      objs.push({ fase: 'mediano', alteracion: 'movilidad (no medida)', actividad: 'medir y luego recuperar ROM',
-        indicador: 'ROM (goniometría)', linea_base: { valor: null, tipo: 'pendiente', fuente: 'valoracion.rom', nota: 'no medido: capturar línea base' },
-        meta_propuesta: null, unidad: 'grados', metodo: 'goniometría', reevaluacion: 'tras medir', criterio_cumplimiento: null, evidencias: [] });
     }
-    // ===== MEDIANO PLAZO: fuerza (escala 0–10 comparativa de Sinergia; sano/referencia = 10) =====
-    if (h.fuerzaEsNumerica && h.fuerzaEscala === 'comparativa_0_10') {
+    // ===== MEDIANO PLAZO: fuerza — SOLO si hay DÉFICIT de fuerza documentado (0–10 Sinergia, multi-grupo) =====
+    var gruposDeficit = (h.fuerzaGrupos || []).filter(function (g) { return g.escala === 'comparativa_0_10' && g.valor < 10; });
+    var fuerzaNormalCual = h.fuerzaTextoCualitativo && has(o.fuerza, ['normal', 'conservad', 'complet', 'sin deficit', 'fuerte', 'buena fuerza']);
+    if (h.fuerzaEscala === 'comparativa_0_10' && gruposDeficit.length) {
       var metaFz = null, justFz = null, criterioFz;
+      var listaGrupos = gruposDeficit.map(function (g) { return (g.grupo || 'segmento') + ' ' + g.valor + '/10' + (g.lado ? ' (' + g.lado + ')' : '') + (g.pct_estimado != null ? ' ≈' + g.pct_estimado + '%' : ''); }).join(', ');
       if (h.fuerzaRefSanaConfirmada) {
-        // SOLO se propone simetría si el lado sano/referencia está CONFIRMADO sano (no se asume contralateral sano).
         metaFz = { valor: '10/10 (simetría con la referencia sana confirmada)', tipo: 'propuesta_editable' };
-        justFz = 'La referencia (lado sano) está CONFIRMADA en 10/10; se propone acercar el lado afectado (' + h.fuerzaValor + '/10 ≈ ' + h.fuerzaPctEstimado + '%) a la referencia. Editable por el fisioterapeuta.';
-        criterioFz = 'fuerza del segmento ≥ meta acordada respecto a la referencia sana';
+        justFz = 'La referencia (lado sano) está CONFIRMADA en 10/10; se propone acercar los grupos afectados (' + listaGrupos + ') a la referencia. Editable; sin tiempos rígidos.';
+        criterioFz = 'fuerza de los grupos ≥ meta acordada respecto a la referencia sana';
       } else {
-        justFz = 'No se propone meta de simetría: la referencia (lado sano) NO está confirmada sana (no se asume el contralateral sano). Primera acción: confirmar/medir la referencia válida.';
+        justFz = 'No se propone meta de simetría: la referencia (lado sano) NO está confirmada sana (no se asume el contralateral sano). Primero confirmar/medir la referencia válida.';
         criterioFz = 'fuerza en la meta acordada una vez definida la referencia';
       }
-      objs.push({ fase: 'mediano', alteracion: 'déficit de fuerza' + (h.fuerzaGrupo ? ' (' + h.fuerzaGrupo + ')' : ''), actividad: 'recuperar fuerza del segmento',
+      objs.push({ fase: 'mediano', alteracion: 'déficit de fuerza (' + gruposDeficit.map(function (g) { return g.grupo || 'segmento'; }).join(', ') + ')', actividad: 'recuperar la fuerza de los grupos afectados',
         indicador: 'fuerza — escala comparativa 0–10 de Sinergia',
-        linea_base: { valor: h.fuerzaValor + '/10', unidad: '/10', escala: 'comparativa_0_10', referencia: 'lado sano = 10', pct_estimado: h.fuerzaPctEstimado, grupo_muscular: h.fuerzaGrupo, lado: h.fuerzaLado, referencia_confirmada_sana: !!h.fuerzaRefSanaConfirmada, fuente: 'valoracion.fuerza', tipo: 'medido' },
+        linea_base: { valor: listaGrupos, unidad: '/10', escala: 'comparativa_0_10', referencia: 'lado sano = 10', referencia_confirmada_sana: !!h.fuerzaRefSanaConfirmada, grupos: gruposDeficit, fuente: 'valoracion.fuerza', tipo: 'medido' },
         meta_propuesta: metaFz, justificacion_meta: justFz,
-        meta_nota: 'Escala 0–10 de Sinergia (lado sano = 10/10; 6/10 ≈ 60% de la referencia). NO se sustituye por Daniels/MRC ni se convierte entre escalas.',
+        meta_nota: 'Escala 0–10 de Sinergia (lado sano = 10; 6/10 ≈ 60%): es la ÚNICA escala de fuerza del protocolo y no se convierten escalas.',
         unidad: '/10', metodo: 'escala comparativa 0–10 de Sinergia (lado sano/referencia = 10)', reevaluacion: '4–6 semanas', criterio_cumplimiento: criterioFz, evidencias: [{ campo: 'valoracion.fuerza', fragmento: String(o.fuerza) }] });
-    } else if (h.fuerzaEsNumerica && h.fuerzaEscala === 'daniels_0_5') {
-      objs.push({ fase: 'mediano', alteracion: 'déficit de fuerza', actividad: 'recuperar fuerza del segmento',
-        indicador: 'fuerza (escala /5 legada — documentada tal cual)',
-        linea_base: { valor: h.fuerzaValor + '/5', unidad: '/5', escala: 'daniels_0_5', fuente: 'valoracion.fuerza', tipo: 'medido', nota: 'Escala /5 legada; NO se convierte a 0–10. Recapturar en escala 0–10 de Sinergia para seguimiento comparativo.' },
-        meta_propuesta: null, meta_nota: 'No se convierte /5 a 0–10. Para seguimiento comparativo, recapturar fuerza en la escala 0–10 de Sinergia (lado sano = 10).',
-        unidad: '/5', metodo: 'escala documentada (no convertida)', reevaluacion: '4–6 semanas', criterio_cumplimiento: 'fuerza en la meta acordada', evidencias: [{ campo: 'valoracion.fuerza', fragmento: String(o.fuerza) }] });
-    } else if (h.fuerzaTextoCualitativo) {
-      objs.push({ fase: 'mediano', alteracion: 'fuerza (descrita en texto, sin escala)', actividad: 'medir fuerza en escala 0–10 (lado sano = 10) y luego recuperarla',
-        indicador: 'fuerza — escala comparativa 0–10 de Sinergia', linea_base: { valor: String(o.fuerza).trim(), unidad: 'texto', fuente: 'valoracion.fuerza', tipo: 'texto_cualitativo', nota: 'descripción cualitativa: capturar en escala 0–10 de Sinergia contra el lado sano/referencia' },
-        meta_propuesta: null, unidad: '/10', metodo: 'escala comparativa 0–10 de Sinergia', reevaluacion: 'tras medir', criterio_cumplimiento: null, evidencias: [{ campo: 'valoracion.fuerza', fragmento: String(o.fuerza) }] });
-    } else {
-      objs.push({ fase: 'mediano', alteracion: 'fuerza (no medida)', actividad: 'medir fuerza en escala 0–10 (lado sano = 10) y luego recuperarla',
-        indicador: 'fuerza — escala comparativa 0–10 de Sinergia', linea_base: { valor: null, tipo: 'pendiente', fuente: 'valoracion.fuerza', nota: 'no medida: capturar en escala 0–10 de Sinergia contra la referencia válida' },
-        meta_propuesta: null, unidad: '/10', metodo: 'escala comparativa 0–10 de Sinergia', reevaluacion: 'tras medir', criterio_cumplimiento: null, evidencias: [] });
+    } else if (h.fuerzaEscala === 'daniels_0_5') {
+      objs.push({ fase: 'mediano', alteracion: 'déficit de fuerza', actividad: 'recuperar la fuerza del segmento',
+        indicador: 'fuerza (valor /5 legado — se conserva, no se convierte)',
+        linea_base: { valor: h.fuerzaValor + '/5', unidad: '/5', escala: 'daniels_0_5', fuente: 'valoracion.fuerza', tipo: 'medido', nota: 'Valor /5 histórico; se conserva tal cual. El seguimiento se hará con la escala 0–10 de Sinergia (lado sano = 10).' },
+        meta_propuesta: null, meta_nota: 'No se convierte el valor /5. El seguimiento de aquí en adelante es con la escala 0–10 de Sinergia.',
+        unidad: '/5', metodo: 'valor documentado (histórico); seguimiento en escala 0–10 de Sinergia', reevaluacion: '4–6 semanas', criterio_cumplimiento: 'fuerza en la meta acordada', evidencias: [{ campo: 'valoracion.fuerza', fragmento: String(o.fuerza) }] });
+    } else if (h.fuerzaTextoCualitativo && !fuerzaNormalCual) {
+      objs.push({ fase: 'mediano', alteracion: 'déficit de fuerza (descrito en texto)', actividad: 'recuperar la fuerza del segmento',
+        indicador: 'fuerza — escala comparativa 0–10 de Sinergia', linea_base: { valor: String(o.fuerza).trim(), unidad: 'texto', fuente: 'valoracion.fuerza', tipo: 'texto_cualitativo', nota: 'descripción cualitativa; para seguimiento, registrar en escala 0–10 de Sinergia contra la referencia' },
+        meta_propuesta: null, meta_nota: 'Sin tiempos rígidos. El seguimiento de fuerza es con la escala 0–10 de Sinergia (lado sano = 10).',
+        unidad: '/10', metodo: 'escala comparativa 0–10 de Sinergia', reevaluacion: '4–6 semanas', criterio_cumplimiento: null, evidencias: [{ campo: 'valoracion.fuerza', fragmento: String(o.fuerza) }] });
     }
-    // ===== LARGO PLAZO: función / retorno a actividad =====
+    // (Si ROM/fuerza NO están documentados, NO se crea objetivo: la captura va a valoracion_pendiente.)
+    // ===== LARGO PLAZO: función / retorno a actividad (objetivo de tratamiento legítimo) =====
     var prioridad = actividadValida(o.deportivos) ? o.deportivos : (actividadValida(o.objetivoFuncional) ? o.objetivoFuncional : null);
     objs.push({ fase: 'largo',
-      alteracion: 'limitación funcional / retorno a actividad',
-      actividad: prioridad ? ('retorno a ' + prioridad + ' según criterios') : 'retorno a la actividad funcional prioritaria según criterios (definir la actividad con el paciente: no documentada)',
+      alteracion: 'retorno funcional',
+      actividad: prioridad ? ('retorno a ' + prioridad + ' según criterios') : 'retorno a la actividad funcional prioritaria según criterios (definir la actividad con el paciente)',
       indicador: escala + ' + prueba funcional pertinente',
       linea_base: lleno(o.limitaciones) ? { valor: o.limitaciones, fuente: 'dxFuncional.limitaciones', tipo: 'documentado' } : { valor: null, tipo: 'pendiente', nota: 'limitación funcional no documentada' },
       meta_propuesta: prioridad ? { valor: prioridad, tipo: 'propuesta_editable' } : null,
@@ -487,7 +502,7 @@
     // Observación informativa (NO acción automática): la IA no inicia un nuevo motivo; decide el fisio.
     if (epi.posible_nuevo_motivo) pend.push('POSIBLE NUEVO MOTIVO (informativo; lo decide el fisioterapeuta, la IA no lo inicia): ' + epi.observacion);
     if (!h.romEsNumerico) pend.push('Medir ROM goniométrico (grados)' + (h.romTextoCualitativo ? ' — hoy solo hay descripción cualitativa' : ''));
-    if (!h.fuerzaEsNumerica) pend.push('Medir fuerza con escala (dinamómetro/Daniels)' + (h.fuerzaTextoCualitativo ? ' — hoy solo hay descripción cualitativa' : ''));
+    if (!h.fuerzaEsNumerica) pend.push('Medir fuerza en la escala 0–10 de Sinergia (lado sano/referencia = 10)' + (h.fuerzaTextoCualitativo ? ' — hoy solo hay descripción cualitativa' : ''));
     if (!h.pruebasEspecialesPresentes) pend.push('Realizar pruebas especiales pertinentes');
     if (!h.cribadoDocumentado) pend.push('Documentar cribado de banderas rojas (no se infiere de pruebas especiales).');
     if (h.datosInsuficientes) pend.unshift('DATOS INSUFICIENTES: completar exploración y cribado antes de afirmar seguridad o fijar metas (ausencia de dato ≠ ausencia de riesgo).');
@@ -504,6 +519,7 @@
       episodio: rec.codigo || null, fecha_corte: fcEfectiva,
       episodio_analisis: epi,
       soap_procesado: { n_notas: h.soap_n, fechas: h.soap_fechas, valoracion_inicial_presente: !!h.soap_inicial, evolucion_actual_presente: !!h.soap_actual },
+      diagnostico_medico_referido: dxMedicoReferido(rec),
       diagnostico_funcional: { texto: dxf.texto, estado: dxf.estado, evidencias: dxf.evidencias },
       hipotesis: hipotesis(rec, h),
       seguridad: { estado: seguridad.estado, cribado_documentado: seguridad.cribado_documentado, nota: seguridad.nota, alertas: seguridad.alertas, bloquea_plan: seguridad.bloquea_plan, reglas_pendientes: seguridad.reglas_pendientes, pendientes_bloqueo: seguridad.pendientes_bloqueo },

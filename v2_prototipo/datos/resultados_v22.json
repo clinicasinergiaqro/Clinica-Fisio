@@ -1,7 +1,7 @@
 {
   "_resumen": {
-    "generado": "2026-11-26T19:14:51.680Z",
-    "version_generador": "2.2.1-proto",
+    "generado": "2026-11-26T20:14:46.620Z",
+    "version_generador": "2.2.2-proto",
     "dataset": "casos_anon.json",
     "n_casos": 24,
     "todos_con_fecha_corte": true,
@@ -15,10 +15,10 @@
   },
   "resultados": [
     {
-      "version_generador": "2.2.1-proto",
-      "version_extractor": "2.2.1-proto",
-      "version_motor": "2.2.1-proto",
-      "catalogo_seguridad": "2026-11-26.c",
+      "version_generador": "2.2.2-proto",
+      "version_extractor": "2.2.2-proto",
+      "version_motor": "2.2.2-proto",
+      "catalogo_seguridad": "2026-11-26.d",
       "episodio": "OCT-06",
       "fecha_corte": "2026-11-26",
       "episodio_analisis": {
@@ -48,14 +48,21 @@
         "valoracion_inicial_presente": false,
         "evolucion_actual_presente": false
       },
-      "diagnostico_funcional": {
-        "texto": "Disfunción de lumbar derecho en contexto de radiculopatía L5 derecha con denervación activa documentada por ENMG por insidioso, sin trauma. Cursa con dolor EVA 7/10, con déficit neurológico OBJETIVADO. A la exploración: movilidad \"limitado por dolor\" (cualitativa, sin goniometría); fuerza 4/5 dorsiflexores (escala /5 documentada; no se convierte a 0–10); pruebas especiales: SLR positivo a 40°. Exploración objetiva por completar (ROM goniométrico): diagnóstico PROVISIONAL.",
-        "estado": "provisional",
+      "diagnostico_medico_referido": {
+        "texto": "radiculopatía L5 derecha con denervación activa documentada por ENMG",
+        "estado": "referido",
+        "nota": "Diagnóstico MÉDICO referido (no es el diagnóstico fisioterapéutico); a confirmar con exploración/imagen pertinente.",
         "evidencias": [
           {
             "campo": "motivo.dxMedico",
             "fragmento": "radiculopatía L5 derecha con denervación activa documentada por ENMG"
-          },
+          }
+        ]
+      },
+      "diagnostico_funcional": {
+        "texto": "Paciente de 48 años con disfunción de lumbar derecho. Cuadro: dolor EVA 7/10; déficit neurológico OBJETIVADO. A la exploración: movilidad limitado por dolor (cualitativa); fuerza 4/5 dorsiflexores (escala /5 legada; se conserva, no se convierte); pruebas especiales (SLR positivo a 40°). Mecanismo: insidioso, sin trauma. Exploración por completar (ROM goniométrico): diagnóstico PROVISIONAL.",
+        "estado": "provisional",
+        "evidencias": [
           {
             "campo": "motivo.mecanismo",
             "fragmento": "insidioso, sin trauma"
@@ -220,17 +227,17 @@
         "autor": null,
         "fecha": null,
         "fuentes": [
-          "2.2.1-proto",
-          "2.2.1-proto"
+          "2.2.2-proto",
+          "2.2.2-proto"
         ],
         "cambios": []
       }
     },
     {
-      "version_generador": "2.2.1-proto",
-      "version_extractor": "2.2.1-proto",
-      "version_motor": "2.2.1-proto",
-      "catalogo_seguridad": "2026-11-26.c",
+      "version_generador": "2.2.2-proto",
+      "version_extractor": "2.2.2-proto",
+      "version_motor": "2.2.2-proto",
+      "catalogo_seguridad": "2026-11-26.d",
       "episodio": "OCT-11",
       "fecha_corte": "2026-11-26",
       "episodio_analisis": {
@@ -260,8 +267,14 @@
         "valoracion_inicial_presente": false,
         "evolucion_actual_presente": false
       },
+      "diagnostico_medico_referido": {
+        "texto": null,
+        "estado": "ausente",
+        "nota": "Sin diagnóstico médico referido en el expediente.",
+        "evidencias": []
+      },
       "diagnostico_funcional": {
-        "texto": "Disfunción de cervical por postural. Cursa con dolor EVA 5/10, con síntomas neurales referidos (sensitivos, sin déficit objetivado). A la exploración: movilidad \"rotación limitada\" (cualitativa, sin goniometría); fuerza \"conservada\" (cualitativa, sin escala 0–10); pruebas especiales: Spurling dudoso. Exploración objetiva por completar (ROM goniométrico, fuerza en escala 0–10): diagnóstico PROVISIONAL.",
+        "texto": "Paciente de 52 años con disfunción de cervical. Cuadro: dolor EVA 5/10; síntomas neurales referidos (sensitivos, sin déficit objetivado). A la exploración: movilidad rotación limitada (cualitativa); fuerza conservada (cualitativa, sin escala 0–10); pruebas especiales (Spurling dudoso). Mecanismo: postural. Exploración por completar (ROM goniométrico, fuerza en escala 0–10): diagnóstico PROVISIONAL.",
         "estado": "provisional",
         "evidencias": [
           {
@@ -314,7 +327,7 @@
       "discrepancias": [],
       "valoracion_pendiente": [
         "Medir ROM goniométrico (grados) — hoy solo hay descripción cualitativa",
-        "Medir fuerza con escala (dinamómetro/Daniels) — hoy solo hay descripción cualitativa",
+        "Medir fuerza en la escala 0–10 de Sinergia (lado sano/referencia = 10) — hoy solo hay descripción cualitativa",
         "Documentar cribado de banderas rojas (no se infiere de pruebas especiales)."
       ],
       "objetivos": [
@@ -326,6 +339,8 @@
           "linea_base": {
             "valor": 5,
             "unidad": "/10",
+            "reposo": null,
+            "movimiento": null,
             "fuente": "valoracion.eva",
             "tipo": "medido"
           },
@@ -333,10 +348,10 @@
             "valor": "≤ 3/10",
             "tipo": "propuesta_editable"
           },
-          "justificacion_meta": "Propuesta a partir de la EVA inicial 5/10 (descenso clínicamente relevante escalonado por irritabilidad). Editable por el fisioterapeuta.",
-          "meta_nota": "Meta editable; no es una reducción fija obligatoria ni \"dolor cero\". Reevaluar por irritabilidad y objetivo del paciente.",
+          "justificacion_meta": "Propuesta a partir de la EVA 5/10: descenso clínicamente relevante, escalonado por irritabilidad. Editable; no impone dolor cero.",
+          "meta_nota": "Meta editable; no es una reducción fija ni \"dolor cero\". Reevaluar por irritabilidad y objetivo del paciente.",
           "unidad": "/10",
-          "metodo": "EVA contextualizada",
+          "metodo": "EVA contextualizada (reposo/movimiento)",
           "reevaluacion": "1–2 semanas",
           "criterio_cumplimiento": "EVA en la meta acordada, sostenida",
           "evidencias": [
@@ -348,21 +363,22 @@
         },
         {
           "fase": "mediano",
-          "alteracion": "movilidad (descrita en texto, sin goniometría)",
-          "actividad": "medir ROM (grados) y luego recuperarlo",
+          "alteracion": "déficit de movilidad",
+          "actividad": "optimizar y recuperar el ROM funcional de la zona",
           "indicador": "ROM (goniometría)",
           "linea_base": {
             "valor": "rotación limitada",
             "unidad": "texto",
             "fuente": "valoracion.rom",
             "tipo": "texto_cualitativo",
-            "nota": "descripción cualitativa: NO es una medición en grados; capturar goniometría para línea base"
+            "nota": "descripción cualitativa; capturar goniometría para línea base medible"
           },
           "meta_propuesta": null,
+          "meta_nota": "Definir ROM meta con el fisio según articulación, objetivo y ROM del lado sano/funcional (no se asume simetría automática).",
           "unidad": "grados",
           "metodo": "goniometría",
-          "reevaluacion": "tras medir",
-          "criterio_cumplimiento": null,
+          "reevaluacion": "3–6 semanas",
+          "criterio_cumplimiento": "ROM en la meta acordada sin dolor",
           "evidencias": [
             {
               "campo": "valoracion.rom",
@@ -371,33 +387,9 @@
           ]
         },
         {
-          "fase": "mediano",
-          "alteracion": "fuerza (descrita en texto, sin escala)",
-          "actividad": "medir fuerza en escala 0–10 (lado sano = 10) y luego recuperarla",
-          "indicador": "fuerza — escala comparativa 0–10 de Sinergia",
-          "linea_base": {
-            "valor": "conservada",
-            "unidad": "texto",
-            "fuente": "valoracion.fuerza",
-            "tipo": "texto_cualitativo",
-            "nota": "descripción cualitativa: capturar en escala 0–10 de Sinergia contra el lado sano/referencia"
-          },
-          "meta_propuesta": null,
-          "unidad": "/10",
-          "metodo": "escala comparativa 0–10 de Sinergia",
-          "reevaluacion": "tras medir",
-          "criterio_cumplimiento": null,
-          "evidencias": [
-            {
-              "campo": "valoracion.fuerza",
-              "fragmento": "conservada"
-            }
-          ]
-        },
-        {
           "fase": "largo",
-          "alteracion": "limitación funcional / retorno a actividad",
-          "actividad": "retorno a la actividad funcional prioritaria según criterios (definir la actividad con el paciente: no documentada)",
+          "alteracion": "retorno funcional",
+          "actividad": "retorno a la actividad funcional prioritaria según criterios (definir la actividad con el paciente)",
           "indicador": "NDI (Neck Disability Index) + prueba funcional pertinente",
           "linea_base": {
             "valor": null,
@@ -518,17 +510,17 @@
         "autor": null,
         "fecha": null,
         "fuentes": [
-          "2.2.1-proto",
-          "2.2.1-proto"
+          "2.2.2-proto",
+          "2.2.2-proto"
         ],
         "cambios": []
       }
     },
     {
-      "version_generador": "2.2.1-proto",
-      "version_extractor": "2.2.1-proto",
-      "version_motor": "2.2.1-proto",
-      "catalogo_seguridad": "2026-11-26.c",
+      "version_generador": "2.2.2-proto",
+      "version_extractor": "2.2.2-proto",
+      "version_motor": "2.2.2-proto",
+      "catalogo_seguridad": "2026-11-26.d",
       "episodio": "OCT-19",
       "fecha_corte": "2026-11-26",
       "episodio_analisis": {
@@ -558,8 +550,14 @@
         "valoracion_inicial_presente": false,
         "evolucion_actual_presente": false
       },
+      "diagnostico_medico_referido": {
+        "texto": null,
+        "estado": "ausente",
+        "nota": "Sin diagnóstico médico referido en el expediente.",
+        "evidencias": []
+      },
       "diagnostico_funcional": {
-        "texto": "Disfunción de cervical por insidioso. Cursa con dolor EVA 6/10, con déficit neurológico OBJETIVADO. A la exploración: movilidad \"limitado\" (cualitativa, sin goniometría); fuerza 3/5 intrínsecos de mano (escala /5 documentada; no se convierte a 0–10). Exploración objetiva por completar (ROM goniométrico, pruebas especiales): diagnóstico PROVISIONAL.",
+        "texto": "Paciente de 60 años con disfunción de cervical. Cuadro: dolor EVA 6/10; déficit neurológico OBJETIVADO. A la exploración: movilidad limitado (cualitativa); fuerza 3/5 intrínsecos de mano (escala /5 legada; se conserva, no se convierte). Mecanismo: insidioso. Exploración por completar (ROM goniométrico, pruebas especiales): diagnóstico PROVISIONAL.",
         "estado": "provisional",
         "evidencias": [
           {
@@ -718,17 +716,17 @@
         "autor": null,
         "fecha": null,
         "fuentes": [
-          "2.2.1-proto",
-          "2.2.1-proto"
+          "2.2.2-proto",
+          "2.2.2-proto"
         ],
         "cambios": []
       }
     },
     {
-      "version_generador": "2.2.1-proto",
-      "version_extractor": "2.2.1-proto",
-      "version_motor": "2.2.1-proto",
-      "catalogo_seguridad": "2026-11-26.c",
+      "version_generador": "2.2.2-proto",
+      "version_extractor": "2.2.2-proto",
+      "version_motor": "2.2.2-proto",
+      "catalogo_seguridad": "2026-11-26.d",
       "episodio": "OCT-22",
       "fecha_corte": "2026-11-26",
       "episodio_analisis": {
@@ -758,8 +756,14 @@
         "valoracion_inicial_presente": false,
         "evolucion_actual_presente": false
       },
+      "diagnostico_medico_referido": {
+        "texto": null,
+        "estado": "ausente",
+        "nota": "Sin diagnóstico médico referido en el expediente.",
+        "evidencias": []
+      },
       "diagnostico_funcional": {
-        "texto": "Disfunción de rodilla derecho por post-operatorio con inmovilización y reposo prolongado. Cursa con dolor EVA 6/10, con inflamación. Sin hallazgos objetivos documentados. Antecedentes a considerar: material de osteosíntesis/prótesis. Exploración objetiva por completar (ROM goniométrico, fuerza en escala 0–10, pruebas especiales): diagnóstico PROVISIONAL. Datos clínicos insuficientes: no se afirma seguridad por ausencia de hallazgos.",
+        "texto": "Paciente de 67 años con disfunción de rodilla derecho. Cuadro: dolor EVA 6/10. A la exploración: inflamación. Mecanismo: post-operatorio con inmovilización y reposo prolongado. Antecedentes a considerar: material de osteosíntesis/prótesis. Exploración por completar (ROM goniométrico, fuerza en escala 0–10, pruebas especiales): diagnóstico PROVISIONAL. Datos clínicos insuficientes: no se afirma seguridad por ausencia de hallazgos.",
         "estado": "provisional",
         "evidencias": [
           {
@@ -825,7 +829,7 @@
         "Resolver seguridad: D3 · Descartar TVP antes de tratar (Wells/dímero-D/eco-doppler). NO masaje, NO compresión/termoterapia, NO ejercicio vigoroso del miembro hasta descartar. Derivación médica.",
         "DATOS INSUFICIENTES: completar exploración y cribado antes de afirmar seguridad o fijar metas (ausencia de dato ≠ ausencia de riesgo).",
         "Medir ROM goniométrico (grados)",
-        "Medir fuerza con escala (dinamómetro/Daniels)",
+        "Medir fuerza en la escala 0–10 de Sinergia (lado sano/referencia = 10)",
         "Realizar pruebas especiales pertinentes",
         "Documentar cribado de banderas rojas (no se infiere de pruebas especiales)."
       ],
@@ -915,17 +919,17 @@
         "autor": null,
         "fecha": null,
         "fuentes": [
-          "2.2.1-proto",
-          "2.2.1-proto"
+          "2.2.2-proto",
+          "2.2.2-proto"
         ],
         "cambios": []
       }
     },
     {
-      "version_generador": "2.2.1-proto",
-      "version_extractor": "2.2.1-proto",
-      "version_motor": "2.2.1-proto",
-      "catalogo_seguridad": "2026-11-26.c",
+      "version_generador": "2.2.2-proto",
+      "version_extractor": "2.2.2-proto",
+      "version_motor": "2.2.2-proto",
+      "catalogo_seguridad": "2026-11-26.d",
       "episodio": "OCT-72",
       "fecha_corte": "2026-11-26",
       "episodio_analisis": {
@@ -955,14 +959,21 @@
         "valoracion_inicial_presente": false,
         "evolucion_actual_presente": false
       },
-      "diagnostico_funcional": {
-        "texto": "Disfunción de rodilla izquierdo en contexto de condromalacia rotuliana, operado por [médico] en 2024 por sobreuso por aumento de volumen de carrera. Cursa con dolor EVA 5/10. A la exploración: ROM flexión 130°; fuerza 4/5 cuádriceps (escala /5 documentada; no se convierte a 0–10). Exploración objetiva por completar (pruebas especiales): diagnóstico PROVISIONAL.",
-        "estado": "provisional",
+      "diagnostico_medico_referido": {
+        "texto": "condromalacia rotuliana, operado por [médico] en 2024",
+        "estado": "referido",
+        "nota": "Diagnóstico MÉDICO referido (no es el diagnóstico fisioterapéutico); a confirmar con exploración/imagen pertinente.",
         "evidencias": [
           {
             "campo": "motivo.dxMedico",
             "fragmento": "condromalacia rotuliana, operado por [médico] en 2024"
-          },
+          }
+        ]
+      },
+      "diagnostico_funcional": {
+        "texto": "Paciente de 30 años con disfunción de rodilla izquierdo. Cuadro: dolor EVA 5/10. A la exploración: ROM flexión 130°; fuerza 4/5 cuádriceps (escala /5 legada; se conserva, no se convierte). Mecanismo: sobreuso por aumento de volumen de carrera. Exploración por completar (pruebas especiales): diagnóstico PROVISIONAL.",
+        "estado": "provisional",
+        "evidencias": [
           {
             "campo": "motivo.mecanismo",
             "fragmento": "sobreuso por aumento de volumen de carrera"
@@ -1018,6 +1029,8 @@
           "linea_base": {
             "valor": 5,
             "unidad": "/10",
+            "reposo": null,
+            "movimiento": null,
             "fuente": "valoracion.eva",
             "tipo": "medido"
           },
@@ -1025,10 +1038,10 @@
             "valor": "≤ 3/10",
             "tipo": "propuesta_editable"
           },
-          "justificacion_meta": "Propuesta a partir de la EVA inicial 5/10 (descenso clínicamente relevante escalonado por irritabilidad). Editable por el fisioterapeuta.",
-          "meta_nota": "Meta editable; no es una reducción fija obligatoria ni \"dolor cero\". Reevaluar por irritabilidad y objetivo del paciente.",
+          "justificacion_meta": "Propuesta a partir de la EVA 5/10: descenso clínicamente relevante, escalonado por irritabilidad. Editable; no impone dolor cero.",
+          "meta_nota": "Meta editable; no es una reducción fija ni \"dolor cero\". Reevaluar por irritabilidad y objetivo del paciente.",
           "unidad": "/10",
-          "metodo": "EVA contextualizada",
+          "metodo": "EVA contextualizada (reposo/movimiento)",
           "reevaluacion": "1–2 semanas",
           "criterio_cumplimiento": "EVA en la meta acordada, sostenida",
           "evidencias": [
@@ -1041,7 +1054,7 @@
         {
           "fase": "mediano",
           "alteracion": "déficit de movilidad",
-          "actividad": "recuperar ROM funcional de la zona",
+          "actividad": "optimizar y recuperar el ROM funcional de la zona",
           "indicador": "ROM (goniometría)",
           "linea_base": {
             "valor": "flexión 130°",
@@ -1050,7 +1063,7 @@
             "tipo": "medido"
           },
           "meta_propuesta": null,
-          "meta_nota": "Definir ROM meta con el fisio según articulación, objetivo y ROM del lado sano/funcional (no se asume simetría automática; proponer meta al documentar la referencia).",
+          "meta_nota": "Definir ROM meta con el fisio según articulación, objetivo y ROM del lado sano/funcional (no se asume simetría automática).",
           "unidad": "grados",
           "metodo": "goniometría",
           "reevaluacion": "3–6 semanas",
@@ -1065,20 +1078,20 @@
         {
           "fase": "mediano",
           "alteracion": "déficit de fuerza",
-          "actividad": "recuperar fuerza del segmento",
-          "indicador": "fuerza (escala /5 legada — documentada tal cual)",
+          "actividad": "recuperar la fuerza del segmento",
+          "indicador": "fuerza (valor /5 legado — se conserva, no se convierte)",
           "linea_base": {
             "valor": "4/5",
             "unidad": "/5",
             "escala": "daniels_0_5",
             "fuente": "valoracion.fuerza",
             "tipo": "medido",
-            "nota": "Escala /5 legada; NO se convierte a 0–10. Recapturar en escala 0–10 de Sinergia para seguimiento comparativo."
+            "nota": "Valor /5 histórico; se conserva tal cual. El seguimiento se hará con la escala 0–10 de Sinergia (lado sano = 10)."
           },
           "meta_propuesta": null,
-          "meta_nota": "No se convierte /5 a 0–10. Para seguimiento comparativo, recapturar fuerza en la escala 0–10 de Sinergia (lado sano = 10).",
+          "meta_nota": "No se convierte el valor /5. El seguimiento de aquí en adelante es con la escala 0–10 de Sinergia.",
           "unidad": "/5",
-          "metodo": "escala documentada (no convertida)",
+          "metodo": "valor documentado (histórico); seguimiento en escala 0–10 de Sinergia",
           "reevaluacion": "4–6 semanas",
           "criterio_cumplimiento": "fuerza en la meta acordada",
           "evidencias": [
@@ -1090,9 +1103,9 @@
         },
         {
           "fase": "largo",
-          "alteracion": "limitación funcional / retorno a actividad",
-          "actividad": "retorno a la actividad funcional prioritaria según criterios (definir la actividad con el paciente: no documentada)",
-          "indicador": "IKDC + dinamometría + tolerancia a sentadilla + prueba funcional pertinente",
+          "alteracion": "retorno funcional",
+          "actividad": "retorno a la actividad funcional prioritaria según criterios (definir la actividad con el paciente)",
+          "indicador": "IKDC + fuerza comparativa 0–10 + tolerancia a sentadilla + prueba funcional pertinente",
           "linea_base": {
             "valor": null,
             "tipo": "pendiente",
@@ -1211,17 +1224,17 @@
         "autor": null,
         "fecha": null,
         "fuentes": [
-          "2.2.1-proto",
-          "2.2.1-proto"
+          "2.2.2-proto",
+          "2.2.2-proto"
         ],
         "cambios": []
       }
     },
     {
-      "version_generador": "2.2.1-proto",
-      "version_extractor": "2.2.1-proto",
-      "version_motor": "2.2.1-proto",
-      "catalogo_seguridad": "2026-11-26.c",
+      "version_generador": "2.2.2-proto",
+      "version_extractor": "2.2.2-proto",
+      "version_motor": "2.2.2-proto",
+      "catalogo_seguridad": "2026-11-26.d",
       "episodio": "OCT-84",
       "fecha_corte": "2026-11-26",
       "episodio_analisis": {
@@ -1251,14 +1264,21 @@
         "valoracion_inicial_presente": false,
         "evolucion_actual_presente": false
       },
-      "diagnostico_funcional": {
-        "texto": "Disfunción de hombro derecho derecho en contexto de síndrome subacromial por sobreuso. Cursa con dolor EVA 6/10. A la exploración: ROM abducción activa 100°; fuerza 4/5 supraespinoso (escala /5 documentada; no se convierte a 0–10); pruebas especiales: Jobe positivo; Hawkins positivo. Antecedentes a considerar: antecedente oncológico (verificar estado).",
-        "estado": "provisional",
+      "diagnostico_medico_referido": {
+        "texto": "síndrome subacromial",
+        "estado": "referido",
+        "nota": "Diagnóstico MÉDICO referido (no es el diagnóstico fisioterapéutico); a confirmar con exploración/imagen pertinente.",
         "evidencias": [
           {
             "campo": "motivo.dxMedico",
             "fragmento": "síndrome subacromial"
-          },
+          }
+        ]
+      },
+      "diagnostico_funcional": {
+        "texto": "Paciente de 58 años con disfunción de hombro derecho derecho. Cuadro: dolor EVA 6/10. A la exploración: ROM abducción activa 100°; fuerza 4/5 supraespinoso (escala /5 legada; se conserva, no se convierte); pruebas especiales (Jobe positivo; Hawkins positivo). Mecanismo: sobreuso. Antecedentes a considerar: antecedente oncológico (verificar estado).",
+        "estado": "provisional",
+        "evidencias": [
           {
             "campo": "motivo.mecanismo",
             "fragmento": "sobreuso"
@@ -1340,6 +1360,8 @@
           "linea_base": {
             "valor": 6,
             "unidad": "/10",
+            "reposo": null,
+            "movimiento": null,
             "fuente": "valoracion.eva",
             "tipo": "medido"
           },
@@ -1347,10 +1369,10 @@
             "valor": "≤ 4/10",
             "tipo": "propuesta_editable"
           },
-          "justificacion_meta": "Propuesta a partir de la EVA inicial 6/10 (descenso clínicamente relevante escalonado por irritabilidad). Editable por el fisioterapeuta.",
-          "meta_nota": "Meta editable; no es una reducción fija obligatoria ni \"dolor cero\". Reevaluar por irritabilidad y objetivo del paciente.",
+          "justificacion_meta": "Propuesta a partir de la EVA 6/10: descenso clínicamente relevante, escalonado por irritabilidad. Editable; no impone dolor cero.",
+          "meta_nota": "Meta editable; no es una reducción fija ni \"dolor cero\". Reevaluar por irritabilidad y objetivo del paciente.",
           "unidad": "/10",
-          "metodo": "EVA contextualizada",
+          "metodo": "EVA contextualizada (reposo/movimiento)",
           "reevaluacion": "1–2 semanas",
           "criterio_cumplimiento": "EVA en la meta acordada, sostenida",
           "evidencias": [
@@ -1363,7 +1385,7 @@
         {
           "fase": "mediano",
           "alteracion": "déficit de movilidad",
-          "actividad": "recuperar ROM funcional de la zona",
+          "actividad": "optimizar y recuperar el ROM funcional de la zona",
           "indicador": "ROM (goniometría)",
           "linea_base": {
             "valor": "abducción activa 100°",
@@ -1372,7 +1394,7 @@
             "tipo": "medido"
           },
           "meta_propuesta": null,
-          "meta_nota": "Definir ROM meta con el fisio según articulación, objetivo y ROM del lado sano/funcional (no se asume simetría automática; proponer meta al documentar la referencia).",
+          "meta_nota": "Definir ROM meta con el fisio según articulación, objetivo y ROM del lado sano/funcional (no se asume simetría automática).",
           "unidad": "grados",
           "metodo": "goniometría",
           "reevaluacion": "3–6 semanas",
@@ -1387,20 +1409,20 @@
         {
           "fase": "mediano",
           "alteracion": "déficit de fuerza",
-          "actividad": "recuperar fuerza del segmento",
-          "indicador": "fuerza (escala /5 legada — documentada tal cual)",
+          "actividad": "recuperar la fuerza del segmento",
+          "indicador": "fuerza (valor /5 legado — se conserva, no se convierte)",
           "linea_base": {
             "valor": "4/5",
             "unidad": "/5",
             "escala": "daniels_0_5",
             "fuente": "valoracion.fuerza",
             "tipo": "medido",
-            "nota": "Escala /5 legada; NO se convierte a 0–10. Recapturar en escala 0–10 de Sinergia para seguimiento comparativo."
+            "nota": "Valor /5 histórico; se conserva tal cual. El seguimiento se hará con la escala 0–10 de Sinergia (lado sano = 10)."
           },
           "meta_propuesta": null,
-          "meta_nota": "No se convierte /5 a 0–10. Para seguimiento comparativo, recapturar fuerza en la escala 0–10 de Sinergia (lado sano = 10).",
+          "meta_nota": "No se convierte el valor /5. El seguimiento de aquí en adelante es con la escala 0–10 de Sinergia.",
           "unidad": "/5",
-          "metodo": "escala documentada (no convertida)",
+          "metodo": "valor documentado (histórico); seguimiento en escala 0–10 de Sinergia",
           "reevaluacion": "4–6 semanas",
           "criterio_cumplimiento": "fuerza en la meta acordada",
           "evidencias": [
@@ -1412,8 +1434,8 @@
         },
         {
           "fase": "largo",
-          "alteracion": "limitación funcional / retorno a actividad",
-          "actividad": "retorno a la actividad funcional prioritaria según criterios (definir la actividad con el paciente: no documentada)",
+          "alteracion": "retorno funcional",
+          "actividad": "retorno a la actividad funcional prioritaria según criterios (definir la actividad con el paciente)",
           "indicador": "SPADI o QuickDASH + prueba funcional pertinente",
           "linea_base": {
             "valor": null,
@@ -1538,17 +1560,17 @@
         "autor": null,
         "fecha": null,
         "fuentes": [
-          "2.2.1-proto",
-          "2.2.1-proto"
+          "2.2.2-proto",
+          "2.2.2-proto"
         ],
         "cambios": []
       }
     },
     {
-      "version_generador": "2.2.1-proto",
-      "version_extractor": "2.2.1-proto",
-      "version_motor": "2.2.1-proto",
-      "catalogo_seguridad": "2026-11-26.c",
+      "version_generador": "2.2.2-proto",
+      "version_extractor": "2.2.2-proto",
+      "version_motor": "2.2.2-proto",
+      "catalogo_seguridad": "2026-11-26.d",
       "episodio": "SINT-TEND",
       "fecha_corte": "2026-11-26",
       "episodio_analisis": {
@@ -1578,8 +1600,14 @@
         "valoracion_inicial_presente": false,
         "evolucion_actual_presente": false
       },
+      "diagnostico_medico_referido": {
+        "texto": null,
+        "estado": "ausente",
+        "nota": "Sin diagnóstico médico referido en el expediente.",
+        "evidencias": []
+      },
       "diagnostico_funcional": {
-        "texto": "Disfunción de rodilla derecho por sobreuso deportivo (voleibol). Cursa con dolor EVA 4/10. A la exploración: ROM flexión 140°; fuerza 4/5 cuádriceps (escala /5 documentada; no se convierte a 0–10). Limita: no puede saltar ni entrenar. Exploración objetiva por completar (pruebas especiales): diagnóstico PROVISIONAL.",
+        "texto": "Paciente de 35 años con disfunción de rodilla derecho. Cuadro: dolor EVA 4/10. Limitación funcional: no puede saltar ni entrenar. A la exploración: ROM flexión 140°; fuerza 4/5 cuádriceps (escala /5 legada; se conserva, no se convierte). Mecanismo: sobreuso deportivo (voleibol). Exploración por completar (pruebas especiales): diagnóstico PROVISIONAL.",
         "estado": "provisional",
         "evidencias": [
           {
@@ -1628,6 +1656,8 @@
           "linea_base": {
             "valor": 4,
             "unidad": "/10",
+            "reposo": null,
+            "movimiento": null,
             "fuente": "valoracion.eva",
             "tipo": "medido"
           },
@@ -1635,10 +1665,10 @@
             "valor": "≤ 2/10",
             "tipo": "propuesta_editable"
           },
-          "justificacion_meta": "Propuesta a partir de la EVA inicial 4/10 (descenso clínicamente relevante escalonado por irritabilidad). Editable por el fisioterapeuta.",
-          "meta_nota": "Meta editable; no es una reducción fija obligatoria ni \"dolor cero\". Reevaluar por irritabilidad y objetivo del paciente.",
+          "justificacion_meta": "Propuesta a partir de la EVA 4/10: descenso clínicamente relevante, escalonado por irritabilidad. Editable; no impone dolor cero.",
+          "meta_nota": "Meta editable; no es una reducción fija ni \"dolor cero\". Reevaluar por irritabilidad y objetivo del paciente.",
           "unidad": "/10",
-          "metodo": "EVA contextualizada",
+          "metodo": "EVA contextualizada (reposo/movimiento)",
           "reevaluacion": "1–2 semanas",
           "criterio_cumplimiento": "EVA en la meta acordada, sostenida",
           "evidencias": [
@@ -1651,7 +1681,7 @@
         {
           "fase": "mediano",
           "alteracion": "déficit de movilidad",
-          "actividad": "recuperar ROM funcional de la zona",
+          "actividad": "optimizar y recuperar el ROM funcional de la zona",
           "indicador": "ROM (goniometría)",
           "linea_base": {
             "valor": "flexión 140°",
@@ -1660,7 +1690,7 @@
             "tipo": "medido"
           },
           "meta_propuesta": null,
-          "meta_nota": "Definir ROM meta con el fisio según articulación, objetivo y ROM del lado sano/funcional (no se asume simetría automática; proponer meta al documentar la referencia).",
+          "meta_nota": "Definir ROM meta con el fisio según articulación, objetivo y ROM del lado sano/funcional (no se asume simetría automática).",
           "unidad": "grados",
           "metodo": "goniometría",
           "reevaluacion": "3–6 semanas",
@@ -1675,20 +1705,20 @@
         {
           "fase": "mediano",
           "alteracion": "déficit de fuerza",
-          "actividad": "recuperar fuerza del segmento",
-          "indicador": "fuerza (escala /5 legada — documentada tal cual)",
+          "actividad": "recuperar la fuerza del segmento",
+          "indicador": "fuerza (valor /5 legado — se conserva, no se convierte)",
           "linea_base": {
             "valor": "4/5",
             "unidad": "/5",
             "escala": "daniels_0_5",
             "fuente": "valoracion.fuerza",
             "tipo": "medido",
-            "nota": "Escala /5 legada; NO se convierte a 0–10. Recapturar en escala 0–10 de Sinergia para seguimiento comparativo."
+            "nota": "Valor /5 histórico; se conserva tal cual. El seguimiento se hará con la escala 0–10 de Sinergia (lado sano = 10)."
           },
           "meta_propuesta": null,
-          "meta_nota": "No se convierte /5 a 0–10. Para seguimiento comparativo, recapturar fuerza en la escala 0–10 de Sinergia (lado sano = 10).",
+          "meta_nota": "No se convierte el valor /5. El seguimiento de aquí en adelante es con la escala 0–10 de Sinergia.",
           "unidad": "/5",
-          "metodo": "escala documentada (no convertida)",
+          "metodo": "valor documentado (histórico); seguimiento en escala 0–10 de Sinergia",
           "reevaluacion": "4–6 semanas",
           "criterio_cumplimiento": "fuerza en la meta acordada",
           "evidencias": [
@@ -1700,7 +1730,7 @@
         },
         {
           "fase": "largo",
-          "alteracion": "limitación funcional / retorno a actividad",
+          "alteracion": "retorno funcional",
           "actividad": "retorno a voleibol recreativo según criterios",
           "indicador": "VISA (según región) + prueba funcional pertinente",
           "linea_base": {
@@ -1823,17 +1853,17 @@
         "autor": null,
         "fecha": null,
         "fuentes": [
-          "2.2.1-proto",
-          "2.2.1-proto"
+          "2.2.2-proto",
+          "2.2.2-proto"
         ],
         "cambios": []
       }
     },
     {
-      "version_generador": "2.2.1-proto",
-      "version_extractor": "2.2.1-proto",
-      "version_motor": "2.2.1-proto",
-      "catalogo_seguridad": "2026-11-26.c",
+      "version_generador": "2.2.2-proto",
+      "version_extractor": "2.2.2-proto",
+      "version_motor": "2.2.2-proto",
+      "catalogo_seguridad": "2026-11-26.d",
       "episodio": "SINT-LCA",
       "fecha_corte": "2026-11-26",
       "episodio_analisis": {
@@ -1863,8 +1893,14 @@
         "valoracion_inicial_presente": false,
         "evolucion_actual_presente": false
       },
+      "diagnostico_medico_referido": {
+        "texto": null,
+        "estado": "ausente",
+        "nota": "Sin diagnóstico médico referido en el expediente.",
+        "evidencias": []
+      },
       "diagnostico_funcional": {
-        "texto": "Disfunción de rodilla izquierdo por post-reconstrucción de LCA (injerto HTG). Cursa con dolor EVA 2/10. A la exploración: ROM extensión 0°, flexión 135°; fuerza \"disminuida en cuádriceps\" (cualitativa, sin escala 0–10); pruebas especiales: Lachman firme; cribado de banderas rojas negativo. Limita: no puede correr ni pivotar. Exploración objetiva por completar (fuerza en escala 0–10): diagnóstico PROVISIONAL.",
+        "texto": "Paciente de 24 años con disfunción de rodilla izquierdo. Cuadro: dolor EVA 2/10. Limitación funcional: no puede correr ni pivotar. A la exploración: ROM extensión 0°, flexión 135°; fuerza disminuida en cuádriceps (cualitativa, sin escala 0–10); pruebas especiales (Lachman firme; cribado de banderas rojas negativo). Mecanismo: post-reconstrucción de LCA (injerto HTG). Exploración por completar (fuerza en escala 0–10): diagnóstico PROVISIONAL.",
         "estado": "provisional",
         "evidencias": [
           {
@@ -1920,7 +1956,7 @@
       },
       "discrepancias": [],
       "valoracion_pendiente": [
-        "Medir fuerza con escala (dinamómetro/Daniels) — hoy solo hay descripción cualitativa",
+        "Medir fuerza en la escala 0–10 de Sinergia (lado sano/referencia = 10) — hoy solo hay descripción cualitativa",
         "Documentar cribado de banderas rojas (no se infiere de pruebas especiales)."
       ],
       "objetivos": [
@@ -1932,6 +1968,8 @@
           "linea_base": {
             "valor": 2,
             "unidad": "/10",
+            "reposo": null,
+            "movimiento": null,
             "fuente": "valoracion.eva",
             "tipo": "medido"
           },
@@ -1939,10 +1977,10 @@
             "valor": "≤ 1/10",
             "tipo": "propuesta_editable"
           },
-          "justificacion_meta": "Propuesta a partir de la EVA inicial 2/10 (descenso clínicamente relevante escalonado por irritabilidad). Editable por el fisioterapeuta.",
-          "meta_nota": "Meta editable; no es una reducción fija obligatoria ni \"dolor cero\". Reevaluar por irritabilidad y objetivo del paciente.",
+          "justificacion_meta": "Propuesta a partir de la EVA 2/10: descenso clínicamente relevante, escalonado por irritabilidad. Editable; no impone dolor cero.",
+          "meta_nota": "Meta editable; no es una reducción fija ni \"dolor cero\". Reevaluar por irritabilidad y objetivo del paciente.",
           "unidad": "/10",
-          "metodo": "EVA contextualizada",
+          "metodo": "EVA contextualizada (reposo/movimiento)",
           "reevaluacion": "1–2 semanas",
           "criterio_cumplimiento": "EVA en la meta acordada, sostenida",
           "evidencias": [
@@ -1955,7 +1993,7 @@
         {
           "fase": "mediano",
           "alteracion": "déficit de movilidad",
-          "actividad": "recuperar ROM funcional de la zona",
+          "actividad": "optimizar y recuperar el ROM funcional de la zona",
           "indicador": "ROM (goniometría)",
           "linea_base": {
             "valor": "extensión 0°, flexión 135°",
@@ -1964,7 +2002,7 @@
             "tipo": "medido"
           },
           "meta_propuesta": null,
-          "meta_nota": "Definir ROM meta con el fisio según articulación, objetivo y ROM del lado sano/funcional (no se asume simetría automática; proponer meta al documentar la referencia).",
+          "meta_nota": "Definir ROM meta con el fisio según articulación, objetivo y ROM del lado sano/funcional (no se asume simetría automática).",
           "unidad": "grados",
           "metodo": "goniometría",
           "reevaluacion": "3–6 semanas",
@@ -1978,20 +2016,21 @@
         },
         {
           "fase": "mediano",
-          "alteracion": "fuerza (descrita en texto, sin escala)",
-          "actividad": "medir fuerza en escala 0–10 (lado sano = 10) y luego recuperarla",
+          "alteracion": "déficit de fuerza (descrito en texto)",
+          "actividad": "recuperar la fuerza del segmento",
           "indicador": "fuerza — escala comparativa 0–10 de Sinergia",
           "linea_base": {
             "valor": "disminuida en cuádriceps",
             "unidad": "texto",
             "fuente": "valoracion.fuerza",
             "tipo": "texto_cualitativo",
-            "nota": "descripción cualitativa: capturar en escala 0–10 de Sinergia contra el lado sano/referencia"
+            "nota": "descripción cualitativa; para seguimiento, registrar en escala 0–10 de Sinergia contra la referencia"
           },
           "meta_propuesta": null,
+          "meta_nota": "Sin tiempos rígidos. El seguimiento de fuerza es con la escala 0–10 de Sinergia (lado sano = 10).",
           "unidad": "/10",
           "metodo": "escala comparativa 0–10 de Sinergia",
-          "reevaluacion": "tras medir",
+          "reevaluacion": "4–6 semanas",
           "criterio_cumplimiento": null,
           "evidencias": [
             {
@@ -2002,7 +2041,7 @@
         },
         {
           "fase": "largo",
-          "alteracion": "limitación funcional / retorno a actividad",
+          "alteracion": "retorno funcional",
           "actividad": "retorno a fútbol según criterios",
           "indicador": "IKDC + hop tests (según fase) + prueba funcional pertinente",
           "linea_base": {
@@ -2130,17 +2169,17 @@
         "autor": null,
         "fecha": null,
         "fuentes": [
-          "2.2.1-proto",
-          "2.2.1-proto"
+          "2.2.2-proto",
+          "2.2.2-proto"
         ],
         "cambios": []
       }
     },
     {
-      "version_generador": "2.2.1-proto",
-      "version_extractor": "2.2.1-proto",
-      "version_motor": "2.2.1-proto",
-      "catalogo_seguridad": "2026-11-26.c",
+      "version_generador": "2.2.2-proto",
+      "version_extractor": "2.2.2-proto",
+      "version_motor": "2.2.2-proto",
+      "catalogo_seguridad": "2026-11-26.d",
       "episodio": "SINT-MEN",
       "fecha_corte": "2026-11-26",
       "episodio_analisis": {
@@ -2170,8 +2209,14 @@
         "valoracion_inicial_presente": false,
         "evolucion_actual_presente": false
       },
+      "diagnostico_medico_referido": {
+        "texto": null,
+        "estado": "ausente",
+        "nota": "Sin diagnóstico médico referido en el expediente.",
+        "evidencias": []
+      },
       "diagnostico_funcional": {
-        "texto": "Disfunción de rodilla derecho por post-reparación meniscal. Cursa con dolor EVA 3/10. A la exploración: ROM flexión limitada a 90° por indicación; fuerza 4/5 (escala /5 documentada; no se convierte a 0–10); pruebas especiales: McMurray no realizado por fase; cribado de banderas rojas negativo. Limita: no puede flexionar más de 90° ni cargar completo.",
+        "texto": "Paciente de 41 años con disfunción de rodilla derecho. Cuadro: dolor EVA 3/10. Limitación funcional: no puede flexionar más de 90° ni cargar completo. A la exploración: ROM flexión limitada a 90° por indicación; fuerza 4/5 (escala /5 legada; se conserva, no se convierte); pruebas especiales (McMurray no realizado por fase; cribado de banderas rojas negativo). Mecanismo: post-reparación meniscal.",
         "estado": "provisional",
         "evidencias": [
           {
@@ -2238,6 +2283,8 @@
           "linea_base": {
             "valor": 3,
             "unidad": "/10",
+            "reposo": null,
+            "movimiento": null,
             "fuente": "valoracion.eva",
             "tipo": "medido"
           },
@@ -2245,10 +2292,10 @@
             "valor": "≤ 2/10",
             "tipo": "propuesta_editable"
           },
-          "justificacion_meta": "Propuesta a partir de la EVA inicial 3/10 (descenso clínicamente relevante escalonado por irritabilidad). Editable por el fisioterapeuta.",
-          "meta_nota": "Meta editable; no es una reducción fija obligatoria ni \"dolor cero\". Reevaluar por irritabilidad y objetivo del paciente.",
+          "justificacion_meta": "Propuesta a partir de la EVA 3/10: descenso clínicamente relevante, escalonado por irritabilidad. Editable; no impone dolor cero.",
+          "meta_nota": "Meta editable; no es una reducción fija ni \"dolor cero\". Reevaluar por irritabilidad y objetivo del paciente.",
           "unidad": "/10",
-          "metodo": "EVA contextualizada",
+          "metodo": "EVA contextualizada (reposo/movimiento)",
           "reevaluacion": "1–2 semanas",
           "criterio_cumplimiento": "EVA en la meta acordada, sostenida",
           "evidencias": [
@@ -2261,7 +2308,7 @@
         {
           "fase": "mediano",
           "alteracion": "déficit de movilidad",
-          "actividad": "recuperar ROM funcional de la zona",
+          "actividad": "optimizar y recuperar el ROM funcional de la zona",
           "indicador": "ROM (goniometría)",
           "linea_base": {
             "valor": "flexión limitada a 90° por indicación",
@@ -2270,7 +2317,7 @@
             "tipo": "medido"
           },
           "meta_propuesta": null,
-          "meta_nota": "Definir ROM meta con el fisio según articulación, objetivo y ROM del lado sano/funcional (no se asume simetría automática; proponer meta al documentar la referencia).",
+          "meta_nota": "Definir ROM meta con el fisio según articulación, objetivo y ROM del lado sano/funcional (no se asume simetría automática).",
           "unidad": "grados",
           "metodo": "goniometría",
           "reevaluacion": "3–6 semanas",
@@ -2285,20 +2332,20 @@
         {
           "fase": "mediano",
           "alteracion": "déficit de fuerza",
-          "actividad": "recuperar fuerza del segmento",
-          "indicador": "fuerza (escala /5 legada — documentada tal cual)",
+          "actividad": "recuperar la fuerza del segmento",
+          "indicador": "fuerza (valor /5 legado — se conserva, no se convierte)",
           "linea_base": {
             "valor": "4/5",
             "unidad": "/5",
             "escala": "daniels_0_5",
             "fuente": "valoracion.fuerza",
             "tipo": "medido",
-            "nota": "Escala /5 legada; NO se convierte a 0–10. Recapturar en escala 0–10 de Sinergia para seguimiento comparativo."
+            "nota": "Valor /5 histórico; se conserva tal cual. El seguimiento se hará con la escala 0–10 de Sinergia (lado sano = 10)."
           },
           "meta_propuesta": null,
-          "meta_nota": "No se convierte /5 a 0–10. Para seguimiento comparativo, recapturar fuerza en la escala 0–10 de Sinergia (lado sano = 10).",
+          "meta_nota": "No se convierte el valor /5. El seguimiento de aquí en adelante es con la escala 0–10 de Sinergia.",
           "unidad": "/5",
-          "metodo": "escala documentada (no convertida)",
+          "metodo": "valor documentado (histórico); seguimiento en escala 0–10 de Sinergia",
           "reevaluacion": "4–6 semanas",
           "criterio_cumplimiento": "fuerza en la meta acordada",
           "evidencias": [
@@ -2310,8 +2357,8 @@
         },
         {
           "fase": "largo",
-          "alteracion": "limitación funcional / retorno a actividad",
-          "actividad": "retorno a la actividad funcional prioritaria según criterios (definir la actividad con el paciente: no documentada)",
+          "alteracion": "retorno funcional",
+          "actividad": "retorno a la actividad funcional prioritaria según criterios (definir la actividad con el paciente)",
           "indicador": "IKDC / KOOS + prueba funcional pertinente",
           "linea_base": {
             "valor": "no puede flexionar más de 90° ni cargar completo",
@@ -2434,17 +2481,17 @@
         "autor": null,
         "fecha": null,
         "fuentes": [
-          "2.2.1-proto",
-          "2.2.1-proto"
+          "2.2.2-proto",
+          "2.2.2-proto"
         ],
         "cambios": []
       }
     },
     {
-      "version_generador": "2.2.1-proto",
-      "version_extractor": "2.2.1-proto",
-      "version_motor": "2.2.1-proto",
-      "catalogo_seguridad": "2026-11-26.c",
+      "version_generador": "2.2.2-proto",
+      "version_extractor": "2.2.2-proto",
+      "version_motor": "2.2.2-proto",
+      "catalogo_seguridad": "2026-11-26.d",
       "episodio": "SINT-LUMB",
       "fecha_corte": "2026-11-26",
       "episodio_analisis": {
@@ -2474,8 +2521,14 @@
         "valoracion_inicial_presente": false,
         "evolucion_actual_presente": false
       },
+      "diagnostico_medico_referido": {
+        "texto": null,
+        "estado": "ausente",
+        "nota": "Sin diagnóstico médico referido en el expediente.",
+        "evidencias": []
+      },
       "diagnostico_funcional": {
-        "texto": "Disfunción de lumbar por esfuerzo al levantar carga. Cursa con dolor EVA 4/10. A la exploración: movilidad \"flexión lumbar moderadamente limitada\" (cualitativa, sin goniometría); fuerza \"conservada\" (cualitativa, sin escala 0–10); pruebas especiales: SLR negativo; cribado de banderas rojas negativo. Limita: molestia al estar sentado mucho tiempo. Exploración objetiva por completar (ROM goniométrico, fuerza en escala 0–10): diagnóstico PROVISIONAL.",
+        "texto": "Paciente de 44 años con disfunción de lumbar. Cuadro: dolor EVA 4/10. Limitación funcional: molestia al estar sentado mucho tiempo. A la exploración: movilidad flexión lumbar moderadamente limitada (cualitativa); fuerza conservada (cualitativa, sin escala 0–10); pruebas especiales (SLR negativo; cribado de banderas rojas negativo). Mecanismo: esfuerzo al levantar carga. Exploración por completar (ROM goniométrico, fuerza en escala 0–10): diagnóstico PROVISIONAL.",
         "estado": "provisional",
         "evidencias": [
           {
@@ -2517,7 +2570,7 @@
       "discrepancias": [],
       "valoracion_pendiente": [
         "Medir ROM goniométrico (grados) — hoy solo hay descripción cualitativa",
-        "Medir fuerza con escala (dinamómetro/Daniels) — hoy solo hay descripción cualitativa",
+        "Medir fuerza en la escala 0–10 de Sinergia (lado sano/referencia = 10) — hoy solo hay descripción cualitativa",
         "Documentar cribado de banderas rojas (no se infiere de pruebas especiales)."
       ],
       "objetivos": [
@@ -2529,6 +2582,8 @@
           "linea_base": {
             "valor": 4,
             "unidad": "/10",
+            "reposo": null,
+            "movimiento": null,
             "fuente": "valoracion.eva",
             "tipo": "medido"
           },
@@ -2536,10 +2591,10 @@
             "valor": "≤ 2/10",
             "tipo": "propuesta_editable"
           },
-          "justificacion_meta": "Propuesta a partir de la EVA inicial 4/10 (descenso clínicamente relevante escalonado por irritabilidad). Editable por el fisioterapeuta.",
-          "meta_nota": "Meta editable; no es una reducción fija obligatoria ni \"dolor cero\". Reevaluar por irritabilidad y objetivo del paciente.",
+          "justificacion_meta": "Propuesta a partir de la EVA 4/10: descenso clínicamente relevante, escalonado por irritabilidad. Editable; no impone dolor cero.",
+          "meta_nota": "Meta editable; no es una reducción fija ni \"dolor cero\". Reevaluar por irritabilidad y objetivo del paciente.",
           "unidad": "/10",
-          "metodo": "EVA contextualizada",
+          "metodo": "EVA contextualizada (reposo/movimiento)",
           "reevaluacion": "1–2 semanas",
           "criterio_cumplimiento": "EVA en la meta acordada, sostenida",
           "evidencias": [
@@ -2551,21 +2606,22 @@
         },
         {
           "fase": "mediano",
-          "alteracion": "movilidad (descrita en texto, sin goniometría)",
-          "actividad": "medir ROM (grados) y luego recuperarlo",
+          "alteracion": "déficit de movilidad",
+          "actividad": "optimizar y recuperar el ROM funcional de la zona",
           "indicador": "ROM (goniometría)",
           "linea_base": {
             "valor": "flexión lumbar moderadamente limitada",
             "unidad": "texto",
             "fuente": "valoracion.rom",
             "tipo": "texto_cualitativo",
-            "nota": "descripción cualitativa: NO es una medición en grados; capturar goniometría para línea base"
+            "nota": "descripción cualitativa; capturar goniometría para línea base medible"
           },
           "meta_propuesta": null,
+          "meta_nota": "Definir ROM meta con el fisio según articulación, objetivo y ROM del lado sano/funcional (no se asume simetría automática).",
           "unidad": "grados",
           "metodo": "goniometría",
-          "reevaluacion": "tras medir",
-          "criterio_cumplimiento": null,
+          "reevaluacion": "3–6 semanas",
+          "criterio_cumplimiento": "ROM en la meta acordada sin dolor",
           "evidencias": [
             {
               "campo": "valoracion.rom",
@@ -2574,33 +2630,9 @@
           ]
         },
         {
-          "fase": "mediano",
-          "alteracion": "fuerza (descrita en texto, sin escala)",
-          "actividad": "medir fuerza en escala 0–10 (lado sano = 10) y luego recuperarla",
-          "indicador": "fuerza — escala comparativa 0–10 de Sinergia",
-          "linea_base": {
-            "valor": "conservada",
-            "unidad": "texto",
-            "fuente": "valoracion.fuerza",
-            "tipo": "texto_cualitativo",
-            "nota": "descripción cualitativa: capturar en escala 0–10 de Sinergia contra el lado sano/referencia"
-          },
-          "meta_propuesta": null,
-          "unidad": "/10",
-          "metodo": "escala comparativa 0–10 de Sinergia",
-          "reevaluacion": "tras medir",
-          "criterio_cumplimiento": null,
-          "evidencias": [
-            {
-              "campo": "valoracion.fuerza",
-              "fragmento": "conservada"
-            }
-          ]
-        },
-        {
           "fase": "largo",
-          "alteracion": "limitación funcional / retorno a actividad",
-          "actividad": "retorno a la actividad funcional prioritaria según criterios (definir la actividad con el paciente: no documentada)",
+          "alteracion": "retorno funcional",
+          "actividad": "retorno a la actividad funcional prioritaria según criterios (definir la actividad con el paciente)",
           "indicador": "Oswestry (ODI) / PSFS + prueba funcional pertinente",
           "linea_base": {
             "valor": "molestia al estar sentado mucho tiempo",
@@ -2716,17 +2748,17 @@
         "autor": null,
         "fecha": null,
         "fuentes": [
-          "2.2.1-proto",
-          "2.2.1-proto"
+          "2.2.2-proto",
+          "2.2.2-proto"
         ],
         "cambios": []
       }
     },
     {
-      "version_generador": "2.2.1-proto",
-      "version_extractor": "2.2.1-proto",
-      "version_motor": "2.2.1-proto",
-      "catalogo_seguridad": "2026-11-26.c",
+      "version_generador": "2.2.2-proto",
+      "version_extractor": "2.2.2-proto",
+      "version_motor": "2.2.2-proto",
+      "catalogo_seguridad": "2026-11-26.d",
       "episodio": "SINT-CERV",
       "fecha_corte": "2026-11-26",
       "episodio_analisis": {
@@ -2756,8 +2788,14 @@
         "valoracion_inicial_presente": false,
         "evolucion_actual_presente": false
       },
+      "diagnostico_medico_referido": {
+        "texto": null,
+        "estado": "ausente",
+        "nota": "Sin diagnóstico médico referido en el expediente.",
+        "evidencias": []
+      },
       "diagnostico_funcional": {
-        "texto": "Disfunción de cervical por postural, trabajo de oficina. Cursa con dolor EVA 3/10. A la exploración: ROM rotación cervical 60° bilateral; fuerza \"conservada\" (cualitativa, sin escala 0–10). Exploración objetiva por completar (fuerza en escala 0–10, pruebas especiales): diagnóstico PROVISIONAL.",
+        "texto": "Paciente de 38 años con disfunción de cervical. Cuadro: dolor EVA 3/10. A la exploración: ROM rotación cervical 60° bilateral; fuerza conservada (cualitativa, sin escala 0–10). Mecanismo: postural, trabajo de oficina. Exploración por completar (fuerza en escala 0–10, pruebas especiales): diagnóstico PROVISIONAL.",
         "estado": "provisional",
         "evidencias": [
           {
@@ -2790,7 +2828,7 @@
       },
       "discrepancias": [],
       "valoracion_pendiente": [
-        "Medir fuerza con escala (dinamómetro/Daniels) — hoy solo hay descripción cualitativa",
+        "Medir fuerza en la escala 0–10 de Sinergia (lado sano/referencia = 10) — hoy solo hay descripción cualitativa",
         "Realizar pruebas especiales pertinentes",
         "Documentar cribado de banderas rojas (no se infiere de pruebas especiales)."
       ],
@@ -2803,6 +2841,8 @@
           "linea_base": {
             "valor": 3,
             "unidad": "/10",
+            "reposo": null,
+            "movimiento": null,
             "fuente": "valoracion.eva",
             "tipo": "medido"
           },
@@ -2810,10 +2850,10 @@
             "valor": "≤ 2/10",
             "tipo": "propuesta_editable"
           },
-          "justificacion_meta": "Propuesta a partir de la EVA inicial 3/10 (descenso clínicamente relevante escalonado por irritabilidad). Editable por el fisioterapeuta.",
-          "meta_nota": "Meta editable; no es una reducción fija obligatoria ni \"dolor cero\". Reevaluar por irritabilidad y objetivo del paciente.",
+          "justificacion_meta": "Propuesta a partir de la EVA 3/10: descenso clínicamente relevante, escalonado por irritabilidad. Editable; no impone dolor cero.",
+          "meta_nota": "Meta editable; no es una reducción fija ni \"dolor cero\". Reevaluar por irritabilidad y objetivo del paciente.",
           "unidad": "/10",
-          "metodo": "EVA contextualizada",
+          "metodo": "EVA contextualizada (reposo/movimiento)",
           "reevaluacion": "1–2 semanas",
           "criterio_cumplimiento": "EVA en la meta acordada, sostenida",
           "evidencias": [
@@ -2826,7 +2866,7 @@
         {
           "fase": "mediano",
           "alteracion": "déficit de movilidad",
-          "actividad": "recuperar ROM funcional de la zona",
+          "actividad": "optimizar y recuperar el ROM funcional de la zona",
           "indicador": "ROM (goniometría)",
           "linea_base": {
             "valor": "rotación cervical 60° bilateral",
@@ -2835,7 +2875,7 @@
             "tipo": "medido"
           },
           "meta_propuesta": null,
-          "meta_nota": "Definir ROM meta con el fisio según articulación, objetivo y ROM del lado sano/funcional (no se asume simetría automática; proponer meta al documentar la referencia).",
+          "meta_nota": "Definir ROM meta con el fisio según articulación, objetivo y ROM del lado sano/funcional (no se asume simetría automática).",
           "unidad": "grados",
           "metodo": "goniometría",
           "reevaluacion": "3–6 semanas",
@@ -2848,33 +2888,9 @@
           ]
         },
         {
-          "fase": "mediano",
-          "alteracion": "fuerza (descrita en texto, sin escala)",
-          "actividad": "medir fuerza en escala 0–10 (lado sano = 10) y luego recuperarla",
-          "indicador": "fuerza — escala comparativa 0–10 de Sinergia",
-          "linea_base": {
-            "valor": "conservada",
-            "unidad": "texto",
-            "fuente": "valoracion.fuerza",
-            "tipo": "texto_cualitativo",
-            "nota": "descripción cualitativa: capturar en escala 0–10 de Sinergia contra el lado sano/referencia"
-          },
-          "meta_propuesta": null,
-          "unidad": "/10",
-          "metodo": "escala comparativa 0–10 de Sinergia",
-          "reevaluacion": "tras medir",
-          "criterio_cumplimiento": null,
-          "evidencias": [
-            {
-              "campo": "valoracion.fuerza",
-              "fragmento": "conservada"
-            }
-          ]
-        },
-        {
           "fase": "largo",
-          "alteracion": "limitación funcional / retorno a actividad",
-          "actividad": "retorno a la actividad funcional prioritaria según criterios (definir la actividad con el paciente: no documentada)",
+          "alteracion": "retorno funcional",
+          "actividad": "retorno a la actividad funcional prioritaria según criterios (definir la actividad con el paciente)",
           "indicador": "NDI (Neck Disability Index) + prueba funcional pertinente",
           "linea_base": {
             "valor": null,
@@ -2990,17 +3006,17 @@
         "autor": null,
         "fecha": null,
         "fuentes": [
-          "2.2.1-proto",
-          "2.2.1-proto"
+          "2.2.2-proto",
+          "2.2.2-proto"
         ],
         "cambios": []
       }
     },
     {
-      "version_generador": "2.2.1-proto",
-      "version_extractor": "2.2.1-proto",
-      "version_motor": "2.2.1-proto",
-      "catalogo_seguridad": "2026-11-26.c",
+      "version_generador": "2.2.2-proto",
+      "version_extractor": "2.2.2-proto",
+      "version_motor": "2.2.2-proto",
+      "catalogo_seguridad": "2026-11-26.d",
       "episodio": "SINT-HOMB",
       "fecha_corte": "2026-11-26",
       "episodio_analisis": {
@@ -3030,8 +3046,14 @@
         "valoracion_inicial_presente": false,
         "evolucion_actual_presente": false
       },
+      "diagnostico_medico_referido": {
+        "texto": null,
+        "estado": "ausente",
+        "nota": "Sin diagnóstico médico referido en el expediente.",
+        "evidencias": []
+      },
       "diagnostico_funcional": {
-        "texto": "Disfunción de hombro izquierdo por insidioso. Cursa con dolor EVA 5/10. A la exploración: ROM abducción activa 110°; fuerza 4/5 manguito (escala /5 documentada; no se convierte a 0–10); pruebas especiales: Neer positivo; cribado de banderas rojas negativo. Limita: no puede levantar el brazo por encima del hombro.",
+        "texto": "Paciente de 50 años con disfunción de hombro izquierdo. Cuadro: dolor EVA 5/10. Limitación funcional: no puede levantar el brazo por encima del hombro. A la exploración: ROM abducción activa 110°; fuerza 4/5 manguito (escala /5 legada; se conserva, no se convierte); pruebas especiales (Neer positivo; cribado de banderas rojas negativo). Mecanismo: insidioso.",
         "estado": "provisional",
         "evidencias": [
           {
@@ -3083,6 +3105,8 @@
           "linea_base": {
             "valor": 5,
             "unidad": "/10",
+            "reposo": null,
+            "movimiento": null,
             "fuente": "valoracion.eva",
             "tipo": "medido"
           },
@@ -3090,10 +3114,10 @@
             "valor": "≤ 3/10",
             "tipo": "propuesta_editable"
           },
-          "justificacion_meta": "Propuesta a partir de la EVA inicial 5/10 (descenso clínicamente relevante escalonado por irritabilidad). Editable por el fisioterapeuta.",
-          "meta_nota": "Meta editable; no es una reducción fija obligatoria ni \"dolor cero\". Reevaluar por irritabilidad y objetivo del paciente.",
+          "justificacion_meta": "Propuesta a partir de la EVA 5/10: descenso clínicamente relevante, escalonado por irritabilidad. Editable; no impone dolor cero.",
+          "meta_nota": "Meta editable; no es una reducción fija ni \"dolor cero\". Reevaluar por irritabilidad y objetivo del paciente.",
           "unidad": "/10",
-          "metodo": "EVA contextualizada",
+          "metodo": "EVA contextualizada (reposo/movimiento)",
           "reevaluacion": "1–2 semanas",
           "criterio_cumplimiento": "EVA en la meta acordada, sostenida",
           "evidencias": [
@@ -3106,7 +3130,7 @@
         {
           "fase": "mediano",
           "alteracion": "déficit de movilidad",
-          "actividad": "recuperar ROM funcional de la zona",
+          "actividad": "optimizar y recuperar el ROM funcional de la zona",
           "indicador": "ROM (goniometría)",
           "linea_base": {
             "valor": "abducción activa 110°",
@@ -3115,7 +3139,7 @@
             "tipo": "medido"
           },
           "meta_propuesta": null,
-          "meta_nota": "Definir ROM meta con el fisio según articulación, objetivo y ROM del lado sano/funcional (no se asume simetría automática; proponer meta al documentar la referencia).",
+          "meta_nota": "Definir ROM meta con el fisio según articulación, objetivo y ROM del lado sano/funcional (no se asume simetría automática).",
           "unidad": "grados",
           "metodo": "goniometría",
           "reevaluacion": "3–6 semanas",
@@ -3130,20 +3154,20 @@
         {
           "fase": "mediano",
           "alteracion": "déficit de fuerza",
-          "actividad": "recuperar fuerza del segmento",
-          "indicador": "fuerza (escala /5 legada — documentada tal cual)",
+          "actividad": "recuperar la fuerza del segmento",
+          "indicador": "fuerza (valor /5 legado — se conserva, no se convierte)",
           "linea_base": {
             "valor": "4/5",
             "unidad": "/5",
             "escala": "daniels_0_5",
             "fuente": "valoracion.fuerza",
             "tipo": "medido",
-            "nota": "Escala /5 legada; NO se convierte a 0–10. Recapturar en escala 0–10 de Sinergia para seguimiento comparativo."
+            "nota": "Valor /5 histórico; se conserva tal cual. El seguimiento se hará con la escala 0–10 de Sinergia (lado sano = 10)."
           },
           "meta_propuesta": null,
-          "meta_nota": "No se convierte /5 a 0–10. Para seguimiento comparativo, recapturar fuerza en la escala 0–10 de Sinergia (lado sano = 10).",
+          "meta_nota": "No se convierte el valor /5. El seguimiento de aquí en adelante es con la escala 0–10 de Sinergia.",
           "unidad": "/5",
-          "metodo": "escala documentada (no convertida)",
+          "metodo": "valor documentado (histórico); seguimiento en escala 0–10 de Sinergia",
           "reevaluacion": "4–6 semanas",
           "criterio_cumplimiento": "fuerza en la meta acordada",
           "evidencias": [
@@ -3155,8 +3179,8 @@
         },
         {
           "fase": "largo",
-          "alteracion": "limitación funcional / retorno a actividad",
-          "actividad": "retorno a la actividad funcional prioritaria según criterios (definir la actividad con el paciente: no documentada)",
+          "alteracion": "retorno funcional",
+          "actividad": "retorno a la actividad funcional prioritaria según criterios (definir la actividad con el paciente)",
           "indicador": "SPADI o QuickDASH + prueba funcional pertinente",
           "linea_base": {
             "valor": "no puede levantar el brazo por encima del hombro",
@@ -3272,17 +3296,17 @@
         "autor": null,
         "fecha": null,
         "fuentes": [
-          "2.2.1-proto",
-          "2.2.1-proto"
+          "2.2.2-proto",
+          "2.2.2-proto"
         ],
         "cambios": []
       }
     },
     {
-      "version_generador": "2.2.1-proto",
-      "version_extractor": "2.2.1-proto",
-      "version_motor": "2.2.1-proto",
-      "catalogo_seguridad": "2026-11-26.c",
+      "version_generador": "2.2.2-proto",
+      "version_extractor": "2.2.2-proto",
+      "version_motor": "2.2.2-proto",
+      "catalogo_seguridad": "2026-11-26.d",
       "episodio": "SINT-TOB",
       "fecha_corte": "2026-11-26",
       "episodio_analisis": {
@@ -3312,8 +3336,14 @@
         "valoracion_inicial_presente": false,
         "evolucion_actual_presente": false
       },
+      "diagnostico_medico_referido": {
+        "texto": null,
+        "estado": "ausente",
+        "nota": "Sin diagnóstico médico referido en el expediente.",
+        "evidencias": []
+      },
       "diagnostico_funcional": {
-        "texto": "Disfunción de tobillo/pie derecho por inversión jugando básquetbol. Cursa con dolor EVA 3/10. A la exploración: movilidad \"dorsiflexión limitada (WBLT reducido)\" (cualitativa, sin goniometría); fuerza 4/5 peroneos (escala /5 documentada; no se convierte a 0–10); pruebas especiales: cajón anterior leve; cribado de banderas rojas negativo. Limita: no puede correr ni saltar. Exploración objetiva por completar (ROM goniométrico): diagnóstico PROVISIONAL.",
+        "texto": "Paciente de 29 años con disfunción de tobillo/pie derecho. Cuadro: dolor EVA 3/10. Limitación funcional: no puede correr ni saltar. A la exploración: movilidad dorsiflexión limitada (WBLT reducido) (cualitativa); fuerza 4/5 peroneos (escala /5 legada; se conserva, no se convierte); pruebas especiales (cajón anterior leve; cribado de banderas rojas negativo). Mecanismo: inversión jugando básquetbol. Exploración por completar (ROM goniométrico): diagnóstico PROVISIONAL.",
         "estado": "provisional",
         "evidencias": [
           {
@@ -3366,6 +3396,8 @@
           "linea_base": {
             "valor": 3,
             "unidad": "/10",
+            "reposo": null,
+            "movimiento": null,
             "fuente": "valoracion.eva",
             "tipo": "medido"
           },
@@ -3373,10 +3405,10 @@
             "valor": "≤ 2/10",
             "tipo": "propuesta_editable"
           },
-          "justificacion_meta": "Propuesta a partir de la EVA inicial 3/10 (descenso clínicamente relevante escalonado por irritabilidad). Editable por el fisioterapeuta.",
-          "meta_nota": "Meta editable; no es una reducción fija obligatoria ni \"dolor cero\". Reevaluar por irritabilidad y objetivo del paciente.",
+          "justificacion_meta": "Propuesta a partir de la EVA 3/10: descenso clínicamente relevante, escalonado por irritabilidad. Editable; no impone dolor cero.",
+          "meta_nota": "Meta editable; no es una reducción fija ni \"dolor cero\". Reevaluar por irritabilidad y objetivo del paciente.",
           "unidad": "/10",
-          "metodo": "EVA contextualizada",
+          "metodo": "EVA contextualizada (reposo/movimiento)",
           "reevaluacion": "1–2 semanas",
           "criterio_cumplimiento": "EVA en la meta acordada, sostenida",
           "evidencias": [
@@ -3388,21 +3420,22 @@
         },
         {
           "fase": "mediano",
-          "alteracion": "movilidad (descrita en texto, sin goniometría)",
-          "actividad": "medir ROM (grados) y luego recuperarlo",
+          "alteracion": "déficit de movilidad",
+          "actividad": "optimizar y recuperar el ROM funcional de la zona",
           "indicador": "ROM (goniometría)",
           "linea_base": {
             "valor": "dorsiflexión limitada (WBLT reducido)",
             "unidad": "texto",
             "fuente": "valoracion.rom",
             "tipo": "texto_cualitativo",
-            "nota": "descripción cualitativa: NO es una medición en grados; capturar goniometría para línea base"
+            "nota": "descripción cualitativa; capturar goniometría para línea base medible"
           },
           "meta_propuesta": null,
+          "meta_nota": "Definir ROM meta con el fisio según articulación, objetivo y ROM del lado sano/funcional (no se asume simetría automática).",
           "unidad": "grados",
           "metodo": "goniometría",
-          "reevaluacion": "tras medir",
-          "criterio_cumplimiento": null,
+          "reevaluacion": "3–6 semanas",
+          "criterio_cumplimiento": "ROM en la meta acordada sin dolor",
           "evidencias": [
             {
               "campo": "valoracion.rom",
@@ -3413,20 +3446,20 @@
         {
           "fase": "mediano",
           "alteracion": "déficit de fuerza",
-          "actividad": "recuperar fuerza del segmento",
-          "indicador": "fuerza (escala /5 legada — documentada tal cual)",
+          "actividad": "recuperar la fuerza del segmento",
+          "indicador": "fuerza (valor /5 legado — se conserva, no se convierte)",
           "linea_base": {
             "valor": "4/5",
             "unidad": "/5",
             "escala": "daniels_0_5",
             "fuente": "valoracion.fuerza",
             "tipo": "medido",
-            "nota": "Escala /5 legada; NO se convierte a 0–10. Recapturar en escala 0–10 de Sinergia para seguimiento comparativo."
+            "nota": "Valor /5 histórico; se conserva tal cual. El seguimiento se hará con la escala 0–10 de Sinergia (lado sano = 10)."
           },
           "meta_propuesta": null,
-          "meta_nota": "No se convierte /5 a 0–10. Para seguimiento comparativo, recapturar fuerza en la escala 0–10 de Sinergia (lado sano = 10).",
+          "meta_nota": "No se convierte el valor /5. El seguimiento de aquí en adelante es con la escala 0–10 de Sinergia.",
           "unidad": "/5",
-          "metodo": "escala documentada (no convertida)",
+          "metodo": "valor documentado (histórico); seguimiento en escala 0–10 de Sinergia",
           "reevaluacion": "4–6 semanas",
           "criterio_cumplimiento": "fuerza en la meta acordada",
           "evidencias": [
@@ -3438,7 +3471,7 @@
         },
         {
           "fase": "largo",
-          "alteracion": "limitación funcional / retorno a actividad",
+          "alteracion": "retorno funcional",
           "actividad": "retorno a básquetbol según criterios",
           "indicador": "FAAM + Weight-Bearing Lunge Test + prueba funcional pertinente",
           "linea_base": {
@@ -3568,17 +3601,17 @@
         "autor": null,
         "fecha": null,
         "fuentes": [
-          "2.2.1-proto",
-          "2.2.1-proto"
+          "2.2.2-proto",
+          "2.2.2-proto"
         ],
         "cambios": []
       }
     },
     {
-      "version_generador": "2.2.1-proto",
-      "version_extractor": "2.2.1-proto",
-      "version_motor": "2.2.1-proto",
-      "catalogo_seguridad": "2026-11-26.c",
+      "version_generador": "2.2.2-proto",
+      "version_extractor": "2.2.2-proto",
+      "version_motor": "2.2.2-proto",
+      "catalogo_seguridad": "2026-11-26.d",
       "episodio": "SINT-CAD",
       "fecha_corte": "2026-11-26",
       "episodio_analisis": {
@@ -3608,8 +3641,14 @@
         "valoracion_inicial_presente": false,
         "evolucion_actual_presente": false
       },
+      "diagnostico_medico_referido": {
+        "texto": null,
+        "estado": "ausente",
+        "nota": "Sin diagnóstico médico referido en el expediente.",
+        "evidencias": []
+      },
       "diagnostico_funcional": {
-        "texto": "Disfunción de cadera derecho por pinzamiento femoroacetabular. Cursa con dolor EVA 5/10. A la exploración: movilidad \"rotación interna de cadera limitada\" (cualitativa, sin goniometría); fuerza 4/5 glúteo medio (escala /5 documentada; no se convierte a 0–10); pruebas especiales: FADIR positivo; cribado de banderas rojas negativo. Limita: no puede hacer sentadilla profunda. Exploración objetiva por completar (ROM goniométrico): diagnóstico PROVISIONAL.",
+        "texto": "Paciente de 33 años con disfunción de cadera derecho. Cuadro: dolor EVA 5/10. Limitación funcional: no puede hacer sentadilla profunda. A la exploración: movilidad rotación interna de cadera limitada (cualitativa); fuerza 4/5 glúteo medio (escala /5 legada; se conserva, no se convierte); pruebas especiales (FADIR positivo; cribado de banderas rojas negativo). Mecanismo: pinzamiento femoroacetabular. Exploración por completar (ROM goniométrico): diagnóstico PROVISIONAL.",
         "estado": "provisional",
         "evidencias": [
           {
@@ -3662,6 +3701,8 @@
           "linea_base": {
             "valor": 5,
             "unidad": "/10",
+            "reposo": null,
+            "movimiento": null,
             "fuente": "valoracion.eva",
             "tipo": "medido"
           },
@@ -3669,10 +3710,10 @@
             "valor": "≤ 3/10",
             "tipo": "propuesta_editable"
           },
-          "justificacion_meta": "Propuesta a partir de la EVA inicial 5/10 (descenso clínicamente relevante escalonado por irritabilidad). Editable por el fisioterapeuta.",
-          "meta_nota": "Meta editable; no es una reducción fija obligatoria ni \"dolor cero\". Reevaluar por irritabilidad y objetivo del paciente.",
+          "justificacion_meta": "Propuesta a partir de la EVA 5/10: descenso clínicamente relevante, escalonado por irritabilidad. Editable; no impone dolor cero.",
+          "meta_nota": "Meta editable; no es una reducción fija ni \"dolor cero\". Reevaluar por irritabilidad y objetivo del paciente.",
           "unidad": "/10",
-          "metodo": "EVA contextualizada",
+          "metodo": "EVA contextualizada (reposo/movimiento)",
           "reevaluacion": "1–2 semanas",
           "criterio_cumplimiento": "EVA en la meta acordada, sostenida",
           "evidencias": [
@@ -3684,21 +3725,22 @@
         },
         {
           "fase": "mediano",
-          "alteracion": "movilidad (descrita en texto, sin goniometría)",
-          "actividad": "medir ROM (grados) y luego recuperarlo",
+          "alteracion": "déficit de movilidad",
+          "actividad": "optimizar y recuperar el ROM funcional de la zona",
           "indicador": "ROM (goniometría)",
           "linea_base": {
             "valor": "rotación interna de cadera limitada",
             "unidad": "texto",
             "fuente": "valoracion.rom",
             "tipo": "texto_cualitativo",
-            "nota": "descripción cualitativa: NO es una medición en grados; capturar goniometría para línea base"
+            "nota": "descripción cualitativa; capturar goniometría para línea base medible"
           },
           "meta_propuesta": null,
+          "meta_nota": "Definir ROM meta con el fisio según articulación, objetivo y ROM del lado sano/funcional (no se asume simetría automática).",
           "unidad": "grados",
           "metodo": "goniometría",
-          "reevaluacion": "tras medir",
-          "criterio_cumplimiento": null,
+          "reevaluacion": "3–6 semanas",
+          "criterio_cumplimiento": "ROM en la meta acordada sin dolor",
           "evidencias": [
             {
               "campo": "valoracion.rom",
@@ -3709,20 +3751,20 @@
         {
           "fase": "mediano",
           "alteracion": "déficit de fuerza",
-          "actividad": "recuperar fuerza del segmento",
-          "indicador": "fuerza (escala /5 legada — documentada tal cual)",
+          "actividad": "recuperar la fuerza del segmento",
+          "indicador": "fuerza (valor /5 legado — se conserva, no se convierte)",
           "linea_base": {
             "valor": "4/5",
             "unidad": "/5",
             "escala": "daniels_0_5",
             "fuente": "valoracion.fuerza",
             "tipo": "medido",
-            "nota": "Escala /5 legada; NO se convierte a 0–10. Recapturar en escala 0–10 de Sinergia para seguimiento comparativo."
+            "nota": "Valor /5 histórico; se conserva tal cual. El seguimiento se hará con la escala 0–10 de Sinergia (lado sano = 10)."
           },
           "meta_propuesta": null,
-          "meta_nota": "No se convierte /5 a 0–10. Para seguimiento comparativo, recapturar fuerza en la escala 0–10 de Sinergia (lado sano = 10).",
+          "meta_nota": "No se convierte el valor /5. El seguimiento de aquí en adelante es con la escala 0–10 de Sinergia.",
           "unidad": "/5",
-          "metodo": "escala documentada (no convertida)",
+          "metodo": "valor documentado (histórico); seguimiento en escala 0–10 de Sinergia",
           "reevaluacion": "4–6 semanas",
           "criterio_cumplimiento": "fuerza en la meta acordada",
           "evidencias": [
@@ -3734,8 +3776,8 @@
         },
         {
           "fase": "largo",
-          "alteracion": "limitación funcional / retorno a actividad",
-          "actividad": "retorno a la actividad funcional prioritaria según criterios (definir la actividad con el paciente: no documentada)",
+          "alteracion": "retorno funcional",
+          "actividad": "retorno a la actividad funcional prioritaria según criterios (definir la actividad con el paciente)",
           "indicador": "HOOS + prueba funcional pertinente",
           "linea_base": {
             "valor": "no puede hacer sentadilla profunda",
@@ -3851,17 +3893,17 @@
         "autor": null,
         "fecha": null,
         "fuentes": [
-          "2.2.1-proto",
-          "2.2.1-proto"
+          "2.2.2-proto",
+          "2.2.2-proto"
         ],
         "cambios": []
       }
     },
     {
-      "version_generador": "2.2.1-proto",
-      "version_extractor": "2.2.1-proto",
-      "version_motor": "2.2.1-proto",
-      "catalogo_seguridad": "2026-11-26.c",
+      "version_generador": "2.2.2-proto",
+      "version_extractor": "2.2.2-proto",
+      "version_motor": "2.2.2-proto",
+      "catalogo_seguridad": "2026-11-26.d",
       "episodio": "SINT-FRAC",
       "fecha_corte": "2026-11-26",
       "episodio_analisis": {
@@ -3891,8 +3933,14 @@
         "valoracion_inicial_presente": false,
         "evolucion_actual_presente": false
       },
+      "diagnostico_medico_referido": {
+        "texto": null,
+        "estado": "ausente",
+        "nota": "Sin diagnóstico médico referido en el expediente.",
+        "evidencias": []
+      },
       "diagnostico_funcional": {
-        "texto": "Disfunción de tobillo/pie izquierdo por caída, fractura bimaleolar con placa y tornillos. Cursa con dolor EVA 5/10. A la exploración: movilidad \"dorsiflexión muy limitada\" (cualitativa, sin goniometría); fuerza \"disminuida\" (cualitativa, sin escala 0–10). Limita: cojea, no puede caminar distancias largas. Antecedentes a considerar: material de osteosíntesis/prótesis. Exploración objetiva por completar (ROM goniométrico, fuerza en escala 0–10, pruebas especiales): diagnóstico PROVISIONAL.",
+        "texto": "Paciente de 55 años con disfunción de tobillo/pie izquierdo. Cuadro: dolor EVA 5/10. Limitación funcional: cojea, no puede caminar distancias largas. A la exploración: movilidad dorsiflexión muy limitada (cualitativa); fuerza disminuida (cualitativa, sin escala 0–10). Mecanismo: caída, fractura bimaleolar con placa y tornillos. Antecedentes a considerar: material de osteosíntesis/prótesis. Exploración por completar (ROM goniométrico, fuerza en escala 0–10, pruebas especiales): diagnóstico PROVISIONAL.",
         "estado": "provisional",
         "evidencias": [
           {
@@ -3943,7 +3991,7 @@
       "discrepancias": [],
       "valoracion_pendiente": [
         "Medir ROM goniométrico (grados) — hoy solo hay descripción cualitativa",
-        "Medir fuerza con escala (dinamómetro/Daniels) — hoy solo hay descripción cualitativa",
+        "Medir fuerza en la escala 0–10 de Sinergia (lado sano/referencia = 10) — hoy solo hay descripción cualitativa",
         "Realizar pruebas especiales pertinentes",
         "Documentar cribado de banderas rojas (no se infiere de pruebas especiales)."
       ],
@@ -3956,6 +4004,8 @@
           "linea_base": {
             "valor": 5,
             "unidad": "/10",
+            "reposo": null,
+            "movimiento": null,
             "fuente": "valoracion.eva",
             "tipo": "medido"
           },
@@ -3963,10 +4013,10 @@
             "valor": "≤ 3/10",
             "tipo": "propuesta_editable"
           },
-          "justificacion_meta": "Propuesta a partir de la EVA inicial 5/10 (descenso clínicamente relevante escalonado por irritabilidad). Editable por el fisioterapeuta.",
-          "meta_nota": "Meta editable; no es una reducción fija obligatoria ni \"dolor cero\". Reevaluar por irritabilidad y objetivo del paciente.",
+          "justificacion_meta": "Propuesta a partir de la EVA 5/10: descenso clínicamente relevante, escalonado por irritabilidad. Editable; no impone dolor cero.",
+          "meta_nota": "Meta editable; no es una reducción fija ni \"dolor cero\". Reevaluar por irritabilidad y objetivo del paciente.",
           "unidad": "/10",
-          "metodo": "EVA contextualizada",
+          "metodo": "EVA contextualizada (reposo/movimiento)",
           "reevaluacion": "1–2 semanas",
           "criterio_cumplimiento": "EVA en la meta acordada, sostenida",
           "evidencias": [
@@ -3978,21 +4028,22 @@
         },
         {
           "fase": "mediano",
-          "alteracion": "movilidad (descrita en texto, sin goniometría)",
-          "actividad": "medir ROM (grados) y luego recuperarlo",
+          "alteracion": "déficit de movilidad",
+          "actividad": "optimizar y recuperar el ROM funcional de la zona",
           "indicador": "ROM (goniometría)",
           "linea_base": {
             "valor": "dorsiflexión muy limitada",
             "unidad": "texto",
             "fuente": "valoracion.rom",
             "tipo": "texto_cualitativo",
-            "nota": "descripción cualitativa: NO es una medición en grados; capturar goniometría para línea base"
+            "nota": "descripción cualitativa; capturar goniometría para línea base medible"
           },
           "meta_propuesta": null,
+          "meta_nota": "Definir ROM meta con el fisio según articulación, objetivo y ROM del lado sano/funcional (no se asume simetría automática).",
           "unidad": "grados",
           "metodo": "goniometría",
-          "reevaluacion": "tras medir",
-          "criterio_cumplimiento": null,
+          "reevaluacion": "3–6 semanas",
+          "criterio_cumplimiento": "ROM en la meta acordada sin dolor",
           "evidencias": [
             {
               "campo": "valoracion.rom",
@@ -4002,20 +4053,21 @@
         },
         {
           "fase": "mediano",
-          "alteracion": "fuerza (descrita en texto, sin escala)",
-          "actividad": "medir fuerza en escala 0–10 (lado sano = 10) y luego recuperarla",
+          "alteracion": "déficit de fuerza (descrito en texto)",
+          "actividad": "recuperar la fuerza del segmento",
           "indicador": "fuerza — escala comparativa 0–10 de Sinergia",
           "linea_base": {
             "valor": "disminuida",
             "unidad": "texto",
             "fuente": "valoracion.fuerza",
             "tipo": "texto_cualitativo",
-            "nota": "descripción cualitativa: capturar en escala 0–10 de Sinergia contra el lado sano/referencia"
+            "nota": "descripción cualitativa; para seguimiento, registrar en escala 0–10 de Sinergia contra la referencia"
           },
           "meta_propuesta": null,
+          "meta_nota": "Sin tiempos rígidos. El seguimiento de fuerza es con la escala 0–10 de Sinergia (lado sano = 10).",
           "unidad": "/10",
           "metodo": "escala comparativa 0–10 de Sinergia",
-          "reevaluacion": "tras medir",
+          "reevaluacion": "4–6 semanas",
           "criterio_cumplimiento": null,
           "evidencias": [
             {
@@ -4026,8 +4078,8 @@
         },
         {
           "fase": "largo",
-          "alteracion": "limitación funcional / retorno a actividad",
-          "actividad": "retorno a la actividad funcional prioritaria según criterios (definir la actividad con el paciente: no documentada)",
+          "alteracion": "retorno funcional",
+          "actividad": "retorno a la actividad funcional prioritaria según criterios (definir la actividad con el paciente)",
           "indicador": "escala funcional de la región + goniometría + prueba funcional pertinente",
           "linea_base": {
             "valor": "cojea, no puede caminar distancias largas",
@@ -4148,17 +4200,17 @@
         "autor": null,
         "fecha": null,
         "fuentes": [
-          "2.2.1-proto",
-          "2.2.1-proto"
+          "2.2.2-proto",
+          "2.2.2-proto"
         ],
         "cambios": []
       }
     },
     {
-      "version_generador": "2.2.1-proto",
-      "version_extractor": "2.2.1-proto",
-      "version_motor": "2.2.1-proto",
-      "catalogo_seguridad": "2026-11-26.c",
+      "version_generador": "2.2.2-proto",
+      "version_extractor": "2.2.2-proto",
+      "version_motor": "2.2.2-proto",
+      "catalogo_seguridad": "2026-11-26.d",
       "episodio": "SINT-MARCA",
       "fecha_corte": "2026-11-26",
       "episodio_analisis": {
@@ -4188,8 +4240,14 @@
         "valoracion_inicial_presente": false,
         "evolucion_actual_presente": false
       },
+      "diagnostico_medico_referido": {
+        "texto": null,
+        "estado": "ausente",
+        "nota": "Sin diagnóstico médico referido en el expediente.",
+        "evidencias": []
+      },
       "diagnostico_funcional": {
-        "texto": "Disfunción de hombro derecho por insidioso. Cursa con dolor EVA 4/10. A la exploración: ROM abducción 120°; fuerza 4/5 (escala /5 documentada; no se convierte a 0–10); pruebas especiales: Hawkins positivo; cribado de banderas rojas negativo.",
+        "texto": "Paciente de 72 años con disfunción de hombro derecho. Cuadro: dolor EVA 4/10. A la exploración: ROM abducción 120°; fuerza 4/5 (escala /5 legada; se conserva, no se convierte); pruebas especiales (Hawkins positivo; cribado de banderas rojas negativo). Mecanismo: insidioso.",
         "estado": "provisional",
         "evidencias": [
           {
@@ -4248,6 +4306,8 @@
           "linea_base": {
             "valor": 4,
             "unidad": "/10",
+            "reposo": null,
+            "movimiento": null,
             "fuente": "valoracion.eva",
             "tipo": "medido"
           },
@@ -4255,10 +4315,10 @@
             "valor": "≤ 2/10",
             "tipo": "propuesta_editable"
           },
-          "justificacion_meta": "Propuesta a partir de la EVA inicial 4/10 (descenso clínicamente relevante escalonado por irritabilidad). Editable por el fisioterapeuta.",
-          "meta_nota": "Meta editable; no es una reducción fija obligatoria ni \"dolor cero\". Reevaluar por irritabilidad y objetivo del paciente.",
+          "justificacion_meta": "Propuesta a partir de la EVA 4/10: descenso clínicamente relevante, escalonado por irritabilidad. Editable; no impone dolor cero.",
+          "meta_nota": "Meta editable; no es una reducción fija ni \"dolor cero\". Reevaluar por irritabilidad y objetivo del paciente.",
           "unidad": "/10",
-          "metodo": "EVA contextualizada",
+          "metodo": "EVA contextualizada (reposo/movimiento)",
           "reevaluacion": "1–2 semanas",
           "criterio_cumplimiento": "EVA en la meta acordada, sostenida",
           "evidencias": [
@@ -4271,7 +4331,7 @@
         {
           "fase": "mediano",
           "alteracion": "déficit de movilidad",
-          "actividad": "recuperar ROM funcional de la zona",
+          "actividad": "optimizar y recuperar el ROM funcional de la zona",
           "indicador": "ROM (goniometría)",
           "linea_base": {
             "valor": "abducción 120°",
@@ -4280,7 +4340,7 @@
             "tipo": "medido"
           },
           "meta_propuesta": null,
-          "meta_nota": "Definir ROM meta con el fisio según articulación, objetivo y ROM del lado sano/funcional (no se asume simetría automática; proponer meta al documentar la referencia).",
+          "meta_nota": "Definir ROM meta con el fisio según articulación, objetivo y ROM del lado sano/funcional (no se asume simetría automática).",
           "unidad": "grados",
           "metodo": "goniometría",
           "reevaluacion": "3–6 semanas",
@@ -4295,20 +4355,20 @@
         {
           "fase": "mediano",
           "alteracion": "déficit de fuerza",
-          "actividad": "recuperar fuerza del segmento",
-          "indicador": "fuerza (escala /5 legada — documentada tal cual)",
+          "actividad": "recuperar la fuerza del segmento",
+          "indicador": "fuerza (valor /5 legado — se conserva, no se convierte)",
           "linea_base": {
             "valor": "4/5",
             "unidad": "/5",
             "escala": "daniels_0_5",
             "fuente": "valoracion.fuerza",
             "tipo": "medido",
-            "nota": "Escala /5 legada; NO se convierte a 0–10. Recapturar en escala 0–10 de Sinergia para seguimiento comparativo."
+            "nota": "Valor /5 histórico; se conserva tal cual. El seguimiento se hará con la escala 0–10 de Sinergia (lado sano = 10)."
           },
           "meta_propuesta": null,
-          "meta_nota": "No se convierte /5 a 0–10. Para seguimiento comparativo, recapturar fuerza en la escala 0–10 de Sinergia (lado sano = 10).",
+          "meta_nota": "No se convierte el valor /5. El seguimiento de aquí en adelante es con la escala 0–10 de Sinergia.",
           "unidad": "/5",
-          "metodo": "escala documentada (no convertida)",
+          "metodo": "valor documentado (histórico); seguimiento en escala 0–10 de Sinergia",
           "reevaluacion": "4–6 semanas",
           "criterio_cumplimiento": "fuerza en la meta acordada",
           "evidencias": [
@@ -4320,8 +4380,8 @@
         },
         {
           "fase": "largo",
-          "alteracion": "limitación funcional / retorno a actividad",
-          "actividad": "retorno a la actividad funcional prioritaria según criterios (definir la actividad con el paciente: no documentada)",
+          "alteracion": "retorno funcional",
+          "actividad": "retorno a la actividad funcional prioritaria según criterios (definir la actividad con el paciente)",
           "indicador": "SPADI o QuickDASH + prueba funcional pertinente",
           "linea_base": {
             "valor": null,
@@ -4442,17 +4502,17 @@
         "autor": null,
         "fecha": null,
         "fuentes": [
-          "2.2.1-proto",
-          "2.2.1-proto"
+          "2.2.2-proto",
+          "2.2.2-proto"
         ],
         "cambios": []
       }
     },
     {
-      "version_generador": "2.2.1-proto",
-      "version_extractor": "2.2.1-proto",
-      "version_motor": "2.2.1-proto",
-      "catalogo_seguridad": "2026-11-26.c",
+      "version_generador": "2.2.2-proto",
+      "version_extractor": "2.2.2-proto",
+      "version_motor": "2.2.2-proto",
+      "catalogo_seguridad": "2026-11-26.d",
       "episodio": "SINT-EPIS",
       "fecha_corte": "2026-11-18",
       "episodio_analisis": {
@@ -4487,8 +4547,14 @@
         "valoracion_inicial_presente": true,
         "evolucion_actual_presente": true
       },
+      "diagnostico_medico_referido": {
+        "texto": null,
+        "estado": "ausente",
+        "nota": "Sin diagnóstico médico referido en el expediente.",
+        "evidencias": []
+      },
       "diagnostico_funcional": {
-        "texto": "Disfunción de rodilla derecho por sobreuso. Cursa con dolor EVA 3/10. A la exploración: ROM flexión 140°; fuerza 4/5 (escala /5 documentada; no se convierte a 0–10). Evolución: en seguimiento, 2 notas SOAP. Exploración objetiva por completar (pruebas especiales): diagnóstico PROVISIONAL.",
+        "texto": "Paciente de 40 años con disfunción de rodilla derecho. Cuadro: dolor EVA 3/10. A la exploración: ROM flexión 140°; fuerza 4/5 (escala /5 legada; se conserva, no se convierte). Mecanismo: sobreuso. Evolución: en seguimiento (2 notas SOAP). Exploración por completar (pruebas especiales): diagnóstico PROVISIONAL.",
         "estado": "provisional",
         "evidencias": [
           {
@@ -4534,6 +4600,8 @@
           "linea_base": {
             "valor": 3,
             "unidad": "/10",
+            "reposo": null,
+            "movimiento": null,
             "fuente": "valoracion.eva",
             "tipo": "medido"
           },
@@ -4541,10 +4609,10 @@
             "valor": "≤ 2/10",
             "tipo": "propuesta_editable"
           },
-          "justificacion_meta": "Propuesta a partir de la EVA inicial 3/10 (descenso clínicamente relevante escalonado por irritabilidad). Editable por el fisioterapeuta.",
-          "meta_nota": "Meta editable; no es una reducción fija obligatoria ni \"dolor cero\". Reevaluar por irritabilidad y objetivo del paciente.",
+          "justificacion_meta": "Propuesta a partir de la EVA 3/10: descenso clínicamente relevante, escalonado por irritabilidad. Editable; no impone dolor cero.",
+          "meta_nota": "Meta editable; no es una reducción fija ni \"dolor cero\". Reevaluar por irritabilidad y objetivo del paciente.",
           "unidad": "/10",
-          "metodo": "EVA contextualizada",
+          "metodo": "EVA contextualizada (reposo/movimiento)",
           "reevaluacion": "1–2 semanas",
           "criterio_cumplimiento": "EVA en la meta acordada, sostenida",
           "evidencias": [
@@ -4557,7 +4625,7 @@
         {
           "fase": "mediano",
           "alteracion": "déficit de movilidad",
-          "actividad": "recuperar ROM funcional de la zona",
+          "actividad": "optimizar y recuperar el ROM funcional de la zona",
           "indicador": "ROM (goniometría)",
           "linea_base": {
             "valor": "flexión 140°",
@@ -4566,7 +4634,7 @@
             "tipo": "medido"
           },
           "meta_propuesta": null,
-          "meta_nota": "Definir ROM meta con el fisio según articulación, objetivo y ROM del lado sano/funcional (no se asume simetría automática; proponer meta al documentar la referencia).",
+          "meta_nota": "Definir ROM meta con el fisio según articulación, objetivo y ROM del lado sano/funcional (no se asume simetría automática).",
           "unidad": "grados",
           "metodo": "goniometría",
           "reevaluacion": "3–6 semanas",
@@ -4581,20 +4649,20 @@
         {
           "fase": "mediano",
           "alteracion": "déficit de fuerza",
-          "actividad": "recuperar fuerza del segmento",
-          "indicador": "fuerza (escala /5 legada — documentada tal cual)",
+          "actividad": "recuperar la fuerza del segmento",
+          "indicador": "fuerza (valor /5 legado — se conserva, no se convierte)",
           "linea_base": {
             "valor": "4/5",
             "unidad": "/5",
             "escala": "daniels_0_5",
             "fuente": "valoracion.fuerza",
             "tipo": "medido",
-            "nota": "Escala /5 legada; NO se convierte a 0–10. Recapturar en escala 0–10 de Sinergia para seguimiento comparativo."
+            "nota": "Valor /5 histórico; se conserva tal cual. El seguimiento se hará con la escala 0–10 de Sinergia (lado sano = 10)."
           },
           "meta_propuesta": null,
-          "meta_nota": "No se convierte /5 a 0–10. Para seguimiento comparativo, recapturar fuerza en la escala 0–10 de Sinergia (lado sano = 10).",
+          "meta_nota": "No se convierte el valor /5. El seguimiento de aquí en adelante es con la escala 0–10 de Sinergia.",
           "unidad": "/5",
-          "metodo": "escala documentada (no convertida)",
+          "metodo": "valor documentado (histórico); seguimiento en escala 0–10 de Sinergia",
           "reevaluacion": "4–6 semanas",
           "criterio_cumplimiento": "fuerza en la meta acordada",
           "evidencias": [
@@ -4606,9 +4674,9 @@
         },
         {
           "fase": "largo",
-          "alteracion": "limitación funcional / retorno a actividad",
+          "alteracion": "retorno funcional",
           "actividad": "retorno a correr según criterios",
-          "indicador": "IKDC + dinamometría + tolerancia a sentadilla + prueba funcional pertinente",
+          "indicador": "IKDC + fuerza comparativa 0–10 + tolerancia a sentadilla + prueba funcional pertinente",
           "linea_base": {
             "valor": null,
             "tipo": "pendiente",
@@ -4731,17 +4799,17 @@
         "autor": null,
         "fecha": null,
         "fuentes": [
-          "2.2.1-proto",
-          "2.2.1-proto"
+          "2.2.2-proto",
+          "2.2.2-proto"
         ],
         "cambios": []
       }
     },
     {
-      "version_generador": "2.2.1-proto",
-      "version_extractor": "2.2.1-proto",
-      "version_motor": "2.2.1-proto",
-      "catalogo_seguridad": "2026-11-26.c",
+      "version_generador": "2.2.2-proto",
+      "version_extractor": "2.2.2-proto",
+      "version_motor": "2.2.2-proto",
+      "catalogo_seguridad": "2026-11-26.d",
       "episodio": "SINT-LADO",
       "fecha_corte": "2026-11-26",
       "episodio_analisis": {
@@ -4771,14 +4839,21 @@
         "valoracion_inicial_presente": false,
         "evolucion_actual_presente": false
       },
-      "diagnostico_funcional": {
-        "texto": "Disfunción de rodilla derecho en contexto de gonartrosis de rodilla izquierda por degenerativo. Cursa con dolor EVA 5/10. A la exploración: ROM flexión 120°; fuerza 4/5 (escala /5 documentada; no se convierte a 0–10). Exploración objetiva por completar (pruebas especiales): diagnóstico PROVISIONAL.",
-        "estado": "provisional",
+      "diagnostico_medico_referido": {
+        "texto": "gonartrosis de rodilla izquierda",
+        "estado": "referido",
+        "nota": "Diagnóstico MÉDICO referido (no es el diagnóstico fisioterapéutico); a confirmar con exploración/imagen pertinente.",
         "evidencias": [
           {
             "campo": "motivo.dxMedico",
             "fragmento": "gonartrosis de rodilla izquierda"
-          },
+          }
+        ]
+      },
+      "diagnostico_funcional": {
+        "texto": "Paciente de 46 años con disfunción de rodilla derecho. Cuadro: dolor EVA 5/10. A la exploración: ROM flexión 120°; fuerza 4/5 (escala /5 legada; se conserva, no se convierte). Mecanismo: degenerativo. Exploración por completar (pruebas especiales): diagnóstico PROVISIONAL.",
+        "estado": "provisional",
+        "evidencias": [
           {
             "campo": "motivo.mecanismo",
             "fragmento": "degenerativo"
@@ -4939,17 +5014,17 @@
         "autor": null,
         "fecha": null,
         "fuentes": [
-          "2.2.1-proto",
-          "2.2.1-proto"
+          "2.2.2-proto",
+          "2.2.2-proto"
         ],
         "cambios": []
       }
     },
     {
-      "version_generador": "2.2.1-proto",
-      "version_extractor": "2.2.1-proto",
-      "version_motor": "2.2.1-proto",
-      "catalogo_seguridad": "2026-11-26.c",
+      "version_generador": "2.2.2-proto",
+      "version_extractor": "2.2.2-proto",
+      "version_motor": "2.2.2-proto",
+      "catalogo_seguridad": "2026-11-26.d",
       "episodio": "SINT-MIN",
       "fecha_corte": "2026-11-26",
       "episodio_analisis": {
@@ -4979,8 +5054,14 @@
         "valoracion_inicial_presente": false,
         "evolucion_actual_presente": false
       },
+      "diagnostico_medico_referido": {
+        "texto": null,
+        "estado": "ausente",
+        "nota": "Sin diagnóstico médico referido en el expediente.",
+        "evidencias": []
+      },
       "diagnostico_funcional": {
-        "texto": "Disfunción de codo derecho. Cursa con dolor EVA 4/10. Sin hallazgos objetivos documentados. Exploración objetiva por completar (ROM goniométrico, fuerza en escala 0–10, pruebas especiales): diagnóstico PROVISIONAL. Datos clínicos insuficientes: no se afirma seguridad por ausencia de hallazgos.",
+        "texto": "Paciente de 39 años con disfunción de codo derecho. Cuadro: dolor EVA 4/10. Exploración objetiva no documentada. Exploración por completar (ROM goniométrico, fuerza en escala 0–10, pruebas especiales): diagnóstico PROVISIONAL. Datos clínicos insuficientes: no se afirma seguridad por ausencia de hallazgos.",
         "estado": "provisional",
         "evidencias": [
           {
@@ -5016,7 +5097,7 @@
       "valoracion_pendiente": [
         "DATOS INSUFICIENTES: completar exploración y cribado antes de afirmar seguridad o fijar metas (ausencia de dato ≠ ausencia de riesgo).",
         "Medir ROM goniométrico (grados)",
-        "Medir fuerza con escala (dinamómetro/Daniels)",
+        "Medir fuerza en la escala 0–10 de Sinergia (lado sano/referencia = 10)",
         "Realizar pruebas especiales pertinentes",
         "Documentar cribado de banderas rojas (no se infiere de pruebas especiales)."
       ],
@@ -5029,6 +5110,8 @@
           "linea_base": {
             "valor": 4,
             "unidad": "/10",
+            "reposo": null,
+            "movimiento": null,
             "fuente": "valoracion.eva",
             "tipo": "medido"
           },
@@ -5036,10 +5119,10 @@
             "valor": "≤ 2/10",
             "tipo": "propuesta_editable"
           },
-          "justificacion_meta": "Propuesta a partir de la EVA inicial 4/10 (descenso clínicamente relevante escalonado por irritabilidad). Editable por el fisioterapeuta.",
-          "meta_nota": "Meta editable; no es una reducción fija obligatoria ni \"dolor cero\". Reevaluar por irritabilidad y objetivo del paciente.",
+          "justificacion_meta": "Propuesta a partir de la EVA 4/10: descenso clínicamente relevante, escalonado por irritabilidad. Editable; no impone dolor cero.",
+          "meta_nota": "Meta editable; no es una reducción fija ni \"dolor cero\". Reevaluar por irritabilidad y objetivo del paciente.",
           "unidad": "/10",
-          "metodo": "EVA contextualizada",
+          "metodo": "EVA contextualizada (reposo/movimiento)",
           "reevaluacion": "1–2 semanas",
           "criterio_cumplimiento": "EVA en la meta acordada, sostenida",
           "evidencias": [
@@ -5050,45 +5133,9 @@
           ]
         },
         {
-          "fase": "mediano",
-          "alteracion": "movilidad (no medida)",
-          "actividad": "medir y luego recuperar ROM",
-          "indicador": "ROM (goniometría)",
-          "linea_base": {
-            "valor": null,
-            "tipo": "pendiente",
-            "fuente": "valoracion.rom",
-            "nota": "no medido: capturar línea base"
-          },
-          "meta_propuesta": null,
-          "unidad": "grados",
-          "metodo": "goniometría",
-          "reevaluacion": "tras medir",
-          "criterio_cumplimiento": null,
-          "evidencias": []
-        },
-        {
-          "fase": "mediano",
-          "alteracion": "fuerza (no medida)",
-          "actividad": "medir fuerza en escala 0–10 (lado sano = 10) y luego recuperarla",
-          "indicador": "fuerza — escala comparativa 0–10 de Sinergia",
-          "linea_base": {
-            "valor": null,
-            "tipo": "pendiente",
-            "fuente": "valoracion.fuerza",
-            "nota": "no medida: capturar en escala 0–10 de Sinergia contra la referencia válida"
-          },
-          "meta_propuesta": null,
-          "unidad": "/10",
-          "metodo": "escala comparativa 0–10 de Sinergia",
-          "reevaluacion": "tras medir",
-          "criterio_cumplimiento": null,
-          "evidencias": []
-        },
-        {
           "fase": "largo",
-          "alteracion": "limitación funcional / retorno a actividad",
-          "actividad": "retorno a la actividad funcional prioritaria según criterios (definir la actividad con el paciente: no documentada)",
+          "alteracion": "retorno funcional",
+          "actividad": "retorno a la actividad funcional prioritaria según criterios (definir la actividad con el paciente)",
           "indicador": "VISA (según región) + prueba funcional pertinente",
           "linea_base": {
             "valor": null,
@@ -5184,17 +5231,17 @@
         "autor": null,
         "fecha": null,
         "fuentes": [
-          "2.2.1-proto",
-          "2.2.1-proto"
+          "2.2.2-proto",
+          "2.2.2-proto"
         ],
         "cambios": []
       }
     },
     {
-      "version_generador": "2.2.1-proto",
-      "version_extractor": "2.2.1-proto",
-      "version_motor": "2.2.1-proto",
-      "catalogo_seguridad": "2026-11-26.c",
+      "version_generador": "2.2.2-proto",
+      "version_extractor": "2.2.2-proto",
+      "version_motor": "2.2.2-proto",
+      "catalogo_seguridad": "2026-11-26.d",
       "episodio": "SINT-BIO",
       "fecha_corte": "2026-11-26",
       "episodio_analisis": {
@@ -5224,8 +5271,14 @@
         "valoracion_inicial_presente": false,
         "evolucion_actual_presente": false
       },
+      "diagnostico_medico_referido": {
+        "texto": null,
+        "estado": "ausente",
+        "nota": "Sin diagnóstico médico referido en el expediente.",
+        "evidencias": []
+      },
       "diagnostico_funcional": {
-        "texto": "Disfunción de rodilla derecho por post-inmovilización por esguince. Cursa con dolor EVA 2/10. A la exploración: fuerza 4/5 cuádriceps (escala /5 documentada; no se convierte a 0–10). Limita: no logra flexión completa para subir escaleras. Exploración objetiva por completar (ROM goniométrico, pruebas especiales): diagnóstico PROVISIONAL.",
+        "texto": "Paciente de 27 años con disfunción de rodilla derecho. Cuadro: dolor EVA 2/10. Limitación funcional: no logra flexión completa para subir escaleras. A la exploración: fuerza 4/5 cuádriceps (escala /5 legada; se conserva, no se convierte). Mecanismo: post-inmovilización por esguince. Exploración por completar (ROM goniométrico, pruebas especiales): diagnóstico PROVISIONAL.",
         "estado": "provisional",
         "evidencias": [
           {
@@ -5271,6 +5324,8 @@
           "linea_base": {
             "valor": 2,
             "unidad": "/10",
+            "reposo": null,
+            "movimiento": null,
             "fuente": "valoracion.eva",
             "tipo": "medido"
           },
@@ -5278,10 +5333,10 @@
             "valor": "≤ 1/10",
             "tipo": "propuesta_editable"
           },
-          "justificacion_meta": "Propuesta a partir de la EVA inicial 2/10 (descenso clínicamente relevante escalonado por irritabilidad). Editable por el fisioterapeuta.",
-          "meta_nota": "Meta editable; no es una reducción fija obligatoria ni \"dolor cero\". Reevaluar por irritabilidad y objetivo del paciente.",
+          "justificacion_meta": "Propuesta a partir de la EVA 2/10: descenso clínicamente relevante, escalonado por irritabilidad. Editable; no impone dolor cero.",
+          "meta_nota": "Meta editable; no es una reducción fija ni \"dolor cero\". Reevaluar por irritabilidad y objetivo del paciente.",
           "unidad": "/10",
-          "metodo": "EVA contextualizada",
+          "metodo": "EVA contextualizada (reposo/movimiento)",
           "reevaluacion": "1–2 semanas",
           "criterio_cumplimiento": "EVA en la meta acordada, sostenida",
           "evidencias": [
@@ -5293,39 +5348,21 @@
         },
         {
           "fase": "mediano",
-          "alteracion": "movilidad (no medida)",
-          "actividad": "medir y luego recuperar ROM",
-          "indicador": "ROM (goniometría)",
-          "linea_base": {
-            "valor": null,
-            "tipo": "pendiente",
-            "fuente": "valoracion.rom",
-            "nota": "no medido: capturar línea base"
-          },
-          "meta_propuesta": null,
-          "unidad": "grados",
-          "metodo": "goniometría",
-          "reevaluacion": "tras medir",
-          "criterio_cumplimiento": null,
-          "evidencias": []
-        },
-        {
-          "fase": "mediano",
           "alteracion": "déficit de fuerza",
-          "actividad": "recuperar fuerza del segmento",
-          "indicador": "fuerza (escala /5 legada — documentada tal cual)",
+          "actividad": "recuperar la fuerza del segmento",
+          "indicador": "fuerza (valor /5 legado — se conserva, no se convierte)",
           "linea_base": {
             "valor": "4/5",
             "unidad": "/5",
             "escala": "daniels_0_5",
             "fuente": "valoracion.fuerza",
             "tipo": "medido",
-            "nota": "Escala /5 legada; NO se convierte a 0–10. Recapturar en escala 0–10 de Sinergia para seguimiento comparativo."
+            "nota": "Valor /5 histórico; se conserva tal cual. El seguimiento se hará con la escala 0–10 de Sinergia (lado sano = 10)."
           },
           "meta_propuesta": null,
-          "meta_nota": "No se convierte /5 a 0–10. Para seguimiento comparativo, recapturar fuerza en la escala 0–10 de Sinergia (lado sano = 10).",
+          "meta_nota": "No se convierte el valor /5. El seguimiento de aquí en adelante es con la escala 0–10 de Sinergia.",
           "unidad": "/5",
-          "metodo": "escala documentada (no convertida)",
+          "metodo": "valor documentado (histórico); seguimiento en escala 0–10 de Sinergia",
           "reevaluacion": "4–6 semanas",
           "criterio_cumplimiento": "fuerza en la meta acordada",
           "evidencias": [
@@ -5337,9 +5374,9 @@
         },
         {
           "fase": "largo",
-          "alteracion": "limitación funcional / retorno a actividad",
-          "actividad": "retorno a la actividad funcional prioritaria según criterios (definir la actividad con el paciente: no documentada)",
-          "indicador": "IKDC + dinamometría + tolerancia a sentadilla + prueba funcional pertinente",
+          "alteracion": "retorno funcional",
+          "actividad": "retorno a la actividad funcional prioritaria según criterios (definir la actividad con el paciente)",
+          "indicador": "IKDC + fuerza comparativa 0–10 + tolerancia a sentadilla + prueba funcional pertinente",
           "linea_base": {
             "valor": "no logra flexión completa para subir escaleras",
             "fuente": "dxFuncional.limitaciones",
@@ -5544,17 +5581,17 @@
         "autor": null,
         "fecha": null,
         "fuentes": [
-          "2.2.1-proto",
-          "2.2.1-proto"
+          "2.2.2-proto",
+          "2.2.2-proto"
         ],
         "cambios": []
       }
     },
     {
-      "version_generador": "2.2.1-proto",
-      "version_extractor": "2.2.1-proto",
-      "version_motor": "2.2.1-proto",
-      "catalogo_seguridad": "2026-11-26.c",
+      "version_generador": "2.2.2-proto",
+      "version_extractor": "2.2.2-proto",
+      "version_motor": "2.2.2-proto",
+      "catalogo_seguridad": "2026-11-26.d",
       "episodio": "SINT-FZ10",
       "fecha_corte": "2026-11-26",
       "episodio_analisis": {
@@ -5584,14 +5621,21 @@
         "valoracion_inicial_presente": false,
         "evolucion_actual_presente": false
       },
-      "diagnostico_funcional": {
-        "texto": "Disfunción de rodilla derecho en contexto de Insuficiencia de LCA por giro con pie fijo en la cancha. Cursa con dolor EVA 4/10. A la exploración: ROM flexion 0-120 grados; fuerza cuadriceps 6/10 (escala comparativa Sinergia, ≈60% de la referencia; lado sano confirmado 10/10); (la disminución de fuerza referida no muestra contexto neurológico: se interpreta como déficit de fuerza, no neural); pruebas especiales: Lachman positivo. Limita: no puede correr.",
-        "estado": "provisional",
+      "diagnostico_medico_referido": {
+        "texto": "Insuficiencia de LCA",
+        "estado": "referido",
+        "nota": "Diagnóstico MÉDICO referido (no es el diagnóstico fisioterapéutico); a confirmar con exploración/imagen pertinente.",
         "evidencias": [
           {
             "campo": "motivo.dxMedico",
             "fragmento": "Insuficiencia de LCA"
-          },
+          }
+        ]
+      },
+      "diagnostico_funcional": {
+        "texto": "Paciente de 26 años con disfunción de rodilla derecho. Cuadro: dolor EVA 4/10. Limitación funcional: no puede correr. A la exploración: ROM flexion 0-120 grados; fuerza cuadriceps 6/10 — escala comparativa Sinergia 0–10 (sano = 10); referencia lado sano confirmada 10/10; pruebas especiales (Lachman positivo). La disminución de fuerza no muestra contexto neurológico (déficit de fuerza, no neural). Mecanismo: giro con pie fijo en la cancha.",
+        "estado": "provisional",
+        "evidencias": [
           {
             "campo": "motivo.mecanismo",
             "fragmento": "giro con pie fijo en la cancha"
@@ -5654,6 +5698,8 @@
           "linea_base": {
             "valor": 4,
             "unidad": "/10",
+            "reposo": null,
+            "movimiento": null,
             "fuente": "valoracion.eva",
             "tipo": "medido"
           },
@@ -5661,10 +5707,10 @@
             "valor": "≤ 2/10",
             "tipo": "propuesta_editable"
           },
-          "justificacion_meta": "Propuesta a partir de la EVA inicial 4/10 (descenso clínicamente relevante escalonado por irritabilidad). Editable por el fisioterapeuta.",
-          "meta_nota": "Meta editable; no es una reducción fija obligatoria ni \"dolor cero\". Reevaluar por irritabilidad y objetivo del paciente.",
+          "justificacion_meta": "Propuesta a partir de la EVA 4/10: descenso clínicamente relevante, escalonado por irritabilidad. Editable; no impone dolor cero.",
+          "meta_nota": "Meta editable; no es una reducción fija ni \"dolor cero\". Reevaluar por irritabilidad y objetivo del paciente.",
           "unidad": "/10",
-          "metodo": "EVA contextualizada",
+          "metodo": "EVA contextualizada (reposo/movimiento)",
           "reevaluacion": "1–2 semanas",
           "criterio_cumplimiento": "EVA en la meta acordada, sostenida",
           "evidencias": [
@@ -5677,7 +5723,7 @@
         {
           "fase": "mediano",
           "alteracion": "déficit de movilidad",
-          "actividad": "recuperar ROM funcional de la zona",
+          "actividad": "optimizar y recuperar el ROM funcional de la zona",
           "indicador": "ROM (goniometría)",
           "linea_base": {
             "valor": "flexion 0-120 grados",
@@ -5686,7 +5732,7 @@
             "tipo": "medido"
           },
           "meta_propuesta": null,
-          "meta_nota": "Definir ROM meta con el fisio según articulación, objetivo y ROM del lado sano/funcional (no se asume simetría automática; proponer meta al documentar la referencia).",
+          "meta_nota": "Definir ROM meta con el fisio según articulación, objetivo y ROM del lado sano/funcional (no se asume simetría automática).",
           "unidad": "grados",
           "metodo": "goniometría",
           "reevaluacion": "3–6 semanas",
@@ -5701,17 +5747,24 @@
         {
           "fase": "mediano",
           "alteracion": "déficit de fuerza (cuadriceps)",
-          "actividad": "recuperar fuerza del segmento",
+          "actividad": "recuperar la fuerza de los grupos afectados",
           "indicador": "fuerza — escala comparativa 0–10 de Sinergia",
           "linea_base": {
-            "valor": "6/10",
+            "valor": "cuadriceps 6/10 ≈60%",
             "unidad": "/10",
             "escala": "comparativa_0_10",
             "referencia": "lado sano = 10",
-            "pct_estimado": 60,
-            "grupo_muscular": "cuadriceps",
-            "lado": "derecho",
             "referencia_confirmada_sana": true,
+            "grupos": [
+              {
+                "grupo": "cuadriceps",
+                "lado": null,
+                "escala": "comparativa_0_10",
+                "valor": 6,
+                "ref": 10,
+                "pct_estimado": 60
+              }
+            ],
             "fuente": "valoracion.fuerza",
             "tipo": "medido"
           },
@@ -5719,12 +5772,12 @@
             "valor": "10/10 (simetría con la referencia sana confirmada)",
             "tipo": "propuesta_editable"
           },
-          "justificacion_meta": "La referencia (lado sano) está CONFIRMADA en 10/10; se propone acercar el lado afectado (6/10 ≈ 60%) a la referencia. Editable por el fisioterapeuta.",
-          "meta_nota": "Escala 0–10 de Sinergia (lado sano = 10/10; 6/10 ≈ 60% de la referencia). NO se sustituye por Daniels/MRC ni se convierte entre escalas.",
+          "justificacion_meta": "La referencia (lado sano) está CONFIRMADA en 10/10; se propone acercar los grupos afectados (cuadriceps 6/10 ≈60%) a la referencia. Editable; sin tiempos rígidos.",
+          "meta_nota": "Escala 0–10 de Sinergia (lado sano = 10; 6/10 ≈ 60%): es la ÚNICA escala de fuerza del protocolo y no se convierten escalas.",
           "unidad": "/10",
           "metodo": "escala comparativa 0–10 de Sinergia (lado sano/referencia = 10)",
           "reevaluacion": "4–6 semanas",
-          "criterio_cumplimiento": "fuerza del segmento ≥ meta acordada respecto a la referencia sana",
+          "criterio_cumplimiento": "fuerza de los grupos ≥ meta acordada respecto a la referencia sana",
           "evidencias": [
             {
               "campo": "valoracion.fuerza",
@@ -5734,8 +5787,8 @@
         },
         {
           "fase": "largo",
-          "alteracion": "limitación funcional / retorno a actividad",
-          "actividad": "retorno a la actividad funcional prioritaria según criterios (definir la actividad con el paciente: no documentada)",
+          "alteracion": "retorno funcional",
+          "actividad": "retorno a la actividad funcional prioritaria según criterios (definir la actividad con el paciente)",
           "indicador": "IKDC + hop tests (según fase) + prueba funcional pertinente",
           "linea_base": {
             "valor": "no puede correr",
@@ -5849,17 +5902,17 @@
         "autor": null,
         "fecha": null,
         "fuentes": [
-          "2.2.1-proto",
-          "2.2.1-proto"
+          "2.2.2-proto",
+          "2.2.2-proto"
         ],
         "cambios": []
       }
     },
     {
-      "version_generador": "2.2.1-proto",
-      "version_extractor": "2.2.1-proto",
-      "version_motor": "2.2.1-proto",
-      "catalogo_seguridad": "2026-11-26.c",
+      "version_generador": "2.2.2-proto",
+      "version_extractor": "2.2.2-proto",
+      "version_motor": "2.2.2-proto",
+      "catalogo_seguridad": "2026-11-26.d",
       "episodio": "SINT-FZ10NR",
       "fecha_corte": "2026-11-26",
       "episodio_analisis": {
@@ -5889,8 +5942,14 @@
         "valoracion_inicial_presente": false,
         "evolucion_actual_presente": false
       },
+      "diagnostico_medico_referido": {
+        "texto": null,
+        "estado": "ausente",
+        "nota": "Sin diagnóstico médico referido en el expediente.",
+        "evidencias": []
+      },
       "diagnostico_funcional": {
-        "texto": "Disfunción de rodilla izquierdo. Cursa con dolor EVA 5/10. A la exploración: ROM flexion 0-110 grados; fuerza cuadriceps 6/10 (escala comparativa Sinergia, ≈60% de la referencia); (la disminución de fuerza referida no muestra contexto neurológico: se interpreta como déficit de fuerza, no neural). Exploración objetiva por completar (pruebas especiales): diagnóstico PROVISIONAL.",
+        "texto": "Paciente de 40 años con disfunción de rodilla izquierdo. Cuadro: dolor EVA 5/10. A la exploración: ROM flexion 0-110 grados; fuerza cuadriceps 6/10 — escala comparativa Sinergia 0–10 (sano = 10). La disminución de fuerza no muestra contexto neurológico (déficit de fuerza, no neural). Exploración por completar (pruebas especiales): diagnóstico PROVISIONAL.",
         "estado": "provisional",
         "evidencias": [
           {
@@ -5931,6 +5990,8 @@
           "linea_base": {
             "valor": 5,
             "unidad": "/10",
+            "reposo": null,
+            "movimiento": null,
             "fuente": "valoracion.eva",
             "tipo": "medido"
           },
@@ -5938,10 +5999,10 @@
             "valor": "≤ 3/10",
             "tipo": "propuesta_editable"
           },
-          "justificacion_meta": "Propuesta a partir de la EVA inicial 5/10 (descenso clínicamente relevante escalonado por irritabilidad). Editable por el fisioterapeuta.",
-          "meta_nota": "Meta editable; no es una reducción fija obligatoria ni \"dolor cero\". Reevaluar por irritabilidad y objetivo del paciente.",
+          "justificacion_meta": "Propuesta a partir de la EVA 5/10: descenso clínicamente relevante, escalonado por irritabilidad. Editable; no impone dolor cero.",
+          "meta_nota": "Meta editable; no es una reducción fija ni \"dolor cero\". Reevaluar por irritabilidad y objetivo del paciente.",
           "unidad": "/10",
-          "metodo": "EVA contextualizada",
+          "metodo": "EVA contextualizada (reposo/movimiento)",
           "reevaluacion": "1–2 semanas",
           "criterio_cumplimiento": "EVA en la meta acordada, sostenida",
           "evidencias": [
@@ -5954,7 +6015,7 @@
         {
           "fase": "mediano",
           "alteracion": "déficit de movilidad",
-          "actividad": "recuperar ROM funcional de la zona",
+          "actividad": "optimizar y recuperar el ROM funcional de la zona",
           "indicador": "ROM (goniometría)",
           "linea_base": {
             "valor": "flexion 0-110 grados",
@@ -5963,7 +6024,7 @@
             "tipo": "medido"
           },
           "meta_propuesta": null,
-          "meta_nota": "Definir ROM meta con el fisio según articulación, objetivo y ROM del lado sano/funcional (no se asume simetría automática; proponer meta al documentar la referencia).",
+          "meta_nota": "Definir ROM meta con el fisio según articulación, objetivo y ROM del lado sano/funcional (no se asume simetría automática).",
           "unidad": "grados",
           "metodo": "goniometría",
           "reevaluacion": "3–6 semanas",
@@ -5978,23 +6039,30 @@
         {
           "fase": "mediano",
           "alteracion": "déficit de fuerza (cuadriceps)",
-          "actividad": "recuperar fuerza del segmento",
+          "actividad": "recuperar la fuerza de los grupos afectados",
           "indicador": "fuerza — escala comparativa 0–10 de Sinergia",
           "linea_base": {
-            "valor": "6/10",
+            "valor": "cuadriceps 6/10 ≈60%",
             "unidad": "/10",
             "escala": "comparativa_0_10",
             "referencia": "lado sano = 10",
-            "pct_estimado": 60,
-            "grupo_muscular": "cuadriceps",
-            "lado": null,
             "referencia_confirmada_sana": false,
+            "grupos": [
+              {
+                "grupo": "cuadriceps",
+                "lado": null,
+                "escala": "comparativa_0_10",
+                "valor": 6,
+                "ref": 10,
+                "pct_estimado": 60
+              }
+            ],
             "fuente": "valoracion.fuerza",
             "tipo": "medido"
           },
           "meta_propuesta": null,
-          "justificacion_meta": "No se propone meta de simetría: la referencia (lado sano) NO está confirmada sana (no se asume el contralateral sano). Primera acción: confirmar/medir la referencia válida.",
-          "meta_nota": "Escala 0–10 de Sinergia (lado sano = 10/10; 6/10 ≈ 60% de la referencia). NO se sustituye por Daniels/MRC ni se convierte entre escalas.",
+          "justificacion_meta": "No se propone meta de simetría: la referencia (lado sano) NO está confirmada sana (no se asume el contralateral sano). Primero confirmar/medir la referencia válida.",
+          "meta_nota": "Escala 0–10 de Sinergia (lado sano = 10; 6/10 ≈ 60%): es la ÚNICA escala de fuerza del protocolo y no se convierten escalas.",
           "unidad": "/10",
           "metodo": "escala comparativa 0–10 de Sinergia (lado sano/referencia = 10)",
           "reevaluacion": "4–6 semanas",
@@ -6008,9 +6076,9 @@
         },
         {
           "fase": "largo",
-          "alteracion": "limitación funcional / retorno a actividad",
-          "actividad": "retorno a la actividad funcional prioritaria según criterios (definir la actividad con el paciente: no documentada)",
-          "indicador": "IKDC + dinamometría + tolerancia a sentadilla + prueba funcional pertinente",
+          "alteracion": "retorno funcional",
+          "actividad": "retorno a la actividad funcional prioritaria según criterios (definir la actividad con el paciente)",
+          "indicador": "IKDC + fuerza comparativa 0–10 + tolerancia a sentadilla + prueba funcional pertinente",
           "linea_base": {
             "valor": null,
             "tipo": "pendiente",
@@ -6125,17 +6193,17 @@
         "autor": null,
         "fecha": null,
         "fuentes": [
-          "2.2.1-proto",
-          "2.2.1-proto"
+          "2.2.2-proto",
+          "2.2.2-proto"
         ],
         "cambios": []
       }
     },
     {
-      "version_generador": "2.2.1-proto",
-      "version_extractor": "2.2.1-proto",
-      "version_motor": "2.2.1-proto",
-      "catalogo_seguridad": "2026-11-26.c",
+      "version_generador": "2.2.2-proto",
+      "version_extractor": "2.2.2-proto",
+      "version_motor": "2.2.2-proto",
+      "catalogo_seguridad": "2026-11-26.d",
       "episodio": "SINT-BIOSES",
       "fecha_corte": "2026-11-26",
       "episodio_analisis": {
@@ -6165,8 +6233,14 @@
         "valoracion_inicial_presente": false,
         "evolucion_actual_presente": false
       },
+      "diagnostico_medico_referido": {
+        "texto": null,
+        "estado": "ausente",
+        "nota": "Sin diagnóstico médico referido en el expediente.",
+        "evidencias": []
+      },
       "diagnostico_funcional": {
-        "texto": "Disfunción de rodilla izquierdo. Cursa con dolor EVA 2/10. Sin hallazgos objetivos documentados. Exploración objetiva por completar (ROM goniométrico, fuerza en escala 0–10, pruebas especiales): diagnóstico PROVISIONAL. Datos clínicos insuficientes: no se afirma seguridad por ausencia de hallazgos.",
+        "texto": "Paciente de 33 años con disfunción de rodilla izquierdo. Cuadro: dolor EVA 2/10. Exploración objetiva no documentada. Exploración por completar (ROM goniométrico, fuerza en escala 0–10, pruebas especiales): diagnóstico PROVISIONAL. Datos clínicos insuficientes: no se afirma seguridad por ausencia de hallazgos.",
         "estado": "provisional",
         "evidencias": [
           {
@@ -6202,7 +6276,7 @@
       "valoracion_pendiente": [
         "DATOS INSUFICIENTES: completar exploración y cribado antes de afirmar seguridad o fijar metas (ausencia de dato ≠ ausencia de riesgo).",
         "Medir ROM goniométrico (grados)",
-        "Medir fuerza con escala (dinamómetro/Daniels)",
+        "Medir fuerza en la escala 0–10 de Sinergia (lado sano/referencia = 10)",
         "Realizar pruebas especiales pertinentes",
         "Documentar cribado de banderas rojas (no se infiere de pruebas especiales)."
       ],
@@ -6215,6 +6289,8 @@
           "linea_base": {
             "valor": 2,
             "unidad": "/10",
+            "reposo": null,
+            "movimiento": null,
             "fuente": "valoracion.eva",
             "tipo": "medido"
           },
@@ -6222,10 +6298,10 @@
             "valor": "≤ 1/10",
             "tipo": "propuesta_editable"
           },
-          "justificacion_meta": "Propuesta a partir de la EVA inicial 2/10 (descenso clínicamente relevante escalonado por irritabilidad). Editable por el fisioterapeuta.",
-          "meta_nota": "Meta editable; no es una reducción fija obligatoria ni \"dolor cero\". Reevaluar por irritabilidad y objetivo del paciente.",
+          "justificacion_meta": "Propuesta a partir de la EVA 2/10: descenso clínicamente relevante, escalonado por irritabilidad. Editable; no impone dolor cero.",
+          "meta_nota": "Meta editable; no es una reducción fija ni \"dolor cero\". Reevaluar por irritabilidad y objetivo del paciente.",
           "unidad": "/10",
-          "metodo": "EVA contextualizada",
+          "metodo": "EVA contextualizada (reposo/movimiento)",
           "reevaluacion": "1–2 semanas",
           "criterio_cumplimiento": "EVA en la meta acordada, sostenida",
           "evidencias": [
@@ -6236,46 +6312,10 @@
           ]
         },
         {
-          "fase": "mediano",
-          "alteracion": "movilidad (no medida)",
-          "actividad": "medir y luego recuperar ROM",
-          "indicador": "ROM (goniometría)",
-          "linea_base": {
-            "valor": null,
-            "tipo": "pendiente",
-            "fuente": "valoracion.rom",
-            "nota": "no medido: capturar línea base"
-          },
-          "meta_propuesta": null,
-          "unidad": "grados",
-          "metodo": "goniometría",
-          "reevaluacion": "tras medir",
-          "criterio_cumplimiento": null,
-          "evidencias": []
-        },
-        {
-          "fase": "mediano",
-          "alteracion": "fuerza (no medida)",
-          "actividad": "medir fuerza en escala 0–10 (lado sano = 10) y luego recuperarla",
-          "indicador": "fuerza — escala comparativa 0–10 de Sinergia",
-          "linea_base": {
-            "valor": null,
-            "tipo": "pendiente",
-            "fuente": "valoracion.fuerza",
-            "nota": "no medida: capturar en escala 0–10 de Sinergia contra la referencia válida"
-          },
-          "meta_propuesta": null,
-          "unidad": "/10",
-          "metodo": "escala comparativa 0–10 de Sinergia",
-          "reevaluacion": "tras medir",
-          "criterio_cumplimiento": null,
-          "evidencias": []
-        },
-        {
           "fase": "largo",
-          "alteracion": "limitación funcional / retorno a actividad",
-          "actividad": "retorno a la actividad funcional prioritaria según criterios (definir la actividad con el paciente: no documentada)",
-          "indicador": "IKDC + dinamometría + tolerancia a sentadilla + prueba funcional pertinente",
+          "alteracion": "retorno funcional",
+          "actividad": "retorno a la actividad funcional prioritaria según criterios (definir la actividad con el paciente)",
+          "indicador": "IKDC + fuerza comparativa 0–10 + tolerancia a sentadilla + prueba funcional pertinente",
           "linea_base": {
             "valor": null,
             "tipo": "pendiente",
@@ -6545,17 +6585,17 @@
         "autor": null,
         "fecha": null,
         "fuentes": [
-          "2.2.1-proto",
-          "2.2.1-proto"
+          "2.2.2-proto",
+          "2.2.2-proto"
         ],
         "cambios": []
       }
     },
     {
-      "version_generador": "2.2.1-proto",
-      "version_extractor": "2.2.1-proto",
-      "version_motor": "2.2.1-proto",
-      "catalogo_seguridad": "2026-11-26.c",
+      "version_generador": "2.2.2-proto",
+      "version_extractor": "2.2.2-proto",
+      "version_motor": "2.2.2-proto",
+      "catalogo_seguridad": "2026-11-26.d",
       "episodio": "SINT-EPIS2",
       "fecha_corte": "2026-11-10",
       "episodio_analisis": {
@@ -6589,8 +6629,14 @@
         "valoracion_inicial_presente": true,
         "evolucion_actual_presente": true
       },
+      "diagnostico_medico_referido": {
+        "texto": null,
+        "estado": "ausente",
+        "nota": "Sin diagnóstico médico referido en el expediente.",
+        "evidencias": []
+      },
       "diagnostico_funcional": {
-        "texto": "Disfunción de hombro derecho. Cursa con dolor EVA 6/10. A la exploración: ROM abduccion 0-90 grados; fuerza abductor 7/10 (escala comparativa Sinergia, ≈70% de la referencia; lado sano confirmado 10/10). Exploración objetiva por completar (pruebas especiales): diagnóstico PROVISIONAL.",
+        "texto": "Paciente de 52 años con disfunción de hombro derecho. Cuadro: dolor EVA 6/10. A la exploración: ROM abduccion 0-90 grados; fuerza abductor 7/10 — escala comparativa Sinergia 0–10 (sano = 10); referencia lado sano confirmada 10/10. Exploración por completar (pruebas especiales): diagnóstico PROVISIONAL.",
         "estado": "provisional",
         "evidencias": [
           {
@@ -6631,6 +6677,8 @@
           "linea_base": {
             "valor": 6,
             "unidad": "/10",
+            "reposo": null,
+            "movimiento": null,
             "fuente": "valoracion.eva",
             "tipo": "medido"
           },
@@ -6638,10 +6686,10 @@
             "valor": "≤ 4/10",
             "tipo": "propuesta_editable"
           },
-          "justificacion_meta": "Propuesta a partir de la EVA inicial 6/10 (descenso clínicamente relevante escalonado por irritabilidad). Editable por el fisioterapeuta.",
-          "meta_nota": "Meta editable; no es una reducción fija obligatoria ni \"dolor cero\". Reevaluar por irritabilidad y objetivo del paciente.",
+          "justificacion_meta": "Propuesta a partir de la EVA 6/10: descenso clínicamente relevante, escalonado por irritabilidad. Editable; no impone dolor cero.",
+          "meta_nota": "Meta editable; no es una reducción fija ni \"dolor cero\". Reevaluar por irritabilidad y objetivo del paciente.",
           "unidad": "/10",
-          "metodo": "EVA contextualizada",
+          "metodo": "EVA contextualizada (reposo/movimiento)",
           "reevaluacion": "1–2 semanas",
           "criterio_cumplimiento": "EVA en la meta acordada, sostenida",
           "evidencias": [
@@ -6654,7 +6702,7 @@
         {
           "fase": "mediano",
           "alteracion": "déficit de movilidad",
-          "actividad": "recuperar ROM funcional de la zona",
+          "actividad": "optimizar y recuperar el ROM funcional de la zona",
           "indicador": "ROM (goniometría)",
           "linea_base": {
             "valor": "abduccion 0-90 grados",
@@ -6663,7 +6711,7 @@
             "tipo": "medido"
           },
           "meta_propuesta": null,
-          "meta_nota": "Definir ROM meta con el fisio según articulación, objetivo y ROM del lado sano/funcional (no se asume simetría automática; proponer meta al documentar la referencia).",
+          "meta_nota": "Definir ROM meta con el fisio según articulación, objetivo y ROM del lado sano/funcional (no se asume simetría automática).",
           "unidad": "grados",
           "metodo": "goniometría",
           "reevaluacion": "3–6 semanas",
@@ -6678,17 +6726,24 @@
         {
           "fase": "mediano",
           "alteracion": "déficit de fuerza (abductor)",
-          "actividad": "recuperar fuerza del segmento",
+          "actividad": "recuperar la fuerza de los grupos afectados",
           "indicador": "fuerza — escala comparativa 0–10 de Sinergia",
           "linea_base": {
-            "valor": "7/10",
+            "valor": "abductor 7/10 ≈70%",
             "unidad": "/10",
             "escala": "comparativa_0_10",
             "referencia": "lado sano = 10",
-            "pct_estimado": 70,
-            "grupo_muscular": "abductor",
-            "lado": "derecho",
             "referencia_confirmada_sana": true,
+            "grupos": [
+              {
+                "grupo": "abductor",
+                "lado": null,
+                "escala": "comparativa_0_10",
+                "valor": 7,
+                "ref": 10,
+                "pct_estimado": 70
+              }
+            ],
             "fuente": "valoracion.fuerza",
             "tipo": "medido"
           },
@@ -6696,12 +6751,12 @@
             "valor": "10/10 (simetría con la referencia sana confirmada)",
             "tipo": "propuesta_editable"
           },
-          "justificacion_meta": "La referencia (lado sano) está CONFIRMADA en 10/10; se propone acercar el lado afectado (7/10 ≈ 70%) a la referencia. Editable por el fisioterapeuta.",
-          "meta_nota": "Escala 0–10 de Sinergia (lado sano = 10/10; 6/10 ≈ 60% de la referencia). NO se sustituye por Daniels/MRC ni se convierte entre escalas.",
+          "justificacion_meta": "La referencia (lado sano) está CONFIRMADA en 10/10; se propone acercar los grupos afectados (abductor 7/10 ≈70%) a la referencia. Editable; sin tiempos rígidos.",
+          "meta_nota": "Escala 0–10 de Sinergia (lado sano = 10; 6/10 ≈ 60%): es la ÚNICA escala de fuerza del protocolo y no se convierten escalas.",
           "unidad": "/10",
           "metodo": "escala comparativa 0–10 de Sinergia (lado sano/referencia = 10)",
           "reevaluacion": "4–6 semanas",
-          "criterio_cumplimiento": "fuerza del segmento ≥ meta acordada respecto a la referencia sana",
+          "criterio_cumplimiento": "fuerza de los grupos ≥ meta acordada respecto a la referencia sana",
           "evidencias": [
             {
               "campo": "valoracion.fuerza",
@@ -6711,8 +6766,8 @@
         },
         {
           "fase": "largo",
-          "alteracion": "limitación funcional / retorno a actividad",
-          "actividad": "retorno a la actividad funcional prioritaria según criterios (definir la actividad con el paciente: no documentada)",
+          "alteracion": "retorno funcional",
+          "actividad": "retorno a la actividad funcional prioritaria según criterios (definir la actividad con el paciente)",
           "indicador": "SPADI o QuickDASH + prueba funcional pertinente",
           "linea_base": {
             "valor": null,
@@ -6828,8 +6883,8 @@
         "autor": null,
         "fecha": null,
         "fuentes": [
-          "2.2.1-proto",
-          "2.2.1-proto"
+          "2.2.2-proto",
+          "2.2.2-proto"
         ],
         "cambios": []
       }

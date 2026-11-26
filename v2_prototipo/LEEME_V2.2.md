@@ -1,11 +1,34 @@
-# SINERGIA · Generador de diagnóstico funcional — PROTOTIPO V2.2.1
+# SINERGIA · Generador de diagnóstico funcional — PROTOTIPO V2.2.2
 
 **Prototipo aislado.** NO toca `index.html` de producción, NO ejecuta `saveDB`, NO modifica expedientes, NO
 despliega, NO se fusiona todavía con el rediseño visual. Rama independiente. El rediseño visual
 (botones/ventanas) avanza en otra ventana de Claude; esta rama define y consume el **contrato de datos**
 (ver `SINERGIA_Contrato_Clinico_Compartido.md`).
 
-Módulos: `extractor / motor / generador / render = 2.2.1-proto` · catálogo seguridad `2026-11-26.c`.
+Módulos: `extractor / motor / generador / render = 2.2.2-proto` · catálogo seguridad `2026-11-26.d`.
+
+## Novedades V2.2.2 (cerrar la 1ª etapa: dx + objetivos de los 85, listos para incorporar)
+
+- **Dx estructurado:** bloques separados **dx médico referido · dx funcional · hipótesis · seguridad ·
+  pendientes**. Prosa fisioterapéutica concisa (EVA reposo/movimiento, fuerza 0–10 multi-grupo, mecanismo,
+  antecedentes, evolución SOAP). No concatena campos.
+- **Objetivos = solo alteraciones reales** (CP/MP/LP). Las tareas de *medir* ROM/fuerza/pruebas van a
+  pendientes, no a objetivos. Metas propuestas, editables y justificadas; sin dolor cero/simetría universal/
+  tiempos rígidos.
+- **Fuerza:** escala 0–10 de Sinergia con **múltiples grupos musculares** (valor+lado+% por grupo).
+  **Eliminadas todas las recomendaciones de Daniels/MRC/dinamómetro** de las propuestas y pendientes.
+- **Correcciones reproducibles** (auditorías): EVA robusta (reposo/movimiento, rangos, `7/10`→7),
+  lateralidad por hallazgo, multi-grupo, fecha de corte, seguridad (sin falsos neuro por "debilidad" ni
+  falsos conflictos de región), nuevo motivo (la IA no inicia), biomecánica `medidas[]`.
+- **Cohorte real-85 = OCTUBRE 2026** con **IDs anónimos ESTABLES** (hash del id real, reproducibles); mapeo
+  privado solo en scratchpad. Se distingue valoración inicial vs hallazgos SOAP posteriores.
+- **Reporte CONCISO** (`tools/build_conciso.js`): **1 página por paciente** (dx anterior vs propuesto,
+  objetivos anteriores vs nuevos CP/MP/LP, pendientes, precauciones, estado de revisión) en vez del PDF largo.
+- **Prototipo de revisión** (`prototipo_revision/`): aceptar/editar/rechazar por campo, prioriza vacíos,
+  conserva lo del fisio como alternativa, verificación previa (paciente/episodio/fecha/cambios) y **flujo de
+  aplicación en seco** por las rutas existentes (no escribe a expedientes). Probado con datos sintéticos.
+- **Contrato reconciliado** (§10): **MP como campo NUEVO aditivo** `objetivosMP` que **no toca** `objetivosCP`
+  /`objetivosLP`; plan de preservación documentado antes de tocar el esquema.
 
 ## Qué incorpora V2.2.1 (requisitos definitivos de Carlos + 3ª revisión)
 
