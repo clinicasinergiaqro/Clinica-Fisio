@@ -21,62 +21,94 @@
 })();
 </script>
 <style>
-  *{margin:0;padding:0;box-sizing:border-box}
-  :root{--navy:#1B3A6B;--navy2:#122950;--gold:#C9A84C;--ink:#2D3344;--gray:#5A6478;--gray2:#9BA3B5;--bg:#F4F6F9;--card:#fff;--line:#E4E8EF}
-  html,body{background:var(--bg);color:var(--ink);font-family:-apple-system,'Segoe UI',system-ui,sans-serif;line-height:1.5;-webkit-text-size-adjust:100%}
-  .wrap{max-width:640px;margin:0 auto;min-height:100vh}
-  .pub-header{background:#fff;color:var(--navy2);text-align:center;padding:24px 18px 20px;border-bottom:1px solid var(--line)}
-  .pub-header .logo-img{height:56px;max-width:82vw;object-fit:contain;display:inline-block}
-  .pub-header .rule{width:56px;height:3px;background:var(--gold);border-radius:3px;margin:14px auto 12px}
-  .pub-header .clin{font-size:11px;color:rgba(255,255,255,.6);text-transform:uppercase;letter-spacing:1px;font-weight:600}
-  .pub-header .nm{font-size:21px;font-weight:800;color:var(--navy2);margin-top:0}
-  .pub-header .fec{font-size:12.5px;color:var(--gray);margin-top:5px}
-  .body{padding:16px 16px 44px}
-  .zt{font-size:15px;font-weight:800;color:var(--navy2);margin:10px 2px 4px}
-  .zt.mt{margin-top:26px}
-  .zsub{font-size:12px;color:var(--gray);margin:0 2px 10px}
-  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden;margin-bottom:14px;box-shadow:0 1px 3px rgba(21,33,52,.05)}
-  .chdr{background:var(--navy);color:#fff;padding:11px 14px}
-  .cnum{font-size:11px;font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:.5px}
-  .cnom{font-size:16px;font-weight:800;margin-top:1px}
-  .cmeta{font-size:11px;color:rgba(255,255,255,.6);margin-top:2px}
-  .cbody{padding:14px}
-  .media{border-radius:10px;overflow:hidden;margin-bottom:12px;background:#0E1622;display:flex;align-items:center;justify-content:center;min-height:200px}
-  .media video,.media img{width:100%;max-height:360px;object-fit:contain;display:block}
-  .media.vidph{cursor:pointer;position:relative}
-  .media.vidph .playwrap{display:flex;flex-direction:column;align-items:center;gap:8px}
-  .media.vidph .playbtn{width:62px;height:62px;border-radius:50%;background:rgba(255,255,255,.14);border:2px solid rgba(255,255,255,.9);display:flex;align-items:center;justify-content:center;font-size:24px;color:#fff;padding-left:5px;box-sizing:border-box}
-  .media.vidph .playtxt{font-size:12px;color:#cbd5e1;font-weight:600}
-  .nomedia{color:var(--gray2);padding:24px;font-size:13px}
-  .dosis{background:#F0F4FF;border-radius:9px;padding:10px 13px;margin-bottom:8px}
-  .dlbl{font-size:11px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px}
-  .dval{font-size:16px;font-weight:600}
-  .ind{background:#F0F4FF;border-radius:9px;padding:10px 13px;margin-bottom:8px}
-  .ind .l{font-size:11px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px}
-  .ind .t{font-size:13.5px;color:var(--ink)}
-  .prec{background:#FEF3C7;border-radius:9px;padding:10px 13px;margin-bottom:8px}
-  .prec .l{font-size:11px;font-weight:700;color:#B7791F;text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px}
-  .prec .t{font-size:13.5px;color:#92400E}
-  .warn{background:#FEF3C7;border:1px solid #F0D888;border-radius:12px;padding:13px 15px;font-size:13px;color:#8A6D1A;line-height:1.55;margin-top:6px}
-  .warn b{color:#6B5314}
-  .sem{background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden;box-shadow:0 1px 3px rgba(21,33,52,.05)}
-  .sem-row{display:flex;gap:11px;padding:12px 14px;border-bottom:1px solid var(--line);align-items:flex-start}
+
+  /* SINERGIA · DISEÑO MÓVIL MÁSTER SENIOR
+     Diseño editorial clínico, sin dependencias ni cambio de reglas clínicas. */
+  *{box-sizing:border-box;margin:0;padding:0}
+  :root{
+    --navy:#102B5C;--navy2:#112750;--brand:#263C98;
+    --gold:#C9A554;--gold-soft:#F7F0E2;
+    --ink:#17243B;--gray:#637086;--gray2:#8490A1;
+    --bg:#F3F5F8;--card:#FFFFFF;--line:#E5E9F0;
+    --soft:#F7F9FC;--focus:#2252AC;
+  }
+  html{scroll-behavior:smooth;-webkit-text-size-adjust:100%}
+  body{background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;line-height:1.48;font-size:15px}
+  .wrap{max-width:620px;margin:0 auto;min-height:100vh;background:var(--bg)}
+  .pub-header{background:#fff;color:var(--navy2);padding:21px 19px 20px 19px;box-shadow:0 1px 0 var(--line)}
+  .pub-header .brand{display:flex;align-items:center;justify-content:flex-start;padding-bottom:18px;border-bottom:1px solid #EDF0F5}
+  .pub-header .logo-img{display:block;width:min(280px,83%);height:auto;object-fit:contain}
+  .head-hero{padding-top:20px}
+  .eyebrow{font-size:10px;letter-spacing:1.65px;font-weight:800;color:#95752E;text-transform:uppercase;display:flex;align-items:center;gap:9px}
+  .eyebrow:before{content:'';width:20px;height:2px;border-radius:10px;background:var(--gold)}
+  .pub-header .nm{font-size:clamp(22px,5.65vw,30px);font-weight:750;letter-spacing:-.6px;line-height:1.15;color:var(--navy2);margin-top:9px;overflow-wrap:anywhere}
+  .head-sub{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:12px}
+  .pub-header .fec{font-size:12px;color:var(--gray);font-weight:500}
+  .count{font-size:11px;font-weight:700;color:#6B562D;background:#F8F0DE;border-radius:20px;padding:5px 9px;white-space:nowrap}
+  .body{padding:19px 14px 44px}
+  .help-strip{background:#fff;border:1px solid var(--line);border-radius:12px;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 13px;margin:0 0 25px}
+  .help-strip .lead{font-weight:700;font-size:12px;color:var(--navy2)}
+  .help-strip .sublead{font-size:11px;color:var(--gray);margin-top:2px}
+  .help-strip a{font-size:11px;font-weight:800;text-decoration:none;white-space:nowrap;color:#9A7629;border-bottom:1px solid #CBAF74;padding-bottom:2px}
+  .zt{font-size:17px;font-weight:800;color:var(--navy2);letter-spacing:-.2px;margin:4px 1px 14px;display:flex;align-items:center;gap:9px}
+  .zt:before{content:'';display:inline-block;width:4px;height:18px;background:var(--gold);border-radius:4px;flex-shrink:0}
+  .zt.mt{margin-top:30px}
+  .zsub{font-size:12.5px;color:var(--gray);margin:-6px 1px 13px;line-height:1.5}
+  .card{background:#fff;border:1px solid var(--line);border-radius:18px;overflow:hidden;margin-bottom:17px;box-shadow:0 5px 20px rgba(18,41,80,.04)}
+  .chdr{padding:19px 16px 13px;background:#fff;border-top:3px solid var(--gold)}
+  .cnum{font-size:10.5px;letter-spacing:1.1px;color:#9C7E3D;font-weight:800;text-transform:uppercase;display:flex;align-items:center;gap:7px}
+  .cindex{display:inline-flex;align-items:center;justify-content:center;background:#F7F1E4;border:1px solid #F0E3C8;color:#8D6A29;font-size:11px;border-radius:7px;height:25px;min-width:31px;font-variant-numeric:tabular-nums}
+  .cnom{font-size:21px;line-height:1.19;letter-spacing:-.4px;font-weight:790;color:var(--navy2);margin-top:9px;overflow-wrap:anywhere}
+  .cmeta{color:#7A8698;font-size:11px;margin-top:9px;display:flex;align-items:center;gap:7px}
+  .cmeta:before{content:'●';font-size:6px;color:var(--gold)}
+  .cbody{padding:0 15px 16px}
+  .media{display:flex;align-items:center;justify-content:center;min-height:194px;aspect-ratio:16/9;background:#101D33;border-radius:12px;overflow:hidden;margin:0 0 16px}
+  .media video,.media img{display:block;width:100%;max-height:365px;max-width:100%;object-fit:contain}
+  .media.vidph{cursor:pointer;position:relative;color:#fff;background:radial-gradient(circle at 70% 22%,#365482 0%,transparent 48%),linear-gradient(145deg,#0A1E3E,#102D60 72%,#162C50);isolation:isolate}
+  .media.vidph:before{content:'';position:absolute;width:230px;height:230px;border:1px solid rgba(230,203,148,.16);border-radius:50%;left:-74px;bottom:-139px;pointer-events:none}
+  .media.vidph:after{content:'';position:absolute;width:118px;height:118px;border:1px solid rgba(230,203,148,.15);border-radius:50%;right:-30px;top:-65px;pointer-events:none}
+  .media-kicker{position:absolute;left:14px;top:14px;font-size:9px;letter-spacing:1.35px;color:#E7D3A1;font-weight:800}
+  .media.vidph .playwrap{position:relative;z-index:1;display:flex;align-items:center;flex-direction:column;gap:11px}
+  .media.vidph .playbtn{width:62px;height:62px;background:#fff;border:3px solid #E3D1A4;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#123165;font-size:23px;padding-left:4px;box-shadow:0 9px 26px rgba(0,0,0,.16);transition:transform .15s ease}
+  .media.vidph:hover .playbtn{transform:scale(1.06)}
+  .media.vidph .playtxt{font-size:12px;font-weight:650;color:#F6F7FC}
+  .nomedia{color:#DFE6EF;padding:20px;font-size:12px;text-align:center}
+  .dosis{margin:0 0 15px;background:#F5F7FB;border-radius:12px;padding:14px 13px 12px}
+  .dlbl{font-size:10px;color:#607390;text-transform:uppercase;letter-spacing:1.1px;font-weight:800;margin-bottom:10px}
+  .dose-pills{display:flex;flex-wrap:wrap;gap:7px}
+  .dose-pill{background:#fff;color:var(--navy2);padding:8px 10px;font-size:13px;line-height:1.3;font-weight:750;border:1px solid #E4EAF2;border-radius:8px;font-variant-numeric:tabular-nums}
+  .ind{padding:4px 1px 12px;margin-bottom:12px;border-bottom:1px solid var(--line)}
+  .ind .l,.prec .l{font-size:11px;font-weight:800;letter-spacing:.2px;color:var(--navy2);margin-bottom:5px}
+  .ind .t,.prec .t{font-size:14px;line-height:1.55;color:#34435B}
+  .prec{padding:12px 13px;background:#FFF9EB;border-left:3px solid #D4AC57;border-radius:9px;margin-bottom:0}
+  .prec .l{color:#9B6B19}
+  .prec .t{color:#72572B}
+  .sem{border:1px solid var(--line);background:#fff;border-radius:15px;overflow:hidden}
+  .sem-row{display:flex;align-items:flex-start;gap:12px;padding:15px 14px;border-bottom:1px solid #ECF0F4}
   .sem-row:last-child{border-bottom:0}
-  .sem-row.g{border-left:6px solid #1F8A4C}
-  .sem-row.a{border-left:6px solid #D99200}
-  .sem-row.r{border-left:6px solid #C0392B}
-  .sem-dot{font-size:19px;line-height:1.3;flex:0 0 auto}
-  .sem-tx{font-size:13px;color:var(--ink);line-height:1.5}
-  .sem-tx b{color:var(--navy2)}
-  .foot{text-align:center;margin-top:22px;font-size:12px;color:var(--gray2);line-height:1.6}
-  .state{text-align:center;padding:64px 26px}
-  .state .em{font-size:46px;margin-bottom:14px}
-  .state .t{font-size:18px;font-weight:800;color:var(--navy)}
-  .state .d{font-size:14px;color:var(--gray);margin-top:8px;line-height:1.55}
-  .btn{margin-top:18px;background:var(--navy);color:#fff;border:none;border-radius:12px;padding:13px 24px;font-size:15px;font-weight:800;cursor:pointer;font-family:inherit}
-  .banner-off{background:#FFF7E0;color:#8A6D1A;font-size:12px;text-align:center;padding:7px 12px;font-weight:600}
-  .spin{display:inline-block;width:34px;height:34px;border:3px solid #D8DEE9;border-top-color:var(--navy);border-radius:50%;animation:sp 1s linear infinite}
+  .sem-row.g{border-left:4px solid #23854C}.sem-row.a{border-left:4px solid #D59B21}.sem-row.r{border-left:4px solid #BC4A4A}
+  .sem-dot{font-size:17px;line-height:1.3;flex:0 0 auto}
+  .sem-tx{font-size:13px;line-height:1.55;color:#415068}
+  .sem-tx b{color:var(--navy2);font-size:13.5px}
+  .warn{border:1px solid #F0E5C7;background:#FFF9E9;border-radius:13px;padding:15px;font-size:12.5px;line-height:1.6;color:#786037;margin-top:17px}
+  .warn b{color:#8B6727}
+  .foot{border-top:1px solid var(--line);font-size:11px;line-height:1.7;color:#778296;text-align:center;margin:29px 0 0;padding:18px 4px 0}
+  .state{text-align:center;padding:72px 25px}.state .em{font-size:43px;margin-bottom:12px}.state .t{font-size:19px;color:var(--navy2);font-weight:800}.state .d{font-size:14px;color:var(--gray);line-height:1.6;margin-top:9px}
+  .btn{margin-top:20px;padding:12px 20px;font-family:inherit;font-size:14px;font-weight:800;color:#fff;background:var(--navy);border:0;border-radius:10px;cursor:pointer}
+  .banner-off{background:#FFF6E1;padding:9px 12px;color:#8A671B;font-size:11.5px;font-weight:700;text-align:center}
+  .spin{display:inline-block;width:34px;height:34px;border:3px solid #DEE5EF;border-top-color:var(--navy);border-radius:50%;animation:sp 1s linear infinite}
   @keyframes sp{to{transform:rotate(360deg)}}
+  .media.vidph:focus-visible,.help-strip a:focus-visible,.btn:focus-visible{outline:3px solid var(--focus);outline-offset:3px}
+  @media(max-width:390px){
+    .pub-header{padding:18px 15px 18px}
+    .body{padding:17px 11px 40px}
+    .cnom{font-size:20px}
+    .cbody{padding:0 12px 14px}
+    .dose-pill{font-size:12px;padding:8px 9px}
+    .help-strip{gap:9px;padding:10px 11px}
+  }
+  @media(min-width:620px){.wrap{border-left:1px solid var(--line);border-right:1px solid var(--line)}}
+  @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}.spin{animation:none}.media.vidph .playbtn{transition:none}}
 </style>
 </head>
 <body>
@@ -121,27 +153,24 @@
     var media='';
     if(m){
       if(!src) media='<div class="media"><div class="nomedia">Video no disponible sin conexión</div></div>';
-      // [POSTER] Antes se veía NEGRO al abrir (iOS/WhatsApp no pinta el 1er frame con #t=0.1, y a
-      // veces el segundo 0.1 del video es negro). Ahora: preload="metadata" + muted + salto a #t=0.5
-      // (fotograma más probable con imagen) + onloadeddata que fuerza el seek → se ve un cuadro del
-      // ejercicio en vez de negro. Sigue con controles para reproducir.
-      // [NO-SE-CARGAN] Videos grandes y sin faststart (moov al FINAL del archivo) obligaban al navegador
-      // del celular a bajar el archivo COMPLETO solo para mostrar el cuadro de inicio (preload="metadata"
-      // en los 4 a la vez) → en WhatsApp/datos móviles se colgaba y "no cargaban". Ahora NO se descarga
-      // nada hasta que la paciente toca Reproducir: la tarjeta aparece al instante y solo se baja el video
-      // que ella elige ver (uno a la vez). onclick → window._playVid inyecta el <video> real y lo reproduce.
-      else if(isVid) media='<div class="media vidph" role="button" tabindex="0" onclick="_playVid(this)" data-src="'+esc(src)+'"><div class="playwrap"><div class="playbtn">▶</div><div class="playtxt">Toca para ver el video</div></div></div>';
-      else if(isImg) media='<div class="media"><img src="'+esc(src)+'" loading="lazy" alt=""></div>';
+      // Video BAJO DEMANDA: no cargar el archivo hasta el toque. Sin poster remoto/precarga.
+      else if(isVid) media='<div class="media vidph" role="button" tabindex="0" aria-label="Reproducir video del ejercicio" onclick="_playVid(this)" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();_playVid(this)}" data-src="'+esc(src)+'"><span class="media-kicker">VIDEO DEL EJERCICIO</span><div class="playwrap"><div class="playbtn" aria-hidden="true">▶</div><div class="playtxt">Toca para reproducir</div></div></div>';
+      else if(isImg) media='<div class="media"><img src="'+esc(src)+'" loading="lazy" alt="Imagen del ejercicio"></div>';
       else media='<div class="media"><div class="nomedia">📎 '+esc(m.label||'Archivo')+'</div></div>';
     }
     var dosisTxt=ej.dosis||[ej.series,ej.repeticiones,ej.tiempo,ej.frecuencia,ej.duracion].filter(Boolean).join(' · ');
-    return '<div class="card"><div class="chdr"><div class="cnum">Ejercicio '+num+'</div><div class="cnom">'+esc(ej.nombre||ej.name||'Ejercicio')+'</div>'
+    var partes=dosisTxt?String(dosisTxt).split(/\s*[·•]\s*/).filter(Boolean):[];
+    var dosisHTML=partes.map(function(p){return '<span class="dose-pill">'+esc(p)+'</span>';}).join('');
+    // Solo oculta nombres técnicos de cámara (IMG_####), no modifica el dato original.
+    var nombreRaw=(ej.nombre||ej.name||'Ejercicio').trim();
+    var nombreVisible=/^(IMG|VID|MOV|DSC|PXL)[-_ ]?\d+(\.[a-z0-9]+)?$/i.test(nombreRaw)?'Ejercicio guiado':nombreRaw;
+    return '<article class="card"><div class="chdr"><div class="cnum"><span class="cindex">'+String(num).padStart(2,'0')+'</span> EJERCICIO</div><div class="cnom">'+esc(nombreVisible)+'</div>'
       +((ej.terapeuta||ej.fecha)?'<div class="cmeta">'+esc([ej.terapeuta,ej.fecha].filter(Boolean).join(' · '))+'</div>':'')+'</div>'
       +'<div class="cbody">'+media
-      +(dosisTxt?'<div class="dosis"><div class="dlbl">Dosificación</div><div class="dval">'+esc(dosisTxt)+'</div></div>':'')
-      +(ej.indicaciones?'<div class="ind"><div class="l">Indicaciones</div><div class="t">'+esc(ej.indicaciones)+'</div></div>':'')
+      +(dosisTxt?'<div class="dosis"><div class="dlbl">Dosificación</div><div class="dose-pills">'+dosisHTML+'</div></div>':'')
+      +(ej.indicaciones?'<div class="ind"><div class="l">Cómo realizarlo</div><div class="t">'+esc(ej.indicaciones)+'</div></div>':'')
       +(ej.precauciones?'<div class="prec"><div class="l">⚠ Precauciones</div><div class="t">'+esc(ej.precauciones)+'</div></div>':'')
-      +'</div></div>';
+      +'</div></article>';
   }
 
   function render(d, offline){
@@ -161,14 +190,15 @@
     var fechaPrograma=(rutina[rutina.length-1]&&rutina[rutina.length-1].fecha)||(vis[vis.length-1]&&vis[vis.length-1].fecha)||hoyFmt();
     var h='';
     if(offline) h+='<div class="banner-off">📶 Sin conexión — mostrando tu última rutina guardada</div>';
-    h+='<div class="pub-header"><img class="logo-img" src="https://storage.googleapis.com/clinicasinergia-ec2cf.firebasestorage.app/clinica/sinergia/assets/logo_horizontal.png" alt="Clínica Sinergia · Fisioterapia y Rehabilitación"><div class="rule"></div><div class="nm">'+esc(nombre)+'</div><div class="fec">Programa de ejercicios · '+esc(fechaPrograma)+'</div></div>';
+    h+='<div class="pub-header"><div class="brand"><img class="logo-img" src="https://storage.googleapis.com/clinicasinergia-ec2cf.firebasestorage.app/clinica/sinergia/assets/logo_horizontal.png" alt="Clínica Sinergia · Fisioterapia y Rehabilitación"></div><div class="head-hero"><div class="eyebrow">Programa de ejercicios</div><div class="nm">'+esc(nombre)+'</div><div class="head-sub"><span class="fec">'+esc(fechaPrograma)+'</span><span class="count">'+vis.length+' ejercicio'+(vis.length===1?'':'s')+' asignado'+(vis.length===1?'':'s')+'</span></div></div></div>';
     h+='<div class="body">';
+    if(vis.length) h+='<div class="help-strip"><div><div class="lead">¿Dudas con el dolor?</div><div class="sublead">Consulta la guía antes de continuar</div></div><a href="#guia-dolor">Ver guía →</a></div>';
     if(!vis.length){ h+='<div class="state"><div class="em">🏃</div><div class="d">Aún no tienes ejercicios asignados.</div></div>'; }
     else{
-      if(rutina.length){ h+='<div class="zt">🎯 Tu rutina de ahora</div>'; rutina.forEach(function(e,i){ h+=tarjeta(e,i+1); }); }
-      if(anteriores.length){ h+='<div class="zt mt">🕒 Tus ejercicios anteriores</div><div class="zsub">Los que trabajaste antes. Puedes seguir haciéndolos si tu terapeuta te lo indicó.</div>'; anteriores.forEach(function(e,i){ h+=tarjeta(e,i+1); }); }
-      if(otros.length){ h+='<div class="zt mt">📚 Más de tu biblioteca</div><div class="zsub">Otros ejercicios que tienes grabados.</div>'; otros.forEach(function(e,i){ h+=tarjeta(e,i+1); }); }
-      h+='<div class="zt mt">🚦 Semáforo del dolor</div><div class="zsub">Te dice cómo seguir con tus ejercicios según cómo te sientas.</div>'
+      if(rutina.length){ h+='<div class="zt">Tu rutina de ahora</div>'; rutina.forEach(function(e,i){ h+=tarjeta(e,i+1); }); }
+      if(anteriores.length){ h+='<div class="zt mt">Tus ejercicios anteriores</div><div class="zsub">Los que trabajaste antes. Puedes seguir haciéndolos si tu terapeuta te lo indicó.</div>'; anteriores.forEach(function(e,i){ h+=tarjeta(e,i+1); }); }
+      if(otros.length){ h+='<div class="zt mt">Más de tu biblioteca</div><div class="zsub">Otros ejercicios que tienes grabados.</div>'; otros.forEach(function(e,i){ h+=tarjeta(e,i+1); }); }
+      h+='<div class="zt mt" id="guia-dolor">Semáforo del dolor</div><div class="zsub">Te dice cómo seguir con tus ejercicios según cómo te sientas.</div>'
         +'<div class="sem">'
         +'<div class="sem-row g"><div class="sem-dot">🟢</div><div class="sem-tx"><b>Verde — puedes seguir</b><br>Molestia leve que se quita el mismo día y no amaneces con más rigidez. Continúa tu rutina normal.</div></div>'
         +'<div class="sem-row a"><div class="sem-dot">🟡</div><div class="sem-tx"><b>Ámbar — con calma</b><br>Dolor moderado durante el ejercicio, o molestia que se calma en 24 horas. Haz lo mismo, no subas la intensidad y repite unos días.</div></div>'
