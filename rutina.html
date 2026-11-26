@@ -26,6 +26,8 @@
   html,body{background:var(--bg);color:var(--ink);font-family:-apple-system,'Segoe UI',system-ui,sans-serif;line-height:1.5;-webkit-text-size-adjust:100%}
   .wrap{max-width:640px;margin:0 auto;min-height:100vh}
   .pub-header{background:var(--navy2);color:#fff;text-align:center;padding:26px 18px 22px}
+  .pub-header .logo-wrap{display:inline-block;background:#fff;border-radius:14px;padding:10px 18px;margin-bottom:12px;box-shadow:0 2px 10px rgba(0,0,0,.18)}
+  .pub-header .logo-img{height:46px;display:block;max-width:78vw;object-fit:contain}
   .pub-header .clin{font-size:11px;color:rgba(255,255,255,.6);text-transform:uppercase;letter-spacing:1px;font-weight:600}
   .pub-header .nm{font-size:20px;font-weight:800;margin-top:6px}
   .pub-header .fec{font-size:12px;color:rgba(255,255,255,.6);margin-top:4px}
@@ -159,7 +161,7 @@
     var fechaPrograma=(rutina[rutina.length-1]&&rutina[rutina.length-1].fecha)||(vis[vis.length-1]&&vis[vis.length-1].fecha)||hoyFmt();
     var h='';
     if(offline) h+='<div class="banner-off">📶 Sin conexión — mostrando tu última rutina guardada</div>';
-    h+='<div class="pub-header"><div style="font-size:34px;margin-bottom:6px">🫀</div><div class="clin">Clínica Sinergia · Fisioterapia y Rehabilitación</div><div class="nm">'+esc(nombre)+'</div><div class="fec">Programa de ejercicios · '+esc(fechaPrograma)+'</div></div>';
+    h+='<div class="pub-header"><div class="logo-wrap"><img class="logo-img" src="https://storage.googleapis.com/clinicasinergia-ec2cf.firebasestorage.app/clinica/sinergia/assets/logo_horizontal.png" alt="Clínica Sinergia · Fisioterapia y Rehabilitación"></div><div class="nm">'+esc(nombre)+'</div><div class="fec">Programa de ejercicios · '+esc(fechaPrograma)+'</div></div>';
     h+='<div class="body">';
     if(!vis.length){ h+='<div class="state"><div class="em">🏃</div><div class="d">Aún no tienes ejercicios asignados.</div></div>'; }
     else{
