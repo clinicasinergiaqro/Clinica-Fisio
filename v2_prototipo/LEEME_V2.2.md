@@ -160,3 +160,28 @@ herramienta de revisión por sección corregida, 5 pilotos seleccionados y entre
 ejecutado `saveDB`, **no** se ha tocado ningún expediente real, **no** se despliega y **no** se fusiona con el
 rediseño visual. Siguiente paso: validación individual de los 5 pilotos por el fisioterapeuta en la
 herramienta de revisión; la incorporación real a expedientes requiere autorización explícita campo por campo.
+
+---
+
+## ETAPA DE GENERACIÓN CERRADA (2026-11-27) — criterios que se conservan
+Carlos dio por cerrada la generación de dx + objetivos. El HTML `SINERGIA_Revision_Real85.html` es el
+documento DEFINITIVO de revisión; el PDF conciso queda DESACTUALIZADO (no regenerar). No más versiones,
+auditorías, cambios al generador ni documentos nuevos. Criterios a conservar de aquí en adelante:
+1. Las alertas clínicas NO impiden formular objetivos funcionales, pero estos quedan CONDICIONADOS a
+   resolver las restricciones pertinentes.
+2. No diferir solo la aparatología: también se respetan restricciones de EJERCICIO, CARGA y TERAPIA MANUAL
+   (no solo agentes físicos).
+3. Pacientes con contradicción de LATERALIDAD, REGIÓN o POSIBLE NUEVO MOTIVO → revisión individual (no
+   incorporar sin resolver).
+4. CONSERVAR los dx y objetivos existentes cuando sean adecuados.
+5. PRIORIZAR los campos vacíos o pendientes.
+6. No modificar el funcionamiento actual de Sinergia.
+
+### Reglas de la INCORPORACIÓN (usando funciones EXISTENTES de la app)
+- Incorporación INDIVIDUAL, con aprobación profesional por paciente y verificación del expediente VIGENTE
+  antes de escribir. NADA masivo.
+- Campos que la app ya tiene: `dxFuncional` (dx funcional), `objetivosCP`, `objetivosLP`. Se incorporan esos.
+- `objetivosMP` (mediano plazo) NO tiene campo en el expediente. NO modificar la estructura de datos para
+  añadirlo SIN autorización específica de Carlos → por ahora el MP queda como propuesta revisada, NO se escribe.
+- Nunca pisar un dx/objetivo escrito por un fisio si es adecuado; prioridad a vacío/pendiente.
+- Rama aislada; no fusionar al rediseño; no desplegar; no tocar el funcionamiento de Sinergia.
