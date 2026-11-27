@@ -23,16 +23,27 @@ shutil.copytree(REPLICA, OUT)
 shutil.copy(HERE + '/sinergia_v2.css', OUT + '/sinergia_v2.css')
 if os.path.exists(HERE + '/sinergia_v2.js'):
     shutil.copy(HERE + '/sinergia_v2.js', OUT + '/sinergia_v2.js')
+# capa de FIDELIDAD (ChatGPT) — se carga DESPUES de la V2 (orden de cascada)
+_fid = os.path.exists(HERE + '/sinergia_fidelidad.css')
+if _fid:
+    shutil.copy(HERE + '/sinergia_fidelidad.css', OUT + '/sinergia_fidelidad.css')
+    if os.path.exists(HERE + '/sinergia_fidelidad.js'):
+        shutil.copy(HERE + '/sinergia_fidelidad.js', OUT + '/sinergia_fidelidad.js')
 
 html = open(OUT + '/index.html', encoding='utf-8').read()
 inject = ('\n<!-- ===== SINERGIA V2 · RESKIN (capa de presentacion, aditiva) ===== -->\n'
           '<link rel="stylesheet" href="sinergia_v2.css">\n')
 if os.path.exists(HERE + '/sinergia_v2.js'):
     inject += '<script src="sinergia_v2.js" defer></script>\n'
+if _fid:
+    inject += ('<!-- ===== SINERGIA FIDELIDAD (ChatGPT) · DESPUES de la V2 ===== -->\n'
+               '<link rel="stylesheet" href="sinergia_fidelidad.css">\n')
+    if os.path.exists(HERE + '/sinergia_fidelidad.js'):
+        inject += '<script src="sinergia_fidelidad.js" defer></script>\n'
 i = html.find('</head>')
 assert i != -1, 'no se encontro </head>'
 html = html[:i] + inject + html[i:]
 open(OUT + '/index.html', 'w', encoding='utf-8').write(html)
 
 print('replica_v2 OK:', os.path.getsize(OUT + '/index.html'), 'bytes')
-print('reskin link presente:', 'sinergia_v2.css' in html)
+print('v2 link:', 'sinergia_v2.css' in html, '| fidelidad link:', 'sinergia_fidelidad.css' in html)
