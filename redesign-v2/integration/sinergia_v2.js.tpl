@@ -45,6 +45,7 @@
     share:"<circle cx='6' cy='12' r='2.4'/><circle cx='18' cy='6' r='2.4'/><circle cx='18' cy='18' r='2.4'/><path d='m8.1 10.9 7.8-3.8M8.1 13.1l7.8 3.8'/>",
     link:"<path d='M10 14a4 4 0 0 0 6 0l2-2a4 4 0 1 0-6-6l-1 1'/><path d='M14 10a4 4 0 0 0-6 0l-2 2a4 4 0 1 0 6 6l1-1'/>",
     moon:"<path d='M20 14a8 8 0 1 1-10-10 7 7 0 0 0 10 10z'/>",
+    wifi:"<path d='M4.5 11a11 11 0 0 1 15 0'/><path d='M7.5 14a7 7 0 0 1 9 0'/><path d='M10.5 17a3 3 0 0 1 3 0'/><circle cx='12' cy='19.5' r='.6'/>",
     hands:"<path d='M7 11V5a1.5 1.5 0 0 1 3 0M10 11V4a1.5 1.5 0 0 1 3 0v6M13 11V5.5a1.5 1.5 0 0 1 3 0V13a6 6 0 0 1-6 6H9a4 4 0 0 1-3-1.8L4 15'/>",
     list:"<path d='M8 6h12M8 12h12M8 18h12'/><circle cx='4' cy='6' r='1'/><circle cx='4' cy='12' r='1'/><circle cx='4' cy='18' r='1'/>",
     pill:"<rect x='3' y='8' width='18' height='8' rx='4' transform='rotate(45 12 12)'/><path d='M8.5 8.5 15.5 15.5'/>",
@@ -142,6 +143,17 @@
       img.alt = 'Clínica Sinergia — Fisioterapia y Rehabilitación';
       img.decoding = 'async'; img.src = LOGO;
       mark.appendChild(img); wrap.classList.add('v2-login-ready');
+    }
+    // etiquetas DENTRO del campo (placeholder), como el mockup (sin tocar la auth)
+    var u = document.getElementById('login-user'), p = document.getElementById('login-pass');
+    if (u && !u.__v2ph) { u.__v2ph = 1; u.placeholder = 'Correo electrónico'; u.setAttribute('aria-label', 'Correo electrónico'); }
+    if (p && !p.__v2ph) { p.__v2ph = 1; p.placeholder = 'Contraseña'; p.setAttribute('aria-label', 'Contraseña'); }
+    // botón offline: icono profesional de conexión en vez del emoji 📴 (conserva onclick)
+    var off = scr.querySelector('.btn-secondary');
+    if (off && !off.__v2off) {
+      off.__v2off = 1; stripEmoji(off);
+      var ic = document.createElement('span'); ic.innerHTML = svg('wifi');
+      if (ic.firstChild) off.insertBefore(ic.firstChild, off.firstChild);
     }
   }
 

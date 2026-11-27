@@ -37,6 +37,7 @@ async function runSuite(file, label) {
   });
 
   const A = [];
+  var extra = {};
   const assert = (name, cond) => A.push({ name, ok: !!cond });
   const ev = (fn, arg) => pg.evaluate(fn, arg);
 
@@ -55,7 +56,7 @@ async function runSuite(file, label) {
   assert('ver-contraseña alterna type (handler real)', t0 !== t1 && (t1 === 'text' || t1 === 'password'));
   await pg.click('#btn-ver-pass');
   // accesibilidad del logo (solo reskin): registrar, no exigir en original
-  const logoAlt = await ev(() => { const i = document.querySelector('#screen-login .login-logo img.v2-login-logo'); return i ? (i.getAttribute('alt') || '') : null; });
+  extra.logoAlt = await ev(() => { const i = document.querySelector('#screen-login .login-logo img.v2-login-logo'); return i ? (i.getAttribute('alt') || '') : null; });
 
   // ---- BOOT -> AGENDA ----
   await pg.waitForTimeout(2900);
@@ -95,12 +96,39 @@ async function runSuite(file, label) {
   const soapInputs = await ev(() => document.querySelectorAll('.form-input, textarea, input, select').length);
   assert('SOAP: controles de captura alcanzables', soapInputs > 5);
 
+  // ---- PRESERVACIÓN DE CAMPO (se escribe en un control real y se lee de vuelta) ----
+  const campoVal = await ev(() => {
+    var t = document.getElementById('f-sdolor') || document.querySelector('#soap-full textarea, #screen-soap textarea');
+    if (!t) return null;
+    t.value = 'QA_V2_PRUEBA'; t.dispatchEvent(new Event('input', { bubbles: true }));
+    return t.value;
+  });
+  assert('SOAP: el campo conserva lo escrito', campoVal === 'QA_V2_PRUEBA');
+
+  // ---- extras SOLO del reskin (no se comparan en paridad; se reportan) ----
+  var ex = extra;
+  ex.soapnav = await ev(() => document.querySelectorAll('.v2-soapnav').length);
+  ex.soapnavBtns = await ev(() => document.querySelectorAll('.v2-soapnav button').length);
+  // navegación S/O/A/P por CLIC visible: marca activo el tocado y desmarca el anterior
+  ex.navClick = await ev(() => {
+    var bs = document.querySelectorAll('.v2-soapnav button'); if (bs.length < 4) return 'n/a';
+    bs[1].click(); return (bs[1].classList.contains('active') && !bs[0].classList.contains('active')) ? 'ok' : 'FALLA';
+  });
+  // DUPLICACIONES del observer: re-render y contar elementos inyectados
+  await ev((id) => openExpediente(id), pid); await pg.waitForTimeout(500);
+  ex.tabIconsDup = await ev(() => {
+    var bad = 0; document.querySelectorAll('#screen-expediente .tabs .tab').forEach(function (t) { if (t.querySelectorAll(':scope > .v2-ic').length > 1) bad++; }); return bad;
+  });
+  ex.heroLogoDup = await ev(() => { var h = document.querySelector('#screen-expediente .exp-header'); return h ? h.querySelectorAll('.v2-hero-logo').length : 0; });
+  await ev((id) => nuevaSesionRapida(id), pid); await pg.waitForTimeout(600);
+  ex.soapnavDup = await ev(() => document.querySelectorAll('.v2-soapnav').length);
+
   // ---- integridad global ----
   assert('0 errores JS inesperados', errs.length === 0);
   assert('0 conexiones a servicios CLÍNICOS/backend (bloqueadas/detectadas)', netClin.length === 0);
 
   await b.close();
-  return { label, A, errs, net, netClin, extra: { logoAlt } };
+  return { label, A, errs, net, netClin, extra };
 }
 
 // ---- correr ambas y comparar paridad funcional ----
@@ -131,7 +159,23 @@ console.log('Logo <img> en original:', JSON.stringify(orig.extra.logoAlt), '(se 
 console.log('\nPARIDAD FUNCIONAL original vs reskin:',
   parityFails.length === 0 ? 'IDÉNTICA ✓ (el reskin no cambió ninguna función)' : ('DIVERGE ✗ -> ' + JSON.stringify(parityFails)));
 
-const okGlobal = so.fail === 0 && sr.fail === 0 && parityFails.length === 0 && orig.netClin.length === 0 && resk.netClin.length === 0;
+// comprobaciones de INTERACCIÓN y NO-DUPLICACIÓN (reskin)
+var rx = resk.extra;
+var reskinChecks = [
+  ['SOAP segmentado presente (1)', rx.soapnav === 1],
+  ['SOAP segmentado con 4 botones', rx.soapnavBtns === 4],
+  ['navegación S/O/A/P por clic marca activo', rx.navClick === 'ok'],
+  ['sin iconos duplicados en tabs del expediente', rx.tabIconsDup === 0],
+  ['1 solo logo en hero del expediente', rx.heroLogoDup <= 1],
+  ['sin duplicación de segmentado tras re-render (observer)', rx.soapnavDup <= 1],
+  ['original sin segmentado (0)', orig.extra.soapnav === 0]
+];
+console.log('\nInteracción / no-duplicación (reskin):');
+reskinChecks.forEach(function (c) { console.log('  ' + (c[1] ? 'OK ' : 'FALLA ') + c[0]); });
+var reskinFails = reskinChecks.filter(function (c) { return !c[1]; }).map(function (c) { return c[0]; });
+
+const okGlobal = so.fail === 0 && sr.fail === 0 && parityFails.length === 0 &&
+  orig.netClin.length === 0 && resk.netClin.length === 0 && reskinFails.length === 0;
 fs.writeFileSync(ROOT + '/scratchpad/audit/equiv_result.json', JSON.stringify({ orig: summarize(orig), resk: summarize(resk), parityFails, netClinOrig: orig.netClin, netClinResk: resk.netClin, externasBloqueadas: [...new Set(resk.net)], logoAltResk: resk.extra.logoAlt }, null, 2));
 console.log('\nRESULTADO GLOBAL:', okGlobal ? 'APROBADO ✓' : 'REVISAR ✗');
 console.log('===================================================================\n');
