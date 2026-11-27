@@ -206,10 +206,13 @@
           });
           nav.appendChild(b);
         });
-        full.insertBefore(nav, full.firstChild);
+        // colocar el segmentado JUSTO bajo el hero (nivel pantalla) para llegar rápido a la S
+        var tb = scr.querySelector('.topbar');
+        if (tb && tb.parentNode === scr && tb.nextSibling) scr.insertBefore(nav, tb.nextSibling);
+        else full.insertBefore(nav, full.firstChild);
       }
     }
-    deEmojiIn(scr, '.soap-label, .section-title, .btn-primary, .btn-secondary, .seg-toggle-label, .form-label');
+    deEmojiIn(scr, '.soap-label, .section-title, .form-section-title, .btn-primary, .btn-secondary, .seg-toggle-label, .form-label, .alert-banner-text, .alert-banner');
   }
 
   /* ---- AGENDA: iconos de chrome (los tiles ricos requieren datos; se de-emoji) ---- */
