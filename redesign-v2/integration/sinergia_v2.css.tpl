@@ -177,3 +177,48 @@ body{ background:var(--gray-50); -webkit-font-smoothing:antialiased; -moz-osx-fo
 .v2-row{ display:flex; align-items:center; gap:12px; background:#fff; border:1px solid var(--v2-border); border-radius:14px; padding:14px 16px; box-shadow:var(--v2-shadow-card); }
 .v2-row .v2-ic{ color:var(--navy); font-size:20px; }
 .v2-row::after{ content:"›"; margin-left:auto; color:var(--gray-400); font-size:20px; }
+
+/* ============================================================================
+   MODO OSCURO — los componentes NUEVOS del reskin necesitan variante oscura
+   (la app ya oscurece .card/.patient-card/etc. con mayor especificidad).
+   ============================================================================ */
+body.modo-oscuro{ background:#121722; color:#E8EDF5; }
+body.modo-oscuro .v2-tile,
+body.modo-oscuro .v2-row,
+body.modo-oscuro #screen-expediente .tabs .tab,
+body.modo-oscuro .v2-soapnav button{
+  background:#1E2533; border-color:#323C4F; color:#E8EDF5;
+  box-shadow:0 1px 2px rgba(0,0,0,.3), 0 10px 24px -16px rgba(0,0,0,.6);
+}
+body.modo-oscuro #screen-expediente .tabs .tab{ border-bottom-color:var(--gold); }
+body.modo-oscuro #screen-expediente .tabs .tab.active{ box-shadow:0 0 0 2px var(--gold-light) inset, 0 1px 2px rgba(0,0,0,.3); }
+body.modo-oscuro #screen-expediente .tab .v2-ic{ color:var(--gold-light); }
+body.modo-oscuro #screen-expediente .tab .v2-ic.boxed{ background:var(--gold); color:#121722; }
+body.modo-oscuro .v2-row .v2-ic{ color:var(--gold-light); }
+body.modo-oscuro .v2-soapnav{ background:#121722; }
+body.modo-oscuro .v2-soapnav button.active{ background:linear-gradient(180deg,var(--navy-light),var(--navy)); border-color:transparent; }
+body.modo-oscuro .v2-soapnav button.active .k,
+body.modo-oscuro .v2-soapnav button.active .t{ color:#fff; }
+body.modo-oscuro .v2-ic{ color:var(--gold-light); }
+body.modo-oscuro .bottom-nav{ background:rgba(20,24,36,.97); border-top-color:#2A3346; }
+body.modo-oscuro .nav-item{ color:#9AA6BC; }
+body.modo-oscuro .nav-item.active{ color:var(--gold-light); }
+/* login en oscuro */
+body.modo-oscuro #screen-login{ background:#121722; }
+body.modo-oscuro .login-box{ background:#1E2533; border-color:#323C4F; color:#E8EDF5; }
+body.modo-oscuro .login-box input{ background:#151B27; border-color:#323C4F; color:#E8EDF5; }
+body.modo-oscuro .login-logo.v2-login-ready p,
+body.modo-oscuro .login-box label{ color:#9AA6BC; }
+
+/* ============================================================================
+   DESKTOP / TABLET — centrar la columna (la app no usa marco de teléfono).
+   Mobile-first: solo afecta pantallas anchas (>= 900px).
+   ============================================================================ */
+@media (min-width:900px){
+  .topbar, .bottom-nav{ max-width:860px; left:50%; right:auto; transform:translateX(-50%); width:100%; }
+  .bottom-nav{ border-radius:18px 18px 0 0; }
+  .screen.active{ max-width:860px; margin-inline:auto; width:100%; }
+  #content-agenda, #content-pacientes, #content-expediente, #content-supervision,
+  #content-biblioteca, #content-nuevo, #soap-full, .exp-header{ max-width:820px; margin-inline:auto; }
+  #screen-expediente .tabs{ grid-template-columns:repeat(3,1fr); }
+}
