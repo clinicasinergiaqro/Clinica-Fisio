@@ -41,6 +41,17 @@ Pruebas: `node v2_prototipo/tests/pruebas_v2.js` → **78 PASA · 0 FALLA · 2 P
   por sección, matriz de correcciones de auditorías, inventario de documentos, lista de no consultables, mapa
   durable R85↔id real (**PHI, fuera de GitHub**), ZIP de código, pruebas.
 
+- **Redacción clínica Sinergia** (`src/redaccion_sinergia.js`): capa que compone el dx funcional y los
+  objetivos CP/MP/LP en **prosa natural de fisioterapeuta** (30–60 palabras, estilo de los ejemplos de la
+  clínica) a partir de los hechos YA verificados — **sin** "Cuadro:", "en seguimiento (N notas)", conteos de
+  sesión, "Exploración por completar/PROVISIONAL" ni "Paciente de X años". Región + lateralidad con
+  concordancia de género; encuadre causal ("secundaria a…") **sólo** cuando la región concuerda (no afirma
+  "cervical secundaria a LCA"); fuerza en escala 0–10 de Sinergia; precauciones/pendientes **aparte**. Con
+  plan bloqueado por seguridad se conserva el dx pero NO se proponen objetivos de progresión. No reconstruye
+  el generador: la extracción, la seguridad y los objetivos (qué alteraciones existen) quedan intactos; sólo
+  cambia la REDACCIÓN. Verificado en los 85: 0 frases de máquina, longitud media 27 palabras, 0 encuadres
+  causales fuera de su región.
+
 ## Novedades V2.2.2 (base de la etapa)
 
 ## Novedades V2.2.2 (cerrar la 1ª etapa: dx + objetivos de los 85, listos para incorporar)

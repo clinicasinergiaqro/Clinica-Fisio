@@ -10,6 +10,7 @@
   'use strict';
   var EX = (typeof require !== 'undefined') ? require('./extractor_v2.js') : root.ExtractorV2;
   var MS = (typeof require !== 'undefined') ? require('./motor_seguridad_v2.js') : root.MotorSeguridadV2;
+  var RED = (typeof require !== 'undefined') ? require('./redaccion_sinergia.js') : root.REDACCION;
   var VERSION = '2.2.3-proto';
 
   var norm = EX._norm, lleno = EX._lleno;
@@ -252,10 +253,13 @@
       trend = 'en seguimiento (' + h.soap_n + ' notas SOAP)' + (tp.length ? '; estado actual: ' + tp.join('; ') : '');
     }
     // Encuadre causal: "secundaria a" cuando hay cirugía/fractura/reconstrucción documentada.
+    // IMPORTANTE: los encuadres por LESIÓN (Aquiles/LCA/menisco) exigen que la REGIÓN concuerde, para no
+    // afirmar "columna cervical secundaria a LCA" cuando el término aparece por otra vía (historial/ruido).
     var _blob = norm((o.dxMedico || '') + ' ' + (o.padecimiento || '') + ' ' + (rec.patologia || ''));
+    var _regN = norm(reg); var _esRodilla = /rodilla/.test(_regN); var _esTobPie = /tobillo|pie/.test(_regN);
     var causal = null;
     if (/postoperad|postquirurg|post-?op|reconstrucc|reparacion|plastia|artroplast|protesis|osteosintesis/.test(_blob)) causal = 'secundaria a procedimiento quirúrgico';
-    if (/aquiles/.test(_blob) && /reparacion|reconstrucc|postoperad|ruptura|rotura/.test(_blob)) causal = 'secundaria a reparación quirúrgica del tendón de Aquiles';
+    if (/aquiles/.test(_blob) && _esTobPie && /reparacion|reconstrucc|postoperad|ruptura|rotura/.test(_blob)) causal = 'secundaria a reparación quirúrgica del tendón de Aquiles';
     if (/fractura/.test(_blob)) {
       // Enriquecer con el descriptor anatómico documentado (p. ej. "supraintercondílea humeral"), si existe.
       var _post = /postoperad|osteosintesis|placa|clavo|tornillo|post-?op/.test(_blob) ? ' postoperada' : '';
@@ -271,8 +275,8 @@
       }
       causal = 'secundaria a fractura' + _desc + _post;
     }
-    if (/lca|ligamento cruzado|cruzado anterior/.test(_blob)) causal = 'secundaria a lesión del ligamento cruzado anterior';
-    if (/menisc/.test(_blob) && /artroscop|meniscect|sutura|operad|postoperad/.test(_blob)) causal = 'secundaria a cirugía meniscal';
+    if (/lca|ligamento cruzado|cruzado anterior/.test(_blob) && _esRodilla) causal = 'secundaria a lesión del ligamento cruzado anterior';
+    if (/menisc/.test(_blob) && _esRodilla && /artroscop|meniscect|sutura|operad|postoperad/.test(_blob)) causal = 'secundaria a cirugía meniscal';
     // Prosa fisioterapéutica.
     var cuadro = [];
     if (dolorTxt) cuadro.push(dolorTxt);
@@ -292,7 +296,8 @@
     var pend = faltan.length ? (' Exploración por completar (' + faltan.join(', ') + '): diagnóstico PROVISIONAL.') : '';
     if (h.datosInsuficientes) pend += ' Datos clínicos insuficientes: no se afirma seguridad por ausencia de hallazgos.';
     var txt = [frase1, frase2, fraseLim, frase3, frase4, frase5, frase6].filter(Boolean).join(' ') + pend;
-    return { texto: txt, estado: 'provisional', evidencias: evid };
+    // Expone las piezas verificadas para la capa de REDACCIÓN (prosa Sinergia); no cambia 'texto'.
+    return { texto: txt, estado: 'provisional', evidencias: evid, reg: reg, lado: (h.ladoRecuperado || null), causal: causal, soapHall: (h.soapHallazgos && h.soapHallazgos.hallazgos) || '' };
   }
 
   function hipotesis(rec, h) {
@@ -566,6 +571,15 @@
     var dxf = dxFuncional(rec, h);
     var epi = episodioAnalisis(rec, h);
     var o = rec.orig || {};
+    // Capa de REDACCIÓN clínica (prosa Sinergia): dx + objetivos CP/MP/LP naturales, desde los hechos verificados.
+    var redac = null;
+    if (RED && dxf.estado === 'provisional' && dxf.texto && dxf.texto.indexOf('Anamnesis insuficiente') !== 0) {
+      try {
+        var _r = RED.redactar({ rec: rec, h: h, o: o, regLabel: dxf.reg, lado: dxf.lado, causal: dxf.causal, soapHall: dxf.soapHall });
+        // Con plan BLOQUEADO por seguridad: se conserva el dx funcional, pero NO se proponen objetivos de progresión.
+        redac = { diagnostico_funcional: _r.dx, objetivos: seguridad.bloquea_plan ? null : _r.objetivos, objetivos_nota: seguridad.bloquea_plan ? 'Resolver la alerta de seguridad antes de fijar objetivos terapéuticos.' : null, estilo: 'sinergia' };
+      } catch (e) { redac = { error: String(e && e.message || e) }; }
+    }
     var pend = [];
     // Observación informativa (NO acción automática): la IA no inicia un nuevo motivo; decide el fisio.
     if (epi.posible_nuevo_motivo) pend.push('POSIBLE NUEVO MOTIVO (informativo; lo decide el fisioterapeuta, la IA no lo inicia): ' + epi.observacion);
@@ -591,7 +605,8 @@
       diagnostico_medico_documentado: dxMedicoDocumentado(rec),
       hallazgos_radiologicos: hallazgosRadiologicos(rec),
       documentos_recuperados: documentosRecuperados(rec),
-      diagnostico_funcional: { texto: dxf.texto, estado: dxf.estado, evidencias: dxf.evidencias },
+      diagnostico_funcional: { texto: dxf.texto, estado: dxf.estado, evidencias: dxf.evidencias, redaccion: redac && !redac.error ? redac.diagnostico_funcional : null },
+      redaccion_sinergia: redac,
       hipotesis: hipotesis(rec, h),
       seguridad: { estado: seguridad.estado, cribado_documentado: seguridad.cribado_documentado, nota: seguridad.nota, alertas: seguridad.alertas, bloquea_plan: seguridad.bloquea_plan, reglas_pendientes: seguridad.reglas_pendientes, pendientes_bloqueo: seguridad.pendientes_bloqueo },
       discrepancias: confl.lista,

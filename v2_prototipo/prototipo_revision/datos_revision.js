@@ -1,6 +1,6 @@
 window.DATOS_REVISION = {
  "_meta": {
-  "generado": "2026-11-26T23:36:55.548Z",
+  "generado": "2026-11-27T00:04:31.024Z",
   "version": "2.2.3-proto",
   "n": 24,
   "fuente": "resultados_v22.json"
@@ -18,7 +18,7 @@ window.DATOS_REVISION = {
     "valoracion_inicial_fecha": null,
     "posible_nuevo_motivo": false,
     "source_hash": "69d4259bc4",
-    "proposal_hash": "4256b28496"
+    "proposal_hash": "27bdab47f6"
    },
    "secciones": {
     "dx_medico": {
@@ -30,13 +30,13 @@ window.DATOS_REVISION = {
     },
     "dx_funcional": {
      "anterior": "",
-     "propuesto": "Paciente de 52 años con disfunción de columna cervical derecho. Cuadro: dolor EVA 5/10; síntomas neurales referidos (sensitivos, sin déficit objetivado). A la exploración: movilidad rotación limitada (cualitativa); fuerza conservada (cualitativa, sin escala 0–10); pruebas especiales (Spurling dudoso). Mecanismo: postural. Exploración por completar (ROM goniométrico, fuerza en escala 0–10): diagnóstico PROVISIONAL.",
+     "propuesto": "Disfunción musculoesquelética de columna cervical derecha caracterizada por dolor, limitación de la movilidad cervical y síntomas neurales referidos, condicionando la tolerancia a posiciones prolongadas y a las actividades laborales.",
      "vacio": true
     },
     "cp": {
      "anterior": "",
      "propuesto": [
-      "reducir el dolor y la irritabilidad — meta: ≤ 3/10 (Propuesta a partir de la EVA 5/10: descenso clínicamente relevante, escalonado por irritabilidad. Editable; no impone dolor cero.)"
+      "Disminuir el dolor y la tensión muscular cervical."
      ],
      "campo": "objetivosCP",
      "vacio": true
@@ -44,7 +44,7 @@ window.DATOS_REVISION = {
     "mp": {
      "anterior": "",
      "propuesto": [
-      "optimizar y recuperar el ROM funcional de la zona"
+      "Recuperar la movilidad cervical, la capacidad muscular y mejorar el control postural según las alteraciones documentadas."
      ],
      "campo": "objetivosMP (nuevo, aditivo)",
      "vacio": true
@@ -52,7 +52,7 @@ window.DATOS_REVISION = {
     "lp": {
      "anterior": "",
      "propuesto": [
-      "retorno a la actividad funcional prioritaria según criterios (definir la actividad con el paciente)"
+      "Mejorar la tolerancia a las actividades laborales y cotidianas relacionadas con la movilidad cervical."
      ],
      "campo": "objetivosLP",
      "vacio": true
@@ -95,7 +95,7 @@ window.DATOS_REVISION = {
     "valoracion_inicial_fecha": null,
     "posible_nuevo_motivo": false,
     "source_hash": "69d4259bc4",
-    "proposal_hash": "2d4322c372"
+    "proposal_hash": "f1a5b9bd86"
    },
    "secciones": {
     "dx_medico": {
@@ -107,12 +107,14 @@ window.DATOS_REVISION = {
     },
     "dx_funcional": {
      "anterior": "",
-     "propuesto": "Paciente de 60 años con disfunción de columna cervical. Cuadro: dolor EVA 6/10; déficit neurológico OBJETIVADO. A la exploración: movilidad limitado (cualitativa); fuerza 3/5 intrínsecos de mano (escala /5 legada; se conserva, no se convierte). Mecanismo: insidioso. Exploración por completar (ROM goniométrico, pruebas especiales): diagnóstico PROVISIONAL.",
+     "propuesto": "Disfunción musculoesquelética de columna cervical caracterizada por dolor y limitación de la movilidad cervical, condicionando la tolerancia a posiciones prolongadas y a las actividades laborales.",
      "vacio": true
     },
     "cp": {
      "anterior": "",
-     "propuesto": [],
+     "propuesto": [
+      "⚠ Resolver la alerta de seguridad antes de fijar objetivos terapéuticos."
+     ],
      "campo": "objetivosCP",
      "vacio": true
     },
@@ -167,7 +169,7 @@ window.DATOS_REVISION = {
     "valoracion_inicial_fecha": null,
     "posible_nuevo_motivo": false,
     "source_hash": "69d4259bc4",
-    "proposal_hash": "a14f2845de"
+    "proposal_hash": "f4e3d6b550"
    },
    "secciones": {
     "dx_medico": {
@@ -179,12 +181,14 @@ window.DATOS_REVISION = {
     },
     "dx_funcional": {
      "anterior": "",
-     "propuesto": "Paciente de 67 años con disfunción musculoesquelética de rodilla derecho secundaria a procedimiento quirúrgico. Cuadro: dolor EVA 6/10. A la exploración: inflamación. Mecanismo: post-operatorio con inmovilización y reposo prolongado. Antecedentes a considerar: material de osteosíntesis/prótesis. Exploración por completar (ROM goniométrico, fuerza en escala 0–10, pruebas especiales): diagnóstico PROVISIONAL. Datos clínicos insuficientes: no se afirma seguridad por ausencia de hallazgos.",
+     "propuesto": "Disfunción musculoesquelética de rodilla derecha secundaria a procedimiento quirúrgico, con dolor e inflamación, condicionando la marcha y el uso de escaleras.",
      "vacio": true
     },
     "cp": {
      "anterior": "",
-     "propuesto": [],
+     "propuesto": [
+      "⚠ Resolver la alerta de seguridad antes de fijar objetivos terapéuticos."
+     ],
      "campo": "objetivosCP",
      "vacio": true
     },
@@ -253,7 +257,7 @@ window.DATOS_REVISION = {
     "valoracion_inicial_fecha": null,
     "posible_nuevo_motivo": false,
     "source_hash": "69d4259bc4",
-    "proposal_hash": "672afe3adc"
+    "proposal_hash": "e2a4e7d1eb"
    },
    "secciones": {
     "dx_medico": {
@@ -265,13 +269,13 @@ window.DATOS_REVISION = {
     },
     "dx_funcional": {
      "anterior": "",
-     "propuesto": "Paciente de 35 años con disfunción de rodilla derecho. Cuadro: dolor EVA 4/10. Limitación funcional: no puede saltar ni entrenar. A la exploración: ROM flexión 140°; fuerza 4/5 cuádriceps (escala /5 legada; se conserva, no se convierte). Mecanismo: sobreuso deportivo (voleibol). Exploración por completar (pruebas especiales): diagnóstico PROVISIONAL.",
+     "propuesto": "Disfunción musculoesquelética de rodilla derecha caracterizada por dolor y limitación de la flexión, condicionando las actividades deportivas y de mayor demanda.",
      "vacio": true
     },
     "cp": {
      "anterior": "",
      "propuesto": [
-      "reducir el dolor y la irritabilidad — meta: ≤ 2/10 (Propuesta a partir de la EVA 4/10: descenso clínicamente relevante, escalonado por irritabilidad. Editable; no impone dolor cero.)"
+      "Disminuir el dolor y mejorar la flexión de rodilla y la tolerancia a la marcha."
      ],
      "campo": "objetivosCP",
      "vacio": true
@@ -279,8 +283,7 @@ window.DATOS_REVISION = {
     "mp": {
      "anterior": "",
      "propuesto": [
-      "optimizar y recuperar el ROM funcional de la zona",
-      "recuperar la fuerza del segmento"
+      "Recuperar la fuerza de cuádriceps e isquiotibiales, la estabilidad y el control dinámico de rodilla."
      ],
      "campo": "objetivosMP (nuevo, aditivo)",
      "vacio": true
@@ -288,7 +291,7 @@ window.DATOS_REVISION = {
     "lp": {
      "anterior": "",
      "propuesto": [
-      "retorno a voleibol recreativo según criterios — meta: voleibol recreativo (Meta de retorno tomada de la actividad/objetivo documentado del paciente: \"voleibol recreativo\". Editable.)"
+      "Recuperar la capacidad funcional para caminar, subir y bajar escaleras y realizar las actividades habituales."
      ],
      "campo": "objetivosLP",
      "vacio": true
@@ -323,7 +326,7 @@ window.DATOS_REVISION = {
     "valoracion_inicial_fecha": null,
     "posible_nuevo_motivo": false,
     "source_hash": "69d4259bc4",
-    "proposal_hash": "cb0eff57dd"
+    "proposal_hash": "cc10103a03"
    },
    "secciones": {
     "dx_medico": {
@@ -335,13 +338,13 @@ window.DATOS_REVISION = {
     },
     "dx_funcional": {
      "anterior": "",
-     "propuesto": "Paciente de 24 años con disfunción musculoesquelética de rodilla izquierdo secundaria a lesión del ligamento cruzado anterior. Cuadro: dolor EVA 2/10. Limitación funcional: no puede correr ni pivotar. A la exploración: ROM extensión 0°, flexión 135°; fuerza disminuida en cuádriceps (cualitativa, sin escala 0–10); pruebas especiales (Lachman firme; cribado de banderas rojas negativo). Mecanismo: post-reconstrucción de LCA (injerto HTG). Exploración por completar (fuerza en escala 0–10): diagnóstico PROVISIONAL.",
+     "propuesto": "Disfunción musculoesquelética de rodilla izquierda secundaria a lesión del ligamento cruzado anterior, con dolor, limitación de la flexoextensión, disminución de la fuerza muscular y alteración de la estabilidad y la propiocepción, condicionando las actividades deportivas y de mayor demanda.",
      "vacio": true
     },
     "cp": {
      "anterior": "",
      "propuesto": [
-      "reducir el dolor y la irritabilidad — meta: ≤ 1/10 (Propuesta a partir de la EVA 2/10: descenso clínicamente relevante, escalonado por irritabilidad. Editable; no impone dolor cero.)"
+      "Disminuir el dolor y el derrame articular, recuperar la extensión de rodilla y favorecer la activación del cuádriceps."
      ],
      "campo": "objetivosCP",
      "vacio": true
@@ -349,8 +352,7 @@ window.DATOS_REVISION = {
     "mp": {
      "anterior": "",
      "propuesto": [
-      "optimizar y recuperar el ROM funcional de la zona",
-      "recuperar la fuerza del segmento"
+      "Recuperar la movilidad, la fuerza muscular, la estabilidad dinámica y el control neuromuscular del miembro inferior."
      ],
      "campo": "objetivosMP (nuevo, aditivo)",
      "vacio": true
@@ -358,7 +360,7 @@ window.DATOS_REVISION = {
     "lp": {
      "anterior": "",
      "propuesto": [
-      "retorno a fútbol según criterios — meta: fútbol (Meta de retorno tomada de la actividad/objetivo documentado del paciente: \"fútbol\". Editable.)"
+      "Recuperar la funcionalidad de la rodilla y favorecer el retorno deportivo cuando se cumplan los criterios funcionales correspondientes."
      ],
      "campo": "objetivosLP",
      "vacio": true
@@ -400,7 +402,7 @@ window.DATOS_REVISION = {
     "valoracion_inicial_fecha": null,
     "posible_nuevo_motivo": false,
     "source_hash": "69d4259bc4",
-    "proposal_hash": "9a9266584d"
+    "proposal_hash": "032d1930c9"
    },
    "secciones": {
     "dx_medico": {
@@ -412,13 +414,13 @@ window.DATOS_REVISION = {
     },
     "dx_funcional": {
      "anterior": "",
-     "propuesto": "Paciente de 41 años con disfunción musculoesquelética de rodilla derecho secundaria a procedimiento quirúrgico. Cuadro: dolor EVA 3/10. Limitación funcional: no puede flexionar más de 90° ni cargar completo. A la exploración: ROM flexión limitada a 90° por indicación; fuerza 4/5 (escala /5 legada; se conserva, no se convierte); pruebas especiales (McMurray no realizado por fase; cribado de banderas rojas negativo). Mecanismo: post-reparación meniscal.",
+     "propuesto": "Disfunción musculoesquelética de rodilla derecha secundaria a procedimiento quirúrgico, con dolor y limitación de la flexión, condicionando la marcha y el uso de escaleras.",
      "vacio": true
     },
     "cp": {
      "anterior": "",
      "propuesto": [
-      "reducir el dolor y la irritabilidad — meta: ≤ 2/10 (Propuesta a partir de la EVA 3/10: descenso clínicamente relevante, escalonado por irritabilidad. Editable; no impone dolor cero.)"
+      "Disminuir el dolor y mejorar la flexión de rodilla y la tolerancia a la marcha."
      ],
      "campo": "objetivosCP",
      "vacio": true
@@ -426,8 +428,7 @@ window.DATOS_REVISION = {
     "mp": {
      "anterior": "",
      "propuesto": [
-      "optimizar y recuperar el ROM funcional de la zona",
-      "recuperar la fuerza del segmento"
+      "Recuperar la fuerza de cuádriceps e isquiotibiales, la estabilidad y el control dinámico de rodilla."
      ],
      "campo": "objetivosMP (nuevo, aditivo)",
      "vacio": true
@@ -435,7 +436,7 @@ window.DATOS_REVISION = {
     "lp": {
      "anterior": "",
      "propuesto": [
-      "retorno a la actividad funcional prioritaria según criterios (definir la actividad con el paciente)"
+      "Recuperar la capacidad funcional para caminar, subir y bajar escaleras y realizar las actividades habituales."
      ],
      "campo": "objetivosLP",
      "vacio": true
@@ -476,7 +477,7 @@ window.DATOS_REVISION = {
     "valoracion_inicial_fecha": null,
     "posible_nuevo_motivo": false,
     "source_hash": "69d4259bc4",
-    "proposal_hash": "89660c38b7"
+    "proposal_hash": "4cbd45d8d5"
    },
    "secciones": {
     "dx_medico": {
@@ -488,13 +489,13 @@ window.DATOS_REVISION = {
     },
     "dx_funcional": {
      "anterior": "",
-     "propuesto": "Paciente de 44 años con disfunción de columna lumbar. Cuadro: dolor EVA 4/10. Limitación funcional: molestia al estar sentado mucho tiempo. A la exploración: movilidad flexión lumbar moderadamente limitada (cualitativa); fuerza conservada (cualitativa, sin escala 0–10); pruebas especiales (SLR negativo; cribado de banderas rojas negativo). Mecanismo: esfuerzo al levantar carga. Exploración por completar (ROM goniométrico, fuerza en escala 0–10): diagnóstico PROVISIONAL.",
+     "propuesto": "Disfunción musculoesquelética de columna lumbar caracterizada por dolor y limitación de la movilidad lumbopélvica, condicionando la marcha, la bipedestación y las actividades cotidianas.",
      "vacio": true
     },
     "cp": {
      "anterior": "",
      "propuesto": [
-      "reducir el dolor y la irritabilidad — meta: ≤ 2/10 (Propuesta a partir de la EVA 4/10: descenso clínicamente relevante, escalonado por irritabilidad. Editable; no impone dolor cero.)"
+      "Disminuir el dolor lumbar e irradiado y mejorar la tolerancia a la marcha y a los cambios de posición, siempre que la valoración de seguridad permita continuar."
      ],
      "campo": "objetivosCP",
      "vacio": true
@@ -502,7 +503,7 @@ window.DATOS_REVISION = {
     "mp": {
      "anterior": "",
      "propuesto": [
-      "optimizar y recuperar el ROM funcional de la zona"
+      "Mejorar la movilidad lumbopélvica, la estabilidad y la tolerancia a las actividades funcionales."
      ],
      "campo": "objetivosMP (nuevo, aditivo)",
      "vacio": true
@@ -510,7 +511,7 @@ window.DATOS_REVISION = {
     "lp": {
      "anterior": "",
      "propuesto": [
-      "retorno a la actividad funcional prioritaria según criterios (definir la actividad con el paciente)"
+      "Recuperar la capacidad para caminar, permanecer de pie y realizar las actividades laborales y cotidianas."
      ],
      "campo": "objetivosLP",
      "vacio": true
@@ -546,7 +547,7 @@ window.DATOS_REVISION = {
     "valoracion_inicial_fecha": null,
     "posible_nuevo_motivo": false,
     "source_hash": "69d4259bc4",
-    "proposal_hash": "05b99da3fb"
+    "proposal_hash": "a95bbcd0aa"
    },
    "secciones": {
     "dx_medico": {
@@ -558,13 +559,13 @@ window.DATOS_REVISION = {
     },
     "dx_funcional": {
      "anterior": "",
-     "propuesto": "Paciente de 38 años con disfunción de columna cervical. Cuadro: dolor EVA 3/10. A la exploración: ROM rotación cervical 60° bilateral; fuerza conservada (cualitativa, sin escala 0–10). Mecanismo: postural, trabajo de oficina. Exploración por completar (fuerza en escala 0–10, pruebas especiales): diagnóstico PROVISIONAL.",
+     "propuesto": "Disfunción musculoesquelética de columna cervical caracterizada por dolor y limitación de la movilidad cervical, condicionando la tolerancia a posiciones prolongadas y a las actividades laborales.",
      "vacio": true
     },
     "cp": {
      "anterior": "",
      "propuesto": [
-      "reducir el dolor y la irritabilidad — meta: ≤ 2/10 (Propuesta a partir de la EVA 3/10: descenso clínicamente relevante, escalonado por irritabilidad. Editable; no impone dolor cero.)"
+      "Disminuir el dolor y la tensión muscular cervical."
      ],
      "campo": "objetivosCP",
      "vacio": true
@@ -572,7 +573,7 @@ window.DATOS_REVISION = {
     "mp": {
      "anterior": "",
      "propuesto": [
-      "optimizar y recuperar el ROM funcional de la zona"
+      "Recuperar la movilidad cervical, la capacidad muscular y mejorar el control postural según las alteraciones documentadas."
      ],
      "campo": "objetivosMP (nuevo, aditivo)",
      "vacio": true
@@ -580,7 +581,7 @@ window.DATOS_REVISION = {
     "lp": {
      "anterior": "",
      "propuesto": [
-      "retorno a la actividad funcional prioritaria según criterios (definir la actividad con el paciente)"
+      "Mejorar la tolerancia a las actividades laborales y cotidianas relacionadas con la movilidad cervical."
      ],
      "campo": "objetivosLP",
      "vacio": true
@@ -616,7 +617,7 @@ window.DATOS_REVISION = {
     "valoracion_inicial_fecha": null,
     "posible_nuevo_motivo": false,
     "source_hash": "69d4259bc4",
-    "proposal_hash": "93c9db75e0"
+    "proposal_hash": "cb88914810"
    },
    "secciones": {
     "dx_medico": {
@@ -628,13 +629,13 @@ window.DATOS_REVISION = {
     },
     "dx_funcional": {
      "anterior": "",
-     "propuesto": "Paciente de 50 años con disfunción musculoesquelética de hombro izquierdo secundaria a lesión del ligamento cruzado anterior. Cuadro: dolor EVA 5/10. Limitación funcional: no puede levantar el brazo por encima del hombro. A la exploración: ROM abducción activa 110°; fuerza 4/5 manguito (escala /5 legada; se conserva, no se convierte); pruebas especiales (Neer positivo; cribado de banderas rojas negativo). Mecanismo: insidioso.",
+     "propuesto": "Disfunción musculoesquelética de hombro izquierdo caracterizada por dolor y limitación de la movilidad en flexión y abducción, condicionando las actividades que requieren elevación del miembro superior.",
      "vacio": true
     },
     "cp": {
      "anterior": "",
      "propuesto": [
-      "reducir el dolor y la irritabilidad — meta: ≤ 3/10 (Propuesta a partir de la EVA 5/10: descenso clínicamente relevante, escalonado por irritabilidad. Editable; no impone dolor cero.)"
+      "Disminuir el dolor y mejorar la movilidad del hombro."
      ],
      "campo": "objetivosCP",
      "vacio": true
@@ -642,8 +643,7 @@ window.DATOS_REVISION = {
     "mp": {
      "anterior": "",
      "propuesto": [
-      "optimizar y recuperar el ROM funcional de la zona",
-      "recuperar la fuerza del segmento"
+      "Recuperar la fuerza de los grupos musculares afectados, el control escapular y la movilidad funcional."
      ],
      "campo": "objetivosMP (nuevo, aditivo)",
      "vacio": true
@@ -651,7 +651,7 @@ window.DATOS_REVISION = {
     "lp": {
      "anterior": "",
      "propuesto": [
-      "retorno a la actividad funcional prioritaria según criterios (definir la actividad con el paciente)"
+      "Recuperar la capacidad de alcance, elevación y carga del miembro superior durante las actividades habituales."
      ],
      "campo": "objetivosLP",
      "vacio": true
@@ -685,7 +685,7 @@ window.DATOS_REVISION = {
     "valoracion_inicial_fecha": null,
     "posible_nuevo_motivo": false,
     "source_hash": "69d4259bc4",
-    "proposal_hash": "61cfe76047"
+    "proposal_hash": "9fe5791844"
    },
    "secciones": {
     "dx_medico": {
@@ -697,13 +697,13 @@ window.DATOS_REVISION = {
     },
     "dx_funcional": {
      "anterior": "",
-     "propuesto": "Paciente de 29 años con disfunción de tobillo/pie derecho. Cuadro: dolor EVA 3/10. Limitación funcional: no puede correr ni saltar. A la exploración: movilidad dorsiflexión limitada (WBLT reducido) (cualitativa); fuerza 4/5 peroneos (escala /5 legada; se conserva, no se convierte); pruebas especiales (cajón anterior leve; cribado de banderas rojas negativo). Mecanismo: inversión jugando básquetbol. Exploración por completar (ROM goniométrico): diagnóstico PROVISIONAL.",
+     "propuesto": "Disfunción musculoesquelética de tobillo derecho posterior a esguince, con dolor, limitación de la dorsiflexión y alteración de la estabilidad y la propiocepción, condicionando las actividades deportivas y de mayor demanda.",
      "vacio": true
     },
     "cp": {
      "anterior": "",
      "propuesto": [
-      "reducir el dolor y la irritabilidad — meta: ≤ 2/10 (Propuesta a partir de la EVA 3/10: descenso clínicamente relevante, escalonado por irritabilidad. Editable; no impone dolor cero.)"
+      "Disminuir el dolor, mejorar la movilidad del tobillo y favorecer la tolerancia al apoyo."
      ],
      "campo": "objetivosCP",
      "vacio": true
@@ -711,8 +711,7 @@ window.DATOS_REVISION = {
     "mp": {
      "anterior": "",
      "propuesto": [
-      "optimizar y recuperar el ROM funcional de la zona",
-      "recuperar la fuerza del segmento"
+      "Recuperar la fuerza muscular, la estabilidad y la propiocepción del tobillo."
      ],
      "campo": "objetivosMP (nuevo, aditivo)",
      "vacio": true
@@ -720,7 +719,7 @@ window.DATOS_REVISION = {
     "lp": {
      "anterior": "",
      "propuesto": [
-      "retorno a básquetbol según criterios — meta: básquetbol (Meta de retorno tomada de la actividad/objetivo documentado del paciente: \"básquetbol\". Editable.)"
+      "Recuperar la marcha independiente y reincorporar al paciente a sus actividades habituales."
      ],
      "campo": "objetivosLP",
      "vacio": true
@@ -755,7 +754,7 @@ window.DATOS_REVISION = {
     "valoracion_inicial_fecha": null,
     "posible_nuevo_motivo": false,
     "source_hash": "69d4259bc4",
-    "proposal_hash": "4009594bce"
+    "proposal_hash": "0d9847c514"
    },
    "secciones": {
     "dx_medico": {
@@ -767,13 +766,13 @@ window.DATOS_REVISION = {
     },
     "dx_funcional": {
      "anterior": "",
-     "propuesto": "Paciente de 33 años con disfunción de cadera derecho. Cuadro: dolor EVA 5/10. Limitación funcional: no puede hacer sentadilla profunda. A la exploración: movilidad rotación interna de cadera limitada (cualitativa); fuerza 4/5 glúteo medio (escala /5 legada; se conserva, no se convierte); pruebas especiales (FADIR positivo; cribado de banderas rojas negativo). Mecanismo: pinzamiento femoroacetabular. Exploración por completar (ROM goniométrico): diagnóstico PROVISIONAL.",
+     "propuesto": "Disfunción musculoesquelética de cadera derecha caracterizada por dolor y limitación de la movilidad de cadera, condicionando la marcha, el apoyo unipodal y el uso de escaleras.",
      "vacio": true
     },
     "cp": {
      "anterior": "",
      "propuesto": [
-      "reducir el dolor y la irritabilidad — meta: ≤ 3/10 (Propuesta a partir de la EVA 5/10: descenso clínicamente relevante, escalonado por irritabilidad. Editable; no impone dolor cero.)"
+      "Disminuir el dolor y mejorar la tolerancia al apoyo y la movilidad de cadera."
      ],
      "campo": "objetivosCP",
      "vacio": true
@@ -781,8 +780,7 @@ window.DATOS_REVISION = {
     "mp": {
      "anterior": "",
      "propuesto": [
-      "optimizar y recuperar el ROM funcional de la zona",
-      "recuperar la fuerza del segmento"
+      "Recuperar la fuerza muscular, la estabilidad pélvica y el control del miembro inferior."
      ],
      "campo": "objetivosMP (nuevo, aditivo)",
      "vacio": true
@@ -790,7 +788,7 @@ window.DATOS_REVISION = {
     "lp": {
      "anterior": "",
      "propuesto": [
-      "retorno a la actividad funcional prioritaria según criterios (definir la actividad con el paciente)"
+      "Recuperar la funcionalidad durante la marcha, las transferencias y el uso de escaleras."
      ],
      "campo": "objetivosLP",
      "vacio": true
@@ -825,7 +823,7 @@ window.DATOS_REVISION = {
     "valoracion_inicial_fecha": null,
     "posible_nuevo_motivo": false,
     "source_hash": "69d4259bc4",
-    "proposal_hash": "9497aa2258"
+    "proposal_hash": "8003fbe921"
    },
    "secciones": {
     "dx_medico": {
@@ -837,13 +835,13 @@ window.DATOS_REVISION = {
     },
     "dx_funcional": {
      "anterior": "",
-     "propuesto": "Paciente de 55 años con disfunción musculoesquelética de tobillo/pie izquierdo secundaria a fractura. Cuadro: dolor EVA 5/10. Limitación funcional: cojea, no puede caminar distancias largas. A la exploración: movilidad dorsiflexión muy limitada (cualitativa); fuerza disminuida (cualitativa, sin escala 0–10). Mecanismo: caída, fractura bimaleolar con placa y tornillos. Antecedentes a considerar: material de osteosíntesis/prótesis. Exploración por completar (ROM goniométrico, fuerza en escala 0–10, pruebas especiales): diagnóstico PROVISIONAL.",
+     "propuesto": "Disfunción musculoesquelética de tobillo izquierdo secundaria a fractura, con dolor, limitación de la dorsiflexión y disminución de la fuerza muscular, condicionando la marcha y la tolerancia al apoyo.",
      "vacio": true
     },
     "cp": {
      "anterior": "",
      "propuesto": [
-      "reducir el dolor y la irritabilidad — meta: ≤ 3/10 (Propuesta a partir de la EVA 5/10: descenso clínicamente relevante, escalonado por irritabilidad. Editable; no impone dolor cero.)"
+      "Disminuir el dolor, mejorar la movilidad del tobillo y favorecer la tolerancia al apoyo."
      ],
      "campo": "objetivosCP",
      "vacio": true
@@ -851,8 +849,7 @@ window.DATOS_REVISION = {
     "mp": {
      "anterior": "",
      "propuesto": [
-      "optimizar y recuperar el ROM funcional de la zona",
-      "recuperar la fuerza del segmento"
+      "Recuperar la fuerza muscular, la estabilidad y la propiocepción del tobillo."
      ],
      "campo": "objetivosMP (nuevo, aditivo)",
      "vacio": true
@@ -860,7 +857,7 @@ window.DATOS_REVISION = {
     "lp": {
      "anterior": "",
      "propuesto": [
-      "retorno a la actividad funcional prioritaria según criterios (definir la actividad con el paciente)"
+      "Recuperar la marcha independiente y reincorporar al paciente a sus actividades habituales."
      ],
      "campo": "objetivosLP",
      "vacio": true
@@ -904,7 +901,7 @@ window.DATOS_REVISION = {
     "valoracion_inicial_fecha": null,
     "posible_nuevo_motivo": false,
     "source_hash": "69d4259bc4",
-    "proposal_hash": "f19dd65cff"
+    "proposal_hash": "b5e2b84c2f"
    },
    "secciones": {
     "dx_medico": {
@@ -916,13 +913,13 @@ window.DATOS_REVISION = {
     },
     "dx_funcional": {
      "anterior": "",
-     "propuesto": "Paciente de 72 años con disfunción de hombro derecho. Cuadro: dolor EVA 4/10. A la exploración: ROM abducción 120°; fuerza 4/5 (escala /5 legada; se conserva, no se convierte); pruebas especiales (Hawkins positivo; cribado de banderas rojas negativo). Mecanismo: insidioso.",
+     "propuesto": "Disfunción musculoesquelética de hombro derecho caracterizada por dolor y limitación de la movilidad en flexión y abducción, condicionando las actividades que requieren elevación del miembro superior.",
      "vacio": true
     },
     "cp": {
      "anterior": "",
      "propuesto": [
-      "reducir el dolor y la irritabilidad — meta: ≤ 2/10 (Propuesta a partir de la EVA 4/10: descenso clínicamente relevante, escalonado por irritabilidad. Editable; no impone dolor cero.)"
+      "Disminuir el dolor y mejorar la movilidad del hombro."
      ],
      "campo": "objetivosCP",
      "vacio": true
@@ -930,8 +927,7 @@ window.DATOS_REVISION = {
     "mp": {
      "anterior": "",
      "propuesto": [
-      "optimizar y recuperar el ROM funcional de la zona",
-      "recuperar la fuerza del segmento"
+      "Recuperar la fuerza de los grupos musculares afectados, el control escapular y la movilidad funcional."
      ],
      "campo": "objetivosMP (nuevo, aditivo)",
      "vacio": true
@@ -939,7 +935,7 @@ window.DATOS_REVISION = {
     "lp": {
      "anterior": "",
      "propuesto": [
-      "retorno a la actividad funcional prioritaria según criterios (definir la actividad con el paciente)"
+      "Recuperar la capacidad de alcance, elevación y carga del miembro superior durante las actividades habituales."
      ],
      "campo": "objetivosLP",
      "vacio": true
@@ -980,7 +976,7 @@ window.DATOS_REVISION = {
     "valoracion_inicial_fecha": null,
     "posible_nuevo_motivo": true,
     "source_hash": "99974cfc0e",
-    "proposal_hash": "c818af9f30"
+    "proposal_hash": "2ccfd71564"
    },
    "secciones": {
     "dx_medico": {
@@ -992,13 +988,13 @@ window.DATOS_REVISION = {
     },
     "dx_funcional": {
      "anterior": "",
-     "propuesto": "Paciente de 40 años con disfunción de rodilla derecho. Cuadro: dolor EVA 3/10. A la exploración: ROM flexión 140°; fuerza 4/5 (escala /5 legada; se conserva, no se convierte). Mecanismo: sobreuso. Evolución: en seguimiento (2 notas SOAP). Exploración por completar (pruebas especiales): diagnóstico PROVISIONAL.",
+     "propuesto": "Disfunción musculoesquelética de rodilla derecha caracterizada por dolor y limitación de la flexión, condicionando la marcha y el uso de escaleras.",
      "vacio": true
     },
     "cp": {
      "anterior": "",
      "propuesto": [
-      "reducir el dolor y la irritabilidad — meta: ≤ 2/10 (Propuesta a partir de la EVA 3/10: descenso clínicamente relevante, escalonado por irritabilidad. Editable; no impone dolor cero.)"
+      "Disminuir el dolor y mejorar la flexión de rodilla y la tolerancia a la marcha."
      ],
      "campo": "objetivosCP",
      "vacio": true
@@ -1006,8 +1002,7 @@ window.DATOS_REVISION = {
     "mp": {
      "anterior": "",
      "propuesto": [
-      "optimizar y recuperar el ROM funcional de la zona",
-      "recuperar la fuerza del segmento"
+      "Recuperar la fuerza de cuádriceps e isquiotibiales, la estabilidad y el control dinámico de rodilla."
      ],
      "campo": "objetivosMP (nuevo, aditivo)",
      "vacio": true
@@ -1015,7 +1010,7 @@ window.DATOS_REVISION = {
     "lp": {
      "anterior": "",
      "propuesto": [
-      "retorno a correr según criterios — meta: correr (Meta de retorno tomada de la actividad/objetivo documentado del paciente: \"correr\". Editable.)"
+      "Recuperar la capacidad funcional para caminar, subir y bajar escaleras y realizar las actividades habituales."
      ],
      "campo": "objetivosLP",
      "vacio": true
@@ -1050,7 +1045,7 @@ window.DATOS_REVISION = {
     "valoracion_inicial_fecha": null,
     "posible_nuevo_motivo": false,
     "source_hash": "69d4259bc4",
-    "proposal_hash": "beb0866883"
+    "proposal_hash": "97d7f3d34a"
    },
    "secciones": {
     "dx_medico": {
@@ -1062,27 +1057,29 @@ window.DATOS_REVISION = {
     },
     "dx_funcional": {
      "anterior": "",
-     "propuesto": "Paciente de 39 años con disfunción de codo derecho. Cuadro: dolor EVA 4/10. Exploración objetiva no documentada. Exploración por completar (ROM goniométrico, fuerza en escala 0–10, pruebas especiales): diagnóstico PROVISIONAL. Datos clínicos insuficientes: no se afirma seguridad por ausencia de hallazgos.",
+     "propuesto": "Disfunción musculoesquelética de codo derecho caracterizada por dolor, condicionando el uso funcional de la extremidad.",
      "vacio": true
     },
     "cp": {
      "anterior": "",
      "propuesto": [
-      "reducir el dolor y la irritabilidad — meta: ≤ 2/10 (Propuesta a partir de la EVA 4/10: descenso clínicamente relevante, escalonado por irritabilidad. Editable; no impone dolor cero.)"
+      "Disminuir el dolor y favorecer la recuperación progresiva de la movilidad del codo dentro de los rangos permitidos."
      ],
      "campo": "objetivosCP",
      "vacio": true
     },
     "mp": {
      "anterior": "",
-     "propuesto": [],
+     "propuesto": [
+      "Recuperar la flexoextensión y la capacidad muscular del miembro superior, según los déficits documentados."
+     ],
      "campo": "objetivosMP (nuevo, aditivo)",
      "vacio": true
     },
     "lp": {
      "anterior": "",
      "propuesto": [
-      "retorno a la actividad funcional prioritaria según criterios (definir la actividad con el paciente)"
+      "Recuperar el uso funcional de la extremidad para las actividades de la vida diaria, respetando las restricciones de carga."
      ],
      "campo": "objetivosLP",
      "vacio": true
@@ -1127,7 +1124,7 @@ window.DATOS_REVISION = {
     "valoracion_inicial_fecha": null,
     "posible_nuevo_motivo": false,
     "source_hash": "69d4259bc4",
-    "proposal_hash": "6552d48baa"
+    "proposal_hash": "3a68c315be"
    },
    "secciones": {
     "dx_medico": {
@@ -1139,13 +1136,13 @@ window.DATOS_REVISION = {
     },
     "dx_funcional": {
      "anterior": "",
-     "propuesto": "Paciente de 27 años con disfunción de rodilla derecho. Cuadro: dolor EVA 2/10. Limitación funcional: no logra flexión completa para subir escaleras. A la exploración: fuerza 4/5 cuádriceps (escala /5 legada; se conserva, no se convierte). Mecanismo: post-inmovilización por esguince. Exploración por completar (ROM goniométrico, pruebas especiales): diagnóstico PROVISIONAL.",
+     "propuesto": "Disfunción musculoesquelética de rodilla derecha caracterizada por dolor, condicionando la marcha y el uso de escaleras.",
      "vacio": true
     },
     "cp": {
      "anterior": "",
      "propuesto": [
-      "reducir el dolor y la irritabilidad — meta: ≤ 1/10 (Propuesta a partir de la EVA 2/10: descenso clínicamente relevante, escalonado por irritabilidad. Editable; no impone dolor cero.)"
+      "Disminuir el dolor y mejorar la flexión de rodilla y la tolerancia a la marcha."
      ],
      "campo": "objetivosCP",
      "vacio": true
@@ -1153,7 +1150,7 @@ window.DATOS_REVISION = {
     "mp": {
      "anterior": "",
      "propuesto": [
-      "recuperar la fuerza del segmento"
+      "Recuperar la fuerza de cuádriceps e isquiotibiales, la estabilidad y el control dinámico de rodilla."
      ],
      "campo": "objetivosMP (nuevo, aditivo)",
      "vacio": true
@@ -1161,7 +1158,7 @@ window.DATOS_REVISION = {
     "lp": {
      "anterior": "",
      "propuesto": [
-      "retorno a la actividad funcional prioritaria según criterios (definir la actividad con el paciente)"
+      "Recuperar la capacidad funcional para caminar, subir y bajar escaleras y realizar las actividades habituales."
      ],
      "campo": "objetivosLP",
      "vacio": true
@@ -1197,7 +1194,7 @@ window.DATOS_REVISION = {
     "valoracion_inicial_fecha": null,
     "posible_nuevo_motivo": false,
     "source_hash": "69d4259bc4",
-    "proposal_hash": "4fe73ac12c"
+    "proposal_hash": "1c62832069"
    },
    "secciones": {
     "dx_medico": {
@@ -1209,13 +1206,13 @@ window.DATOS_REVISION = {
     },
     "dx_funcional": {
      "anterior": "",
-     "propuesto": "Paciente de 40 años con disfunción de rodilla izquierdo. Cuadro: dolor EVA 5/10. A la exploración: ROM flexion 0-110 grados; fuerza cuadriceps 6/10 — escala comparativa Sinergia 0–10 (sano = 10). La disminución de fuerza no muestra contexto neurológico (déficit de fuerza, no neural). Exploración por completar (pruebas especiales): diagnóstico PROVISIONAL.",
+     "propuesto": "Disfunción musculoesquelética de rodilla izquierda caracterizada por dolor, limitación de la flexión y disminución de la fuerza de cuádriceps, condicionando la marcha y el uso de escaleras.",
      "vacio": true
     },
     "cp": {
      "anterior": "",
      "propuesto": [
-      "reducir el dolor y la irritabilidad — meta: ≤ 3/10 (Propuesta a partir de la EVA 5/10: descenso clínicamente relevante, escalonado por irritabilidad. Editable; no impone dolor cero.)"
+      "Disminuir el dolor y mejorar la flexión de rodilla y la tolerancia a la marcha."
      ],
      "campo": "objetivosCP",
      "vacio": true
@@ -1223,8 +1220,7 @@ window.DATOS_REVISION = {
     "mp": {
      "anterior": "",
      "propuesto": [
-      "optimizar y recuperar el ROM funcional de la zona",
-      "recuperar la fuerza de los grupos afectados (No se propone meta de simetría: la referencia (lado sano) NO está confirmada sana (no se asume el contralateral sano). Primero confirmar/medir la referencia válida.)"
+      "Recuperar la fuerza de cuádriceps e isquiotibiales, la estabilidad y el control dinámico de rodilla."
      ],
      "campo": "objetivosMP (nuevo, aditivo)",
      "vacio": true
@@ -1232,7 +1228,7 @@ window.DATOS_REVISION = {
     "lp": {
      "anterior": "",
      "propuesto": [
-      "retorno a la actividad funcional prioritaria según criterios (definir la actividad con el paciente)"
+      "Recuperar la capacidad funcional para caminar, subir y bajar escaleras y realizar las actividades habituales."
      ],
      "campo": "objetivosLP",
      "vacio": true
@@ -1267,7 +1263,7 @@ window.DATOS_REVISION = {
     "valoracion_inicial_fecha": null,
     "posible_nuevo_motivo": false,
     "source_hash": "69d4259bc4",
-    "proposal_hash": "de900f55a4"
+    "proposal_hash": "586f4c4dc9"
    },
    "secciones": {
     "dx_medico": {
@@ -1279,27 +1275,29 @@ window.DATOS_REVISION = {
     },
     "dx_funcional": {
      "anterior": "",
-     "propuesto": "Paciente de 33 años con disfunción de rodilla izquierdo. Cuadro: dolor EVA 2/10. Exploración objetiva no documentada. Exploración por completar (ROM goniométrico, fuerza en escala 0–10, pruebas especiales): diagnóstico PROVISIONAL. Datos clínicos insuficientes: no se afirma seguridad por ausencia de hallazgos.",
+     "propuesto": "Disfunción musculoesquelética de rodilla izquierda caracterizada por dolor, condicionando la marcha y el uso de escaleras.",
      "vacio": true
     },
     "cp": {
      "anterior": "",
      "propuesto": [
-      "reducir el dolor y la irritabilidad — meta: ≤ 1/10 (Propuesta a partir de la EVA 2/10: descenso clínicamente relevante, escalonado por irritabilidad. Editable; no impone dolor cero.)"
+      "Disminuir el dolor y mejorar la flexión de rodilla y la tolerancia a la marcha."
      ],
      "campo": "objetivosCP",
      "vacio": true
     },
     "mp": {
      "anterior": "",
-     "propuesto": [],
+     "propuesto": [
+      "Recuperar la fuerza de cuádriceps e isquiotibiales, la estabilidad y el control dinámico de rodilla."
+     ],
      "campo": "objetivosMP (nuevo, aditivo)",
      "vacio": true
     },
     "lp": {
      "anterior": "",
      "propuesto": [
-      "retorno a la actividad funcional prioritaria según criterios (definir la actividad con el paciente)"
+      "Recuperar la capacidad funcional para caminar, subir y bajar escaleras y realizar las actividades habituales."
      ],
      "campo": "objetivosLP",
      "vacio": true
@@ -1344,7 +1342,7 @@ window.DATOS_REVISION = {
     "valoracion_inicial_fecha": null,
     "posible_nuevo_motivo": false,
     "source_hash": "1ba3e0a4a8",
-    "proposal_hash": "3602b6164c"
+    "proposal_hash": "37d4af3e02"
    },
    "secciones": {
     "dx_medico": {
@@ -1356,13 +1354,13 @@ window.DATOS_REVISION = {
     },
     "dx_funcional": {
      "anterior": "",
-     "propuesto": "Paciente de 52 años con disfunción de hombro derecho. Cuadro: dolor EVA 6/10. A la exploración: ROM abduccion 0-90 grados; fuerza abductor 7/10 — escala comparativa Sinergia 0–10 (sano = 10); referencia lado sano confirmada 10/10. Exploración por completar (pruebas especiales): diagnóstico PROVISIONAL.",
+     "propuesto": "Disfunción musculoesquelética de hombro derecho caracterizada por dolor, limitación de la movilidad en flexión y abducción y disminución de la fuerza de glúteos y abductores de cadera, condicionando las actividades que requieren elevación del miembro superior.",
      "vacio": true
     },
     "cp": {
      "anterior": "",
      "propuesto": [
-      "reducir el dolor y la irritabilidad — meta: ≤ 4/10 (Propuesta a partir de la EVA 6/10: descenso clínicamente relevante, escalonado por irritabilidad. Editable; no impone dolor cero.)"
+      "Disminuir el dolor y mejorar la movilidad del hombro."
      ],
      "campo": "objetivosCP",
      "vacio": true
@@ -1370,8 +1368,7 @@ window.DATOS_REVISION = {
     "mp": {
      "anterior": "",
      "propuesto": [
-      "optimizar y recuperar el ROM funcional de la zona",
-      "recuperar la fuerza de los grupos afectados — meta: 10/10 (simetría con la referencia sana confirmada) (La referencia (lado sano) está CONFIRMADA en 10/10; se propone acercar los grupos afectados (abductor 7/10 ≈70%) a la referencia. Editable; sin tiempos rígidos.)"
+      "Recuperar la fuerza de los grupos musculares afectados, el control escapular y la movilidad funcional."
      ],
      "campo": "objetivosMP (nuevo, aditivo)",
      "vacio": true
@@ -1379,7 +1376,7 @@ window.DATOS_REVISION = {
     "lp": {
      "anterior": "",
      "propuesto": [
-      "retorno a la actividad funcional prioritaria según criterios (definir la actividad con el paciente)"
+      "Recuperar la capacidad de alcance, elevación y carga del miembro superior durante las actividades habituales."
      ],
      "campo": "objetivosLP",
      "vacio": true
@@ -1414,7 +1411,7 @@ window.DATOS_REVISION = {
     "valoracion_inicial_fecha": null,
     "posible_nuevo_motivo": false,
     "source_hash": "69d4259bc4",
-    "proposal_hash": "546188e84a"
+    "proposal_hash": "f41f8b92d3"
    },
    "secciones": {
     "dx_medico": {
@@ -1426,12 +1423,14 @@ window.DATOS_REVISION = {
     },
     "dx_funcional": {
      "anterior": "",
-     "propuesto": "Paciente de 48 años con disfunción de columna lumbar derecho. Cuadro: dolor EVA 7/10; déficit neurológico OBJETIVADO. A la exploración: movilidad limitado por dolor (cualitativa); fuerza 4/5 dorsiflexores (escala /5 legada; se conserva, no se convierte); pruebas especiales (SLR positivo a 40°). Mecanismo: insidioso, sin trauma. Exploración por completar (ROM goniométrico): diagnóstico PROVISIONAL.",
+     "propuesto": "Disfunción musculoesquelética de columna lumbar derecha caracterizada por dolor y limitación de la movilidad lumbopélvica, condicionando la marcha, la bipedestación y las actividades cotidianas.",
      "vacio": true
     },
     "cp": {
      "anterior": "",
-     "propuesto": [],
+     "propuesto": [
+      "⚠ Resolver la alerta de seguridad antes de fijar objetivos terapéuticos."
+     ],
      "campo": "objetivosCP",
      "vacio": true
     },
@@ -1485,7 +1484,7 @@ window.DATOS_REVISION = {
     "valoracion_inicial_fecha": null,
     "posible_nuevo_motivo": false,
     "source_hash": "69d4259bc4",
-    "proposal_hash": "839ce0177e"
+    "proposal_hash": "c27f182bf6"
    },
    "secciones": {
     "dx_medico": {
@@ -1497,13 +1496,13 @@ window.DATOS_REVISION = {
     },
     "dx_funcional": {
      "anterior": "",
-     "propuesto": "Paciente de 30 años con disfunción de rodilla izquierdo. Cuadro: dolor EVA 5/10. A la exploración: ROM flexión 130°; fuerza 4/5 cuádriceps (escala /5 legada; se conserva, no se convierte). Mecanismo: sobreuso por aumento de volumen de carrera. Exploración por completar (pruebas especiales): diagnóstico PROVISIONAL.",
+     "propuesto": "Disfunción musculoesquelética de rodilla izquierda caracterizada por dolor y limitación de la flexión, condicionando la marcha y el uso de escaleras.",
      "vacio": true
     },
     "cp": {
      "anterior": "",
      "propuesto": [
-      "reducir el dolor y la irritabilidad — meta: ≤ 3/10 (Propuesta a partir de la EVA 5/10: descenso clínicamente relevante, escalonado por irritabilidad. Editable; no impone dolor cero.)"
+      "Disminuir el dolor y mejorar la flexión de rodilla y la tolerancia a la marcha."
      ],
      "campo": "objetivosCP",
      "vacio": true
@@ -1511,8 +1510,7 @@ window.DATOS_REVISION = {
     "mp": {
      "anterior": "",
      "propuesto": [
-      "optimizar y recuperar el ROM funcional de la zona",
-      "recuperar la fuerza del segmento"
+      "Recuperar la fuerza de cuádriceps e isquiotibiales, la estabilidad y el control dinámico de rodilla."
      ],
      "campo": "objetivosMP (nuevo, aditivo)",
      "vacio": true
@@ -1520,7 +1518,7 @@ window.DATOS_REVISION = {
     "lp": {
      "anterior": "",
      "propuesto": [
-      "retorno a la actividad funcional prioritaria según criterios (definir la actividad con el paciente)"
+      "Recuperar la capacidad funcional para caminar, subir y bajar escaleras y realizar las actividades habituales."
      ],
      "campo": "objetivosLP",
      "vacio": true
@@ -1555,7 +1553,7 @@ window.DATOS_REVISION = {
     "valoracion_inicial_fecha": null,
     "posible_nuevo_motivo": false,
     "source_hash": "69d4259bc4",
-    "proposal_hash": "02c631ad3a"
+    "proposal_hash": "4a9e4b2e46"
    },
    "secciones": {
     "dx_medico": {
@@ -1567,13 +1565,13 @@ window.DATOS_REVISION = {
     },
     "dx_funcional": {
      "anterior": "",
-     "propuesto": "Paciente de 58 años con disfunción de hombro derecho. Cuadro: dolor EVA 6/10. A la exploración: ROM abducción activa 100°; fuerza 4/5 supraespinoso (escala /5 legada; se conserva, no se convierte); pruebas especiales (Jobe positivo; Hawkins positivo). Mecanismo: sobreuso. Antecedentes a considerar: antecedente oncológico (verificar estado).",
+     "propuesto": "Disfunción musculoesquelética de hombro derecho caracterizada por dolor y limitación de la movilidad en flexión y abducción, condicionando las actividades que requieren elevación del miembro superior.",
      "vacio": true
     },
     "cp": {
      "anterior": "",
      "propuesto": [
-      "reducir el dolor y la irritabilidad — meta: ≤ 4/10 (Propuesta a partir de la EVA 6/10: descenso clínicamente relevante, escalonado por irritabilidad. Editable; no impone dolor cero.)"
+      "Disminuir el dolor y mejorar la movilidad del hombro."
      ],
      "campo": "objetivosCP",
      "vacio": true
@@ -1581,8 +1579,7 @@ window.DATOS_REVISION = {
     "mp": {
      "anterior": "",
      "propuesto": [
-      "optimizar y recuperar el ROM funcional de la zona",
-      "recuperar la fuerza del segmento"
+      "Recuperar la fuerza de los grupos musculares afectados, el control escapular y la movilidad funcional."
      ],
      "campo": "objetivosMP (nuevo, aditivo)",
      "vacio": true
@@ -1590,7 +1587,7 @@ window.DATOS_REVISION = {
     "lp": {
      "anterior": "",
      "propuesto": [
-      "retorno a la actividad funcional prioritaria según criterios (definir la actividad con el paciente)"
+      "Recuperar la capacidad de alcance, elevación y carga del miembro superior durante las actividades habituales."
      ],
      "campo": "objetivosLP",
      "vacio": true
@@ -1637,7 +1634,7 @@ window.DATOS_REVISION = {
     "valoracion_inicial_fecha": null,
     "posible_nuevo_motivo": false,
     "source_hash": "69d4259bc4",
-    "proposal_hash": "e803fbc723"
+    "proposal_hash": "8850035079"
    },
    "secciones": {
     "dx_medico": {
@@ -1649,12 +1646,14 @@ window.DATOS_REVISION = {
     },
     "dx_funcional": {
      "anterior": "",
-     "propuesto": "Paciente de 46 años con disfunción de rodilla derecho. Cuadro: dolor EVA 5/10. A la exploración: ROM flexión 120°; fuerza 4/5 (escala /5 legada; se conserva, no se convierte). Mecanismo: degenerativo. Exploración por completar (pruebas especiales): diagnóstico PROVISIONAL.",
+     "propuesto": "Disfunción musculoesquelética de rodilla derecha caracterizada por dolor y limitación de la flexión, condicionando la marcha y el uso de escaleras.",
      "vacio": true
     },
     "cp": {
      "anterior": "",
-     "propuesto": [],
+     "propuesto": [
+      "⚠ Resolver la alerta de seguridad antes de fijar objetivos terapéuticos."
+     ],
      "campo": "objetivosCP",
      "vacio": true
     },
@@ -1709,7 +1708,7 @@ window.DATOS_REVISION = {
     "valoracion_inicial_fecha": null,
     "posible_nuevo_motivo": false,
     "source_hash": "69d4259bc4",
-    "proposal_hash": "2f15d5f953"
+    "proposal_hash": "8d2076525a"
    },
    "secciones": {
     "dx_medico": {
@@ -1721,13 +1720,13 @@ window.DATOS_REVISION = {
     },
     "dx_funcional": {
      "anterior": "",
-     "propuesto": "Paciente de 26 años con disfunción musculoesquelética de rodilla derecho secundaria a lesión del ligamento cruzado anterior. Cuadro: dolor EVA 4/10. Limitación funcional: no puede correr. A la exploración: ROM flexion 0-120 grados; fuerza cuadriceps 6/10 — escala comparativa Sinergia 0–10 (sano = 10); referencia lado sano confirmada 10/10; pruebas especiales (Lachman positivo). La disminución de fuerza no muestra contexto neurológico (déficit de fuerza, no neural). Mecanismo: giro con pie fijo en la cancha.",
+     "propuesto": "Disfunción musculoesquelética de rodilla derecha secundaria a lesión del ligamento cruzado anterior, con dolor, limitación de la flexión, disminución de la fuerza de cuádriceps y alteración de la estabilidad y la propiocepción, condicionando las actividades deportivas y de mayor demanda.",
      "vacio": true
     },
     "cp": {
      "anterior": "",
      "propuesto": [
-      "reducir el dolor y la irritabilidad — meta: ≤ 2/10 (Propuesta a partir de la EVA 4/10: descenso clínicamente relevante, escalonado por irritabilidad. Editable; no impone dolor cero.)"
+      "Disminuir el dolor y el derrame articular, recuperar la extensión de rodilla y favorecer la activación del cuádriceps."
      ],
      "campo": "objetivosCP",
      "vacio": true
@@ -1735,8 +1734,7 @@ window.DATOS_REVISION = {
     "mp": {
      "anterior": "",
      "propuesto": [
-      "optimizar y recuperar el ROM funcional de la zona",
-      "recuperar la fuerza de los grupos afectados — meta: 10/10 (simetría con la referencia sana confirmada) (La referencia (lado sano) está CONFIRMADA en 10/10; se propone acercar los grupos afectados (cuadriceps 6/10 ≈60%) a la referencia. Editable; sin tiempos rígidos.)"
+      "Recuperar la movilidad, la fuerza muscular, la estabilidad dinámica y el control neuromuscular del miembro inferior."
      ],
      "campo": "objetivosMP (nuevo, aditivo)",
      "vacio": true
@@ -1744,7 +1742,7 @@ window.DATOS_REVISION = {
     "lp": {
      "anterior": "",
      "propuesto": [
-      "retorno a la actividad funcional prioritaria según criterios (definir la actividad con el paciente)"
+      "Recuperar la funcionalidad de la rodilla y favorecer el retorno deportivo cuando se cumplan los criterios funcionales correspondientes."
      ],
      "campo": "objetivosLP",
      "vacio": true

@@ -31,8 +31,14 @@ var items = resultados.map(function (c) {
   var rad = c.hallazgos_radiologicos || [];
   var docsx = c.documentos_recuperados || {};
   var dxAnt = lleno(ex.dxFuncional) ? ex.dxFuncional : (lleno(ex.dxClinico) ? ex.dxClinico : '');
-  var porFase = { corto: [], mediano: [], largo: [] };
-  (c.objetivos || []).forEach(function (o) { if (o.fase === 'seguridad') return; (porFase[o.fase] || porFase.largo).push(objTxt(o)); });
+  // REDACCIÓN Sinergia (prosa natural) como propuesta; respaldo: la prosa estructurada del generador.
+  var red = c.redaccion_sinergia || null;
+  var dxFunPropuesto = (red && !red.error && red.diagnostico_funcional) ? red.diagnostico_funcional : c.diagnostico_funcional.texto;
+  var bloqueado = !!(c.seguridad && c.seguridad.bloquea_plan);
+  var objCP = [], objMP = [], objLP = [];
+  if (red && !red.error && red.objetivos) { objCP = [red.objetivos.cp]; objMP = [red.objetivos.mp]; objLP = [red.objetivos.lp]; }
+  else if (bloqueado) { var nota = (red && red.objetivos_nota) || 'Resolver la alerta de seguridad antes de fijar objetivos terapéuticos.'; objCP = ['⚠ ' + nota]; objMP = []; objLP = []; }
+  else { var porFase = { corto: [], mediano: [], largo: [] }; (c.objetivos || []).forEach(function (o) { if (o.fase === 'seguridad') return; (porFase[o.fase] || porFase.largo).push(objTxt(o)); }); objCP = porFase.corto; objMP = porFase.mediano; objLP = porFase.largo; }
   var vacios = {
     dx_medico: !lleno(dm.texto),
     dx_funcional: !lleno(dxAnt),
@@ -54,15 +60,15 @@ var items = resultados.map(function (c) {
       posible_nuevo_motivo: !!(c.episodio_analisis && c.episodio_analisis.posible_nuevo_motivo),
       // source_hash = estado del EXPEDIENTE del que se derivó la propuesta (para re-leer y abortar si cambió).
       source_hash: hash({ ex: ex, soap_n: (c.soap_procesado ? c.soap_procesado.n_notas : 0), corte: c.fecha_corte || null, docs: (c.documentos_recuperados || null) }),
-      // proposal_hash = contenido EXACTO de la propuesta V2.2.3 que se está revisando.
-      proposal_hash: hash({ dxm: dxMedPropuesto, dx: c.diagnostico_funcional.texto, obj: porFase })
+      // proposal_hash = contenido EXACTO de la propuesta que se está revisando (dx + objetivos redactados).
+      proposal_hash: hash({ dxm: dxMedPropuesto, dx: dxFunPropuesto, cp: objCP, mp: objMP, lp: objLP })
     },
     secciones: {
       dx_medico: { anterior: dm.texto || '', propuesto: dxMedPropuesto, documentado: ddoc.propuestas || [], radiologicos: rad, vacio: vacios.dx_medico },
-      dx_funcional: { anterior: dxAnt, propuesto: c.diagnostico_funcional.texto, vacio: vacios.dx_funcional },
-      cp: { anterior: lleno(ex.objetivosCP) ? ex.objetivosCP : '', propuesto: porFase.corto, campo: 'objetivosCP', vacio: vacios.cp },
-      mp: { anterior: '', propuesto: porFase.mediano, campo: 'objetivosMP (nuevo, aditivo)', vacio: true },
-      lp: { anterior: lleno(ex.objetivosLP) ? ex.objetivosLP : '', propuesto: porFase.largo, campo: 'objetivosLP', vacio: vacios.lp }
+      dx_funcional: { anterior: dxAnt, propuesto: dxFunPropuesto, vacio: vacios.dx_funcional },
+      cp: { anterior: lleno(ex.objetivosCP) ? ex.objetivosCP : '', propuesto: objCP, campo: 'objetivosCP', vacio: vacios.cp },
+      mp: { anterior: '', propuesto: objMP, campo: 'objetivosMP (nuevo, aditivo)', vacio: true },
+      lp: { anterior: lleno(ex.objetivosLP) ? ex.objetivosLP : '', propuesto: objLP, campo: 'objetivosLP', vacio: vacios.lp }
     },
     pendientes: (c.valoracion_pendiente || []).filter(function (p) { return !/POSIBLE NUEVO MOTIVO/.test(p); }),
     precauciones: (c.seguridad.alertas || []).map(function (a) { return { regla: a.regla, clase: a.clasificacion, accion: a.accion, requiere_validacion: !!a.requiere_validacion }; }),

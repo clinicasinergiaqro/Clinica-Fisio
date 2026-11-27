@@ -1,6 +1,6 @@
 {
   "_resumen": {
-    "generado": "2026-11-26T23:00:59.121Z",
+    "generado": "2026-11-27T00:04:30.985Z",
     "version_generador": "2.2.3-proto",
     "dataset": "casos_anon.json",
     "n_casos": 24,
@@ -98,7 +98,14 @@
             "campo": "valoracion.pruebas",
             "fragmento": "SLR positivo a 40°"
           }
-        ]
+        ],
+        "redaccion": "Disfunción musculoesquelética de columna lumbar derecha caracterizada por dolor y limitación de la movilidad lumbopélvica, condicionando la marcha, la bipedestación y las actividades cotidianas."
+      },
+      "redaccion_sinergia": {
+        "diagnostico_funcional": "Disfunción musculoesquelética de columna lumbar derecha caracterizada por dolor y limitación de la movilidad lumbopélvica, condicionando la marcha, la bipedestación y las actividades cotidianas.",
+        "objetivos": null,
+        "objetivos_nota": "Resolver la alerta de seguridad antes de fijar objetivos terapéuticos.",
+        "estilo": "sinergia"
       },
       "hipotesis": [
         {
@@ -323,7 +330,18 @@
             "campo": "valoracion.pruebas",
             "fragmento": "Spurling dudoso"
           }
-        ]
+        ],
+        "redaccion": "Disfunción musculoesquelética de columna cervical derecha caracterizada por dolor, limitación de la movilidad cervical y síntomas neurales referidos, condicionando la tolerancia a posiciones prolongadas y a las actividades laborales."
+      },
+      "redaccion_sinergia": {
+        "diagnostico_funcional": "Disfunción musculoesquelética de columna cervical derecha caracterizada por dolor, limitación de la movilidad cervical y síntomas neurales referidos, condicionando la tolerancia a posiciones prolongadas y a las actividades laborales.",
+        "objetivos": {
+          "cp": "Disminuir el dolor y la tensión muscular cervical.",
+          "mp": "Recuperar la movilidad cervical, la capacidad muscular y mejorar el control postural según las alteraciones documentadas.",
+          "lp": "Mejorar la tolerancia a las actividades laborales y cotidianas relacionadas con la movilidad cervical."
+        },
+        "objetivos_nota": null,
+        "estilo": "sinergia"
       },
       "hipotesis": [],
       "seguridad": {
@@ -613,7 +631,14 @@
             "campo": "valoracion.fuerza",
             "fragmento": "3/5 intrínsecos de mano"
           }
-        ]
+        ],
+        "redaccion": "Disfunción musculoesquelética de columna cervical caracterizada por dolor y limitación de la movilidad cervical, condicionando la tolerancia a posiciones prolongadas y a las actividades laborales."
+      },
+      "redaccion_sinergia": {
+        "diagnostico_funcional": "Disfunción musculoesquelética de columna cervical caracterizada por dolor y limitación de la movilidad cervical, condicionando la tolerancia a posiciones prolongadas y a las actividades laborales.",
+        "objetivos": null,
+        "objetivos_nota": "Resolver la alerta de seguridad antes de fijar objetivos terapéuticos.",
+        "estilo": "sinergia"
       },
       "hipotesis": [],
       "seguridad": {
@@ -822,7 +847,14 @@
             "campo": "valoracion.inflamacion",
             "fragmento": "hinchazón y aumento de volume"
           }
-        ]
+        ],
+        "redaccion": "Disfunción musculoesquelética de rodilla derecha secundaria a procedimiento quirúrgico, con dolor e inflamación, condicionando la marcha y el uso de escaleras."
+      },
+      "redaccion_sinergia": {
+        "diagnostico_funcional": "Disfunción musculoesquelética de rodilla derecha secundaria a procedimiento quirúrgico, con dolor e inflamación, condicionando la marcha y el uso de escaleras.",
+        "objetivos": null,
+        "objetivos_nota": "Resolver la alerta de seguridad antes de fijar objetivos terapéuticos.",
+        "estilo": "sinergia"
       },
       "hipotesis": [],
       "seguridad": {
@@ -1045,7 +1077,18 @@
             "campo": "valoracion.fuerza",
             "fragmento": "4/5 cuádriceps"
           }
-        ]
+        ],
+        "redaccion": "Disfunción musculoesquelética de rodilla izquierda caracterizada por dolor y limitación de la flexión, condicionando la marcha y el uso de escaleras."
+      },
+      "redaccion_sinergia": {
+        "diagnostico_funcional": "Disfunción musculoesquelética de rodilla izquierda caracterizada por dolor y limitación de la flexión, condicionando la marcha y el uso de escaleras.",
+        "objetivos": {
+          "cp": "Disminuir el dolor y mejorar la flexión de rodilla y la tolerancia a la marcha.",
+          "mp": "Recuperar la fuerza de cuádriceps e isquiotibiales, la estabilidad y el control dinámico de rodilla.",
+          "lp": "Recuperar la capacidad funcional para caminar, subir y bajar escaleras y realizar las actividades habituales."
+        },
+        "objetivos_nota": null,
+        "estilo": "sinergia"
       },
       "hipotesis": [
         {
@@ -1365,7 +1408,18 @@
             "campo": "valoracion.pruebas",
             "fragmento": "Jobe positivo; Hawkins positivo"
           }
-        ]
+        ],
+        "redaccion": "Disfunción musculoesquelética de hombro derecho caracterizada por dolor y limitación de la movilidad en flexión y abducción, condicionando las actividades que requieren elevación del miembro superior."
+      },
+      "redaccion_sinergia": {
+        "diagnostico_funcional": "Disfunción musculoesquelética de hombro derecho caracterizada por dolor y limitación de la movilidad en flexión y abducción, condicionando las actividades que requieren elevación del miembro superior.",
+        "objetivos": {
+          "cp": "Disminuir el dolor y mejorar la movilidad del hombro.",
+          "mp": "Recuperar la fuerza de los grupos musculares afectados, el control escapular y la movilidad funcional.",
+          "lp": "Recuperar la capacidad de alcance, elevación y carga del miembro superior durante las actividades habituales."
+        },
+        "objetivos_nota": null,
+        "estilo": "sinergia"
       },
       "hipotesis": [
         {
@@ -1707,7 +1761,18 @@
             "campo": "dxFuncional.limitaciones",
             "fragmento": "no puede saltar ni entrenar"
           }
-        ]
+        ],
+        "redaccion": "Disfunción musculoesquelética de rodilla derecha caracterizada por dolor y limitación de la flexión, condicionando las actividades deportivas y de mayor demanda."
+      },
+      "redaccion_sinergia": {
+        "diagnostico_funcional": "Disfunción musculoesquelética de rodilla derecha caracterizada por dolor y limitación de la flexión, condicionando las actividades deportivas y de mayor demanda.",
+        "objetivos": {
+          "cp": "Disminuir el dolor y mejorar la flexión de rodilla y la tolerancia a la marcha.",
+          "mp": "Recuperar la fuerza de cuádriceps e isquiotibiales, la estabilidad y el control dinámico de rodilla.",
+          "lp": "Recuperar la capacidad funcional para caminar, subir y bajar escaleras y realizar las actividades habituales."
+        },
+        "objetivos_nota": null,
+        "estilo": "sinergia"
       },
       "hipotesis": [],
       "seguridad": {
@@ -2015,7 +2080,18 @@
             "campo": "dxFuncional.limitaciones",
             "fragmento": "no puede correr ni pivotar"
           }
-        ]
+        ],
+        "redaccion": "Disfunción musculoesquelética de rodilla izquierda secundaria a lesión del ligamento cruzado anterior, con dolor, limitación de la flexoextensión, disminución de la fuerza muscular y alteración de la estabilidad y la propiocepción, condicionando las actividades deportivas y de mayor demanda."
+      },
+      "redaccion_sinergia": {
+        "diagnostico_funcional": "Disfunción musculoesquelética de rodilla izquierda secundaria a lesión del ligamento cruzado anterior, con dolor, limitación de la flexoextensión, disminución de la fuerza muscular y alteración de la estabilidad y la propiocepción, condicionando las actividades deportivas y de mayor demanda.",
+        "objetivos": {
+          "cp": "Disminuir el dolor y el derrame articular, recuperar la extensión de rodilla y favorecer la activación del cuádriceps.",
+          "mp": "Recuperar la movilidad, la fuerza muscular, la estabilidad dinámica y el control neuromuscular del miembro inferior.",
+          "lp": "Recuperar la funcionalidad de la rodilla y favorecer el retorno deportivo cuando se cumplan los criterios funcionales correspondientes."
+        },
+        "objetivos_nota": null,
+        "estilo": "sinergia"
       },
       "hipotesis": [],
       "seguridad": {
@@ -2344,7 +2420,18 @@
             "campo": "dxFuncional.limitaciones",
             "fragmento": "no puede flexionar más de 90° ni cargar completo"
           }
-        ]
+        ],
+        "redaccion": "Disfunción musculoesquelética de rodilla derecha secundaria a procedimiento quirúrgico, con dolor y limitación de la flexión, condicionando la marcha y el uso de escaleras."
+      },
+      "redaccion_sinergia": {
+        "diagnostico_funcional": "Disfunción musculoesquelética de rodilla derecha secundaria a procedimiento quirúrgico, con dolor y limitación de la flexión, condicionando la marcha y el uso de escaleras.",
+        "objetivos": {
+          "cp": "Disminuir el dolor y mejorar la flexión de rodilla y la tolerancia a la marcha.",
+          "mp": "Recuperar la fuerza de cuádriceps e isquiotibiales, la estabilidad y el control dinámico de rodilla.",
+          "lp": "Recuperar la capacidad funcional para caminar, subir y bajar escaleras y realizar las actividades habituales."
+        },
+        "objetivos_nota": null,
+        "estilo": "sinergia"
       },
       "hipotesis": [],
       "seguridad": {
@@ -2667,7 +2754,18 @@
             "campo": "dxFuncional.limitaciones",
             "fragmento": "molestia al estar sentado mucho tiempo"
           }
-        ]
+        ],
+        "redaccion": "Disfunción musculoesquelética de columna lumbar caracterizada por dolor y limitación de la movilidad lumbopélvica, condicionando la marcha, la bipedestación y las actividades cotidianas."
+      },
+      "redaccion_sinergia": {
+        "diagnostico_funcional": "Disfunción musculoesquelética de columna lumbar caracterizada por dolor y limitación de la movilidad lumbopélvica, condicionando la marcha, la bipedestación y las actividades cotidianas.",
+        "objetivos": {
+          "cp": "Disminuir el dolor lumbar e irradiado y mejorar la tolerancia a la marcha y a los cambios de posición, siempre que la valoración de seguridad permita continuar.",
+          "mp": "Mejorar la movilidad lumbopélvica, la estabilidad y la tolerancia a las actividades funcionales.",
+          "lp": "Recuperar la capacidad para caminar, permanecer de pie y realizar las actividades laborales y cotidianas."
+        },
+        "objetivos_nota": null,
+        "estilo": "sinergia"
       },
       "hipotesis": [],
       "seguridad": {
@@ -2937,7 +3035,18 @@
             "campo": "valoracion.fuerza",
             "fragmento": "conservada"
           }
-        ]
+        ],
+        "redaccion": "Disfunción musculoesquelética de columna cervical caracterizada por dolor y limitación de la movilidad cervical, condicionando la tolerancia a posiciones prolongadas y a las actividades laborales."
+      },
+      "redaccion_sinergia": {
+        "diagnostico_funcional": "Disfunción musculoesquelética de columna cervical caracterizada por dolor y limitación de la movilidad cervical, condicionando la tolerancia a posiciones prolongadas y a las actividades laborales.",
+        "objetivos": {
+          "cp": "Disminuir el dolor y la tensión muscular cervical.",
+          "mp": "Recuperar la movilidad cervical, la capacidad muscular y mejorar el control postural según las alteraciones documentadas.",
+          "lp": "Mejorar la tolerancia a las actividades laborales y cotidianas relacionadas con la movilidad cervical."
+        },
+        "objetivos_nota": null,
+        "estilo": "sinergia"
       },
       "hipotesis": [],
       "seguridad": {
@@ -3187,7 +3296,7 @@
         "enlaces_no_consultados": []
       },
       "diagnostico_funcional": {
-        "texto": "Paciente de 50 años con disfunción musculoesquelética de hombro izquierdo secundaria a lesión del ligamento cruzado anterior. Cuadro: dolor EVA 5/10. Limitación funcional: no puede levantar el brazo por encima del hombro. A la exploración: ROM abducción activa 110°; fuerza 4/5 manguito (escala /5 legada; se conserva, no se convierte); pruebas especiales (Neer positivo; cribado de banderas rojas negativo). Mecanismo: insidioso.",
+        "texto": "Paciente de 50 años con disfunción de hombro izquierdo. Cuadro: dolor EVA 5/10. Limitación funcional: no puede levantar el brazo por encima del hombro. A la exploración: ROM abducción activa 110°; fuerza 4/5 manguito (escala /5 legada; se conserva, no se convierte); pruebas especiales (Neer positivo; cribado de banderas rojas negativo). Mecanismo: insidioso.",
         "estado": "provisional",
         "evidencias": [
           {
@@ -3214,7 +3323,18 @@
             "campo": "dxFuncional.limitaciones",
             "fragmento": "no puede levantar el brazo por encima del hombro"
           }
-        ]
+        ],
+        "redaccion": "Disfunción musculoesquelética de hombro izquierdo caracterizada por dolor y limitación de la movilidad en flexión y abducción, condicionando las actividades que requieren elevación del miembro superior."
+      },
+      "redaccion_sinergia": {
+        "diagnostico_funcional": "Disfunción musculoesquelética de hombro izquierdo caracterizada por dolor y limitación de la movilidad en flexión y abducción, condicionando las actividades que requieren elevación del miembro superior.",
+        "objetivos": {
+          "cp": "Disminuir el dolor y mejorar la movilidad del hombro.",
+          "mp": "Recuperar la fuerza de los grupos musculares afectados, el control escapular y la movilidad funcional.",
+          "lp": "Recuperar la capacidad de alcance, elevación y carga del miembro superior durante las actividades habituales."
+        },
+        "objetivos_nota": null,
+        "estilo": "sinergia"
       },
       "hipotesis": [],
       "seguridad": {
@@ -3515,7 +3635,18 @@
             "campo": "dxFuncional.limitaciones",
             "fragmento": "no puede correr ni saltar"
           }
-        ]
+        ],
+        "redaccion": "Disfunción musculoesquelética de tobillo derecho posterior a esguince, con dolor, limitación de la dorsiflexión y alteración de la estabilidad y la propiocepción, condicionando las actividades deportivas y de mayor demanda."
+      },
+      "redaccion_sinergia": {
+        "diagnostico_funcional": "Disfunción musculoesquelética de tobillo derecho posterior a esguince, con dolor, limitación de la dorsiflexión y alteración de la estabilidad y la propiocepción, condicionando las actividades deportivas y de mayor demanda.",
+        "objetivos": {
+          "cp": "Disminuir el dolor, mejorar la movilidad del tobillo y favorecer la tolerancia al apoyo.",
+          "mp": "Recuperar la fuerza muscular, la estabilidad y la propiocepción del tobillo.",
+          "lp": "Recuperar la marcha independiente y reincorporar al paciente a sus actividades habituales."
+        },
+        "objetivos_nota": null,
+        "estilo": "sinergia"
       },
       "hipotesis": [],
       "seguridad": {
@@ -3831,7 +3962,18 @@
             "campo": "dxFuncional.limitaciones",
             "fragmento": "no puede hacer sentadilla profunda"
           }
-        ]
+        ],
+        "redaccion": "Disfunción musculoesquelética de cadera derecha caracterizada por dolor y limitación de la movilidad de cadera, condicionando la marcha, el apoyo unipodal y el uso de escaleras."
+      },
+      "redaccion_sinergia": {
+        "diagnostico_funcional": "Disfunción musculoesquelética de cadera derecha caracterizada por dolor y limitación de la movilidad de cadera, condicionando la marcha, el apoyo unipodal y el uso de escaleras.",
+        "objetivos": {
+          "cp": "Disminuir el dolor y mejorar la tolerancia al apoyo y la movilidad de cadera.",
+          "mp": "Recuperar la fuerza muscular, la estabilidad pélvica y el control del miembro inferior.",
+          "lp": "Recuperar la funcionalidad durante la marcha, las transferencias y el uso de escaleras."
+        },
+        "objetivos_nota": null,
+        "estilo": "sinergia"
       },
       "hipotesis": [],
       "seguridad": {
@@ -4130,7 +4272,18 @@
             "campo": "dxFuncional.limitaciones",
             "fragmento": "cojea, no puede caminar distancias largas"
           }
-        ]
+        ],
+        "redaccion": "Disfunción musculoesquelética de tobillo izquierdo secundaria a fractura, con dolor, limitación de la dorsiflexión y disminución de la fuerza muscular, condicionando la marcha y la tolerancia al apoyo."
+      },
+      "redaccion_sinergia": {
+        "diagnostico_funcional": "Disfunción musculoesquelética de tobillo izquierdo secundaria a fractura, con dolor, limitación de la dorsiflexión y disminución de la fuerza muscular, condicionando la marcha y la tolerancia al apoyo.",
+        "objetivos": {
+          "cp": "Disminuir el dolor, mejorar la movilidad del tobillo y favorecer la tolerancia al apoyo.",
+          "mp": "Recuperar la fuerza muscular, la estabilidad y la propiocepción del tobillo.",
+          "lp": "Recuperar la marcha independiente y reincorporar al paciente a sus actividades habituales."
+        },
+        "objetivos_nota": null,
+        "estilo": "sinergia"
       },
       "hipotesis": [],
       "seguridad": {
@@ -4448,7 +4601,18 @@
             "campo": "valoracion.pruebas",
             "fragmento": "Hawkins positivo; cribado de banderas rojas negativo"
           }
-        ]
+        ],
+        "redaccion": "Disfunción musculoesquelética de hombro derecho caracterizada por dolor y limitación de la movilidad en flexión y abducción, condicionando las actividades que requieren elevación del miembro superior."
+      },
+      "redaccion_sinergia": {
+        "diagnostico_funcional": "Disfunción musculoesquelética de hombro derecho caracterizada por dolor y limitación de la movilidad en flexión y abducción, condicionando las actividades que requieren elevación del miembro superior.",
+        "objetivos": {
+          "cp": "Disminuir el dolor y mejorar la movilidad del hombro.",
+          "mp": "Recuperar la fuerza de los grupos musculares afectados, el control escapular y la movilidad funcional.",
+          "lp": "Recuperar la capacidad de alcance, elevación y carga del miembro superior durante las actividades habituales."
+        },
+        "objetivos_nota": null,
+        "estilo": "sinergia"
       },
       "hipotesis": [],
       "seguridad": {
@@ -4762,7 +4926,18 @@
             "campo": "valoracion.fuerza",
             "fragmento": "4/5"
           }
-        ]
+        ],
+        "redaccion": "Disfunción musculoesquelética de rodilla derecha caracterizada por dolor y limitación de la flexión, condicionando la marcha y el uso de escaleras."
+      },
+      "redaccion_sinergia": {
+        "diagnostico_funcional": "Disfunción musculoesquelética de rodilla derecha caracterizada por dolor y limitación de la flexión, condicionando la marcha y el uso de escaleras.",
+        "objetivos": {
+          "cp": "Disminuir el dolor y mejorar la flexión de rodilla y la tolerancia a la marcha.",
+          "mp": "Recuperar la fuerza de cuádriceps e isquiotibiales, la estabilidad y el control dinámico de rodilla.",
+          "lp": "Recuperar la capacidad funcional para caminar, subir y bajar escaleras y realizar las actividades habituales."
+        },
+        "objetivos_nota": null,
+        "estilo": "sinergia"
       },
       "hipotesis": [],
       "seguridad": {
@@ -5070,7 +5245,14 @@
             "campo": "valoracion.fuerza",
             "fragmento": "4/5"
           }
-        ]
+        ],
+        "redaccion": "Disfunción musculoesquelética de rodilla derecha caracterizada por dolor y limitación de la flexión, condicionando la marcha y el uso de escaleras."
+      },
+      "redaccion_sinergia": {
+        "diagnostico_funcional": "Disfunción musculoesquelética de rodilla derecha caracterizada por dolor y limitación de la flexión, condicionando la marcha y el uso de escaleras.",
+        "objetivos": null,
+        "objetivos_nota": "Resolver la alerta de seguridad antes de fijar objetivos terapéuticos.",
+        "estilo": "sinergia"
       },
       "hipotesis": [
         {
@@ -5279,7 +5461,18 @@
             "campo": "valoracion.eva",
             "fragmento": "4"
           }
-        ]
+        ],
+        "redaccion": "Disfunción musculoesquelética de codo derecho caracterizada por dolor, condicionando el uso funcional de la extremidad."
+      },
+      "redaccion_sinergia": {
+        "diagnostico_funcional": "Disfunción musculoesquelética de codo derecho caracterizada por dolor, condicionando el uso funcional de la extremidad.",
+        "objetivos": {
+          "cp": "Disminuir el dolor y favorecer la recuperación progresiva de la movilidad del codo dentro de los rangos permitidos.",
+          "mp": "Recuperar la flexoextensión y la capacidad muscular del miembro superior, según los déficits documentados.",
+          "lp": "Recuperar el uso funcional de la extremidad para las actividades de la vida diaria, respetando las restricciones de carga."
+        },
+        "objetivos_nota": null,
+        "estilo": "sinergia"
       },
       "hipotesis": [],
       "seguridad": {
@@ -5519,7 +5712,18 @@
             "campo": "dxFuncional.limitaciones",
             "fragmento": "no logra flexión completa para subir escaleras"
           }
-        ]
+        ],
+        "redaccion": "Disfunción musculoesquelética de rodilla derecha caracterizada por dolor, condicionando la marcha y el uso de escaleras."
+      },
+      "redaccion_sinergia": {
+        "diagnostico_funcional": "Disfunción musculoesquelética de rodilla derecha caracterizada por dolor, condicionando la marcha y el uso de escaleras.",
+        "objetivos": {
+          "cp": "Disminuir el dolor y mejorar la flexión de rodilla y la tolerancia a la marcha.",
+          "mp": "Recuperar la fuerza de cuádriceps e isquiotibiales, la estabilidad y el control dinámico de rodilla.",
+          "lp": "Recuperar la capacidad funcional para caminar, subir y bajar escaleras y realizar las actividades habituales."
+        },
+        "objetivos_nota": null,
+        "estilo": "sinergia"
       },
       "hipotesis": [],
       "seguridad": {
@@ -5893,7 +6097,18 @@
             "campo": "dxFuncional.limitaciones",
             "fragmento": "no puede correr"
           }
-        ]
+        ],
+        "redaccion": "Disfunción musculoesquelética de rodilla derecha secundaria a lesión del ligamento cruzado anterior, con dolor, limitación de la flexión, disminución de la fuerza de cuádriceps y alteración de la estabilidad y la propiocepción, condicionando las actividades deportivas y de mayor demanda."
+      },
+      "redaccion_sinergia": {
+        "diagnostico_funcional": "Disfunción musculoesquelética de rodilla derecha secundaria a lesión del ligamento cruzado anterior, con dolor, limitación de la flexión, disminución de la fuerza de cuádriceps y alteración de la estabilidad y la propiocepción, condicionando las actividades deportivas y de mayor demanda.",
+        "objetivos": {
+          "cp": "Disminuir el dolor y el derrame articular, recuperar la extensión de rodilla y favorecer la activación del cuádriceps.",
+          "mp": "Recuperar la movilidad, la fuerza muscular, la estabilidad dinámica y el control neuromuscular del miembro inferior.",
+          "lp": "Recuperar la funcionalidad de la rodilla y favorecer el retorno deportivo cuando se cumplan los criterios funcionales correspondientes."
+        },
+        "objetivos_nota": null,
+        "estilo": "sinergia"
       },
       "hipotesis": [
         {
@@ -6211,7 +6426,18 @@
             "campo": "valoracion.fuerza",
             "fragmento": "Fuerza de cuadriceps 6/10"
           }
-        ]
+        ],
+        "redaccion": "Disfunción musculoesquelética de rodilla izquierda caracterizada por dolor, limitación de la flexión y disminución de la fuerza de cuádriceps, condicionando la marcha y el uso de escaleras."
+      },
+      "redaccion_sinergia": {
+        "diagnostico_funcional": "Disfunción musculoesquelética de rodilla izquierda caracterizada por dolor, limitación de la flexión y disminución de la fuerza de cuádriceps, condicionando la marcha y el uso de escaleras.",
+        "objetivos": {
+          "cp": "Disminuir el dolor y mejorar la flexión de rodilla y la tolerancia a la marcha.",
+          "mp": "Recuperar la fuerza de cuádriceps e isquiotibiales, la estabilidad y el control dinámico de rodilla.",
+          "lp": "Recuperar la capacidad funcional para caminar, subir y bajar escaleras y realizar las actividades habituales."
+        },
+        "objetivos_nota": null,
+        "estilo": "sinergia"
       },
       "hipotesis": [],
       "seguridad": {
@@ -6506,7 +6732,18 @@
             "campo": "valoracion.eva",
             "fragmento": "2"
           }
-        ]
+        ],
+        "redaccion": "Disfunción musculoesquelética de rodilla izquierda caracterizada por dolor, condicionando la marcha y el uso de escaleras."
+      },
+      "redaccion_sinergia": {
+        "diagnostico_funcional": "Disfunción musculoesquelética de rodilla izquierda caracterizada por dolor, condicionando la marcha y el uso de escaleras.",
+        "objetivos": {
+          "cp": "Disminuir el dolor y mejorar la flexión de rodilla y la tolerancia a la marcha.",
+          "mp": "Recuperar la fuerza de cuádriceps e isquiotibiales, la estabilidad y el control dinámico de rodilla.",
+          "lp": "Recuperar la capacidad funcional para caminar, subir y bajar escaleras y realizar las actividades habituales."
+        },
+        "objetivos_nota": null,
+        "estilo": "sinergia"
       },
       "hipotesis": [],
       "seguridad": {
@@ -6921,7 +7158,18 @@
             "campo": "valoracion.fuerza",
             "fragmento": "Fuerza de abductores 7/10 lado derecho (lado sano 10/10)"
           }
-        ]
+        ],
+        "redaccion": "Disfunción musculoesquelética de hombro derecho caracterizada por dolor, limitación de la movilidad en flexión y abducción y disminución de la fuerza de glúteos y abductores de cadera, condicionando las actividades que requieren elevación del miembro superior."
+      },
+      "redaccion_sinergia": {
+        "diagnostico_funcional": "Disfunción musculoesquelética de hombro derecho caracterizada por dolor, limitación de la movilidad en flexión y abducción y disminución de la fuerza de glúteos y abductores de cadera, condicionando las actividades que requieren elevación del miembro superior.",
+        "objetivos": {
+          "cp": "Disminuir el dolor y mejorar la movilidad del hombro.",
+          "mp": "Recuperar la fuerza de los grupos musculares afectados, el control escapular y la movilidad funcional.",
+          "lp": "Recuperar la capacidad de alcance, elevación y carga del miembro superior durante las actividades habituales."
+        },
+        "objetivos_nota": null,
+        "estilo": "sinergia"
       },
       "hipotesis": [],
       "seguridad": {
