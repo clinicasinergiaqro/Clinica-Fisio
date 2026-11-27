@@ -221,6 +221,15 @@
     deEmojiIn(scr, '.section-title, .btn-primary, .btn-secondary, .badge, .exp-pill');
   }
 
+  /* ---- genérico: curva + de-emoji del chrome en CUALQUIER pantalla activa ---- */
+  var CHROME_SEL = '.section-title, .form-section-title, .btn-primary, .btn-secondary, .seg-toggle-label, .form-label, .badge, .exp-pill, .chip-quick, .mod-grp-label, .soap-label, .alert-banner-text';
+  function skinGeneric() {
+    var scr = document.querySelector('.screen.active'); if (!scr) return;
+    if (scr.id === 'screen-login') return;
+    addCurve(scr.querySelector('.topbar'));
+    deEmojiIn(scr, CHROME_SEL);
+  }
+
   /* ---- aplicar todo (idempotente) ---- */
   var busy = false;
   function apply() {
@@ -229,6 +238,7 @@
     try { skinExpediente(); } catch (e) {}
     try { skinSOAP(); } catch (e) {}
     try { skinAgenda(); } catch (e) {}
+    try { skinGeneric(); } catch (e) {}
     busy = false;
   }
 
