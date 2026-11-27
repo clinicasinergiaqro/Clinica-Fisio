@@ -1371,7 +1371,7 @@ body.modo-oscuro .topbar{background:#141824}
 <body>
 <div id="sync-indicator" class="sync-indicator ok" style="display:none"></div>
 <div id="app-version-chip" title="Versión de la app en este equipo — toca para buscar actualización" onclick="try{_tapVersionChip()}catch(e){}"></div>
-<script>/* VERSIÓN VISIBLE: refleja el index.html realmente cargado en ESTE equipo (se bumpea junto con sw.js). Así un iPad con versión vieja se ve de un vistazo. */window.APP_VERSION='v1-2026-11-23b';(function(){try{var c=document.getElementById('app-version-chip');if(c)c.textContent=window.APP_VERSION;}catch(e){}})();</script>
+<script>/* VERSIÓN VISIBLE: refleja el index.html realmente cargado en ESTE equipo (se bumpea junto con sw.js). Así un iPad con versión vieja se ve de un vistazo. */window.APP_VERSION='v1-2026-11-27a';(function(){try{var c=document.getElementById('app-version-chip');if(c)c.textContent=window.APP_VERSION;}catch(e){}})();</script>
 <div class="toast" id="toast" aria-live="polite" aria-atomic="true"></div>
 
 <!-- LOGIN -->
@@ -7769,7 +7769,20 @@ async function _montarBannerPendientes(){
   if(!_previa && _codB){
     try{ var _ls=JSON.parse(localStorage.getItem('sinergia_bannerPend_'+_codB)||'null'); if(_ls && _ls.cod===_codB && Array.isArray(_ls.items)) _previa=_ls; }catch(_){}
   }
-  if(_previa){ try{ _renderBannerPendientes(_previa); }catch(_){} }   // pintar ya (no desaparece), sin tocar la caché global
+  // [ANTI-FLICKER · 2026-11-27] NO pintar NOMBRES concretos ANTES de confirmar contra la nube. Una cita ya
+  // documentada en OTRO equipo sigue en esta caché stale (este equipo aún no la sincronizó) → "aparecía y
+  // desaparecía", y un fisio podía reescribir una nota que ya existe. Ahora: si _previa ya estaba "al día"
+  // (sin nombres), se pinta (es estable y sin riesgo); si traía nombres (o no hay _previa), se muestra un
+  // estado NEUTRO "verificando" y solo se nombran citas tras el recálculo CONFIRMADO (r). Si el recálculo
+  // falla (sin red), abajo se cae a _previa como respaldo (mejor molestar que esconder trabajo real).
+  if(_previa && !_previa.total){ try{ _renderBannerPendientes(_previa); }catch(_){} }
+  else {
+    try{
+      var _elV=document.getElementById('banner-pend-personal');
+      if(_elV){ var _exV=''; try{ _exV=_htmlNotasPorCompletar(); }catch(_){}
+        _elV.innerHTML='<div style="margin-bottom:10px;padding:8px 12px;background:#F3F6FB;border-radius:10px;font-size:12px;font-weight:700;color:#334155">⏳ Verificando la documentación del día…</div>'+_exV; }
+    }catch(_){}
+  }
   var r=null;
   try{ r=await _computarBannerPendientes(); }catch(_){ r=null; }
   if(!document.getElementById('banner-pend-personal')) return;   // el bloque pudo re-renderizarse durante el await
