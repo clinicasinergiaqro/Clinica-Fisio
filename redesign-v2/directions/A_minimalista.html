@@ -1,0 +1,614 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sinergia · Dirección A — Clínica premium minimalista</title>
+<style>
+/* ============================================================
+   DIRECCIÓN A — CLÍNICA PREMIUM MINIMALISTA
+   Inspiración: Apple Health. Aire, jerarquía por tamaño y
+   espacio, bordes casi ausentes, dorado como acento puntual.
+   Mockup estático de alta fidelidad · 390 px · datos ficticios.
+   ============================================================ */
+:root{
+  --navy:#122950; --navy2:#1B3A6B; --gold:#C9A84C;
+  --bg:#F5F7FA; --surface:#FFFFFF; --ink:#172538; --ink2:#64748B;
+  --border:#E2E8F0; --hair:#EEF1F6;
+  --ok:#236646; --warn:#83520C; --risk:#A52D25; --derma:#8E3B6E;
+  --ok-bg:#E9F3EC; --warn-bg:#FBF2E0; --risk-bg:#FBECEA;
+  --r:18px; --r-sm:12px;
+  --sh:0 1px 2px rgba(16,32,64,.04), 0 6px 20px rgba(16,32,64,.06);
+  --sh-sm:0 1px 2px rgba(16,32,64,.05);
+  --font:-apple-system,"SF Pro Text",system-ui,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+}
+*{box-sizing:border-box;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+body{margin:0;background:#E7EBF1;font-family:var(--font);color:var(--ink);
+  background-image:radial-gradient(circle at 20% 10%,#eef2f7,#dfe5ee);padding:40px 18px 64px}
+.wrap{max-width:1760px;margin:0 auto}
+.dir-head{max-width:860px;margin:0 auto 34px;text-align:center}
+.dir-kick{font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:var(--gold);font-weight:700}
+.dir-head h1{font-size:30px;margin:8px 0 6px;color:var(--navy);letter-spacing:-.02em}
+.dir-head p{color:var(--ink2);font-size:15px;line-height:1.55;margin:0}
+.gallery{display:flex;gap:30px;justify-content:center;flex-wrap:wrap;align-items:flex-start}
+.art{width:390px}
+.art .cap{display:flex;align-items:center;gap:8px;justify-content:center;margin-bottom:12px;color:var(--navy);font-weight:600;font-size:14px}
+.art .cap b{background:var(--navy);color:#fff;font-size:11px;font-weight:700;width:20px;height:20px;border-radius:7px;display:grid;place-items:center}
+
+/* ---- Teléfono ---- */
+.phone{width:390px;background:var(--bg);border-radius:42px;padding:11px;
+  box-shadow:0 2px 6px rgba(16,32,64,.10),0 30px 60px -20px rgba(16,32,64,.35);position:relative}
+.screen{background:var(--bg);border-radius:32px;overflow:hidden;height:812px;display:flex;flex-direction:column;position:relative}
+.statusbar{height:46px;display:flex;align-items:center;justify-content:space-between;padding:0 24px 0 28px;font-weight:600;font-size:14px;color:var(--ink);flex-shrink:0}
+.statusbar .r{display:flex;gap:6px;align-items:center}
+.statusbar .notch{position:absolute;top:11px;left:50%;transform:translateX(-50%);width:120px;height:26px;background:#0c0c0e;border-radius:0 0 16px 16px;z-index:5}
+.sb-ic{width:16px;height:11px}
+.scroll{flex:1;overflow-y:auto;overflow-x:hidden}
+.scroll::-webkit-scrollbar{width:0}
+
+.ic{width:20px;height:20px;stroke:currentColor;stroke-width:1.9;fill:none;stroke-linecap:round;stroke-linejoin:round;display:block}
+.ic.sm{width:16px;height:16px}
+.ic.lg{width:24px;height:24px}
+
+/* ---- Tipografía base ---- */
+.pad{padding:0 20px}
+.h-screen{font-size:28px;font-weight:700;letter-spacing:-.025em;color:var(--navy);line-height:1.05}
+.sub{color:var(--ink2);font-size:14px}
+.eyebrow{font-size:12px;letter-spacing:.09em;text-transform:uppercase;color:var(--ink2);font-weight:700}
+
+/* ---- App header ---- */
+.appbar{display:flex;align-items:flex-end;justify-content:space-between;padding:6px 20px 14px}
+.appbar .date{font-size:13px;color:var(--ink2);font-weight:600;margin-bottom:3px}
+.avatar{width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,var(--navy),var(--navy2));color:#fff;display:grid;place-items:center;font-weight:700;font-size:15px;box-shadow:var(--sh-sm)}
+.iconbtn{width:40px;height:40px;border-radius:50%;background:var(--surface);display:grid;place-items:center;color:var(--navy);box-shadow:var(--sh-sm)}
+
+/* ---- Cards ---- */
+.card{background:var(--surface);border-radius:var(--r);box-shadow:var(--sh);margin:0 20px 14px}
+.card.pad-c{padding:18px}
+.flush{margin-left:20px;margin-right:20px}
+
+/* ---- Resumen del día (hero) ---- */
+.hero{margin:0 20px 18px;background:linear-gradient(140deg,var(--navy) 0%,#17315c 60%,var(--navy2) 100%);
+  border-radius:22px;padding:20px 20px 18px;color:#fff;box-shadow:0 10px 30px -10px rgba(18,41,80,.5);position:relative;overflow:hidden}
+.hero::after{content:"";position:absolute;right:-40px;top:-40px;width:160px;height:160px;border-radius:50%;background:rgba(201,168,76,.14)}
+.hero .lbl{font-size:12px;letter-spacing:.09em;text-transform:uppercase;color:rgba(255,255,255,.7);font-weight:700}
+.hero .big{font-size:40px;font-weight:700;letter-spacing:-.03em;margin:4px 0 2px}
+.hero .big small{font-size:16px;font-weight:600;color:rgba(255,255,255,.8)}
+.hero-row{display:flex;gap:10px;margin-top:16px;position:relative;z-index:1}
+.hero-stat{flex:1;background:rgba(255,255,255,.1);border-radius:14px;padding:11px 12px;backdrop-filter:blur(4px)}
+.hero-stat .n{font-size:22px;font-weight:700;line-height:1}
+.hero-stat .n.gold{color:var(--gold)}
+.hero-stat .t{font-size:11.5px;color:rgba(255,255,255,.78);margin-top:4px;line-height:1.25}
+
+/* ---- Agenda list ---- */
+.sec-head{display:flex;align-items:center;justify-content:space-between;padding:6px 22px 10px}
+.sec-head .t{font-size:15px;font-weight:700;color:var(--navy)}
+.sec-head .a{font-size:13px;color:var(--navy2);font-weight:600;display:flex;align-items:center;gap:2px}
+.appt{display:flex;gap:14px;padding:14px 18px;align-items:center;background:var(--surface);position:relative}
+.appt+.appt{border-top:1px solid var(--hair)}
+.appt .time{width:52px;flex-shrink:0;text-align:right}
+.appt .time b{font-size:15px;font-weight:700;color:var(--ink);display:block;line-height:1.1}
+.appt .time span{font-size:11px;color:var(--ink2)}
+.appt .tl{width:2px;align-self:stretch;background:var(--border);border-radius:2px;position:relative}
+.appt .tl.on{background:var(--gold)}
+.appt .body{flex:1;min-width:0}
+.appt .nm{font-size:15.5px;font-weight:600;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.appt .meta{display:flex;align-items:center;gap:7px;margin-top:5px}
+.chip{font-size:11.5px;font-weight:600;padding:2px 9px;border-radius:999px;background:#EEF2F8;color:var(--navy2);white-space:nowrap;max-width:168px;overflow:hidden;text-overflow:ellipsis}
+.chip.derma{background:#F7EBF2;color:var(--derma)}
+.ini{width:24px;height:24px;border-radius:8px;background:var(--navy);color:#fff;font-size:11px;font-weight:700;display:grid;place-items:center;flex-shrink:0}
+.ini.z{background:#1B3A6B}.ini.d{background:#2E6B4E}.ini.j{background:#7A5BA6}
+.appt .right{margin-left:auto;display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex-shrink:0;padding-left:8px}
+.appt .st{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--ink2);font-weight:600;white-space:nowrap}
+.dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.dot.ok{background:var(--ok)}.dot.wait{background:var(--gold)}.dot.todo{background:#CBD5E1}
+
+/* ---- Tabbar ---- */
+.tabbar{flex-shrink:0;background:rgba(255,255,255,.92);backdrop-filter:blur(14px);border-top:1px solid var(--hair);
+  display:flex;padding:9px 8px 22px}
+.tab{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;color:var(--ink2);font-size:11px;font-weight:600}
+.tab.on{color:var(--navy)}
+.tab.on .ic{stroke-width:2.2}
+.fab{position:absolute;right:20px;bottom:92px;width:56px;height:56px;border-radius:19px;background:var(--navy);color:#fff;display:grid;place-items:center;box-shadow:0 10px 24px -6px rgba(18,41,80,.6);z-index:4}
+
+/* ---- Expediente ---- */
+.topnav{display:flex;align-items:center;gap:12px;padding:6px 16px 12px}
+.topnav .back{width:38px;height:38px;border-radius:50%;background:var(--surface);display:grid;place-items:center;color:var(--navy);box-shadow:var(--sh-sm)}
+.topnav .t{font-size:13px;color:var(--ink2);font-weight:600}
+.pt-head{margin:0 20px 14px;background:var(--surface);border-radius:20px;box-shadow:var(--sh);overflow:hidden}
+.pt-head .top{padding:18px 18px 14px;display:flex;gap:14px;align-items:center}
+.pt-av{width:52px;height:52px;border-radius:16px;background:linear-gradient(135deg,var(--navy),var(--navy2));color:#fff;display:grid;place-items:center;font-size:20px;font-weight:700;flex-shrink:0}
+.pt-head h2{margin:0;font-size:20px;letter-spacing:-.02em;color:var(--ink)}
+.pt-head .line{display:flex;align-items:center;gap:8px;margin-top:4px;flex-wrap:wrap}
+.pt-head .line .m{font-size:12.5px;color:var(--ink2);font-weight:600}
+.pt-stats{display:flex;border-top:1px solid var(--hair)}
+.pt-stats .s{flex:1;padding:12px 8px;text-align:center}
+.pt-stats .s+.s{border-left:1px solid var(--hair)}
+.pt-stats .s .n{font-size:19px;font-weight:700;color:var(--navy);letter-spacing:-.02em}
+.pt-stats .s .n .u{font-size:11px;color:var(--ink2);font-weight:600}
+.pt-stats .s .l{font-size:11px;color:var(--ink2);font-weight:600;margin-top:2px}
+.safe{margin:0 20px 14px;display:flex;align-items:center;gap:10px;padding:11px 14px;border-radius:14px;
+  background:var(--ok-bg);color:var(--ok);font-size:12.5px;font-weight:600}
+.safe .ic{stroke-width:2}
+
+.modgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:0 20px 16px}
+.mod{background:var(--surface);border-radius:16px;padding:14px;box-shadow:var(--sh-sm);display:flex;flex-direction:column;gap:9px}
+.mod .ico{width:34px;height:34px;border-radius:11px;display:grid;place-items:center;background:#EEF2F8;color:var(--navy)}
+.mod.on .ico{background:var(--navy);color:#fff}
+.mod .nm{font-size:14px;font-weight:600;color:var(--ink)}
+.mod .d{font-size:11.5px;color:var(--ink2);line-height:1.3}
+.mod .ico.derma{background:#F7EBF2;color:var(--derma)}
+
+/* ---- Evolución mini ---- */
+.evo{margin:0 20px 14px;background:var(--surface);border-radius:18px;padding:16px 18px;box-shadow:var(--sh)}
+.evo .hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.evo .hd .t{font-size:14px;font-weight:700;color:var(--navy)}
+.evo .hd .delta{font-size:12px;font-weight:700;color:var(--ok);display:flex;align-items:center;gap:3px}
+.spark{display:flex;align-items:flex-end;gap:7px;height:62px}
+.spark .b{flex:1;background:linear-gradient(to top,var(--navy2),#8fa6c9);border-radius:5px 5px 2px 2px;position:relative;min-height:8px;opacity:.5}
+.spark .b.on{opacity:1;background:linear-gradient(to top,var(--navy),var(--navy2))}
+.spark .b span{position:absolute;top:-16px;left:50%;transform:translateX(-50%);font-size:10px;font-weight:700;color:var(--ink2)}
+.evo .xax{display:flex;gap:7px;margin-top:6px}
+.evo .xax span{flex:1;text-align:center;font-size:10px;color:var(--ink2)}
+
+/* ---- Valoración components ---- */
+.vhead{padding:8px 20px 4px}
+.vcard{background:var(--surface);border-radius:18px;box-shadow:var(--sh);margin:0 20px 14px;padding:16px 18px}
+.vcard .vt{display:flex;align-items:center;gap:9px;margin-bottom:14px}
+.vcard .vt .ico{width:30px;height:30px;border-radius:9px;background:#EEF2F8;color:var(--navy);display:grid;place-items:center}
+.vcard .vt .t{font-size:15px;font-weight:700;color:var(--ink)}
+.vcard .vt .badge{margin-left:auto;font-size:11px;font-weight:700;padding:3px 9px;border-radius:999px}
+.badge.done{background:var(--ok-bg);color:var(--ok)}
+.badge.part{background:var(--warn-bg);color:var(--warn)}
+
+/* EVA */
+.eva-top{display:flex;align-items:baseline;gap:8px;margin-bottom:12px}
+.eva-top .n{font-size:38px;font-weight:700;color:var(--navy);letter-spacing:-.03em;line-height:1}
+.eva-top .d{font-size:16px;color:var(--ink2);font-weight:600}
+.eva-top .tag{margin-left:auto;font-size:12px;font-weight:700;color:var(--warn);background:var(--warn-bg);padding:3px 10px;border-radius:999px}
+.evabar{height:10px;border-radius:999px;background:linear-gradient(90deg,#2E8B57,#D8B74A 55%,#C0392B);position:relative}
+.evabar .pin{position:absolute;top:50%;transform:translate(-50%,-50%);width:18px;height:18px;border-radius:50%;background:#fff;border:3px solid var(--navy);box-shadow:var(--sh-sm)}
+.evascale{display:flex;justify-content:space-between;margin-top:6px;font-size:10.5px;color:var(--ink2);font-weight:600}
+
+/* ROM arc */
+.rom-row{display:flex;align-items:center;gap:16px}
+.arc{width:92px;height:92px;flex-shrink:0;position:relative}
+.arc svg{transform:rotate(-90deg)}
+.arc .lbl{position:absolute;inset:0;display:grid;place-items:center;text-align:center}
+.arc .lbl b{font-size:20px;font-weight:700;color:var(--navy);line-height:1}
+.arc .lbl span{font-size:10px;color:var(--ink2);font-weight:600}
+.rom-info .big{font-size:15px;font-weight:700;color:var(--ink)}
+.rom-info .sub2{font-size:12.5px;color:var(--ink2);margin-top:3px;line-height:1.4}
+.rom-info .gain{display:inline-flex;align-items:center;gap:3px;font-size:12px;font-weight:700;color:var(--ok);background:var(--ok-bg);padding:3px 9px;border-radius:999px;margin-top:8px}
+
+/* Fuerza comparativa */
+.fz-row{margin-bottom:14px}
+.fz-row:last-child{margin-bottom:0}
+.fz-row .nm{display:flex;align-items:center;justify-content:space-between;font-size:13.5px;font-weight:600;color:var(--ink);margin-bottom:7px}
+.fz-row .nm .def{font-size:11.5px;font-weight:700;color:var(--risk)}
+.fz-row .nm .def.ref{color:var(--ok)}
+.fz-bars{display:flex;gap:10px}
+.fz-side{flex:1}
+.fz-side .lab{font-size:10.5px;color:var(--ink2);font-weight:700;margin-bottom:4px;display:flex;justify-content:space-between}
+.fz-track{height:9px;border-radius:999px;background:#EEF2F6;overflow:hidden}
+.fz-fill{height:100%;border-radius:999px}
+.fz-fill.v{background:var(--navy)}
+.fz-fill.r{background:var(--ok)}
+.fz-fill.lo{background:var(--risk)}
+
+/* Estado tags (no eval/na/neg/pos) */
+.states{display:flex;flex-wrap:wrap;gap:8px}
+.state{display:flex;align-items:center;gap:7px;padding:8px 11px;border-radius:12px;font-size:12.5px;font-weight:600;background:#F4F6F9;color:var(--ink)}
+.state .pt{width:7px;height:7px;border-radius:50%}
+.state.pos{background:var(--ok-bg);color:var(--ok)} .state.pos .pt{background:var(--ok)}
+.state.neg .pt{background:var(--ink2)}
+.state.na{color:var(--ink2)} .state.na .pt{background:#CBD5E1}
+.state.ne{background:var(--warn-bg);color:var(--warn)} .state.ne .pt{background:var(--warn)}
+
+/* ---- SOAP ---- */
+.soap-head{background:var(--surface);box-shadow:var(--sh-sm);padding:6px 16px 0;position:sticky;top:0;z-index:6}
+.soap-id{display:flex;align-items:center;gap:11px;padding:6px 4px 12px}
+.soap-id .pt-av{width:42px;height:42px;border-radius:13px;font-size:16px}
+.soap-id h3{margin:0;font-size:16px;color:var(--ink);letter-spacing:-.01em}
+.soap-id .ml{font-size:12px;color:var(--ink2);font-weight:600;margin-top:2px;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.ses-chip{background:var(--navy);color:#fff;font-size:11px;font-weight:700;padding:2px 9px;border-radius:999px}
+.soap-safe{margin:0 0 10px;display:flex;align-items:center;gap:9px;padding:9px 12px;border-radius:12px;background:var(--ok-bg);color:var(--ok);font-size:12px;font-weight:600}
+.qnav{display:flex;gap:7px;padding:0 0 11px}
+.qnav .q{flex:1;text-align:center;padding:9px 0;border-radius:12px;background:#EEF2F8;color:var(--navy2);font-weight:700;font-size:13px;position:relative}
+.qnav .q.on{background:var(--navy);color:#fff}
+.qnav .q small{display:block;font-size:9px;font-weight:600;opacity:.7;margin-top:1px;letter-spacing:.02em}
+.qa{display:flex;gap:8px;padding:0 0 12px;overflow-x:auto}
+.qa .a{flex-shrink:0;display:flex;align-items:center;gap:6px;background:#F4F6F9;border-radius:999px;padding:7px 13px;font-size:12.5px;font-weight:600;color:var(--navy2)}
+.qa .a .ic{width:15px;height:15px}
+
+.sgrp{margin:0 20px 14px}
+.sgrp .gl{display:flex;align-items:center;gap:9px;margin-bottom:9px}
+.sgrp .gl .k{width:26px;height:26px;border-radius:9px;background:var(--navy);color:#fff;font-size:13px;font-weight:700;display:grid;place-items:center}
+.sgrp .gl .t{font-size:15px;font-weight:700;color:var(--navy)}
+.sgrp .gl .t small{display:block;font-size:11px;color:var(--ink2);font-weight:600}
+.field{background:var(--surface);border-radius:14px;box-shadow:var(--sh-sm);padding:13px 14px;margin-bottom:9px}
+.field .fl{font-size:12px;font-weight:700;color:var(--ink2);margin-bottom:6px;display:flex;align-items:center;justify-content:space-between}
+.field .ft{font-size:14.5px;color:var(--ink);line-height:1.5}
+.field .ph{font-size:14px;color:#AEB8C6}
+.field.filled{border-left:3px solid var(--gold)}
+.pillrow{display:flex;flex-wrap:wrap;gap:7px;margin-top:9px}
+.pill{font-size:12px;font-weight:600;padding:6px 11px;border-radius:999px;background:#EEF2F8;color:var(--navy2)}
+.pill.on{background:var(--navy);color:#fff}
+.mini-metric{display:flex;gap:9px;margin-top:4px}
+.mm{flex:1;background:#F4F6F9;border-radius:12px;padding:10px 12px}
+.mm .ml{font-size:10.5px;color:var(--ink2);font-weight:700;text-transform:uppercase;letter-spacing:.05em}
+.mm .mv{font-size:17px;font-weight:700;color:var(--navy);margin-top:2px}
+.mm .mv small{font-size:11px;color:var(--ok);font-weight:700}
+
+/* Save bar */
+.savebar{flex-shrink:0;background:rgba(255,255,255,.96);backdrop-filter:blur(14px);border-top:1px solid var(--hair);padding:11px 16px 24px;display:flex;align-items:center;gap:12px}
+.savebar .state2{flex:1;display:flex;align-items:center;gap:8px;font-size:12px;color:var(--ink2);font-weight:600}
+.savebar .state2 .d{width:8px;height:8px;border-radius:50%;background:var(--gold)}
+.btn-save{background:var(--navy);color:#fff;border-radius:14px;padding:13px 22px;font-size:15px;font-weight:700;display:flex;align-items:center;gap:8px;box-shadow:0 8px 18px -6px rgba(18,41,80,.5)}
+.btn-top{width:44px;height:44px;border-radius:13px;background:var(--surface);box-shadow:var(--sh-sm);display:grid;place-items:center;color:var(--navy)}
+
+.footer-note{max-width:860px;margin:30px auto 0;text-align:center;color:#8290a3;font-size:12.5px;line-height:1.6}
+</style>
+</head>
+<body>
+<svg style="display:none">
+  <symbol id="i-cal" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></symbol>
+  <symbol id="i-users" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></symbol>
+  <symbol id="i-book" viewBox="0 0 24 24"><path d="M12 7v14M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M5 12h14M12 5v14"/></symbol>
+  <symbol id="i-cr" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
+  <symbol id="i-back" viewBox="0 0 24 24"><path d="m12 19-7-7 7-7M19 12H5"/></symbol>
+  <symbol id="i-activity" viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></symbol>
+  <symbol id="i-clip" viewBox="0 0 24 24"><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4M12 16h4M8 11h.01M8 16h.01"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 24 24"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="M12 8v4M12 16h.01"/></symbol>
+  <symbol id="i-ruler" viewBox="0 0 24 24"><path d="M21.3 15.3a2.4 2.4 0 0 1 0 3.4l-2.6 2.6a2.4 2.4 0 0 1-3.4 0L2.7 8.7a2.41 2.41 0 0 1 0-3.4l2.6-2.6a2.41 2.41 0 0 1 3.4 0Z"/><path d="m14.5 12.5 2-2M11.5 9.5l2-2M8.5 6.5l2-2M17.5 15.5l2-2"/></symbol>
+  <symbol id="i-cam" viewBox="0 0 24 24"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></symbol>
+  <symbol id="i-mic" viewBox="0 0 24 24"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M19 10v1a7 7 0 0 1-14 0v-1M12 18v4"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+  <symbol id="i-cd" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+  <symbol id="i-file" viewBox="0 0 24 24"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7z"/><path d="M14 2v5h5M9 13h6M9 17h6"/></symbol>
+  <symbol id="i-target" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/></symbol>
+  <symbol id="i-plus2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-bolt" viewBox="0 0 24 24"><path d="M13 2 3 14h9l-1 8 10-12h-9z"/></symbol>
+  <symbol id="i-bone" viewBox="0 0 24 24"><path d="M17 10c.7-.7 1.69 0 2.5 0a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0-2.5 2.5c0 .81.7 1.8 0 2.5l-7 7c-.7.7-1.69 0-2.5 0a2.5 2.5 0 0 0 0 5 2.5 2.5 0 0 0 2.5-2.5c0-.81-.7-1.8 0-2.5z"/></symbol>
+  <symbol id="i-up" viewBox="0 0 24 24"><path d="m18 15-6-6-6 6"/></symbol>
+  <symbol id="i-sig" viewBox="0 0 24 24" fill="currentColor" stroke="none"><rect x="1" y="9" width="3" height="5" rx="1"/><rect x="6" y="6" width="3" height="8" rx="1"/><rect x="11" y="3" width="3" height="11" rx="1"/></symbol>
+  <symbol id="i-bat" viewBox="0 0 24 24"><rect x="1" y="6" width="18" height="12" rx="3" fill="currentColor" stroke="none"/><rect x="20" y="10" width="2" height="4" rx="1" fill="currentColor" stroke="none"/></symbol>
+</svg>
+
+<div class="wrap">
+  <div class="dir-head">
+    <div class="dir-kick">Dirección A</div>
+    <h1>Clínica premium minimalista</h1>
+    <p>Aire, jerarquía por tamaño y espacio, superficies suaves y bordes casi ausentes. El dorado aparece solo como acento del dato clave. Inspiración: la claridad de Apple&nbsp;Health aplicada al expediente clínico. Íconos SVG (Lucide), tipografía del sistema, paleta navy&nbsp;/&nbsp;dorado institucional.</p>
+  </div>
+
+  <div class="gallery">
+
+    <!-- ============== AGENDA ============== -->
+    <div class="art" id="art-agenda">
+      <div class="cap"><b>1</b> Agenda · hoy</div>
+      <div class="phone"><div class="screen">
+        <div class="notch"></div>
+        <div class="statusbar"><span>9:41</span><div class="r"><svg class="sb-ic"><use href="#i-sig"/></svg><svg class="sb-ic"><use href="#i-bat"/></svg></div></div>
+        <div class="scroll">
+          <div class="appbar">
+            <div><div class="date">Martes · 26 de noviembre</div><div class="h-screen">Hoy</div></div>
+            <div style="display:flex;gap:10px;align-items:center">
+              <div class="iconbtn"><svg class="ic"><use href="#i-search"/></svg></div>
+              <div class="avatar">CA</div>
+            </div>
+          </div>
+
+          <div class="hero">
+            <div class="lbl">Jornada de hoy</div>
+            <div class="big">14<small> &nbsp;citas</small></div>
+            <div class="hero-row">
+              <div class="hero-stat"><div class="n">11</div><div class="t">Atendidas</div></div>
+              <div class="hero-stat"><div class="n gold">2</div><div class="t">Sin documentar</div></div>
+              <div class="hero-stat"><div class="n">1</div><div class="t">Por llegar</div></div>
+            </div>
+          </div>
+
+          <div class="sec-head"><div class="t">Próximas</div><div class="a">Ver todas <svg class="ic sm"><use href="#i-cr"/></svg></div></div>
+          <div class="card" style="overflow:hidden;padding:0">
+            <div class="appt">
+              <div class="time"><b>17:00</b><span>45 min</span></div>
+              <div class="tl on"></div>
+              <div class="body">
+                <div class="nm">Juan Pérez Demo</div>
+                <div class="meta"><span class="chip">Tendinopatía rotuliana</span></div>
+              </div>
+              <div class="right"><span class="ini z">Z</span><span class="st"><span class="dot wait"></span>Por llegar</span></div>
+            </div>
+            <div class="appt">
+              <div class="time"><b>17:45</b><span>45 min</span></div>
+              <div class="tl"></div>
+              <div class="body">
+                <div class="nm">María López Ávila</div>
+                <div class="meta"><span class="chip">Manguito rotador izq.</span></div>
+              </div>
+              <div class="right"><span class="ini z">Z</span><span class="st"><span class="dot todo"></span>Agendada</span></div>
+            </div>
+            <div class="appt">
+              <div class="time"><b>18:30</b><span>60 min</span></div>
+              <div class="tl"></div>
+              <div class="body">
+                <div class="nm">Ana Torres Beltrán</div>
+                <div class="meta"><span class="chip derma">Post-lipoabdominoplastia</span></div>
+              </div>
+              <div class="right"><span class="ini j">J</span><span class="st"><span class="dot todo"></span>Agendada</span></div>
+            </div>
+          </div>
+
+          <div class="sec-head"><div class="t">Atendidas · sin documentar</div></div>
+          <div class="card" style="overflow:hidden;padding:0">
+            <div class="appt">
+              <div class="time"><b>16:00</b><span>Hoy</span></div>
+              <div class="tl"></div>
+              <div class="body">
+                <div class="nm">Carlos Ramírez Ortega</div>
+                <div class="meta"><span class="chip">Lumbalgia mecánica</span></div>
+              </div>
+              <div class="right"><span class="ini d">D</span><span class="st" style="color:var(--warn)"><span class="dot wait"></span>Falta nota</span></div>
+            </div>
+            <div class="appt">
+              <div class="time"><b>15:15</b><span>Hoy</span></div>
+              <div class="tl"></div>
+              <div class="body">
+                <div class="nm">Luis Hernández Gil</div>
+                <div class="meta"><span class="chip">Esguince tobillo der.</span></div>
+              </div>
+              <div class="right"><span class="ini z">Z</span><span class="st" style="color:var(--warn)"><span class="dot wait"></span>Falta nota</span></div>
+            </div>
+          </div>
+          <div style="height:88px"></div>
+        </div>
+        <div class="fab"><svg class="ic lg"><use href="#i-plus"/></svg></div>
+        <div class="tabbar">
+          <div class="tab on"><svg class="ic"><use href="#i-cal"/></svg>Agenda</div>
+          <div class="tab"><svg class="ic"><use href="#i-users"/></svg>Pacientes</div>
+          <div class="tab"><svg class="ic"><use href="#i-book"/></svg>Protocolos</div>
+          <div class="tab"><svg class="ic"><use href="#i-activity"/></svg>Supervisión</div>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- ============== EXPEDIENTE ============== -->
+    <div class="art" id="art-exp">
+      <div class="cap"><b>2</b> Expediente</div>
+      <div class="phone"><div class="screen">
+        <div class="notch"></div>
+        <div class="statusbar"><span>9:41</span><div class="r"><svg class="sb-ic"><use href="#i-sig"/></svg><svg class="sb-ic"><use href="#i-bat"/></svg></div></div>
+        <div class="scroll">
+          <div class="topnav"><div class="back"><svg class="ic"><use href="#i-back"/></svg></div><div class="t">Agenda · Hoy 17:00</div></div>
+
+          <div class="pt-head">
+            <div class="top">
+              <div class="pt-av">JP</div>
+              <div style="flex:1;min-width:0">
+                <h2>Juan Pérez Demo</h2>
+                <div class="line"><span class="m">36 años</span><span class="m">·</span><span class="m">Zara</span><span class="chip">Activo</span></div>
+              </div>
+            </div>
+            <div style="padding:0 18px 12px"><div class="chip" style="background:#EEF2F8;color:var(--navy2)">Tendinopatía rotuliana derecha · fase reactiva</div></div>
+            <div class="pt-stats">
+              <div class="s"><div class="n">6<span class="u">/10</span></div><div class="l">EVA</div></div>
+              <div class="s"><div class="n">125<span class="u">°</span></div><div class="l">Flexión</div></div>
+              <div class="s"><div class="n">13</div><div class="l">Sesiones</div></div>
+            </div>
+          </div>
+
+          <div class="safe"><svg class="ic sm"><use href="#i-shield"/></svg>Seguridad revisada · sin contraindicaciones registradas</div>
+
+          <div class="evo">
+            <div class="hd"><div class="t">Evolución del dolor</div><div class="delta"><svg class="ic sm"><use href="#i-cd"/></svg>−3 en 6 sem</div></div>
+            <div class="spark">
+              <div class="b" style="height:90%"><span>9</span></div>
+              <div class="b" style="height:80%"></div>
+              <div class="b" style="height:70%"><span>7</span></div>
+              <div class="b" style="height:70%"></div>
+              <div class="b" style="height:60%"></div>
+              <div class="b on" style="height:60%"><span>6</span></div>
+            </div>
+            <div class="xax"><span>S1</span><span>S3</span><span>S5</span><span>S7</span><span>S9</span><span>Hoy</span></div>
+          </div>
+
+          <div style="padding:6px 22px 8px" class="eyebrow">Áreas del expediente</div>
+          <div class="modgrid">
+            <div class="mod on"><div class="ico"><svg class="ic"><use href="#i-clip"/></svg></div><div class="nm">Valoración</div><div class="d">EVA · ROM · fuerza · pruebas</div></div>
+            <div class="mod"><div class="ico"><svg class="ic"><use href="#i-activity"/></svg></div><div class="nm">Notas SOAP</div><div class="d">13 sesiones · última hoy</div></div>
+            <div class="mod"><div class="ico"><svg class="ic"><use href="#i-bone"/></svg></div><div class="nm">Biomecánica</div><div class="d">Goniometría · marcha</div></div>
+            <div class="mod"><div class="ico"><svg class="ic"><use href="#i-target"/></svg></div><div class="nm">Protocolo</div><div class="d">Rotuliano HSR · M2</div></div>
+            <div class="mod"><div class="ico"><svg class="ic"><use href="#i-bolt"/></svg></div><div class="nm">Ejercicios</div><div class="d">4 en casa · HSR</div></div>
+            <div class="mod"><div class="ico"><svg class="ic"><use href="#i-file"/></svg></div><div class="nm">Estudios</div><div class="d">RM rodilla · 2</div></div>
+          </div>
+          <div style="height:20px"></div>
+        </div>
+        <div class="tabbar">
+          <div class="tab"><svg class="ic"><use href="#i-cal"/></svg>Agenda</div>
+          <div class="tab on"><svg class="ic"><use href="#i-users"/></svg>Pacientes</div>
+          <div class="tab"><svg class="ic"><use href="#i-book"/></svg>Protocolos</div>
+          <div class="tab"><svg class="ic"><use href="#i-activity"/></svg>Supervisión</div>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- ============== VALORACIÓN ============== -->
+    <div class="art" id="art-val">
+      <div class="cap"><b>3</b> Valoración</div>
+      <div class="phone"><div class="screen">
+        <div class="notch"></div>
+        <div class="statusbar"><span>9:41</span><div class="r"><svg class="sb-ic"><use href="#i-sig"/></svg><svg class="sb-ic"><use href="#i-bat"/></svg></div></div>
+        <div class="scroll">
+          <div class="topnav"><div class="back"><svg class="ic"><use href="#i-back"/></svg></div><div class="t">Juan Pérez Demo · Valoración</div></div>
+          <div class="vhead"><div class="h-screen" style="font-size:24px">Valoración inicial</div><div class="sub" style="margin-top:3px">Rodilla derecha · 09 nov 2026</div></div>
+          <div style="height:12px"></div>
+
+          <!-- EVA -->
+          <div class="vcard">
+            <div class="vt"><div class="ico"><svg class="ic sm"><use href="#i-activity"/></svg></div><div class="t">Dolor (EVA)</div><span class="badge done">Evaluado</span></div>
+            <div class="eva-top"><div class="n">6</div><div class="d">/ 10</div><div class="tag">Moderado</div></div>
+            <div class="evabar"><div class="pin" style="left:60%"></div></div>
+            <div class="evascale"><span>Sin dolor</span><span>Máximo</span></div>
+          </div>
+
+          <!-- ROM -->
+          <div class="vcard">
+            <div class="vt"><div class="ico"><svg class="ic sm"><use href="#i-ruler"/></svg></div><div class="t">Rango de movimiento</div><span class="badge done">Medido</span></div>
+            <div class="rom-row">
+              <div class="arc">
+                <svg width="92" height="92" viewBox="0 0 92 92">
+                  <circle cx="46" cy="46" r="40" fill="none" stroke="#EEF2F6" stroke-width="9"/>
+                  <circle cx="46" cy="46" r="40" fill="none" stroke="#122950" stroke-width="9" stroke-linecap="round" stroke-dasharray="251" stroke-dashoffset="80"/>
+                </svg>
+                <div class="lbl"><b>125°</b><span>flexión</span></div>
+              </div>
+              <div class="rom-info">
+                <div class="big">Flexión de rodilla</div>
+                <div class="sub2">Inicial 100° → actual 125°<br>Goniometría de cámara · 2D</div>
+                <div class="gain"><svg class="ic sm"><use href="#i-up"/></svg>+25° de ganancia</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- FUERZA -->
+          <div class="vcard">
+            <div class="vt"><div class="ico"><svg class="ic sm"><use href="#i-bolt"/></svg></div><div class="t">Fuerza comparativa</div><span class="badge part">0–10</span></div>
+            <div class="fz-row">
+              <div class="nm"><span>Cuádriceps</span><span class="def">Déficit 30%</span></div>
+              <div class="fz-bars">
+                <div class="fz-side"><div class="lab"><span>Derecho</span><span>7/10</span></div><div class="fz-track"><div class="fz-fill v" style="width:70%"></div></div></div>
+                <div class="fz-side"><div class="lab"><span>Izquierdo</span><span>10/10</span></div><div class="fz-track"><div class="fz-fill r" style="width:100%"></div></div></div>
+              </div>
+            </div>
+            <div class="fz-row">
+              <div class="nm"><span>Isquiotibiales</span><span class="def ref">Simétrico</span></div>
+              <div class="fz-bars">
+                <div class="fz-side"><div class="lab"><span>Derecho</span><span>9/10</span></div><div class="fz-track"><div class="fz-fill v" style="width:90%"></div></div></div>
+                <div class="fz-side"><div class="lab"><span>Izquierdo</span><span>9/10</span></div><div class="fz-track"><div class="fz-fill r" style="width:90%"></div></div></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Pruebas / estados -->
+          <div class="vcard">
+            <div class="vt"><div class="ico"><svg class="ic sm"><use href="#i-clip"/></svg></div><div class="t">Pruebas y hallazgos</div></div>
+            <div class="states">
+              <div class="state pos"><span class="pt"></span>Dolor a la palpación polo inferior</div>
+              <div class="state ne"><span class="pt"></span>Single-leg decline · dolor 6/10</div>
+              <div class="state neg"><span class="pt"></span>Lachman negativo</div>
+              <div class="state na"><span class="pt"></span>Cajón anterior · no evaluado</div>
+            </div>
+          </div>
+          <div style="height:20px"></div>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- ============== SOAP ============== -->
+    <div class="art" id="art-soap">
+      <div class="cap"><b>4</b> Nota SOAP</div>
+      <div class="phone"><div class="screen">
+        <div class="notch"></div>
+        <div class="statusbar"><span>9:41</span><div class="r"><svg class="sb-ic"><use href="#i-sig"/></svg><svg class="sb-ic"><use href="#i-bat"/></svg></div></div>
+
+        <div class="soap-head">
+          <div class="soap-id">
+            <div class="pt-av">JP</div>
+            <div style="flex:1;min-width:0">
+              <h3>Juan Pérez Demo</h3>
+              <div class="ml">Tendinopatía rotuliana der. <span class="ses-chip">Sesión 13</span></div>
+            </div>
+            <div class="back" style="box-shadow:var(--sh-sm)"><svg class="ic"><use href="#i-back"/></svg></div>
+          </div>
+          <div class="soap-safe"><svg class="ic sm"><use href="#i-shield"/></svg>Sin contraindicaciones para agentes físicos</div>
+          <div class="qnav">
+            <div class="q on">S<small>Subjetivo</small></div>
+            <div class="q">O<small>Objetivo</small></div>
+            <div class="q">A<small>Análisis</small></div>
+            <div class="q">P<small>Plan</small></div>
+          </div>
+          <div class="qa">
+            <div class="a"><svg class="ic"><use href="#i-plus2"/></svg>Nuevo motivo</div>
+            <div class="a"><svg class="ic"><use href="#i-mic"/></svg>Dictar</div>
+            <div class="a"><svg class="ic"><use href="#i-clock"/></svg>Última sesión</div>
+            <div class="a"><svg class="ic"><use href="#i-target"/></svg>Objetivos</div>
+          </div>
+        </div>
+
+        <div class="scroll" style="padding-top:12px">
+          <!-- S -->
+          <div class="sgrp">
+            <div class="gl"><div class="k">S</div><div class="t">Subjetivo<small>Lo que refiere el paciente</small></div></div>
+            <div class="field filled">
+              <div class="fl">Molestia / dolor<span style="color:var(--ink2);font-weight:600">EVA inicio 5/10</span></div>
+              <div class="ft">Refiere menos dolor al bajar escaleras. Molestia matutina leve que cede al calentar.</div>
+            </div>
+            <div class="field">
+              <div class="fl">Actividad física / cambios</div>
+              <div class="ft ph">Toca para escribir…</div>
+            </div>
+          </div>
+
+          <!-- O -->
+          <div class="sgrp">
+            <div class="gl"><div class="k">O</div><div class="t">Objetivo<small>Exploración y mediciones</small></div></div>
+            <div class="field filled">
+              <div class="fl">ROM · fuerza</div>
+              <div class="mini-metric">
+                <div class="mm"><div class="ml">Flexión</div><div class="mv">125° <small>+25</small></div></div>
+                <div class="mm"><div class="ml">Cuádriceps</div><div class="mv">7/10</div></div>
+              </div>
+            </div>
+            <div class="field">
+              <div class="fl">Agentes físicos aplicados</div>
+              <div class="pillrow">
+                <span class="pill on">Tecar resistiva</span>
+                <span class="pill on">Láser 808 nm</span>
+                <span class="pill">Ultrasonido</span>
+                <span class="pill">Ondas de choque</span>
+                <span class="pill">+ más</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- A -->
+          <div class="sgrp">
+            <div class="gl"><div class="k">A</div><div class="t">Análisis<small>Razonamiento clínico</small></div></div>
+            <div class="field filled">
+              <div class="fl">Evolución</div>
+              <div class="ft">Buena respuesta a carga progresiva (HSR). Tolera isométricos a 70% CVM sin dolor residual &gt;24 h.</div>
+            </div>
+          </div>
+
+          <!-- P -->
+          <div class="sgrp">
+            <div class="gl"><div class="k">P</div><div class="t">Plan<small>Indicaciones y objetivos</small></div></div>
+            <div class="field">
+              <div class="fl">Indicaciones</div>
+              <div class="ft ph">Toca para escribir…</div>
+            </div>
+          </div>
+          <div style="height:12px"></div>
+        </div>
+
+        <div class="savebar">
+          <div class="btn-top"><svg class="ic"><use href="#i-up"/></svg></div>
+          <div class="state2"><span class="d"></span>Borrador · se guarda al confirmar</div>
+          <div class="btn-save"><svg class="ic sm"><use href="#i-check"/></svg>Guardar</div>
+        </div>
+      </div></div>
+    </div>
+
+  </div>
+
+  <div class="footer-note">
+    Dirección A · mockup estático de alta fidelidad · datos ficticios (Juan Pérez Demo).<br>
+    Navy #122950 · Navy 2 #1B3A6B · Dorado #C9A84C · Fondo #F5F7FA · Dermatofuncional #8E3B6E. Íconos Lucide (SVG local).
+  </div>
+</div>
+</body>
+</html>

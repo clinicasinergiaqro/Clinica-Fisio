@@ -1,0 +1,749 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sinergia · Dirección B — Clínica tecnológica con indicadores visuales</title>
+<style>
+/* ============================================================
+   DIRECCIÓN B — CLÍNICA TECNOLÓGICA CON INDICADORES VISUALES
+   Inspiración: Linear + cabina clínica / panel de control.
+   Densa pero impecablemente ordenada. Cada dato clave lleva su
+   indicador de estado: anillos, medidores, gauges segmentados,
+   sparkbars, badges de tendencia (▲/▼) y lecturas tipo instrumento.
+   Mockup estático de alta fidelidad · 390 px · datos ficticios.
+   ============================================================ */
+:root{
+  --navy:#122950; --navy2:#1B3A6B; --gold:#C9A84C;
+  --bg:#F5F7FA; --surface:#FFFFFF; --ink:#172538; --ink2:#64748B;
+  --border:#E2E8F0; --hair:#EDF1F6;
+  --ok:#236646; --warn:#83520C; --risk:#A52D25; --derma:#8E3B6E;
+  --ok-bg:#E9F3EC; --warn-bg:#FBF2E0; --risk-bg:#FBECEA;
+  --steel:#7FA8D9;
+  --r:14px; --r-sm:10px;
+  --sh:0 1px 2px rgba(16,32,64,.05);
+  --sh-raise:0 1px 2px rgba(16,32,64,.05),0 8px 22px -12px rgba(16,32,64,.25);
+  --font:-apple-system,system-ui,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  --mono:"SF Mono",ui-monospace,Menlo,"Roboto Mono","Liberation Mono",monospace;
+}
+*{box-sizing:border-box;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+body{margin:0;background:#D7DDE7;background-image:radial-gradient(circle at 25% 0%,#e4e9f1,#c9d1de);
+  font-family:var(--font);color:var(--ink);padding:40px 18px 64px}
+.wrap{max-width:1760px;margin:0 auto}
+.dir-head{max-width:880px;margin:0 auto 34px;text-align:center}
+.dir-kick{font-family:var(--mono);font-size:12px;letter-spacing:.2em;text-transform:uppercase;color:var(--gold);font-weight:700}
+.dir-head h1{font-size:30px;margin:9px 0 7px;color:var(--navy);letter-spacing:-.02em}
+.dir-head p{color:var(--ink2);font-size:15px;line-height:1.56;margin:0}
+.gallery{display:flex;gap:30px;justify-content:center;flex-wrap:wrap;align-items:flex-start}
+.art{width:390px}
+.art .cap{display:flex;align-items:center;gap:8px;justify-content:center;margin-bottom:12px;color:var(--navy);font-weight:600;font-size:14px}
+.art .cap b{background:var(--navy);color:#fff;font-size:11px;font-weight:700;width:20px;height:20px;border-radius:6px;display:grid;place-items:center;font-family:var(--mono)}
+
+/* ---- Teléfono ---- */
+.phone{width:390px;background:#0b1526;border-radius:42px;padding:11px;
+  box-shadow:0 2px 6px rgba(16,32,64,.10),0 30px 60px -20px rgba(16,32,64,.38);position:relative}
+.screen{background:var(--bg);border-radius:32px;overflow:hidden;height:812px;display:flex;flex-direction:column;position:relative}
+.statusbar{height:46px;display:flex;align-items:center;justify-content:space-between;padding:0 24px 0 28px;font-family:var(--mono);font-weight:600;font-size:14px;color:var(--ink);flex-shrink:0;background:var(--surface)}
+.statusbar .r{display:flex;gap:6px;align-items:center}
+.statusbar .notch{position:absolute;top:11px;left:50%;transform:translateX(-50%);width:120px;height:26px;background:#0c0c0e;border-radius:0 0 16px 16px;z-index:5}
+.sb-ic{width:16px;height:11px}
+.scroll{flex:1;overflow-y:auto;overflow-x:hidden;background:var(--bg);
+  background-image:linear-gradient(#ECF1F7 1px,transparent 1px),linear-gradient(90deg,#ECF1F7 1px,transparent 1px);
+  background-size:26px 26px}
+.scroll::-webkit-scrollbar{width:0}
+
+.ic{width:20px;height:20px;stroke:currentColor;stroke-width:1.9;fill:none;stroke-linecap:round;stroke-linejoin:round;display:block}
+.ic.sm{width:16px;height:16px}
+.ic.lg{width:24px;height:24px}
+.mono{font-family:var(--mono)}
+
+/* ---- App header ---- */
+.appbar{display:flex;align-items:flex-end;justify-content:space-between;padding:8px 16px 14px}
+.appbar .date{font-family:var(--mono);font-size:11px;color:var(--ink2);font-weight:700;letter-spacing:.06em;text-transform:uppercase;margin-bottom:5px}
+.h-screen{font-size:28px;font-weight:700;letter-spacing:-.02em;color:var(--navy);line-height:1}
+.avatar{width:40px;height:40px;border-radius:12px;background:linear-gradient(135deg,var(--navy),var(--navy2));color:#fff;display:grid;place-items:center;font-family:var(--mono);font-weight:700;font-size:14px}
+.iconbtn{width:40px;height:40px;border-radius:12px;background:var(--surface);border:1px solid var(--border);display:grid;place-items:center;color:var(--navy)}
+
+/* ---- Cockpit (resumen del día) ---- */
+.cockpit{margin:2px 16px 14px;background:linear-gradient(150deg,var(--navy),#16315d 58%,var(--navy2));
+  border-radius:16px;padding:16px;color:#fff;box-shadow:0 14px 30px -16px rgba(18,41,80,.6);position:relative;overflow:hidden}
+.cockpit::after{content:"";position:absolute;inset:0;opacity:.6;pointer-events:none;
+  background-image:linear-gradient(rgba(255,255,255,.045) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.045) 1px,transparent 1px);background-size:20px 20px}
+.ck-top{display:flex;align-items:center;justify-content:space-between;position:relative;z-index:1}
+.ck-lbl{font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:rgba(255,255,255,.62);font-weight:700}
+.ck-big{font-family:var(--mono);font-size:40px;font-weight:700;letter-spacing:-.03em;margin-top:4px;line-height:.95}
+.ck-big span{font-size:14px;color:rgba(255,255,255,.72);font-weight:600;margin-left:4px}
+.ck-ring{width:64px;height:64px;position:relative;flex-shrink:0}
+.ck-ring .lab{position:absolute;inset:0;display:grid;place-items:center;font-family:var(--mono);font-size:14px;font-weight:700;color:var(--gold)}
+.ck-bar{display:flex;gap:3px;margin:16px 0 11px;position:relative;z-index:1}
+.ck-bar .sg{height:12px;border-radius:3px}
+.ck-bar .sg.at{background:var(--steel)}
+.ck-bar .sg.sd{background:var(--gold)}
+.ck-bar .sg.pl{background:rgba(255,255,255,.28)}
+.ck-leg{display:flex;gap:16px;position:relative;z-index:1}
+.ck-leg .it{display:flex;align-items:center;gap:8px}
+.ck-leg .it .sq{width:10px;height:10px;border-radius:3px;flex-shrink:0}
+.ck-leg .it .n{font-family:var(--mono);font-size:15px;font-weight:700;line-height:1}
+.ck-leg .it .t{font-size:10px;color:rgba(255,255,255,.72);font-weight:600;line-height:1.1;margin-top:2px}
+
+/* ---- Navy section strip ---- */
+.strip{display:flex;align-items:center;gap:9px;margin:8px 16px 10px;padding:9px 12px;background:var(--navy);color:#fff;border-radius:9px}
+.strip .t{font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.11em;text-transform:uppercase}
+.strip .n{margin-left:auto;font-family:var(--mono);font-size:11px;color:var(--gold);font-weight:700}
+
+/* ---- Panel / list ---- */
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:14px;margin:0 16px 12px;box-shadow:var(--sh);overflow:hidden}
+
+/* ---- Agenda appts ---- */
+.appt{display:flex;gap:12px;padding:13px 14px;align-items:center;position:relative}
+.appt+.appt{border-top:1px solid var(--hair)}
+.appt .rail{width:3px;align-self:stretch;border-radius:3px;background:var(--border);flex-shrink:0}
+.appt .rail.gold{background:var(--gold)}
+.appt .rail.warn{background:var(--warn)}
+.appt .time{width:48px;flex-shrink:0}
+.appt .time b{font-family:var(--mono);font-size:15px;font-weight:700;color:var(--ink);display:block;line-height:1.05}
+.appt .time span{font-family:var(--mono);font-size:10px;color:var(--ink2)}
+.appt .body{flex:1;min-width:0}
+.appt .nm{font-size:15px;font-weight:600;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.appt .dx{margin-top:5px}
+.appt .right{margin-left:auto;display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex-shrink:0;padding-left:6px}
+.appt .stt{display:flex;align-items:center;gap:5px;font-family:var(--mono);font-size:9.5px;color:var(--ink2);font-weight:700;white-space:nowrap;text-transform:uppercase;letter-spacing:.04em}
+.chip{display:inline-block;font-size:11.5px;font-weight:600;padding:3px 9px;border-radius:7px;background:#EEF2F8;color:var(--navy2);white-space:nowrap;max-width:168px;overflow:hidden;text-overflow:ellipsis;border:1px solid #E1E8F2}
+.chip.derma{background:#F7EBF2;color:var(--derma);border-color:#EBD6E3}
+.ini{width:24px;height:24px;border-radius:7px;color:#fff;font-family:var(--mono);font-size:11px;font-weight:700;display:grid;place-items:center;flex-shrink:0}
+.ini.z{background:var(--navy2)}.ini.d{background:#2E6B4E}.ini.j{background:#7A5BA6}
+.dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.dot.ok{background:var(--ok)}.dot.wait{background:var(--gold)}.dot.todo{background:#CBD5E1}.dot.warn{background:var(--warn)}
+
+/* ---- Tabbar ---- */
+.tabbar{flex-shrink:0;background:var(--surface);border-top:1px solid var(--border);display:flex;padding:9px 6px 20px}
+.tab{position:relative;flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;color:var(--ink2);font-size:11px;font-weight:600}
+.tab.on{color:var(--navy)}
+.tab.on .ic{stroke-width:2.3}
+.tab.on::before{content:"";position:absolute;top:-9px;width:24px;height:3px;border-radius:0 0 3px 3px;background:var(--gold)}
+.fab{position:absolute;right:16px;bottom:90px;width:54px;height:54px;border-radius:16px;background:var(--navy);color:#fff;display:grid;place-items:center;box-shadow:0 10px 22px -6px rgba(18,41,80,.6);z-index:4;border:1px solid rgba(255,255,255,.12)}
+
+/* ---- Topnav ---- */
+.topnav{display:flex;align-items:center;gap:11px;padding:8px 14px 12px}
+.topnav .back{width:38px;height:38px;border-radius:11px;background:var(--surface);border:1px solid var(--border);display:grid;place-items:center;color:var(--navy)}
+.topnav .t{font-family:var(--mono);font-size:11px;color:var(--ink2);font-weight:700;letter-spacing:.04em;text-transform:uppercase}
+
+/* ---- Expediente header ---- */
+.pthead{margin:0 16px 12px;background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:hidden;box-shadow:var(--sh)}
+.pthead .top{padding:14px 14px 12px;display:flex;gap:13px;align-items:center}
+.ptav{width:50px;height:50px;border-radius:13px;background:linear-gradient(135deg,var(--navy),var(--navy2));color:#fff;display:grid;place-items:center;font-family:var(--mono);font-size:18px;font-weight:700;flex-shrink:0}
+.pthead h2{margin:0;font-size:19px;letter-spacing:-.01em;color:var(--ink)}
+.pthead .line{display:flex;align-items:center;gap:8px;margin-top:5px;flex-wrap:wrap}
+.pthead .line .m{font-size:12px;color:var(--ink2);font-weight:600}
+.pthead .dxrow{padding:0 14px 13px}
+.statestrip{display:flex;border-top:1px solid var(--hair)}
+.statestrip .c{flex:1;padding:12px 11px}
+.statestrip .c+.c{border-left:1px solid var(--hair)}
+.statestrip .c .l{font-family:var(--mono);font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink2);font-weight:700}
+.statestrip .c .v{font-family:var(--mono);font-size:22px;font-weight:700;color:var(--navy);margin-top:4px;line-height:1}
+.statestrip .c .v small{font-size:12px;color:var(--ink2)}
+.umeter{height:5px;border-radius:3px;background:#E8EDF4;overflow:hidden;margin-top:9px}
+.umeter .f{height:100%;border-radius:3px}
+.uspk{display:flex;gap:2px;align-items:flex-end;height:14px;margin-top:9px}
+.uspk i{flex:1;background:var(--navy2);border-radius:1px;display:block}
+.cdelta{display:inline-flex;align-items:center;gap:2px;font-family:var(--mono);font-size:10.5px;font-weight:700;margin-top:9px;color:var(--warn)}
+.cmeta{font-family:var(--mono);font-size:10px;color:var(--ink2);font-weight:600;margin-top:9px;display:block}
+
+.safe{margin:0 16px 12px;display:flex;align-items:center;gap:9px;padding:10px 13px;border-radius:11px;background:var(--ok-bg);color:var(--ok);font-size:12.5px;font-weight:600;border:1px solid #CFE6D7}
+.safe .ic{stroke-width:2.1}
+
+/* ---- Delta badge ---- */
+.delta{display:inline-flex;align-items:center;gap:3px;font-family:var(--mono);font-size:11px;font-weight:700;padding:3px 7px;border-radius:6px}
+.delta.good{background:var(--ok-bg);color:var(--ok)}
+.delta.gold{background:#F6EFD6;color:#8A6D18}
+.delta .ar{font-size:9px;line-height:1}
+
+/* ---- Evolución sparkbars ---- */
+.evo{margin:0 16px 12px;background:var(--surface);border:1px solid var(--border);border-radius:14px;box-shadow:var(--sh);overflow:hidden}
+.evo .hd{display:flex;align-items:center;justify-content:space-between;padding:12px 14px 2px}
+.evo .hd .t{font-size:14px;font-weight:700;color:var(--ink)}
+.evo .hd .t small{display:block;font-family:var(--mono);font-size:9.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--ink2);font-weight:600;margin-top:2px}
+.evo .bd{padding:4px 14px 14px}
+.spk{display:flex;align-items:flex-end;gap:7px;height:66px;padding-top:18px}
+.spk .b{flex:1;background:#C7D3E4;border-radius:4px 4px 2px 2px;position:relative;min-height:10px}
+.spk .b.on{background:linear-gradient(to top,var(--navy),var(--navy2))}
+.spk .b span{position:absolute;top:-16px;left:50%;transform:translateX(-50%);font-family:var(--mono);font-size:10px;font-weight:700;color:var(--ink2)}
+.spk-x{display:flex;gap:7px;margin-top:8px}
+.spk-x span{flex:1;text-align:center;font-family:var(--mono);font-size:9.5px;color:var(--ink2)}
+
+/* ---- Módulos ---- */
+.modgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:0 16px 14px}
+.mod{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:9px;box-shadow:var(--sh)}
+.mod.on{border-color:var(--navy);box-shadow:0 0 0 1px var(--navy),var(--sh)}
+.mod .top{display:flex;align-items:center;justify-content:space-between}
+.mod .ico{width:32px;height:32px;border-radius:9px;background:#EEF2F8;color:var(--navy);display:grid;place-items:center}
+.mod.on .ico{background:var(--navy);color:#fff}
+.mod .ico.derma{background:#F7EBF2;color:var(--derma)}
+.mod .cnt{font-family:var(--mono);font-size:10.5px;font-weight:700;color:var(--ink2);background:#F1F4F9;padding:2px 7px;border-radius:6px;border:1px solid var(--hair)}
+.mod .cnt.on{background:var(--gold);color:var(--navy);border-color:var(--gold)}
+.mod .nm{font-size:14px;font-weight:700;color:var(--ink)}
+.mod .d{font-family:var(--mono);font-size:10px;color:var(--ink2);line-height:1.4;letter-spacing:.01em}
+
+/* ---- Valoración ---- */
+.vhead{padding:8px 16px 4px}
+.vhead .h{font-size:22px;font-weight:700;color:var(--navy);letter-spacing:-.01em}
+.vhead .s{font-family:var(--mono);font-size:11px;color:var(--ink2);font-weight:700;margin-top:5px;letter-spacing:.04em;text-transform:uppercase}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:14px;margin:0 16px 12px;box-shadow:var(--sh);overflow:hidden}
+.card-hd{display:flex;align-items:center;gap:10px;padding:12px 14px 11px}
+.card-hd .cic{width:30px;height:30px;border-radius:9px;background:#EEF2F8;color:var(--navy);display:grid;place-items:center;flex-shrink:0}
+.card-hd .ct{min-width:0}
+.card-hd .ct .tt{font-size:14.5px;font-weight:700;color:var(--ink);line-height:1.1}
+.card-hd .ct .tg{font-family:var(--mono);font-size:9.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--ink2);font-weight:700;margin-top:3px}
+.card-hd .badge{margin-left:auto}
+.badge{font-family:var(--mono);font-size:10px;font-weight:700;padding:3px 8px;border-radius:6px;letter-spacing:.04em;text-transform:uppercase}
+.badge.done{background:var(--ok-bg);color:var(--ok)}
+.badge.part{background:var(--warn-bg);color:var(--warn)}
+.badge.navy{background:#EAF0F8;color:var(--navy2)}
+.card-bd{padding:0 14px 15px}
+
+/* EVA segmented gauge */
+.eva-read{display:flex;align-items:flex-end;gap:9px;margin-bottom:12px}
+.eva-read .num{font-family:var(--mono);font-size:40px;font-weight:700;color:var(--navy);line-height:.85;letter-spacing:-.02em}
+.eva-read .den{font-family:var(--mono);font-size:15px;color:var(--ink2);font-weight:600}
+.eva-read .tag{margin-left:auto;font-family:var(--mono);font-size:11px;font-weight:700;color:var(--warn);background:var(--warn-bg);padding:4px 9px;border-radius:6px;text-transform:uppercase;letter-spacing:.03em}
+.segauge{display:flex;gap:4px;height:26px}
+.segauge .s{flex:1;border-radius:3px;background:#E7EBF2}
+.segauge .s.g{background:#5E9E7D}
+.segauge .s.y{background:var(--gold)}
+.segscale{display:flex;justify-content:space-between;margin-top:7px;font-family:var(--mono);font-size:9px;color:#94A3B4;font-weight:600}
+
+/* ROM ring */
+.rom{display:flex;align-items:center;gap:16px}
+.ring{width:104px;height:104px;position:relative;flex-shrink:0}
+.ring .lab{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.ring .lab b{font-family:var(--mono);font-size:23px;font-weight:700;color:var(--navy);line-height:1}
+.ring .lab span{font-family:var(--mono);font-size:8px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink2);font-weight:700;margin-top:3px}
+.rom .info .t{font-size:14px;font-weight:700;color:var(--ink)}
+.rom .info .sub{font-family:var(--mono);font-size:10.5px;color:var(--ink2);margin-top:6px;line-height:1.55;letter-spacing:.01em}
+.rom .info .delta{margin-top:9px}
+
+/* Fuerza dual meters */
+.fz+.fz{margin-top:13px;padding-top:13px;border-top:1px solid var(--hair)}
+.fz-hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.fz-hd .n{font-size:13.5px;font-weight:700;color:var(--ink)}
+.fz-hd .b{font-family:var(--mono);font-size:10px;font-weight:700;padding:3px 8px;border-radius:6px;text-transform:uppercase;letter-spacing:.03em}
+.fz-hd .b.def{background:var(--risk-bg);color:var(--risk)}
+.fz-hd .b.sym{background:var(--ok-bg);color:var(--ok)}
+.fz-line{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.fz-line:last-child{margin-bottom:0}
+.fz-line .side{width:60px;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--ink2);text-transform:uppercase;letter-spacing:.03em;flex-shrink:0}
+.fz-line .val{width:42px;text-align:right;font-family:var(--mono);font-size:13px;font-weight:700;color:var(--ink);flex-shrink:0}
+.meter{position:relative;flex:1;height:11px;border-radius:5px;background:#E8EDF4;overflow:hidden}
+.meter .fill{position:relative;height:100%;border-radius:5px;z-index:1}
+.meter .fill.navy{background:var(--navy)}
+.meter .fill.ok{background:var(--ok)}
+.meter .fill.risk{background:var(--risk)}
+.meter::after{content:"";position:absolute;inset:0;z-index:2;pointer-events:none;
+  background:repeating-linear-gradient(90deg,rgba(10,22,44,.12) 0,rgba(10,22,44,.12) 1px,transparent 1px,transparent 10%)}
+.fzscale{display:flex;justify-content:space-between;font-family:var(--mono);font-size:8.5px;color:#9AA7B8;font-weight:600;margin-top:5px;margin-left:70px;margin-right:52px}
+
+/* Pruebas / estados */
+.states{display:flex;flex-direction:column;gap:9px}
+.st-row{display:flex;align-items:center;gap:11px}
+.st-tag{display:flex;align-items:center;justify-content:center;gap:5px;font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:.04em;padding:4px 7px;border-radius:6px;width:84px;flex-shrink:0}
+.st-tag .pt{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+.st-tag.pos{background:#EAF0F8;color:var(--navy2)} .st-tag.pos .pt{background:var(--navy2)}
+.st-tag.att{background:var(--warn-bg);color:var(--warn)} .st-tag.att .pt{background:var(--warn)}
+.st-tag.neg{background:var(--ok-bg);color:var(--ok)} .st-tag.neg .pt{background:var(--ok)}
+.st-tag.na{background:#EEF1F5;color:#94A3B4} .st-tag.na .pt{background:#CBD5E1}
+.st-row .lab{font-size:13px;color:var(--ink);font-weight:500;line-height:1.3}
+.st-row .lab.m{color:var(--ink2)}
+
+/* ---- SOAP ---- */
+.soap-head{background:var(--surface);border-bottom:1px solid var(--border);padding:6px 14px 10px;z-index:6;flex-shrink:0;box-shadow:0 2px 10px -6px rgba(16,32,64,.18)}
+.soap-id{display:flex;align-items:center;gap:11px;padding:6px 2px 10px}
+.soap-id .ptav{width:42px;height:42px;border-radius:12px;font-size:15px}
+.soap-id h3{margin:0;font-size:16px;color:var(--ink);letter-spacing:-.01em}
+.soap-id .ml{font-size:12px;color:var(--ink2);font-weight:600;margin-top:3px;display:flex;gap:7px;align-items:center;flex-wrap:wrap}
+.ses-chip{font-family:var(--mono);background:var(--navy);color:#fff;font-size:10.5px;font-weight:700;padding:3px 8px;border-radius:6px;letter-spacing:.03em}
+.soap-id .back{width:38px;height:38px;border-radius:11px;background:var(--surface);border:1px solid var(--border);display:grid;place-items:center;color:var(--navy);flex-shrink:0}
+.soap-safe{display:flex;align-items:center;gap:8px;padding:8px 11px;border-radius:9px;background:var(--ok-bg);color:var(--ok);font-size:12px;font-weight:600;margin-bottom:10px;border:1px solid #CFE6D7}
+.qnav{display:flex;gap:5px;background:#E6ECF3;border-radius:11px;padding:4px;margin-bottom:10px}
+.qnav .q{flex:1;text-align:center;padding:8px 0;border-radius:8px;color:var(--navy2);font-weight:700;font-size:14px;font-family:var(--mono)}
+.qnav .q.on{background:var(--navy);color:#fff;box-shadow:0 2px 6px -2px rgba(18,41,80,.5)}
+.qnav .q small{display:block;font-size:8px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;opacity:.72;margin-top:2px;font-family:var(--font)}
+.qa{display:flex;gap:8px;overflow-x:auto;padding-bottom:1px}
+.qa::-webkit-scrollbar{height:0}
+.qa .a{flex-shrink:0;display:flex;align-items:center;gap:6px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:12.5px;font-weight:600;color:var(--navy2)}
+.qa .a .ic{width:15px;height:15px}
+
+.sgrp{margin:0 16px 12px}
+.sgrp .gl{display:flex;align-items:center;gap:11px;background:var(--navy);color:#fff;border-radius:10px;padding:9px 12px;margin-bottom:9px}
+.sgrp .gl .k{width:26px;height:26px;border-radius:7px;background:var(--gold);color:var(--navy);font-family:var(--mono);font-size:14px;font-weight:700;display:grid;place-items:center;flex-shrink:0}
+.sgrp .gl .t{font-size:14px;font-weight:700}
+.sgrp .gl .t small{display:block;font-family:var(--mono);font-size:9px;letter-spacing:.07em;text-transform:uppercase;color:rgba(255,255,255,.62);font-weight:600;margin-top:2px}
+.field{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px 13px;margin-bottom:9px}
+.field.filled{border-left:3px solid var(--gold)}
+.field .fl{display:flex;align-items:center;gap:7px;font-family:var(--mono);font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink2);font-weight:700;margin-bottom:8px}
+.field .fl .fdot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.field .fl .fdot.ok{background:var(--ok)}
+.field .fl .fdot.empty{background:#CBD5E1}
+.field .fl .fchip{margin-left:auto;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--navy2);background:#EAF0F8;border:1px solid #DCE6F3;padding:2px 7px;border-radius:5px;letter-spacing:.02em;text-transform:none}
+.field .ft{font-size:14.5px;color:var(--ink);line-height:1.5}
+.field .ph{font-size:14px;color:#AEB8C6}
+.mini-metric{display:flex;gap:9px}
+.mm{flex:1;border:1px solid var(--border);border-radius:10px;padding:10px 11px;background:#FBFCFE}
+.mm .l{font-family:var(--mono);font-size:9px;letter-spacing:.07em;text-transform:uppercase;color:var(--ink2);font-weight:700}
+.mm .v{font-family:var(--mono);font-size:18px;font-weight:700;color:var(--navy);margin-top:4px;line-height:1}
+.mm .v .d{font-size:11px;color:var(--ok);font-weight:700;margin-left:3px}
+.pillrow{display:flex;flex-wrap:wrap;gap:7px}
+.pill{font-size:12px;font-weight:600;padding:7px 11px;border-radius:8px;background:#EEF2F8;color:var(--navy2);border:1px solid var(--border)}
+.pill.on{background:var(--navy);color:#fff;border-color:var(--navy)}
+
+/* Save bar */
+.savebar{flex-shrink:0;background:var(--surface);border-top:1px solid var(--border);padding:11px 14px 22px;display:flex;align-items:center;gap:11px}
+.savebar .st2{flex:1;display:flex;align-items:center;gap:8px;font-size:12px;color:var(--ink2);font-weight:600}
+.savebar .st2 .d{width:9px;height:9px;border-radius:50%;background:var(--gold);box-shadow:0 0 0 3px rgba(201,168,76,.2);flex-shrink:0}
+.btn-save{background:var(--navy);color:#fff;border-radius:11px;padding:12px 20px;font-size:15px;font-weight:700;display:flex;align-items:center;gap:7px;box-shadow:0 8px 16px -6px rgba(18,41,80,.5)}
+.btn-top{width:44px;height:44px;border-radius:11px;border:1px solid var(--border);background:var(--surface);display:grid;place-items:center;color:var(--navy)}
+
+.footer-note{max-width:880px;margin:30px auto 0;text-align:center;color:#8290a3;font-size:12.5px;line-height:1.65;font-family:var(--mono)}
+</style>
+</head>
+<body>
+<svg style="display:none">
+  <symbol id="i-cal" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></symbol>
+  <symbol id="i-users" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></symbol>
+  <symbol id="i-book" viewBox="0 0 24 24"><path d="M12 7v14M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M5 12h14M12 5v14"/></symbol>
+  <symbol id="i-cr" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
+  <symbol id="i-back" viewBox="0 0 24 24"><path d="m12 19-7-7 7-7M19 12H5"/></symbol>
+  <symbol id="i-activity" viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></symbol>
+  <symbol id="i-clip" viewBox="0 0 24 24"><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4M12 16h4M8 11h.01M8 16h.01"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 24 24"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="M12 8v4M12 16h.01"/></symbol>
+  <symbol id="i-ruler" viewBox="0 0 24 24"><path d="M21.3 15.3a2.4 2.4 0 0 1 0 3.4l-2.6 2.6a2.4 2.4 0 0 1-3.4 0L2.7 8.7a2.41 2.41 0 0 1 0-3.4l2.6-2.6a2.41 2.41 0 0 1 3.4 0Z"/><path d="m14.5 12.5 2-2M11.5 9.5l2-2M8.5 6.5l2-2M17.5 15.5l2-2"/></symbol>
+  <symbol id="i-cam" viewBox="0 0 24 24"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></symbol>
+  <symbol id="i-mic" viewBox="0 0 24 24"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M19 10v1a7 7 0 0 1-14 0v-1M12 18v4"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+  <symbol id="i-cd" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+  <symbol id="i-file" viewBox="0 0 24 24"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7z"/><path d="M14 2v5h5M9 13h6M9 17h6"/></symbol>
+  <symbol id="i-target" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/></symbol>
+  <symbol id="i-plus2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-bolt" viewBox="0 0 24 24"><path d="M13 2 3 14h9l-1 8 10-12h-9z"/></symbol>
+  <symbol id="i-bone" viewBox="0 0 24 24"><path d="M17 10c.7-.7 1.69 0 2.5 0a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0-2.5 2.5c0 .81.7 1.8 0 2.5l-7 7c-.7.7-1.69 0-2.5 0a2.5 2.5 0 0 0 0 5 2.5 2.5 0 0 0 2.5-2.5c0-.81-.7-1.8 0-2.5z"/></symbol>
+  <symbol id="i-up" viewBox="0 0 24 24"><path d="m18 15-6-6-6 6"/></symbol>
+  <symbol id="i-gauge" viewBox="0 0 24 24"><path d="M12 14l3.5-3.5"/><path d="M4.5 18a9 9 0 1 1 15 0"/><circle cx="12" cy="14" r="1.4" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-bars" viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="M8 17v-5M13 17V9M18 17v-8"/></symbol>
+  <symbol id="i-trend" viewBox="0 0 24 24"><path d="M22 17 13.5 8.5l-5 5L2 7"/><path d="M16 17h6v-6"/></symbol>
+  <symbol id="i-sig" viewBox="0 0 24 24" fill="currentColor" stroke="none"><rect x="1" y="9" width="3" height="5" rx="1"/><rect x="6" y="6" width="3" height="8" rx="1"/><rect x="11" y="3" width="3" height="11" rx="1"/></symbol>
+  <symbol id="i-bat" viewBox="0 0 24 24"><rect x="1" y="6" width="18" height="12" rx="3" fill="currentColor" stroke="none"/><rect x="20" y="10" width="2" height="4" rx="1" fill="currentColor" stroke="none"/></symbol>
+</svg>
+
+<div class="wrap">
+  <div class="dir-head">
+    <div class="dir-kick">Dirección B</div>
+    <h1>Clínica tecnológica con indicadores visuales</h1>
+    <p>Un panel de control clínico: denso pero impecablemente ordenado. Cada número clave viaja con su indicador de estado — anillos de progreso, medidores con marcas, gauges segmentados, sparkbars, badges de tendencia&nbsp;▲/▼ y lecturas monoespaciadas tipo instrumento. Bandas navy de cabecera, rejilla técnica de fondo y dorado como acento del dato principal. Calma a través del orden, no del vacío.</p>
+  </div>
+
+  <div class="gallery">
+
+    <!-- ============== AGENDA ============== -->
+    <div class="art" id="art-agenda">
+      <div class="cap"><b>1</b> Agenda · hoy</div>
+      <div class="phone"><div class="screen">
+        <div class="notch"></div>
+        <div class="statusbar"><span>9:41</span><div class="r"><svg class="sb-ic"><use href="#i-sig"/></svg><svg class="sb-ic"><use href="#i-bat"/></svg></div></div>
+        <div class="scroll">
+          <div class="appbar">
+            <div><div class="date">Martes · 26 de noviembre</div><div class="h-screen">Hoy</div></div>
+            <div style="display:flex;gap:10px;align-items:center">
+              <div class="iconbtn"><svg class="ic"><use href="#i-search"/></svg></div>
+              <div class="avatar">CA</div>
+            </div>
+          </div>
+
+          <div class="cockpit">
+            <div class="ck-top">
+              <div>
+                <div class="ck-lbl">Jornada de hoy</div>
+                <div class="ck-big">14<span>citas</span></div>
+              </div>
+              <div class="ck-ring">
+                <svg width="64" height="64" viewBox="0 0 64 64" style="transform:rotate(-90deg)">
+                  <circle cx="32" cy="32" r="25" fill="none" stroke="rgba(255,255,255,.18)" stroke-width="6"/>
+                  <circle cx="32" cy="32" r="25" fill="none" stroke="#C9A84C" stroke-width="6" stroke-linecap="round" stroke-dasharray="157" stroke-dashoffset="33"/>
+                </svg>
+                <div class="lab">79%</div>
+              </div>
+            </div>
+            <div class="ck-bar">
+              <div class="sg at" style="flex-grow:11"></div>
+              <div class="sg sd" style="flex-grow:2"></div>
+              <div class="sg pl" style="flex-grow:1"></div>
+            </div>
+            <div class="ck-leg">
+              <div class="it"><span class="sq" style="background:var(--steel)"></span><div><div class="n">11</div><div class="t">Atendidas</div></div></div>
+              <div class="it"><span class="sq" style="background:var(--gold)"></span><div><div class="n">2</div><div class="t">Sin documentar</div></div></div>
+              <div class="it"><span class="sq" style="background:rgba(255,255,255,.4)"></span><div><div class="n">1</div><div class="t">Por llegar</div></div></div>
+            </div>
+          </div>
+
+          <div class="strip"><svg class="ic sm"><use href="#i-clock"/></svg><span class="t">Próximas</span><span class="n">3 citas</span></div>
+          <div class="panel">
+            <div class="appt">
+              <div class="rail gold"></div>
+              <div class="time"><b>17:00</b><span>45 m</span></div>
+              <div class="body">
+                <div class="nm">Juan Pérez Demo</div>
+                <div class="dx"><span class="chip">Tendinopatía rotuliana</span></div>
+              </div>
+              <div class="right"><span class="ini z">Z</span><span class="stt"><span class="dot wait"></span>Por llegar</span></div>
+            </div>
+            <div class="appt">
+              <div class="rail"></div>
+              <div class="time"><b>17:45</b><span>45 m</span></div>
+              <div class="body">
+                <div class="nm">María López Ávila</div>
+                <div class="dx"><span class="chip">Manguito rotador izq.</span></div>
+              </div>
+              <div class="right"><span class="ini z">Z</span><span class="stt"><span class="dot todo"></span>Agendada</span></div>
+            </div>
+            <div class="appt">
+              <div class="rail"></div>
+              <div class="time"><b>18:30</b><span>60 m</span></div>
+              <div class="body">
+                <div class="nm">Ana Torres Beltrán</div>
+                <div class="dx"><span class="chip derma">Post-lipoabdominoplastia</span></div>
+              </div>
+              <div class="right"><span class="ini j">J</span><span class="stt"><span class="dot todo"></span>Agendada</span></div>
+            </div>
+          </div>
+
+          <div class="strip" style="background:var(--warn);"><svg class="ic sm"><use href="#i-clip"/></svg><span class="t">Sin documentar</span><span class="n" style="color:#FBF2E0">2 pendientes</span></div>
+          <div class="panel">
+            <div class="appt">
+              <div class="rail warn"></div>
+              <div class="time"><b>16:00</b><span>Hoy</span></div>
+              <div class="body">
+                <div class="nm">Carlos Ramírez Ortega</div>
+                <div class="dx"><span class="chip">Lumbalgia mecánica</span></div>
+              </div>
+              <div class="right"><span class="ini d">D</span><span class="stt" style="color:var(--warn)"><span class="dot warn"></span>Falta nota</span></div>
+            </div>
+            <div class="appt">
+              <div class="rail warn"></div>
+              <div class="time"><b>15:15</b><span>Hoy</span></div>
+              <div class="body">
+                <div class="nm">Luis Hernández Gil</div>
+                <div class="dx"><span class="chip">Esguince tobillo der.</span></div>
+              </div>
+              <div class="right"><span class="ini z">Z</span><span class="stt" style="color:var(--warn)"><span class="dot warn"></span>Falta nota</span></div>
+            </div>
+          </div>
+          <div style="height:88px"></div>
+        </div>
+        <div class="fab"><svg class="ic lg"><use href="#i-plus"/></svg></div>
+        <div class="tabbar">
+          <div class="tab on"><svg class="ic"><use href="#i-cal"/></svg>Agenda</div>
+          <div class="tab"><svg class="ic"><use href="#i-users"/></svg>Pacientes</div>
+          <div class="tab"><svg class="ic"><use href="#i-book"/></svg>Protocolos</div>
+          <div class="tab"><svg class="ic"><use href="#i-activity"/></svg>Supervisión</div>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- ============== EXPEDIENTE ============== -->
+    <div class="art" id="art-exp">
+      <div class="cap"><b>2</b> Expediente</div>
+      <div class="phone"><div class="screen">
+        <div class="notch"></div>
+        <div class="statusbar"><span>9:41</span><div class="r"><svg class="sb-ic"><use href="#i-sig"/></svg><svg class="sb-ic"><use href="#i-bat"/></svg></div></div>
+        <div class="scroll">
+          <div class="topnav"><div class="back"><svg class="ic"><use href="#i-back"/></svg></div><div class="t">Agenda · Hoy 17:00</div></div>
+
+          <div class="pthead">
+            <div class="top">
+              <div class="ptav">JP</div>
+              <div style="flex:1;min-width:0">
+                <h2>Juan Pérez Demo</h2>
+                <div class="line"><span class="m">36 años</span><span class="m">·</span><span class="m">Zara</span><span class="chip navy" style="font-family:var(--mono)">Activo</span></div>
+              </div>
+            </div>
+            <div class="dxrow"><span class="chip">Tendinopatía rotuliana derecha · fase reactiva</span></div>
+            <div class="statestrip">
+              <div class="c">
+                <div class="l">EVA</div>
+                <div class="v">6<small>/10</small></div>
+                <div class="umeter"><div class="f" style="width:60%;background:linear-gradient(90deg,#5E9E7D,var(--gold))"></div></div>
+              </div>
+              <div class="c">
+                <div class="l">Flexión</div>
+                <div class="v">125<small>°</small></div>
+                <div class="cdelta" style="color:#8A6D18"><span style="font-size:9px">▲</span>+25°</div>
+              </div>
+              <div class="c">
+                <div class="l">Sesiones</div>
+                <div class="v">13</div>
+                <div class="uspk"><i style="height:40%"></i><i style="height:55%"></i><i style="height:50%"></i><i style="height:75%"></i><i style="height:100%"></i></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="safe"><svg class="ic sm"><use href="#i-shield"/></svg>Seguridad revisada · sin contraindicaciones registradas</div>
+
+          <div class="evo">
+            <div class="hd">
+              <div class="t">Evolución del dolor<small>EVA · 6 semanas</small></div>
+              <div class="delta good"><span class="ar">▼</span>−3</div>
+            </div>
+            <div class="bd">
+              <div class="spk">
+                <div class="b" style="height:90%"><span>9</span></div>
+                <div class="b" style="height:80%"></div>
+                <div class="b" style="height:70%"><span>7</span></div>
+                <div class="b" style="height:70%"></div>
+                <div class="b" style="height:60%"></div>
+                <div class="b on" style="height:60%"><span>6</span></div>
+              </div>
+              <div class="spk-x"><span>S1</span><span>S3</span><span>S5</span><span>S7</span><span>S9</span><span>Hoy</span></div>
+            </div>
+          </div>
+
+          <div class="strip"><svg class="ic sm"><use href="#i-bars"/></svg><span class="t">Áreas del expediente</span><span class="n">6</span></div>
+          <div class="modgrid">
+            <div class="mod on">
+              <div class="top"><div class="ico"><svg class="ic"><use href="#i-clip"/></svg></div><span class="cnt on">Activa</span></div>
+              <div class="nm">Valoración</div><div class="d">EVA · ROM · fuerza</div>
+            </div>
+            <div class="mod">
+              <div class="top"><div class="ico"><svg class="ic"><use href="#i-activity"/></svg></div><span class="cnt">13</span></div>
+              <div class="nm">Notas SOAP</div><div class="d">Última hoy</div>
+            </div>
+            <div class="mod">
+              <div class="top"><div class="ico"><svg class="ic"><use href="#i-bone"/></svg></div><span class="cnt">2D</span></div>
+              <div class="nm">Biomecánica</div><div class="d">Goniometría · marcha</div>
+            </div>
+            <div class="mod">
+              <div class="top"><div class="ico"><svg class="ic"><use href="#i-target"/></svg></div><span class="cnt">M2</span></div>
+              <div class="nm">Protocolo</div><div class="d">Rotuliano HSR</div>
+            </div>
+            <div class="mod">
+              <div class="top"><div class="ico"><svg class="ic"><use href="#i-bolt"/></svg></div><span class="cnt">4</span></div>
+              <div class="nm">Ejercicios</div><div class="d">En casa · HSR</div>
+            </div>
+            <div class="mod">
+              <div class="top"><div class="ico"><svg class="ic"><use href="#i-file"/></svg></div><span class="cnt">2</span></div>
+              <div class="nm">Estudios</div><div class="d">RM rodilla</div>
+            </div>
+          </div>
+          <div style="height:20px"></div>
+        </div>
+        <div class="tabbar">
+          <div class="tab"><svg class="ic"><use href="#i-cal"/></svg>Agenda</div>
+          <div class="tab on"><svg class="ic"><use href="#i-users"/></svg>Pacientes</div>
+          <div class="tab"><svg class="ic"><use href="#i-book"/></svg>Protocolos</div>
+          <div class="tab"><svg class="ic"><use href="#i-activity"/></svg>Supervisión</div>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- ============== VALORACIÓN ============== -->
+    <div class="art" id="art-val">
+      <div class="cap"><b>3</b> Valoración</div>
+      <div class="phone"><div class="screen">
+        <div class="notch"></div>
+        <div class="statusbar"><span>9:41</span><div class="r"><svg class="sb-ic"><use href="#i-sig"/></svg><svg class="sb-ic"><use href="#i-bat"/></svg></div></div>
+        <div class="scroll">
+          <div class="topnav"><div class="back"><svg class="ic"><use href="#i-back"/></svg></div><div class="t">Juan Pérez Demo · Valoración</div></div>
+          <div class="vhead"><div class="h">Valoración inicial</div><div class="s">Rodilla derecha · 09 nov 2026</div></div>
+          <div style="height:10px"></div>
+
+          <!-- EVA -->
+          <div class="card">
+            <div class="card-hd"><div class="cic"><svg class="ic sm"><use href="#i-gauge"/></svg></div><div class="ct"><div class="tt">Dolor (EVA)</div><div class="tg">Escala 0–10</div></div><span class="badge done">Evaluado</span></div>
+            <div class="card-bd">
+              <div class="eva-read"><div class="num">6</div><div class="den">/10</div><div class="tag">Moderado</div></div>
+              <div class="segauge">
+                <div class="s g"></div><div class="s g"></div><div class="s g"></div>
+                <div class="s y"></div><div class="s y"></div><div class="s y"></div>
+                <div class="s"></div><div class="s"></div><div class="s"></div><div class="s"></div>
+              </div>
+              <div class="segscale"><span>0 · sin dolor</span><span>5</span><span>10 · máx</span></div>
+            </div>
+          </div>
+
+          <!-- ROM -->
+          <div class="card">
+            <div class="card-hd"><div class="cic"><svg class="ic sm"><use href="#i-ruler"/></svg></div><div class="ct"><div class="tt">Rango de movimiento</div><div class="tg">Flexión de rodilla</div></div><span class="badge done">Medido</span></div>
+            <div class="card-bd">
+              <div class="rom">
+                <div class="ring">
+                  <svg width="104" height="104" viewBox="0 0 104 104">
+                    <g stroke="#C3CEDC" stroke-width="1.6" stroke-linecap="round">
+                      <line x1="52" y1="3" x2="52" y2="8"/>
+                      <line x1="52" y1="3" x2="52" y2="8" transform="rotate(30 52 52)"/>
+                      <line x1="52" y1="3" x2="52" y2="8" transform="rotate(60 52 52)"/>
+                      <line x1="52" y1="3" x2="52" y2="8" transform="rotate(90 52 52)"/>
+                      <line x1="52" y1="3" x2="52" y2="8" transform="rotate(120 52 52)"/>
+                      <line x1="52" y1="3" x2="52" y2="8" transform="rotate(150 52 52)"/>
+                      <line x1="52" y1="3" x2="52" y2="8" transform="rotate(180 52 52)"/>
+                      <line x1="52" y1="3" x2="52" y2="8" transform="rotate(210 52 52)"/>
+                      <line x1="52" y1="3" x2="52" y2="8" transform="rotate(240 52 52)"/>
+                      <line x1="52" y1="3" x2="52" y2="8" transform="rotate(270 52 52)"/>
+                      <line x1="52" y1="3" x2="52" y2="8" transform="rotate(300 52 52)"/>
+                      <line x1="52" y1="3" x2="52" y2="8" transform="rotate(330 52 52)"/>
+                    </g>
+                    <g transform="rotate(-90 52 52)">
+                      <circle cx="52" cy="52" r="40" fill="none" stroke="#E6EBF2" stroke-width="8"/>
+                      <circle cx="52" cy="52" r="40" fill="none" stroke="#122950" stroke-width="8" stroke-linecap="round" stroke-dasharray="251" stroke-dashoffset="28"/>
+                    </g>
+                  </svg>
+                  <div class="lab"><b>125°</b><span>Flexión</span></div>
+                </div>
+                <div class="info">
+                  <div class="t">Goniometría de cámara</div>
+                  <div class="sub">Inicial&nbsp;&nbsp;100°<br>Actual&nbsp;&nbsp;&nbsp;125°<br>Método · 2D</div>
+                  <div class="delta gold"><span class="ar">▲</span>+25° de ganancia</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- FUERZA -->
+          <div class="card">
+            <div class="card-hd"><div class="cic"><svg class="ic sm"><use href="#i-bolt"/></svg></div><div class="ct"><div class="tt">Fuerza comparativa</div><div class="tg">Escala 0–10 · 10 = lado sano</div></div></div>
+            <div class="card-bd">
+              <div class="fz">
+                <div class="fz-hd"><span class="n">Cuádriceps</span><span class="b def">Déficit 30%</span></div>
+                <div class="fz-line"><span class="side">Derecho</span><div class="meter"><div class="fill risk" style="width:70%"></div></div><span class="val">7/10</span></div>
+                <div class="fz-line"><span class="side">Izquierdo</span><div class="meter"><div class="fill ok" style="width:100%"></div></div><span class="val">10/10</span></div>
+                <div class="fzscale"><span>0</span><span>5</span><span>10</span></div>
+              </div>
+              <div class="fz">
+                <div class="fz-hd"><span class="n">Isquiotibiales</span><span class="b sym">Simétrico</span></div>
+                <div class="fz-line"><span class="side">Derecho</span><div class="meter"><div class="fill navy" style="width:90%"></div></div><span class="val">9/10</span></div>
+                <div class="fz-line"><span class="side">Izquierdo</span><div class="meter"><div class="fill ok" style="width:90%"></div></div><span class="val">9/10</span></div>
+                <div class="fzscale"><span>0</span><span>5</span><span>10</span></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Pruebas / estados -->
+          <div class="card">
+            <div class="card-hd"><div class="cic"><svg class="ic sm"><use href="#i-clip"/></svg></div><div class="ct"><div class="tt">Pruebas y hallazgos</div><div class="tg">4 evaluadas</div></div></div>
+            <div class="card-bd">
+              <div class="states">
+                <div class="st-row"><span class="st-tag pos"><span class="pt"></span>Positivo</span><span class="lab">Dolor a la palpación polo inferior</span></div>
+                <div class="st-row"><span class="st-tag att"><span class="pt"></span>Atención</span><span class="lab">Single-leg decline · dolor 6/10</span></div>
+                <div class="st-row"><span class="st-tag neg"><span class="pt"></span>Negativo</span><span class="lab">Lachman</span></div>
+                <div class="st-row"><span class="st-tag na"><span class="pt"></span>Sin eval.</span><span class="lab m">Cajón anterior · no evaluado</span></div>
+              </div>
+            </div>
+          </div>
+          <div style="height:20px"></div>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- ============== SOAP ============== -->
+    <div class="art" id="art-soap">
+      <div class="cap"><b>4</b> Nota SOAP</div>
+      <div class="phone"><div class="screen">
+        <div class="notch"></div>
+        <div class="statusbar"><span>9:41</span><div class="r"><svg class="sb-ic"><use href="#i-sig"/></svg><svg class="sb-ic"><use href="#i-bat"/></svg></div></div>
+
+        <div class="soap-head">
+          <div class="soap-id">
+            <div class="ptav">JP</div>
+            <div style="flex:1;min-width:0">
+              <h3>Juan Pérez Demo</h3>
+              <div class="ml">Tendinopatía rotuliana der. <span class="ses-chip">Sesión 13</span></div>
+            </div>
+            <div class="back"><svg class="ic"><use href="#i-back"/></svg></div>
+          </div>
+          <div class="soap-safe"><svg class="ic sm"><use href="#i-shield"/></svg>Sin contraindicaciones para agentes físicos</div>
+          <div class="qnav">
+            <div class="q on">S<small>Subjetivo</small></div>
+            <div class="q">O<small>Objetivo</small></div>
+            <div class="q">A<small>Análisis</small></div>
+            <div class="q">P<small>Plan</small></div>
+          </div>
+          <div class="qa">
+            <div class="a"><svg class="ic"><use href="#i-plus2"/></svg>Nuevo motivo</div>
+            <div class="a"><svg class="ic"><use href="#i-mic"/></svg>Dictar</div>
+            <div class="a"><svg class="ic"><use href="#i-clock"/></svg>Última sesión</div>
+            <div class="a"><svg class="ic"><use href="#i-target"/></svg>Objetivos</div>
+          </div>
+        </div>
+
+        <div class="scroll" style="padding-top:12px">
+          <!-- S -->
+          <div class="sgrp">
+            <div class="gl"><div class="k">S</div><div class="t">Subjetivo<small>Lo que refiere el paciente</small></div></div>
+            <div class="field filled">
+              <div class="fl"><span class="fdot ok"></span>Molestia / dolor<span class="fchip">EVA inicio 5/10</span></div>
+              <div class="ft">Refiere menos dolor al bajar escaleras. Molestia matutina leve que cede al calentar.</div>
+            </div>
+            <div class="field">
+              <div class="fl"><span class="fdot empty"></span>Actividad física / cambios</div>
+              <div class="ft ph">Toca para escribir…</div>
+            </div>
+          </div>
+
+          <!-- O -->
+          <div class="sgrp">
+            <div class="gl"><div class="k">O</div><div class="t">Objetivo<small>Exploración y mediciones</small></div></div>
+            <div class="field filled">
+              <div class="fl"><span class="fdot ok"></span>ROM · fuerza</div>
+              <div class="mini-metric">
+                <div class="mm"><div class="l">Flexión</div><div class="v">125°<span class="d">+25</span></div></div>
+                <div class="mm"><div class="l">Cuádriceps</div><div class="v">7/10</div></div>
+              </div>
+            </div>
+            <div class="field filled">
+              <div class="fl"><span class="fdot ok"></span>Agentes físicos aplicados</div>
+              <div class="pillrow">
+                <span class="pill on">Tecar resistiva</span>
+                <span class="pill on">Láser 808 nm</span>
+                <span class="pill">Ultrasonido</span>
+                <span class="pill">Ondas de choque</span>
+                <span class="pill">+ más</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- A -->
+          <div class="sgrp">
+            <div class="gl"><div class="k">A</div><div class="t">Análisis<small>Razonamiento clínico</small></div></div>
+            <div class="field filled">
+              <div class="fl"><span class="fdot ok"></span>Evolución</div>
+              <div class="ft">Buena respuesta a carga progresiva (HSR). Tolera isométricos a 70% CVM sin dolor residual &gt;24 h.</div>
+            </div>
+          </div>
+
+          <!-- P -->
+          <div class="sgrp">
+            <div class="gl"><div class="k">P</div><div class="t">Plan<small>Indicaciones y objetivos</small></div></div>
+            <div class="field">
+              <div class="fl"><span class="fdot empty"></span>Indicaciones</div>
+              <div class="ft ph">Toca para escribir…</div>
+            </div>
+          </div>
+          <div style="height:12px"></div>
+        </div>
+
+        <div class="savebar">
+          <div class="btn-top"><svg class="ic"><use href="#i-up"/></svg></div>
+          <div class="st2"><span class="d"></span>Borrador · se guarda al confirmar</div>
+          <div class="btn-save"><svg class="ic sm"><use href="#i-check"/></svg>Guardar</div>
+        </div>
+      </div></div>
+    </div>
+
+  </div>
+
+  <div class="footer-note">
+    Dirección B · mockup estático de alta fidelidad · datos ficticios (Juan Pérez Demo).<br>
+    Navy #122950 · Navy 2 #1B3A6B · Dorado #C9A84C · Fondo #F5F7FA · Dermatofuncional #8E3B6E · Íconos Lucide (SVG local) · Lecturas monoespaciadas.
+  </div>
+</div>
+</body>
+</html>

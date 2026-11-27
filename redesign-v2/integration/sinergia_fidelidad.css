@@ -1,0 +1,131 @@
+/* SINERGIA · especificación de presentación ChatGPT. Cargar DESPUÉS de sinergia_v2.css.
+   Sin estilos de ocultación de seguridad, sin cambios en datos ni en funciones clínicas. */
+:root{--sf-navy:#10284e;--sf-blue:#1d4175;--sf-gold:#c9a84c;--sf-ink:#14243b;--sf-muted:#53647c;--sf-bg:#f4f6fa;--sf-paper:#fff;--sf-line:#dce3ec;--sf-shadow:0 5px 18px #1229500d;--sf-r:14px}
+body.modo-oscuro{--sf-ink:#e8edf6;--sf-muted:#acb9ce;--sf-bg:#121722;--sf-paper:#1e2533;--sf-line:#344052;--sf-shadow:0 3px 12px #0003}
+/* LOGIN: composición sobre blanco, no una tarjeta flotante. Dos curvas ornamentales. */
+#screen-login.active{display:flex;position:relative;isolation:isolate;overflow-x:hidden;overflow-y:auto;min-height:100vh;min-height:100dvh;max-width:none;width:100%;background:#fff!important;padding:max(58px,env(safe-area-inset-top)) 24px max(78px,env(safe-area-inset-bottom));justify-content:safe center;align-items:center}
+#screen-login::before,#screen-login::after{content:"";position:absolute;z-index:-1;pointer-events:none;width:108%;height:clamp(90px,17vh,150px);background:linear-gradient(140deg,#10284e,#23477b);box-shadow:none;border:0;border-radius:0;transform:none}
+#screen-login::before{top:0;left:auto;right:0;clip-path:ellipse(100% 100% at 100% 0%);background:linear-gradient(160deg,#10284e 0%,#163666 61%,#c9a84c 62%,#f1d48a 73%,#fff 74%);height:clamp(75px,15vh,135px);width:68%}
+#screen-login::after{top:auto;left:0;right:auto;bottom:0;clip-path:ellipse(100% 100% at 0% 100%);background:linear-gradient(28deg,#10284e 0%,#193968 61%,#c9a84c 62%,#f1d48a 73%,#fff 74%);width:68%}
+#screen-login .login-box{background:transparent!important;box-shadow:none!important;border:0!important;border-radius:0;backdrop-filter:none;padding:0;max-width:380px;width:100%;color:#14243b!important;z-index:1}
+#screen-login .login-logo{margin:0 0 26px}
+#screen-login .login-logo .mark{width:auto;height:auto;background:transparent;box-shadow:none;margin:0 0 12px}
+#screen-login .v2-login-logo{width:clamp(185px,66vw,250px);max-width:100%;height:auto;object-fit:contain}
+#screen-login .login-logo p{font-size:14px!important;font-weight:650;color:#203a60!important;margin-top:12px;line-height:1.45}
+#screen-login .login-box label{font-size:12px;letter-spacing:0;text-transform:none;color:#425773!important;margin-bottom:5px;font-weight:650}
+#screen-login #login-user,#screen-login #login-pass{height:52px;font-size:16px;color:#14243b!important;background-color:#fff!important;border:1px solid #cdd6e3;border-bottom:2px solid #c9a84c;border-radius:14px;padding-left:44px;box-shadow:0 4px 12px #1229500a;margin-bottom:15px}
+#screen-login #login-pass{margin-bottom:0}
+#screen-login #btn-ver-pass{height:44px;width:44px;right:3px!important;top:50%!important;color:#122950!important}
+#screen-login .btn-login{margin-top:22px;min-height:52px;border:1.5px solid #c9a84c;border-radius:16px;background:linear-gradient(145deg,#1b3a6b,#10284e)!important;font-size:17px;box-shadow:0 7px 18px #12295024}
+#screen-login .btn-login::after{display:none}
+#screen-login .btn-secondary{min-height:48px;border:1.4px solid #c9a84c!important;background:#fff!important;color:#122950!important;border-radius:15px;margin-top:12px!important;font-size:15px;display:flex;align-items:center;justify-content:center;gap:8px}
+#screen-login a{display:inline-block;padding:8px 0;color:#122950!important;font-size:14px!important}
+/* AGENDA/DIRECTORIO: utilizar el resumen y tarjetas originales; solo su presentación cambia. */
+#content-agenda,#content-pacientes,#content-expediente,#content-soap{background:var(--sf-bg);color:var(--sf-ink);padding-inline:14px}
+#screen-agenda .topbar,#screen-pacientes .topbar,#screen-expediente .topbar,#screen-soap .topbar{background:var(--sf-navy);box-shadow:none;min-height:56px}
+#screen-agenda .date-header{border:1px solid var(--sf-line);border-radius:14px;box-shadow:none;padding:14px;margin-bottom:12px;background:var(--sf-paper)}
+.sf-ag-summary{background:var(--sf-paper)!important;border:1px solid var(--sf-line);box-shadow:var(--sf-shadow);border-radius:var(--sf-r)!important}
+.sf-ag-metrics{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px!important}
+.sf-ag-metrics>span{min-width:0;display:flex;align-items:center;justify-content:center;min-height:42px;text-align:center;white-space:normal;font-size:12px!important;border:1px solid var(--sf-line);border-radius:10px!important;padding:7px!important;line-height:1.3}
+#screen-agenda .patient-card,#screen-pacientes .patient-card{display:grid;grid-template-columns:40px minmax(0,1fr);gap:8px 12px;align-items:start;background:var(--sf-paper);border:1px solid var(--sf-line);border-radius:14px;padding:13px;box-shadow:var(--sf-shadow);margin-bottom:9px}
+#screen-agenda .patient-card .patient-avatar,#screen-pacientes .patient-card .patient-avatar{width:40px;height:40px;border-radius:50%;background:#f2dfad;color:#17345d;font-size:15px}
+#screen-agenda .patient-card .patient-info,#screen-pacientes .patient-card .patient-info{min-width:0;width:100%}
+#screen-agenda .patient-name,#screen-pacientes .patient-name{font-size:15px;font-weight:750;color:var(--sf-ink);overflow-wrap:anywhere;white-space:normal}
+#screen-agenda .patient-meta,#screen-pacientes .patient-meta{color:var(--sf-muted);font-size:12px;flex-wrap:wrap}
+#screen-agenda .patient-card>.sf-card-status,#screen-pacientes .patient-card>.sf-card-status{grid-column:2;justify-content:flex-start!important;align-items:flex-start!important;display:flex!important;flex-wrap:wrap;gap:5px!important;text-align:left!important}
+#screen-agenda .patient-card button[onclick*="nuevaSesionRapida"]{min-height:40px;padding:8px 14px!important;border-radius:10px!important;font-size:12px!important;background:var(--sf-navy)!important}
+#screen-agenda .bottom-nav .nav-item.active,#screen-pacientes .bottom-nav .nav-item.active{background:#eaf0f7;border-radius:11px;color:#10284e}
+/* EXPEDIENTE: jerarquía nueva: identidad -> seguridad -> nueva sesión -> estado -> módulos -> acciones. */
+#content-expediente .exp-header{margin:0 0 12px!important;padding:48px 16px 14px!important;border-radius:0 0 20px 20px;background:linear-gradient(130deg,#10284e,#244b80);box-shadow:none}
+#content-expediente .exp-name{font-size:21px;line-height:1.2;letter-spacing:-.4px;overflow-wrap:anywhere}
+#content-expediente .exp-meta{font-size:12px;gap:7px;flex-wrap:wrap;margin-top:5px}
+#content-expediente .exp-pills{gap:6px;margin-top:8px;flex-wrap:wrap}
+#content-expediente .exp-pill{padding:5px 9px;font-size:11px;white-space:normal;line-height:1.35;max-width:100%}
+#content-expediente .v2-hero-logo{top:10px;left:15px}
+#content-expediente .v2-hero-logo img.em{width:27px;height:27px}
+#content-expediente .sf-safety{margin:0 0 10px!important;padding:10px 12px!important;border-radius:12px!important;line-height:1.42}
+#content-expediente .sf-completion{margin:10px 0 14px!important;padding:13px!important;background:var(--sf-paper)!important;border:1px solid var(--sf-line);border-radius:14px!important;box-shadow:var(--sf-shadow)}
+#content-expediente .tabs{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px!important;margin:0 0 12px!important;padding:0!important;background:transparent!important}
+#content-expediente .tabs .tab{padding:11px 9px!important;min-height:58px!important;height:auto!important;border-radius:12px!important;font-size:12px!important;line-height:1.25;gap:7px!important;white-space:normal;overflow-wrap:anywhere;background:var(--sf-paper)!important;color:var(--sf-ink)!important;border:1px solid var(--sf-line)!important;border-bottom:2px solid var(--sf-gold)!important;box-shadow:var(--sf-shadow)}
+#content-expediente .tabs .tab.active{box-shadow:inset 0 0 0 1.5px var(--sf-gold),var(--sf-shadow)!important}
+#content-expediente .tabs .tab .v2-ic{flex:0 0 21px;font-size:21px!important;width:21px!important;height:21px!important}
+#content-expediente .tabs .tab::after{font-size:17px;flex-shrink:0}
+.sf-exp-action{width:100%;min-height:48px;display:flex;align-items:center;justify-content:center;gap:9px;border:0;border-radius:13px;background:linear-gradient(140deg,#244b80,#10284e);color:white;font-size:16px;font-weight:750;cursor:pointer;box-shadow:0 4px 12px #10284e20;margin:0 0 10px}
+.sf-exp-action svg{color:#e7c768;width:21px;height:21px;fill:none;stroke:currentColor;stroke-width:2.3}
+/* Original FAB remains in DOM, retains its real handler and authorization. Proxy exists only while FAB is active. */
+#screen-expediente.sf-has-session #fab-soap{visibility:hidden!important;pointer-events:none!important}
+#content-expediente .sf-exp-controls{display:flex;flex-wrap:wrap;gap:7px;padding:0!important;margin:0 0 10px;text-align:left!important;justify-content:flex-start!important}
+#content-expediente .sf-exp-controls button{min-height:42px;white-space:normal;text-align:center;max-width:100%;font-size:12px!important}
+#content-expediente button[onclick*="exportarExpedienteJSON"]{color:var(--sf-ink)!important;border:1px solid var(--sf-line)!important;background:var(--sf-paper)!important}
+#content-expediente button[onclick*="pedirRevaloracion"]{width:100%;border-radius:11px!important}
+/* SOAP: conservar S/O/A/P, reducir identificación informativa y dar acceso temprano al campo real. */
+#content-soap{padding-top:10px;padding-bottom:calc(90px + env(safe-area-inset-bottom,0px));scroll-padding-top:130px}
+#screen-soap .v2-soapnav{position:sticky;top:56px;z-index:40;padding:7px 14px!important;margin:0;background:var(--sf-bg);gap:6px}
+#screen-soap .v2-soapnav button{min-height:44px;padding:7px 3px!important;border-radius:10px;box-shadow:none;background:var(--sf-paper);border-color:var(--sf-line)}
+#screen-soap .v2-soapnav button.active{background:var(--sf-navy)!important;color:#fff}
+#content-soap .form-section{border:1px solid var(--sf-line);border-radius:14px;background:var(--sf-paper);box-shadow:var(--sf-shadow);margin-bottom:10px;scroll-margin-top:120px}
+#content-soap .form-section-title{font-size:15px;letter-spacing:0;font-weight:800;padding:12px 13px!important;color:var(--sf-ink)}
+#content-soap .form-group{padding:10px 12px!important}
+#content-soap .form-label{font-size:13px;color:var(--sf-ink);line-height:1.4;font-weight:650}
+#content-soap input.form-input,#content-soap textarea.form-input,#content-soap select.form-input{font-size:16px!important;border:1px solid var(--sf-line);background:var(--sf-paper);color:var(--sf-ink);border-radius:12px;padding:11px;line-height:1.45}
+#content-soap textarea.form-input{min-height:78px}
+#content-soap .sf-id-details{border:1px solid var(--sf-line);border-radius:12px;background:var(--sf-paper);margin:0 0 8px;padding:0 11px}
+#content-soap .sf-id-details summary{padding:12px 0;min-height:44px;cursor:pointer;color:var(--sf-ink);font-size:13px;font-weight:700;overflow-wrap:anywhere}
+#content-soap .sf-id-details>.form-section{box-shadow:none;margin:0 0 8px}
+#content-soap .sf-date .form-section-title{padding:9px 12px 3px!important;font-size:13px}
+#content-soap .sf-date .form-group{padding:5px 12px 9px!important}
+#content-soap .sf-date .form-field{margin-bottom:0!important}
+#content-soap .evabtn-row{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:5px}
+#content-soap .evabtn{width:100%;min-width:0;min-height:44px;border-radius:9px}
+#content-soap .evabtn.ne{grid-column:span 2;white-space:normal;font-size:11px}
+#content-soap .btn-descarga,#content-soap #btn-nuevo-motivo-soap{min-height:44px;font-size:13px!important}
+#content-soap button[onclick="guardarSOAP()"]{min-height:50px;border-radius:13px;font-size:16px}
+/* No fake save status. Keep original real save button at end; visible navigation scrolls to it. */
+.sf-soap-jump{display:flex;justify-content:center;align-items:center;min-height:44px;width:100%;margin:0 0 8px;border:1px solid var(--sf-line);background:var(--sf-paper);color:var(--sf-ink);font-weight:700;border-radius:11px;cursor:pointer}
+#screen-soap .v2-soapnav.sf-descarga{display:none!important}
+/* Toast noninteractive remains visible but does not cover the middle of the clinical title. */
+#sync-indicator{left:auto;right:max(8px,env(safe-area-inset-right));top:env(safe-area-inset-top,0);font-size:10px;max-width:42%;padding:4px 8px;margin:0;border-radius:0 0 9px 9px;line-height:1.2}
+body.modo-oscuro #screen-expediente .tabs .tab .v2-ic{color:#e8cb76}
+body.modo-oscuro #screen-agenda .bottom-nav .nav-item.active,body.modo-oscuro #screen-pacientes .bottom-nav .nav-item.active{background:#273449;color:#e8cb76}
+@media(min-width:900px){#content-expediente .tabs{grid-template-columns:repeat(3,minmax(0,1fr))}#content-expediente .tabs .tab{font-size:14px!important;min-height:62px!important}.sf-ag-metrics{grid-template-columns:repeat(4,minmax(0,1fr))}#screen-login .login-box{max-width:400px}#screen-login::before,#screen-login::after{width:45%;height:23vh}}
+@media(max-height:650px){#screen-login.active{justify-content:flex-start;padding-top:50px;padding-bottom:64px}#screen-login .v2-login-logo{width:155px}#screen-login .login-logo{margin-bottom:13px}#screen-login::before,#screen-login::after{height:64px}}
+@media(prefers-reduced-motion:reduce){.sf-exp-action,.sf-soap-jump{scroll-behavior:auto;transition:none}}
+#screen-expediente.sf-compact-exp #exp-topbar-name{font-size:0}
+#screen-expediente.sf-compact-exp #exp-topbar-name::after{content:'Expediente';font-size:15px;font-weight:750}
+/* Refinamiento final mobile-first: nueve accesos reales, compactos, con iconos arriba. */
+@media(min-width:370px) and (max-width:899px){
+ #content-expediente .tabs{grid-template-columns:repeat(3,minmax(0,1fr))}
+ #content-expediente .tabs .tab{flex-direction:column;justify-content:center;text-align:center;gap:5px!important;min-height:70px!important;padding:8px 4px!important;font-size:11.5px!important}
+ #content-expediente .tabs .tab::after{display:none}
+}
+#content-expediente .exp-header{padding-top:43px!important;padding-bottom:12px!important}
+#content-expediente .sf-completion{padding:10px!important}
+#content-expediente .sf-completion span{font-size:11px!important}
+#content-expediente .sf-exp-controls button[onclick*="_agregarModalidad"]{min-height:36px}
+#content-expediente .sf-safety{margin-top:0!important}
+#screen-agenda .patient-card .sf-card-status,#screen-pacientes .patient-card .sf-card-status{flex-direction:row!important}
+#screen-agenda .patient-info{display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:7px}
+#screen-agenda .patient-info>.patient-name,#screen-agenda .patient-info>.patient-meta{grid-column:1}
+#screen-agenda .patient-info>button[onclick*="nuevaSesionRapida"]{grid-column:2;grid-row:1 / span 3;align-self:center;margin-top:0!important}
+#screen-agenda .patient-info>.patient-meta{overflow-wrap:anywhere}
+#content-soap .sf-quick-section{padding:5px 8px!important;box-shadow:none!important;margin:0 0 7px!important}
+#content-soap .sf-quick-section .btn-descarga,#content-soap .sf-quick-section #btn-nuevo-motivo-soap{padding:7px 8px!important;min-height:40px!important;line-height:1.35}
+#content-soap .sf-quick-section .soap-expand-btn{padding:5px 7px!important;min-height:38px!important;box-shadow:none!important}
+#content-soap .sf-quick-section .seb-sub{font-size:10px}
+#content-soap .sf-date{box-shadow:none;margin:0 0 7px;display:flex;align-items:center;flex-wrap:wrap;padding:0 8px}
+#content-soap .sf-date .form-section-title{flex:0 1 auto;border:none;padding:7px!important;font-size:12px}
+#content-soap .sf-date .form-group{flex:1;min-width:145px;padding:5px!important}
+#content-soap .sf-date .form-field{display:flex;flex-wrap:wrap;gap:4px;align-items:center;padding:0!important}
+#content-soap .sf-date .form-label{font-size:10px;line-height:1.2;margin:0}
+#content-soap .sf-date input{min-height:40px;padding:6px!important;width:100%}
+#content-soap .sf-id-details summary{min-height:35px;padding:8px 0;font-size:12px}
+#content-soap>.sf-soap-safety{margin:0 0 8px!important;padding:9px 11px!important}
+#content-soap .sf-subject .form-group{padding-top:2px!important}
+#content-soap .sf-subject .form-section-title{background:var(--sf-paper);border-radius:14px 14px 0 0;color:#183d73!important}
+body.modo-oscuro #content-soap .sf-subject .form-section-title{color:#e7cc80!important}
+#content-soap .sf-date .form-field{display:block!important}
+#content-soap .sf-date .form-label{display:block!important;font-size:11px!important;margin-bottom:3px!important}
+#content-soap .sf-date .form-label span{display:inline!important;font-size:10px!important}
+#content-soap .sf-date input{max-width:none!important}
+#content-soap textarea.form-input::placeholder{color:var(--sf-muted);opacity:.88}
+body:has(#screen-login.active) #app-version-chip{color:#fff!important;background:#10284e!important;border-color:#c9a84c!important}

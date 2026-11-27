@@ -1,0 +1,306 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sinergia · Login premium + identidad + estados PWA</title>
+<style>
+:root{
+  --navy:#122950; --navy2:#1B3A6B; --gold:#C9A84C; --gold2:#B8932F;
+  --bg:#F5F7FA; --surface:#FFFFFF; --ink:#172538; --ink2:#64748B;
+  --border:#DCE3EC; --hair:#EEF1F6;
+  --ok:#236646; --warn:#83520C; --risk:#A52D25;
+  --font:-apple-system,"SF Pro Text",system-ui,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+}
+*{box-sizing:border-box;-webkit-font-smoothing:antialiased}
+body{margin:0;background:#E7EBF1;background-image:radial-gradient(circle at 20% 10%,#eef2f7,#dfe5ee);
+  font-family:var(--font);color:var(--ink);padding:40px 18px 64px}
+.wrap{max-width:1760px;margin:0 auto}
+.dir-head{max-width:880px;margin:0 auto 34px;text-align:center}
+.dir-kick{font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:var(--gold);font-weight:700}
+.dir-head h1{font-size:30px;margin:8px 0 6px;color:var(--navy);letter-spacing:-.02em}
+.dir-head p{color:var(--ink2);font-size:15px;line-height:1.55;margin:0}
+.gallery{display:flex;gap:30px;justify-content:center;flex-wrap:wrap;align-items:flex-start}
+.art{width:390px}
+.art .cap{display:flex;align-items:center;gap:8px;justify-content:center;margin-bottom:12px;color:var(--navy);font-weight:600;font-size:14px}
+.art .cap b{background:var(--navy);color:#fff;font-size:11px;font-weight:700;width:20px;height:20px;border-radius:7px;display:grid;place-items:center}
+
+.phone{width:390px;background:var(--bg);border-radius:42px;padding:11px;
+  box-shadow:0 2px 6px rgba(16,32,64,.10),0 30px 60px -20px rgba(16,32,64,.35);position:relative}
+.screen{background:var(--surface);border-radius:32px;overflow:hidden;height:812px;display:flex;flex-direction:column;position:relative}
+.notch{position:absolute;top:11px;left:50%;transform:translateX(-50%);width:120px;height:26px;background:#0c0c0e;border-radius:0 0 16px 16px;z-index:9}
+.statusbar{height:46px;display:flex;align-items:center;justify-content:space-between;padding:0 24px 0 28px;font-weight:600;font-size:14px;color:var(--ink);flex-shrink:0;position:relative;z-index:8}
+.statusbar .r{display:flex;gap:6px;align-items:center}
+.sb-ic{width:16px;height:11px}
+.ic{stroke:currentColor;stroke-width:1.9;fill:none;stroke-linecap:round;stroke-linejoin:round;display:block}
+
+/* ---- Curvas de marca (navy + oro) ---- */
+.curves{position:absolute;top:46px;left:0;right:0;bottom:0;z-index:0;pointer-events:none;overflow:hidden}
+.curves svg{position:absolute}
+.curves .tl{top:-128px;left:-132px;width:322px;height:322px}
+.curves .br{bottom:-176px;right:-150px;width:340px;height:340px}
+
+/* ---- Login ---- */
+.login{flex:1;position:relative;z-index:2;display:flex;flex-direction:column;padding:4px 30px 26px;overflow-y:auto}
+.login .brandbox{text-align:center;margin-top:10px}
+.login .brandbox img{width:188px;height:auto;filter:drop-shadow(0 6px 16px rgba(18,41,80,.14))}
+.gold-div{width:84px;height:3px;border-radius:3px;background:linear-gradient(90deg,transparent,var(--gold),transparent);margin:14px auto 0}
+.login h2{font-family:var(--font);text-align:center;font-size:30px;font-weight:800;color:var(--navy);letter-spacing:-.02em;margin:22px 0 2px}
+.login .welcome-sub{text-align:center;color:var(--ink2);font-size:15.5px;margin:0 0 26px}
+.flabel{font-size:14px;font-weight:700;color:var(--navy);margin:0 2px 8px}
+.ifield{display:flex;align-items:center;background:var(--surface);border:1.5px solid var(--border);border-radius:15px;height:58px;padding:0 14px;margin-bottom:20px;box-shadow:0 1px 2px rgba(16,32,64,.03)}
+.ifield.focus{border-color:var(--navy);box-shadow:0 0 0 4px rgba(27,58,107,.10)}
+.ifield .lead{color:var(--navy);display:flex;align-items:center}
+.ifield .lead .ic{width:22px;height:22px}
+.ifield .sep{width:1.5px;height:26px;background:var(--border);margin:0 13px;flex-shrink:0}
+.ifield input{border:0;outline:0;flex:1;font-size:16px;color:var(--ink);background:transparent;font-family:var(--font)}
+.ifield .dots{flex:1;letter-spacing:4px;color:var(--ink);font-size:20px}
+.ifield .eye{color:var(--ink2);display:flex}
+.ifield .eye .ic{width:22px;height:22px}
+.btn-primary{height:58px;border-radius:16px;background:linear-gradient(135deg,var(--navy),var(--navy2));color:#fff;
+  font-size:17px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:12px;
+  box-shadow:0 10px 22px -8px rgba(18,41,80,.55);margin-top:6px}
+.btn-primary .ic{width:22px;height:22px;stroke:var(--gold);stroke-width:2.4}
+.forgot{text-align:center;color:var(--navy);font-size:15px;font-weight:700;text-decoration:underline;text-underline-offset:3px;margin:22px 0}
+.btn-ghost{height:56px;border-radius:16px;background:var(--surface);border:1.6px solid var(--navy);color:var(--navy);
+  font-size:15.5px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:0}
+.btn-ghost .lead{display:flex;align-items:center;color:var(--navy)}
+.btn-ghost .lead .ic{width:22px;height:22px}
+.btn-ghost .sep{width:1.5px;height:24px;background:#C9D3E0;margin:0 14px}
+.auth-note{display:flex;align-items:center;justify-content:center;gap:8px;color:var(--ink2);font-size:13.5px;font-weight:600;margin-top:24px}
+.auth-note .ic{width:18px;height:18px;stroke:var(--gold);stroke-width:2}
+.verchip{align-self:center;margin-top:14px;background:#EEF1F6;color:var(--ink2);font-size:12.5px;font-weight:700;padding:5px 15px;border-radius:999px}
+
+/* ---- Splash ---- */
+.splash{flex:1;position:relative;z-index:2;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0}
+.splash img{width:220px;height:auto;filter:drop-shadow(0 10px 24px rgba(18,41,80,.18))}
+.splash .tag{color:var(--ink2);font-size:14px;font-weight:600;margin-top:6px;letter-spacing:.02em}
+.splash .prog{width:140px;height:4px;border-radius:4px;background:#E5E9F0;overflow:hidden;margin-top:34px}
+.splash .prog i{display:block;width:62%;height:100%;border-radius:4px;background:linear-gradient(90deg,var(--navy),var(--gold))}
+.splash .foot{position:absolute;bottom:40px;color:#9aa6b6;font-size:12px;font-weight:600}
+
+/* ---- Loading ---- */
+.center-state{flex:1;position:relative;z-index:2;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 40px;text-align:center}
+.emblem-badge{width:96px;height:96px;border-radius:50%;display:grid;place-items:center;background:#fff;box-shadow:0 10px 26px -10px rgba(18,41,80,.3)}
+.emblem-badge img{width:84px;height:84px}
+.spinner{width:42px;height:42px;border-radius:50%;border:4px solid #E5E9F0;border-top-color:var(--navy);margin:26px auto 0;
+  background:conic-gradient(from 0deg,transparent,rgba(27,58,107,.12));-webkit-mask:radial-gradient(farthest-side,transparent 60%,#000 61%)}
+.spinner.gold{border-top-color:var(--gold)}
+.center-state h3{font-size:20px;color:var(--navy);margin:22px 0 6px;font-weight:700}
+.center-state p{color:var(--ink2);font-size:14.5px;line-height:1.5;margin:0;max-width:280px}
+.state-ic{width:72px;height:72px;border-radius:22px;display:grid;place-items:center;margin-bottom:6px}
+.state-ic .ic{width:36px;height:36px;stroke-width:2}
+.state-ic.warn{background:#FBF2E0;color:var(--warn)}
+.state-ic.navy{background:#EAF0F8;color:var(--navy)}
+.state-ic.off{background:#EEF1F6;color:var(--ink2)}
+.state-actions{display:flex;flex-direction:column;gap:12px;width:100%;margin-top:26px}
+.sa-primary{height:54px;border-radius:15px;background:var(--navy);color:#fff;font-size:15.5px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:9px}
+.sa-primary .ic{width:20px;height:20px;stroke:var(--gold);stroke-width:2.2}
+.sa-ghost{height:52px;border-radius:15px;background:#fff;border:1.5px solid var(--border);color:var(--navy);font-size:15px;font-weight:700;display:flex;align-items:center;justify-content:center}
+.offbar{position:absolute;top:50px;left:16px;right:16px;z-index:5;display:flex;align-items:center;gap:9px;background:#43506333;background:rgba(55,65,81,.92);color:#fff;border-radius:13px;padding:11px 14px;font-size:13px;font-weight:600;box-shadow:0 8px 20px -8px rgba(0,0,0,.4)}
+.offbar .ic{width:17px;height:17px;stroke:var(--gold)}
+
+.footer-note{max-width:900px;margin:30px auto 0;text-align:center;color:#8290a3;font-size:12.5px;line-height:1.6}
+.sec-label{max-width:900px;margin:40px auto 18px;text-align:center}
+.sec-label .l{display:inline-block;font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:var(--navy2);font-weight:700;border-top:2px solid var(--gold);padding-top:10px}
+</style>
+</head>
+<body>
+<svg style="display:none">
+  <symbol id="i-mail" viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></symbol>
+  <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></symbol>
+  <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></symbol>
+  <symbol id="i-wifioff" viewBox="0 0 24 24"><path d="M12 20h.01M8.5 16.5a5 5 0 0 1 7 0M5 12.9a10 10 0 0 1 3-2M2 8.8a15 15 0 0 1 4.2-2.7M19 12.9a10 10 0 0 0-3.5-2.2M22 8.8a15 15 0 0 0-3-1.9M2 2l20 20"/></symbol>
+  <symbol id="i-wifi" viewBox="0 0 24 24"><path d="M12 20h.01M8.5 16.4a5 5 0 0 1 7 0M5 12.9a10 10 0 0 1 14 0M2 8.8a15 15 0 0 1 20 0"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 24 24"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></symbol>
+  <symbol id="i-key" viewBox="0 0 24 24"><circle cx="7.5" cy="15.5" r="5.5"/><path d="m11 12 8.5-8.5M15 7l2 2M18 4l2 2"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+  <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-3-6.7L21 8M21 3v5h-5"/></symbol>
+  <symbol id="i-send" viewBox="0 0 24 24"><path d="M22 2 11 13M22 2l-7 20-4-9-9-4z"/></symbol>
+  <symbol id="i-sig" viewBox="0 0 24 24" fill="currentColor" stroke="none"><rect x="1" y="9" width="3" height="5" rx="1"/><rect x="6" y="6" width="3" height="8" rx="1"/><rect x="11" y="3" width="3" height="11" rx="1"/></symbol>
+  <symbol id="i-wifibars" viewBox="0 0 24 24"><path d="M12 20h.01M8.5 16.4a5 5 0 0 1 7 0M5 12.9a10 10 0 0 1 14 0M2 8.8a15 15 0 0 1 20 0"/></symbol>
+  <symbol id="i-bat" viewBox="0 0 24 24"><rect x="1" y="7" width="17" height="10" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.6"/><rect x="2.5" y="8.5" width="10" height="7" rx="1" fill="#C9A84C" stroke="none"/><rect x="19" y="10" width="2" height="4" rx="1" fill="currentColor" stroke="none"/></symbol>
+</svg>
+
+<!-- Curva de marca reutilizable -->
+<template id="curves-tpl">
+  <div class="curves">
+    <svg class="tl" viewBox="0 0 330 330">
+      <path d="M-40,-40 C 170,-30 300,70 250,195 C 214,285 95,250 -40,300 Z" fill="#122950"/>
+      <path d="M-40,-40 C 150,-26 268,64 236,176" fill="none" stroke="#C9A84C" stroke-width="5" stroke-linecap="round"/>
+      <path d="M-60,-10 C 120,10 210,96 196,196" fill="none" stroke="#C9A84C" stroke-width="2.4" opacity=".7"/>
+    </svg>
+    <svg class="br" viewBox="0 0 360 360">
+      <path d="M400,400 C 190,392 60,286 118,160 C 158,66 286,104 400,56 Z" fill="#1B3A6B"/>
+      <path d="M400,400 C 206,388 92,296 128,182" fill="none" stroke="#C9A84C" stroke-width="5" stroke-linecap="round"/>
+      <path d="M400,370 C 232,360 150,276 160,180" fill="none" stroke="#C9A84C" stroke-width="2.4" opacity=".7"/>
+    </svg>
+  </div>
+</template>
+
+<div class="wrap">
+  <div class="dir-head">
+    <div class="dir-kick">Identidad oficial · estados de acceso</div>
+    <h1>Inicio de sesión premium + marca Sinergia</h1>
+    <p>Login reconstruido con fidelidad a la propuesta de referencia, usando el <b>logotipo oficial del kit</b> (no una recreación). Fondo claro, curvas navy&nbsp;/&nbsp;dorado, campos con iconografía lineal, botón principal navy con flecha dorada y acceso sin conexión. Se eliminó el emoji del corazón: la identidad pasa a logo vertical (login/splash), emblema (navegación) e iconos del kit (instalación). Íconos SVG locales.</p>
+  </div>
+
+  <div class="gallery">
+
+    <!-- ============== LOGIN ============== -->
+    <div class="art" id="art-login">
+      <div class="cap"><b>1</b> Inicio de sesión</div>
+      <div class="phone"><div class="screen">
+        <div class="notch"></div>
+        <div class="curves">
+          <svg class="tl" viewBox="0 0 330 330">
+            <path d="M-40,-40 C 170,-30 300,70 250,195 C 214,285 95,250 -40,300 Z" fill="#122950"/>
+            <path d="M-40,-40 C 150,-26 268,64 236,176" fill="none" stroke="#C9A84C" stroke-width="5" stroke-linecap="round"/>
+            <path d="M-60,-10 C 120,10 210,96 196,196" fill="none" stroke="#C9A84C" stroke-width="2.4" opacity=".7"/>
+          </svg>
+          <svg class="br" viewBox="0 0 360 360">
+            <path d="M400,400 C 190,392 60,286 118,160 C 158,66 286,104 400,56 Z" fill="#1B3A6B"/>
+            <path d="M400,400 C 206,388 92,296 128,182" fill="none" stroke="#C9A84C" stroke-width="5" stroke-linecap="round"/>
+            <path d="M400,370 C 232,360 150,276 160,180" fill="none" stroke="#C9A84C" stroke-width="2.4" opacity=".7"/>
+          </svg>
+        </div>
+        <div class="statusbar"><span>9:41</span><div class="r"><svg class="ic sb-ic"><use href="#i-sig"/></svg><svg class="ic sb-ic"><use href="#i-wifibars"/></svg><svg class="sb-ic" style="width:24px"><use href="#i-bat"/></svg></div></div>
+        <div class="login">
+          <div class="brandbox"><img src="../brand/logo_vertical.png" alt="Clínica Sinergia"></div>
+          <div class="gold-div"></div>
+          <h2>Bienvenido</h2>
+          <p class="welcome-sub">Sistema de expedientes clínicos</p>
+
+          <div class="flabel">Correo electrónico</div>
+          <div class="ifield">
+            <span class="lead"><svg class="ic"><use href="#i-mail"/></svg></span>
+            <span class="sep"></span>
+            <input placeholder="tu correo institucional" readonly>
+          </div>
+
+          <div class="flabel">Contraseña</div>
+          <div class="ifield focus">
+            <span class="lead"><svg class="ic"><use href="#i-lock"/></svg></span>
+            <span class="sep"></span>
+            <span class="dots">••••••••</span>
+            <span class="eye"><svg class="ic"><use href="#i-eye"/></svg></span>
+          </div>
+
+          <div class="btn-primary">Iniciar sesión <svg class="ic"><use href="#i-arrow"/></svg></div>
+          <div class="forgot">¿Olvidaste tu contraseña?</div>
+          <div class="btn-ghost"><span class="lead"><svg class="ic"><use href="#i-wifi"/></svg></span><span class="sep"></span>Acceder sin conexión</div>
+
+          <div class="auth-note"><svg class="ic"><use href="#i-shield"/></svg>Acceso exclusivo para personal autorizado</div>
+          <div class="verchip">v1-2026-11-23b</div>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- ============== SPLASH ============== -->
+    <div class="art" id="art-splash">
+      <div class="cap"><b>2</b> Pantalla de apertura</div>
+      <div class="phone"><div class="screen">
+        <div class="notch"></div>
+        <div class="curves">
+          <svg class="tl" viewBox="0 0 330 330"><path d="M-40,-40 C 170,-30 300,70 250,195 C 214,285 95,250 -40,300 Z" fill="#122950"/><path d="M-40,-40 C 150,-26 268,64 236,176" fill="none" stroke="#C9A84C" stroke-width="5" stroke-linecap="round"/></svg>
+          <svg class="br" viewBox="0 0 360 360"><path d="M400,400 C 190,392 60,286 118,160 C 158,66 286,104 400,56 Z" fill="#1B3A6B"/><path d="M400,400 C 206,388 92,296 128,182" fill="none" stroke="#C9A84C" stroke-width="5" stroke-linecap="round"/></svg>
+        </div>
+        <div class="statusbar"><span>9:41</span><div class="r"><svg class="ic sb-ic"><use href="#i-sig"/></svg><svg class="ic sb-ic"><use href="#i-wifibars"/></svg><svg class="sb-ic" style="width:24px"><use href="#i-bat"/></svg></div></div>
+        <div class="splash">
+          <img src="../brand/logo_vertical.png" alt="Clínica Sinergia">
+          <div class="tag">Fisioterapia y Rehabilitación</div>
+          <div class="prog"><i></i></div>
+          <div class="foot">v1-2026-11-23b</div>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- ============== CARGA ============== -->
+    <div class="art" id="art-loading">
+      <div class="cap"><b>3</b> Pantalla de carga</div>
+      <div class="phone"><div class="screen">
+        <div class="notch"></div>
+        <div class="statusbar"><span>9:41</span><div class="r"><svg class="ic sb-ic"><use href="#i-sig"/></svg><svg class="ic sb-ic"><use href="#i-wifibars"/></svg><svg class="sb-ic" style="width:24px"><use href="#i-bat"/></svg></div></div>
+        <div class="center-state">
+          <div class="emblem-badge"><img src="../brand/emblema.png" alt=""></div>
+          <div class="spinner"></div>
+          <h3>Cargando expedientes…</h3>
+          <p>Sincronizando la agenda y los pacientes del día. Esto toma solo un momento.</p>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- ============== SIN CONEXIÓN ============== -->
+    <div class="art" id="art-offline">
+      <div class="cap"><b>4</b> Modo sin conexión</div>
+      <div class="phone"><div class="screen">
+        <div class="notch"></div>
+        <div class="statusbar"><span>9:41</span><div class="r"><svg class="ic sb-ic" style="color:var(--warn)"><use href="#i-wifioff"/></svg><svg class="sb-ic" style="width:24px"><use href="#i-bat"/></svg></div></div>
+        <div class="offbar"><svg class="ic"><use href="#i-wifioff"/></svg>Sin conexión · trabajando en modo local. Tus notas se guardan y se sincronizan al reconectar.</div>
+        <div class="center-state">
+          <div class="state-ic off"><svg class="ic"><use href="#i-wifioff"/></svg></div>
+          <h3>Modo sin conexión</h3>
+          <p>Puedes seguir atendiendo: la app guarda todo en este equipo y lo sube solo cuando regrese el internet.</p>
+          <div class="state-actions">
+            <div class="sa-primary"><svg class="ic"><use href="#i-refresh"/></svg>Reintentar conexión</div>
+            <div class="sa-ghost">Continuar sin conexión</div>
+          </div>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- ============== RECUPERAR CONTRASEÑA ============== -->
+    <div class="art" id="art-recuperar">
+      <div class="cap"><b>5</b> Recuperar contraseña</div>
+      <div class="phone"><div class="screen">
+        <div class="notch"></div>
+        <div class="curves">
+          <svg class="tl" viewBox="0 0 330 330"><path d="M-40,-40 C 170,-30 300,70 250,195 C 214,285 95,250 -40,300 Z" fill="#122950"/><path d="M-40,-40 C 150,-26 268,64 236,176" fill="none" stroke="#C9A84C" stroke-width="5" stroke-linecap="round"/></svg>
+        </div>
+        <div class="statusbar"><span>9:41</span><div class="r"><svg class="ic sb-ic"><use href="#i-sig"/></svg><svg class="ic sb-ic"><use href="#i-wifibars"/></svg><svg class="sb-ic" style="width:24px"><use href="#i-bat"/></svg></div></div>
+        <div class="login" style="padding-top:20px">
+          <div class="state-ic navy" style="margin:14px auto 18px"><svg class="ic"><use href="#i-key"/></svg></div>
+          <h2 style="font-size:25px">Recuperar acceso</h2>
+          <p class="welcome-sub" style="margin-bottom:28px">Te enviaremos un enlace seguro a tu correo institucional para restablecer tu contraseña.</p>
+          <div class="flabel">Correo electrónico</div>
+          <div class="ifield focus">
+            <span class="lead"><svg class="ic"><use href="#i-mail"/></svg></span>
+            <span class="sep"></span>
+            <input value="z.gutierrez@clinica" readonly>
+          </div>
+          <div class="btn-primary">Enviar enlace <svg class="ic"><use href="#i-send"/></svg></div>
+          <div class="forgot">Volver a inicio de sesión</div>
+          <div class="auth-note"><svg class="ic"><use href="#i-shield"/></svg>El enlace expira en 30 minutos</div>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- ============== SESIÓN EXPIRADA ============== -->
+    <div class="art" id="art-expirada">
+      <div class="cap"><b>6</b> Sesión expirada</div>
+      <div class="phone"><div class="screen">
+        <div class="notch"></div>
+        <div class="statusbar"><span>9:41</span><div class="r"><svg class="ic sb-ic"><use href="#i-sig"/></svg><svg class="ic sb-ic"><use href="#i-wifibars"/></svg><svg class="sb-ic" style="width:24px"><use href="#i-bat"/></svg></div></div>
+        <div class="center-state">
+          <div class="state-ic warn"><svg class="ic"><use href="#i-clock"/></svg></div>
+          <h3>Tu sesión expiró</h3>
+          <p>Por seguridad cerramos la sesión tras un periodo de inactividad. Tus borradores siguen guardados en este equipo.</p>
+          <div class="state-actions">
+            <div class="sa-primary"><svg class="ic"><use href="#i-arrow"/></svg>Volver a iniciar sesión</div>
+          </div>
+          <div class="auth-note" style="margin-top:22px"><svg class="ic"><use href="#i-shield"/></svg>Ninguna nota sin guardar se perdió</div>
+        </div>
+      </div></div>
+    </div>
+
+  </div>
+
+  <div class="footer-note">
+    Logo oficial del kit (vertical/emblema). Sin emoji de corazón. Iconografía Lucide SVG. Tokens: navy #122950 · navy 2 #1B3A6B · dorado #C9A84C · fondo #F5F7FA.<br>
+    Instalación PWA: iconos 180/192/512/1024 + maskable + favicon del kit (no se cargan en 4K en el teléfono).
+  </div>
+</div>
+</body>
+</html>
