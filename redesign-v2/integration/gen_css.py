@@ -16,10 +16,11 @@ css = css.replace('__EMBLEMA_DATAURI__', datauri(BRAND + '/emblema_sm.png'))
 assert '__EMBLEMA_DATAURI__' not in css
 open(HERE + '/sinergia_v2.css', 'w', encoding='utf-8').write(css)
 
-# JS (logo oficial completo, optimizado)
+# JS (logo oficial + emblema incrustados)
 js = open(HERE + '/sinergia_v2.js.tpl', encoding='utf-8').read()
 js = js.replace('__LOGO_DATAURI__', datauri(BRAND + '/logo_login.png'))
-assert '__LOGO_DATAURI__' not in js
+js = js.replace('__EMBLEMA_DATAURI__', datauri(BRAND + '/emblema_sm.png'))
+assert '__LOGO_DATAURI__' not in js and '__EMBLEMA_DATAURI__' not in js
 open(HERE + '/sinergia_v2.js', 'w', encoding='utf-8').write(js)
 
 print('sinergia_v2.css OK:', len(css), 'bytes | sinergia_v2.js OK:', len(js), 'bytes')
