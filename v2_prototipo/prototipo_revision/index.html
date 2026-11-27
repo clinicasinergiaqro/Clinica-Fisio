@@ -168,7 +168,7 @@
   function card(it){
     var S=st(it); var v=it.verificacion; var ap=aprobado(it);
     var cls=it.bloquea_plan?"bloq":(ap?"done":(it.nVacios>0?"vacio":""));
-    var chips='<span class="chip">'+esc(it.patologia||"—")+'</span>'+(it.edad!=null?'<span class="chip">'+it.edad+' años</span>':'')+'<span class="chip oct">corte '+esc(v.fecha_corte||"—")+'</span>'+(it.nVacios>0?'<span class="chip gold">'+it.nVacios+' campos vacíos</span>':'');
+    var chips='<span class="chip">'+esc(it.patologia||"—")+'</span>'+'<span class="chip oct">corte '+esc(v.fecha_corte||"—")+'</span>'+(it.nVacios>0?'<span class="chip gold">'+it.nVacios+' campos vacíos</span>':'');
     var stateCls=it.bloquea_plan?"bloq":(ap?"done":"rev");
     var nInv=invalidadasN(it);
     var stateTxt=it.bloquea_plan?"Resolver seguridad":(ap?"APROBADO":(nInv?nInv+" invalidada(s) · ":"")+pendientesN(it)+" sección(es) por revisar");
