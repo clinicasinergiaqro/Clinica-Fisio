@@ -365,6 +365,19 @@ check('V222-NO-DANIELS', 'Ningún TEXTO de recomendación (objetivos/plan) recom
     return blob.indexOf('daniels') === -1 && blob.indexOf('dinamom') === -1 && blob.indexOf('mrc') === -1;
   })());
 
+check('V223-OBJ-CON-ALERTA', 'Con alerta de seguridad: SÍ se redactan objetivos funcionales CP/MP/LP; el plan de DOSIFICACIÓN sí se difiere; la alerta vive aparte',
+  (function () {
+    // Sospecha de TVP (D3) → bloquea_plan (derivación prioritaria), pero los OBJETIVOS funcionales no se omiten.
+    var c = GEN.generar({ patologia: 'Rodilla', orig: { zona: 'rodilla', lado: 'derecho', padecimiento: 'dolor de rodilla derecha; posterior a cirugía de rodilla reciente con inmovilización y reposo prolongado', inflamacion: 'hinchazón de pantorrilla derecha', eva: '5', fuerza: 'cuádriceps 6/10 derecho (lado sano 10/10)' } });
+    var bloq = c.seguridad && c.seguridad.bloquea_plan;
+    var red = c.redaccion_sinergia || {};
+    var obj = red.objetivos || {};
+    var tieneObj = !!(obj.cp && obj.cp.trim() && obj.mp && obj.mp.trim() && obj.lp && obj.lp.trim());
+    var planDiferido = c.plan === null; // dosificación de agentes físicos sí espera a resolver la alerta
+    var alertaAparte = !!(c.seguridad && c.seguridad.alertas && c.seguridad.alertas.length);
+    return bloq && tieneObj && planDiferido && alertaAparte && !red.objetivos_nota;
+  })());
+
 // Pendientes declarados honestamente (no implementados aún en este incremento)
 pendiente('UX-EDIT', 'Interfaz editable (editar dx/objetivos/metas, validar/rechazar) — la define el rediseño visual (otra ventana)');
 pendiente('BIO-BTN', 'Botones de medición: los implementa el rediseño visual; esta rama define/consume el CONTRATO de datos de medición');

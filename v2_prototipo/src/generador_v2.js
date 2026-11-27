@@ -576,8 +576,10 @@
     if (RED && dxf.estado === 'provisional' && dxf.texto && dxf.texto.indexOf('Anamnesis insuficiente') !== 0) {
       try {
         var _r = RED.redactar({ rec: rec, h: h, o: o, regLabel: dxf.reg, lado: dxf.lado, causal: dxf.causal, soapHall: dxf.soapHall });
-        // Con plan BLOQUEADO por seguridad: se conserva el dx funcional, pero NO se proponen objetivos de progresión.
-        redac = { diagnostico_funcional: _r.dx, objetivos: seguridad.bloquea_plan ? null : _r.objetivos, objetivos_nota: seguridad.bloquea_plan ? 'Resolver la alerta de seguridad antes de fijar objetivos terapéuticos.' : null, estilo: 'sinergia' };
+        // SIEMPRE se redactan objetivos funcionales (CP/MP/LP) para los 85, aun con alerta de seguridad:
+        // los objetivos son metas de función (dolor/ROM/fuerza/marcha); la alerta/derivación/precaución vive
+        // APARTE en seguridad (y el plan de DOSIFICACIÓN de agentes físicos sí se difiere en plan()).
+        redac = { diagnostico_funcional: _r.dx, objetivos: _r.objetivos, objetivos_nota: null, estilo: 'sinergia' };
       } catch (e) { redac = { error: String(e && e.message || e) }; }
     }
     var pend = [];
