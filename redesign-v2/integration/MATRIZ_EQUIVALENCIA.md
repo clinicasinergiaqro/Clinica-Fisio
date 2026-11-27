@@ -83,6 +83,27 @@ reskin **no** cambia tabs, acciones, datos ni el motor de render.
 
 ---
 
+## MÉTODO (reconstrucción de la PRESENTACIÓN, lógica intacta)
+A partir de la dirección aprobada, el reskin **reorganiza la presentación** con un
+motor (`sinergia_v2.js`) que, tras cada render, mejora el DOM **reenviando a los
+controles reales** (nunca recrea handlers ni toca datos/guardado):
+- **Hero** con logo oficial (emblema + wordmark) + **curva dorada** en los headers navy.
+- **Expediente**: las pestañas reales (`.tab`, mismos `onclick=renderExpediente(...)`)
+  se presentan como **mosaico de módulos** (CSS grid) con **iconos de línea** (no emoji).
+- **SOAP**: control **segmentado S/O/A/P** bajo el hero que hace *scroll* a las
+  secciones **reales** (`.form-section-title`); el formulario y `guardarSOAP` no se tocan.
+- **Iconos de línea SVG** reemplazan emojis **decorativos** del chrome (títulos,
+  botones, pills, labels), acotado para **no** alterar texto clínico ni símbolos con
+  significado (p. ej. ▲/▼ de tendencia se respetan).
+- **Modo oscuro**: variantes oscuras para los componentes nuevos (la app ya oscurecía
+  `.card`/`.patient-card`). **Desktop (≥900px)**: columna centrada (sin marco de
+  teléfono) + mosaico a 3 columnas; mobile-first intacto.
+
+**Verificación continua:** `equiv_test.mjs` corre sobre ORIGINAL y RESKIN con el motor
+activo → **21/21 ambas, paridad IDÉNTICA, 0 conexiones clínicas, 0 pageerror** en cada
+iteración (login, agenda, directorio, expediente, SOAP, alta, supervisión, protocolos,
+biomecánica, dark, desktop).
+
 ## Pendientes de dispositivo físico (⏳, no testeable headless)
 - Teclado iOS/Android (foco de campos login/SOAP).
 - Instalación PWA real (icono/splash/maskable) — sin tocar manifest aún.

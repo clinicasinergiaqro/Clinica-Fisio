@@ -49,6 +49,15 @@ ocultar datos.
 
 ## Progreso por módulos (orden §20)
 - [x] Fundación + gobernanza · [x] 1 Login · [x] 2 Agenda/directorio
-- [ ] 3 Expediente · [ ] 4 Alta/historia · [ ] 5 Valoración/SOAP
-- [ ] 6 Biomecánica · [ ] 7 Dermato · [ ] 8 Estudios/Protocolos/Ejercicios/Supervisión
-- [ ] 9 Dark/desktop · [ ] 10 Pruebas integrales + matriz completa
+- [x] 3 Expediente (hero+curva+logo, mosaico de módulos) · [x] 4 Alta/historia · [x] 5 Valoración/SOAP (segmentado S/O/A/P)
+- [x] 6 Biomecánica (skin genérico) · [x] 8 Estudios/Protocolos/Supervisión (skin genérico) · [~] 7 Dermato (lente rosa conservada; afinar)
+- [x] 9 Dark + desktop (columna centrada, mosaico 3-col) · [x] 10 Pruebas (equiv 21/21 paridad idéntica + 12 suites) 
+- Afinar: emojis restantes en algunos banners (⚠️🙌🎤), iconos propios Dermato/Ejercicios, PDF visual.
+
+## Reconstruir capturas / réplica
+```
+python3 redesign-v2/integration/build_v2.py
+node     redesign-v2/integration/cap.mjs      "$PWD/scratchpad/audit/replica_v2/index.html" "$PWD/scratchpad/audit/v2shots" despues
+node     redesign-v2/integration/cap_deep.mjs "$PWD/scratchpad/audit/replica_v2/index.html" "$PWD/scratchpad/audit/v2shots" despues
+node     redesign-v2/integration/equiv_test.mjs
+```
